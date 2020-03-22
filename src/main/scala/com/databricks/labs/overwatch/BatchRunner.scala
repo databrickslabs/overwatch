@@ -1,31 +1,41 @@
 package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.labs.overwatch.pipeline.Initializer
 import com.databricks.labs.overwatch.utils.GlobalStructures._
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.module.SimpleModule
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils0
+import org.apache.log4j.{Level, Logger}
 
 object BatchRunner {
 
-  def main(args: Array[String]): Unit = {
-    val paramModule: SimpleModule = new SimpleModule()
-      .addDeserializer(classOf[OverwatchParams], new ParamDeserializer)
-    val mapper: ObjectMapper with ScalaObjectMapper = (new ObjectMapper() with ScalaObjectMapper)
-      .registerModule(DefaultScalaModule)
-      .registerModule(paramModule)
-      .asInstanceOf[ObjectMapper with ScalaObjectMapper]
+  private val logger: Logger = Logger.getLogger(this.getClass)
 
-    val myParams = mapper.readValue[OverwatchParams](args(0))
+  def tempTester(params: OverwatchParams): Unit = {
 
-    val workspace = Workspace(myParams)
+    val workspace = Workspace(params)
     val jobsDF = workspace.getJobs
     jobsDF.show()
-
-
-
   }
 
+  def main(args: Array[String]): Unit = {
+
+    val params: OverwatchParams = if (args.length != 0) {
+      Initializer.validateBatchParams(args)
+    } else { OverwatchParams(None, None) }
+
+    // Create target database if not exists
+    def initializeTargets = ???
+
+    // Append all batch data to target tables
+    def updateTargets = ???
+
+    def updateReportingTables = ???
+
+    // pull in the data from the stream job and merge into master insights
+    def mergeStreamingAndBatchInsights = ???
+
+    def deliverKeyInsights = ???
+
+    tempTester(params)
+
+  }
 }
