@@ -1,20 +1,50 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-
 import com.databricks.labs.overwatch.ParamDeserializer
+import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.GlobalStructures.{DataTarget, OverwatchParams, TokenSecret}
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
+
 import scala.collection.JavaConverters._
 
-class Initializer {
+class Initializer extends SparkSessionWrapper{
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
   private var _databaseName: String = _
   private var _databaseLocation: String = _
+
+  def setBaseParams(value: OverwatchParams): this.type = {
+    _databaseName = value.dataTarget.get.databaseName.get
+    _databaseLocation = value.dataTarget.get.databaseLocation.get
+    this
+  }
+
+  def getDatabaseName: String = _databaseName
+  def getDatabaseLocation: String = _databaseLocation
+
+  def initializeDatabase(): Database = {
+    if (!spark.catalog.databaseExists(getDatabaseName)) {
+      logger.log(Level.INFO, s"Database ${getDatabaseName} not found, creating it at " +
+        s"${getDatabaseLocation}.")
+      val createDBIfNotExists = s"create database if not exists ${getDatabaseName} location '" +
+        s"${getDatabaseLocation}'"
+      spark.sql(createDBIfNotExists)
+      logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
+      Database(getDatabaseName)
+    } else {
+      logger.log(Level.INFO, s"Databsae ${getDatabaseName} already exists, using append mode.")
+      Database(getDatabaseName)
+    }
+  }
+
+  // TODO - Find point left off for each asset
+  def identifyStops = ???
 
 }
 
@@ -22,9 +52,13 @@ object Initializer {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  def apply(params: OverwatchParams): Initializer = {
+    new Initializer().setBaseParams(params)
+  }
+
   def buildLocalOverwatchParams: OverwatchParams = {
     val tokenSecret = Some(TokenSecret("LOCALTESTING", "TOKEN"))
-    val dataTarget = Some(DataTarget(None, None))
+    val dataTarget = Some(DataTarget(Some("Overwatch"), Some("/mnt/tomesdata/data/overwatch/overwatch.db")))
     OverwatchParams(
       tokenSecret,
       dataTarget
