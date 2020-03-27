@@ -9,3 +9,4 @@ project/project/
 project/target/
 *.DS_Store
 /src/main/scala/com/databricks/labs/overwatch/TestRunner.scala
+/data_samples/

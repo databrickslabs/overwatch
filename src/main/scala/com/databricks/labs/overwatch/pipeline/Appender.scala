@@ -32,6 +32,7 @@ class Appender extends SparkSessionWrapper {
 
     _database.write(jobsDF, jobsTable)
 
+    jobsDF.schema.fields(0).name
   }
 
 }
