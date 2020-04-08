@@ -18,6 +18,15 @@ class Initializer extends SparkSessionWrapper{
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _databaseName: String = _
   private var _databaseLocation: String = _
+  private final var _snapUnixStartTimeMillis: Long = _
+  private var _snapUnixPreviousEndTimeMillis: Long = _
+
+  def initializeTimestamps(value: Long): this.type = {
+    _snapUnixStartTimeMillis = value
+    // TODO - Pull from state - Currently hardcoded to Jan 1 2020
+    _snapUnixPreviousEndTimeMillis = 1577836800000L
+    this
+  }
 
   def setBaseParams(value: OverwatchParams): this.type = {
     _databaseName = value.dataTarget.get.databaseName.get
@@ -25,26 +34,25 @@ class Initializer extends SparkSessionWrapper{
     this
   }
 
-  def getDatabaseName: String = _databaseName
-  def getDatabaseLocation: String = _databaseLocation
+  def databaseName: String = _databaseName
+  def databaseLocation: String = _databaseLocation
+  def startTime: Long = _snapUnixStartTimeMillis
+  def previousEndTime: Long = _snapUnixPreviousEndTimeMillis
 
   def initializeDatabase(): Database = {
-    if (!spark.catalog.databaseExists(getDatabaseName)) {
-      logger.log(Level.INFO, s"Database ${getDatabaseName} not found, creating it at " +
-        s"${getDatabaseLocation}.")
-      val createDBIfNotExists = s"create database if not exists ${getDatabaseName} location '" +
-        s"${getDatabaseLocation}'"
+    if (!spark.catalog.databaseExists(databaseName)) {
+      logger.log(Level.INFO, s"Database ${databaseName} not found, creating it at " +
+        s"${databaseLocation}.")
+      val createDBIfNotExists = s"create database if not exists ${databaseName} location '" +
+        s"${databaseLocation}'"
       spark.sql(createDBIfNotExists)
       logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
-      Database(getDatabaseName)
+      Database(databaseName)
     } else {
-      logger.log(Level.INFO, s"Databsae ${getDatabaseName} already exists, using append mode.")
-      Database(getDatabaseName)
+      logger.log(Level.INFO, s"Databsae ${databaseName} already exists, using append mode.")
+      Database(databaseName)
     }
   }
-
-  // TODO - Find point left off for each asset
-  def identifyStops = ???
 
 }
 
@@ -53,7 +61,9 @@ object Initializer {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   def apply(params: OverwatchParams): Initializer = {
-    new Initializer().setBaseParams(params)
+    new Initializer()
+      .setBaseParams(params)
+      .initializeTimestamps(System.currentTimeMillis())
   }
 
   def buildLocalOverwatchParams: OverwatchParams = {

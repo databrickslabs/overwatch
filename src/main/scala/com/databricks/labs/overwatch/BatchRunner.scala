@@ -19,8 +19,11 @@ object BatchRunner {
     logger.log(Level.INFO, "Initializing Database")
     val workspace = Workspace(params)
     val database = initializer.initializeDatabase()
-    val appender = Appender(workspace, database)
-    appender.appendJobs("holder")
+//    val appender = Appender(workspace, database)
+//    appender.appendJobs("holder")
+//    workspace.getEventsByCluster("0321-201717-chows241").show()
+    workspace.getJobsDF.show()
+//    workspace.getJobsDF.printSchema()
 
     // Create target database if not exists
     def initializeTargets = ???

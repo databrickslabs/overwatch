@@ -20,6 +20,7 @@ trait SparkSessionWrapper extends Serializable {
 
   lazy val sc: SparkContext = spark.sparkContext
   sc.setLogLevel("WARN")
+//  sc.setLogLevel("DEBUG")
 
   private var _coresPerWorker: Int = _
   private var _numberOfWorkerNodes: Int = _

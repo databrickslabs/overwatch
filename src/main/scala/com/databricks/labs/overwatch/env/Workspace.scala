@@ -2,12 +2,13 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.backend.common.rpc.CommandContext
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.DBWrapper
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.utils.{JsonUtils, SparkSessionWrapper}
 import com.databricks.labs.overwatch.utils.GlobalStructures._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+import scala.io.Source
 
 class Workspace(
                  url: String,
@@ -15,15 +16,16 @@ class Workspace(
                ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
   import spark.implicits._
-//  lazy private val ctx: CommandContext = dbutils.notebook.getContext()
-  val dbWrapper: DBWrapper = new DBWrapper
 
   // TODO -- Change queries appropriately based on Cloud Type
 
   def getJobsDF: DataFrame = {
 
     val jobsEndpoint = "jobs/list"
+//    val jSchema = Source.fromFile("C:\\Dev\\git\\Databricks--Overwatch\\data_samples\\databricks_api_sdk_modified_compact.json")
+//      .getLines().mkString
 
     // TODO -- Add pagination support
     // TODO -- ADD derived metadata
@@ -31,7 +33,9 @@ class Workspace(
     // TODO -- Add Cluster Events - review pagination -- may belong in StreamRunner
     // TODO -- Only add new data, identify method for identifying new data
     try {
-      spark.read.json(Seq(dbWrapper.executeGet(jobsEndpoint)).toDS).toDF
+      ApiCall(jobsEndpoint)
+        .executeGet()
+        .asDF()
         .withColumn("data", explode('jobs))
         .drop("jobs")
         .select(
@@ -40,8 +44,8 @@ class Workspace(
           $"data.job_id",
           $"data.settings",
           $"data.settings.email_notifications",
-          $"data.settings.email_notifications.alert_on_last_attempt".alias("alerts_on_last_attempt"),
-          $"data.settings.email_notifications.no_alert_for_skipped_runs".alias("no_alerts_on_skipped_runs"),
+//          $"data.settings.email_notifications.alert_on_last_attempt".alias("alerts_on_last_attempt"), //this seems to have been removed
+//          $"data.settings.email_notifications.no_alert_for_skipped_runs".alias("no_alerts_on_skipped_runs"),
           $"data.settings.email_notifications.on_failure".alias("alerts_on_failure"),
           $"data.settings.email_notifications.on_start".alias("alerts_on_start"),
           $"data.settings.email_notifications.on_success".alias("alerts_on_success"),
@@ -52,7 +56,7 @@ class Workspace(
           $"data.settings.min_retry_interval_millis",
           $"data.settings.name",
           $"data.settings.new_cluster",
-//          $"data.settings.notebook_task.base_parameters".alias("notebook_base_params"), //Multiple fields same name
+          //          $"data.settings.notebook_task.base_parameters".alias("notebook_base_params"), //Multiple fields same name
           $"data.settings.notebook_task.notebook_path".alias("notebook_path"),
           $"data.settings.notebook_task.revision_timestamp".alias("notebook_revision_timestamp"),
           $"data.settings.retry_on_timeout",
@@ -64,14 +68,16 @@ class Workspace(
         )
         .drop("settings")
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, "Could"); System.exit(1); spark.sql("select ERROR")
+      case e: Throwable => logger.log(Level.ERROR, "Could", e); System.exit(1); spark.sql("select ERROR")
     }
 
   }
+
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"
-
-    spark.read.json(Seq(dbWrapper.executeGet(clustersEndpoint)).toDS).toDF
+    ApiCall(clustersEndpoint)
+      .executeGet()
+      .asDF()
       .withColumn("data", explode('clusters))
       .drop("clusters")
       .select(
@@ -121,10 +127,16 @@ class Workspace(
 
   def getEventsByCluster(clusterId: String): DataFrame = {
     val eventsEndpoint = "clusters/events"
-    val jquery = s"""{"cluster_id":"${clusterId}"}"""
-    spark.read.json(Seq(dbWrapper.executePost(eventsEndpoint, jquery)).toDS).toDF
+    val queryMap = Map[String, Any](
+      "cluster_id" -> clusterId
+    )
+    val jsonQuery = JsonUtils.objToJson(queryMap).compactString
+    ApiCall(eventsEndpoint, jsonQuery)
+      .executePost()
+      .asDF()
       .withColumn("data", explode('events))
       .drop("events")
+//      .select($"data.")
     // TODO - Fill in Structure select
   }
 
@@ -139,7 +151,9 @@ object Workspace {
     try {
       if (System.getenv("OVERWATCH_ENV").nonEmpty) {
         System.getenv("OVERWATCH_ENV")
-      } else { dbutils.notebook.getContext().apiUrl.get }
+      } else {
+        dbutils.notebook.getContext().apiUrl.get
+      }
     } catch {
       case e: Throwable => {
         val e = new Exception("Cannot Acquire Databricks URL")
@@ -156,7 +170,9 @@ object Workspace {
         val key = tokenSecret.get.key
         val token = if (scope == "LOCALTESTING" && key == "TOKEN") {
           System.getenv("OVERWATCH_TOKEN")
-        } else { dbutils.secrets.get(scope, key) }
+        } else {
+          dbutils.secrets.get(scope, key)
+        }
         val authMsg = s"Executing with token located in secret, $scope : $key"
         logger.log(Level.INFO, authMsg)
         token
@@ -178,6 +194,8 @@ object Workspace {
     new Workspace(initUrl, initToken(params.tokenSecret))
   }
 
-  def apply(): Workspace = { new Workspace(initUrl, initToken(None))}
+  def apply(): Workspace = {
+    new Workspace(initUrl, initToken(None))
+  }
 
 }
