@@ -3,12 +3,11 @@ package com.databricks.labs.overwatch.utils
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.io.JsonStringEncoder
-import java.security.Key
 import java.util.UUID
 
 import javax.crypto
-import javax.crypto.{KeyGenerator, SecretKeyFactory}
-import javax.crypto.spec.{IvParameterSpec, PBEKeySpec, SecretKeySpec}
+import javax.crypto.KeyGenerator
+import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
 
 
 object JsonUtils {

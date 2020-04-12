@@ -1,8 +1,8 @@
 package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Appender, Initializer}
-import com.databricks.labs.overwatch.utils.GlobalStructures._
+import com.databricks.labs.overwatch.pipeline.{Pipeline, Initializer}
+import com.databricks.labs.overwatch.utils.Global._
 import org.apache.log4j.{Level, Logger}
 
 object BatchRunner {
@@ -15,14 +15,15 @@ object BatchRunner {
       Initializer.validateBatchParams(args)
     } else { OverwatchParams(None, None) }
 
+    val (workspace, database, pipeline) = Initializer(params)
+
+    pipeline
+
     val initializer = Initializer(params)
-    logger.log(Level.INFO, "Initializing Database")
-    val workspace = Workspace(params)
-    val database = initializer.initializeDatabase()
 //    val appender = Appender(workspace, database)
 //    appender.appendJobs("holder")
 //    workspace.getEventsByCluster("0321-201717-chows241").show()
-    workspace.getJobsDF.show()
+    workspace.getClustersDF.show()
 //    workspace.getJobsDF.printSchema()
 
     // Create target database if not exists

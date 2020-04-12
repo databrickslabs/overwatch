@@ -1,8 +1,9 @@
 package com.databricks.labs.overwatch.env
 
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import com.databricks.labs.overwatch.utils.{Global, SparkSessionWrapper}
 import org.apache.spark.sql.DataFrame
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.functions.{from_unixtime, lit, col}
 
 class Database extends SparkSessionWrapper {
 
@@ -19,9 +20,14 @@ class Database extends SparkSessionWrapper {
   def doAutoCompact = ???
   def doAutoOptimize = ???
 
-  def write(df: DataFrame, tableName: String, format: String = "delta",
+  def write(inputDF: DataFrame, tableName: String, format: String = "delta",
             mode: String = "append", autoOptimize: Boolean = false,
-            autoCompact: Boolean = false, partitionBy: Array[String] = Array()): Boolean = {
+            autoCompact: Boolean = false, partitionBy: Array[String] = Array(),
+            withCreateDate: Boolean = false): Boolean = {
+
+    var finalDF: DataFrame = inputDF
+    if (withCreateDate) finalDF = finalDF.withColumn("CreateDate",
+      from_unixtime(lit(Global.pipelineSnapTime)))
 
     try {
       logger.log(Level.INFO, s"Beginning write to ${_databaseName}.${tableName}")
@@ -30,12 +36,12 @@ class Database extends SparkSessionWrapper {
 
       // TODO - Validate proper repartition to minimize files per partition. Could be autoOptimize
       if (!partitionBy.isEmpty) {
-        df.write.format(format).mode(mode)
+        finalDF.write.format(format).mode(mode)
           .partitionBy(partitionBy: _*)
           .saveAsTable(s"${_databaseName}.${tableName}")
         true
       } else {
-        df.write.format(format).mode(mode).saveAsTable(s"${_databaseName}.${tableName}")
+        finalDF.write.format(format).mode(mode).saveAsTable(s"${_databaseName}.${tableName}")
         true
       }
     } catch {

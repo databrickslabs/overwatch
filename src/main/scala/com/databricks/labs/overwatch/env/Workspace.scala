@@ -4,7 +4,7 @@ import com.databricks.backend.common.rpc.CommandContext
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.utils.{JsonUtils, SparkSessionWrapper}
-import com.databricks.labs.overwatch.utils.GlobalStructures._
+import com.databricks.labs.overwatch.utils.Global._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -24,8 +24,6 @@ class Workspace(
   def getJobsDF: DataFrame = {
 
     val jobsEndpoint = "jobs/list"
-//    val jSchema = Source.fromFile("C:\\Dev\\git\\Databricks--Overwatch\\data_samples\\databricks_api_sdk_modified_compact.json")
-//      .getLines().mkString
 
     // TODO -- Add pagination support
     // TODO -- ADD derived metadata
@@ -35,38 +33,7 @@ class Workspace(
     try {
       ApiCall(jobsEndpoint)
         .executeGet()
-        .asDF()
-        .withColumn("data", explode('jobs))
-        .drop("jobs")
-        .select(
-          from_unixtime($"data.created_time" / 1000).alias("create_time"),
-          $"data.creator_user_name",
-          $"data.job_id",
-          $"data.settings",
-          $"data.settings.email_notifications",
-//          $"data.settings.email_notifications.alert_on_last_attempt".alias("alerts_on_last_attempt"), //this seems to have been removed
-//          $"data.settings.email_notifications.no_alert_for_skipped_runs".alias("no_alerts_on_skipped_runs"),
-          $"data.settings.email_notifications.on_failure".alias("alerts_on_failure"),
-          $"data.settings.email_notifications.on_start".alias("alerts_on_start"),
-          $"data.settings.email_notifications.on_success".alias("alerts_on_success"),
-          $"data.settings.existing_cluster_id",
-          $"data.settings.libraries",
-          $"data.settings.max_concurrent_runs",
-          $"data.settings.max_retries",
-          $"data.settings.min_retry_interval_millis",
-          $"data.settings.name",
-          $"data.settings.new_cluster",
-          //          $"data.settings.notebook_task.base_parameters".alias("notebook_base_params"), //Multiple fields same name
-          $"data.settings.notebook_task.notebook_path".alias("notebook_path"),
-          $"data.settings.notebook_task.revision_timestamp".alias("notebook_revision_timestamp"),
-          $"data.settings.retry_on_timeout",
-          $"data.settings.schedule",
-          $"data.settings.spark_jar_task",
-          $"data.settings.spark_python_task",
-          $"data.settings.spark_submit_task",
-          $"data.settings.timeout_seconds"
-        )
-        .drop("settings")
+        .asDF
     } catch {
       case e: Throwable => logger.log(Level.ERROR, "Could", e); System.exit(1); spark.sql("select ERROR")
     }
@@ -77,52 +44,7 @@ class Workspace(
     val clustersEndpoint = "clusters/list"
     ApiCall(clustersEndpoint)
       .executeGet()
-      .asDF()
-      .withColumn("data", explode('clusters))
-      .drop("clusters")
-      .select(
-        $"data.autoscale",
-        $"data.autoscale.max_workers",
-        $"data.autoscale.min_workers",
-        $"data.autotermination_minutes",
-        $"data.aws_attributes",
-        $"data.cluster_cores",
-        $"data.cluster_id",
-        $"data.cluster_log_conf",
-        $"data.aws_attributes",
-        $"data.cluster_log_status",
-        $"data.cluster_memory_mb",
-        $"data.cluster_name",
-        $"data.cluster_source",
-        $"data.creator_user_name",
-        $"data.custom_tags",
-        $"data.default_tags",
-        $"data.docker_image",
-        $"data.driver",
-        $"data.driver_node_type_id",
-        $"data.enable_elastic_disk",
-        $"data.enable_local_disk_encryption",
-        $"data.executors",
-        $"data.init_scripts",
-        $"data.init_scripts_safe_mode",
-        $"data.instance_pool_id",
-        $"data.jdbc_port",
-        $"data.last_activity_time",
-        $"data.last_state_loss_time",
-        $"data.node_type_id",
-        $"data.num_workers",
-        $"data.pinned_by_user_name",
-        $"data.spark_conf",
-        $"data.spark_context_id",
-        $"data.spark_env_vars",
-        $"data.spark_version",
-        $"data.ssh_public_keys",
-        $"data.start_time",
-        $"data.state",
-        $"data.state_message",
-        $"data.terminated_time",
-        $"data.termination_reason"
-      )
+      .asDF
   }
 
   def getEventsByCluster(clusterId: String): DataFrame = {
@@ -130,14 +52,43 @@ class Workspace(
     val queryMap = Map[String, Any](
       "cluster_id" -> clusterId
     )
-    val jsonQuery = JsonUtils.objToJson(queryMap).compactString
-    ApiCall(eventsEndpoint, jsonQuery)
+    ApiCall(eventsEndpoint, queryMap)
       .executePost()
-      .asDF()
-      .withColumn("data", explode('events))
-      .drop("events")
-//      .select($"data.")
-    // TODO - Fill in Structure select
+      .asDF
+  }
+
+  def getDBFSPaths(dbfsPath: String): DataFrame = {
+    val dbfsEndpoint = "dbfs/list"
+    val queryMap = Map[String, Any](
+      "path" -> dbfsPath
+    )
+    ApiCall(dbfsEndpoint, queryMap)
+      .executeGet()
+      .asDF
+  }
+
+  def getPoolsDF: DataFrame = {
+    val poolsEndpoint = "instance-pools/list"
+    ApiCall(poolsEndpoint)
+      .executeGet()
+      .asDF
+  }
+
+  def getProfilesDF: DataFrame = {
+    val profilesEndpoint = "instance-profiles/list"
+    ApiCall(profilesEndpoint)
+      .executeGet()
+      .asDF
+  }
+
+  def getWorkspaceUsersDF: DataFrame = {
+    val workspaceEndpoint = "workspace/list"
+    val queryMap = Map[String, Any](
+      "path" -> "/Users"
+    )
+    ApiCall(workspaceEndpoint, queryMap)
+      .executeGet()
+      .asDF
   }
 
 }

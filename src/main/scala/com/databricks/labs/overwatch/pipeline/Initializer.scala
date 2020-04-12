@@ -2,9 +2,9 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ParamDeserializer
-import com.databricks.labs.overwatch.env.Database
-import com.databricks.labs.overwatch.utils.GlobalStructures.{DataTarget, OverwatchParams, TokenSecret}
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import com.databricks.labs.overwatch.env.{Database, Workspace}
+import com.databricks.labs.overwatch.utils.Global.{DataTarget, OverwatchParams, TokenSecret}
+import com.databricks.labs.overwatch.utils.{Global, SparkSessionWrapper}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -18,13 +18,11 @@ class Initializer extends SparkSessionWrapper{
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _databaseName: String = _
   private var _databaseLocation: String = _
-  private final var _snapUnixStartTimeMillis: Long = _
-  private var _snapUnixPreviousEndTimeMillis: Long = _
 
   def initializeTimestamps(value: Long): this.type = {
-    _snapUnixStartTimeMillis = value
     // TODO - Pull from state - Currently hardcoded to Jan 1 2020
-    _snapUnixPreviousEndTimeMillis = 1577836800000L
+    Global.setFromTime(1577836800000L)
+    Global.setPipelineSnapTime(value)
     this
   }
 
@@ -36,8 +34,6 @@ class Initializer extends SparkSessionWrapper{
 
   def databaseName: String = _databaseName
   def databaseLocation: String = _databaseLocation
-  def startTime: Long = _snapUnixStartTimeMillis
-  def previousEndTime: Long = _snapUnixPreviousEndTimeMillis
 
   def initializeDatabase(): Database = {
     if (!spark.catalog.databaseExists(databaseName)) {
@@ -60,10 +56,23 @@ object Initializer {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def apply(params: OverwatchParams): Initializer = {
-    new Initializer()
+  def apply(params: OverwatchParams): (Workspace, Database, Pipeline) = {
+
+    logger.log(Level.INFO, "Initializing Environment")
+    val initializer = new Initializer()
       .setBaseParams(params)
       .initializeTimestamps(System.currentTimeMillis())
+
+    logger.log(Level.INFO, "Initializing Workspace")
+    val workspace = Workspace(params)
+
+    logger.log(Level.INFO, "Initializing Database")
+    val database = initializer.initializeDatabase()
+
+    logger.log(Level.INFO, "Initializing Pipeline")
+    val appender = Pipeline(workspace, database)
+
+    (workspace, database, appender)
   }
 
   def buildLocalOverwatchParams: OverwatchParams = {

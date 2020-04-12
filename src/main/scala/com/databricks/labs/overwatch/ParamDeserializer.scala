@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch
 import java.io.IOException
 
-import com.databricks.labs.overwatch.utils.GlobalStructures._
+import com.databricks.labs.overwatch.utils.Global._
 import com.fasterxml.jackson.core.{JsonParser, JsonProcessingException}
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode}
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
