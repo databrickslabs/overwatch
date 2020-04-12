@@ -28,14 +28,16 @@ class Pipeline extends SparkSessionWrapper {
   def workspace: Workspace = _workspace
   def database: Database = _database
 
+  // TODO -- Enable parallelized write
   private def append(table: String, df: DataFrame): Boolean = {
     logger.log(Level.INFO, s"Beginning append to " +
-      s"${_database.getDatabaseName}.${table}.")
+      s"${_database.getDatabaseName}.${table}. " +
+      s"\n Start Time: ${Global.fromTime.asString} \n End Time: ${Global.pipelineSnapTime.asString}")
 
     try {
       _database.write(df, table, withCreateDate = true)
       logger.log(Level.INFO, s"Append to $table success." +
-        s"Start Time: ${Global.fromTime} \n End Time: ${Global.pipelineSnapTime}")
+        s"Start Time: ${Global.fromTime.asString} \n End Time: ${Global.pipelineSnapTime.asString}")
       true
     } catch {
       case e: Throwable => logger.log(Level.ERROR, s"Could not append to $table", e)
@@ -44,25 +46,12 @@ class Pipeline extends SparkSessionWrapper {
 
   }
 
-  // TODO -- Get start date from persisted snapshot time in previous run
-  def appendJobs(): Boolean = {
-    val jobsTable = "jobs_master"
-    val jobsDF = workspace.getJobsDF
-
-    logger.log(Level.INFO, s"Beginning jobs append to " +
-      s"${_database.getDatabaseName}.${jobsTable}.")
-
-    try {
-      _database.write(jobsDF, jobsTable, withCreateDate = true)
-      true
-    } catch {
-      case e: Throwable => logger.log(Level.ERROR, "Could not append to jobs_master", e)
-        false
-    }
-  }
-
-  def appendClusters(): Unit = {
-
+  def appendMasters(): Boolean = {
+    append("jobs_master", workspace.getJobsDF)
+    append("cluster_master", workspace.getClustersDF)
+    append("pools_master", workspace.getPoolsDF)
+    append("profiles_master", workspace.getProfilesDF)
+    append("users_master", workspace.getWorkspaceUsersDF)
   }
 
 }

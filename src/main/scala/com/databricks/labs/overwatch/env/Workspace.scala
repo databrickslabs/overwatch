@@ -21,6 +21,9 @@ class Workspace(
 
   // TODO -- Change queries appropriately based on Cloud Type
 
+  // TODO -- Load up spark logs via a path glob
+  def getLogGlobs = ???
+
   def getJobsDF: DataFrame = {
 
     val jobsEndpoint = "jobs/list"
