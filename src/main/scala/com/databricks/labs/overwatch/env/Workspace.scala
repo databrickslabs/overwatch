@@ -3,17 +3,14 @@ package com.databricks.labs.overwatch.env
 import com.databricks.backend.common.rpc.CommandContext
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
-import com.databricks.labs.overwatch.utils.{JsonUtils, SparkSessionWrapper}
-import com.databricks.labs.overwatch.utils.Global._
+import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+
 import scala.io.Source
 
-class Workspace(
-                 url: String,
-                 token: String
-               ) extends SparkSessionWrapper {
+class Workspace extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
@@ -86,70 +83,24 @@ class Workspace(
 
   def getWorkspaceUsersDF: DataFrame = {
     val workspaceEndpoint = "workspace/list"
-    val queryMap = Map[String, Any](
-      "path" -> "/Users"
-    )
-    ApiCall(workspaceEndpoint, queryMap)
+//    val queryMap = Map[String, Any](
+//      "path" -> "/Users"
+//    )
+
+    ApiCall(workspaceEndpoint, "path=/Users")
       .executeGet()
       .asDF
+  }
+
+  def getAuditLogsDF: DataFrame = {
+    spark.read.json(Config.auditLogPath.get)
   }
 
 }
 
 object Workspace {
-
-  private val logger: Logger = Logger.getLogger(this.getClass)
-
-  private def initUrl: String = {
-
-    try {
-      if (System.getenv("OVERWATCH_ENV").nonEmpty) {
-        System.getenv("OVERWATCH_ENV")
-      } else {
-        dbutils.notebook.getContext().apiUrl.get
-      }
-    } catch {
-      case e: Throwable => {
-        val e = new Exception("Cannot Acquire Databricks URL")
-        logger.log(Level.FATAL, e.getStackTrace.toString)
-        throw e
-      }
-    }
-  }
-
-  private def initToken(tokenSecret: Option[TokenSecret]): String = {
-    if (tokenSecret.nonEmpty) {
-      try {
-        val scope = tokenSecret.get.scope
-        val key = tokenSecret.get.key
-        val token = if (scope == "LOCALTESTING" && key == "TOKEN") {
-          System.getenv("OVERWATCH_TOKEN")
-        } else {
-          dbutils.secrets.get(scope, key)
-        }
-        val authMsg = s"Executing with token located in secret, $scope : $key"
-        logger.log(Level.INFO, authMsg)
-        token
-      } catch {
-        case e: Throwable => logger.log(Level.FATAL, e); "NULL"
-      }
-    } else {
-      try {
-        val token = dbutils.notebook.getContext().apiToken.get
-        println("Token scope and key not provided, running with default credentials.")
-        token
-      } catch {
-        case e: Throwable => logger.log(Level.FATAL, e); "NULL"
-      }
-    }
-  }
-
-  def apply(params: OverwatchParams): Workspace = {
-    new Workspace(initUrl, initToken(params.tokenSecret))
-  }
-
   def apply(): Workspace = {
-    new Workspace(initUrl, initToken(None))
+    new Workspace
   }
 
 }

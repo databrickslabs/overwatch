@@ -3,8 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ParamDeserializer
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.Global.{DataTarget, OverwatchParams, TokenSecret}
-import com.databricks.labs.overwatch.utils.{Global, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, OverwatchParams, TokenSecret, SparkSessionWrapper}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -13,40 +12,29 @@ import org.apache.log4j.{Level, Logger}
 
 import scala.collection.JavaConverters._
 
-class Initializer extends SparkSessionWrapper{
+class Initializer extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private var _databaseName: String = _
-  private var _databaseLocation: String = _
 
   def initializeTimestamps(value: Long): this.type = {
     // TODO - Pull from state - Currently hardcoded to Jan 1 2020
-    Global.setFromTime(1577836800000L)
-    Global.setPipelineSnapTime(value)
+    Config.setFromTime(1577836800000L)
+    Config.setPipelineSnapTime(value)
     this
   }
-
-  def setBaseParams(value: OverwatchParams): this.type = {
-    _databaseName = value.dataTarget.get.databaseName.get
-    _databaseLocation = value.dataTarget.get.databaseLocation.get
-    this
-  }
-
-  def databaseName: String = _databaseName
-  def databaseLocation: String = _databaseLocation
 
   def initializeDatabase(): Database = {
-    if (!spark.catalog.databaseExists(databaseName)) {
-      logger.log(Level.INFO, s"Database ${databaseName} not found, creating it at " +
-        s"${databaseLocation}.")
-      val createDBIfNotExists = s"create database if not exists ${databaseName} location '" +
-        s"${databaseLocation}'"
+    if (!spark.catalog.databaseExists(Config.databaseName)) {
+      logger.log(Level.INFO, s"Database ${Config.databaseName} not found, creating it at " +
+        s"${Config.databaseLocation}.")
+      val createDBIfNotExists = s"create database if not exists ${Config.databaseName} location '" +
+        s"${Config.databaseLocation}'"
       spark.sql(createDBIfNotExists)
       logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
-      Database(databaseName)
+      Database(Config.databaseName)
     } else {
-      logger.log(Level.INFO, s"Databsae ${databaseName} already exists, using append mode.")
-      Database(databaseName)
+      logger.log(Level.INFO, s"Databsae ${Config.databaseName} already exists, using append mode.")
+      Database(Config.databaseName)
     }
   }
 
@@ -56,35 +44,28 @@ object Initializer {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def apply(params: OverwatchParams): (Workspace, Database, Pipeline) = {
+  def apply(args: Array[String]): (Workspace, Database, Pipeline) = {
 
     logger.log(Level.INFO, "Initializing Environment")
+    validateAndRegisterArgs(args)
+
+    // Todo - Move timestamp init to correct location
     val initializer = new Initializer()
-      .setBaseParams(params)
       .initializeTimestamps(System.currentTimeMillis())
 
     logger.log(Level.INFO, "Initializing Workspace")
-    val workspace = Workspace(params)
+    val workspace = Workspace()
 
     logger.log(Level.INFO, "Initializing Database")
     val database = initializer.initializeDatabase()
 
     logger.log(Level.INFO, "Initializing Pipeline")
-    val appender = Pipeline(workspace, database)
+    val pipeline = Pipeline(workspace, database)
 
-    (workspace, database, appender)
+    (workspace, database, pipeline)
   }
 
-  def buildLocalOverwatchParams: OverwatchParams = {
-    val tokenSecret = Some(TokenSecret("LOCALTESTING", "TOKEN"))
-    val dataTarget = Some(DataTarget(Some("Overwatch"), Some("/mnt/tomesdata/data/overwatch/overwatch.db")))
-    OverwatchParams(
-      tokenSecret,
-      dataTarget
-    )
-  }
-
-  def validateBatchParams(args: Array[String]): OverwatchParams = {
+  def validateAndRegisterArgs(args: Array[String]): Unit = {
 
     val paramModule: SimpleModule = new SimpleModule()
       .addDeserializer(classOf[OverwatchParams], new ParamDeserializer)
@@ -94,17 +75,19 @@ object Initializer {
       .asInstanceOf[ObjectMapper with ScalaObjectMapper]
 
     // Allow for local testing
-    if (System.getenv("OVERWATCH").equals("LOCAL")) {
-      buildLocalOverwatchParams
+    if (Config.isLocalTesting) {
+      Config.buildLocalOverwatchParams()
     } else {
       try {
         logger.log(Level.INFO, "Validating Input Parameters")
         val rawParams = mapper.readValue[OverwatchParams](args(0))
         val tokenSecret = rawParams.tokenSecret
         val dataTarget = rawParams.dataTarget
+        val auditLogPath = rawParams.auditLogPath
 
         // validate token secret requirements
-        val validatedTokenSecret: Option[TokenSecret] = if (tokenSecret.nonEmpty) {
+        // TODO - Validate if token has access to necessary assets. Warn/Fail if not
+        if (tokenSecret.nonEmpty) {
           if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
             throw new IllegalArgumentException(s"Secret AND Key must be provided together or neither of them. " +
               s"Either supply both or neither.")
@@ -118,45 +101,62 @@ object Initializer {
           if (keyCheck.length == 0) throw new NullPointerException(s"Key ${tokenSecret.get.key} does not exist " +
             s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
             s"available and accessible to this account.")
-          Some(TokenSecret(scopeName, keyCheck.head.key))
-        } else None
-        // validate data target requirements
-        if (dataTarget.nonEmpty) {
-          if (dataTarget.get.databaseLocation.nonEmpty) {
-            require(dataTarget.get.databaseLocation.get.take(6) == "dbfs:/", "Specified database location " +
-              "must be on dbfs. If direct third party storage is required, please mount that to Databricks and " +
-              "specificy the mount location, dbfs:/mnt/...")
-            try {
-              dbutils.fs.ls(dataTarget.get.databaseLocation.get)
-              throw new IllegalArgumentException(s"The target database location: ${dataTarget.get.databaseLocation.get} " +
-                s"already exists. Specify a path that doesn't already exist.")
-            } catch {
-              case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Target location is valid: " +
-                s"will create database at ${dataTarget.get.databaseLocation.get}")
-            }
-          }
-        }
-        val dbName = dataTarget.get.databaseName.getOrElse("Overwatch")
-        val dbDefaultLocation = s"dbfs:/user/hive/warehouse/${dbName}.db"
-        try {
-          dbutils.fs.ls(dbDefaultLocation)
-          throw new IllegalArgumentException(s"The default target database location: ${dbDefaultLocation} " +
-            s"already exists. Specify a path that doesn't already exist.")
-        } catch {
-          case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Default Target location " +
-            s"is valid: will create database at ${dbDefaultLocation}")
-        }
-        val validatedDataTarget: DataTarget = DataTarget(Some(dbName),
-          Some(dataTarget.get.databaseLocation.getOrElse(dbDefaultLocation)))
 
-        OverwatchParams(validatedTokenSecret, Some(validatedDataTarget))
-      } catch {
-        case e: Throwable => {
-          logger.log(Level.FATAL, s"Input parameters could not be validated. " +
-            s"Failing to avoid workspace contamination. \n $e")
-          OverwatchParams(tokenSecret = None, dataTarget = None)
-        }
+          Config.registeredEncryptedToken(Some(TokenSecret(scopeName, keyCheck.head.key)))
+        } else Config.registeredEncryptedToken(None)
+
+        // Todo -- validate database name and location
+        // Todo -- If Name exists allow existing location and validate correct Overwatch DB and DB version
+
+        val dbName = if (dataTarget.nonEmpty && dataTarget.get.databaseName.nonEmpty) dataTarget.get.databaseName.get
+        else "OverWatch"
+
+        val dbLoc = if (dataTarget.nonEmpty && dataTarget.get.databaseLocation.nonEmpty) dataTarget.get.databaseLocation.get
+        else s"dbfs:/user/hive/warehouse/${dbName}.db"
+
+        Config.setDatabaseNameandLoc(dbName, dbLoc)
+        Config.setAuditLogPath(auditLogPath)
+
+
+        //        // validate data target requirements
+        //        val (dbName, dbLocation) = if (dataTarget.nonEmpty) {
+        //          // Database location validation
+        //          if (dataTarget.get.databaseLocation.nonEmpty) {
+        //            // Require On DBFS
+        //            require(dataTarget.get.databaseLocation.get.take(6) == "dbfs:/", "Specified database location " +
+        //              "must be on dbfs. If direct third party storage is required, please mount that to Databricks and " +
+        //              "specificy the mount location, dbfs:/mnt/...")
+        //            try {
+        //              dbutils.fs.ls(dataTarget.get.databaseLocation.get)
+        //              throw new IllegalArgumentException(s"The target database location: ${dataTarget.get.databaseLocation.get} " +
+        //                s"already exists. Specify a path that doesn't already exist.")
+        //            } catch {
+        //              case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Target location is valid: " +
+        //                s"will create database at ${dataTarget.get.databaseLocation.get}", e)
+        //            }
+        //          }
+        //        }
+        //        try {
+        //          dbutils.fs.ls(dbDefaultLocation)
+        //          throw new IllegalArgumentException(s"The default target database location: ${dbDefaultLocation} " +
+        //            s"already exists. Specify a path that doesn't already exist.")
+        //        } catch {
+        //          case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Default Target location " +
+        //            s"is valid: will create database at ${dbDefaultLocation}")
+        //        }
+        //
+        ////        val dbName = dataTarget.get.databaseName.getOrElse("Overwatch")
+        ////        val dbDefaultLocation = dataTarget.get s"dbfs:/user/hive/warehouse/${dbName}.db"
+        //        val validatedDataTarget: DataTarget = DataTarget(Some(dbName),
+        //          Some(dataTarget.get.databaseLocation.getOrElse(dbDefaultLocation)))
+        //
+        //        OverwatchParams(validatedTokenSecret, Some(validatedDataTarget), auditLogPath)
+              } catch {
+                case e: Throwable => {
+                  logger.log(Level.FATAL, s"Input parameters could not be validated. " +
+                    s"Failing to avoid workspace contamination. \n $e")
+                }
+              }
       }
     }
   }
-}

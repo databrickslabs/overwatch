@@ -1,9 +1,12 @@
 package com.databricks.labs.overwatch.env
 
-import com.databricks.labs.overwatch.utils.{Global, SparkSessionWrapper}
-import org.apache.spark.sql.DataFrame
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.{from_unixtime, lit, col}
+import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
+import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
+
+import scala.collection.mutable.ArrayBuffer
 
 class Database extends SparkSessionWrapper {
 
@@ -18,7 +21,43 @@ class Database extends SparkSessionWrapper {
   def getDatabaseName: String = _databaseName
 
   def doAutoCompact = ???
+
   def doAutoOptimize = ???
+
+  def sanitizeFieldName(s: String): String = {
+    s.replaceAll("[^a-zA-Z0-9_]", "")
+  }
+
+  def sanitizeFields(field: StructField): StructField = {
+    field.copy(name = sanitizeFieldName(field.name), dataType = sanitizeSchema(field.dataType))
+  }
+
+  def generateUniques(fields: Array[StructField]): Array[StructField] = {
+    val r = new scala.util.Random(10)
+    val fieldNames = fields.map(_.name)
+    val dups = fieldNames.diff(fieldNames.distinct)
+    val dupCount = dups.length
+    if (dupCount == 0) {
+      fields
+    } else {
+      val uniqueSuffixes = (0 to dupCount + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
+      fields.zipWithIndex.map(f => {
+        f._1.copy(name = f._1.name + "_" + uniqueSuffixes(f._2))
+      })
+    }
+  }
+
+  def sanitizeSchema(dataType: DataType): DataType = {
+    dataType match {
+      case dt: StructType =>
+        val dtStruct = dt.asInstanceOf[StructType]
+        dtStruct.copy(fields = generateUniques(dtStruct.fields).map(sanitizeFields))
+      case dt: ArrayType =>
+        val dtArray = dt.asInstanceOf[ArrayType]
+        dtArray.copy(elementType = sanitizeSchema(dtArray.elementType))
+      case _ => dataType
+    }
+  }
 
   def write(inputDF: DataFrame, tableName: String, format: String = "delta",
             mode: String = "append", autoOptimize: Boolean = false,
@@ -27,7 +66,8 @@ class Database extends SparkSessionWrapper {
 
     var finalDF: DataFrame = inputDF
     if (withCreateDate) finalDF = finalDF.withColumn("CreateDate",
-      from_unixtime(lit(Global.pipelineSnapTime)))
+      from_unixtime(lit(Config.pipelineSnapTime.asUnixTime)))
+    finalDF = spark.createDataFrame(finalDF.rdd, sanitizeSchema(finalDF.schema).asInstanceOf[StructType])
 
     try {
       logger.log(Level.INFO, s"Beginning write to ${_databaseName}.${tableName}")

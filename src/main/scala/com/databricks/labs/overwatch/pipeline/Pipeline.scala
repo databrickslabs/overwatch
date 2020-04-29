@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Global, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.struct
@@ -32,12 +32,12 @@ class Pipeline extends SparkSessionWrapper {
   private def append(table: String, df: DataFrame): Boolean = {
     logger.log(Level.INFO, s"Beginning append to " +
       s"${_database.getDatabaseName}.${table}. " +
-      s"\n Start Time: ${Global.fromTime.asString} \n End Time: ${Global.pipelineSnapTime.asString}")
-
+      s"\n Start Time: ${Config.fromTime.asString} \n End Time: ${Config.pipelineSnapTime.asString}")
     try {
-      _database.write(df, table, withCreateDate = true)
+      val f = if (Config.isLocalTesting) "parquet" else "delta"
+      _database.write(df, table, withCreateDate = true, format = f)
       logger.log(Level.INFO, s"Append to $table success." +
-        s"Start Time: ${Global.fromTime.asString} \n End Time: ${Global.pipelineSnapTime.asString}")
+        s"Start Time: ${Config.fromTime.asString} \n End Time: ${Config.pipelineSnapTime.asString}")
       true
     } catch {
       case e: Throwable => logger.log(Level.ERROR, s"Could not append to $table", e)
@@ -46,12 +46,14 @@ class Pipeline extends SparkSessionWrapper {
 
   }
 
-  def appendMasters(): Boolean = {
+  def buildBronze(): Boolean = {
+
     append("jobs_master", workspace.getJobsDF)
     append("cluster_master", workspace.getClustersDF)
     append("pools_master", workspace.getPoolsDF)
     append("profiles_master", workspace.getProfilesDF)
     append("users_master", workspace.getWorkspaceUsersDF)
+//    append("audit_log_master", workspace.getAuditLogsDF)
   }
 
 }
