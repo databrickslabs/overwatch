@@ -1,10 +1,10 @@
 package com.databricks.labs.overwatch
 
-import scala.sys.process._
 import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{DataFrame}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+import scalaj.http.Http
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -69,7 +69,7 @@ class ApiCall extends SparkSessionWrapper {
     } catch {
       case e: Throwable =>
         val emptyDF = sc.parallelize(Seq("")).toDF()
-        if (results(0) == "{}") {
+        if (results.isEmpty) {
           logger.log(Level.INFO,
             s"No data returned for api endpoint ${_apiName}")
           emptyDF
@@ -99,19 +99,21 @@ class ApiCall extends SparkSessionWrapper {
     }
   }
 
-  private[overwatch] def executeGet(query: String = _query, pageCall: Boolean = false): this.type = {
+  def executeGet(query: String = _query, pageCall: Boolean = false): this.type = {
     try {
-      val call = Seq("curl", "-H", s""""Authorization: Bearer ${Config.token}"""", s"${req}${query}")
-      val x = call.mkString(" ")
-      curlCommand = call.map(p => if (p.contains("Authorization")) "REDACTED" else p).mkString(" ")
-      logger.log(Level.INFO, s"Executing curl: ${curlCommand}")
-      val result = call.mkString(" ").!!
+      val result = Http(req)
+        .headers(Map[String, String](
+          "Content-Type" -> "application/json",
+          "Charset"-> "UTF-8",
+          "Authorization" -> s"Bearer ${Config.token}"
+        )).asString
       if (!pageCall) {
-        results.append(mapper.writeValueAsString(mapper.readTree(result)))
+        val x = result.body
+        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
         val totalCount = JsonUtils.jsonToMap(results(0)).getOrElse("total_count", 0).toString.toLong
         if (totalCount > limit) paginate(totalCount)
       } else {
-        results.append(mapper.writeValueAsString(mapper.readTree(result)))
+        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
     } catch {
       case e: Throwable => logger.log(Level.ERROR, "Could not execute API call.", e)
@@ -139,25 +141,24 @@ class ApiCall extends SparkSessionWrapper {
     })
   }
 
-  private[overwatch] def executePost(queryOverride: Option[String] = None, pageCall: Boolean = false): this.type = {
+  def executePost(queryOverride: Option[String] = None, pageCall: Boolean = false): this.type = {
 
-    //    curl --location --request POST 'https://demo.cloud.databricks.com/api/2.0/clusters/events' \
-    //    --header 'Authorization: Bearer dapic5733c7b95601a1084b6d22ba6141a6b' \
-    //    --header 'Content-Type: text/plain' \
-    //    --data-raw '{"start_time":1577836800000,"end_time":1586357096644,"offset":50,"cluster_id":"0321-201717-chows241","limit":10,"select":"total_count"}'
     // TODO -- Add proper try catch
     try {
-      val finalQuery = s"${queryOverride.getOrElse(query)}".replace("\"", "\\\"")
-      val call = Seq("curl", "-X POST", "-s", "-H", s""""Authorization: Bearer ${Config.token}"""", "-d", s""""${finalQuery}"""", s"${req}")
-      curlCommand = call.map(p => if (p.contains("Authorization")) "REDACTED" else p).mkString(" ")
-      logger.log(Level.INFO, s"Executing curl: ${curlCommand}")
-      val result = call.mkString(" ").!!
+      val finalQuery = s"${queryOverride.getOrElse(query)}"
+      val result = Http(req)
+        .postData(finalQuery)
+        .headers(Map[String, String](
+          "Content-Type" -> "application/json",
+          "Charset"-> "UTF-8",
+          "Authorization" -> s"Bearer ${Config.token}"
+        )).asString
       if (!pageCall) {
-        results.append(mapper.writeValueAsString(mapper.readTree(result)))
+        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
         val totalCount = JsonUtils.jsonToMap(results(0)).getOrElse("total_count", 0).toString.toLong
         if (totalCount > limit) paginate(totalCount)
       } else {
-        results.append(mapper.writeValueAsString(mapper.readTree(result)))
+        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
       this
     } catch {

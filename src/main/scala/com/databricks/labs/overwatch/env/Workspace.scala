@@ -35,7 +35,7 @@ class Workspace extends SparkSessionWrapper {
         .executeGet()
         .asDF
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, "Could", e); System.exit(1); spark.sql("select ERROR")
+      case e: Throwable => logger.log(Level.ERROR, "Could", e); spark.sql("select ERROR")
     }
 
   }

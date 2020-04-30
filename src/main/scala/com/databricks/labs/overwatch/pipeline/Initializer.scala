@@ -77,6 +77,7 @@ object Initializer {
     // Allow for local testing
     if (Config.isLocalTesting) {
       Config.buildLocalOverwatchParams()
+      println("Built Local Override Parameters")
     } else {
       try {
         logger.log(Level.INFO, "Validating Input Parameters")

@@ -14,11 +14,11 @@ object BatchRunner {
       Initializer(args)
     } else { Initializer(Array()) }
 
-    pipeline.buildBronze()
+//    pipeline.buildBronze()
 
 //    Play
-//    workspace.getWorkspaceUsersDF.show()
-//    workspace.getJobsDF.printSchema()
+    workspace.getJobsDF.show()
+//    workspace.getJobsDF.show()
 
     // Create target database if not exists
     def initializeTargets = ???

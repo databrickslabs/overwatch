@@ -13,9 +13,15 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
   override def deserialize(jp: JsonParser, ctxt: DeserializationContext): OverwatchParams = {
     val masterNode = jp.getCodec.readTree[JsonNode](jp)
 
-    val token = TokenSecret(
-      masterNode.get("tokenSecret").get("scope").asText(),
-      masterNode.get("tokenSecret").get("key").asText())
+    val token = try {
+      Some(TokenSecret(
+        masterNode.get("tokenSecret").get("scope").asText(),
+        masterNode.get("tokenSecret").get("key").asText()))
+    } catch {
+      case e: Throwable =>
+        println("No Token Secret Defined", e)
+        None
+    }
 
     val dataTarget = DataTarget(
       Some(masterNode.get("dataTarget").get("databaseName").asText()),
@@ -26,6 +32,6 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
 //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
 //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
 
-    OverwatchParams(Some(token), Some(dataTarget), Some(auditLogPath))
+    OverwatchParams(token, Some(dataTarget), Some(auditLogPath))
   }
 }

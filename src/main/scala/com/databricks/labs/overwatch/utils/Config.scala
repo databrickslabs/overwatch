@@ -15,34 +15,34 @@ object Config {
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _fromTime: Long = _
   private var _pipelineSnapTime: Long = _
-  private var _databaseName: String = _
-  private var _databaseLocation: String = _
-  private var _workspaceUrl: String = _
+  private var _databaseName: String = ""
+  private var _databaseLocation: String = ""
+  private var _workspaceUrl: String = ""
   private var _token: Array[Byte] = _
-  private var _auditLogsPath: Option[String] = _
+  private var _auditLogsPath: Option[String] = None
 
   final private val cipher = new Cipher
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
-  private[overwatch] def setFromTime(value: Long): Boolean = {
+  private[overwatch] def setFromTime(value: Long): this.type = {
     _fromTime = value;
-    true
+    this
   }
 
-  private[overwatch] def setFromTime(value: Date): Boolean = {
+  private[overwatch] def setFromTime(value: Date): this.type = {
     _fromTime = value.getTime / 1000;
-    true
+    this
   }
 
-  private[overwatch] def setPipelineSnapTime(value: Long): Boolean = {
+  private[overwatch] def setPipelineSnapTime(value: Long): this.type = {
     _pipelineSnapTime = value;
-    true
+    this
   }
 
-  private[overwatch] def setPipelineSnapTime(value: Date): Boolean = {
+  private[overwatch] def setPipelineSnapTime(value: Date): this.type = {
     _pipelineSnapTime = value.getTime / 1000;
-    true
+    this
   }
 
   private[overwatch] def fromTime: TimeTypes = {
@@ -76,17 +76,18 @@ object Config {
 
   private[overwatch] def auditLogPath: Option[String] = _auditLogsPath
 
-  def buildLocalOverwatchParams(): Unit = {
+  def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
     _databaseName = "Overwatch"
     _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
     _auditLogsPath = if (System.getenv("AUDIT_LOG_PATH") == "") None
     else Some(System.getenv("AUDIT_LOG_PATH"))
+    this
 
   }
 
-  private[overwatch] def registeredEncryptedToken(tokenSecret: Option[TokenSecret]): Unit = {
+  private[overwatch] def registeredEncryptedToken(tokenSecret: Option[TokenSecret]): this.type = {
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
@@ -108,18 +109,22 @@ object Config {
           println(authMessage)
         }
       }
+      this
     } catch {
-      case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e)
+      case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e);this
     }
   }
 
-  private[overwatch] def setDatabaseNameandLoc(dbName: String, dbLocation: String): Unit = {
+  private[overwatch] def setDatabaseNameandLoc(dbName: String, dbLocation: String): this.type = {
     _databaseLocation = dbLocation
     _databaseName = dbName
+    println(s"DEBUG: Database Name and Locations set to ${_databaseName} and ${_databaseLocation}")
+    this
   }
 
-  private[overwatch] def setAuditLogPath(auditLogPath: Option[String]): Unit = {
+  private[overwatch] def setAuditLogPath(auditLogPath: Option[String]): this.type = {
     _auditLogsPath = auditLogPath
+    this
   }
 
 }
