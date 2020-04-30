@@ -1,15 +1,10 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.backend.common.rpc.CommandContext
-import com.fasterxml.jackson.databind.ObjectMapper
-
 import scala.sys.process._
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.{Cipher, Config, JsonUtils, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{DataFrame, Dataset}
+import org.apache.spark.sql.{DataFrame}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -17,7 +12,6 @@ class ApiCall extends SparkSessionWrapper {
 
   import spark.implicits._
 
-  //  final private val cipher = new Cipher
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var curlCommand: String = _
   private var _apiName: String = _
@@ -25,9 +19,6 @@ class ApiCall extends SparkSessionWrapper {
   private var _initialQueryMap: Map[String, Any] = _
   private val results = ArrayBuffer[String]()
   private var _limit: Int = _
-  private var _ctx: CommandContext = _
-  //  private var _url: String = _
-  //  private var _token: Array[Byte] = _
   private var _req: String = _
   private val mapper = JsonUtils.objectMapper
 
@@ -53,7 +44,6 @@ class ApiCall extends SparkSessionWrapper {
 
 
     if (!Config.isLocalTesting) {
-      _ctx = dbutils.notebook.getContext
       _req = s"${Config.workspaceURL}/api/2.0/${_apiName}"
     } else {
       _req = s"${Config.workspaceURL}/api/2.0/${_apiName}"

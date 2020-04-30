@@ -12,7 +12,7 @@ object Config {
 
   case class TimeTypes(asUnixTime: Long, asColumnTS: Column, asJavaDate: Date, asString: String)
 
-  private val _isLocalTesting: Boolean = System.getenv("OVERWATCH").equals("LOCAL")
+  private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _fromTime: Long = _
   private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
