@@ -9,6 +9,10 @@ import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
 
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.Column
+import org.apache.spark.sql.types.{StructType, StructField, DataType, ArrayType}
+
 
 object JsonUtils {
 
@@ -56,5 +60,64 @@ class Cipher {
     new String(cipher.doFinal(byteStream))
   }
 
+
+}
+
+object SchemaTools {
+
+  private def sanitizeFieldName(s: String): String = {
+    s.replaceAll("[^a-zA-Z0-9_]", "")
+  }
+
+  private def sanitizeFields(field: StructField): StructField = {
+    field.copy(name = sanitizeFieldName(field.name), dataType = sanitizeSchema(field.dataType))
+  }
+
+  private def generateUniques(fields: Array[StructField]): Array[StructField] = {
+    val r = new scala.util.Random(10)
+    val fieldNames = fields.map(_.name)
+    val dups = fieldNames.diff(fieldNames.distinct)
+    val dupCount = dups.length
+    if (dupCount == 0) {
+      fields
+    } else {
+      val uniqueSuffixes = (0 to dupCount + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
+      fields.zipWithIndex.map(f => {
+        f._1.copy(name = f._1.name + "_" + uniqueSuffixes(f._2))
+      })
+    }
+  }
+
+  def sanitizeSchema(dataType: DataType): DataType = {
+    dataType match {
+      case dt: StructType =>
+        val dtStruct = dt.asInstanceOf[StructType]
+        dtStruct.copy(fields = generateUniques(dtStruct.fields).map(sanitizeFields))
+      case dt: ArrayType =>
+        val dtArray = dt.asInstanceOf[ArrayType]
+        dtArray.copy(elementType = sanitizeSchema(dtArray.elementType))
+      case _ => dataType
+    }
+  }
+}
+
+object Helpers {
+
+  def SubtractTime(start: Column, end: Column): Column = {
+    val runTimeMS = end - start
+    val runTimeS = runTimeMS / 1000
+    val runTimeM = runTimeS / 60
+    val runTimeH = runTimeM / 60
+    struct(
+      start.alias("startEpochMS"),
+      from_unixtime(start / 1000).alias("startTS"),
+      end.alias("endEpochMS"),
+      from_unixtime(end / 1000).alias("endTS"),
+      lit(runTimeMS).alias("runTimeMS"),
+      lit(runTimeS).alias("runTimeS"),
+      lit(runTimeM).alias("runTimeM"),
+      lit(runTimeH).alias("runTimeH")
+    ).alias("RunTime")
+  }
 
 }

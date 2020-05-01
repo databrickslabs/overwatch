@@ -48,7 +48,6 @@ class ApiCall extends SparkSessionWrapper {
     } else {
       _req = s"${Config.workspaceURL}/api/2.0/${_apiName}"
     }
-
     this
   }
 
