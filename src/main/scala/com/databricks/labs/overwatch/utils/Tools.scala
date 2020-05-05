@@ -1,17 +1,21 @@
 package com.databricks.labs.overwatch.utils
 
+import java.text.SimpleDateFormat
+
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.io.JsonStringEncoder
-import java.util.UUID
+import java.util.{Date, UUID}
+
+import java.io.File
+import org.apache.hadoop.fs.{FileSystem, Path, FileUtil}
 
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
-
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.types.{StructType, StructField, DataType, ArrayType}
+import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 
 
 object JsonUtils {
@@ -101,7 +105,7 @@ object SchemaTools {
   }
 }
 
-object Helpers {
+object Helpers extends SparkSessionWrapper {
 
   def SubtractTime(start: Column, end: Column): Column = {
     val runTimeMS = end - start
@@ -118,6 +122,34 @@ object Helpers {
       lit(runTimeM).alias("runTimeM"),
       lit(runTimeH).alias("runTimeH")
     ).alias("RunTime")
+  }
+
+  def pathExists(path: String): Boolean = {
+    val conf = sc.hadoopConfiguration
+    val fs = FileSystem.get(conf)
+    fs.exists(new Path(path))
+  }
+
+  def getFullPath(path:String): String = {
+    val conf = sc.hadoopConfiguration
+    val fs = FileSystem.get(conf)
+    fs.getFileStatus(new Path(path)).getPath.toString
+  }
+
+  def getAllFiles(path:String): Seq[String] = {
+    val conf = sc.hadoopConfiguration
+    val fs = FileSystem.get(conf)
+    val files = fs.listStatus(new Path(path))
+    files.map(_.getPath.toString)
+  }
+
+  def globPath(path: String): Array[String] = {
+    val conf = sc.hadoopConfiguration
+    val glob = new Path(path)
+    val fileSystem = FileSystem.get(conf)
+    val allStatus = fileSystem.globStatus(glob)
+    val allPath = FileUtil.stat2Paths(allStatus)
+    allPath.map(_.toString)
   }
 
 }

@@ -15,6 +15,8 @@ trait SparkSessionWrapper extends Serializable {
     SparkSession.builder()
       .master("local")
       .appName("OverwatchBatch")
+      .enableHiveSupport()
+      .config("spark.warehouse.dir", "metastore")
       .getOrCreate()
   }
 

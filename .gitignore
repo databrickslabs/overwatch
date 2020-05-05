@@ -11,3 +11,5 @@ project/target/
 /src/main/scala/com/databricks/labs/overwatch/TestRunner.scala
 /data_samples/
 /src/main/scala/com/databricks/labs/overwatch/Testing.sc
+/metastore_db/
+/derby.log

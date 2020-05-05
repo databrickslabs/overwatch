@@ -165,7 +165,7 @@ class Silver extends SparkSessionWrapper{
         $"PropertiesAtStageStart.user".alias("UserEmail"),
         $"PropertiesAtStageStart.userID".alias("UserID")
       ))
-    
+
   }
 
 }

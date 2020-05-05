@@ -5,7 +5,11 @@ import com.databricks.labs.overwatch.utils.{DataTarget, OverwatchParams, TokenSe
 import com.fasterxml.jackson.core.{JsonParser, JsonProcessingException}
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode}
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
+import com.fasterxml.jackson.databind.node.ArrayNode
 
+import scala.collection.mutable.ArrayBuffer
+
+// TODO -- Handle master nodes that don't exist
 class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[OverwatchParams]) {
 
   @throws(classOf[IOException])
@@ -28,10 +32,20 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       Some(masterNode.get("dataTarget").get("databaseLocation").asText()))
 
     val auditLogPath = masterNode.get("auditLogPath").asText()
+    val eventLogPrefix = masterNode.get("eventLogPrefix").asText()
+
+    val badRecordsPath = masterNode.get("badRecordsPath").asText()
+
+    val overwatchScopes = ArrayBuffer[String]()
+    val overwatchScopesNode = masterNode.get("overwatchScope").asInstanceOf[ArrayNode].elements()
+    while (overwatchScopesNode.hasNext) {
+      overwatchScopes.append(overwatchScopesNode.next().asText())
+    }
 
 //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
 //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
 
-    OverwatchParams(token, Some(dataTarget), Some(auditLogPath))
+    OverwatchParams(token, Some(dataTarget), Some(auditLogPath),
+      Some(eventLogPrefix), Some(badRecordsPath), Some(overwatchScopes.toArray))
   }
 }

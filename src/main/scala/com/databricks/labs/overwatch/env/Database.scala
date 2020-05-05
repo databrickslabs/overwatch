@@ -81,7 +81,8 @@ class Database extends SparkSessionWrapper {
           .saveAsTable(s"${_databaseName}.${tableName}")
         true
       } else {
-        finalDF.write.format(format).mode(mode).saveAsTable(s"${_databaseName}.${tableName}")
+        finalDF.write.format(format).mode(mode).option("mergeSchema", "true")
+          .saveAsTable(s"${_databaseName}.${tableName}")
         true
       }
     } catch {

@@ -3,10 +3,11 @@ package com.databricks.labs.overwatch.env
 import com.databricks.backend.common.rpc.CommandContext
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
-import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{AnalysisException, DataFrame}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.StructType
 
 import scala.io.Source
 
@@ -52,7 +53,7 @@ class Workspace extends SparkSessionWrapper {
     val queryMap = Map[String, Any](
       "cluster_id" -> clusterId
     )
-    ApiCall(eventsEndpoint, queryMap)
+    ApiCall(eventsEndpoint, Some(queryMap))
       .executePost()
       .asDF
   }
@@ -62,7 +63,7 @@ class Workspace extends SparkSessionWrapper {
     val queryMap = Map[String, Any](
       "path" -> dbfsPath
     )
-    ApiCall(dbfsEndpoint, queryMap)
+    ApiCall(dbfsEndpoint, Some(queryMap))
       .executeGet()
       .asDF
   }
@@ -87,13 +88,31 @@ class Workspace extends SparkSessionWrapper {
 //      "path" -> "/Users"
 //    )
 
-    ApiCall(workspaceEndpoint, "path=/Users")
+    ApiCall(workspaceEndpoint, Some(Map("path" -> "/Users")))
       .executeGet()
       .asDF
   }
 
   def getAuditLogsDF: DataFrame = {
     spark.read.json(Config.auditLogPath.get)
+  }
+
+  private def getUniqueSparkEventsFiles(filesToBeConsidered: DataFrame): Array[String] = {
+    spark.table("spark_events_master").select('filename)
+      .unionByName(filesToBeConsidered)
+      .distinct.as[String].collect()
+  }
+
+
+  def getEventLogsDF(pathsGlobDF: DataFrame): DataFrame = {
+
+    val pathsGlob = getUniqueSparkEventsFiles(pathsGlobDF)
+
+    val eventsDFRaw = spark.read.option("badRecordsPath", Config.badRecordsPath)
+      .json(pathsGlob: _*).drop("Classpath Entries")
+    spark.createDataFrame(eventsDFRaw.rdd, SchemaTools.sanitizeSchema(eventsDFRaw.schema).asInstanceOf[StructType])
+      .withColumn("filename", input_file_name)
+      .repartition(getTotalCores * 4)
   }
 
 }

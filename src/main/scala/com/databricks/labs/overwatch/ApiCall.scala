@@ -15,33 +15,29 @@ class ApiCall extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var curlCommand: String = _
   private var _apiName: String = _
-  private var _query: String = _
+  private var _jsonQuery: String = _
+  private var _getQueryString: String = _
   private var _initialQueryMap: Map[String, Any] = _
   private val results = ArrayBuffer[String]()
   private var _limit: Int = _
   private var _req: String = _
   private val mapper = JsonUtils.objectMapper
 
-  private def setQuery(value: String): this.type = {
-    _query = value;
+  private def setQuery(value: Option[Map[String, Any]]): this.type = {
+    if (value.nonEmpty) {
+      _limit = value.get.getOrElse("limit", 150).toString.toInt
+      _initialQueryMap = value.get + ("limit" -> _limit) + ("offset" -> value.get.getOrElse("offset", 0))
+    } else {
+      _limit = 150
+      _initialQueryMap = Map("limit" -> _limit, "offset" -> 0)
+    }
+    _jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
+    _getQueryString = "?" + _initialQueryMap.map { case(k, v) => s"$k=$v"}.mkString("&")
     this
   }
 
   private def setApiName(value: String): this.type = {
-    _apiName = value;
-    this
-  }
-
-  private def init(): this.type = {
-    if (_query != "") {
-      if (_query.startsWith("{") || _query.startsWith("[")) {
-        _initialQueryMap = JsonUtils.jsonToMap(_query)
-        _limit = _initialQueryMap.getOrElse("limit", 50).toString.toInt
-      } else {
-        _query = s"?${_query}"
-      }
-    } else _limit = 50
-
+    _apiName = value
 
     if (!Config.isLocalTesting) {
       _req = s"${Config.workspaceURL}/api/2.0/${_apiName}"
@@ -53,9 +49,11 @@ class ApiCall extends SparkSessionWrapper {
 
   private def req: String = _req
 
-  private def query: String = _query
+  private def jsonQuery: String = _jsonQuery
 
-  private def limit: Long = _limit
+  private def getQueryString: String = _getQueryString
+
+  private def limit: Int = _limit
 
   def getCurlCommand: String = curlCommand
 
@@ -98,19 +96,20 @@ class ApiCall extends SparkSessionWrapper {
     }
   }
 
-  def executeGet(query: String = _query, pageCall: Boolean = false): this.type = {
+  def executeGet(pageCall: Boolean = false): this.type = {
     try {
-      val result = Http(req)
+      val x = req + getQueryString
+      val y = Config.token
+      val result = Http(req + getQueryString)
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${Config.token}"
         )).asString
       if (!pageCall) {
-        val x = result.body
+        // Append initial results
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
-        val totalCount = JsonUtils.jsonToMap(results(0)).getOrElse("total_count", 0).toString.toLong
-        if (totalCount > limit) paginate(totalCount)
+        paginate()
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
@@ -120,33 +119,41 @@ class ApiCall extends SparkSessionWrapper {
     this
   }
 
+  private def paginate(): Unit = {
+    var hasMore = JsonUtils.jsonToMap(results(0)).getOrElse("has_more", false).toString.toBoolean
+    var i: Int = 1
+    while (hasMore) {
+      _initialQueryMap += ("offset" -> (_initialQueryMap.getOrElse("offset", 0).toString.toInt + limit))
+      setQuery(Some(_initialQueryMap))
+      executeGet(true)
+      hasMore = JsonUtils.jsonToMap(results(i)).getOrElse("has_more", false).toString.toBoolean
+      i+=1
+    }
+  }
+
   // TODO - Use RDD if any of the results start getting to big
   private def paginate(totalCount: Long): Unit = {
 
-    val callingMethod = Thread.currentThread.getStackTrace()(2).getMethodName
     val offsets = (0L to totalCount by limit).toArray
     if (!_initialQueryMap.contains("end_time")) {
-      _initialQueryMap = _initialQueryMap + ("end_time" -> System.currentTimeMillis().toString) // TODO -- Change this to start fromTime in config
+      _initialQueryMap += ("end_time" -> System.currentTimeMillis().toString) // TODO -- Change this to start fromTime in config
     }
+
     offsets.foreach(offset => {
-      val pagedQuery: String = JsonUtils.objToJson(_initialQueryMap +
-        ("offset" -> offset), "limit" -> limit).compactString
-      callingMethod match {
-        case "executePost" =>
-          executePost(Some(pagedQuery), pageCall = true)
-        //          case "executeGet" =>
-        //            executeGet(apiName, pageQuery, limit, pageCall = true)
-      }
+      _initialQueryMap += ("offset" -> offset)
+      setQuery(Some(_initialQueryMap))
+      executePost(pageCall = true)
     })
+
   }
 
-  def executePost(queryOverride: Option[String] = None, pageCall: Boolean = false): this.type = {
+  def executePost(pageCall: Boolean = false): this.type = {
 
     // TODO -- Add proper try catch
     try {
-      val finalQuery = s"${queryOverride.getOrElse(query)}"
+      val jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
       val result = Http(req)
-        .postData(finalQuery)
+        .postData(jsonQuery)
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
@@ -168,17 +175,10 @@ class ApiCall extends SparkSessionWrapper {
 }
 
 object ApiCall {
-  def apply(apiName: String, jsonQuery: String = ""): ApiCall = {
-    new ApiCall().setApiName(apiName)
-      .setQuery(jsonQuery)
-      .init()
-  }
 
-  def apply(apiName: String, queryMap: Map[String, Any]): ApiCall = {
-    val jsonQuery = JsonUtils.objToJson(queryMap).compactString
+  def apply(apiName: String, queryMap: Option[Map[String, Any]] = None): ApiCall = {
     new ApiCall().setApiName(apiName)
-      .setQuery(jsonQuery)
-      .init()
+      .setQuery(queryMap)
   }
 
   // TODO -- Accept jsonQuery as Map

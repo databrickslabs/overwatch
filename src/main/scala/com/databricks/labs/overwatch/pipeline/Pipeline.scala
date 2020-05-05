@@ -11,9 +11,13 @@ class Pipeline extends SparkSessionWrapper {
 
   // TODO - cleanse column names (no special chars)
   // TODO - enable merge schema on write -- includes checks for number of new columns
-  private val logger: Logger = Logger.getLogger(this.getClass)
+  protected val logger: Logger = Logger.getLogger(this.getClass)
+  protected var _clusterIDs: Array[String] = _
+  protected var _jobIDs: Array[Long] = _
+  protected var _eventLogGlob: DataFrame = _
   private var _workspace: Workspace = _
   private var _database: Database = _
+
   import spark.implicits._
 
   def setWorkspace(value: Workspace): this.type = {
@@ -26,19 +30,46 @@ class Pipeline extends SparkSessionWrapper {
     this
   }
 
+  protected def setClusterIDs(value: Array[String]): this.type = {
+    _clusterIDs = value
+    this
+  }
+
+  protected def setJobIDs(value: Array[Long]): this.type = {
+    _jobIDs = value
+    this
+  }
+
+  protected def setEventLogGlob(value: DataFrame): this.type = {
+    _eventLogGlob = value
+    this
+  }
+
   def workspace: Workspace = _workspace
+
   def database: Database = _database
 
+  protected def clusterIDs: Array[String] = _clusterIDs
+
+  protected def jobIDs: Array[Long] = _jobIDs
+
+  protected def sparkEventsLogGlob: DataFrame = _eventLogGlob
+
   // TODO -- Enable parallelized write
-  private def append(table: String, df: DataFrame): Boolean = {
-    logger.log(Level.INFO, s"Beginning append to " +
-      s"${_database.getDatabaseName}.${table}. " +
-      s"\n Start Time: ${Config.fromTime.asString} \n End Time: ${Config.pipelineSnapTime.asString}")
+  private[overwatch] def append(table: String, df: DataFrame, fromTime: Option[Long] = None): Boolean = {
+    val startLogMsg = if (fromTime.nonEmpty) {
+      s"Beginning append to " +
+        s"${_database.getDatabaseName}.${table}. " +
+        s"\n From Time: ${fromTime.toString} \n Until Time: ${Config.pipelineSnapTime.asTSString}"
+    } else {
+      s"Beginning append to " +
+        s"${_database.getDatabaseName}.${table}."
+    }
+    logger.log(Level.INFO, startLogMsg)
     try {
       val f = if (Config.isLocalTesting) "parquet" else "delta"
       _database.write(df, table, withCreateDate = true, format = f)
-      logger.log(Level.INFO, s"Append to $table success." +
-        s"Start Time: ${Config.fromTime.asString} \n End Time: ${Config.pipelineSnapTime.asString}")
+      logger.log(Level.INFO, s"Append to $table success.")
       true
     } catch {
       case e: Throwable => logger.log(Level.ERROR, s"Could not append to $table", e)
@@ -47,57 +78,13 @@ class Pipeline extends SparkSessionWrapper {
 
   }
 
-  def x : Unit = {
-    import org.apache.spark.sql.functions._
-    import org.apache.spark.sql.types._
-
-    val conf = new Configuration
-    conf.set("textinputformat.record.delimiter", "~~~")
-    val schema = StructType(Array(StructField("value", StringType)))
-    val logRDD = sc.newAPIHadoopFile("/cluster-logs/0827-194754-tithe1/driver",
-      classOf[org.apache.hadoop.mapreduce.lib.input.TextInputFormat],
-      classOf[org.apache.hadoop.io.LongWritable],
-      classOf[org.apache.hadoop.io.Text], conf
-    ).map(r => Row.fromSeq(r._2.toString))
-
-
-
-    val valueDf = spark.createDataFrame(logRDD, schema)
-      .withColumn("log_file_name", input_file_name())
-      .filter('log_file_name.like("%log4j%log%"))
-      .withColumn("split", split('value, "~"))
-
-//    value_df = spark.createDataFrame(log_rdd, schema) \
-//    .withColumn("log_file_name", f.input_file_name()) \
-//    .filter(f.col("log_file_name").like("%log4j%.log%")) \
-//    .withColumn("split", f.split(f.col("value"), log4j_column_delimiter)) \
-//    .select(f.from_unixtime(f.unix_timestamp(f.col("split")[0], "yy/MM/dd HH:mm:ss")).cast("timestamp").alias("date_time"),
-//      f.col("split")[1].alias("level"),
-//      f.col("split")[2].alias("source"),
-//      f.col("split")[3].alias("message"),
-//      f.col("value").alias("raw_log_value"),
-//      f.col("log_file_name")
-//    ) \
-//    .filter(f.col("date_time").isNotNull()) \
-//    .orderBy(f.col("date_time"))
-
-  def buildBronze(): Boolean = {
-
-    append("jobs_master", workspace.getJobsDF)
-    append("cluster_master", workspace.getClustersDF)
-    append("pools_master", workspace.getPoolsDF)
-    append("profiles_master", workspace.getProfilesDF)
-    append("users_master", workspace.getWorkspaceUsersDF)
-    append("audit_log_master", workspace.getAuditLogsDF)
-  }
+  //  def appendBronze(): Boolean = {
+  //
+  //    try {
+  //      val reports = Bronze().run()
+  //    }
+  //
+  //  }
 
 }
 
-object Pipeline {
-
-  def apply(workspace: Workspace, database: Database): Pipeline = {
-    new Pipeline().setWorkspace(workspace).setDatabase(database)
-
-  }
-
-}
