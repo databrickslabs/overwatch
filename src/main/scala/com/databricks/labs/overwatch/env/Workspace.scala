@@ -98,21 +98,26 @@ class Workspace extends SparkSessionWrapper {
   }
 
   private def getUniqueSparkEventsFiles(filesToBeConsidered: DataFrame): Array[String] = {
-    spark.table("spark_events_master").select('filename)
-      .unionByName(filesToBeConsidered)
-      .distinct.as[String].collect()
+    if(spark.catalog.tableExists(Config.databaseName, "spark_events_bronze")) {
+      spark.table("spark_events_bronze").select('filename)
+        .unionByName(filesToBeConsidered)
+        .distinct.as[String].collect()
+    } else {
+      filesToBeConsidered.select('filename)
+        .distinct.as[String].collect()
+    }
   }
 
 
   def getEventLogsDF(pathsGlobDF: DataFrame): DataFrame = {
 
     val pathsGlob = getUniqueSparkEventsFiles(pathsGlobDF)
+    val dropCols = Array("Classpath Entries", "HadoopProperties", "SparkProperties", "SystemProperties", "sparkPlanInfo")
 
-    val eventsDFRaw = spark.read.option("badRecordsPath", Config.badRecordsPath)
-      .json(pathsGlob: _*).drop("Classpath Entries")
-    spark.createDataFrame(eventsDFRaw.rdd, SchemaTools.sanitizeSchema(eventsDFRaw.schema).asInstanceOf[StructType])
+    spark.read.option("badRecordsPath", Config.badRecordsPath)
+      .json(pathsGlob: _*).drop(dropCols: _*)
       .withColumn("filename", input_file_name)
-      .repartition(getTotalCores * 4)
+      .repartition()
   }
 
 }

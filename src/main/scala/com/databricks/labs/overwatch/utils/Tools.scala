@@ -7,7 +7,6 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import java.util.{Date, UUID}
 
-import java.io.File
 import org.apache.hadoop.fs.{FileSystem, Path, FileUtil}
 
 import javax.crypto
@@ -85,9 +84,10 @@ object SchemaTools {
     if (dupCount == 0) {
       fields
     } else {
-      val uniqueSuffixes = (0 to dupCount + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
+      val uniqueSuffixes = (0 to fields.length + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
       fields.zipWithIndex.map(f => {
-        f._1.copy(name = f._1.name + "_" + uniqueSuffixes(f._2))
+        if (dups.contains(f._1.name)) f._1.copy(name = f._1.name + "_" + uniqueSuffixes(f._2))
+        else f._1
       })
     }
   }
@@ -96,7 +96,7 @@ object SchemaTools {
     dataType match {
       case dt: StructType =>
         val dtStruct = dt.asInstanceOf[StructType]
-        dtStruct.copy(fields = generateUniques(dtStruct.fields).map(sanitizeFields))
+        dtStruct.copy(fields = generateUniques(dtStruct.fields.map(sanitizeFields)))
       case dt: ArrayType =>
         val dtArray = dt.asInstanceOf[ArrayType]
         dtArray.copy(elementType = sanitizeSchema(dtArray.elementType))

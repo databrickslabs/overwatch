@@ -19,7 +19,7 @@ object Config {
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-","")
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
-  private var _fromTime: Map[Int, Long] = _
+  private var _fromTime: Map[Int, Long] = Map(0 -> primordealEpoch)
   private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _

@@ -18,17 +18,22 @@ import scala.collection.JavaConverters._
 class Initializer extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
   import spark.implicits._
 
   def initializeTimestamps(): this.type = {
-    val w = Window.partitionBy('moduleID).orderBy('untilTS)
-    val fromTimeByModuleID = spark.table("overwatch.pipeline_report")
-      .withColumn("rnk", rank().over(w))
-      .withColumn("rn", row_number().over(w))
-      .filter('rnk === 1 && 'rn === 1)
-      .select('moduleID, 'untilTS)
-      .rdd.map(r => (r.getInt(0), r.getLong(1)))
-      .collectAsMap().toMap
+    val fromTimeByModuleID = if (spark.catalog.databaseExists(Config.databaseName)) {
+      val w = Window.partitionBy('moduleID).orderBy('untilTS)
+      spark.table("overwatch.pipeline_report")
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter('rnk === 1 && 'rn === 1)
+        .select('moduleID, 'untilTS)
+        .rdd.map(r => (r.getInt(0), r.getLong(1)))
+        .collectAsMap().toMap
+    } else {
+      Map(0 -> Config.fromTime(0).asUnixTime)
+    }
     Config.setFromTime(fromTimeByModuleID)
     Config.setPipelineSnapTime()
     this
@@ -55,14 +60,13 @@ class Initializer extends SparkSessionWrapper {
 object Initializer extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
   import spark.implicits._
 
   def apply(args: Array[String]): (Workspace, Database) = {
 
     logger.log(Level.INFO, "Initializing Environment")
     validateAndRegisterArgs(args)
-
-    dbutils.notebook.getContext().tags
 
     // Todo - Move timestamp init to correct location
     val initializer = new Initializer()
@@ -74,22 +78,37 @@ object Initializer extends SparkSessionWrapper {
     logger.log(Level.INFO, "Initializing Database")
     val database = initializer.initializeDatabase()
 
+
     (workspace, database)
   }
 
-  // TODO - Require -- If jobRuns jobs must be present; If clusterEvents OR sparkEvents, clusters must be present
-  // TODO - Refactor to allow for validation of entire array as one object (required for ^)
-  private def validateScope(scope: String): OverwatchScope.Value = {
-    scope.toLowerCase match {
+  @throws(classOf[IllegalArgumentException])
+  private def validateScope(scopes: Array[String]): Array[OverwatchScope.OverwatchScope] = {
+    val lcScopes = scopes.map(_.toLowerCase)
+    if (lcScopes.contains("jobruns")) {
+      require(lcScopes.contains("jobs"), "When jobruns are in scope for log capture, jobs must also be in scope " +
+        "as jobruns depend on jobIDs captured from jobs scope.")
+    }
+
+    if (lcScopes.contains("clusterevents") || lcScopes.contains("sparkevents")) {
+      require(lcScopes.contains("clusters"), "sparkEvents and clusterEvents scopes both require clusters scope to " +
+        "also be enabled as clusterID is a requirement for these scopes.")
+    }
+
+    lcScopes.map {
       case "jobs" => jobs
+      case "jobruns" => jobRuns
       case "clusters" => clusters
+      case "clusterevents" => clusterEvents
+      case "sparkevents" => sparkEvents
       case "pools" => pools
       case "audit" => audit
-      case "sparkevents" => sparkEvents
-      case _ => {
-        val supportedScopes = OverwatchScope.values.mkString(", ")
+      case "iampassthrough" => iamPassthrough
+      case "profiles" => profiles
+      case scope => {
+        val supportedScopes = s"${OverwatchScope.values.mkString(", ")}, all"
         throw new IllegalArgumentException(s"Scope $scope is not supported. Supported scopes include: " +
-          s"${supportedScopes}, all.")
+          s"${supportedScopes}.")
       }
     }
   }
@@ -199,15 +218,14 @@ object Initializer extends SparkSessionWrapper {
         // Todo -- add validation to badRecordsPath
         Config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
-
         if (overwatchScope(0) == "all") Config.setOverwatchScope(OverwatchScope.values.toArray)
-        else Config.setOverwatchScope(overwatchScope.map(validateScope))
-              } catch {
-                case e: Throwable => {
-                  logger.log(Level.FATAL, s"Input parameters could not be validated. " +
-                    s"Failing to avoid workspace contamination. \n $e")
-                }
-              }
+        else Config.setOverwatchScope(validateScope(overwatchScope))
+      } catch {
+        case e: Throwable => {
+          logger.log(Level.FATAL, s"Input parameters could not be validated. " +
+            s"Failing to avoid workspace contamination. \n $e")
+        }
       }
     }
   }
+}

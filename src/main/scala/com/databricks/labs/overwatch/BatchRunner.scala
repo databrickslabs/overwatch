@@ -13,8 +13,8 @@ object BatchRunner extends SparkSessionWrapper{
 
   def main(args: Array[String]): Unit = {
 
-//    spark.sql("drop database if exists overwatch cascade")
     import spark.implicits._
+    spark.sql("drop database if exists overwatch cascade")
 
     val (workspace, database) = if (args.length != 0) {
       Initializer(args)
@@ -23,18 +23,18 @@ object BatchRunner extends SparkSessionWrapper{
     }
 
     //    pipeline.buildBronze()
-//    Bronze(workspace, database).run()
+    Bronze(workspace, database).run()
 
-    val w = Window.partitionBy('moduleID).orderBy('untilTS)
-    val untilTSByModule = spark.table("overwatch.pipeline_report")
-      .withColumn("rnk", rank().over(w))
-      .withColumn("rn", row_number().over(w))
-      .filter('rnk === 1 && 'rn === 1)
-      .select('moduleID, 'untilTS)
-      .rdd.map(r => (r.getInt(0), r.getLong(1)))
-      .collectAsMap()
-
-    println(untilTSByModule(1002))
+//    val w = Window.partitionBy('moduleID).orderBy('untilTS)
+//    val untilTSByModule = spark.table("overwatch.pipeline_report")
+//      .withColumn("rnk", rank().over(w))
+//      .withColumn("rn", row_number().over(w))
+//      .filter('rnk === 1 && 'rn === 1)
+//      .select('moduleID, 'untilTS)
+//      .rdd.map(r => (r.getInt(0), r.getLong(1)))
+//      .collectAsMap()
+//
+//    println(untilTSByModule(1002))
 
 
     // Test

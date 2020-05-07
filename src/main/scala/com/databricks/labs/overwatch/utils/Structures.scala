@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.utils
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.catalyst.ScalaReflection
+import org.apache.spark.sql.types._
 
 case class DBDetail()
 
@@ -17,7 +18,7 @@ case class DataTarget(databaseName: Option[String], databaseLocation: Option[Str
 case class OverwatchParams(tokenSecret: Option[TokenSecret],
                            dataTarget: Option[DataTarget],
                            auditLogPath: Option[String],
-                           eventLogPrefix: Option[String],
+                           eventLogPrefix: Option[String], // no longer needed
                            badRecordsPath: Option[String],
                            overwatchScope: Option[Array[String]]
                           )
@@ -39,14 +40,14 @@ case class ModuleStatusReport(
                                runEndTS: Long,
                                fromTS: Long,
                                untilTS: Long,
-                               success: Boolean,
+                               status: String,
                                inputConfig: OverwatchParams,
                                parsedConfig: ParsedConfig
                              )
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, jobRuns, clusters, clusterEvents, pools, audit, sparkEvents = Value
+  val jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles = Value
 }
 
 object OverwatchEncoders {

@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.env
 
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
@@ -24,50 +24,16 @@ class Database extends SparkSessionWrapper {
 
   def doAutoOptimize = ???
 
-  def sanitizeFieldName(s: String): String = {
-    s.replaceAll("[^a-zA-Z0-9_]", "")
-  }
-
-  def sanitizeFields(field: StructField): StructField = {
-    field.copy(name = sanitizeFieldName(field.name), dataType = sanitizeSchema(field.dataType))
-  }
-
-  def generateUniques(fields: Array[StructField]): Array[StructField] = {
-    val r = new scala.util.Random(10)
-    val fieldNames = fields.map(_.name)
-    val dups = fieldNames.diff(fieldNames.distinct)
-    val dupCount = dups.length
-    if (dupCount == 0) {
-      fields
-    } else {
-      val uniqueSuffixes = (0 to dupCount + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
-      fields.zipWithIndex.map(f => {
-        f._1.copy(name = f._1.name + "_" + uniqueSuffixes(f._2))
-      })
-    }
-  }
-
-  def sanitizeSchema(dataType: DataType): DataType = {
-    dataType match {
-      case dt: StructType =>
-        val dtStruct = dt.asInstanceOf[StructType]
-        dtStruct.copy(fields = generateUniques(dtStruct.fields).map(sanitizeFields))
-      case dt: ArrayType =>
-        val dtArray = dt.asInstanceOf[ArrayType]
-        dtArray.copy(elementType = sanitizeSchema(dtArray.elementType))
-      case _ => dataType
-    }
-  }
-
   def write(inputDF: DataFrame, tableName: String, format: String = "delta",
-            mode: String = "append", autoOptimize: Boolean = false,
-            autoCompact: Boolean = false, partitionBy: Array[String] = Array(),
-            withCreateDate: Boolean = false): Boolean = {
+            mode: String = "append", autoOptimize: Boolean = false, autoCompact: Boolean = false,
+            partitionBy: Array[String] = Array(),
+            withCreateDate: Boolean = false, withOverwatchRunID: Boolean = false): Boolean = {
 
     var finalDF: DataFrame = inputDF
-    if (withCreateDate) finalDF = finalDF.withColumn("CreateDate",
-      from_unixtime(lit(Config.pipelineSnapTime.asUnixTime)))
-    finalDF = spark.createDataFrame(finalDF.rdd, sanitizeSchema(finalDF.schema).asInstanceOf[StructType])
+    if (withCreateDate) finalDF = finalDF.withColumn("Pipeline_SnapTS", Config.pipelineSnapTime.asColumnTS)
+    if (withOverwatchRunID) finalDF = finalDF.withColumn("Overwatch_RunID", lit(Config.runID))
+
+    finalDF = spark.createDataFrame(finalDF.rdd, SchemaTools.sanitizeSchema(finalDF.schema).asInstanceOf[StructType])
 
     try {
       logger.log(Level.INFO, s"Beginning write to ${_databaseName}.${tableName}")

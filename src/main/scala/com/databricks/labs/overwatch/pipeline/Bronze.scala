@@ -1,23 +1,27 @@
 package com.databricks.labs.overwatch.pipeline
 
-import java.io.File
+import java.io.{PrintWriter, StringWriter}
 
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, ModuleStatusReport, OverwatchScope, SparkSessionWrapper, Helpers}
-import org.apache.hadoop.fs.Path
+import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 import org.apache.spark.sql.functions.{array, col, explode, lit}
-import org.apache.log4j.Level
+import org.apache.log4j.{Level, Logger}
+
+import scala.collection.mutable.ArrayBuffer
 
 
 class Bronze extends Pipeline with SparkSessionWrapper {
 
   import spark.implicits._
 
-  private def apiByID[T](moduleID: Int, endpoint: String, apiType: String,
+  private val logger: Logger = Logger.getLogger(this.getClass)
+  private val sw = new StringWriter
+
+  private def apiByID[T](endpoint: String, apiType: String,
                          ids: Array[T], idsKey: String,
                          extraQuery: Option[Map[String, Any]] = None): Array[String] = {
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(6))
@@ -26,8 +30,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
 
     ids.flatMap(id => {
       val rawQuery = Map(
-        idsKey -> id,
-        "start_time" -> Config.fromTime(moduleID).asUnixTime
+        idsKey -> id
       )
 
       val query = if (extraQuery.nonEmpty) {
@@ -44,19 +47,26 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     val startTime = System.currentTimeMillis()
     val moduleID = 1001
     val moduleName = "Bronze_Jobs"
-    val success: Boolean = try {
+    val status: String = try {
       val df = workspace.getJobsDF
-        .withColumn("Overwatch_RunID", lit(Config.runID))
-        .withColumn("Pipeline_SnapTS", lit(Config.pipelineSnapTime.asUnixTime))
         .cache()
-      append("jobs_master", df)
+      append("jobs_bronze", df)
       if (Config.overwatchScope.contains(OverwatchScope.jobRuns)) {
-        setJobIDs(df.select('job_id).distinct().as[Long].collect())
+        //TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
+        //DEBUG
+//        val debugX = df.select('job_id).as[Long].collect()
+//        val debugY = df.select('job_id).distinct.as[Long].collect()
+        // setJobIDs(df.select('job_id).distinct().as[Long].collect())
+        setJobIDs(df.select('job_id).as[Long].collect())
       }
       df.unpersist(blocking = true)
-      true
+      "SUCCESS"
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, s"Failed: ${moduleName}", e); false
+          // TODO -- Figure out how to bubble up the exceptions
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
+        e.printStackTrace(new PrintWriter(sw)).toString
+      }
     }
     val endTime = System.currentTimeMillis()
     ModuleStatusReport(
@@ -66,7 +76,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
       runEndTS = endTime,
       fromTS = 0L,
       untilTS = 0L,
-      success = success,
+      status = status,
       inputConfig = Config.inputConfig,
       parsedConfig = Config.parsedConfig
     )
@@ -76,21 +86,22 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     val startTime = System.currentTimeMillis()
     val moduleID = 1007
     val moduleName = "Bronze_JobRuns"
-    val success: Boolean = try {
+    val status: String = try {
 
       val extraQuery = Map("completed_only" -> true)
-      val jobRuns = apiByID(moduleID, "jobs/runs/list",
+      val jobRuns = apiByID("jobs/runs/list",
         "get", _jobIDs, "job_id", Some(extraQuery))
 
       // TODO -- add filter to remove runs before fromTS
       val df = spark.read.json(Seq(jobRuns: _*).toDS()).select(explode('runs).alias("runs"))
         .select(col("runs.*"))
-        .withColumn("Overwatch_RunID", lit(Config.runID))
-        .withColumn("Pipeline_SnapTS", lit(Config.pipelineSnapTime.asUnixTime))
-        .cache()
-      append("runs_by_job_master", df)
+      append("jobruns_bronze", df)
+      "SUCCESS"
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, s"Failed: ${moduleName}", e); false
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
+        e.printStackTrace(new PrintWriter(sw)).toString
+      }
     }
     val endTime = System.currentTimeMillis()
     ModuleStatusReport(
@@ -100,48 +111,54 @@ class Bronze extends Pipeline with SparkSessionWrapper {
       runEndTS = endTime,
       fromTS = 0L,
       untilTS = 0L,
-      success = success,
+      status = status,
       inputConfig = Config.inputConfig,
       parsedConfig = Config.parsedConfig
     )
   }
 
+  // TODO - sparkConf -- convert struct to array
   def appendClusters: ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
     val moduleID = 1002
     val moduleName = "Bronze_Clusters"
-    val success: Boolean = try {
+    val status = try {
       val df = workspace.getClustersDF
-        .withColumn("Overwatch_RunID", lit(Config.runID))
-        .withColumn("Pipeline_SnapTS", lit(Config.pipelineSnapTime.asUnixTime))
         .cache()
-      append("cluster_master", df)
+      append("clusters_bronze", df)
       if (Config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-        setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
+        // TODO -- DEBUG -- DISTINCT
+        // TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
+        // TODO -- SAME AS jobRuns
+//        setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
+        setClusterIDs(df.select('cluster_id).as[String].collect())
       }
 
       if (Config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-        val colsDF = df.select($"data.cluster_log_conf.*")
+        val colsDF = df.select($"cluster_log_conf.*")
         val cols = colsDF.columns.map(c => s"${c}.destination")
-        val logsDF = df.select($"data.cluster_log_conf.*", $"data.cluster_id".alias("cluster_id"))
-        val eventLogsPathGlob = cols.flatMap(
+        val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
+        val eventLogsPathGlobDF = cols.flatMap(
           c => {
             logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
               .select(
                 array(col("destination"), col("cluster_id"),
-                  lit("eventlog"), lit("*"), lit("*"), lit("eventlog"))
+                  lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
               ).rdd
               .map(r => r.getSeq[String](0).mkString("/")).collect()
           }).distinct
           .flatMap(Helpers.globPath)
-          .toSeq.toDF("filenames")
-        setEventLogGlob(eventLogsPathGlob)
+          .toSeq.toDF("filename")
+        setEventLogGlob(eventLogsPathGlobDF)
       }
 
       df.unpersist(blocking = true)
-      true
+      "SUCCESS"
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, s"Failed: ${moduleName}", e); false
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
+        e.printStackTrace(new PrintWriter(sw)).toString
+      }
     }
     val endTime = System.currentTimeMillis()
     ModuleStatusReport(
@@ -151,7 +168,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
       runEndTS = endTime,
       fromTS = 0L,
       untilTS = 0L,
-      success = success,
+      status = status,
       inputConfig = Config.inputConfig,
       parsedConfig = Config.parsedConfig
     )
@@ -162,13 +179,15 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     val startTime = System.currentTimeMillis()
     val moduleID = 1003
     val moduleName = "Bronze_Pools"
-    val success: Boolean = try {
+    val status: String = try {
       val df = workspace.getPoolsDF
-        .withColumn("Overwatch_RunID", lit(Config.runID))
-        .withColumn("Pipeline_SnapTS", lit(Config.pipelineSnapTime.asUnixTime))
-      append("pools_master", df)
+      append("pools_bronze", df)
+      "SUCCESS"
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, s"Failed: ${moduleName}", e); false
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
+        e.printStackTrace(new PrintWriter(sw)).toString
+      }
     }
     val endTime = System.currentTimeMillis()
     ModuleStatusReport(
@@ -178,7 +197,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
       runEndTS = endTime,
       fromTS = 0L,
       untilTS = 0L,
-      success = success,
+      status = status,
       inputConfig = Config.inputConfig,
       parsedConfig = Config.parsedConfig
     )
@@ -191,17 +210,19 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     // Audit logs are Daily so get date from TS
 
     //    val fromDate =
-    val success: Boolean = try {
+    val status: String = try {
       val df = workspace.getAuditLogsDF
         .filter('Date.between(
           Config.fromTime(moduleID).asColumnTS,
           Config.pipelineSnapTime.asColumnTS
         ))
-        .withColumn("Overwatch_RunID", lit(Config.runID))
-        .withColumn("Pipeline_SnapTS", lit(Config.pipelineSnapTime.asUnixTime))
-      append("audit_log_master", df)
+      append("audit_log_bronze", df, fromTime = Some(Config.fromTime(moduleID).asTSString))
+      "SUCCESS"
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, s"Failed: ${moduleName}", e); false
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
+        e.printStackTrace(new PrintWriter(sw)).toString
+      }
     }
     val endTime = System.currentTimeMillis()
     ModuleStatusReport(
@@ -211,7 +232,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
       runEndTS = endTime,
       fromTS = Config.fromTime(moduleID).asMidnightEpochMilli,
       untilTS = Config.pipelineSnapTime.asMidnightEpochMilli,
-      success = success,
+      status = status,
       inputConfig = Config.inputConfig,
       parsedConfig = Config.parsedConfig
     )
@@ -221,23 +242,25 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     val startTime = System.currentTimeMillis()
     val moduleID = 1005
     val moduleName = "Bronze_ClusterEventLogs"
-    val success: Boolean = try {
+    val status: String = try {
 
       val extraQuery = Map(
         "start_time" -> Config.fromTime(moduleID).asUnixTime,
         "end_time" -> Config.pipelineSnapTime.asUnixTime
       )
-      val clusterEvents = apiByID(moduleID, "clusters/events", "post",
+      val clusterEvents = apiByID("clusters/events", "post",
         _clusterIDs, "cluster_id", Some(extraQuery))
 
       val df = spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
         .select(col("events.*"))
-        .withColumn("Overwatch_RunID", lit(Config.runID))
-        .withColumn("Pipeline_SnapTS", lit(Config.pipelineSnapTime.asUnixTime))
 
-      append("events_by_cluster_master", df)
+      append("cluster_events_bronze", df)
+      "SUCCESS"
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, s"Failed: ${moduleName}", e); false
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
+        e.printStackTrace(new PrintWriter(sw)).toString
+      }
     }
     val endTime = System.currentTimeMillis()
     ModuleStatusReport(
@@ -247,7 +270,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
       runEndTS = endTime,
       fromTS = Config.fromTime(moduleID).asUnixTime,
       untilTS = Config.pipelineSnapTime.asUnixTime,
-      success = success,
+      status = status,
       inputConfig = Config.inputConfig,
       parsedConfig = Config.parsedConfig
     )
@@ -257,13 +280,15 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     val startTime = System.currentTimeMillis()
     val moduleID = 1006
     val moduleName = "Bronze_EventLogs"
-    val success: Boolean = try {
+    val status: String = try {
       val df = workspace.getEventLogsDF(sparkEventsLogGlob)
-        .withColumn("Overwatch_RunID", lit(Config.runID))
-        .withColumn("Pipeline_SnapTS", lit(Config.pipelineSnapTime.asUnixTime))
-      append("spark_events_master", df)
+      append("spark_events_bronze", df)
+      "SUCCESS"
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, s"Failed: ${moduleName}", e); false
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
+        e.printStackTrace(new PrintWriter(sw)).toString
+      }
     }
     val endTime = System.currentTimeMillis()
     ModuleStatusReport(
@@ -273,25 +298,48 @@ class Bronze extends Pipeline with SparkSessionWrapper {
       runEndTS = endTime,
       fromTS = 0L,
       untilTS = 0L,
-      success = success,
+      status = status,
       inputConfig = Config.inputConfig,
       parsedConfig = Config.parsedConfig
     )
   }
 
-  // TODO -- Add try/catch around each scope
+  // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
   def run(): Boolean = {
-    val reports = Config.overwatchScope.map {
-      case OverwatchScope.jobs => appendJobs
-      case OverwatchScope.jobRuns => appendJobRuns(jobIDs)
-      case OverwatchScope.clusters => appendClusters
-      case OverwatchScope.clusterEvents => appendClusterEventLogs(clusterIDs)
-      case OverwatchScope.pools => appendPools
-      case OverwatchScope.audit => appendAuditLogs
-      case OverwatchScope.sparkEvents => appendEventLogs
+    val reports = ArrayBuffer[ModuleStatusReport]()
+    if (Config.overwatchScope.contains(OverwatchScope.jobs)) {
+      reports.append(appendJobs)
     }
+    if (Config.overwatchScope.contains(OverwatchScope.jobRuns)) {
+      reports.append(appendJobRuns(jobIDs))
+    }
+    if (Config.overwatchScope.contains(OverwatchScope.clusters)) {
+      reports.append(appendClusters)
+    }
+    if (Config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
+      reports.append(appendClusterEventLogs(clusterIDs))
+    }
+    if (Config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
+      reports.append(appendEventLogs)
+    }
+    if (Config.overwatchScope.contains(OverwatchScope.pools)) {
+      reports.append(appendPools)
+    }
+    if (Config.overwatchScope.contains(OverwatchScope.audit)) {
+      reports.append(appendAuditLogs)
+    }
+    //    DOES NOT PRESERVER NECESSARY ORDERING
+    //    val reports = Config.overwatchScope.map {
+    //      case OverwatchScope.jobs => appendJobs
+    //      case OverwatchScope.jobRuns => appendJobRuns(jobIDs)
+    //      case OverwatchScope.clusters => appendClusters
+    //      case OverwatchScope.clusterEvents => appendClusterEventLogs(clusterIDs)
+    //      case OverwatchScope.pools => appendPools
+    //      case OverwatchScope.audit => appendAuditLogs
+    //      case OverwatchScope.sparkEvents => appendEventLogs
+    //    }
 
-    append("pipeline_report", reports.toSeq.toDF)
+    append("pipeline_report", reports.toDF)
 
 
   }

@@ -62,7 +62,8 @@ class ApiCall extends SparkSessionWrapper {
   def asDF: DataFrame = {
     try {
       if (dataCol == "*") spark.read.json(Seq(results: _*).toDS)
-      else spark.read.json(Seq(results: _*).toDS).select(explode(col(dataCol)).alias(dataCol)).select(col(s"${dataCol}.*"))
+      else spark.read.json(Seq(results: _*).toDS).select(explode(col(dataCol)).alias(dataCol))
+        .select(col(s"${dataCol}.*"))
     } catch {
       case e: Throwable =>
         val emptyDF = sc.parallelize(Seq("")).toDF()
