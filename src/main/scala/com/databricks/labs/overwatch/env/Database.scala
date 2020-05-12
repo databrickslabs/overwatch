@@ -33,7 +33,7 @@ class Database extends SparkSessionWrapper {
     if (withCreateDate) finalDF = finalDF.withColumn("Pipeline_SnapTS", Config.pipelineSnapTime.asColumnTS)
     if (withOverwatchRunID) finalDF = finalDF.withColumn("Overwatch_RunID", lit(Config.runID))
 
-    finalDF = spark.createDataFrame(finalDF.rdd, SchemaTools.sanitizeSchema(finalDF.schema).asInstanceOf[StructType])
+    finalDF = SchemaTools.scrubSchema(finalDF)
 
     try {
       logger.log(Level.INFO, s"Beginning write to ${_databaseName}.${tableName}")
@@ -63,6 +63,12 @@ class Database extends SparkSessionWrapper {
   def readPath(path: String, format: String = "delta"): DataFrame = {
     spark.read.format(format).load(path)
   }
+
+  def tableExists(tableName: String): Boolean = {
+    spark.catalog.tableExists(_databaseName, tableName)
+  }
+
+  //TODO -- Add dbexists func
 
 }
 

@@ -16,14 +16,14 @@ object BatchRunner extends SparkSessionWrapper{
     import spark.implicits._
     spark.sql("drop database if exists overwatch cascade")
 
-    val (workspace, database) = if (args.length != 0) {
+    val workspace = if (args.length != 0) {
       Initializer(args)
     } else {
       Initializer(Array())
     }
 
     //    pipeline.buildBronze()
-    Bronze(workspace, database).run()
+    Bronze(workspace).run()
 
 //    val w = Window.partitionBy('moduleID).orderBy('untilTS)
 //    val untilTSByModule = spark.table("overwatch.pipeline_report")

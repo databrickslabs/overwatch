@@ -11,7 +11,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{rank, row_number}
+import org.apache.spark.sql.functions.{rank, row_number, current_timestamp, max, lit}
 
 import scala.collection.JavaConverters._
 
@@ -23,8 +23,15 @@ class Initializer extends SparkSessionWrapper {
 
   def initializeTimestamps(): this.type = {
     val fromTimeByModuleID = if (spark.catalog.databaseExists(Config.databaseName)) {
+      // Determine if >= 7 days since last pipeline run, if so, set postProcessing Flag
+      Config.setPostProcessingFlag(spark.table(s"${Config.databaseName}.pipeline_report")
+        .select(
+          (current_timestamp.cast("long") -
+            max('Pipeline_SnapTS).cast("long")) >= lit(604800)).as[Boolean]
+        .collect()(0))
+
       val w = Window.partitionBy('moduleID).orderBy('untilTS)
-      spark.table("overwatch.pipeline_report")
+      spark.table(s"${Config.databaseName}.pipeline_report")
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter('rnk === 1 && 'rn === 1)
@@ -32,6 +39,7 @@ class Initializer extends SparkSessionWrapper {
         .rdd.map(r => (r.getInt(0), r.getLong(1)))
         .collectAsMap().toMap
     } else {
+      Config.setPostProcessingFlag(true)
       Map(0 -> Config.fromTime(0).asUnixTime)
     }
     Config.setFromTime(fromTimeByModuleID)
@@ -45,7 +53,7 @@ class Initializer extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Database ${Config.databaseName} not found, creating it at " +
         s"${Config.databaseLocation}.")
       val createDBIfNotExists = s"create database if not exists ${Config.databaseName} location '" +
-        s"${Config.databaseLocation}' WITH DBPROPERTIES (OVERWATCHDB=TRUE,SCHEMA=${Config.overwatchSchemaVersion})"
+        s"${Config.databaseLocation}' WITH DBPROPERTIES (OVERWATCHDB='TRUE',SCHEMA=${Config.overwatchSchemaVersion})"
       spark.sql(createDBIfNotExists)
       logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
       Database(Config.databaseName)
@@ -61,9 +69,10 @@ object Initializer extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  import spark.implicits._
+  // Init the SparkSessionWrapper with envVars
+  envInit()
 
-  def apply(args: Array[String]): (Workspace, Database) = {
+  def apply(args: Array[String]): Workspace = {
 
     logger.log(Level.INFO, "Initializing Environment")
     validateAndRegisterArgs(args)
@@ -72,14 +81,13 @@ object Initializer extends SparkSessionWrapper {
     val initializer = new Initializer()
       .initializeTimestamps()
 
-    logger.log(Level.INFO, "Initializing Workspace")
-    val workspace = Workspace()
-
     logger.log(Level.INFO, "Initializing Database")
     val database = initializer.initializeDatabase()
 
+    logger.log(Level.INFO, "Initializing Workspace")
+    val workspace = Workspace(database)
 
-    (workspace, database)
+    workspace
   }
 
   @throws(classOf[IllegalArgumentException])
@@ -113,6 +121,7 @@ object Initializer extends SparkSessionWrapper {
     }
   }
 
+  @throws(classOf[IllegalArgumentException])
   private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
     val dbName = dataTarget.databaseName.getOrElse("overwatch")
     val dblocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
@@ -172,60 +181,53 @@ object Initializer extends SparkSessionWrapper {
       Config.buildLocalOverwatchParams()
       println("Built Local Override Parameters")
     } else {
-      try {
-        logger.log(Level.INFO, "Validating Input Parameters")
-        val rawParams = mapper.readValue[OverwatchParams](args(0))
-        Config.setInputConfig(rawParams)
-        val overwatchScope = rawParams.overwatchScope.getOrElse(Array("all"))
-        val tokenSecret = rawParams.tokenSecret
-        val dataTarget = rawParams.dataTarget.getOrElse(
-          DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db")))
-        val auditLogPath = rawParams.auditLogPath
-        val eventLogPrefix = rawParams.eventLogPrefix
-        val badRecordsPath = rawParams.badRecordsPath
+      logger.log(Level.INFO, "Validating Input Parameters")
+      val rawParams = mapper.readValue[OverwatchParams](args(0))
+      Config.setInputConfig(rawParams)
+      val overwatchScope = rawParams.overwatchScope.getOrElse(Array("all"))
+      val tokenSecret = rawParams.tokenSecret
+      val dataTarget = rawParams.dataTarget.getOrElse(
+        DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db")))
+      val auditLogPath = rawParams.auditLogPath
+      val eventLogPrefix = rawParams.eventLogPrefix
+      val badRecordsPath = rawParams.badRecordsPath
 
-        // validate token secret requirements
-        // TODO - Validate if token has access to necessary assets. Warn/Fail if not
-        if (tokenSecret.nonEmpty) {
-          if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
-            throw new IllegalArgumentException(s"Secret AND Key must be provided together or neither of them. " +
-              s"Either supply both or neither.")
-          }
-          val scopeCheck = dbutils.secrets.listScopes().map(_.getName()).toArray.filter(_ == tokenSecret.get.scope)
-          if (scopeCheck.length == 0) throw new NullPointerException(s"Scope ${tokenSecret.get.scope} does not exist " +
-            s"in this workspace. Please provide a scope available and accessible to this account.")
-          val scopeName = scopeCheck.head
-
-          val keyCheck = dbutils.secrets.list(scopeName).toArray.filter(_.key == tokenSecret.get.key)
-          if (keyCheck.length == 0) throw new NullPointerException(s"Key ${tokenSecret.get.key} does not exist " +
-            s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
-            s"available and accessible to this account.")
-
-          Config.registeredEncryptedToken(Some(TokenSecret(scopeName, keyCheck.head.key)))
-        } else Config.registeredEncryptedToken(None)
-
-        // Todo -- validate database name and location
-        // Todo -- If Name exists allow existing location and validate correct Overwatch DB and DB version
-        dataTargetIsValid(dataTarget)
-
-        val dbName = dataTarget.databaseName.get
-        val dbLocation = dataTarget.databaseLocation.get
-
-        Config.setDatabaseNameandLoc(dbName, dbLocation)
-        Config.setAuditLogPath(auditLogPath)
-        Config.setEventLogPrefix(eventLogPrefix)
-
-        // Todo -- add validation to badRecordsPath
-        Config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
-
-        if (overwatchScope(0) == "all") Config.setOverwatchScope(OverwatchScope.values.toArray)
-        else Config.setOverwatchScope(validateScope(overwatchScope))
-      } catch {
-        case e: Throwable => {
-          logger.log(Level.FATAL, s"Input parameters could not be validated. " +
-            s"Failing to avoid workspace contamination. \n $e")
+      // validate token secret requirements
+      // TODO - Validate if token has access to necessary assets. Warn/Fail if not
+      if (tokenSecret.nonEmpty) {
+        if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
+          throw new IllegalArgumentException(s"Secret AND Key must be provided together or neither of them. " +
+            s"Either supply both or neither.")
         }
-      }
+        val scopeCheck = dbutils.secrets.listScopes().map(_.getName()).toArray.filter(_ == tokenSecret.get.scope)
+        if (scopeCheck.length == 0) throw new NullPointerException(s"Scope ${tokenSecret.get.scope} does not exist " +
+          s"in this workspace. Please provide a scope available and accessible to this account.")
+        val scopeName = scopeCheck.head
+
+        val keyCheck = dbutils.secrets.list(scopeName).toArray.filter(_.key == tokenSecret.get.key)
+        if (keyCheck.length == 0) throw new NullPointerException(s"Key ${tokenSecret.get.key} does not exist " +
+          s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
+          s"available and accessible to this account.")
+
+        Config.registeredEncryptedToken(Some(TokenSecret(scopeName, keyCheck.head.key)))
+      } else Config.registeredEncryptedToken(None)
+
+      // Todo -- validate database name and location
+      // Todo -- If Name exists allow existing location and validate correct Overwatch DB and DB version
+      dataTargetIsValid(dataTarget)
+
+      val dbName = dataTarget.databaseName.get
+      val dbLocation = dataTarget.databaseLocation.get
+
+      Config.setDatabaseNameandLoc(dbName, dbLocation)
+      Config.setAuditLogPath(auditLogPath)
+      Config.setEventLogPrefix(eventLogPrefix)
+
+      // Todo -- add validation to badRecordsPath
+      Config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
+
+      if (overwatchScope(0) == "all") Config.setOverwatchScope(OverwatchScope.values.toArray)
+      else Config.setOverwatchScope(validateScope(overwatchScope))
     }
   }
 }

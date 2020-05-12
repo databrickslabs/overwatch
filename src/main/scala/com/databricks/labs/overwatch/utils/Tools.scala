@@ -7,16 +7,18 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import java.util.{Date, UUID}
 
-import org.apache.hadoop.fs.{FileSystem, Path, FileUtil}
-
+import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.Column
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
+// TODO -- Add loggers to objects with throwables
 object JsonUtils {
 
   case class JsonStrings(prettyString: String, compactString: String, escapedString: String, fromObj: Any)
@@ -66,7 +68,7 @@ class Cipher {
 
 }
 
-object SchemaTools {
+object SchemaTools extends SparkSessionWrapper {
 
   private def sanitizeFieldName(s: String): String = {
     s.replaceAll("[^a-zA-Z0-9_]", "")
@@ -103,9 +105,29 @@ object SchemaTools {
       case _ => dataType
     }
   }
+
+  def scrubSchema(df: DataFrame): DataFrame = {
+    spark.createDataFrame(df.rdd, SchemaTools.sanitizeSchema(df.schema).asInstanceOf[StructType])
+  }
+
+  def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
+    val dropSuffix = UUID.randomUUID().toString.replace("-","")
+    colsToMove.foldLeft(df) {
+      case (df, c) =>
+        val tempColName = s"${c}_${dropSuffix}"
+        df.selectExpr(s"$c as $tempColName", "*").drop(c).withColumnRenamed(tempColName, c)
+    }
+  }
+
 }
 
 object Helpers extends SparkSessionWrapper {
+
+  private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
+  private def parallelism: Int = {
+    Math.min(driverCores, 8)
+  }
+
 
   def SubtractTime(start: Column, end: Column): Column = {
     val runTimeMS = end - start
@@ -114,9 +136,9 @@ object Helpers extends SparkSessionWrapper {
     val runTimeH = runTimeM / 60
     struct(
       start.alias("startEpochMS"),
-      from_unixtime(start / 1000).alias("startTS"),
+      from_unixtime(start / 1000).cast("timestamp").alias("startTS"),
       end.alias("endEpochMS"),
-      from_unixtime(end / 1000).alias("endTS"),
+      from_unixtime(end / 1000).cast("timestamp").alias("endTS"),
       lit(runTimeMS).alias("runTimeMS"),
       lit(runTimeS).alias("runTimeS"),
       lit(runTimeM).alias("runTimeM"),
@@ -150,6 +172,72 @@ object Helpers extends SparkSessionWrapper {
     val allStatus = fileSystem.globStatus(glob)
     val allPath = FileUtil.stat2Paths(allStatus)
     allPath.map(_.toString)
+  }
+
+  def getTables(db: String): Array[String] = {
+    spark.catalog.listTables(db).rdd.map(row => row.name).collect()
+  }
+
+  def parOptimize(db: String, parallelism: Int = parallelism - 1,
+                  zOrdersByTable: Map[String, Array[String]] = Map(),
+                  vacuum: Boolean = true): Unit = {
+    val tables = getTables(db)
+    val tablesPar = tables.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    tablesPar.tasksupport = taskSupport
+
+    tablesPar.foreach(tbl => {
+      try{
+        val zorderColumns = if (zOrdersByTable.contains(tbl)) s"ZORDER BY (${zOrdersByTable(tbl).mkString(", ")})" else ""
+        val sql = s"""optimize ${db}.${tbl} ${zorderColumns}"""
+        println(s"optimizing: ${db}.${tbl} --> $sql")
+        spark.sql(sql)
+        if (vacuum) {
+          println(s"vacuuming: ${db}.${tbl}")
+          spark.sql(s"vacuum ${db}.${tbl}")
+        }
+        println(s"Complete: ${db}.${tbl}")
+      } catch {
+        case e: Throwable => println(e.printStackTrace())
+      }
+    })
+  }
+
+  def parOptimizeTables(tables: Array[String],
+                        parallelism: Int = parallelism - 1): Unit = {
+    val tablesPar = tables.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    tablesPar.tasksupport = taskSupport
+
+    tablesPar.foreach(tbl => {
+      try{
+        println(s"optimizing: ${tbl}")
+        spark.sql(s"optimize ${tbl}")
+        println(s"Complete: ${tbl}")
+      } catch {
+        case e: Throwable => println(e.printStackTrace())
+      }
+    })
+  }
+
+  def computeStats(db: String, parallelism: Int = parallelism - 1,
+                   forColumnsByTable: Map[String, Array[String]] = Map()): Unit = {
+    val tables = getTables(db)
+    val tablesPar = tables.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    tablesPar.tasksupport = taskSupport
+
+    tablesPar.foreach(tbl => {
+      val forColumns = if (forColumnsByTable.contains(tbl)) s"for columns ${forColumnsByTable(tbl).mkString(", ")}" else ""
+      val sql = s"""analyze table ${db}.${tbl} compute statistics ${forColumns}"""
+      try {
+        println(s"Analyzing: $tbl --> $sql")
+        spark.sql(sql)
+        println(s"Completed: $tbl")
+      } catch {
+        case e: Throwable => println(s"FAILED: $tbl --> $sql")
+      }
+    })
   }
 
 }

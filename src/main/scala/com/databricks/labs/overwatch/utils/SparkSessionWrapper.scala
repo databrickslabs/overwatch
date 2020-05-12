@@ -9,6 +9,8 @@ import org.apache.log4j.{Level, Logger}
 trait SparkSessionWrapper extends Serializable {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+  @transient
+  lazy protected val _envInit: Boolean = envInit()
   lazy val spark: SparkSession = if (System.getenv("OVERWATCH") != "LOCAL") {
     logger.log(Level.INFO, "Using Databricks SparkSession")
     SparkSession
@@ -69,26 +71,32 @@ trait SparkSessionWrapper extends Serializable {
 
   def getParTasks: Int = _parTasks
 
+  def envInit(): Boolean = {
+    if (System.getenv("OVERWATCH") != "LOCAL") {
+      setCoresPerWorker(sc.parallelize("1", 1)
+        .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0))
 
-  if (System.getenv("OVERWATCH") != "LOCAL") {
-    setCoresPerWorker(sc.parallelize("1", 1)
-      .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0))
+      setNumberOfWorkerNodes(sc.statusTracker.getExecutorInfos.length - 1)
+    } else {
+      val env = System.getenv().asScala
+      setCoresPerWorker(env("coresPerWorker").toInt)
+      setNumberOfWorkerNodes(env("numberOfWorkerNodes").toInt)
+    }
+    setTotalCores(getCoresPerWorker * getNumberOfWorkerNodes)
+    setCoresPerTask(
+      try {
+        spark.conf.get("spark.task.cpus").toInt
+      }
+      catch {
+        case e: java.util.NoSuchElementException => 1
+      }
+    )
+    setParTasks(scala.math.floor(getTotalCores / getCoresPerTask).toInt)
+    if (spark.conf.get("spark.sql.shuffle.partitions") == "200")
+      spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 4)
 
-    setNumberOfWorkerNodes(sc.statusTracker.getExecutorInfos.length - 1)
-  } else {
-    val env = System.getenv().asScala
-    setCoresPerWorker(env("coresPerWorker").toInt)
-    setNumberOfWorkerNodes(env("numberOfWorkerNodes").toInt)
+    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", "134217728")
+
+    true
   }
-  setTotalCores(getCoresPerWorker * getNumberOfWorkerNodes)
-  setCoresPerTask(
-    try {
-      spark.conf.get("spark.task.cpus").toInt
-    }
-    catch {
-      case e: java.util.NoSuchElementException => 1
-    }
-  )
-  setParTasks(scala.math.floor(getTotalCores / getCoresPerTask).toInt)
-  spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 4)
 }

@@ -14,8 +14,11 @@ import scala.io.Source
 class Workspace extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+  private var _database: Database = _
 
   import spark.implicits._
+
+  def database: Database = _database
 
   // TODO -- Change queries appropriately based on Cloud Type
 
@@ -97,11 +100,15 @@ class Workspace extends SparkSessionWrapper {
     spark.read.json(Config.auditLogPath.get)
   }
 
-  private def getUniqueSparkEventsFiles(filesToBeConsidered: DataFrame): Array[String] = {
-    if(spark.catalog.tableExists(Config.databaseName, "spark_events_bronze")) {
-      spark.table("spark_events_bronze").select('filename)
-        .unionByName(filesToBeConsidered)
-        .distinct.as[String].collect()
+  // Todo -- Put back to private
+  def getUniqueSparkEventsFiles(filesToBeConsidered: DataFrame): Array[String] = {
+    if (database.tableExists("spark_events_bronze")) {
+      val existingFiles = database.readTable("spark_events_bronze").select('filename)
+        .distinct
+      val badFiles = spark.read.format("json").load(s"${Config.badRecordsPath}/*/*/")
+        .select('path.alias("filename"))
+        .distinct
+      filesToBeConsidered.except(existingFiles.unionByName(badFiles)).as[String].collect()
     } else {
       filesToBeConsidered.select('filename)
         .distinct.as[String].collect()
@@ -114,17 +121,36 @@ class Workspace extends SparkSessionWrapper {
     val pathsGlob = getUniqueSparkEventsFiles(pathsGlobDF)
     val dropCols = Array("Classpath Entries", "HadoopProperties", "SparkProperties", "SystemProperties", "sparkPlanInfo")
 
-    spark.read.option("badRecordsPath", Config.badRecordsPath)
+    val rawEventsDF = spark.read.option("badRecordsPath", Config.badRecordsPath)
       .json(pathsGlob: _*).drop(dropCols: _*)
+
+    val cleanEvents = SchemaTools.scrubSchema(rawEventsDF)
       .withColumn("filename", input_file_name)
+      .withColumn("pathSize", size(split('filename, "/")) - lit(2))
+      .withColumn("SparkContextID", split('filename, "/")('pathSize))
+      .withColumn("ClusterID", $"Properties.sparkdatabricksclusterUsageTagsclusterId")
+      .withColumn("JobGroupID", $"Properties.sparkjobGroupid")
+      .withColumn("ExecutionID", $"Properties.sparksqlexecutionid")
+      .withColumn("ExecutionParent", $"Properties.sparksqlexecutionparent")
+      .drop("pathSize")
       .repartition()
+
+    // TODO -- When cols are arranged in abstract Table class, pull the zorder cols from there
+    // Rearranging columns to collect stats to be able to zorder on them later
+    SchemaTools.moveColumnsToFront(cleanEvents, "SparkContextID, ClusterID, JobGroupID".split(", "))
+  }
+
+  def setDatabase(value: Database): this.type = {
+    _database = value
+    this
   }
 
 }
 
+// TODO -- Put the database in the workspace
 object Workspace {
-  def apply(): Workspace = {
-    new Workspace
+  def apply(database: Database): Workspace = {
+    new Workspace().setDatabase(database)
   }
 
 }

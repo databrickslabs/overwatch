@@ -56,7 +56,9 @@ class Pipeline extends SparkSessionWrapper {
   protected def sparkEventsLogGlob: DataFrame = _eventLogGlob
 
   // TODO -- Enable parallelized write
-  private[overwatch] def append(table: String, df: DataFrame, fromTime: Option[String] = None): Boolean = {
+  private[overwatch] def append(table: String, df: DataFrame,
+                                partitionBy: Array[String] = Array(),
+                                fromTime: Option[String] = None): Boolean = {
     val startLogMsg = if (fromTime.nonEmpty) {
       s"Beginning append to " +
         s"${_database.getDatabaseName}.${table}. " +
@@ -68,7 +70,8 @@ class Pipeline extends SparkSessionWrapper {
     logger.log(Level.INFO, startLogMsg)
     try {
       val f = if (Config.isLocalTesting) "parquet" else "delta"
-      _database.write(df, table, withCreateDate = true, withOverwatchRunID = true, format = f)
+      _database.write(df, table, withCreateDate = true, withOverwatchRunID = true,
+        partitionBy = partitionBy, format = f)
       logger.log(Level.INFO, s"Append to $table success.")
       true
     } catch {

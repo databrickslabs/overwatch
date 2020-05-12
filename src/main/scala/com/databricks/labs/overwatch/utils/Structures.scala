@@ -50,6 +50,11 @@ object OverwatchScope extends Enumeration {
   val jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles = Value
 }
 
+object Layer extends Enumeration {
+  type Layer = Value
+  val bronze, silver, gold, consumption = Value
+}
+
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =
     org.apache.spark.sql.Encoders.kryo[Array[OverwatchScope.Value]]

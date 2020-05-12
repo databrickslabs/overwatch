@@ -4,7 +4,7 @@ import java.io.{PrintWriter, StringWriter}
 
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport, OverwatchScope, SchemaTools, SparkSessionWrapper}
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -254,7 +254,11 @@ class Bronze extends Pipeline with SparkSessionWrapper {
       val df = spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
         .select(col("events.*"))
 
-      append("cluster_events_bronze", df)
+      // TODO -- When cols are arranged in abstract Table class, pull the zorder cols from there
+      // Rearranging for zorder
+      val orderedDF = SchemaTools.moveColumnsToFront(df, "cluster_id, timestamp".split(", "))
+
+      append("cluster_events_bronze", orderedDF)
       "SUCCESS"
     } catch {
       case e: Throwable => {
@@ -282,7 +286,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     val moduleName = "Bronze_EventLogs"
     val status: String = try {
       val df = workspace.getEventLogsDF(sparkEventsLogGlob)
-      append("spark_events_bronze", df)
+      append("spark_events_bronze", df, partitionBy = Array("event"))
       "SUCCESS"
     } catch {
       case e: Throwable => {
@@ -347,7 +351,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
 }
 
 object Bronze {
-  def apply(workspace: Workspace, database: Database): Bronze = new Bronze()
-    .setWorkspace(workspace).setDatabase(database)
+  def apply(workspace: Workspace): Bronze = new Bronze()
+    .setWorkspace(workspace).setDatabase(workspace.database)
 
 }

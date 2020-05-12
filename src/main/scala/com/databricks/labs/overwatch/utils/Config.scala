@@ -32,6 +32,7 @@ object Config {
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _parsedConfig: ParsedConfig = _
+  private var _postProcessingFlag: Boolean = false
   private var _overwatchScope: Array[OverwatchScope.Value] = OverwatchScope.values.toArray
 
   final private val cipher = new Cipher
@@ -44,16 +45,6 @@ object Config {
       .truncatedTo(ChronoUnit.DAYS)
       .toEpochMilli
   }
-
-//  private[overwatch] def setFromTime(value: Long): this.type = {
-//    _fromTime_OLD = value;
-//    this
-//  }
-//
-//  private[overwatch] def setFromTime(value: Date): this.type = {
-//    _fromTime_OLD = value.getTime;
-//    this
-//  }
 
   // FromTime by ModuleID
   private[overwatch] def setFromTime(value: Map[Int, Long]): this.type = {
@@ -73,7 +64,7 @@ object Config {
     val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
     TimeTypes(
       fromTime,
-      from_unixtime(lit(fromTime / 1000)),
+      from_unixtime(lit(fromTime / 1000)).cast("timestamp"),
       dt,
       localDT,
       localDT.toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).toEpochMilli,
@@ -88,7 +79,7 @@ object Config {
     val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
     TimeTypes(
       _pipelineSnapTime,
-      from_unixtime(lit(_pipelineSnapTime / 1000)),
+      from_unixtime(lit(_pipelineSnapTime / 1000)).cast("timestamp"),
       dt,
       localDT,
       localDT.toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).toEpochMilli,
@@ -99,6 +90,11 @@ object Config {
 
   private[overwatch] def setOverwatchScope(value: Array[OverwatchScope.Value]): this.type = {
     _overwatchScope = value
+    this
+  }
+
+  private[overwatch] def setPostProcessingFlag(value: Boolean): this.type = {
+    _postProcessingFlag = value
     this
   }
 
@@ -129,6 +125,8 @@ object Config {
   private[overwatch] def runID: String = _runID
 
   private[overwatch] def overwatchScope: Array[OverwatchScope.Value] = _overwatchScope
+
+  private[overwatch] def postProcessingFlag: Boolean = _postProcessingFlag
 
   private[overwatch] def cal: Calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
 
