@@ -11,6 +11,7 @@ import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
+import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
@@ -166,12 +167,10 @@ object Helpers extends SparkSessionWrapper {
   }
 
   def globPath(path: String): Array[String] = {
-    val conf = sc.hadoopConfiguration
-    val glob = new Path(path)
-    val fileSystem = FileSystem.get(conf)
-    val allStatus = fileSystem.globStatus(glob)
-    val allPath = FileUtil.stat2Paths(allStatus)
-    allPath.map(_.toString)
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val driverFS = new Path(path).getFileSystem(hadoopConf)
+    val paths = driverFS.globStatus(new Path(path))
+    paths.map(_.getPath.toString)
   }
 
   def getTables(db: String): Array[String] = {

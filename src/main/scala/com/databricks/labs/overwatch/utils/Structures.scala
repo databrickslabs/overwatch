@@ -18,7 +18,7 @@ case class DataTarget(databaseName: Option[String], databaseLocation: Option[Str
 case class OverwatchParams(tokenSecret: Option[TokenSecret],
                            dataTarget: Option[DataTarget],
                            auditLogPath: Option[String],
-                           eventLogPrefix: Option[String], // no longer needed
+                           eventLogPrefixes: Option[String], // no longer needed TODO - Refactor
                            badRecordsPath: Option[String],
                            overwatchScope: Option[Array[String]]
                           )

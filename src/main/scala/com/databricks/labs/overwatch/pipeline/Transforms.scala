@@ -149,8 +149,6 @@ trait Transforms extends SparkSessionWrapper {
   // Todo -- ODBC/JDBC
   object Session {
 
-    def get: this.type = this
-
     private val serverSessionStartDF = sparkEventsDF
       .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerSessionCreated")
       .select('SparkContextID, 'ip, 'sessionId, 'startTime, 'userName, 'filenameGroup.alias("startFilenameGroup"))
@@ -171,15 +169,23 @@ trait Transforms extends SparkSessionWrapper {
       .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerOperationClosed")
       .select('SparkContextID, 'id, 'closeTime, 'filenameGroup.alias("endFilenameGroup"))
 
-    val serverSessionDF: DataFrame = serverSessionStartDF
+    private val serverSessionDF: DataFrame = serverSessionStartDF
       .join(serverSessionEndDF, Seq("SparkContextID", "sessionId"))
       .withColumn("ServerSessionRunTime", subtractTime('startTime, 'finishTime))
       .drop("startTime", "finishTime")
 
-    val serverOperationDF: DataFrame = serverOperationStartDF
+    private val serverOperationDF: DataFrame = serverOperationStartDF
       .join(serverOperationEndDF, Seq("SparkContextID", "id"))
       .withColumn("ServerOperationRunTime", subtractTime('startTime, 'closeTime))
       .drop("startTime", "finishTime")
+
+    def getSession: DataFrame = {
+      serverSessionDF
+    }
+
+    def getOperation: DataFrame = {
+      serverOperationDF
+    }
 
   }
 
@@ -206,13 +212,15 @@ trait Transforms extends SparkSessionWrapper {
 
   object Application {
 
-    val appDF: DataFrame = sparkEventsDF.filter('Event === "SparkListenerApplicationStart")
+    private val appDF: DataFrame = sparkEventsDF.filter('Event === "SparkListenerApplicationStart")
       .select('SparkContextID, 'AppID, 'AppName,
         from_unixtime('Timestamp / 1000).cast("timestamp").alias("AppStartTime"), 'filenameGroup)
 
+    def get: DataFrame = appDF
+
   }
 
-  object Execution {
+  object Executions {
 
     // This window is necessary to guarantee unique Execution IDs
     // Apparently the Spark listener can occasionally place two events in the log with differing times
@@ -240,21 +248,27 @@ trait Transforms extends SparkSessionWrapper {
       .filter('timeRnk === 1 && 'timeRn === 1)
       .drop("timeRnk", "timeRn")
 
-    val sqlExecDF: DataFrame = sqlExecStartDF
+    private val sqlExecutionsDF: DataFrame = sqlExecStartDF
       .join(sqlExecEndDF.hint("SKEW", Seq("SparkContextID")), Seq("SparkContextID", "ExecutionID"))
       .withColumn("SqlExecutionRunTime", subtractTime('SqlExecStartTime, 'SqlExecEndTime))
       .drop("SqlExecStartTime", "SqlExecEndTime")
+
+    private var returnDF: DataFrame = sqlExecutionsDF
+
+    def get: DataFrame = {
+      returnDF
+    }
+
+    def withJobs: this.type = {
+      returnDF = returnDF
+        .join(Jobs.get, Seq("SparkContextID", "ExecutionID"))
+      this
+    }
 
   }
 
   // TODO -- Usage: Jobs.get.withStages.withTasks.byExecution or .byUser or .byCluster
   object Jobs {
-
-    def compositeKey: Array[Column] = {
-      Array('AppID, 'JobID, 'StageID)
-    }
-
-    def get: this.type = this
 
     // Window attempting to get ClusterID from JobGroup
     private val jobGroupIDW = Window.partitionBy('SparkContextID, 'JobGroupID)
@@ -274,12 +288,45 @@ trait Transforms extends SparkSessionWrapper {
       .select('SparkContextID, 'JobID, 'JobResult, 'CompletionTime,
         'filenameGroup.alias("endFilenameGroup"))
 
-    val jobsDF: DataFrame = jobStartDF.join(jobEndDF.hint("SKEW", Seq("SparkContextID")), Seq("SparkContextID", "JobId"))
+    private val jobsDF: DataFrame = jobStartDF.join(jobEndDF.hint("SKEW", Seq("SparkContextID")), Seq("SparkContextID", "JobId"))
       .withColumn("JobRunTime", subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
+
+    private var returnDF: DataFrame = jobsDF
+    private var _joiner: Seq[String] = Seq("SparkContextID")
+
+    private def withStageID: Column = {
+      if (returnDF.columns.contains("StageID")) {
+        col("StageID")
+      } else {
+        explode(col("StageIDs"))
+      }
+    }
+
+    def get: DataFrame = {
+      returnDF
+    }
+
+    def withStages: this.type = {
+      _joiner ++ Seq("StageID")
+      returnDF = returnDF
+        .withColumn("StageID", explode('StageIDs))
+        .join(Stages.get, _joiner)
+      this
+    }
+
+    def withTasks: this.type = {
+      _joiner ++ Seq("StageID", "StageAttemptID")
+
+      returnDF = returnDF
+        .withColumn("StageID", withStageID)
+        .join(Tasks.get, _joiner.distinct)
+      this
+    }
+
   }
 
-  object Stage {
+  object Stages {
 
     // TODO - What causes a null AppID
     // TODO - Why do some stages start but not finish?
@@ -295,7 +342,7 @@ trait Transforms extends SparkSessionWrapper {
         'StageInfo.alias("StageEndInfo"), 'filenameGroup.alias("endFilenameGroup")
       )
 
-    val stagesDF: DataFrame = stageStartDF
+    private val stagesDF: DataFrame = stageStartDF
       .join(stageEndDF.hint("SKEW", Seq("SparkContextID")), Seq("SparkContextID", "StageID", "StageAttemptID"))
       .withColumn("StageInfo", struct(
         $"StageEndInfo.Accumulables", $"StageEndInfo.CompletionTime", $"StageStartInfo.Details",
@@ -305,11 +352,23 @@ trait Transforms extends SparkSessionWrapper {
       .withColumn("StageRunTime", subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
 
+    private var returnDF: DataFrame = stagesDF
+
+    def get: DataFrame = {
+      returnDF
+    }
+
+    def withTasks: this.type = {
+      returnDF = returnDF
+        .join(Tasks.get, Seq("SparkContextID", "StageID", "StageAttemptID"))
+      this
+    }
+
   }
 
   // Orphan tasks are a result of "TaskEndReason.Reason" != "Success"
   // Failed tasks lose association with their chain
-  object Task {
+  object Tasks {
 
     private val taskStartEvents = sparkEventsDF.filter('Event === "SparkListenerTaskStart")
       .select('SparkContextID,
@@ -328,7 +387,7 @@ trait Transforms extends SparkSessionWrapper {
       )
 
     // TODO -- The join here is overly powerful, it appears to be possible to reduce to SparkContextID, TaskID, TaskAttempt
-    val tasksDF: DataFrame = taskStartEvents.join(
+    private val tasksDF: DataFrame = taskStartEvents.join(
       taskEndEvents.hint("SKEW", Seq("SparkContextID")), Seq(
         "SparkContextID", "StageID", "StageAttemptID", "TaskID", "TaskAttempt", "ExecutorID", "Host"
       ))
@@ -340,8 +399,12 @@ trait Transforms extends SparkSessionWrapper {
       )).drop("TaskStartInfo", "TaskEndInfo")
       .withColumn("TaskRunTime", subtractTime('LaunchTime, 'FinishTime)).drop("LaunchTime", "FinishTime")
 
+    private var returnDF: DataFrame = tasksDF
+
+    def get: DataFrame = {
+      returnDF
+    }
+
   }
-
-
 
 }

@@ -189,7 +189,7 @@ object Initializer extends SparkSessionWrapper {
       val dataTarget = rawParams.dataTarget.getOrElse(
         DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db")))
       val auditLogPath = rawParams.auditLogPath
-      val eventLogPrefix = rawParams.eventLogPrefix
+      val eventLogPrefix = rawParams.eventLogPrefixes
       val badRecordsPath = rawParams.badRecordsPath
 
       // validate token secret requirements
