@@ -121,7 +121,6 @@ class ApiCall extends SparkSessionWrapper {
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
-      if (results.isEmpty) throw new NoNewDataException(s"${_apiName} returned no new data, skipping")
     } catch {
       case e: Throwable => logger.log(Level.ERROR, "Could not execute API call.", e)
     }
@@ -173,7 +172,6 @@ class ApiCall extends SparkSessionWrapper {
       if (!pageCall) {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
         val totalCount = JsonUtils.jsonToMap(results(0)).getOrElse("total_count", 0).toString.toLong
-        if (totalCount == 0) throw new NoNewDataException(s"${_apiName} returned no new data, skipping")
         if (totalCount > limit) paginate(totalCount)
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))

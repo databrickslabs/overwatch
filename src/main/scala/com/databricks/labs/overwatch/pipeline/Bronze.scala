@@ -41,14 +41,16 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
       } else rawQuery
 
         val apiCall = ApiCall(endpoint, Some(query))
-        if (apiType == "post") apiCall.executePost().asStrings
+        val results = if (apiType == "post") apiCall.executePost().asStrings
         else apiCall.executeGet().asStrings
+      if (results.length == 0) throw new NoNewDataException(s"${endpoint} returned no new data, skipping")
+      results
     })
     } catch {
       case e: NoNewDataException =>
         setNewDataRetrievedFlag(false)
         val failMsg = s"Failed: No New Data Retrieved ${endpoint} with query: $extraQuery " +
-          s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load"
+          s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load for module"
         println(failMsg)
         logger.log(Level.WARN, failMsg, e)
         Array("FAILURE")
@@ -156,8 +158,8 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
 
   private def prepClusterEventLogs(moduleID: Int): DataFrame = {
     val extraQuery = Map(
-      "start_time" -> Config.fromTime(moduleID).asUnixTimeMilli,
-      "end_time" -> Config.pipelineSnapTime.asUnixTimeMilli
+      "start_time" -> 1584230400000L, //Config.fromTime(moduleID).asUnixTimeMilli,
+      "end_time" -> 1589485410621L //Config.pipelineSnapTime.asUnixTimeMilli
     )
 
       // TODO -- add assertion that df count == total count from API CALL
