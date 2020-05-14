@@ -158,8 +158,8 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
 
   private def prepClusterEventLogs(moduleID: Int): DataFrame = {
     val extraQuery = Map(
-      "start_time" -> 1584230400000L, //Config.fromTime(moduleID).asUnixTimeMilli,
-      "end_time" -> 1589485410621L //Config.pipelineSnapTime.asUnixTimeMilli
+      "start_time" -> Config.fromTime(moduleID).asUnixTimeMilli,
+      "end_time" -> Config.pipelineSnapTime.asUnixTimeMilli
     )
 
       // TODO -- add assertion that df count == total count from API CALL
