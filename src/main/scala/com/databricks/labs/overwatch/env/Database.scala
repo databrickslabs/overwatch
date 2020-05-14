@@ -9,7 +9,7 @@ import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 
 import scala.collection.mutable.ArrayBuffer
 
-class Database extends SparkSessionWrapper {
+class Database(config: Config) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _databaseName: String = _
@@ -28,8 +28,8 @@ class Database extends SparkSessionWrapper {
   def write(df: DataFrame, target: PipelineTable): Boolean = {
 
     var finalDF: DataFrame = df
-    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", Config.pipelineSnapTime.asColumnTS) else finalDF
-    finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(Config.runID)) else finalDF
+    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS) else finalDF
+    finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
     finalDF = SchemaTools.scrubSchema(finalDF)
 
 
@@ -61,8 +61,8 @@ class Database extends SparkSessionWrapper {
 
 object Database {
 
-  def apply(databaseName: String): Database = {
-    new Database().setDatabaseName(databaseName)
+  def apply(config: Config): Database = {
+    new Database(config).setDatabaseName(config.databaseName)
   }
 
 }

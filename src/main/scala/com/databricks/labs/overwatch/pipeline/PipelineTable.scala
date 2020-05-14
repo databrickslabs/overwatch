@@ -10,13 +10,10 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, DataFrameWriter, Row}
 
 case class PipelineTable(
-                          override val name: String,
+                          name: String,
                           keys: Array[String],
                           tsCol: String,
-                          override val database: String = Config.databaseName,
-                          override val tableType: String = "MANAGED",
-                          override val isTemporary: Boolean = false,
-                          override val description: String = "",
+                          config: Config,
                           dataFrequency: Frequency = Frequency.milliSecond,
                           format: String = "delta",
                           mode: String = "append",
@@ -29,27 +26,27 @@ case class PipelineTable(
                           enableSchemaMerge: Boolean = true,
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true
-                ) extends Table(name, database, description, tableType, isTemporary) with SparkSessionWrapper {
+                ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
 
-  private val (catalogDB, catalogTable) = if (!Config.isFirstRun) {
+  private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try{
-      Some(spark.sessionState.catalog.getDatabaseMetadata(database))
+      Some(spark.sessionState.catalog.getDatabaseMetadata(config.databaseName))
     } catch {
       case e: Throwable => None
     }
 
     val dbTable = try{
-      Some(spark.sessionState.catalog.getTableMetadata(new TableIdentifier(name, Some(database))))
+      Some(spark.sessionState.catalog.getTableMetadata(new TableIdentifier(name, Some(config.databaseName))))
     } catch {
       case e: Throwable => None
     }
     (dbCatalog, dbCatalog)
   } else (None, None)
 
-  val tableFullName: String = s"${database}.${name}"
+  val tableFullName: String = s"${config.databaseName}.${name}"
 
   if (autoOptimize) spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
@@ -64,7 +61,7 @@ case class PipelineTable(
 
   // TODO - set autoOptimizeConfigs
   def writer(df: DataFrame): DataFrameWriter[Row] = {
-    val f = if (Config.isLocalTesting) "parquet" else format
+    val f = if (config.isLocalTesting) "parquet" else format
     var writer = df.write.mode(mode).format(f)
     // TODO - Validate proper repartition to minimize files per partition. Could be autoOptimize
     writer = if(partitionBy.nonEmpty) writer.partitionBy(partitionBy: _*) else writer

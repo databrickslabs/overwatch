@@ -15,8 +15,9 @@ import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Row}
 import scala.collection.mutable.ArrayBuffer
 
 
-class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_workspace, _database)
-  with SparkSessionWrapper with BronzeTargets {
+class Bronze(_workspace: Workspace, _database: Database, _config: Config)
+  extends Pipeline(_workspace, _database, _config)
+  with SparkSessionWrapper {
 
   import spark.implicits._
 
@@ -63,7 +64,7 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
   }
 
   private def collectJobsIDs()(df: DataFrame): DataFrame = {
-    if (Config.overwatchScope.contains(OverwatchScope.jobRuns)) {
+    if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
       //TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
       //DEBUG
       //        val debugX = df.select('job_id).as[Long].collect()
@@ -102,7 +103,7 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
   )
 
   private def collectClusterIDs()(df: DataFrame): DataFrame = {
-    if (Config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
+    if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
       // TODO -- DEBUG -- DISTINCT
       // TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
       // TODO -- SAME AS jobRuns
@@ -113,7 +114,7 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
   }
 
   private def collectEventLogPaths()(df: DataFrame): DataFrame = {
-    if (Config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
+    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
       val colsDF = df.select($"cluster_log_conf.*")
       val cols = colsDF.columns.map(c => s"${c}.destination")
       val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
@@ -156,8 +157,8 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
 
   private def prepClusterEventLogs(moduleID: Int): DataFrame = {
     val extraQuery = Map(
-      "start_time" -> Config.fromTime(moduleID).asUnixTimeMilli,
-      "end_time" -> Config.pipelineSnapTime.asUnixTimeMilli
+      "start_time" -> config.fromTime(moduleID).asUnixTimeMilli,
+      "end_time" -> config.pipelineSnapTime.asUnixTimeMilli
     )
 
       // TODO -- add assertion that df count == total count from API CALL
@@ -189,25 +190,25 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
   // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
   def run(): Unit = {
     val reports = ArrayBuffer[ModuleStatusReport]()
-    if (Config.overwatchScope.contains(OverwatchScope.jobs)) {
+    if (config.overwatchScope.contains(OverwatchScope.jobs)) {
       reports.append(appendJobsProcess.process())
     }
-    if (Config.overwatchScope.contains(OverwatchScope.jobRuns)) {
+    if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
       reports.append(appendJobRunsProcess.process())
     }
-    if (Config.overwatchScope.contains(OverwatchScope.clusters)) {
+    if (config.overwatchScope.contains(OverwatchScope.clusters)) {
       reports.append(appendClustersProcess.process())
     }
-    if (Config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
+    if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
       reports.append(appendClusterEventLogsProcess.process())
     }
-    if (Config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
+    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
       reports.append(appendSparkEventLogsProcess.process())
     }
-    if (Config.overwatchScope.contains(OverwatchScope.pools)) {
+    if (config.overwatchScope.contains(OverwatchScope.pools)) {
       reports.append(appendPoolsProcess.process())
     }
-    if (Config.overwatchScope.contains(OverwatchScope.audit)) {
+    if (config.overwatchScope.contains(OverwatchScope.audit)) {
       reports.append(appendAuditLogsProcess.process())
     }
     //    DOES NOT PRESERVER NECESSARY ORDERING
@@ -234,7 +235,7 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
 }
 
 object Bronze {
-  def apply(workspace: Workspace): Bronze = new Bronze(workspace, workspace.database)
+  def apply(workspace: Workspace): Bronze = new Bronze(workspace, workspace.database, workspace.getConfig)
 //    .setWorkspace(workspace).setDatabase(workspace.database)
 
 }

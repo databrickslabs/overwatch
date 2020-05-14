@@ -9,7 +9,8 @@ import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
-class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionWrapper {
+class Pipeline(_workspace: Workspace, _database: Database,
+               _config: Config) extends BronzeTargets(_config) with SparkSessionWrapper {
 
   // TODO - cleanse column names (no special chars)
   // TODO - enable merge schema on write -- includes checks for number of new columns
@@ -20,6 +21,7 @@ class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionW
   private var _newDataRetrieved: Boolean = true
   protected final val workspace: Workspace = _workspace
   protected final val database: Database = _database
+  protected final val config: Config = _config
   lazy protected final val postProcessor = new PostProcessor()
 
   //  private var _database: Database = _

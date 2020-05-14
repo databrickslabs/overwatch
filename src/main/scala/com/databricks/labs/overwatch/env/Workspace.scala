@@ -11,7 +11,7 @@ import org.apache.spark.sql.types.StructType
 
 import scala.io.Source
 
-class Workspace extends SparkSessionWrapper {
+class Workspace(config: Config) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _database: Database = _
@@ -44,6 +44,8 @@ class Workspace extends SparkSessionWrapper {
     }
 
   }
+
+  private[overwatch] def getConfig: Config = config
 
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"
@@ -98,7 +100,7 @@ class Workspace extends SparkSessionWrapper {
   }
 
   def getAuditLogsDF: DataFrame = {
-    spark.read.json(Config.auditLogPath.get)
+    spark.read.json(config.auditLogPath.get)
   }
 
   // Todo -- Put back to private
@@ -106,7 +108,7 @@ class Workspace extends SparkSessionWrapper {
     if (database.tableExists("spark_events_bronze")) {
       val existingFiles = database.readTable("spark_events_bronze").select('filename)
         .distinct
-      val badFiles = spark.read.format("json").load(s"${Config.badRecordsPath}/*/*/")
+      val badFiles = spark.read.format("json").load(s"${config.badRecordsPath}/*/*/")
         .select('path.alias("filename"))
         .distinct
       filesToBeConsidered.except(existingFiles.unionByName(badFiles)).as[String].collect()
@@ -122,7 +124,7 @@ class Workspace extends SparkSessionWrapper {
     val pathsGlob = getUniqueSparkEventsFiles(pathsGlobDF)
     val dropCols = Array("Classpath Entries", "HadoopProperties", "SparkProperties", "SystemProperties", "sparkPlanInfo")
 
-    val rawEventsDF = spark.read.option("badRecordsPath", Config.badRecordsPath)
+    val rawEventsDF = spark.read.option("badRecordsPath", config.badRecordsPath)
       .json(pathsGlob: _*).drop(dropCols: _*)
 
     SchemaTools.scrubSchema(rawEventsDF)
@@ -146,8 +148,8 @@ class Workspace extends SparkSessionWrapper {
 
 // TODO -- Put the database in the workspace
 object Workspace {
-  def apply(database: Database): Workspace = {
-    new Workspace().setDatabase(database)
+  def apply(database: Database, config: Config): Workspace = {
+    new Workspace(config).setDatabase(database)
   }
 
 }

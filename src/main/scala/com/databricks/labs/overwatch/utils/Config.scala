@@ -10,7 +10,7 @@ import org.apache.spark.sql.functions.{from_unixtime, lit}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
 
-object Config {
+class Config() {
 
   case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
                        asUTCDateTime: LocalDateTime, asMidnightEpochMilli: Long,
@@ -22,7 +22,6 @@ object Config {
   private var _isFirstRun: Boolean = false
   private var _debugFlag: Boolean = false
   private var _lastRunDetail: Array[ModuleStatusReport] = Array[ModuleStatusReport]()
-//  private var _fromTime: Map[Int, Long] = Map(0 -> primordealEpoch)
   private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
