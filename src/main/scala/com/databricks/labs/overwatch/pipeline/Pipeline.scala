@@ -17,12 +17,14 @@ class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionW
   private var _clusterIDs: Array[String] = _
   private var _jobIDs: Array[Long] = _
   private var _eventLogGlob: DataFrame = _
+  private var _newDataRetrieved: Boolean = true
   protected final val workspace: Workspace = _workspace
   protected final val database: Database = _database
   lazy protected final val postProcessor = new PostProcessor()
-//  private var _database: Database = _
 
-  case class Module(moduleID: Int,moduleName: String)
+  //  private var _database: Database = _
+
+  case class Module(moduleID: Int, moduleName: String)
 
   case class EtlDefinition(
                             sourceDF: DataFrame,
@@ -46,16 +48,6 @@ class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionW
 
   import spark.implicits._
 
-//  def setWorkspace(value: Workspace): this.type = {
-//    _workspace = value
-//    this
-//  }
-//
-//  def setDatabase(value: Database): this.type = {
-//    _database = value
-//    this
-//  }
-
   protected def setClusterIDs(value: Array[String]): this.type = {
     _clusterIDs = value
     this
@@ -71,13 +63,36 @@ class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionW
     this
   }
 
+  protected def setNewDataRetrievedFlag(value: Boolean): this.type = {
+    _newDataRetrieved = value
+    this
+  }
+
   protected def clusterIDs: Array[String] = _clusterIDs
 
   protected def jobIDs: Array[Long] = _jobIDs
 
+  protected def newDataRetrieved: Boolean = _newDataRetrieved
+
   protected def sparkEventsLogGlob: DataFrame = _eventLogGlob
 
+  private def getLastOptimized(moduleID: Int): Long = {
+    val lastRunOptimizeTS = Config.lastRunDetail.filter(_.moduleID == moduleID)
+    if (!Config.isFirstRun && lastRunOptimizeTS.nonEmpty) lastRunOptimizeTS.head.lastOptimizedTS
+    else 0L
+  }
+
+  // TODO - make this timeframe configurable by module
+  private def needsOptimize(moduleID: Int): Boolean = {
+    val WEEK = 1000L * 60L * 60L * 24L * 7L // week of milliseconds
+    val tsLessSevenD = System.currentTimeMillis() - WEEK.toLong
+    if ((getLastOptimized(moduleID) < tsLessSevenD ||
+      Config.isFirstRun) && !Config.isLocalTesting) true
+    else false
+  }
+
   // TODO -- Enable parallelized write
+  // TODO -- Add assertion that max(count) groupBy keys == 1
   private[overwatch] def append(target: PipelineTable,
                                 newDataOnly: Boolean = false,
                                 cdc: Boolean = false)(df: DataFrame, module: Module): ModuleStatusReport = {
@@ -85,11 +100,9 @@ class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionW
     var finalDF = df
     var fromTS: Long = 0L
     var untilTS: Long = 0L
+    var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
     val fromTime = Config.fromTime(module.moduleID)
-    val startLogMsg = if (newDataOnly) {
-      s"Beginning append to ${target.tableFullName}. " +
-        s"\n From Time: ${fromTime.asTSString} \n Until Time: ${Config.pipelineSnapTime.asTSString}"
-    } else s"Beginning append to ${target.tableFullName}"
+
 
     finalDF = if (target.zOrderBy.nonEmpty) {
       SchemaTools.moveColumnsToFront(finalDF, target.zOrderBy)
@@ -97,25 +110,32 @@ class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionW
 
     if (newDataOnly) {
 
-//      val x = finalDF.schema.fields.collect{case x if x.name == target.tsCol => x.dataType}
+      fromTS = fromTime.asUnixTimeMilli
+      untilTS = Config.pipelineSnapTime.asUnixTimeMilli
 
       val typedTSCol = finalDF.schema.fields.filter(_.name == target.tsCol).head.dataType match {
         case dt: TimestampType =>
-          fromTS = fromTime.asUnixTime
-          untilTS = Config.pipelineSnapTime.asUnixTime
           col(target.tsCol).cast(LongType)
         case dt: DateType =>
+          // Date filters -- The unixTS must be at the epoch Second level but the storage must be at the
+          // epoch MilliSecond level
           untilTS = Config.pipelineSnapTime.asMidnightEpochMilli
           fromTS = fromTime.asMidnightEpochMilli
-          col(target.tsCol)
+          to_timestamp(col(target.tsCol)).cast(LongType)
         case _ => col(target.tsCol)
       }
 
       finalDF = finalDF
-        .filter(typedTSCol.between(fromTS, untilTS))
+        .filter(typedTSCol.between(fromTS / 1000, untilTS / 1000))
     }
 
+    val startLogMsg = if (newDataOnly) {
+      s"Beginning append to ${target.tableFullName}. " +
+        s"\n From Time: ${Config.createTimeDetail(fromTS).asTSString} \n"+
+        s"Until Time: ${Config.createTimeDetail(untilTS).asTSString}"
+    } else s"Beginning append to ${target.tableFullName}"
     logger.log(Level.INFO, startLogMsg)
+
     val startTime = System.currentTimeMillis()
     val status: String = try {
       _database.write(finalDF, target)
@@ -138,7 +158,11 @@ class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionW
     } finally df.unpersist(blocking = true)
 
     // TODO -- this should be calculated by module/target
-    if (Config.postProcessingFlag) postProcessor.add(target)
+
+    if (needsOptimize(module.moduleID)) {
+      postProcessor.add(target)
+      lastOptimizedTS = Config.pipelineSnapTime.asUnixTimeMilli
+    }
 
     val endTime = System.currentTimeMillis()
 
@@ -149,23 +173,16 @@ class Pipeline(_workspace: Workspace, _database: Database) extends SparkSessionW
       runEndTS = endTime,
       fromTS = fromTS,
       untilTS = untilTS,
+      dataFrequency = target.dataFrequency.toString,
       status = status,
-      lastOptimizedTS = untilTS,
+      lastOptimizedTS = lastOptimizedTS,
+      vacuumRetentionHours = 24 * 7,
       inputConfig = Config.inputConfig,
       parsedConfig = Config.parsedConfig
     )
 
 
-
   }
-
-  //  def appendBronze(): Boolean = {
-  //
-  //    try {
-  //      val reports = Bronze().run()
-  //    }
-  //
-  //  }
 
 }
 

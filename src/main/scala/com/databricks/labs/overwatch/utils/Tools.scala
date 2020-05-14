@@ -217,9 +217,9 @@ object Helpers extends SparkSessionWrapper {
         val sql = s"""optimize ${tbl.tableFullName} ${zorderColumns}"""
         println(s"optimizing: ${tbl.tableFullName} --> $sql")
         spark.sql(sql)
-        if (tbl.vacuum) {
-          println(s"vacuuming: ${tbl.tableFullName}")
-          spark.sql(s"vacuum ${tbl.tableFullName}")
+        if (tbl.vacuum > 0) {
+          println(s"vacuuming: ${tbl.tableFullName}, Retention == ${tbl.vacuum}")
+          spark.sql(s"VACUUM ${tbl.tableFullName} RETAIN ${tbl.vacuum} HOURS")
         }
         println(s"Complete: ${tbl.tableFullName}")
       } catch {

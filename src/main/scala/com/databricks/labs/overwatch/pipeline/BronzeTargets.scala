@@ -1,5 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.labs.overwatch.utils.Frequency
+
 trait BronzeTargets {
 
   lazy protected val jobsTarget: PipelineTable = PipelineTable("jobs_bronze", Array("job_id"), "created_time",
@@ -14,7 +16,7 @@ trait BronzeTargets {
       "Pipeline_SnapTS, Overwatch_RunID").split(", "))
   lazy protected val auditLogsTarget: PipelineTable = PipelineTable("audit_log_bronze", Array("requestId", "timestamp"), "date",
     partitionBy = Array("date"), zOrderBy = Array("timestamp"), statsColumns = ("actionName, requestId, serviceName, sessionId, " +
-      "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "))
+      "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "), dataFrequency = Frequency.daily)
   lazy protected val clusterEventsTarget: PipelineTable = PipelineTable("cluster_events_bronze", Array("cluster_id", "timestamp"), "timestamp",
     partitionBy = Array("cluster_id"), zOrderBy = Array("timestamp"), statsColumns = ("cluster_id, timestamp, type, " +
       "Pipeline_SnapTS, Overwatch_RunID").split(", "))

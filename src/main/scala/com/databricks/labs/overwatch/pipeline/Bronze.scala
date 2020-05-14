@@ -4,7 +4,7 @@ import java.io.{PrintWriter, StringWriter}
 
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport, OverwatchScope, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{ApiCallFailure, Config, Helpers, ModuleStatusReport, NoNewDataException, OverwatchScope, SchemaTools, SparkSessionWrapper}
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -30,6 +30,7 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
     val idsPar = ids.par
     idsPar.tasksupport = taskSupport
 
+    try {
     ids.flatMap(id => {
       val rawQuery = Map(
         idsKey -> id
@@ -39,10 +40,26 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
         extraQuery.get ++ rawQuery
       } else rawQuery
 
-      val apiCall = ApiCall(endpoint, Some(query))
-      if (apiType == "post") apiCall.executePost().asStrings
-      else apiCall.executeGet().asStrings
+        val apiCall = ApiCall(endpoint, Some(query))
+        if (apiType == "post") apiCall.executePost().asStrings
+        else apiCall.executeGet().asStrings
     })
+    } catch {
+      case e: NoNewDataException =>
+        setNewDataRetrievedFlag(false)
+        val failMsg = s"Failed: No New Data Retrieved ${endpoint} with query: $extraQuery " +
+          s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load"
+        println(failMsg)
+        logger.log(Level.WARN, failMsg, e)
+        Array("FAILURE")
+      case e: Throwable =>
+        val failMsg = s"Failed: ${endpoint} with query: $extraQuery " +
+          s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load"
+        println(failMsg)
+        println(e)
+        logger.log(Level.WARN, failMsg, e)
+        Array("FAILURE")
+    }
   }
 
   private def collectJobsIDs()(df: DataFrame): DataFrame = {
@@ -52,7 +69,7 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
       //        val debugX = df.select('job_id).as[Long].collect()
       //        val debugY = df.select('job_id).distinct.as[Long].collect()
       // setJobIDs(df.select('job_id).distinct().as[Long].collect())
-      setJobIDs(df.select('job_id).as[Long].collect())
+      setJobIDs(df.select('job_id).distinct().as[Long].collect())
     }
     df
   }
@@ -64,14 +81,17 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
     Module(1001, "Bronze_Jobs")
   )
 
+  // TODO -- add assertion that df count == total count from API CALL
   private def prepJobRunsDF: DataFrame = {
     val extraQuery = Map("completed_only" -> true)
     val jobRuns = apiByID("jobs/runs/list",
       "get", jobIDs, "job_id", Some(extraQuery))
 
-    // TODO -- add filter to remove runs before fromTS
-    spark.read.json(Seq(jobRuns: _*).toDS()).select(explode('runs).alias("runs"))
-      .select(col("runs.*"))
+    if (newDataRetrieved) {
+      // TODO -- add filter to remove runs before fromTS
+      spark.read.json(Seq(jobRuns: _*).toDS()).select(explode('runs).alias("runs"))
+        .select(col("runs.*"))
+    } else jobRuns.toSeq.toDF("FAILURE")
   }
 
   lazy private val appendJobRunsProcess = EtlDefinition(
@@ -87,7 +107,7 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
       // TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
       // TODO -- SAME AS jobRuns
       //        setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
-      setClusterIDs(df.select('cluster_id).as[String].collect())
+      setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
     }
     df
   }
@@ -130,27 +150,32 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
   lazy private val appendAuditLogsProcess = EtlDefinition(
     workspace.getAuditLogsDF,
     None,
-    append(auditLogsTarget),
+    append(auditLogsTarget, newDataOnly = true),
     Module(1004, "Bronze_AuditLogs")
   )
 
   private def prepClusterEventLogs(moduleID: Int): DataFrame = {
     val extraQuery = Map(
-      "start_time" -> Config.fromTime(moduleID).asUnixTime,
-      "end_time" -> Config.pipelineSnapTime.asUnixTime
+      "start_time" -> Config.fromTime(moduleID).asUnixTimeMilli,
+      "end_time" -> Config.pipelineSnapTime.asUnixTimeMilli
     )
-    val clusterEvents = apiByID("clusters/events", "post",
-      clusterIDs, "cluster_id", Some(extraQuery))
 
-    spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
-      .select(col("events.*"))
+      // TODO -- add assertion that df count == total count from API CALL
+      val clusterEvents = apiByID("clusters/events", "post",
+        clusterIDs, "cluster_id", Some(extraQuery))
+
+    if (newDataRetrieved) {
+      spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
+        .select(col("events.*"))
+    } else clusterEvents.toSeq.toDF("FAILURE")
+
   }
 
   private val appendClusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs")
   lazy private val appendClusterEventLogsProcess = EtlDefinition(
     prepClusterEventLogs(appendClusterEventLogsModule.moduleID),
     None,
-    append(clusterEventsTarget),
+    append(clusterEventsTarget, newDataOnly = true),
     appendClusterEventLogsModule
   )
 

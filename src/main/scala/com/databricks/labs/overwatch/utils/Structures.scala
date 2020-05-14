@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.catalyst.ScalaReflection
@@ -38,8 +39,10 @@ case class ModuleStatusReport(
                                runEndTS: Long,
                                fromTS: Long,
                                untilTS: Long,
+                               dataFrequency: String,
                                status: String,
                                lastOptimizedTS: Long,
+                               vacuumRetentionHours: Int,
                                inputConfig: OverwatchParams,
                                parsedConfig: ParsedConfig
                              )
@@ -53,6 +56,14 @@ object Layer extends Enumeration {
   type Layer = Value
   val bronze, silver, gold, consumption = Value
 }
+
+object Frequency extends Enumeration {
+  type Frequency = Value
+  val milliSecond, daily = Value
+}
+
+private[overwatch] class NoNewDataException(s: String) extends Exception(s) {}
+private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
 
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =
@@ -72,6 +83,9 @@ object OverwatchEncoders {
 
   implicit def overwatchParams: org.apache.spark.sql.Encoder[OverwatchParams] =
     org.apache.spark.sql.Encoders.kryo[OverwatchParams]
+
+  implicit def frequency: org.apache.spark.sql.Encoder[Frequency] =
+    org.apache.spark.sql.Encoders.kryo[Frequency]
 
   implicit def moduleStatusReport: org.apache.spark.sql.Encoder[ModuleStatusReport] =
     org.apache.spark.sql.Encoders.kryo[ModuleStatusReport]

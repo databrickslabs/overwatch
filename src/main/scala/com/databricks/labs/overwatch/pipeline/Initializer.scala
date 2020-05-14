@@ -4,7 +4,7 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ParamDeserializer
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.OverwatchScope._
-import com.databricks.labs.overwatch.utils.{Config, DataTarget, ModuleStatusReport, OverwatchParams, OverwatchScope, SparkSessionWrapper, TokenSecret}
+import com.databricks.labs.overwatch.utils.{Config, DataTarget, ModuleStatusReport, OverwatchEncoders, OverwatchParams, OverwatchScope, SparkSessionWrapper, TokenSecret}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -23,15 +23,6 @@ class Initializer extends SparkSessionWrapper {
 
   def initPipelineRun(): this.type = {
     if (spark.catalog.databaseExists(Config.databaseName)) {
-      // Determine if >= 7 days since last pipeline run, if so, set postProcessing Flag
-      // TODO -- This is WRONG -- Need to adjust pipeline_report to add last optimized date
-      // TODO -- if table exists ...
-      Config.setPostProcessingFlag(spark.table(s"${Config.databaseName}.pipeline_report")
-        .select(
-          (current_timestamp.cast("long") -
-            max('Pipeline_SnapTS).cast("long")) >= lit(604800)).as[Boolean]
-        .collect()(0))
-
       val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
       val lastRunDetail = spark.table(s"${Config.databaseName}.pipeline_report")
         .filter('Status === "SUCCESS")

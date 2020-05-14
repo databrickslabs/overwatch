@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.Frequency.Frequency
+import com.databricks.labs.overwatch.utils.{Config, Frequency, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.Logger
 import org.apache.spark.sql.catalog.Table
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -16,6 +17,7 @@ case class PipelineTable(
                           override val tableType: String = "MANAGED",
                           override val isTemporary: Boolean = false,
                           override val description: String = "",
+                          dataFrequency: Frequency = Frequency.milliSecond,
                           format: String = "delta",
                           mode: String = "append",
                           autoOptimize: Boolean = false,
@@ -23,7 +25,7 @@ case class PipelineTable(
                           partitionBy: Array[String] = Array(),
                           statsColumns: Array[String] = Array(),
                           zOrderBy: Array[String] = Array(),
-                          vacuum: Boolean = true, // Todo -- Change this to set retention time
+                          vacuum: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
                           enableSchemaMerge: Boolean = true,
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true

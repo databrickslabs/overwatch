@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{ApiCallFailure, Config, JsonUtils, NoNewDataException, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -19,7 +19,7 @@ class ApiCall extends SparkSessionWrapper {
   private var _getQueryString: String = _
   private var _initialQueryMap: Map[String, Any] = _
   private val results = ArrayBuffer[String]()
-  private var _limit: Int = _
+  private var _limit: Long = _
   private var _req: String = _
   private val mapper = JsonUtils.objectMapper
 
@@ -53,7 +53,7 @@ class ApiCall extends SparkSessionWrapper {
 
   private def getQueryString: String = _getQueryString
 
-  private def limit: Int = _limit
+  private def limit: Long = _limit
 
   def getCurlCommand: String = curlCommand
 
@@ -97,16 +97,23 @@ class ApiCall extends SparkSessionWrapper {
     }
   }
 
+  @throws(classOf[ApiCallFailure])
   def executeGet(pageCall: Boolean = false): this.type = {
     try {
-      val x = req + getQueryString
-      val y = Config.token
       val result = Http(req + getQueryString)
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${Config.token}"
         )).asString
+      if (result.isError) {
+        if (mapper.readTree(result.body).has("error_code")) {
+          val err = mapper.readTree(result.body).get("error_code").asText()
+          throw new ApiCallFailure(s"${_apiName} could not execute: ${err}")
+        } else {
+          throw new ApiCallFailure(s"${_apiName} could not execute: ${result.code}")
+        }
+      }
       if (!pageCall) {
         // Append initial results
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
@@ -114,6 +121,7 @@ class ApiCall extends SparkSessionWrapper {
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
+      if (results.isEmpty) throw new NoNewDataException(s"${_apiName} returned no new data, skipping")
     } catch {
       case e: Throwable => logger.log(Level.ERROR, "Could not execute API call.", e)
     }
@@ -135,7 +143,7 @@ class ApiCall extends SparkSessionWrapper {
   // TODO - Use RDD if any of the results start getting to big
   private def paginate(totalCount: Long): Unit = {
 
-    val offsets = (0L to totalCount by limit).toArray
+    val offsets = (limit to totalCount by limit).toArray
     if (!_initialQueryMap.contains("end_time")) {
       _initialQueryMap += ("end_time" -> System.currentTimeMillis().toString) // TODO -- Change this to start fromTime in config
     }
@@ -148,6 +156,7 @@ class ApiCall extends SparkSessionWrapper {
 
   }
 
+  @throws(classOf[NoNewDataException])
   def executePost(pageCall: Boolean = false): this.type = {
 
     // TODO -- Add proper try catch
@@ -160,9 +169,11 @@ class ApiCall extends SparkSessionWrapper {
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${Config.token}"
         )).asString
+      if (result.isError) throw new ApiCallFailure(s"${_apiName} could not execute")
       if (!pageCall) {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
         val totalCount = JsonUtils.jsonToMap(results(0)).getOrElse("total_count", 0).toString.toLong
+        if (totalCount == 0) throw new NoNewDataException(s"${_apiName} returned no new data, skipping")
         if (totalCount > limit) paginate(totalCount)
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))

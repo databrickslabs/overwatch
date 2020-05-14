@@ -12,7 +12,7 @@ import org.apache.log4j.{Level, Logger}
 
 object Config {
 
-  case class TimeTypes(asUnixTime: Long, asColumnTS: Column, asJavaDate: Date,
+  case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
                        asUTCDateTime: LocalDateTime, asMidnightEpochMilli: Long,
                        asTSString: String, asDTString: String)
 
@@ -20,7 +20,6 @@ object Config {
   private final val _runID = UUID.randomUUID().toString.replace("-","")
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _isFirstRun: Boolean = false
-  private var _postProcessingFlag: Boolean = false
   private var _debugFlag: Boolean = false
   private var _lastRunDetail: Array[ModuleStatusReport] = Array[ModuleStatusReport]()
 //  private var _fromTime: Map[Int, Long] = Map(0 -> primordealEpoch)
@@ -48,58 +47,41 @@ object Config {
       .toEpochMilli
   }
 
-  // FromTime by ModuleID
-//  private[overwatch] def setFromTime(value: Map[Int, Long]): this.type = {
-//    _fromTime = value
-//    this
-//  }
-
   private[overwatch] def setPipelineSnapTime(): this.type = {
     _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
     this
   }
 
-  // Inclusive when used as fromTS logic will be >= NOT >
   @throws(classOf[NoSuchElementException])
   private[overwatch] def fromTime(moduleID: Int): TimeTypes = {
     val lastRunStatus = if (!isFirstRun) lastRunDetail.filter(_.moduleID == moduleID) else lastRunDetail
     require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
     val fromTime = if (lastRunStatus.length != 1) primordealEpoch else lastRunStatus.head.untilTS
-    val dt = new Date(fromTime)
-    val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
-    TimeTypes(
-      fromTime,
-      from_unixtime(lit(fromTime / 1000)).cast("timestamp"),
-      dt,
-      localDT,
-      localDT.toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).toEpochMilli,
-      tsFormat.format(new Date(fromTime)),
-      dtFormat.format(new Date(fromTime))
-    )
+    createTimeDetail(fromTime)
   }
 
   // Exclusive when used as untilTS logic will be < NOT <=
   private[overwatch] def pipelineSnapTime: TimeTypes = {
-    val dt = new Date(_pipelineSnapTime)
+    createTimeDetail(_pipelineSnapTime)
+  }
+
+  private[overwatch] def createTimeDetail(tsMilli: Long): TimeTypes = {
+    val dt = new Date(tsMilli)
     val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
     TimeTypes(
-      _pipelineSnapTime,
-      from_unixtime(lit(_pipelineSnapTime / 1000)).cast("timestamp"),
+      tsMilli,
+      tsMilli / 1000,
+      from_unixtime(lit(tsMilli / 1000)).cast("timestamp"),
       dt,
       localDT,
       localDT.toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).toEpochMilli,
-      tsFormat.format(new Date(_pipelineSnapTime)),
-      dtFormat.format(new Date(_pipelineSnapTime))
+      tsFormat.format(new Date(tsMilli)),
+      dtFormat.format(new Date(tsMilli))
     )
   }
 
   private[overwatch] def setOverwatchScope(value: Array[OverwatchScope.Value]): this.type = {
     _overwatchScope = value
-    this
-  }
-
-  private[overwatch] def setPostProcessingFlag(value: Boolean): this.type = {
-    _postProcessingFlag = value
     this
   }
 
@@ -109,8 +91,6 @@ object Config {
   }
 
   private[overwatch] def setIsFirstRun(value: Boolean): this.type = {
-    val postProcessing = if (!isLocalTesting) value else false
-    setPostProcessingFlag(postProcessing)
     _isFirstRun = value
     this
   }
@@ -153,23 +133,20 @@ object Config {
 
   private[overwatch] def overwatchScope: Array[OverwatchScope.Value] = _overwatchScope
 
-  private[overwatch] def postProcessingFlag: Boolean = _postProcessingFlag
-
   private[overwatch] def cal: Calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
 
   private[overwatch] def tsFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   private[overwatch] def dtFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
+  // Set scope for local testing
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.clusters, OverwatchScope.jobs,
-      OverwatchScope.jobRuns, OverwatchScope.clusterEvents)
+    _overwatchScope = Array(OverwatchScope.audit)
     _databaseName = "Overwatch"
     _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
-    _auditLogPath = if (System.getenv("AUDIT_LOG_PATH") == "") None
-    else Some(System.getenv("AUDIT_LOG_PATH"))
+    _auditLogPath = Some("C:\\Dev\\git\\Databricks--Overwatch\\data_samples\\audit_logs")
     this
 
   }
