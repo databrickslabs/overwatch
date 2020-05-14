@@ -4,14 +4,14 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ParamDeserializer
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.OverwatchScope._
-import com.databricks.labs.overwatch.utils.{Config, DataTarget, OverwatchParams, OverwatchScope, SparkSessionWrapper, TokenSecret}
+import com.databricks.labs.overwatch.utils.{Config, DataTarget, ModuleStatusReport, OverwatchParams, OverwatchScope, SparkSessionWrapper, TokenSecret}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{rank, row_number, current_timestamp, max, lit}
+import org.apache.spark.sql.functions.{current_timestamp, lit, max, rank, row_number}
 
 import scala.collection.JavaConverters._
 
@@ -21,28 +21,29 @@ class Initializer extends SparkSessionWrapper {
 
   import spark.implicits._
 
-  def initializeTimestamps(): this.type = {
-    val fromTimeByModuleID = if (spark.catalog.databaseExists(Config.databaseName)) {
+  def initPipelineRun(): this.type = {
+    if (spark.catalog.databaseExists(Config.databaseName)) {
       // Determine if >= 7 days since last pipeline run, if so, set postProcessing Flag
+      // TODO -- This is WRONG -- Need to adjust pipeline_report to add last optimized date
+      // TODO -- if table exists ...
       Config.setPostProcessingFlag(spark.table(s"${Config.databaseName}.pipeline_report")
         .select(
           (current_timestamp.cast("long") -
             max('Pipeline_SnapTS).cast("long")) >= lit(604800)).as[Boolean]
         .collect()(0))
 
-      val w = Window.partitionBy('moduleID).orderBy('untilTS)
-      spark.table(s"${Config.databaseName}.pipeline_report")
+      val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
+      val lastRunDetail = spark.table(s"${Config.databaseName}.pipeline_report")
+        .filter('Status === "SUCCESS")
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter('rnk === 1 && 'rn === 1)
-        .select('moduleID, 'untilTS)
-        .rdd.map(r => (r.getInt(0), r.getLong(1)))
-        .collectAsMap().toMap
+        .as[ModuleStatusReport]
+        .collect()
+      Config.setLastRunDetail(lastRunDetail)
     } else {
-      Config.setPostProcessingFlag(true)
-      Map(0 -> Config.fromTime(0).asUnixTime)
+      Config.setIsFirstRun(true)
     }
-    Config.setFromTime(fromTimeByModuleID)
     Config.setPipelineSnapTime()
     this
   }
@@ -79,7 +80,7 @@ object Initializer extends SparkSessionWrapper {
 
     // Todo - Move timestamp init to correct location
     val initializer = new Initializer()
-      .initializeTimestamps()
+      .initPipelineRun()
 
     logger.log(Level.INFO, "Initializing Database")
     val database = initializer.initializeDatabase()
@@ -189,7 +190,6 @@ object Initializer extends SparkSessionWrapper {
       val dataTarget = rawParams.dataTarget.getOrElse(
         DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db")))
       val auditLogPath = rawParams.auditLogPath
-      val eventLogPrefix = rawParams.eventLogPrefixes
       val badRecordsPath = rawParams.badRecordsPath
 
       // validate token secret requirements
@@ -221,7 +221,6 @@ object Initializer extends SparkSessionWrapper {
 
       Config.setDatabaseNameandLoc(dbName, dbLocation)
       Config.setAuditLogPath(auditLogPath)
-      Config.setEventLogPrefix(eventLogPrefix)
 
       // Todo -- add validation to badRecordsPath
       Config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))

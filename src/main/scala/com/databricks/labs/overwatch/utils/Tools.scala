@@ -7,6 +7,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import java.util.{Date, UUID}
 
+import com.databricks.labs.overwatch.pipeline.PipelineTable
 import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
 import javax.crypto
 import javax.crypto.KeyGenerator
@@ -166,6 +167,8 @@ object Helpers extends SparkSessionWrapper {
     files.map(_.getPath.toString)
   }
 
+  // TODO - change this to the faster glob path here
+  //  https://databricks.slack.com/archives/G95GCH8LT/p1589320667122200?thread_ts=1589317810.117200&cid=G95GCH8LT
   def globPath(path: String): Array[String] = {
     val hadoopConf = spark.sessionState.newHadoopConf()
     val driverFS = new Path(path).getFileSystem(hadoopConf)
@@ -196,6 +199,29 @@ object Helpers extends SparkSessionWrapper {
           spark.sql(s"vacuum ${db}.${tbl}")
         }
         println(s"Complete: ${db}.${tbl}")
+      } catch {
+        case e: Throwable => println(e.printStackTrace())
+      }
+    })
+  }
+
+  def parOptimize(tables: Array[PipelineTable]): Unit = {
+
+    val tablesPar = tables.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    tablesPar.tasksupport = taskSupport
+
+    tablesPar.foreach(tbl => {
+      try{
+        val zorderColumns = if (tbl.zOrderBy.nonEmpty) s"ZORDER BY (${tbl.zOrderBy.mkString(", ")})" else ""
+        val sql = s"""optimize ${tbl.tableFullName} ${zorderColumns}"""
+        println(s"optimizing: ${tbl.tableFullName} --> $sql")
+        spark.sql(sql)
+        if (tbl.vacuum) {
+          println(s"vacuuming: ${tbl.tableFullName}")
+          spark.sql(s"vacuum ${tbl.tableFullName}")
+        }
+        println(s"Complete: ${tbl.tableFullName}")
       } catch {
         case e: Throwable => println(e.printStackTrace())
       }
@@ -235,6 +261,24 @@ object Helpers extends SparkSessionWrapper {
         println(s"Completed: $tbl")
       } catch {
         case e: Throwable => println(s"FAILED: $tbl --> $sql")
+      }
+    })
+  }
+
+  def computeStats(tables: Array[PipelineTable]): Unit = {
+    val tablesPar = tables.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    tablesPar.tasksupport = taskSupport
+
+    tablesPar.foreach(tbl => {
+      val forColumns = if (tbl.statsColumns.nonEmpty) s"for columns ${tbl.statsColumns.mkString(", ")}" else ""
+      val sql = s"""analyze table ${tbl.tableFullName} compute statistics ${forColumns}"""
+      try {
+        println(s"Analyzing: ${tbl.tableFullName} --> $sql")
+        spark.sql(sql)
+        println(s"Completed: ${tbl.tableFullName}")
+      } catch {
+        case e: Throwable => println(s"FAILED: ${tbl.tableFullName} --> $sql")
       }
     })
   }

@@ -6,7 +6,7 @@ import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 
-trait Transforms extends SparkSessionWrapper {
+trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
 
   import spark.implicits._
 

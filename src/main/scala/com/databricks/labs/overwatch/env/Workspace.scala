@@ -38,6 +38,7 @@ class Workspace extends SparkSessionWrapper {
       ApiCall(jobsEndpoint)
         .executeGet()
         .asDF
+
     } catch {
       case e: Throwable => logger.log(Level.ERROR, "Could", e); spark.sql("select ERROR")
     }
@@ -124,7 +125,7 @@ class Workspace extends SparkSessionWrapper {
     val rawEventsDF = spark.read.option("badRecordsPath", Config.badRecordsPath)
       .json(pathsGlob: _*).drop(dropCols: _*)
 
-    val cleanEvents = SchemaTools.scrubSchema(rawEventsDF)
+    SchemaTools.scrubSchema(rawEventsDF)
       .withColumn("filename", input_file_name)
       .withColumn("pathSize", size(split('filename, "/")) - lit(2))
       .withColumn("SparkContextID", split('filename, "/")('pathSize))
@@ -134,10 +135,6 @@ class Workspace extends SparkSessionWrapper {
       .withColumn("ExecutionParent", $"Properties.sparksqlexecutionparent")
       .drop("pathSize")
       .repartition()
-
-    // TODO -- When cols are arranged in abstract Table class, pull the zorder cols from there
-    // Rearranging columns to collect stats to be able to zorder on them later
-    SchemaTools.moveColumnsToFront(cleanEvents, "SparkContextID, ClusterID, JobGroupID".split(", "))
   }
 
   def setDatabase(value: Database): this.type = {

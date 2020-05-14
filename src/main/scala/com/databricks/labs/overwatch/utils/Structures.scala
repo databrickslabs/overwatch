@@ -18,7 +18,6 @@ case class DataTarget(databaseName: Option[String], databaseLocation: Option[Str
 case class OverwatchParams(tokenSecret: Option[TokenSecret],
                            dataTarget: Option[DataTarget],
                            auditLogPath: Option[String],
-                           eventLogPrefixes: Option[String], // no longer needed TODO - Refactor
                            badRecordsPath: Option[String],
                            overwatchScope: Option[Array[String]]
                           )
@@ -29,8 +28,7 @@ case class ParsedConfig(
                          targetDatabase: String,
                          targetDatabaseLocation: String,
                          auditLogPath: Option[String],
-                         passthroughLogPath: Option[String],
-                         eventLogPefix: Option[String]
+                         passthroughLogPath: Option[String]
                        )
 
 case class ModuleStatusReport(
@@ -41,6 +39,7 @@ case class ModuleStatusReport(
                                fromTS: Long,
                                untilTS: Long,
                                status: String,
+                               lastOptimizedTS: Long,
                                inputConfig: OverwatchParams,
                                parsedConfig: ParsedConfig
                              )

@@ -1,7 +1,8 @@
 package com.databricks.labs.overwatch.env
 
+import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Dataset, Row}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
@@ -24,33 +25,19 @@ class Database extends SparkSessionWrapper {
 
   def doAutoOptimize = ???
 
-  def write(inputDF: DataFrame, tableName: String, format: String = "delta",
-            mode: String = "append", autoOptimize: Boolean = false, autoCompact: Boolean = false,
-            partitionBy: Array[String] = Array(),
-            withCreateDate: Boolean = false, withOverwatchRunID: Boolean = false): Boolean = {
+  def write(df: DataFrame, target: PipelineTable): Boolean = {
 
-    var finalDF: DataFrame = inputDF
-    if (withCreateDate) finalDF = finalDF.withColumn("Pipeline_SnapTS", Config.pipelineSnapTime.asColumnTS)
-    if (withOverwatchRunID) finalDF = finalDF.withColumn("Overwatch_RunID", lit(Config.runID))
-
+    var finalDF: DataFrame = df
+    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", Config.pipelineSnapTime.asColumnTS) else finalDF
+    finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(Config.runID)) else finalDF
     finalDF = SchemaTools.scrubSchema(finalDF)
 
-    try {
-      logger.log(Level.INFO, s"Beginning write to ${_databaseName}.${tableName}")
-      if (autoCompact) doAutoCompact
-      if (autoOptimize) doAutoOptimize
 
-      // TODO - Validate proper repartition to minimize files per partition. Could be autoOptimize
-      if (!partitionBy.isEmpty) {
-        finalDF.write.format(format).mode(mode)
-          .partitionBy(partitionBy: _*)
-          .saveAsTable(s"${_databaseName}.${tableName}")
-        true
-      } else {
-        finalDF.write.format(format).mode(mode).option("mergeSchema", "true")
-          .saveAsTable(s"${_databaseName}.${tableName}")
-        true
-      }
+    try {
+      logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
+      target.writer(finalDF).saveAsTable(target.tableFullName)
+      logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
+      true
     } catch {
       case e: Throwable => logger.log(Level.ERROR, s"Failed to write to ${_databaseName}", e); false
     }

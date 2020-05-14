@@ -5,7 +5,7 @@ import java.time.temporal.ChronoUnit
 import java.time.{LocalDateTime, LocalTime, ZoneId, ZoneOffset}
 import java.util.{Calendar, Date, TimeZone, UUID}
 
-import org.apache.spark.sql.Column
+import org.apache.spark.sql.{Column, Dataset}
 import org.apache.spark.sql.functions.{from_unixtime, lit}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
@@ -19,20 +19,22 @@ object Config {
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-","")
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
-  private var _fromTime: Map[Int, Long] = Map(0 -> primordealEpoch)
+  private var _isFirstRun: Boolean = false
+  private var _postProcessingFlag: Boolean = false
+  private var _debugFlag: Boolean = false
+  private var _lastRunDetail: Array[ModuleStatusReport] = Array[ModuleStatusReport]()
+//  private var _fromTime: Map[Int, Long] = Map(0 -> primordealEpoch)
   private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
   private var _workspaceUrl: String = _
   private var _token: Array[Byte] = _
   private var _tokenType: String = _
-  private var _eventLogPrefix: Option[String] = None
   private var _auditLogPath: Option[String] = None
   private var _badRecordsPath: String = _
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _parsedConfig: ParsedConfig = _
-  private var _postProcessingFlag: Boolean = false
   private var _overwatchScope: Array[OverwatchScope.Value] = OverwatchScope.values.toArray
 
   final private val cipher = new Cipher
@@ -47,10 +49,10 @@ object Config {
   }
 
   // FromTime by ModuleID
-  private[overwatch] def setFromTime(value: Map[Int, Long]): this.type = {
-    _fromTime = value
-    this
-  }
+//  private[overwatch] def setFromTime(value: Map[Int, Long]): this.type = {
+//    _fromTime = value
+//    this
+//  }
 
   private[overwatch] def setPipelineSnapTime(): this.type = {
     _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
@@ -58,8 +60,11 @@ object Config {
   }
 
   // Inclusive when used as fromTS logic will be >= NOT >
+  @throws(classOf[NoSuchElementException])
   private[overwatch] def fromTime(moduleID: Int): TimeTypes = {
-    val fromTime = _fromTime.getOrElse(moduleID, primordealEpoch)
+    val lastRunStatus = if (!isFirstRun) lastRunDetail.filter(_.moduleID == moduleID) else lastRunDetail
+    require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
+    val fromTime = if (lastRunStatus.length != 1) primordealEpoch else lastRunStatus.head.untilTS
     val dt = new Date(fromTime)
     val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
     TimeTypes(
@@ -98,9 +103,33 @@ object Config {
     this
   }
 
+  private[overwatch] def setDebugFlag(value: Boolean): this.type = {
+    _debugFlag = value
+    this
+  }
+
+  private[overwatch] def setIsFirstRun(value: Boolean): this.type = {
+    val postProcessing = if (!isLocalTesting) value else false
+    setPostProcessingFlag(postProcessing)
+    _isFirstRun = value
+    this
+  }
+
+  private[overwatch] def setLastRunDetail(value: Array[ModuleStatusReport]): this.type = {
+    // Todo -- Add assertion --> number of rows <= number of modules or something to that effect
+    _lastRunDetail = value
+    this
+  }
+
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
+  private[overwatch] def lastRunDetail: Array[ModuleStatusReport] = _lastRunDetail
+
   private[overwatch] def isLocalTesting: Boolean = _isLocalTesting
+
+  private[overwatch] def isFirstRun: Boolean = _isFirstRun
+
+  private[overwatch] def debugFlag: Boolean = _debugFlag
 
   private[overwatch] def databaseName: String = _databaseName
 
@@ -113,8 +142,6 @@ object Config {
   private[overwatch] def encryptedToken: Array[Byte] = _token
 
   private[overwatch] def auditLogPath: Option[String] = _auditLogPath
-
-  private[overwatch] def eventLogPrefix: Option[String] = _eventLogPrefix
 
   private[overwatch] def badRecordsPath: String = _badRecordsPath
 
@@ -200,11 +227,6 @@ object Config {
     this
   }
 
-  private[overwatch] def setEventLogPrefix(value: Option[String]): this.type = {
-    _eventLogPrefix = value
-    this
-  }
-
   private[overwatch] def setBadRecordsPath(value: String): this.type = {
     _badRecordsPath = value
     this
@@ -217,8 +239,7 @@ object Config {
       targetDatabase = databaseName,
       targetDatabaseLocation = databaseLocation,
       auditLogPath = auditLogPath,
-      passthroughLogPath = passthroughLogPath,
-      eventLogPefix = eventLogPrefix
+      passthroughLogPath = passthroughLogPath
     )
   }
 

@@ -32,7 +32,6 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       Some(masterNode.get("dataTarget").get("databaseLocation").asText()))
 
     val auditLogPath = masterNode.get("auditLogPath").asText()
-    val eventLogPrefix = masterNode.get("eventLogPrefix").asText()
 
     val badRecordsPath = masterNode.get("badRecordsPath").asText()
 
@@ -46,6 +45,6 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
 //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
 
     OverwatchParams(token, Some(dataTarget), Some(auditLogPath),
-      Some(eventLogPrefix), Some(badRecordsPath), Some(overwatchScopes.toArray))
+      Some(badRecordsPath), Some(overwatchScopes.toArray))
   }
 }

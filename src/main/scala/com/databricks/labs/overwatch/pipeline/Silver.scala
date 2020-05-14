@@ -7,7 +7,8 @@ import com.databricks.labs.overwatch.utils.{ModuleStatusReport, SparkSessionWrap
 import org.apache.spark.sql.functions._
 import org.apache.log4j.{Level, Logger}
 
-class Silver extends Pipeline with Transforms with SparkSessionWrapper{
+class Silver(_workspace: Workspace, _database: Database) extends Pipeline(_workspace, _database)
+  with SilverTransforms with SparkSessionWrapper{
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -33,7 +34,7 @@ class Silver extends Pipeline with Transforms with SparkSessionWrapper{
 }
 
 object Silver {
-  def apply(workspace: Workspace): Silver = new Silver()
-    .setWorkspace(workspace).setDatabase(workspace.database)
+  def apply(workspace: Workspace): Silver = new Silver(workspace, workspace.database)
+//    .setWorkspace(workspace).setDatabase(workspace.database)
 
 }

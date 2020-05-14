@@ -10,11 +10,13 @@ import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 import org.apache.spark.sql.functions.{array, col, explode, lit}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Row}
 
 import scala.collection.mutable.ArrayBuffer
 
 
-class Bronze extends Pipeline with SparkSessionWrapper {
+class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_workspace, _database)
+  with SparkSessionWrapper with BronzeTargets {
 
   import spark.implicits._
 
@@ -43,294 +45,145 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     })
   }
 
-  def appendJobs: ModuleStatusReport = {
-    val startTime = System.currentTimeMillis()
-    val moduleID = 1001
-    val moduleName = "Bronze_Jobs"
-    val status: String = try {
-      val df = workspace.getJobsDF
-        .cache()
-      append("jobs_bronze", df)
-      if (Config.overwatchScope.contains(OverwatchScope.jobRuns)) {
-        //TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
-        //DEBUG
-//        val debugX = df.select('job_id).as[Long].collect()
-//        val debugY = df.select('job_id).distinct.as[Long].collect()
-        // setJobIDs(df.select('job_id).distinct().as[Long].collect())
-        setJobIDs(df.select('job_id).as[Long].collect())
-      }
-      df.unpersist(blocking = true)
-      "SUCCESS"
-    } catch {
-          // TODO -- Figure out how to bubble up the exceptions
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
-        e.printStackTrace(new PrintWriter(sw)).toString
-      }
+  private def collectJobsIDs()(df: DataFrame): DataFrame = {
+    if (Config.overwatchScope.contains(OverwatchScope.jobRuns)) {
+      //TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
+      //DEBUG
+      //        val debugX = df.select('job_id).as[Long].collect()
+      //        val debugY = df.select('job_id).distinct.as[Long].collect()
+      // setJobIDs(df.select('job_id).distinct().as[Long].collect())
+      setJobIDs(df.select('job_id).as[Long].collect())
     }
-    val endTime = System.currentTimeMillis()
-    ModuleStatusReport(
-      moduleID = moduleID,
-      moduleName = moduleName,
-      runStartTS = startTime,
-      runEndTS = endTime,
-      fromTS = 0L,
-      untilTS = 0L,
-      status = status,
-      inputConfig = Config.inputConfig,
-      parsedConfig = Config.parsedConfig
-    )
+    df
   }
 
-  def appendJobRuns(_jobIDs: Array[Long]): ModuleStatusReport = {
-    val startTime = System.currentTimeMillis()
-    val moduleID = 1007
-    val moduleName = "Bronze_JobRuns"
-    val status: String = try {
+  lazy private val appendJobsProcess = EtlDefinition(
+    workspace.getJobsDF.cache(),
+    Some(Seq(collectJobsIDs())),
+    append(jobsTarget),
+    Module(1001, "Bronze_Jobs")
+  )
 
-      val extraQuery = Map("completed_only" -> true)
-      val jobRuns = apiByID("jobs/runs/list",
-        "get", _jobIDs, "job_id", Some(extraQuery))
+  private def prepJobRunsDF: DataFrame = {
+    val extraQuery = Map("completed_only" -> true)
+    val jobRuns = apiByID("jobs/runs/list",
+      "get", jobIDs, "job_id", Some(extraQuery))
 
-      // TODO -- add filter to remove runs before fromTS
-      val df = spark.read.json(Seq(jobRuns: _*).toDS()).select(explode('runs).alias("runs"))
-        .select(col("runs.*"))
-      append("jobruns_bronze", df)
-      "SUCCESS"
-    } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
-        e.printStackTrace(new PrintWriter(sw)).toString
-      }
-    }
-    val endTime = System.currentTimeMillis()
-    ModuleStatusReport(
-      moduleID = moduleID,
-      moduleName = moduleName,
-      runStartTS = startTime,
-      runEndTS = endTime,
-      fromTS = 0L,
-      untilTS = 0L,
-      status = status,
-      inputConfig = Config.inputConfig,
-      parsedConfig = Config.parsedConfig
-    )
+    // TODO -- add filter to remove runs before fromTS
+    spark.read.json(Seq(jobRuns: _*).toDS()).select(explode('runs).alias("runs"))
+      .select(col("runs.*"))
   }
 
-  // TODO - sparkConf -- convert struct to array
-  def appendClusters: ModuleStatusReport = {
-    val startTime = System.currentTimeMillis()
-    val moduleID = 1002
-    val moduleName = "Bronze_Clusters"
-    val status = try {
-      val df = workspace.getClustersDF
-        .cache()
-      append("clusters_bronze", df)
-      if (Config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-        // TODO -- DEBUG -- DISTINCT
-        // TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
-        // TODO -- SAME AS jobRuns
-//        setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
-        setClusterIDs(df.select('cluster_id).as[String].collect())
-      }
+  lazy private val appendJobRunsProcess = EtlDefinition(
+    prepJobRunsDF,
+    None,
+    append(jobRunsTarget, newDataOnly = true),
+    Module(1007, "Bronze_JobRuns")
+  )
 
-      if (Config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-        val colsDF = df.select($"cluster_log_conf.*")
-        val cols = colsDF.columns.map(c => s"${c}.destination")
-        val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
-        val eventLogsPathGlobDF = cols.flatMap(
-          c => {
-            logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
-              .select(
-                array(col("destination"), col("cluster_id"),
-                  lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-              ).rdd
-              .map(r => r.getSeq[String](0).mkString("/")).collect()
-          }).distinct
-          .flatMap(Helpers.globPath)
-          .toSeq.toDF("filename")
-        setEventLogGlob(eventLogsPathGlobDF)
-      }
-
-      df.unpersist(blocking = true)
-      "SUCCESS"
-    } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
-        e.printStackTrace(new PrintWriter(sw)).toString
-      }
+  private def collectClusterIDs()(df: DataFrame): DataFrame = {
+    if (Config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
+      // TODO -- DEBUG -- DISTINCT
+      // TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
+      // TODO -- SAME AS jobRuns
+      //        setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
+      setClusterIDs(df.select('cluster_id).as[String].collect())
     }
-    val endTime = System.currentTimeMillis()
-    ModuleStatusReport(
-      moduleID = moduleID,
-      moduleName = moduleName,
-      runStartTS = startTime,
-      runEndTS = endTime,
-      fromTS = 0L,
-      untilTS = 0L,
-      status = status,
-      inputConfig = Config.inputConfig,
-      parsedConfig = Config.parsedConfig
-    )
-
+    df
   }
 
-  def appendPools: ModuleStatusReport = {
-    val startTime = System.currentTimeMillis()
-    val moduleID = 1003
-    val moduleName = "Bronze_Pools"
-    val status: String = try {
-      val df = workspace.getPoolsDF
-      append("pools_bronze", df)
-      "SUCCESS"
-    } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
-        e.printStackTrace(new PrintWriter(sw)).toString
-      }
+  private def collectEventLogPaths()(df: DataFrame): DataFrame = {
+    if (Config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
+      val colsDF = df.select($"cluster_log_conf.*")
+      val cols = colsDF.columns.map(c => s"${c}.destination")
+      val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
+      val eventLogsPathGlobDF = cols.flatMap(
+        c => {
+          logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
+            .select(
+              array(col("destination"), col("cluster_id"),
+                lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
+            ).rdd
+            .map(r => r.getSeq[String](0).mkString("/")).collect()
+        }).distinct
+        .flatMap(Helpers.globPath)
+        .toSeq.toDF("filename")
+      setEventLogGlob(eventLogsPathGlobDF)
     }
-    val endTime = System.currentTimeMillis()
-    ModuleStatusReport(
-      moduleID = moduleID,
-      moduleName = moduleName,
-      runStartTS = startTime,
-      runEndTS = endTime,
-      fromTS = 0L,
-      untilTS = 0L,
-      status = status,
-      inputConfig = Config.inputConfig,
-      parsedConfig = Config.parsedConfig
-    )
+    df
   }
 
-  def appendAuditLogs: ModuleStatusReport = {
-    val startTime = System.currentTimeMillis()
-    val moduleID = 1004
-    val moduleName = "Bronze_AuditLogs"
-    // Audit logs are Daily so get date from TS
+  lazy private val appendClustersProcess = EtlDefinition(
+    workspace.getClustersDF.cache(),
+    Some(Seq(collectClusterIDs(), collectEventLogPaths())),
+    append(clustersTarget),
+    Module(1002, "Bronze_Clusters")
+  )
 
-    //    val fromDate =
-    val status: String = try {
-      val df = workspace.getAuditLogsDF
-        .filter('Date.between(
-          Config.fromTime(moduleID).asColumnTS,
-          Config.pipelineSnapTime.asColumnTS
-        ))
-      append("audit_log_bronze", df, fromTime = Some(Config.fromTime(moduleID).asTSString))
-      "SUCCESS"
-    } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
-        e.printStackTrace(new PrintWriter(sw)).toString
-      }
-    }
-    val endTime = System.currentTimeMillis()
-    ModuleStatusReport(
-      moduleID = moduleID,
-      moduleName = moduleName,
-      runStartTS = startTime,
-      runEndTS = endTime,
-      fromTS = Config.fromTime(moduleID).asMidnightEpochMilli,
-      untilTS = Config.pipelineSnapTime.asMidnightEpochMilli,
-      status = status,
-      inputConfig = Config.inputConfig,
-      parsedConfig = Config.parsedConfig
+  lazy private val appendPoolsProcess = EtlDefinition(
+    workspace.getPoolsDF,
+    None,
+    append(poolsTarget),
+    Module(1003, "Bronze_Pools")
+  )
+
+  lazy private val appendAuditLogsProcess = EtlDefinition(
+    workspace.getAuditLogsDF,
+    None,
+    append(auditLogsTarget),
+    Module(1004, "Bronze_AuditLogs")
+  )
+
+  private def prepClusterEventLogs(moduleID: Int): DataFrame = {
+    val extraQuery = Map(
+      "start_time" -> Config.fromTime(moduleID).asUnixTime,
+      "end_time" -> Config.pipelineSnapTime.asUnixTime
     )
+    val clusterEvents = apiByID("clusters/events", "post",
+      clusterIDs, "cluster_id", Some(extraQuery))
+
+    spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
+      .select(col("events.*"))
   }
 
-  def appendClusterEventLogs(_clusterIDs: Array[String]): ModuleStatusReport = {
-    val startTime = System.currentTimeMillis()
-    val moduleID = 1005
-    val moduleName = "Bronze_ClusterEventLogs"
-    val status: String = try {
+  private val appendClusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs")
+  lazy private val appendClusterEventLogsProcess = EtlDefinition(
+    prepClusterEventLogs(appendClusterEventLogsModule.moduleID),
+    None,
+    append(clusterEventsTarget),
+    appendClusterEventLogsModule
+  )
 
-      val extraQuery = Map(
-        "start_time" -> Config.fromTime(moduleID).asUnixTime,
-        "end_time" -> Config.pipelineSnapTime.asUnixTime
-      )
-      val clusterEvents = apiByID("clusters/events", "post",
-        _clusterIDs, "cluster_id", Some(extraQuery))
-
-      val df = spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
-        .select(col("events.*"))
-
-      // TODO -- When cols are arranged in abstract Table class, pull the zorder cols from there
-      // Rearranging for zorder
-      val orderedDF = SchemaTools.moveColumnsToFront(df, "cluster_id, timestamp".split(", "))
-
-      append("cluster_events_bronze", orderedDF)
-      "SUCCESS"
-    } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
-        e.printStackTrace(new PrintWriter(sw)).toString
-      }
-    }
-    val endTime = System.currentTimeMillis()
-    ModuleStatusReport(
-      moduleID = moduleID,
-      moduleName = moduleName,
-      runStartTS = startTime,
-      runEndTS = endTime,
-      fromTS = Config.fromTime(moduleID).asUnixTime,
-      untilTS = Config.pipelineSnapTime.asUnixTime,
-      status = status,
-      inputConfig = Config.inputConfig,
-      parsedConfig = Config.parsedConfig
-    )
-  }
-
-  def appendEventLogs: ModuleStatusReport = {
-    val startTime = System.currentTimeMillis()
-    val moduleID = 1006
-    val moduleName = "Bronze_EventLogs"
-    val status: String = try {
-      val df = workspace.getEventLogsDF(sparkEventsLogGlob)
-      append("spark_events_bronze", df, partitionBy = Array("event"))
-      "SUCCESS"
-    } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"Failed: ${moduleName}", e)
-        e.printStackTrace(new PrintWriter(sw)).toString
-      }
-    }
-    val endTime = System.currentTimeMillis()
-    ModuleStatusReport(
-      moduleID = moduleID,
-      moduleName = moduleName,
-      runStartTS = startTime,
-      runEndTS = endTime,
-      fromTS = 0L,
-      untilTS = 0L,
-      status = status,
-      inputConfig = Config.inputConfig,
-      parsedConfig = Config.parsedConfig
-    )
-  }
+  lazy private val appendSparkEventLogsProcess = EtlDefinition(
+    workspace.getEventLogsDF(sparkEventsLogGlob),
+    None,
+    append(sparkEventLogsTarget),
+    Module(1006, "Bronze_EventLogs")
+  )
 
   // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
-  def run(): Boolean = {
+  def run(): Unit = {
     val reports = ArrayBuffer[ModuleStatusReport]()
     if (Config.overwatchScope.contains(OverwatchScope.jobs)) {
-      reports.append(appendJobs)
+      reports.append(appendJobsProcess.process())
     }
     if (Config.overwatchScope.contains(OverwatchScope.jobRuns)) {
-      reports.append(appendJobRuns(jobIDs))
+      reports.append(appendJobRunsProcess.process())
     }
     if (Config.overwatchScope.contains(OverwatchScope.clusters)) {
-      reports.append(appendClusters)
+      reports.append(appendClustersProcess.process())
     }
     if (Config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-      reports.append(appendClusterEventLogs(clusterIDs))
+      reports.append(appendClusterEventLogsProcess.process())
     }
     if (Config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-      reports.append(appendEventLogs)
+      reports.append(appendSparkEventLogsProcess.process())
     }
     if (Config.overwatchScope.contains(OverwatchScope.pools)) {
-      reports.append(appendPools)
+      reports.append(appendPoolsProcess.process())
     }
     if (Config.overwatchScope.contains(OverwatchScope.audit)) {
-      reports.append(appendAuditLogs)
+      reports.append(appendAuditLogsProcess.process())
     }
     //    DOES NOT PRESERVER NECESSARY ORDERING
     //    val reports = Config.overwatchScope.map {
@@ -343,7 +196,12 @@ class Bronze extends Pipeline with SparkSessionWrapper {
     //      case OverwatchScope.sparkEvents => appendEventLogs
     //    }
 
-    append("pipeline_report", reports.toDF)
+    // TODO -- update reports to note if post_porcessing / optimize was run
+    val pipelineReportTarget = PipelineTable("pipeline_report", Array("Overwatch_RunID"), "Pipeline_SnapTS")
+    database.write(reports.toDF, pipelineReportTarget)
+
+    postProcessor.analyze()
+    postProcessor.optimize()
 
 
   }
@@ -351,7 +209,7 @@ class Bronze extends Pipeline with SparkSessionWrapper {
 }
 
 object Bronze {
-  def apply(workspace: Workspace): Bronze = new Bronze()
-    .setWorkspace(workspace).setDatabase(workspace.database)
+  def apply(workspace: Workspace): Bronze = new Bronze(workspace, workspace.database)
+//    .setWorkspace(workspace).setDatabase(workspace.database)
 
 }
