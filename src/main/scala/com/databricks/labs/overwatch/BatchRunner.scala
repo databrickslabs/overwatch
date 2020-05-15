@@ -24,6 +24,11 @@ object BatchRunner extends SparkSessionWrapper{
     }
 
     Bronze(workspace).run()
+//
+//    spark.read.format("parquet")
+//      .load("C:\\Dev\\git\\Databricks--Overwatch\\spark-warehouse\\overwatch.db\\cluster_events_bronze")
+//      .show(20, false)
+
 
 //    spark.read.table("overwatch.pipeline_report").show(20, false)
 

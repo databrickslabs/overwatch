@@ -21,17 +21,12 @@ class Database extends SparkSessionWrapper {
 
   def getDatabaseName: String = _databaseName
 
-  def doAutoCompact = ???
-
-  def doAutoOptimize = ???
-
   def write(df: DataFrame, target: PipelineTable): Boolean = {
 
     var finalDF: DataFrame = df
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", Config.pipelineSnapTime.asColumnTS) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(Config.runID)) else finalDF
     finalDF = SchemaTools.scrubSchema(finalDF)
-
 
     try {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")

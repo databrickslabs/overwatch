@@ -52,14 +52,16 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
         val failMsg = s"Failed: No New Data Retrieved ${endpoint} with query: $extraQuery " +
           s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load for module"
         println(failMsg)
+        setPipelineStatus(failMsg)
         logger.log(Level.WARN, failMsg, e)
         Array("FAILURE")
       case e: Throwable =>
         val failMsg = s"Failed: ${endpoint} with query: $extraQuery " +
           s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load"
+        setPipelineStatus(failMsg)
         println(failMsg)
         println(e)
-        logger.log(Level.WARN, failMsg, e)
+        logger.log(Level.ERROR, failMsg, e)
         Array("FAILURE")
     }
   }
@@ -158,8 +160,8 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
 
   private def prepClusterEventLogs(moduleID: Int): DataFrame = {
     val extraQuery = Map(
-      "start_time" -> Config.fromTime(moduleID).asUnixTimeMilli,
-      "end_time" -> Config.pipelineSnapTime.asUnixTimeMilli
+      "start_time" -> Config.fromTime(moduleID).asUnixTimeMilli, // 1588935326000L, //
+      "end_time" -> Config.pipelineSnapTime.asUnixTimeMilli //1589021726000L //
     )
 
       // TODO -- add assertion that df count == total count from API CALL
@@ -191,24 +193,31 @@ class Bronze(_workspace: Workspace, _database: Database) extends Pipeline(_works
   // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
   def run(): Unit = {
     val reports = ArrayBuffer[ModuleStatusReport]()
+    resetDefaults()
     if (Config.overwatchScope.contains(OverwatchScope.jobs)) {
       reports.append(appendJobsProcess.process())
     }
+    resetDefaults()
     if (Config.overwatchScope.contains(OverwatchScope.jobRuns)) {
       reports.append(appendJobRunsProcess.process())
     }
+    resetDefaults()
     if (Config.overwatchScope.contains(OverwatchScope.clusters)) {
       reports.append(appendClustersProcess.process())
     }
+    resetDefaults()
     if (Config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
       reports.append(appendClusterEventLogsProcess.process())
     }
+    resetDefaults()
     if (Config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
       reports.append(appendSparkEventLogsProcess.process())
     }
+    resetDefaults()
     if (Config.overwatchScope.contains(OverwatchScope.pools)) {
       reports.append(appendPoolsProcess.process())
     }
+    resetDefaults()
     if (Config.overwatchScope.contains(OverwatchScope.audit)) {
       reports.append(appendAuditLogsProcess.process())
     }

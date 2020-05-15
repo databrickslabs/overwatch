@@ -21,6 +21,8 @@ class ApiCall extends SparkSessionWrapper {
   private val results = ArrayBuffer[String]()
   private var _limit: Long = _
   private var _req: String = _
+  private var _status: String = "SUCCESS"
+  private var _errorFlag: Boolean = false
   private val mapper = JsonUtils.objectMapper
 
   private def setQuery(value: Option[Map[String, Any]]): this.type = {
@@ -47,6 +49,15 @@ class ApiCall extends SparkSessionWrapper {
     this
   }
 
+  private def setStatus(value: String, level: Level, e: Option[Throwable] = None): Unit = {
+    error()
+    _status = value
+    if (e.nonEmpty) logger.log(level, value, e.get)
+    else logger.log(level, value)
+  }
+
+  private def error(): Unit = _errorFlag = true
+
   private def req: String = _req
 
   private def jsonQuery: String = _jsonQuery
@@ -54,6 +65,10 @@ class ApiCall extends SparkSessionWrapper {
   private def getQueryString: String = _getQueryString
 
   private def limit: Long = _limit
+
+  private[overwatch] def status: String = _status
+
+  private[overwatch] def isError: Boolean = _errorFlag
 
   def getCurlCommand: String = curlCommand
 
@@ -68,13 +83,13 @@ class ApiCall extends SparkSessionWrapper {
       case e: Throwable =>
         val emptyDF = sc.parallelize(Seq("")).toDF()
         if (results.isEmpty) {
-          logger.log(Level.INFO,
-            s"No data returned for api endpoint ${_apiName}")
+          val msg = s"No data returned for api endpoint ${_apiName}"
+          setStatus(msg, Level.INFO, Some(e))
           emptyDF
         }
         else {
-          logger.log(Level.ERROR,
-            s"Acquiring data from ${_apiName} failed.", e)
+          val msg = s"Acquiring data from ${_apiName} failed."
+          setStatus(msg, Level.ERROR, Some(e))
           emptyDF
         }
     }
@@ -93,7 +108,11 @@ class ApiCall extends SparkSessionWrapper {
       }
     } catch {
       case _: scala.MatchError => logger.log(Level.WARN, "API not configured, returning full dataset"); "*"
-      case e: Throwable => logger.log(Level.ERROR, "API Not Supported.", e); ""
+      case e: Throwable => {
+        val msg = "API Not Supported."
+        setStatus(msg, Level.ERROR, Some(e))
+        ""
+      }
     }
   }
 
@@ -121,10 +140,14 @@ class ApiCall extends SparkSessionWrapper {
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
+      this
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, "Could not execute API call.", e)
+      case e: Throwable => {
+        val msg = "Could not execute API call."
+        setStatus(msg, Level.ERROR, Some(e))
+        this
+      }
     }
-    this
   }
 
   private def paginate(): Unit = {
@@ -178,7 +201,10 @@ class ApiCall extends SparkSessionWrapper {
       }
       this
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, "Could not execute API call.", e); this
+      case e: Throwable =>
+        val msg = s"POST FAILED: Endpoint: ${_apiName} Query: ${jsonQuery}"
+        setStatus(msg, Level.ERROR, Some(e))
+        this
     }
   }
 

@@ -21,13 +21,13 @@ trait SparkSessionWrapper extends Serializable {
     SparkSession.builder()
       .master("local")
       .appName("OverwatchBatch")
-      .enableHiveSupport()
-      .config("spark.warehouse.dir", "metastore")
+//      .enableHiveSupport()
+//      .config("spark.warehouse.dir", "metastore")
       .getOrCreate()
   }
 
   lazy val sc: SparkContext = spark.sparkContext
-  sc.setLogLevel("WARN")
+  if (Config.isLocalTesting) sc.setLogLevel("WARN") else sc.setLogLevel("INFO")
 //  sc.setLogLevel("DEBUG")
 
   private var _coresPerWorker: Int = _
