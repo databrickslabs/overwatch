@@ -79,8 +79,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
   protected def sparkEventsLogGlob: DataFrame = _eventLogGlob
 
   private def getLastOptimized(moduleID: Int): Long = {
-    val lastRunOptimizeTS = Config.lastRunDetail.filter(_.moduleID == moduleID)
-    if (!Config.isFirstRun && lastRunOptimizeTS.nonEmpty) lastRunOptimizeTS.head.lastOptimizedTS
+    val lastRunOptimizeTS = config.lastRunDetail.filter(_.moduleID == moduleID)
+    if (!config.isFirstRun && lastRunOptimizeTS.nonEmpty) lastRunOptimizeTS.head.lastOptimizedTS
     else 0L
   }
 
@@ -89,7 +89,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
     val WEEK = 1000L * 60L * 60L * 24L * 7L // week of milliseconds
     val tsLessSevenD = System.currentTimeMillis() - WEEK.toLong
     if ((getLastOptimized(moduleID) < tsLessSevenD ||
-      Config.isFirstRun) && !Config.isLocalTesting) true
+      config.isFirstRun) && !config.isLocalTesting) true
     else false
   }
 
@@ -103,7 +103,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
     var fromTS: Long = 0L
     var untilTS: Long = 0L
     var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
-    val fromTime = Config.fromTime(module.moduleID)
+    val fromTime = config.fromTime(module.moduleID)
 
 
     finalDF = if (target.zOrderBy.nonEmpty) {
@@ -113,7 +113,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
     if (newDataOnly) {
 
       fromTS = fromTime.asUnixTimeMilli
-      untilTS = Config.pipelineSnapTime.asUnixTimeMilli
+      untilTS = config.pipelineSnapTime.asUnixTimeMilli
 
       val typedTSCol = finalDF.schema.fields.filter(_.name == target.tsCol).head.dataType match {
         case dt: TimestampType =>
@@ -121,7 +121,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         case dt: DateType =>
           // Date filters -- The unixTS must be at the epoch Second level but the storage must be at the
           // epoch MilliSecond level
-          untilTS = Config.pipelineSnapTime.asMidnightEpochMilli
+          untilTS = config.pipelineSnapTime.asMidnightEpochMilli
           fromTS = fromTime.asMidnightEpochMilli
           to_timestamp(col(target.tsCol)).cast(LongType)
         case _ => col(target.tsCol)
@@ -133,15 +133,15 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     val startLogMsg = if (newDataOnly) {
       s"Beginning append to ${target.tableFullName}. " +
-        s"\n From Time: ${Config.createTimeDetail(fromTS).asTSString} \n"+
-        s"Until Time: ${Config.createTimeDetail(untilTS).asTSString}"
+        s"\n From Time: ${config.createTimeDetail(fromTS).asTSString} \n"+
+        s"Until Time: ${config.createTimeDetail(untilTS).asTSString}"
     } else s"Beginning append to ${target.tableFullName}"
     logger.log(Level.INFO, startLogMsg)
 
     val startTime = System.currentTimeMillis()
     val status: String = try {
       _database.write(finalDF, target)
-      if (Config.debugFlag) {
+      if (config.debugFlag) {
         val debugCount = finalDF.count()
         logger.log(Level.INFO, s"${module.moduleName} SUCCESS: appended ${debugCount}.")
         "SUCCESS"
@@ -163,7 +163,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     if (needsOptimize(module.moduleID)) {
       postProcessor.add(target)
-      lastOptimizedTS = Config.pipelineSnapTime.asUnixTimeMilli
+      lastOptimizedTS = config.pipelineSnapTime.asUnixTimeMilli
     }
 
     val endTime = System.currentTimeMillis()
@@ -179,8 +179,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
       status = status,
       lastOptimizedTS = lastOptimizedTS,
       vacuumRetentionHours = 24 * 7,
-      inputConfig = Config.inputConfig,
-      parsedConfig = Config.parsedConfig
+      inputConfig = config.inputConfig,
+      parsedConfig = config.parsedConfig
     )
 
 

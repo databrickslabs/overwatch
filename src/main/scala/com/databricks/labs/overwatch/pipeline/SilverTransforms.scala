@@ -9,6 +9,9 @@ import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
 
   import spark.implicits._
+  private var _dbName: String = _
+  //TODO - remove the objects and fix the inheritence from old Config
+  protected def setTransformDatabaseName(value: String): Unit = _dbName = value
 
   // TODO -- Only Pull data since last pipelineSnap_TS
   // TODO -- Do not cache final table -- likely too large
@@ -18,7 +21,7 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
   // TODO -- Add recalculate stats
   // TODO -- URGENT -- Fix the event_logs_pipline -- duplicates are getting loaded
   // TODO -- URGENT -- Window is SKEWED
-  protected val sparkEventsDF: DataFrame = spark.table(s"${Config.databaseName}.spark_events_bronze")
+  protected val sparkEventsDF: DataFrame = spark.table(s"${_dbName}.spark_events_bronze")
     .drop("ClasspathEntries", "HadoopProperties", "SparkProperties", "SystemProperties", "SparkPlanInfo") // TODO - TEMP
     .withColumn("filenameGroup", groupFilename('filename))
 //      .repartition().cache

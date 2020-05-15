@@ -16,6 +16,8 @@ case class TokenSecret(scope: String, key: String)
 
 case class DataTarget(databaseName: Option[String], databaseLocation: Option[String])
 
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, encryptedToken: Array[Byte], cipher: Cipher)
+
 case class OverwatchParams(tokenSecret: Option[TokenSecret],
                            dataTarget: Option[DataTarget],
                            auditLogPath: Option[String],

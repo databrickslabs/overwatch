@@ -41,7 +41,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         extraQuery.get ++ rawQuery
       } else rawQuery
 
-        val apiCall = ApiCall(endpoint, Some(query))
+        val apiCall = ApiCall(endpoint, config.apiEnv, Some(query))
         if (apiType == "post") apiCall.executePost().asStrings
         else apiCall.executeGet().asStrings
     })
@@ -223,7 +223,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     //    }
 
     // TODO -- update reports to note if post_porcessing / optimize was run
-    val pipelineReportTarget = PipelineTable("pipeline_report", Array("Overwatch_RunID"), "Pipeline_SnapTS")
+    val pipelineReportTarget = PipelineTable("pipeline_report", Array("Overwatch_RunID"), "Pipeline_SnapTS", config)
     database.write(reports.toDF, pipelineReportTarget)
 
     postProcessor.analyze()

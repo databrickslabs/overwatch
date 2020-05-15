@@ -35,7 +35,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     // TODO -- Add Cluster Events - review pagination -- may belong in StreamRunner
     // TODO -- Only add new data, identify method for identifying new data
     try {
-      ApiCall(jobsEndpoint)
+      ApiCall(jobsEndpoint, config.apiEnv)
         .executeGet()
         .asDF
 
@@ -49,7 +49,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"
-    ApiCall(clustersEndpoint)
+    ApiCall(clustersEndpoint, config.apiEnv)
       .executeGet()
       .asDF
   }
@@ -59,7 +59,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val queryMap = Map[String, Any](
       "cluster_id" -> clusterId
     )
-    ApiCall(eventsEndpoint, Some(queryMap))
+    ApiCall(eventsEndpoint, config.apiEnv, Some(queryMap))
       .executePost()
       .asDF
   }
@@ -69,21 +69,21 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val queryMap = Map[String, Any](
       "path" -> dbfsPath
     )
-    ApiCall(dbfsEndpoint, Some(queryMap))
+    ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap))
       .executeGet()
       .asDF
   }
 
   def getPoolsDF: DataFrame = {
     val poolsEndpoint = "instance-pools/list"
-    ApiCall(poolsEndpoint)
+    ApiCall(poolsEndpoint, config.apiEnv)
       .executeGet()
       .asDF
   }
 
   def getProfilesDF: DataFrame = {
     val profilesEndpoint = "instance-profiles/list"
-    ApiCall(profilesEndpoint)
+    ApiCall(profilesEndpoint, config.apiEnv)
       .executeGet()
       .asDF
   }
@@ -94,7 +94,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 //      "path" -> "/Users"
 //    )
 
-    ApiCall(workspaceEndpoint, Some(Map("path" -> "/Users")))
+    ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")))
       .executeGet()
       .asDF
   }

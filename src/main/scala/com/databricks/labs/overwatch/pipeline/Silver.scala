@@ -15,6 +15,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val sw = new StringWriter
 
+  //TODO - FIX
+  setTransformDatabaseName(config.databaseName)
+
 
 
 //  def appendTasks: ModuleStatusReport = {

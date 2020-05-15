@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.utils.{ApiCallFailure, Config, JsonUtils, NoNewDataException, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, Config, JsonUtils, NoNewDataException, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -8,7 +8,7 @@ import scalaj.http.Http
 
 import scala.collection.mutable.ArrayBuffer
 
-class ApiCall extends SparkSessionWrapper {
+class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   import spark.implicits._
 
@@ -39,10 +39,10 @@ class ApiCall extends SparkSessionWrapper {
   private def setApiName(value: String): this.type = {
     _apiName = value
 
-    if (!Config.isLocalTesting) {
-      _req = s"${Config.workspaceURL}/api/2.0/${_apiName}"
+    if (!env.isLocal) {
+      _req = s"${env.workspaceURL}/api/2.0/${_apiName}"
     } else {
-      _req = s"${Config.workspaceURL}/api/2.0/${_apiName}"
+      _req = s"${env.workspaceURL}/api/2.0/${_apiName}"
     }
     this
   }
@@ -104,7 +104,7 @@ class ApiCall extends SparkSessionWrapper {
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
-          "Authorization" -> s"Bearer ${Config.token}"
+          "Authorization" -> s"Bearer ${env.cipher.decrypt(env.encryptedToken)}"
         )).asString
       if (result.isError) {
         if (mapper.readTree(result.body).has("error_code")) {
@@ -167,7 +167,7 @@ class ApiCall extends SparkSessionWrapper {
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
-          "Authorization" -> s"Bearer ${Config.token}"
+          "Authorization" -> s"Bearer ${env.cipher.decrypt(env.encryptedToken)}"
         )).asString
       if (result.isError) throw new ApiCallFailure(s"${_apiName} could not execute")
       if (!pageCall) {
@@ -188,8 +188,8 @@ class ApiCall extends SparkSessionWrapper {
 
 object ApiCall {
 
-  def apply(apiName: String, queryMap: Option[Map[String, Any]] = None): ApiCall = {
-    new ApiCall().setApiName(apiName)
+  def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None): ApiCall = {
+    new ApiCall(apiEnv).setApiName(apiName)
       .setQuery(queryMap)
   }
 

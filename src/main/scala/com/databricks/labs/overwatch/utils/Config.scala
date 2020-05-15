@@ -28,6 +28,7 @@ class Config() {
   private var _workspaceUrl: String = _
   private var _token: Array[Byte] = _
   private var _tokenType: String = _
+  private var _apiEnv: ApiEnv = _
   private var _auditLogPath: Option[String] = None
   private var _badRecordsPath: String = _
   private var _passthroughLogPath: Option[String] = None
@@ -100,6 +101,11 @@ class Config() {
     this
   }
 
+  private def setApiEnv(value: ApiEnv): this.type = {
+    _apiEnv = value
+    this
+  }
+
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
   private[overwatch] def lastRunDetail: Array[ModuleStatusReport] = _lastRunDetail
@@ -117,6 +123,8 @@ class Config() {
   private[overwatch] def workspaceURL: String = _workspaceUrl
 
   private[overwatch] def token: String = cipher.decrypt(_token)
+
+  private[overwatch] def apiEnv: ApiEnv = _apiEnv
 
   private[overwatch] def encryptedToken: Array[Byte] = _token
 
@@ -180,6 +188,7 @@ class Config() {
           _tokenType = "Owner"
         }
       }
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, _token, cipher))
       this
     } catch {
       case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e); this
