@@ -45,6 +45,6 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
 //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
 
     OverwatchParams(token, Some(dataTarget), Some(auditLogPath),
-      Some(badRecordsPath), Some(overwatchScopes.toArray))
+      Some(badRecordsPath), Some(overwatchScopes.toArray.toSeq))
   }
 }

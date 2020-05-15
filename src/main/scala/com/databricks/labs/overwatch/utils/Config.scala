@@ -34,7 +34,7 @@ class Config() {
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _parsedConfig: ParsedConfig = _
-  private var _overwatchScope: Array[OverwatchScope.Value] = OverwatchScope.values.toArray
+  private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
 
   final private val cipher = new Cipher
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -80,7 +80,7 @@ class Config() {
     )
   }
 
-  private[overwatch] def setOverwatchScope(value: Array[OverwatchScope.Value]): this.type = {
+  private[overwatch] def setOverwatchScope(value: Seq[OverwatchScope.Value]): this.type = {
     _overwatchScope = value
     this
   }
@@ -138,13 +138,19 @@ class Config() {
 
   private[overwatch] def runID: String = _runID
 
-  private[overwatch] def overwatchScope: Array[OverwatchScope.Value] = _overwatchScope
+  private[overwatch] def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
 
   private[overwatch] def cal: Calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
 
   private[overwatch] def tsFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   private[overwatch] def dtFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
+
+  private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
+    import OverwatchScope._
+//    jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles
+    Seq(jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles)
+  }
 
   // Set scope for local testing
   def buildLocalOverwatchParams(): this.type = {

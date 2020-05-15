@@ -9,14 +9,17 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogTable}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, DataFrameWriter, Row}
 
+// TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
+//  also add ruleStrateg: Enum(Kill, Quarantine, Ignore) to determine when to require them
+//  Perhaps add the strategy into the Rule definition in the Rules Engine
 case class PipelineTable(
                           name: String,
                           keys: Array[String],
-                          tsCol: String,
+                          incrementalFromColumn: String, // TODO -- Change to CDC incrementing ID (i.e. allow appender to handle ints/etc
                           config: Config,
                           dataFrequency: Frequency = Frequency.milliSecond,
-                          format: String = "delta",
-                          mode: String = "append",
+                          format: String = "delta", // TODO -- Conver to Enum
+                          mode: String = "append", // TODO -- Convert to Enum
                           autoOptimize: Boolean = false,
                           autoCompact: Boolean = false,
                           partitionBy: Array[String] = Array(),

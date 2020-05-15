@@ -10,10 +10,9 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
 class Pipeline(_workspace: Workspace, _database: Database,
-               _config: Config) extends BronzeTargets(_config) with SparkSessionWrapper {
+               _config: Config) extends PipelineTargets(_config) with SparkSessionWrapper {
 
-  // TODO - cleanse column names (no special chars)
-  // TODO - enable merge schema on write -- includes checks for number of new columns
+  // TODO -- Validate Targets (unique table names, ModuleIDs and names, etc)
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _clusterIDs: Array[String] = _
   private var _jobIDs: Array[Long] = _
@@ -25,8 +24,11 @@ class Pipeline(_workspace: Workspace, _database: Database,
   protected final val config: Config = _config
   lazy protected final val postProcessor = new PostProcessor()
 
+  // Todo Add Description
   case class Module(moduleID: Int, moduleName: String)
 
+  // TODO -- Add Rules engine
+  //  additional field under transforms rules: Option[Seq[Rule => Boolean]]
   case class EtlDefinition(
                             sourceDF: DataFrame,
                             transforms: Option[Seq[DataFrame => DataFrame]],
@@ -107,6 +109,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   // TODO -- Enable parallelized write
   // TODO -- Add assertion that max(count) groupBy keys == 1
+  // TODO -- Add support for every-incrasing IDs that are not TimeStamps
   private[overwatch] def append(target: PipelineTable,
                                 newDataOnly: Boolean = false,
                                 cdc: Boolean = false)(df: DataFrame, module: Module): ModuleStatusReport = {
@@ -127,16 +130,17 @@ class Pipeline(_workspace: Workspace, _database: Database,
       fromTS = fromTime.asUnixTimeMilli
       untilTS = config.pipelineSnapTime.asUnixTimeMilli
 
-      val timeFilter = finalDF.schema.fields.filter(_.name == target.tsCol).head.dataType match {
+      val timeFilter = finalDF.schema.fields.filter(_.name == target.incrementalFromColumn).head.dataType match {
         case dt: TimestampType =>
-          col(target.tsCol).cast(LongType).between(fromTS, untilTS)
+          col(target.incrementalFromColumn).cast(LongType).between(fromTS, untilTS)
         case dt: DateType =>
           // Date filters -- The unixTS must be at the epoch Second level but the storage must be at the
           // epoch MilliSecond level
           untilTS = config.pipelineSnapTime.asMidnightEpochMilli
           fromTS = fromTime.asMidnightEpochMilli
-          to_timestamp(col(target.tsCol)).cast(LongType).between(fromTS / 1000, untilTS / 1000)
-        case _ => col(target.tsCol).between(fromTS, untilTS)
+          to_timestamp(col(target.incrementalFromColumn)).cast(LongType).between(fromTS / 1000, untilTS / 1000)
+        case LongType => col(target.incrementalFromColumn).between(fromTS, untilTS)
+        case e: _ => throw new IllegalArgumentException(s"IncreasingID Type: ${e.typeName} is Not supported")
       }
 
       finalDF = finalDF

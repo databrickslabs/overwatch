@@ -82,7 +82,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobsProcess = EtlDefinition(
     workspace.getJobsDF.cache(),
     Some(Seq(collectJobsIDs())),
-    append(jobsTarget),
+    append(Bronze.jobsTarget),
     Module(1001, "Bronze_Jobs")
   )
 
@@ -102,16 +102,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobRunsProcess = EtlDefinition(
     prepJobRunsDF,
     None,
-    append(jobRunsTarget, newDataOnly = true),
+    append(Bronze.jobRunsTarget, newDataOnly = true),
     Module(1007, "Bronze_JobRuns")
   )
 
   private def collectClusterIDs()(df: DataFrame): DataFrame = {
     if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-      // TODO -- DEBUG -- DISTINCT
-      // TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
-      // TODO -- SAME AS jobRuns
-      //        setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
       setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
     }
     df
@@ -141,21 +137,21 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClustersProcess = EtlDefinition(
     workspace.getClustersDF.cache(),
     Some(Seq(collectClusterIDs(), collectEventLogPaths())),
-    append(clustersTarget),
+    append(Bronze.clustersTarget),
     Module(1002, "Bronze_Clusters")
   )
 
   lazy private val appendPoolsProcess = EtlDefinition(
     workspace.getPoolsDF,
     None,
-    append(poolsTarget),
+    append(Bronze.poolsTarget),
     Module(1003, "Bronze_Pools")
   )
 
   lazy private val appendAuditLogsProcess = EtlDefinition(
     workspace.getAuditLogsDF,
     None,
-    append(auditLogsTarget, newDataOnly = true),
+    append(Bronze.auditLogsTarget, newDataOnly = true),
     Module(1004, "Bronze_AuditLogs")
   )
 
@@ -180,14 +176,14 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClusterEventLogsProcess = EtlDefinition(
     prepClusterEventLogs(appendClusterEventLogsModule.moduleID),
     None,
-    append(clusterEventsTarget, newDataOnly = true),
+    append(Bronze.clusterEventsTarget, newDataOnly = true),
     appendClusterEventLogsModule
   )
 
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
     workspace.getEventLogsDF(sparkEventsLogGlob),
     None,
-    append(sparkEventLogsTarget),
+    append(Bronze.sparkEventLogsTarget),
     Module(1006, "Bronze_EventLogs")
   )
 

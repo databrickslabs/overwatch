@@ -22,11 +22,11 @@ case class OverwatchParams(tokenSecret: Option[TokenSecret],
                            dataTarget: Option[DataTarget],
                            auditLogPath: Option[String],
                            badRecordsPath: Option[String],
-                           overwatchScope: Option[Array[String]]
+                           overwatchScope: Option[Seq[String]]
                           )
 
 case class ParsedConfig(
-                         overwatchScope: Array[String],
+                         overwatchScope: Seq[String],
                          tokenUsed: String, //TODO - Convert to enum
                          targetDatabase: String,
                          targetDatabaseLocation: String,

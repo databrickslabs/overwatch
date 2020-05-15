@@ -14,6 +14,7 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{current_timestamp, lit, max, rank, row_number}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 
 class Initializer(config: Config) extends SparkSessionWrapper {
 
@@ -73,7 +74,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, "Validating Input Parameters")
       val rawParams = mapper.readValue[OverwatchParams](args(0))
       config.setInputConfig(rawParams)
-      val overwatchScope = rawParams.overwatchScope.getOrElse(Array("all"))
+      val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
       val tokenSecret = rawParams.tokenSecret
       val dataTarget = rawParams.dataTarget.getOrElse(
         DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db")))
@@ -113,7 +114,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       // Todo -- add validation to badRecordsPath
       config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
-      if (overwatchScope(0) == "all") config.setOverwatchScope(OverwatchScope.values.toArray)
+      if (overwatchScope(0) == "all") config.setOverwatchScope(config.orderedOverwatchScope)
       else config.setOverwatchScope(validateScope(overwatchScope))
     }
     this
@@ -166,7 +167,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   }
 
   @throws(classOf[IllegalArgumentException])
-  private def validateScope(scopes: Array[String]): Array[OverwatchScope.OverwatchScope] = {
+  private def validateScope(scopes: Seq[String]): Seq[OverwatchScope.OverwatchScope] = {
     val lcScopes = scopes.map(_.toLowerCase)
     if (lcScopes.contains("jobruns")) {
       require(lcScopes.contains("jobs"), "When jobruns are in scope for log capture, jobs must also be in scope " +
