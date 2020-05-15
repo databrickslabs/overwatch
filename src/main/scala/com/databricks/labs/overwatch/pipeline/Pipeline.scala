@@ -19,12 +19,11 @@ class Pipeline(_workspace: Workspace, _database: Database,
   private var _jobIDs: Array[Long] = _
   private var _eventLogGlob: DataFrame = _
   private var _newDataRetrieved: Boolean = true
+  private var _pipelineStatus: String = "SUCCESS"
   protected final val workspace: Workspace = _workspace
   protected final val database: Database = _database
   protected final val config: Config = _config
   lazy protected final val postProcessor = new PostProcessor()
-
-  //  private var _database: Database = _
 
   case class Module(moduleID: Int, moduleName: String)
 
@@ -55,6 +54,17 @@ class Pipeline(_workspace: Workspace, _database: Database,
     this
   }
 
+  protected def setPipelineStatus(value: String): this.type = {
+    _pipelineStatus = value
+    this
+  }
+
+  protected def resetDefaults(): this.type = {
+    _newDataRetrieved = true
+    _pipelineStatus = "SUCCESS"
+    this
+  }
+
   protected def setJobIDs(value: Array[Long]): this.type = {
     _jobIDs = value
     this
@@ -77,6 +87,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
   protected def newDataRetrieved: Boolean = _newDataRetrieved
 
   protected def sparkEventsLogGlob: DataFrame = _eventLogGlob
+
+  private def pipelineStatus: String = _pipelineStatus
 
   private def getLastOptimized(moduleID: Int): Long = {
     val lastRunOptimizeTS = config.lastRunDetail.filter(_.moduleID == moduleID)
@@ -115,20 +127,20 @@ class Pipeline(_workspace: Workspace, _database: Database,
       fromTS = fromTime.asUnixTimeMilli
       untilTS = config.pipelineSnapTime.asUnixTimeMilli
 
-      val typedTSCol = finalDF.schema.fields.filter(_.name == target.tsCol).head.dataType match {
+      val timeFilter = finalDF.schema.fields.filter(_.name == target.tsCol).head.dataType match {
         case dt: TimestampType =>
-          col(target.tsCol).cast(LongType)
+          col(target.tsCol).cast(LongType).between(fromTS, untilTS)
         case dt: DateType =>
           // Date filters -- The unixTS must be at the epoch Second level but the storage must be at the
           // epoch MilliSecond level
           untilTS = config.pipelineSnapTime.asMidnightEpochMilli
           fromTS = fromTime.asMidnightEpochMilli
-          to_timestamp(col(target.tsCol)).cast(LongType)
-        case _ => col(target.tsCol)
+          to_timestamp(col(target.tsCol)).cast(LongType).between(fromTS / 1000, untilTS / 1000)
+        case _ => col(target.tsCol).between(fromTS, untilTS)
       }
 
       finalDF = finalDF
-        .filter(typedTSCol.between(fromTS / 1000, untilTS / 1000))
+        .filter(timeFilter)
     }
 
     val startLogMsg = if (newDataOnly) {
@@ -139,27 +151,21 @@ class Pipeline(_workspace: Workspace, _database: Database,
     logger.log(Level.INFO, startLogMsg)
 
     val startTime = System.currentTimeMillis()
-    val status: String = try {
+    val dfCount = try {
       _database.write(finalDF, target)
-      if (config.debugFlag) {
-        val debugCount = finalDF.count()
-        logger.log(Level.INFO, s"${module.moduleName} SUCCESS: appended ${debugCount}.")
-        "SUCCESS"
-      } else {
-        logger.log(Level.INFO, s"${module.moduleName} SUCCESS!")
-        "SUCCESS"
-      }
+      val debugCount = finalDF.count()
+      logger.log(Level.INFO, s"${module.moduleName} SUCCESS! ${debugCount} records appended.")
+      debugCount
     } catch {
       // TODO -- Figure out how to bubble up the exceptions
       case e: Throwable => {
         val errorMsg = s"FAILED: ${target.tableFullName} Could not append!"
         logger.log(Level.ERROR, errorMsg, e)
+        setPipelineStatus(errorMsg)
         println(errorMsg)
-        errorMsg
+        0
       }
     } finally df.unpersist(blocking = true)
-
-    // TODO -- this should be calculated by module/target
 
     if (needsOptimize(module.moduleID)) {
       postProcessor.add(target)
@@ -168,6 +174,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     val endTime = System.currentTimeMillis()
 
+    // TODO - satus is not reflecting exception from upstream
     ModuleStatusReport(
       moduleID = module.moduleID,
       moduleName = module.moduleName,
@@ -176,13 +183,13 @@ class Pipeline(_workspace: Workspace, _database: Database,
       fromTS = fromTS,
       untilTS = untilTS,
       dataFrequency = target.dataFrequency.toString,
-      status = status,
+      status = pipelineStatus,
+      recordsAppended = dfCount,
       lastOptimizedTS = lastOptimizedTS,
       vacuumRetentionHours = 24 * 7,
       inputConfig = config.inputConfig,
       parsedConfig = config.parsedConfig
     )
-
 
   }
 

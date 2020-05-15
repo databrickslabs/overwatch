@@ -150,7 +150,7 @@ class Config() {
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.audit)
+    _overwatchScope = Array(OverwatchScope.clusters, OverwatchScope.clusterEvents)
     _databaseName = "Overwatch"
     _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
     _auditLogPath = Some("C:\\Dev\\git\\Databricks--Overwatch\\data_samples\\audit_logs")

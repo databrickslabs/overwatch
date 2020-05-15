@@ -43,6 +43,7 @@ case class ModuleStatusReport(
                                untilTS: Long,
                                dataFrequency: String,
                                status: String,
+                               recordsAppended: Long,
                                lastOptimizedTS: Long,
                                vacuumRetentionHours: Int,
                                inputConfig: OverwatchParams,

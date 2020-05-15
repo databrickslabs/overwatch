@@ -42,23 +42,27 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       } else rawQuery
 
         val apiCall = ApiCall(endpoint, config.apiEnv, Some(query))
-        if (apiType == "post") apiCall.executePost().asStrings
+        val results = if (apiType == "post") apiCall.executePost().asStrings
         else apiCall.executeGet().asStrings
+      if (results.length == 0) throw new NoNewDataException(s"${endpoint} returned no new data, skipping")
+      results
     })
     } catch {
       case e: NoNewDataException =>
         setNewDataRetrievedFlag(false)
         val failMsg = s"Failed: No New Data Retrieved ${endpoint} with query: $extraQuery " +
-          s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load"
+          s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load for module"
         println(failMsg)
+        setPipelineStatus(failMsg)
         logger.log(Level.WARN, failMsg, e)
         Array("FAILURE")
       case e: Throwable =>
         val failMsg = s"Failed: ${endpoint} with query: $extraQuery " +
           s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load"
+        setPipelineStatus(failMsg)
         println(failMsg)
         println(e)
-        logger.log(Level.WARN, failMsg, e)
+        logger.log(Level.ERROR, failMsg, e)
         Array("FAILURE")
     }
   }
@@ -157,8 +161,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private def prepClusterEventLogs(moduleID: Int): DataFrame = {
     val extraQuery = Map(
-      "start_time" -> config.fromTime(moduleID).asUnixTimeMilli,
-      "end_time" -> config.pipelineSnapTime.asUnixTimeMilli
+      "start_time" -> config.fromTime(moduleID).asUnixTimeMilli, // 1588935326000L, //
+      "end_time" -> config.pipelineSnapTime.asUnixTimeMilli //1589021726000L //
     )
 
       // TODO -- add assertion that df count == total count from API CALL
@@ -190,24 +194,31 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
   def run(): Unit = {
     val reports = ArrayBuffer[ModuleStatusReport]()
+    resetDefaults()
     if (config.overwatchScope.contains(OverwatchScope.jobs)) {
       reports.append(appendJobsProcess.process())
     }
+    resetDefaults()
     if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
       reports.append(appendJobRunsProcess.process())
     }
+    resetDefaults()
     if (config.overwatchScope.contains(OverwatchScope.clusters)) {
       reports.append(appendClustersProcess.process())
     }
+    resetDefaults()
     if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
       reports.append(appendClusterEventLogsProcess.process())
     }
+    resetDefaults()
     if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
       reports.append(appendSparkEventLogsProcess.process())
     }
+    resetDefaults()
     if (config.overwatchScope.contains(OverwatchScope.pools)) {
       reports.append(appendPoolsProcess.process())
     }
+    resetDefaults()
     if (config.overwatchScope.contains(OverwatchScope.audit)) {
       reports.append(appendAuditLogsProcess.process())
     }
