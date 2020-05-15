@@ -213,8 +213,8 @@ object Initializer extends SparkSessionWrapper {
     // Todo - Move timestamp init to correct location
     logger.log(Level.INFO, "Initializing Environment")
     val database = new Initializer(config)
-      .initPipelineRun()
       .validateAndRegisterArgs(args)
+      .initPipelineRun()
       .initializeDatabase()
 
     logger.log(Level.INFO, "Initializing Workspace")

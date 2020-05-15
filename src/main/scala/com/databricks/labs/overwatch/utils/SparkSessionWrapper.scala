@@ -27,7 +27,7 @@ trait SparkSessionWrapper extends Serializable {
   }
 
   lazy val sc: SparkContext = spark.sparkContext
-  if (Config.isLocalTesting) sc.setLogLevel("WARN") else sc.setLogLevel("INFO")
+  if (System.getenv("OVERWATCH") == "LOCAL") sc.setLogLevel("WARN") else sc.setLogLevel("INFO")
 //  sc.setLogLevel("DEBUG")
 
   private var _coresPerWorker: Int = _
