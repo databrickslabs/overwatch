@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, Config, JsonUtils, NoNewDataException, SparkSessionWrapper}
+import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -184,6 +185,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     // TODO -- Add proper try catch
     try {
       val jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
+      // DEBUG
+      println(s"Loading ${_apiName} -> query: $jsonQuery")
       val result = Http(req)
         .postData(jsonQuery)
         .headers(Map[String, String](
@@ -191,16 +194,26 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${env.cipher.decrypt(env.encryptedToken)}"
         )).asString
-      if (result.isError) throw new ApiCallFailure(s"${_apiName} could not execute")
+      if (result.isError) {
+        val err = mapper.readTree(result.body).get("error_code").asText()
+        val msg = mapper.readTree(result.body).get("message").asText()
+        setStatus(s"$err -> $msg", Level.WARN)
+        throw new ApiCallFailure(s"$err -> $msg")
+      }
       if (!pageCall) {
-        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
-        val totalCount = JsonUtils.jsonToMap(results(0)).getOrElse("total_count", 0).toString.toLong
+        val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
+        val totalCount = JsonUtils.jsonToMap(jsonResult).getOrElse("total_count", 0).toString.toLong
+        if (totalCount > 0) results.append(jsonResult)
         if (totalCount > limit) paginate(totalCount)
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
       this
     } catch {
+      case _: JsonMappingException =>
+        val msg = s"API POST: NO NEW DATA -> ${_apiName} Query: ${jsonQuery}"
+        setStatus(msg, Level.WARN)
+        this
       case e: Throwable =>
         val msg = s"POST FAILED: Endpoint: ${_apiName} Query: ${jsonQuery}"
         setStatus(msg, Level.ERROR, Some(e))

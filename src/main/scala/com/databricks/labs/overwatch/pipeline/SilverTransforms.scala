@@ -1,12 +1,14 @@
 package com.databricks.labs.overwatch.pipeline
 
+import java.util.UUID
+
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 
-trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
+trait SilverTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
 
@@ -62,11 +64,15 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
       val jobGroupIDW = Window.partitionBy('SparkContextID, 'JobGroupID).rangeBetween(Window.unboundedPreceding, Window.unboundedFollowing)
 
       val jobsProps = df.filter('event === "SparkListenerJobStart")
+        .withColumn("JobGroupID", $"Properties.sparkjobGroupid")
+        .withColumn("ClusterID", $"Properties.sparkdatabricksclusterUsageTagsclusterId")
         .select('SparkContextID, 'JobGroupID, 'JobID, explode('StageIDs).alias("StageID"), 'ClusterID)
         .withColumn("ClusterID", when('ClusterID.isNull, first('ClusterID).over(jobGroupIDW)).otherwise('ClusterID))
         .withColumn("JobsClusterID", when('ClusterID.isNull, last('ClusterID).over(jobGroupIDW)).otherwise('ClusterID))
         .drop("ClusterID")
       val stagesProps = df.filter('event === "SparkListenerStageSubmitted")
+        .withColumn("JobGroupID", $"Properties.sparkjobGroupid")
+        .withColumn("ClusterID", $"Properties.sparkdatabricksclusterUsageTagsclusterId")
         .select('SparkContextID, 'JobGroupID, 'StageID, 'ClusterID)
         .withColumn("ClusterID", when('ClusterID.isNull, first('ClusterID).over(jobGroupIDW)).otherwise('ClusterID))
         .withColumn("StagesClusterID", when('ClusterID.isNull, last('ClusterID).over(jobGroupIDW)).otherwise('ClusterID))
@@ -113,30 +119,18 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
           $"Properties.sparkdatabricksclusterUsageTagsdriverNodeType".alias("DriverNodeType"),
           $"Properties.sparkdatabricksworkerNodeTypeId".alias("WorkerNodeType"),
           $"Properties.sparkdatabricksclusterUsageTagssparkVersion".alias("SparkVersion")
-        ).alias("ClusterDetails")
-        ,
-        $"Properties.sparkdatabricksnotebookid".alias("NotebookID")
-        ,
-        $"Properties.sparkdatabricksnotebookpath".alias("NotebookPath")
-        ,
-        $"Properties.sparkdatabrickssparkContextId".alias("SparkContextID")
-        ,
-        $"Properties.sparkdriverhost".alias("DriverHostIP")
-        ,
-        $"Properties.sparkdrivermaxResultSize".alias("DriverMaxResults")
-        ,
-        $"Properties.sparkexecutorid".alias("ExecutorID")
-        ,
-        $"Properties.sparkexecutormemory".alias("ExecutorMemory")
-        ,
-        $"Properties.sparksqlexecutionid".alias("ExecutionID")
-        ,
-        $"Properties.sparksqlexecutionparent".alias("ExecutionParent")
-        ,
-        $"Properties.sparksqlshufflepartitions".alias("ShufflePartitions")
-        ,
-        $"Properties.user".alias("UserEmail")
-        ,
+        ).alias("ClusterDetails"),
+        $"Properties.sparkdatabricksnotebookid".alias("NotebookID"),
+        $"Properties.sparkdatabricksnotebookpath".alias("NotebookPath"),
+        $"Properties.sparkdatabrickssparkContextId".alias("SparkContextID"),
+        $"Properties.sparkdriverhost".alias("DriverHostIP"),
+        $"Properties.sparkdrivermaxResultSize".alias("DriverMaxResults"),
+        $"Properties.sparkexecutorid".alias("ExecutorID"),
+        $"Properties.sparkexecutormemory".alias("ExecutorMemory"),
+        $"Properties.sparksqlexecutionid".alias("ExecutionID"),
+        $"Properties.sparksqlexecutionparent".alias("ExecutionParent"),
+        $"Properties.sparksqlshufflepartitions".alias("ShufflePartitions"),
+        $"Properties.user".alias("UserEmail"),
         $"Properties.userID".alias("UserID")
       )
     }
@@ -156,26 +150,43 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
       .drop("startTime", "finishTime")
   }
 
-  protected def getExecutor(executorAddedDF: DataFrame, executorRemovedDF: DataFrame): DataFrame = {
-    executorAddedDF.join(executorRemovedDF, Seq("SparkContextID", "ExecutorID"))
-      .withColumn("ExecutorAliveTime", UDF.subtractTime('executorAddedTS, 'executorRemovedTS))
+  private def simplifyExecutorAdded(df: DataFrame): DataFrame = {
+    df.filter('Event === "SparkListenerExecutorAdded")
+      .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
+        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup"))
+  }
+
+  private def simplifyExecutorRemoved(df: DataFrame): DataFrame = {
+    df.filter('Event === "SparkListenerExecutorRemoved")
+      .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
+        'filenameGroup.alias("endFilenameGroup"))
+  }
+
+  protected def executor()(df: DataFrame): DataFrame = {
+
+    val executorAdded = simplifyExecutorAdded(df)
+    val executorRemoved = simplifyExecutorRemoved(df)
+
+    executorAdded.join(executorRemoved, Seq("SparkContextID", "ExecutorID"))
+      .withColumn("TaskRunTime", UDF.subtractTime('executorAddedTS, 'executorRemovedTS))
       .drop("executorAddedTS", "executorRemovedTS")
       .withColumn("ExecutorAliveTime", struct(
-        $"ExecutorAliveTime.startEpochMS".alias("AddedEpochMS"),
-        $"ExecutorAliveTime.startTS".alias("AddedTS"),
-        $"ExecutorAliveTime.endEpochMS".alias("RemovedTS"),
-        $"ExecutorAliveTime.endTS".alias("RemovedTS"),
-        $"ExecutorAliveTime.runTimeMS".alias("uptimeMS"),
-        $"ExecutorAliveTime.runTimeS".alias("uptimeS"),
-        $"ExecutorAliveTime.runTimeM".alias("uptimeM"),
-        $"ExecutorAliveTime.runTimeH".alias("uptimeH")
+        $"TaskRunTime.startEpochMS".alias("AddedEpochMS"),
+        $"TaskRunTime.startTS".alias("AddedTS"),
+        $"TaskRunTime.endEpochMS".alias("RemovedTS"),
+        $"TaskRunTime.endTS".alias("RemovedTS"),
+        $"TaskRunTime.runTimeMS".alias("uptimeMS"),
+        $"TaskRunTime.runTimeS".alias("uptimeS"),
+        $"TaskRunTime.runTimeM".alias("uptimeM"),
+        $"TaskRunTime.runTimeH".alias("uptimeH")
       ))
       .withColumn("addedTimestamp", $"ExecutorAliveTime.AddedEpochMS")
   }
 
-  protected def getApplication(df: DataFrame): DataFrame = {
+  protected def enhanceApplication()(df: DataFrame): DataFrame = {
     df.select('SparkContextID, 'AppID, 'AppName,
-      from_unixtime('Timestamp / 1000).cast("timestamp").alias("AppStartTime"), 'filenameGroup)
+      from_unixtime('Timestamp / 1000).cast("timestamp").alias("AppStartTime"),
+      'Pipeline_SnapTS, 'filenameGroup)
   }
 
   private val uniqueTimeWindow = Window.partitionBy("SparkContextID", "executionId")
@@ -184,7 +195,7 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
     df.filter('Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
       .select('SparkContextID, 'description, 'details, 'executionId.alias("ExecutionID"),
         'time.alias("SqlExecStartTime"),
-        'filenameGroup.alias("startFilenameGroup"))
+        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup"))
       .withColumn("timeRnk", rank().over(uniqueTimeWindow.orderBy('SqlExecStartTime)))
       .withColumn("timeRn", row_number().over(uniqueTimeWindow.orderBy('SqlExecStartTime)))
       .filter('timeRnk === 1 && 'timeRn === 1)
@@ -214,17 +225,17 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
       .withColumn("startTimestamp", $"SqlExecutionRunTime.startEpochMS")
   }
 
-  protected def simplifyJobStart(df: DataFrame): DataFrame = {
+  protected def simplifyJobStart(df: DataFrame, eventsRawDF: DataFrame): DataFrame = {
     df.filter('Event.isin("SparkListenerJobStart"))
       .withColumn("PowerProperties", UDF.appendPowerProperties)
       .select(
-        'SparkContextID, $"PowerProperties.ClusterID",
+        'SparkContextID, $"PowerProperties.ClusterDetails.ClusterID",
         $"PowerProperties.JobGroupID", $"PowerProperties.ExecutionID",
         'JobID, 'StageIDs, 'SubmissionTime, 'PowerProperties,
         'Properties.alias("OriginalProperties"),
-        'filenameGroup.alias("startFilenameGroup")
+        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup")
       )
-      .join(UDF.clusterIDLookup(df).jobLevel, Seq("SparkContextID", "JobID"), "left")
+      .join(UDF.clusterIDLookup(eventsRawDF).jobLevel, Seq("SparkContextID", "JobID"), "left")
   }
 
   protected def simplifyJobEnd(df: DataFrame): DataFrame = {
@@ -233,8 +244,8 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
         'filenameGroup.alias("endFilenameGroup"))
   }
 
-  protected def jobs()(df: DataFrame): DataFrame = {
-    val jobStart = simplifyJobStart(df)
+  protected def jobs(clusterLookupDF: DataFrame)(df: DataFrame): DataFrame = {
+    val jobStart = simplifyJobStart(df, clusterLookupDF)
     val jobEnd = simplifyJobEnd(df)
 
     jobStart.join(jobEnd.hint("SKEW", Seq("SparkContextID")), Seq("SparkContextID", "JobId"))
@@ -248,7 +259,8 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
     df.filter('Event === "SparkListenerStageSubmitted")
       .select('SparkContextID,
         $"StageInfo.StageID", $"StageInfo.SubmissionTime", $"StageInfo.StageAttemptID",
-        'StageInfo.alias("StageStartInfo"), 'filenameGroup.alias("startFilenameGroup"))
+        'StageInfo.alias("StageStartInfo"),
+        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup"))
   }
 
   protected def simplifyStageEnd(df: DataFrame): DataFrame = {
@@ -281,7 +293,7 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
         'StageID, 'StageAttemptID, $"TaskInfo.TaskID", $"TaskInfo.ExecutorID",
         $"TaskInfo.Attempt".alias("TaskAttempt"),
         $"TaskInfo.Host", $"TaskInfo.LaunchTime", 'TaskInfo.alias("TaskStartInfo"),
-        'filenameGroup.alias("startFilenameGroup")
+        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup")
       )
   }
 
@@ -315,9 +327,66 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
       .withColumn("startTimestamp", $"TaskRunTime.startEpochMS")
   }
 
+  protected def userLogins()(df: DataFrame): DataFrame = {
+    df.filter(
+      'serviceName === "accounts" &&
+      'actionName.isin("login", "tokenLogin") &&
+        $"userIdentity.email" =!= "dbadmin")
+      .select('date, $"userIdentity.email".alias("userEmail"),
+        'serviceName, 'actionName, 'sourceIPAddress, 'timestamp, 'userAgent)
+  }
 
+  protected def newAccounts()(df: DataFrame): DataFrame = {
+    df.filter('serviceName === "accounts" && 'actionName.isin("add"))
+      .select('date, 'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"),
+        $"requestParams.targetUserName", 'sourceIPAddress, 'userAgent)
+  }
 
+  private val audidBaseCols: Array[Column] = Array(
+    'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"))
 
+  protected def clustersStatusSummary()(df: DataFrame): DataFrame = {
+    val cluster_id_gen_w = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
+    val cluster_name_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
+    val cluster_state_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val cluster_id_gen = first('cluster_id, true).over(cluster_id_gen_w)
+    val cluster_name_gen = first('cluster_name, true).over(cluster_name_gen_w)
+    val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
+
+    val clusterSummaryCols = audidBaseCols ++ Array[Column](
+      when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
+      when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
+      'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
+      'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
+      'aws_attributes, 'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags,
+      'cluster_source, 'spark_env_vars, 'spark_conf,
+      when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
+      'acl_path_prefix, 'instance_pool_id, 'spark_version, 'cluster_creator, 'idempotency_token,
+      'organization_id, 'user_id, 'sourceIPAddress, 'ssh_public_keys)
+
+    df
+      .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
+      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .select(clusterSummaryCols: _*)
+      .withColumn("cluster_id", cluster_id_gen)
+      .withColumn("cluster_name", cluster_name_gen)
+      .withColumn("cluster_state", cluster_state_gen)
+  }
+
+  protected def jobsStatusSummary()(df: DataFrame): DataFrame = {
+    val jobChangeCols = audidBaseCols ++ Array[Column](when('name.isNull && 'new_settings.isNotNull,
+      get_json_object('new_settings, "$.name")).otherwise('name).alias("job_name"),
+      when('job_id.isNull && 'actionName === "create",
+        regexp_replace(split($"response.result", ":")(1),"}", ""))
+        .otherwise('job_id).alias("job_id"),
+      'notebook_task, 'existing_cluster_id, 'job_type, 'schedule, 'timeout_seconds, 'new_settings, 'new_cluster)
+
+    df
+      .filter('serviceName === "jobs" && 'actionName.isin("reset", "create", "update"))
+      .selectExpr("*", "requestParams.*")
+      .select(jobChangeCols: _*)
+      .orderBy('timestamp)
+  }
 
 
   //  object Session {
@@ -369,17 +438,17 @@ trait SilverTransforms extends SparkSessionWrapper with SilverTargets {
   //      Array('SparkContextID, col("ExecutorInfo.Host"), 'ExecutorID)
   //    }
   //
-  //    private val executorAddedDF = sparkEventsDF.filter('Event === "SparkListenerExecutorAdded")
-  //      .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
-  //        'filenameGroup.alias("startFilenameGroup"))
+  //      private val executorAddedDF = sparkEventsDF.filter('Event === "SparkListenerExecutorAdded")
+  //        .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
+  //          'filenameGroup.alias("startFilenameGroup"))
   //
-  //    private val executorRemovedDF = sparkEventsDF.filter('Event === "SparkListenerExecutorRemoved")
-  //      .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
-  //        'filenameGroup.alias("endFilenameGroup"))
-  //
-  //    val executorDF: DataFrame = executorAddedDF.join(executorRemovedDF, Seq("SparkContextID", "ExecutorID"))
-  //      .withColumn("TaskRunTime", subtractTime('executorAddedTS, 'executorRemovedTS))
-  //        .drop("executorAddedTS", "executorRemovedTS")
+  //      private val executorRemovedDF = sparkEventsDF.filter('Event === "SparkListenerExecutorRemoved")
+  //        .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
+  //          'filenameGroup.alias("endFilenameGroup"))
+  //  //
+  //      val executorDF: DataFrame = executorAddedDF.join(executorRemovedDF, Seq("SparkContextID", "ExecutorID"))
+  //        .withColumn("TaskRunTime", subtractTime('executorAddedTS, 'executorRemovedTS))
+  //          .drop("executorAddedTS", "executorRemovedTS")
   //
   //  }
 

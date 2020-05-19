@@ -19,196 +19,179 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val sw = new StringWriter
 
-  object UDFs {
+  /**
+   * Module sparkEvents
+   * Bronze sources for spark events
+   */
 
+  // TODO -- Compare all configurations against defaults and notate non-default configs
+  private lazy val sparkEventsDF: DataFrame = BronzeTargets.sparkEventLogsTarget.asDF
+    .drop("ClasspathEntries", "HadoopProperties", "SparkProperties", "SystemProperties", "SparkPlanInfo") // TODO - TEMP
+    .withColumn("filenameGroup", UDF.groupFilename('filename))
 
+  private var newAuditLogsDF: DataFrame = BronzeTargets.auditLogsTarget.asDF
+
+  private def cacheAuditLogs(auditModuleIDs: Array[Int]): Unit = {
+    val minAuditTS = config.lastRunDetail.filter(run => auditModuleIDs.contains(run.moduleID)).map(_.untilTS).min
+    val minAuditColTS = config.createTimeDetail(minAuditTS).asColumnTS
+    newAuditLogsDF = newAuditLogsDF
+      .filter('date >= minAuditColTS.cast("date"))
+      .repartition(getTotalCores).cache
+    newAuditLogsDF.count()
   }
 
-  object Sources {
+  // Slack Chat
+  // https://databricks.slack.com/archives/C04SZU99Q/p1588959876188200
+  // Todo -- Only return filenameGroup with specific request
+  // Todo -- ODBC/JDBC
+  /**
+   * ODBC/JDBC Sessions
+   */
 
-    /**
-     * Module sparkEvents
-     * Bronze sources for spark events
-     */
+  //    val serverSessionStartDF: DataFrame = sparkEventsDF
+  //      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerSessionCreated")
+  //      .select('SparkContextID, 'ip, 'sessionId, 'startTime, 'userName, 'filenameGroup.alias("startFilenameGroup"))
+  //
+  //    val serverSessionEndDF: DataFrame = sparkEventsDF
+  //      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerSessionClosed")
+  //      .select('SparkContextID, 'sessionId, 'finishTime, 'filenameGroup.alias("endFilenameGroup"))
+  //
+  //    val serverOperationStartDF: DataFrame = sparkEventsDF
+  //      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerOperationStart")
+  //      .select('SparkContextID, 'groupId, 'id, 'sessionId, 'startTime, 'statement, 'userName,
+  //        'filenameGroup.alias("startFilenameGroup"))
+  //
+  //    val serverOperationEndDF: DataFrame = sparkEventsDF
+  //      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerOperationClosed")
+  //      .select('SparkContextID, 'id, 'closeTime, 'filenameGroup.alias("endFilenameGroup"))
 
-    // TODO -- Compare all configurations against defaults and notate non-default configs
-    val sparkEventsDF: DataFrame = Bronze.sparkEventLogsTarget.asDF
-      .drop("ClasspathEntries", "HadoopProperties", "SparkProperties", "SystemProperties", "SparkPlanInfo") // TODO - TEMP
-      .withColumn("filenameGroup", UDF.groupFilename('filename))
+  /**
+   * Executor
+   */
 
-    // Slack Chat
-    // https://databricks.slack.com/archives/C04SZU99Q/p1588959876188200
-    // Todo -- Only return filenameGroup with specific request
-    // Todo -- ODBC/JDBC
-    /**
-     * ODBC/JDBC Sessions
-     */
+  lazy val executorAddedDF: DataFrame = sparkEventsDF
+    .filter('Event === "SparkListenerExecutorAdded")
+    .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
+      'filenameGroup.alias("startFilenameGroup"))
 
-    val serverSessionStartDF: DataFrame = Bronze.sparkEventLogsTarget.asDF
-      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerSessionCreated")
-      .select('SparkContextID, 'ip, 'sessionId, 'startTime, 'userName, 'filenameGroup.alias("startFilenameGroup"))
+  lazy val executorRemovedDF: DataFrame = sparkEventsDF
+    .filter('Event === "SparkListenerExecutorRemoved")
+    .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
+      'filenameGroup.alias("endFilenameGroup"))
 
-    val serverSessionEndDF: DataFrame = Bronze.sparkEventLogsTarget.asDF
-      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerSessionClosed")
-      .select('SparkContextID, 'sessionId, 'finishTime, 'filenameGroup.alias("endFilenameGroup"))
-
-    val serverOperationStartDF: DataFrame = Bronze.sparkEventLogsTarget.asDF
-      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerOperationStart")
-      .select('SparkContextID, 'groupId, 'id, 'sessionId, 'startTime, 'statement, 'userName,
-        'filenameGroup.alias("startFilenameGroup"))
-
-    val serverOperationEndDF: DataFrame = Bronze.sparkEventLogsTarget.asDF
-      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerOperationClosed")
-      .select('SparkContextID, 'id, 'closeTime, 'filenameGroup.alias("endFilenameGroup"))
-
-    /**
-     * Executor
-     */
-
-    val executorAddedDF: DataFrame = Bronze.sparkEventLogsTarget.asDF
-      .filter('Event === "SparkListenerExecutorAdded")
-      .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
-        'filenameGroup.alias("startFilenameGroup"))
-
-    val executorRemovedDF: DataFrame = Bronze.sparkEventLogsTarget.asDF
-      .filter('Event === "SparkListenerExecutorRemoved")
-      .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
-        'filenameGroup.alias("endFilenameGroup"))
-
-
-  }
 
   /**
    * Module SparkEvents
    */
 
+  // TODO - -replace lazy val back to lazy private val when done testing
   // Todo -- no data to test yet
-  lazy private val appendJDBCSessionsProcess = EtlDefinition(
-    getJDBCSession(Sources.serverSessionStartDF, Sources.serverSessionEndDF),
-    None,
-    append(Silver.jdbcSessionsTarget, newDataOnly = true),
-    Module(2001, "SPARK_JDBC_Sessions_Raw")
-  )
+  //  lazy val appendJDBCSessionsProcess = EtlDefinition(
+  //    getJDBCSession(Sources.serverSessionStartDF, Sources.serverSessionEndDF),
+  //    None,
+  //    append(Silver.jdbcSessionsTarget, newDataOnly = true),
+  //    Module(2001, "SPARK_JDBC_Sessions_Raw")
+  //  )
+  //
+  //  lazy val appendJDBCOperationsProcess = EtlDefinition(
+  //    getJDBCOperation(Sources.serverOperationStartDF, Sources.serverOperationEndDF),
+  //    None,
+  //    append(Silver.jdbcOperationsTarget, newDataOnly = true),
+  //    Module(2002, "SPARK_JDBC_Operations_Raw")
+  //  )
 
-  lazy private val appendJDBCOperationsProcess = EtlDefinition(
-    getJDBCOperation(Sources.serverOperationStartDF, Sources.serverOperationEndDF),
-    None,
-    append(Silver.jdbcOperationsTarget, newDataOnly = true),
-    Module(2002, "SPARK_JDBC_Operations_Raw")
-  )
-
-  lazy private val appendExecutorsProcess = EtlDefinition(
-    getExecutor(Sources.executorAddedDF, Sources.executorRemovedDF),
-    None,
-    append(Silver.executorsTarget, newDataOnly = true),
+  lazy val appendExecutorsProcess = EtlDefinition(
+    sparkEventsDF,
+    Some(Seq(executor())),
+    append(SilverTargets.executorsTarget, newDataOnly = true),
     Module(2003, "SPARK_Executors_Raw")
   )
 
-  lazy private val appendApplicationsProcess = EtlDefinition(
-    getApplication(Bronze.sparkEventLogsTarget.asDF
-      .filter('Event === "SparkListenerApplicationStart")),
-    None,
-    append(Silver.executorsTarget, newDataOnly = true),
-    Module(2004, "SPARK_Applications_Raw")
-  )
+  // TODO -- Build Bronze
+//  lazy val appendApplicationsProcess = EtlDefinition(
+//    sparkEventsDF,
+//    Some(Seq(enhanceApplication())),
+//    append(Silver., newDataOnly = true),
+//    Module(2004, "SPARK_Applications_Raw")
+//  )
 
-  lazy private val appendExecutionsProcess = EtlDefinition(
-    Bronze.sparkEventLogsTarget.asDF,
+  lazy val appendExecutionsProcess = EtlDefinition(
+    sparkEventsDF,
     Some(Seq(sqlExecutions())),
-    append(Silver.executionsTarget, newDataOnly = true),
+    append(SilverTargets.executionsTarget, newDataOnly = true),
     Module(2005, "SPARK_Executions_Raw")
   )
 
-  lazy private val appendJobsProcess = EtlDefinition(
-    Bronze.sparkEventLogsTarget.asDF,
-    Some(Seq(jobs())),
-    append(Silver.jobsTarget, newDataOnly = true),
+  lazy val appendJobsProcess = EtlDefinition(
+    sparkEventsDF,
+    Some(Seq(jobs(sparkEventsDF))),
+    append(SilverTargets.jobsTarget, newDataOnly = true),
     Module(2006, "SPARK_Jobs_Raw")
   )
 
-  lazy private val appendStagesProcess = EtlDefinition(
-    Bronze.sparkEventLogsTarget.asDF,
+  lazy val appendStagesProcess = EtlDefinition(
+    sparkEventsDF,
     Some(Seq(stages())),
-    append(Silver.stagesTarget, newDataOnly = true),
+    append(SilverTargets.stagesTarget, newDataOnly = true),
     Module(2007, "SPARK_Stages_Raw")
   )
 
-  lazy private val appendTasksProcess = EtlDefinition(
-    Bronze.sparkEventLogsTarget.asDF,
+  lazy val appendTasksProcess = EtlDefinition(
+    sparkEventsDF,
     Some(Seq(tasks())),
-    append(Silver.tasksTarget, newDataOnly = true),
+    append(SilverTargets.tasksTarget, newDataOnly = true),
     Module(2008, "SPARK_Tasks_Raw")
   )
 
-  lazy private val appendJobsHistoricalProcess = EtlDefinition(
-    Bronze.jobsTarget.asDF.coalesce(1),
-    None,
-    append(Silver.dbJobsHistoricalTarget, newDataOnly = true),
-    Module(2009, "DB_Jobs_Historical")
+  lazy val appendJobStatusProcess = EtlDefinition(
+    newAuditLogsDF,
+    Some(Seq(jobsStatusSummary())),
+    append(SilverTargets.secJobsStatusTarget, newDataOnly = true),
+    Module(2010, "SEC_JobsStatus")
   )
 
-  lazy private val overwriteJobsCurrentSnapshotProcess = EtlDefinition(
-    Bronze.jobsTarget.asDF,
+  lazy val appendJobRunsProcess = EtlDefinition(
+    BronzeTargets.jobRunsTarget.asDF,
     None,
-    append(Silver.dbJobsCurrentTarget, newDataOnly = true),
-    Module(2010, "DB_Jobs_Current")
-  )
-
-  lazy private val appendJobRunsProcess = EtlDefinition(
-    Bronze.jobRunsTarget.asDF,
-    None,
-    append(Silver.dbJobRunsTarget, newDataOnly = true),
+    append(SilverTargets.dbJobRunsTarget, newDataOnly = true),
     Module(2011, "DB_JobRuns")
   )
 
-  lazy private val appendClustersHistoricalProcess = EtlDefinition(
-    Bronze.clustersTarget.asDF,
-    None,
-    append(Silver.dbClustersHistoricalTarget, newDataOnly = true),
-    Module(2013, "DB_Clusters_Historical")
+  lazy val appendClusterAuditSummaryProcess = EtlDefinition(
+    newAuditLogsDF,
+    Some(Seq(clustersStatusSummary())),
+    append(SilverTargets.secClustersStatusTarget, newDataOnly = true),
+    Module(2014, "SEC_ClusterStatusChange")
   )
 
-  lazy private val overwriteClustersCurrentProcess = EtlDefinition(
-    Bronze.clustersTarget.asDF,
+  lazy val appendClusterEventsProcess = EtlDefinition(
+    BronzeTargets.clusterEventsTarget.asDF,
     None,
-    append(Silver.dbClustersCurrentTarget, newDataOnly = true),
-    Module(2014, "DB_Clusters_Current")
-  )
-
-  lazy private val appendClusterEventsProcess = EtlDefinition(
-    Bronze.clusterEventsTarget.asDF,
-    None,
-    append(Silver.dbClustersEventsTarget, newDataOnly = true),
+    append(SilverTargets.dbClustersEventsTarget, newDataOnly = true),
     Module(2015, "DB_ClusterEvents")
   )
 
-  lazy private val appendPoolsHistoricalProcess = EtlDefinition(
-    Bronze.poolsTarget.asDF,
-    None,
-    append(Silver.dbPoolsHistoricalTarget, newDataOnly = true),
-    Module(2016, "DB_Pools_Historical")
+  lazy val appendUserLoginsProcess = EtlDefinition(
+    newAuditLogsDF,
+    Some(Seq(userLogins())),
+    append(SilverTargets.secUserLoginsTarget, newDataOnly = true),
+    Module(2016, "SEC_UserLogins")
   )
 
-  lazy private val overwritePoolsCurrentProcess = EtlDefinition(
-    Bronze.poolsTarget.asDF,
-    None,
-    append(Silver.dbPoolsCurrentTarget, newDataOnly = true),
-    Module(2017, "DB_Pools_Current")
+  lazy val appendNewAccountsProcess = EtlDefinition(
+    newAuditLogsDF,
+    Some(Seq(newAccounts())),
+    append(SilverTargets.secAccountsTarget, newDataOnly = true),
+    Module(2017, "SEC_UserAccounts")
   )
 
-  lazy private val appendDBAuditLogsProcess = EtlDefinition(
-    Bronze.auditLogsTarget.asDF,
-    None,
-    append(Silver.secAuditLogs, newDataOnly = true),
-    Module(2018, "DB_Audit_Logs")
-  )
 
-  private def processSparkEvents: Array[ModuleStatusReport] = {
+  def processSparkEvents: Array[ModuleStatusReport] = {
     Array(
-      appendJDBCSessionsProcess.process(),
-      appendJDBCOperationsProcess.process(),
+//      appendJDBCSessionsProcess.process(),
+//      appendJDBCOperationsProcess.process(),
       appendExecutorsProcess.process(),
-      appendApplicationsProcess.process(),
+//      appendApplicationsProcess.process(),
       appendExecutionsProcess.process(),
       appendJobsProcess.process(),
       appendStagesProcess.process(),
@@ -222,23 +205,25 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.sparkEvents =>
         processSparkEvents.foreach(sparkReport => reports.append(sparkReport))
       case OverwatchScope.jobs =>
-        reports.append(appendJobsHistoricalProcess.process())
-        reports.append(overwriteJobsCurrentSnapshotProcess.process())
       case OverwatchScope.jobRuns =>
         reports.append(appendJobRunsProcess.process())
       case OverwatchScope.clusters =>
-        reports.append(appendClustersHistoricalProcess.process())
-        reports.append(overwriteClustersCurrentProcess.process())
       case OverwatchScope.clusterEvents =>
         reports.append(appendClusterEventsProcess.process())
       case OverwatchScope.pools =>
-        reports.append(appendPoolsHistoricalProcess.process())
-        reports.append(overwritePoolsCurrentProcess.process())
       case OverwatchScope.audit =>
-        reports.append(appendDBAuditLogsProcess.process())
-        
+        val auditModuleIDs = Array(2010, 2014, 2016, 2017)
+        cacheAuditLogs(auditModuleIDs)
+        reports.append(appendJobStatusProcess.process())
+        reports.append(appendClusterAuditSummaryProcess.process())
+        reports.append(appendUserLoginsProcess.process())
+        reports.append(appendNewAccountsProcess.process())
+        // todo -- create notebook ETL
+        // todo -- create pools history from audit log
+        newAuditLogsDF.unpersist()
     }
 
+    finalizeRun(reports.toArray)
     true
   }
 

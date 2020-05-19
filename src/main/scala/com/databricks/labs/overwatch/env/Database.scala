@@ -31,6 +31,8 @@ class Database(config: Config) extends SparkSessionWrapper {
     try {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
       target.writer(finalDF).saveAsTable(target.tableFullName)
+//      if (!config.isLocalTesting) target.writer(finalDF).saveAsTable(target.tableFullName)
+//      else target.writer(finalDF).saveAsTable(target.tableFullName)
       logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
       true
     } catch {

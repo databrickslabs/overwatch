@@ -99,46 +99,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .asDF
   }
 
-  def getAuditLogsDF: DataFrame = {
-    spark.read.json(config.auditLogPath.get)
-  }
-
-  // Todo -- Put back to private
-  def getUniqueSparkEventsFiles(filesToBeConsidered: DataFrame): Array[String] = {
-    if (database.tableExists("spark_events_bronze")) {
-      val existingFiles = database.readTable("spark_events_bronze").select('filename)
-        .distinct
-      val badFiles = spark.read.format("json").load(s"${config.badRecordsPath}/*/*/")
-        .select('path.alias("filename"))
-        .distinct
-      filesToBeConsidered.except(existingFiles.unionByName(badFiles)).as[String].collect()
-    } else {
-      filesToBeConsidered.select('filename)
-        .distinct.as[String].collect()
-    }
-  }
-
-
-  def getEventLogsDF(pathsGlobDF: DataFrame): DataFrame = {
-
-    val pathsGlob = getUniqueSparkEventsFiles(pathsGlobDF)
-    val dropCols = Array("Classpath Entries", "HadoopProperties", "SparkProperties", "SystemProperties", "sparkPlanInfo")
-
-    val rawEventsDF = spark.read.option("badRecordsPath", config.badRecordsPath)
-      .json(pathsGlob: _*).drop(dropCols: _*)
-
-    SchemaTools.scrubSchema(rawEventsDF)
-      .withColumn("filename", input_file_name)
-      .withColumn("pathSize", size(split('filename, "/")) - lit(2))
-      .withColumn("SparkContextID", split('filename, "/")('pathSize))
-//      .withColumn("ClusterID", $"Properties.sparkdatabricksclusterUsageTagsclusterId")
-//      .withColumn("JobGroupID", $"Properties.sparkjobGroupid")
-//      .withColumn("ExecutionID", $"Properties.sparksqlexecutionid")
-//      .withColumn("ExecutionParent", $"Properties.sparksqlexecutionparent")
-      .drop("pathSize")
-      .repartition()
-  }
-
   def setDatabase(value: Database): this.type = {
     _database = value
     this

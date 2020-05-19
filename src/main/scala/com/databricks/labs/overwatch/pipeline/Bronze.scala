@@ -2,222 +2,146 @@ package com.databricks.labs.overwatch.pipeline
 
 import java.io.{PrintWriter, StringWriter}
 
-import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{ApiCallFailure, Config, Helpers, ModuleStatusReport, NoNewDataException, OverwatchScope, SchemaTools, SparkSessionWrapper}
-
-import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.forkjoin.ForkJoinPool
-import org.apache.spark.sql.functions.{array, col, explode, lit}
+import com.databricks.labs.overwatch.utils.{Config, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Row}
+import org.apache.spark.sql.DataFrame
 
 import scala.collection.mutable.ArrayBuffer
 
 
 class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
-  with SparkSessionWrapper {
+    with SparkSessionWrapper with BronzeTransforms {
 
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private val sw = new StringWriter
-
-  private def apiByID[T](endpoint: String, apiType: String,
-                         ids: Array[T], idsKey: String,
-                         extraQuery: Option[Map[String, Any]] = None): Array[String] = {
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(6))
-    val idsPar = ids.par
-    idsPar.tasksupport = taskSupport
-
-    try {
-    ids.flatMap(id => {
-      val rawQuery = Map(
-        idsKey -> id
-      )
-
-      val query = if (extraQuery.nonEmpty) {
-        extraQuery.get ++ rawQuery
-      } else rawQuery
-
-        val apiCall = ApiCall(endpoint, config.apiEnv, Some(query))
-        val results = if (apiType == "post") apiCall.executePost().asStrings
-        else apiCall.executeGet().asStrings
-      if (results.length == 0) throw new NoNewDataException(s"${endpoint} returned no new data, skipping")
-      results
-    })
-    } catch {
-      case e: NoNewDataException =>
-        setNewDataRetrievedFlag(false)
-        val failMsg = s"Failed: No New Data Retrieved ${endpoint} with query: $extraQuery " +
-          s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load for module"
-        println(failMsg)
-        setPipelineStatus(failMsg)
-        logger.log(Level.WARN, failMsg, e)
-        Array("FAILURE")
-      case e: Throwable =>
-        val failMsg = s"Failed: ${endpoint} with query: $extraQuery " +
-          s"and ids ${ids.mkString(", ")}! Skipping ${endpoint} load"
-        setPipelineStatus(failMsg)
-        println(failMsg)
-        println(e)
-        logger.log(Level.ERROR, failMsg, e)
-        Array("FAILURE")
-    }
-  }
-
-  private def collectJobsIDs()(df: DataFrame): DataFrame = {
-    if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
-      //TODO -- Add the .distinct back -- bug -- distinct is resuling in no return values????
-      //DEBUG
-      //        val debugX = df.select('job_id).as[Long].collect()
-      //        val debugY = df.select('job_id).distinct.as[Long].collect()
-      // setJobIDs(df.select('job_id).distinct().as[Long].collect())
-      setJobIDs(df.select('job_id).distinct().as[Long].collect())
-    }
-    df
-  }
 
   lazy private val appendJobsProcess = EtlDefinition(
     workspace.getJobsDF.cache(),
-    Some(Seq(collectJobsIDs())),
-    append(Bronze.jobsTarget),
+    Some(Seq(collectJobsIDs(config.overwatchScope))),
+    append(BronzeTargets.jobsTarget),
     Module(1001, "Bronze_Jobs")
   )
 
-  // TODO -- add assertion that df count == total count from API CALL
-  private def prepJobRunsDF: DataFrame = {
-    val extraQuery = Map("completed_only" -> true)
-    val jobRuns = apiByID("jobs/runs/list",
-      "get", jobIDs, "job_id", Some(extraQuery))
-
-    if (newDataRetrieved) {
-      // TODO -- add filter to remove runs before fromTS
-      spark.read.json(Seq(jobRuns: _*).toDS()).select(explode('runs).alias("runs"))
-        .select(col("runs.*"))
-    } else jobRuns.toSeq.toDF("FAILURE")
-  }
-
   lazy private val appendJobRunsProcess = EtlDefinition(
-    prepJobRunsDF,
+    prepJobRunsDF(config.apiEnv),
     None,
-    append(Bronze.jobRunsTarget, newDataOnly = true),
+    append(BronzeTargets.jobRunsTarget, newDataOnly = true),
     Module(1007, "Bronze_JobRuns")
   )
 
-  private def collectClusterIDs()(df: DataFrame): DataFrame = {
-    if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-      setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
-    }
-    df
-  }
-
-  private def collectEventLogPaths()(df: DataFrame): DataFrame = {
-    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-      val colsDF = df.select($"cluster_log_conf.*")
-      val cols = colsDF.columns.map(c => s"${c}.destination")
-      val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
-      val eventLogsPathGlobDF = cols.flatMap(
-        c => {
-          logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
-            .select(
-              array(col("destination"), col("cluster_id"),
-                lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-            ).rdd
-            .map(r => r.getSeq[String](0).mkString("/")).collect()
-        }).distinct
-        .flatMap(Helpers.globPath)
-        .toSeq.toDF("filename")
-      setEventLogGlob(eventLogsPathGlobDF)
-    }
-    df
-  }
-
-  lazy private val appendClustersProcess = EtlDefinition(
+  private val appendClustersModule = Module(1002, "Bronze_Clusters")
+  lazy private val appendClustersAPIProcess = EtlDefinition(
     workspace.getClustersDF.cache(),
-    Some(Seq(collectClusterIDs(), collectEventLogPaths())),
-    append(Bronze.clustersTarget),
-    Module(1002, "Bronze_Clusters")
+    Some(Seq(
+      collectClusterIDs(config.overwatchScope)
+    )),
+    append(BronzeTargets.clustersTarget),
+    appendClustersModule
   )
+
+//  lazy private val appendClustersAuditProcess = EtlDefinition(
+//    BronzeTargets.auditLogsTarget.asDF,
+//    Some(Seq(
+//      collectClusterIDs(config.overwatchScope), // for cluster events api
+//      collectEventLogPaths(
+//        BronzeTargets.auditLogsTarget, appendClustersModule.moduleID, config, SilverTargets.secClustersStatusTarget
+//      ),
+//
+//    )),
+//    append(BronzeTargets.clustersTarget),
+//    appendClustersModule
+//  )
 
   lazy private val appendPoolsProcess = EtlDefinition(
     workspace.getPoolsDF,
     None,
-    append(Bronze.poolsTarget),
+    append(BronzeTargets.poolsTarget),
     Module(1003, "Bronze_Pools")
   )
 
   lazy private val appendAuditLogsProcess = EtlDefinition(
-    workspace.getAuditLogsDF,
-    None,
-    append(Bronze.auditLogsTarget, newDataOnly = true),
+    getAuditLogsDF(config.auditLogPath.get),
+    Some(Seq(collectClusterIDs(config.overwatchScope))),
+    append(BronzeTargets.auditLogsTarget, newDataOnly = true),
     Module(1004, "Bronze_AuditLogs")
   )
 
-  private def prepClusterEventLogs(moduleID: Int): DataFrame = {
-    val extraQuery = Map(
-      "start_time" -> config.fromTime(moduleID).asUnixTimeMilli, // 1588935326000L, //
-      "end_time" -> config.pipelineSnapTime.asUnixTimeMilli //1589021726000L //
-    )
-
-      // TODO -- add assertion that df count == total count from API CALL
-      val clusterEvents = apiByID("clusters/events", "post",
-        clusterIDs, "cluster_id", Some(extraQuery))
-
-    if (newDataRetrieved) {
-      spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
-        .select(col("events.*"))
-    } else clusterEvents.toSeq.toDF("FAILURE")
-
-  }
-
   private val appendClusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs")
   lazy private val appendClusterEventLogsProcess = EtlDefinition(
-    prepClusterEventLogs(appendClusterEventLogsModule.moduleID),
+    prepClusterEventLogs(
+      config.fromTime(appendClusterEventLogsModule.moduleID).asUnixTimeMilli,
+      config.pipelineSnapTime.asUnixTimeMilli,
+      config.apiEnv
+    ),
     None,
-    append(Bronze.clusterEventsTarget, newDataOnly = true),
+    append(BronzeTargets.clusterEventsTarget, newDataOnly = true),
     appendClusterEventLogsModule
   )
 
+  private def getEventLogPathsSourceDF: DataFrame = {
+    if (config.overwatchScope.contains(OverwatchScope.audit)) BronzeTargets.auditLogsTarget.asDF
+    else BronzeTargets.clustersTarget.asDF.filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
+  }
+  private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
+//  lazy private val appendSparkEventLogsProcess = EtlDefinition(
+//    generateEventLogsDF(config.badRecordsPath, BronzeTargets.sparkEventLogsTarget),
+//    None,
+//    append(BronzeTargets.sparkEventLogsTarget),
+//    sparkEventLogsModule
+//  )
+
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
-    workspace.getEventLogsDF(sparkEventsLogGlob),
-    None,
-    append(Bronze.sparkEventLogsTarget),
-    Module(1006, "Bronze_EventLogs")
+    getEventLogPathsSourceDF,
+    Some(Seq(
+      collectEventLogPaths(
+        config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
+        config.isFirstRun,
+        config.overwatchScope
+      ),
+      generateEventLogsDF(config.badRecordsPath, BronzeTargets.sparkEventLogsTarget)
+    )),
+    append(BronzeTargets.sparkEventLogsTarget),
+    sparkEventLogsModule
   )
 
   // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
   def run(): Unit = {
     val reports = ArrayBuffer[ModuleStatusReport]()
-    resetDefaults()
-    if (config.overwatchScope.contains(OverwatchScope.jobs)) {
-      reports.append(appendJobsProcess.process())
-    }
-    resetDefaults()
-    if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
-      reports.append(appendJobRunsProcess.process())
-    }
-    resetDefaults()
-    if (config.overwatchScope.contains(OverwatchScope.clusters)) {
-      reports.append(appendClustersProcess.process())
-    }
-    resetDefaults()
-    if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-      reports.append(appendClusterEventLogsProcess.process())
-    }
-    resetDefaults()
-    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-      reports.append(appendSparkEventLogsProcess.process())
-    }
-    resetDefaults()
-    if (config.overwatchScope.contains(OverwatchScope.pools)) {
-      reports.append(appendPoolsProcess.process())
-    }
-    resetDefaults()
+
     if (config.overwatchScope.contains(OverwatchScope.audit)) {
       reports.append(appendAuditLogsProcess.process())
+      if (config.overwatchScope.contains(OverwatchScope.jobs)) reports.append(appendJobsProcess.process())
+//      if (config.overwatchScope.contains(OverwatchScope.jobRuns)) reports.append(appendJobRunsProcess.process())
+      if (config.overwatchScope.contains(OverwatchScope.clusters)) reports.append(appendClustersAPIProcess.process())
+//      if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) reports.append(appendClusterEventLogsProcess.process())
+//      if (config.overwatchScope.contains(OverwatchScope.pools)) reports.append(appendPoolsProcess.process())
+    } else {
+      if (config.overwatchScope.contains(OverwatchScope.jobs)) {
+        reports.append(appendJobsProcess.process())
+      }
+      if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
+        reports.append(appendJobRunsProcess.process())
+      }
+      if (config.overwatchScope.contains(OverwatchScope.clusters)) {
+        reports.append(appendClustersAPIProcess.process())
+      }
+      if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
+        reports.append(appendClusterEventLogsProcess.process())
+      }
+      if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
+        reports.append(appendSparkEventLogsProcess.process())
+      }
+      if (config.overwatchScope.contains(OverwatchScope.pools)) {
+        reports.append(appendPoolsProcess.process())
+      }
     }
+
+    // TODO -- TESTING eventLogs
+    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) reports.append(appendSparkEventLogsProcess.process())
+
     //    DOES NOT PRESERVER NECESSARY ORDERING
     //    val reports = Config.overwatchScope.map {
     //      case OverwatchScope.jobs => appendJobs
@@ -229,12 +153,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     //      case OverwatchScope.sparkEvents => appendEventLogs
     //    }
 
-    // TODO -- update reports to note if post_porcessing / optimize was run
-    val pipelineReportTarget = PipelineTable("pipeline_report", Array("Overwatch_RunID"), "Pipeline_SnapTS", config)
-    database.write(reports.toDF, pipelineReportTarget)
-
-    postProcessor.analyze()
-    postProcessor.optimize()
+    finalizeRun(reports.toArray)
 
 
   }
@@ -243,6 +162,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
 object Bronze {
   def apply(workspace: Workspace): Bronze = new Bronze(workspace, workspace.database, workspace.getConfig)
-//    .setWorkspace(workspace).setDatabase(workspace.database)
+
+  //    .setWorkspace(workspace).setDatabase(workspace.database)
 
 }

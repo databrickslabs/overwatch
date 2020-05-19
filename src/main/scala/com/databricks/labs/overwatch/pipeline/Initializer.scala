@@ -46,8 +46,13 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     if (!spark.catalog.databaseExists(config.databaseName)) {
       logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
         s"${config.databaseLocation}.")
-      val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
-        s"${config.databaseLocation}' WITH DBPROPERTIES (OVERWATCHDB='TRUE',SCHEMA=${config.overwatchSchemaVersion})"
+      val createDBIfNotExists = if (!config.isLocalTesting) {
+        s"create database if not exists ${config.databaseName} location '" +
+          s"${config.databaseLocation}' WITH DBPROPERTIES (OVERWATCHDB='TRUE',SCHEMA=${config.overwatchSchemaVersion})"
+      } else {
+        s"create database if not exists ${config.databaseName} " +
+          s"WITH DBPROPERTIES (OVERWATCHDB='TRUE',SCHEMA=${config.overwatchSchemaVersion})"
+      }
       spark.sql(createDBIfNotExists)
       logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
       Database(config)
@@ -170,13 +175,29 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   private def validateScope(scopes: Seq[String]): Seq[OverwatchScope.OverwatchScope] = {
     val lcScopes = scopes.map(_.toLowerCase)
     if (lcScopes.contains("jobruns")) {
-      require(lcScopes.contains("jobs"), "When jobruns are in scope for log capture, jobs must also be in scope " +
+      require(lcScopes.contains("audit") || lcScopes.contains("jobs"),
+        "When jobruns are in scope, jobs and/or audit must also be in scope " +
         "as jobruns depend on jobIDs captured from jobs scope.")
+    }
+
+    if (lcScopes.contains("jobRuns") && !lcScopes.contains("audit")) {
+      println(s"WARNING: JobRuns without audit will result in loss of granularity. It's recommended to configure" +
+        s"the audit module.")
+    }
+
+    if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters"))&& !lcScopes.contains("audit")) {
+      println(s"WARNING: Cluster data without audit will result in loss of granularity. It's recommended to configure" +
+        s"the audit module.")
     }
 
     if (lcScopes.contains("clusterevents") || lcScopes.contains("sparkevents")) {
       require(lcScopes.contains("clusters"), "sparkEvents and clusterEvents scopes both require clusters scope to " +
         "also be enabled as clusterID is a requirement for these scopes.")
+    }
+
+    if (lcScopes.contains("clusterevents") && !lcScopes.contains("audit")) {
+      println(s"WARNING: JobRuns without audit will result in loss of granularity. It's recommended to configure" +
+        s"the audit module.")
     }
 
     lcScopes.map {

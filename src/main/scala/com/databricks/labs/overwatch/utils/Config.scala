@@ -19,6 +19,7 @@ class Config() {
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-","")
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
+  private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
   private var _isFirstRun: Boolean = false
   private var _debugFlag: Boolean = false
   private var _lastRunDetail: Array[ModuleStatusReport] = Array[ModuleStatusReport]()
@@ -52,6 +53,13 @@ class Config() {
     this
   }
 
+  // TODO -- This is for local testing only
+  private[overwatch] def setPipelineSnapTime(tsMilli: Long): this.type = {
+//    _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
+    _pipelineSnapTime = tsMilli
+    this
+  }
+
   @throws(classOf[NoSuchElementException])
   private[overwatch] def fromTime(moduleID: Int): TimeTypes = {
     val lastRunStatus = if (!isFirstRun) lastRunDetail.filter(_.moduleID == moduleID) else lastRunDetail
@@ -65,18 +73,21 @@ class Config() {
     createTimeDetail(_pipelineSnapTime)
   }
 
+//  case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
+//                       asUTCDateTime: LocalDateTime, asMidnightEpochMilli: Long,
+//                       asTSString: String, asDTString: String)
   private[overwatch] def createTimeDetail(tsMilli: Long): TimeTypes = {
     val dt = new Date(tsMilli)
     val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
     TimeTypes(
-      tsMilli,
-      tsMilli / 1000,
-      from_unixtime(lit(tsMilli / 1000)).cast("timestamp"),
-      dt,
-      localDT,
-      localDT.toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).toEpochMilli,
-      tsFormat.format(new Date(tsMilli)),
-      dtFormat.format(new Date(tsMilli))
+      tsMilli, // asUnixTimeMilli
+      tsMilli / 1000, // asUnixTimeS -- NOTE: THIS IS LOSSY
+      from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp"), // asColumnTS
+      dt, // asJavaDate
+      localDT, // asUTCDateTime
+      localDT.toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).toEpochMilli, // asMidnightEpochMilli
+      tsFormat.format(new Date(tsMilli)), // asTSString
+      dtFormat.format(new Date(tsMilli)) // asDTString
     )
   }
 
@@ -111,6 +122,8 @@ class Config() {
   private[overwatch] def lastRunDetail: Array[ModuleStatusReport] = _lastRunDetail
 
   private[overwatch] def isLocalTesting: Boolean = _isLocalTesting
+
+  private[overwatch] def isDBConnect: Boolean = _isDBConnect
 
   private[overwatch] def isFirstRun: Boolean = _isFirstRun
 
@@ -156,10 +169,11 @@ class Config() {
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.clusters, OverwatchScope.clusterEvents)
-    _databaseName = "Overwatch"
-    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
-    _auditLogPath = Some("C:\\Dev\\git\\Databricks--Overwatch\\data_samples\\audit_logs")
+    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters, OverwatchScope.sparkEvents)
+    _databaseName = "overwatch_local"
+    _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
+//    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
+    _auditLogPath = Some("/mnt/tomesdata/logs/field_training_audit/")
     this
 
   }
