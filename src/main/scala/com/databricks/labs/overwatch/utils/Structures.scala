@@ -16,7 +16,7 @@ case class TokenSecret(scope: String, key: String)
 
 case class DataTarget(databaseName: Option[String], databaseLocation: Option[String])
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, encryptedToken: Array[Byte], cipher: Cipher)
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encryptedToken: Array[Byte], cipher: Cipher)
 
 case class OverwatchParams(tokenSecret: Option[TokenSecret],
                            dataTarget: Option[DataTarget],
@@ -52,7 +52,8 @@ case class ModuleStatusReport(
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles = Value
+  val jobs, jobRuns, clusters, clusterEvents, sparkEvents, audit, notebooks  = Value
+  // TODO - iamPassthrough, profiles, pools
 }
 
 object Layer extends Enumeration {
@@ -67,6 +68,7 @@ object Frequency extends Enumeration {
 
 private[overwatch] class NoNewDataException(s: String) extends Exception(s) {}
 private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
+private[overwatch] class TokenError(s: String) extends Exception(s) {}
 
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =

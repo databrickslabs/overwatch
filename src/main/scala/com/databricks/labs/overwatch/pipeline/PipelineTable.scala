@@ -62,7 +62,9 @@ case class PipelineTable(
 
   def asDF: DataFrame = {
     try{
-      spark.table(tableFullName)
+      if (!unpersistWhenComplete) {
+        spark.table(tableFullName).repartition().cache() // TODO -- ensure this cache is only caching filtered values
+      } else spark.table(tableFullName)
     } catch {
       case e: AnalysisException =>
         logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
@@ -70,7 +72,6 @@ case class PipelineTable(
     }
   }
 
-  // TODO - set autoOptimizeConfigs
   def writer(df: DataFrame): DataFrameWriter[Row] = {
     val f = if (config.isLocalTesting && !config.isDBConnect) "parquet" else format
     var writer = df.write.mode(mode).format(f)

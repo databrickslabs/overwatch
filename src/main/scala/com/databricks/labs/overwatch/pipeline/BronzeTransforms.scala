@@ -57,11 +57,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
                          ids: Array[T], idsKey: String,
                          extraQuery: Option[Map[String, Any]] = None): Array[String] = {
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(4))
-    //    val idsPar = ids.par
-    //    idsPar.tasksupport = taskSupport
+    val idsPar = ids.par
+    idsPar.tasksupport = taskSupport
     //    DEBUG
-    val idsPar = Array("0827-194754-tithe1")
-    val results = idsPar.flatMap(id => {
+    //    val idsPar = Array("0827-194754-tithe1")
+    // removing parallelization for now to see if it fixes some weird errors
+    // CONFIRMED -- Parallelizing this breaks the token cipher
+    val results = ids.flatMap(id => {
       val rawQuery = Map(
         idsKey -> id
       )
@@ -73,7 +75,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val apiCall = ApiCall(endpoint, apiEnv, Some(query))
       if (apiType == "post") apiCall.executePost().asStrings
       else apiCall.executeGet().asStrings
-    }).toArray
+    }) //.toArray
     if (results.isEmpty) {
       setNewDataRetrievedFlag(false)
       //      throw new NoNewDataException(s"${endpoint} returned no new data, skipping") // TODO -- BUBBLE THIS UP
@@ -87,11 +89,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   // TODO -- Get from audit if exists
-  protected def collectJobsIDs(overwatchScope: Seq[OverwatchScope.OverwatchScope])(df: DataFrame): DataFrame = {
-    if (overwatchScope.contains(OverwatchScope.jobRuns) &&
-      !overwatchScope.contains(OverwatchScope.audit)) {
-      setJobIDs(df.select('job_id).distinct().as[Long].collect())
-    }
+  protected def collectJobsIDs()(df: DataFrame): DataFrame = {
+    setJobIDs(df.select('job_id).distinct().as[Long].collect())
     df
   }
 
@@ -109,21 +108,35 @@ trait BronzeTransforms extends SparkSessionWrapper {
     } else jobRuns.toSeq.toDF("FAILURE")
   }
 
-  protected def collectClusterIDs(overwatchScope: Seq[OverwatchScope.OverwatchScope])(df: DataFrame): DataFrame = {
-    // If called from API cluster process
-    if (overwatchScope.contains(OverwatchScope.clusterEvents) &&
-      !overwatchScope.contains(OverwatchScope.audit)) {
-      setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
-    }
+  protected def getNewJobRuns(apiEnv: ApiEnv, fromTimeCol: Column)(df: DataFrame): DataFrame = {
+    val runIDs = df
+      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .filter('actionName.isin("runSucceeded", "runFailed"))
+      .filter('date > fromTimeCol.cast("date"))
+      .select('runId.cast("int")).distinct.as[Int].collect()
+    val jobRuns = apiByID("jobs/runs/get", apiEnv,
+      "get", runIDs, "run_id", None)
 
-    // If called from audit process
-    if (overwatchScope.contains(OverwatchScope.clusterEvents) && overwatchScope.contains(OverwatchScope.audit)) {
-      setClusterIDs(
-        df
-          .selectExpr("*", "requestParams.*")
-          .filter('serviceName === "clusters" && 'cluster_id.isNotNull)
-          .select('cluster_id).distinct().as[String].collect())
-    }
+    if (newDataRetrieved) {
+      // TODO -- add filter to remove runs before fromTS
+      spark.read.json(Seq(jobRuns: _*).toDS())
+    } else jobRuns.toSeq.toDF("FAILURE")
+  }
+
+  protected def collectClusterIDs()(df: DataFrame): DataFrame = {
+    setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
+    df
+  }
+
+  protected def collectClusterIDs(fromTimeCol: Column)(df: DataFrame): DataFrame = {
+    // Get clusterIDs for clusters with activity since last run
+    setClusterIDs(
+      df
+        .selectExpr("*", "requestParams.*")
+        .filter('serviceName === "clusters" && 'cluster_id.isNotNull)
+        .filter('date > fromTimeCol.cast("date")) // Partition Filter
+        .select('cluster_id).distinct().as[String].collect()
+    )
     df
   }
 
@@ -177,7 +190,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("pathSize", size(split('filename, "/")) - lit(2))
       .withColumn("SparkContextID", split('filename, "/")('pathSize))
       .drop("pathSize")
-      .repartition()
   }
 
   protected def collectEventLogPaths(fromTimeCol: Column,
@@ -195,28 +207,29 @@ trait BronzeTransforms extends SparkSessionWrapper {
       var baseClusterLookupDF = df
         .selectExpr("*", "requestParams.*")
         .filter('serviceName === "clusters")
-        .filter('date >= fromTimeCol.cast("date")) //Partition filter
+        .filter('date > fromTimeCol.cast("date")) //Partition filter
         .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
 
       // get cluster ids with events since last run to get new cluster events from api
       setClusterIDs(baseClusterLookupDF.select('cluster_id).distinct().as[String].collect())
 
-      // TODO -- add some max historical lookback to shrink scope
+      // Removing this for now -- I don't think it's necessary to do the look back
       // Combine edited and created clusters with historical clusters to get full list of event log paths
-      if (!isFirstRun) {
-        baseClusterLookupDF = baseClusterLookupDF
-          .filter('actionName.isin("create", "createResult", "edit"))
-          .unionByName(
-            df
-              .filter('serviceName === "clusters")
-              .filter('actionName.isin("create", "createResult", "edit"))
-              .filter('date < fromTimeCol.cast("date")) //Partition filter
-              .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
-          ).distinct
-      }
+      //      if (!isFirstRun) {
+      //        baseClusterLookupDF = baseClusterLookupDF
+      //          .filter('actionName.isin("create", "createResult", "edit"))
+      //          .unionByName(
+      //            df
+      //              .selectExpr("*", "requestParams.*")
+      //              .filter('serviceName === "clusters")
+      //              .filter('actionName.isin("create", "createResult", "edit"))
+      //              .filter('date <= fromTimeCol.cast("date")) //Partition filter
+      //              .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+      //          ).distinct
+      //      }
 
       // get all relevant cluster log paths
-      val eventLogsPathGlobDF = baseClusterLookupDF
+      baseClusterLookupDF
         .filter('cluster_log_conf.isNotNull)
         .withColumn("s3", get_json_object('cluster_log_conf, "$.s3"))
         .withColumn("dbfs", get_json_object('cluster_log_conf, "$.dbfs"))
@@ -232,7 +245,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .map(r => r.getSeq[String](0).mkString("/")).collect()
         .flatMap(Helpers.globPath)
         .toSeq.toDF("filename")
-    } else {
+    } else { // TODO - TEST -- might have broken when not using audit
       val colsDF = df.select($"cluster_log_conf.*")
       val cols = colsDF.columns.map(c => s"${c}.destination")
       val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
@@ -248,28 +261,27 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .flatMap(Helpers.globPath)
         .toSeq.toDF("filename")
     }
-    df
   }
 
-//  protected def collectEventLogPaths()(df: DataFrame): DataFrame = {
-//
-//    // Best effort to get currently existing cluster ids
-//    val colsDF = df.select($"cluster_log_conf.*")
-//    val cols = colsDF.columns.map(c => s"${c}.destination")
-//    val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
-//    cols.flatMap(
-//      c => {
-//        logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
-//          .select(
-//            array(regexp_replace(col("destination"), "\\/$", ""), col("cluster_id"),
-//              lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-//          ).rdd
-//          .map(r => r.getSeq[String](0).mkString("/")).collect()
-//      }).distinct
-//      .flatMap(Helpers.globPath)
-//      .toSeq.toDF("filename")
-//    setEventLogGlob(eventLogsPathGlobDF)
-//    df
-//  }
+  //  protected def collectEventLogPaths()(df: DataFrame): DataFrame = {
+  //
+  //    // Best effort to get currently existing cluster ids
+  //    val colsDF = df.select($"cluster_log_conf.*")
+  //    val cols = colsDF.columns.map(c => s"${c}.destination")
+  //    val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
+  //    cols.flatMap(
+  //      c => {
+  //        logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
+  //          .select(
+  //            array(regexp_replace(col("destination"), "\\/$", ""), col("cluster_id"),
+  //              lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
+  //          ).rdd
+  //          .map(r => r.getSeq[String](0).mkString("/")).collect()
+  //      }).distinct
+  //      .flatMap(Helpers.globPath)
+  //      .toSeq.toDF("filename")
+  //    setEventLogGlob(eventLogsPathGlobDF)
+  //    df
+  //  }
 
 }

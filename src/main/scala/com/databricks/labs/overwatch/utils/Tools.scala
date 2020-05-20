@@ -44,29 +44,27 @@ object JsonUtils {
 
 }
 
-class Cipher {
+class Cipher(key: String) {
 
-  private val tempKey = UUID.randomUUID().toString
   private val salt = Array[Byte](16)
-  private val spec = new PBEKeySpec(tempKey.toCharArray, salt, 1000, 128 * 8)
+  private val spec = new PBEKeySpec(key.toCharArray, salt, 1000, 128 * 8)
   private val keyGenner = KeyGenerator.getInstance("AES")
   keyGenner.init(128)
   private val aesKey = keyGenner.generateKey()
-  private val iv = new IvParameterSpec("0102030405060708".getBytes())
+  private val iv = new IvParameterSpec("0102030405060708".getBytes("UTF-8"))
   private val cipher = crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
 
   private[overwatch] def encrypt(text: String): Array[Byte] = {
     //    val aesKey = new SecretKeySpec(tempKey.getBytes(), "AES")
     //    val aesKey = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec)
     cipher.init(crypto.Cipher.ENCRYPT_MODE, aesKey, iv)
-    cipher.doFinal(text.getBytes())
+    cipher.doFinal(text.getBytes("UTF-8"))
   }
 
   private[overwatch] def decrypt(byteStream: Array[Byte]): String = {
     cipher.init(crypto.Cipher.DECRYPT_MODE, aesKey, iv)
     new String(cipher.doFinal(byteStream))
   }
-
 
 }
 
@@ -113,7 +111,7 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val dropSuffix = UUID.randomUUID().toString.replace("-","")
+    val dropSuffix = UUID.randomUUID().toString.replace("-", "")
     colsToMove.foldLeft(df) {
       case (df, c) =>
         val tempColName = s"${c}_${dropSuffix}"
@@ -126,6 +124,7 @@ object SchemaTools extends SparkSessionWrapper {
 object Helpers extends SparkSessionWrapper {
 
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
+
   private def parallelism: Int = {
     Math.min(driverCores, 8)
   }
@@ -154,13 +153,13 @@ object Helpers extends SparkSessionWrapper {
     fs.exists(new Path(path))
   }
 
-  def getFullPath(path:String): String = {
+  def getFullPath(path: String): String = {
     val conf = sc.hadoopConfiguration
     val fs = FileSystem.get(conf)
     fs.getFileStatus(new Path(path)).getPath.toString
   }
 
-  def getAllFiles(path:String): Seq[String] = {
+  def getAllFiles(path: String): Seq[String] = {
     val conf = sc.hadoopConfiguration
     val fs = FileSystem.get(conf)
     val files = fs.listStatus(new Path(path))
@@ -189,7 +188,7 @@ object Helpers extends SparkSessionWrapper {
     tablesPar.tasksupport = taskSupport
 
     tablesPar.foreach(tbl => {
-      try{
+      try {
         val zorderColumns = if (zOrdersByTable.contains(tbl)) s"ZORDER BY (${zOrdersByTable(tbl).mkString(", ")})" else ""
         val sql = s"""optimize ${db}.${tbl} ${zorderColumns}"""
         println(s"optimizing: ${db}.${tbl} --> $sql")
@@ -212,7 +211,7 @@ object Helpers extends SparkSessionWrapper {
     tablesPar.tasksupport = taskSupport
 
     tablesPar.foreach(tbl => {
-      try{
+      try {
         val zorderColumns = if (tbl.zOrderBy.nonEmpty) s"ZORDER BY (${tbl.zOrderBy.mkString(", ")})" else ""
         val sql = s"""optimize ${tbl.tableFullName} ${zorderColumns}"""
         println(s"optimizing: ${tbl.tableFullName} --> $sql")
@@ -235,7 +234,7 @@ object Helpers extends SparkSessionWrapper {
     tablesPar.tasksupport = taskSupport
 
     tablesPar.foreach(tbl => {
-      try{
+      try {
         println(s"optimizing: ${tbl}")
         spark.sql(s"optimize ${tbl}")
         println(s"Complete: ${tbl}")

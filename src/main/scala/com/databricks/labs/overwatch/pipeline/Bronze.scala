@@ -14,46 +14,40 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
     with SparkSessionWrapper with BronzeTransforms {
 
+  envInit()
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   lazy private val appendJobsProcess = EtlDefinition(
     workspace.getJobsDF.cache(),
-    Some(Seq(collectJobsIDs(config.overwatchScope))),
+    Some(Seq(collectJobsIDs())),
     append(BronzeTargets.jobsTarget),
     Module(1001, "Bronze_Jobs")
   )
 
+  private val jobRunsModule = Module(1007, "Bronze_JobRuns")
   lazy private val appendJobRunsProcess = EtlDefinition(
     prepJobRunsDF(config.apiEnv),
     None,
     append(BronzeTargets.jobRunsTarget, newDataOnly = true),
-    Module(1007, "Bronze_JobRuns")
+    jobRunsModule
+  )
+
+  lazy private val appendJobRunsAuditFilteredProcess = EtlDefinition(
+    BronzeTargets.auditLogsTarget.asDF,
+    Some(Seq(getNewJobRuns(config.apiEnv, config.fromTime(jobRunsModule.moduleID).asColumnTS))),
+    append(BronzeTargets.jobRunsTarget, newDataOnly = true),
+    jobRunsModule
   )
 
   private val appendClustersModule = Module(1002, "Bronze_Clusters")
   lazy private val appendClustersAPIProcess = EtlDefinition(
     workspace.getClustersDF.cache(),
-    Some(Seq(
-      collectClusterIDs(config.overwatchScope)
-    )),
+    Some(Seq(collectClusterIDs())),
     append(BronzeTargets.clustersTarget),
     appendClustersModule
   )
-
-//  lazy private val appendClustersAuditProcess = EtlDefinition(
-//    BronzeTargets.auditLogsTarget.asDF,
-//    Some(Seq(
-//      collectClusterIDs(config.overwatchScope), // for cluster events api
-//      collectEventLogPaths(
-//        BronzeTargets.auditLogsTarget, appendClustersModule.moduleID, config, SilverTargets.secClustersStatusTarget
-//      ),
-//
-//    )),
-//    append(BronzeTargets.clustersTarget),
-//    appendClustersModule
-//  )
 
   lazy private val appendPoolsProcess = EtlDefinition(
     workspace.getPoolsDF,
@@ -64,7 +58,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private val appendAuditLogsProcess = EtlDefinition(
     getAuditLogsDF(config.auditLogPath.get),
-    Some(Seq(collectClusterIDs(config.overwatchScope))),
+    Some(Seq(
+      collectClusterIDs(
+        config.fromTime(sparkEventLogsModule.moduleID).asColumnTS
+      ))),
     append(BronzeTargets.auditLogsTarget, newDataOnly = true),
     Module(1004, "Bronze_AuditLogs")
   )
@@ -85,14 +82,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     if (config.overwatchScope.contains(OverwatchScope.audit)) BronzeTargets.auditLogsTarget.asDF
     else BronzeTargets.clustersTarget.asDF.filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
   }
-  private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
-//  lazy private val appendSparkEventLogsProcess = EtlDefinition(
-//    generateEventLogsDF(config.badRecordsPath, BronzeTargets.sparkEventLogsTarget),
-//    None,
-//    append(BronzeTargets.sparkEventLogsTarget),
-//    sparkEventLogsModule
-//  )
 
+  private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
     getEventLogPathsSourceDF,
     Some(Seq(
@@ -113,11 +104,14 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
     if (config.overwatchScope.contains(OverwatchScope.audit)) {
       reports.append(appendAuditLogsProcess.process())
-      if (config.overwatchScope.contains(OverwatchScope.jobs)) reports.append(appendJobsProcess.process())
-//      if (config.overwatchScope.contains(OverwatchScope.jobRuns)) reports.append(appendJobRunsProcess.process())
-      if (config.overwatchScope.contains(OverwatchScope.clusters)) reports.append(appendClustersAPIProcess.process())
-//      if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) reports.append(appendClusterEventLogsProcess.process())
-//      if (config.overwatchScope.contains(OverwatchScope.pools)) reports.append(appendPoolsProcess.process())
+      // TODO -- keeping these two api events with audit since there appears to be more granular data available
+      //  from the api than from audit -- VERIFY
+      if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) reports.append(appendClusterEventLogsProcess.process())
+      if (config.overwatchScope.contains(OverwatchScope.jobRuns)) reports.append(appendJobRunsAuditFilteredProcess.process())
+      //      if (config.overwatchScope.contains(OverwatchScope.jobs)) reports.append(appendJobsProcess.process())
+      //      The following are disabled when audit is in scope
+      //      if (config.overwatchScope.contains(OverwatchScope.clusters)) reports.append(appendClustersAPIProcess.process())
+      //      if (config.overwatchScope.contains(OverwatchScope.pools)) reports.append(appendPoolsProcess.process())
     } else {
       if (config.overwatchScope.contains(OverwatchScope.jobs)) {
         reports.append(appendJobsProcess.process())
@@ -134,12 +128,11 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
         reports.append(appendSparkEventLogsProcess.process())
       }
-      if (config.overwatchScope.contains(OverwatchScope.pools)) {
-        reports.append(appendPoolsProcess.process())
-      }
+//      if (config.overwatchScope.contains(OverwatchScope.pools)) {
+//        reports.append(appendPoolsProcess.process())
+//      }
     }
 
-    // TODO -- TESTING eventLogs
     if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) reports.append(appendSparkEventLogsProcess.process())
 
     //    DOES NOT PRESERVER NECESSARY ORDERING

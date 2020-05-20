@@ -342,8 +342,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"requestParams.targetUserName", 'sourceIPAddress, 'userAgent)
   }
 
-  private val audidBaseCols: Array[Column] = Array(
-    'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"))
+  private val auditBaseCols: Array[Column] = Array(
+    'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
 
   protected def clustersStatusSummary()(df: DataFrame): DataFrame = {
     val cluster_id_gen_w = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
@@ -353,7 +353,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val cluster_name_gen = first('cluster_name, true).over(cluster_name_gen_w)
     val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
 
-    val clusterSummaryCols = audidBaseCols ++ Array[Column](
+    val clusterSummaryCols = auditBaseCols ++ Array[Column](
       when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
       when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
       'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
@@ -374,18 +374,31 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   protected def jobsStatusSummary()(df: DataFrame): DataFrame = {
-    val jobChangeCols = audidBaseCols ++ Array[Column](when('name.isNull && 'new_settings.isNotNull,
-      get_json_object('new_settings, "$.name")).otherwise('name).alias("job_name"),
-      when('job_id.isNull && 'actionName === "create",
-        regexp_replace(split($"response.result", ":")(1),"}", ""))
+    val jobsCols = auditBaseCols ++ Array[Column](
+      when('name.isNull && 'new_settings.isNotNull, get_json_object('new_settings, "$.name"))
+        .otherwise('name).alias("job_name"),
+      when('job_id.isNull && 'actionName === "create", get_json_object($"response.result", "$.job_id"))
+        .when('job_id.isNull, 'jobId)
         .otherwise('job_id).alias("job_id"),
-      'notebook_task, 'existing_cluster_id, 'job_type, 'schedule, 'timeout_seconds, 'new_settings, 'new_cluster)
+      'runId, 'jobTerminalState, 'jobTriggerType, 'jobTaskType, 'notebook_task, 'notebook_params,
+      'workflow_context, 'orgId, 'idInJob, 'jobClusterType, 'existing_cluster_id, 'job_type, 'schedule,
+      'timeout_seconds, 'new_settings, 'new_cluster, 'sessionId)
 
     df
-      .filter('serviceName === "jobs" && 'actionName.isin("reset", "create", "update"))
+      .filter('serviceName === "jobs" && !'actionName.isin("changeJobAcl"))
       .selectExpr("*", "requestParams.*")
-      .select(jobChangeCols: _*)
+      .select(jobsCols: _*)
       .orderBy('timestamp)
+  }
+
+  protected def notebookSummary()(df: DataFrame): DataFrame = {
+    val notebookCols = auditBaseCols ++ Array[Column]('notebookId, 'notebookName, 'path, 'oldName, 'oldPath, 'newName, 'newPath, 'parentPath, 'clusterId)
+
+    df.filter('serviceName === "notebook")
+      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .withColumn("pathLength", when('notebookName.isNull, size(split('path, "/"))))
+      .withColumn("notebookName", when('notebookName.isNull, split('path, "/")('pathLength - 1)).otherwise('notebookName))
+      .select(notebookCols: _*)
   }
 
 

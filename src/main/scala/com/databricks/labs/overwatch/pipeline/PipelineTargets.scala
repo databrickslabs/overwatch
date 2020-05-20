@@ -24,7 +24,7 @@ abstract class PipelineTargets(config: Config) {
       statsColumns = ("instance_pool_id, node_type_id, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "))
     lazy private[overwatch] val auditLogsTarget: PipelineTable = PipelineTable("audit_log_bronze", Array("requestId", "timestamp"), "date",
-      config,
+      config, unpersistWhenComplete = false,
       partitionBy = Array("date"), statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "), dataFrequency = Frequency.daily)
     lazy private[overwatch] val clusterEventsTarget: PipelineTable = PipelineTable("cluster_events_bronze",
@@ -88,17 +88,20 @@ abstract class PipelineTargets(config: Config) {
       zOrderBy = Array("cluster_id")
     )
 
-    lazy private[overwatch] val secUserLoginsTarget: PipelineTable = PipelineTable("sec_user_logins_silver",
+    lazy private[overwatch] val userLoginsTarget: PipelineTable = PipelineTable("user_logins_silver",
       Array("timestamp", "userEmail"), "timestamp", config)
 
-    lazy private[overwatch] val secAccountsTarget: PipelineTable = PipelineTable("sec_user_accounts_silver",
+    lazy private[overwatch] val newAccountsTarget: PipelineTable = PipelineTable("user_accounts_silver",
       Array("timestamp", "targetUserName"), "timestamp", config)
 
-    lazy private[overwatch] val secClustersStatusTarget: PipelineTable = PipelineTable("clusters_status_change_silver",
+    lazy private[overwatch] val clustersStatusTarget: PipelineTable = PipelineTable("clusters_silver",
       Array("timestamp", "cluster_id"), "timestamp", config)
 
-    lazy private[overwatch] val secJobsStatusTarget: PipelineTable = PipelineTable("clusters_status_change_silver",
+    lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable("jobs_silver",
       Array("timestamp", "job_id"), "timestamp", config)
+
+    lazy private[overwatch] val notebookStatusTarget: PipelineTable = PipelineTable("notebooks_silver",
+      Array("timestamp", "notebook_id"), "timestamp", config)
 
   }
 

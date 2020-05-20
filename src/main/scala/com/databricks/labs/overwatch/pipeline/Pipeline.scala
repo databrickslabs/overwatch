@@ -21,6 +21,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
   lazy protected final val postProcessor = new PostProcessor()
   private val sw = new StringWriter
 
+  envInit()
+
   // Todo Add Description
   case class Module(moduleID: Int, moduleName: String)
 
@@ -34,6 +36,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
                           ) {
 
     def process(): ModuleStatusReport = {
+      println(s"Beginning: ${module.moduleName}")
       if (transforms.nonEmpty) {
         val transformedDF = transforms.get.foldLeft(sourceDF) {
           case (df, transform) =>
@@ -49,6 +52,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
   import spark.implicits._
 
   protected def finalizeRun(reports: Array[ModuleStatusReport]): Unit = {
+    println(s"Writing Pipeline Report for modules: ${reports.map(_.moduleID).mkString(",")}")
     val pipelineReportTarget = PipelineTable("pipeline_report", Array("Overwatch_RunID"), "Pipeline_SnapTS", config)
     database.write(reports.toSeq.toDF, pipelineReportTarget)
     initiatePostProcessing()
@@ -196,8 +200,16 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
       val startTime = System.currentTimeMillis()
       _database.write(finalDF, target)
-      val debugCount = finalDF.count()
-      logger.log(Level.INFO, s"${module.moduleName} SUCCESS! ${debugCount} records appended.")
+      val debugCount = if (!config.isFirstRun) {
+        val dfCount = finalDF.count()
+        val msg = s"${module.moduleName} SUCCESS! ${dfCount} records appended."
+        println(msg)
+        logger.log(Level.INFO, msg)
+        dfCount
+      } else {
+        logger.log(Level.INFO, "Counts not calculated on first run.")
+        0
+      }
       if (target.unpersistWhenComplete) df.unpersist()
 
       if (needsOptimize(module.moduleID)) {

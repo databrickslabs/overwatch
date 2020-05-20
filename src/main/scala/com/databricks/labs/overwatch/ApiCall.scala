@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, Config, JsonUtils, NoNewDataException, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, Config, JsonUtils, NoNewDataException, SparkSessionWrapper, TokenError}
 import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -25,6 +25,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private var _status: String = "SUCCESS"
   private var _errorFlag: Boolean = false
   private val mapper = JsonUtils.objectMapper
+  private var _decryptedToken: String = env.rawToken
 
   private def setQuery(value: Option[Map[String, Any]]): this.type = {
     if (value.nonEmpty) {
@@ -37,6 +38,25 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     _jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
     _getQueryString = "?" + _initialQueryMap.map { case(k, v) => s"$k=$v"}.mkString("&")
     this
+  }
+
+  // Causing a padding error -- seemingly getting corrupted inside the class instance
+  // or it could be from parallelization
+  private def decryptToken(retry: Int = 0): this.type = {
+    try {
+      val cipher = env.cipher
+      val encryptedToken = env.encryptedToken
+      val decryptedToken = cipher.decrypt(encryptedToken)
+      if (!decryptedToken.matches("^dapi[a-zA-Z0-9]{32}$")) {
+        if (retry <= 10) {decryptToken(retry + 1)}
+        else {
+          throw new TokenError(s"Could not decrypt token! Erroring: ${_apiName}")
+        }
+      } else {
+        _decryptedToken = decryptedToken
+        this
+      }
+    }
   }
 
   private def setApiName(value: String): this.type = {
@@ -117,16 +137,23 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
+  // TODO -- Simplify differences between get and post
+  //  and validate the error handling
   @throws(classOf[ApiCallFailure])
   def executeGet(pageCall: Boolean = false): this.type = {
     try {
+      logger.log(Level.INFO, s"Loading ${req} -> query: $getQueryString")
       val result = Http(req + getQueryString)
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
-          "Authorization" -> s"Bearer ${env.cipher.decrypt(env.encryptedToken)}"
+          "Authorization" -> s"Bearer ${_decryptedToken}"
         )).asString
       if (result.isError) {
+        if (result.code == 429) {
+          Thread.sleep(2000)
+          executeGet(pageCall) // rate limit retry
+        }
         if (mapper.readTree(result.body).has("error_code")) {
           val err = mapper.readTree(result.body).get("error_code").asText()
           throw new ApiCallFailure(s"${_apiName} could not execute: ${err}")
@@ -185,14 +212,13 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     // TODO -- Add proper try catch
     try {
       val jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
-      // DEBUG
-      println(s"Loading ${_apiName} -> query: $jsonQuery")
+      logger.log(Level.INFO, s"Loading ${_apiName} -> query: $jsonQuery")
       val result = Http(req)
         .postData(jsonQuery)
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
-          "Authorization" -> s"Bearer ${env.cipher.decrypt(env.encryptedToken)}"
+          "Authorization" -> s"Bearer ${_decryptedToken}"
         )).asString
       if (result.isError) {
         val err = mapper.readTree(result.body).get("error_code").asText()
@@ -227,7 +253,7 @@ object ApiCall {
 
   def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None): ApiCall = {
     new ApiCall(apiEnv).setApiName(apiName)
-      .setQuery(queryMap)
+      .setQuery(queryMap) //.decryptToken()
   }
 
   // TODO -- Accept jsonQuery as Map

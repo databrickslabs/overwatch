@@ -18,6 +18,7 @@ class Config() {
 
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-","")
+  private final val cipherKey = UUID.randomUUID().toString
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
   private var _isFirstRun: Boolean = false
@@ -37,7 +38,7 @@ class Config() {
   private var _parsedConfig: ParsedConfig = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
 
-  final private val cipher = new Cipher
+  final private val cipher = new Cipher(cipherKey)
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
@@ -162,14 +163,15 @@ class Config() {
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
     import OverwatchScope._
 //    jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles
-    Seq(jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles)
+    Seq(audit, jobs, jobRuns, clusters, clusterEvents, sparkEvents, notebooks)
   }
 
   // Set scope for local testing
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters, OverwatchScope.sparkEvents)
+    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters, OverwatchScope.notebooks,
+      OverwatchScope.clusterEvents, OverwatchScope.sparkEvents, OverwatchScope.jobs, OverwatchScope.jobRuns)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
@@ -183,13 +185,16 @@ class Config() {
     this
   }
 
+  // TODO - figure out why the decryption is failing and properly encrypt
   private[overwatch] def registeredEncryptedToken(tokenSecret: Option[TokenSecret]): this.type = {
+    var rawToken = ""
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
         _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
         val scope = tokenSecret.get.scope
         val key = tokenSecret.get.key
+        rawToken = dbutils.secrets.get(scope, key)
         _token = cipher.encrypt(dbutils.secrets.get(scope, key))
         val authMessage = s"Valid Secret Identified: Executing with token located in secret, $scope : $key"
         logger.log(Level.INFO, authMessage)
@@ -197,6 +202,7 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
+          rawToken = System.getenv("OVERWATCH_TOKEN")
           _token = cipher.encrypt(System.getenv("OVERWATCH_TOKEN"))
           _tokenType = "Environment"
         } else { // Use default token for job owner
@@ -208,7 +214,7 @@ class Config() {
           _tokenType = "Owner"
         }
       }
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, _token, cipher))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, _token, cipher))
       this
     } catch {
       case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e); this

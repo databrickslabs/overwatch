@@ -200,16 +200,19 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         s"the audit module.")
     }
 
+    // TODO -- Check to see if audit scope was used previous and not now. If so, throw warning and require
+    //  override parameter to ensure the user understands the data corruption/loss
     lcScopes.map {
       case "jobs" => jobs
       case "jobruns" => jobRuns
       case "clusters" => clusters
       case "clusterevents" => clusterEvents
       case "sparkevents" => sparkEvents
-      case "pools" => pools
+      case "notebooks" => notebooks
+//      case "pools" => pools
       case "audit" => audit
-      case "iampassthrough" => iamPassthrough
-      case "profiles" => profiles
+//      case "iampassthrough" => iamPassthrough
+//      case "profiles" => profiles
       case scope => {
         val supportedScopes = s"${OverwatchScope.values.mkString(", ")}, all"
         throw new IllegalArgumentException(s"Scope $scope is not supported. Supported scopes include: " +
@@ -220,6 +223,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
 }
 
+// Todo - do a quick touch to audit logs location and bad records path to validate access
 object Initializer extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
