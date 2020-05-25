@@ -17,6 +17,9 @@ object BatchRunner extends SparkSessionWrapper{
   def main(args: Array[String]): Unit = {
 
     import spark.implicits._
+
+
+
     envInit()
 
     sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1.jar")
@@ -30,7 +33,7 @@ object BatchRunner extends SparkSessionWrapper{
     }
 
     Bronze(workspace).run()
-    Silver(workspace).run()
+//    Silver(workspace).run()
 
 //    val config = workspace.getConfig
 //    val fakeTime = LocalDateTime.of(2020,4,30,13,44).atZone(ZoneId.of("Etc/UTC"))

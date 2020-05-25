@@ -148,7 +148,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
       var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
       val fromTime = config.fromTime(module.moduleID)
 
-
       finalDF = if (target.zOrderBy.nonEmpty) {
         SchemaTools.moveColumnsToFront(finalDF, target.zOrderBy)
       } else finalDF

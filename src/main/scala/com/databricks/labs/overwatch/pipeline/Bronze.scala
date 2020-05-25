@@ -28,7 +28,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobRunsModule = Module(1007, "Bronze_JobRuns")
   lazy private val appendJobRunsProcess = EtlDefinition(
-    prepJobRunsDF(config.apiEnv),
+    prepJobRunsDF(config.apiEnv, config.isFirstRun),
     None,
     append(BronzeTargets.jobRunsTarget, newDataOnly = true),
     jobRunsModule
@@ -108,6 +108,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       //  from the api than from audit -- VERIFY
       if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) reports.append(appendClusterEventLogsProcess.process())
       if (config.overwatchScope.contains(OverwatchScope.jobRuns)) reports.append(appendJobRunsAuditFilteredProcess.process())
+      if (config.overwatchScope.contains(OverwatchScope.clusters)) {
+        reports.append(appendClustersAPIProcess.process())
+      }
       //      if (config.overwatchScope.contains(OverwatchScope.jobs)) reports.append(appendJobsProcess.process())
       //      The following are disabled when audit is in scope
       //      if (config.overwatchScope.contains(OverwatchScope.clusters)) reports.append(appendClustersAPIProcess.process())
@@ -116,6 +119,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       if (config.overwatchScope.contains(OverwatchScope.jobs)) {
         reports.append(appendJobsProcess.process())
       }
+      // TODO -- determine if jobRuns API pull has diff/more data than audit -- perhaps create runs from API
       if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
         reports.append(appendJobRunsProcess.process())
       }

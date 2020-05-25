@@ -96,7 +96,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   // TODO -- get from audit
   // TODO -- add assertion that df count == total count from API CALL
-  protected def prepJobRunsDF(apiEnv: ApiEnv): DataFrame = {
+  protected def prepJobRunsDF(apiEnv: ApiEnv, isFirstRun: Boolean): DataFrame = {
+    if (isFirstRun) println("As this is your first run, the job runs will be gathered as quickly as possible. " +
+      "This is done via the API and thus needs to be loaded at a safe pace so as not to exceed the limits. " +
+      "If you feel the job is stuck, look at the log4j output in driver logs, you'll notice the runIDs should be " +
+      "steadily increasing. This may take some time.")
     val extraQuery = Map("completed_only" -> true)
     val jobRuns = apiByID("jobs/runs/list", apiEnv,
       "get", jobIDs, "job_id", Some(extraQuery))

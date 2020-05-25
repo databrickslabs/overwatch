@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import java.util.UUID
 
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
@@ -58,6 +58,39 @@ trait SilverTransforms extends SparkSessionWrapper {
         .map(_.name).map(col)
       val cleanDF = df.select(nonNullCols ++ complexTypeFields: _*)
       (nonNullCols ++ complexTypeFields, cleanDF)
+    }
+
+    def fillFromLookupsByTS(primaryDF: DataFrame, primaryOnlyKey: String,
+                            columnsToLookup: Array[String], w: WindowSpec,
+                            lookupDF: DataFrame*): DataFrame = {
+      val finalDFWNulls = lookupDF.foldLeft(primaryDF) {
+        case (primaryDF, lookup) =>
+          unionWithMissingAsNull(primaryDF, lookup)
+      }
+
+      columnsToLookup.foldLeft((finalDFWNulls)) {
+        case (df, c) =>
+          val dt = df.schema.fields.filter(_.name == c).head.dataType
+          df.withColumn(c, coalesce(last(col(c), ignoreNulls = true).over(w), lit(0).cast(dt)))
+      }.filter(col(primaryOnlyKey).isNotNull)
+
+    }
+
+    def unionWithMissingAsNull(baseDF: DataFrame, lookupDF: DataFrame): DataFrame = {
+      val baseCols = baseDF.columns
+      val lookupCols = lookupDF.columns
+      val missingBaseCols = lookupCols.diff(baseCols)
+      val missingLookupCols = baseCols.diff(lookupCols)
+      val df1Complete = missingBaseCols.foldLeft(baseDF) {
+        case (df, c) =>
+          df.withColumn(c, lit(null))
+      }
+      val df2Complete = missingLookupCols.foldLeft(lookupDF) {
+        case (df, c) =>
+          df.withColumn(c, lit(null))
+      }
+
+      df1Complete.unionByName(df2Complete)
     }
 
     def clusterIDLookup(df: DataFrame): DerivedCluster = {
@@ -330,10 +363,13 @@ trait SilverTransforms extends SparkSessionWrapper {
   protected def userLogins()(df: DataFrame): DataFrame = {
     df.filter(
       'serviceName === "accounts" &&
-      'actionName.isin("login", "tokenLogin") &&
+      'actionName.isin("login", "tokenLogin", "samlLogin", "jwtLogin") &&
         $"userIdentity.email" =!= "dbadmin")
-      .select('date, $"userIdentity.email".alias("userEmail"),
-        'serviceName, 'actionName, 'sourceIPAddress, 'timestamp, 'userAgent)
+      .select('timestamp, 'date, 'serviceName, 'actionName,
+        $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
+        $"requestParams.user_name".alias("groups_user_name"),
+        $"requestParams.userID".alias("account_admin_userID"),
+        $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
   }
 
   protected def newAccounts()(df: DataFrame): DataFrame = {

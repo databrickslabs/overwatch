@@ -15,7 +15,7 @@ import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
-import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
+import org.apache.spark.sql.types._
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -146,6 +146,16 @@ object Helpers extends SparkSessionWrapper {
       lit(runTimeH).alias("runTimeH")
     ).alias("RunTime")
   }
+
+  // TODO -- This is broken -- It looks like I may have to pass in the df.schema as well
+//  def getLocalTime(ts: Column, tz: String): Column = {
+//    ts.expr.dataType match {
+//      case _: TimestampType => from_utc_timestamp(ts, tz)
+//      case _: LongType => from_utc_timestamp(from_unixtime(ts.cast("double") / 1000).cast("timestamp"), tz)
+//      case _: DoubleType => from_utc_timestamp(from_unixtime(ts).cast("timestamp"), tz)
+//      case _: IntegerType => from_utc_timestamp(from_unixtime(ts).cast("timestamp"), tz)
+//    }
+//  }
 
   def pathExists(path: String): Boolean = {
     val conf = sc.hadoopConfiguration

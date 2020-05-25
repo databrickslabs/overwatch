@@ -68,6 +68,16 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   //      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerOperationClosed")
   //      .select('SparkContextID, 'id, 'closeTime, 'filenameGroup.alias("endFilenameGroup"))
 
+  //    private val serverSessionDF: DataFrame = serverSessionStartDF
+  //      .join(serverSessionEndDF, Seq("SparkContextID", "sessionId"))
+  //      .withColumn("ServerSessionRunTime", subtractTime('startTime, 'finishTime))
+  //      .drop("startTime", "finishTime")
+  //
+  //    private val serverOperationDF: DataFrame = serverOperationStartDF
+  //      .join(serverOperationEndDF, Seq("SparkContextID", "id"))
+  //      .withColumn("ServerOperationRunTime", subtractTime('startTime, 'closeTime))
+  //      .drop("startTime", "finishTime")
+
   /**
    * Executor
    */

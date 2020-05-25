@@ -69,6 +69,7 @@ object Frequency extends Enumeration {
 private[overwatch] class NoNewDataException(s: String) extends Exception(s) {}
 private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
+private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =

@@ -9,17 +9,20 @@ abstract class PipelineTargets(config: Config) {
    * Bronze Targets
    */
     object BronzeTargets {
-    lazy private[overwatch] val jobsTarget: PipelineTable = PipelineTable("jobs_bronze", Array("job_id"), "created_time",
+    lazy private[overwatch] val jobsTarget: PipelineTable = PipelineTable("jobs_snapshot_bronze",
+      Array("job_id"), "created_time",
       config,
       statsColumns = "created_time, creator_user_name, job_id, Pipeline_SnapTS, Overwatch_RunID".split(", "))
     lazy private[overwatch] val jobRunsTarget: PipelineTable = PipelineTable("jobruns_bronze", Array("run_id", "job_id"), "start_time",
       config,
       statsColumns = "job_id, original_attempt_run_id, run_id, start_time, Pipeline_SnapTS, Overwatch_RunID".split(", "))
-    lazy private[overwatch] val clustersTarget: PipelineTable = PipelineTable("clusters_bronze", Array("cluster_id"), "last_activity_time",
+    lazy private[overwatch] val clustersTarget: PipelineTable = PipelineTable("clusters_snapshot_bronze",
+      Array("cluster_id"), "last_activity_time",
       config, unpersistWhenComplete = false,
       statsColumns = ("cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
         "start_time, terminated_time, Overwatch_RunID").split(", "))
-    lazy private[overwatch] val poolsTarget: PipelineTable = PipelineTable("pools_bronze", Array("instance_pool_id"), "",
+    lazy private[overwatch] val poolsTarget: PipelineTable = PipelineTable("pools_snapshot_bronze",
+      Array("instance_pool_id"), "",
       config,
       statsColumns = ("instance_pool_id, node_type_id, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "))

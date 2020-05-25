@@ -104,6 +104,17 @@ class Config() {
 
   private[overwatch] def setIsFirstRun(value: Boolean): this.type = {
     _isFirstRun = value
+    if (_isFirstRun) {
+      println(s"WARNING! First runs often require a large cluster for some modules and long API runs for others. " +
+        s"Below is the suggested method for running the first historical load. \n \nFirst Run --> With a sufficiently " +
+        s"large cluster load modules: audit, clusters, jobs, notebooks, pools, sparkEvents.\n\nFollowup Run --> " +
+        s"With a small cluster add the additional desired modules. For example, given the run above as the first run " +
+        s"the following would be a suggested second run (and future) module config:\n" +
+        s"audit, clusters, jobs, notebooks, pools, sparkEvents, clusterEvents, jobRuns")
+      if (overwatchScope.contains(OverwatchScope.jobRuns)) {
+        println(s"WARNING! It's not recommended to combine API modules and audit/events modules on the first run.")
+      }
+    }
     this
   }
 
@@ -170,8 +181,7 @@ class Config() {
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters, OverwatchScope.notebooks,
-      OverwatchScope.clusterEvents, OverwatchScope.sparkEvents, OverwatchScope.jobs, OverwatchScope.jobRuns)
+    _overwatchScope = Array(OverwatchScope.clusters)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"

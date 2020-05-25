@@ -62,6 +62,23 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     }
   }
 
+  @throws(classOf[BadConfigException])
+  def validateAndSetAuditLogPaths(auditLogPath: Option[String]): this.type = {
+
+    if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
+      throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
+    }
+
+    if (auditLogPath.nonEmpty && !config.isLocalTesting)
+      dbutils.fs.ls(auditLogPath.get).foreach(auditFolder => {
+        if (auditFolder.isDir) require(auditFolder.name.startsWith("date="), s"Audit directory must contain " +
+          s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
+      })
+
+    config.setAuditLogPath(auditLogPath)
+    this
+  }
+
   def validateAndRegisterArgs(args: Array[String]): this.type = {
 
     val paramModule: SimpleModule = new SimpleModule()
@@ -81,46 +98,47 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       config.setInputConfig(rawParams)
       val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
       val tokenSecret = rawParams.tokenSecret
+      // TODO -- PRIORITY -- If data target is null -- default table gets dbfs:/null
       val dataTarget = rawParams.dataTarget.getOrElse(
         DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db")))
       val auditLogPath = rawParams.auditLogPath
       val badRecordsPath = rawParams.badRecordsPath
 
+      if (overwatchScope.head == "all") config.setOverwatchScope(config.orderedOverwatchScope)
+      else config.setOverwatchScope(validateScope(overwatchScope))
+
       // validate token secret requirements
       // TODO - Validate if token has access to necessary assets. Warn/Fail if not
       if (tokenSecret.nonEmpty) {
         if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
-          throw new IllegalArgumentException(s"Secret AND Key must be provided together or neither of them. " +
+          throw new BadConfigException(s"Secret AND Key must be provided together or neither of them. " +
             s"Either supply both or neither.")
         }
         val scopeCheck = dbutils.secrets.listScopes().map(_.getName()).toArray.filter(_ == tokenSecret.get.scope)
-        if (scopeCheck.length == 0) throw new NullPointerException(s"Scope ${tokenSecret.get.scope} does not exist " +
+        if (scopeCheck.length == 0) throw new BadConfigException(s"Scope ${tokenSecret.get.scope} does not exist " +
           s"in this workspace. Please provide a scope available and accessible to this account.")
         val scopeName = scopeCheck.head
 
         val keyCheck = dbutils.secrets.list(scopeName).toArray.filter(_.key == tokenSecret.get.key)
-        if (keyCheck.length == 0) throw new NullPointerException(s"Key ${tokenSecret.get.key} does not exist " +
+        if (keyCheck.length == 0) throw new BadConfigException(s"Key ${tokenSecret.get.key} does not exist " +
           s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
           s"available and accessible to this account.")
 
         config.registeredEncryptedToken(Some(TokenSecret(scopeName, keyCheck.head.key)))
       } else config.registeredEncryptedToken(None)
 
-      // Todo -- validate database name and location
-      // Todo -- If Name exists allow existing location and validate correct Overwatch DB and DB version
       dataTargetIsValid(dataTarget)
 
       val dbName = dataTarget.databaseName.get
-      val dbLocation = dataTarget.databaseLocation.get
+      val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
 
       config.setDatabaseNameandLoc(dbName, dbLocation)
-      config.setAuditLogPath(auditLogPath)
+
+      validateAndSetAuditLogPaths(auditLogPath)
 
       // Todo -- add validation to badRecordsPath
       config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
-      if (overwatchScope(0) == "all") config.setOverwatchScope(config.orderedOverwatchScope)
-      else config.setOverwatchScope(validateScope(overwatchScope))
     }
     this
   }
@@ -136,7 +154,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val existingDBLocaion = dbMeta.locationUri.toString
       if (existingDBLocaion != dblocation) {
         switch = false
-        throw new IllegalArgumentException(s"The DB: $dbName exists" +
+        throw new BadConfigException(s"The DB: $dbName exists" +
           s"at location $existingDBLocaion which is different than the location entered in the config. Ensure" +
           s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
           s"dbfs:/...")
@@ -145,13 +163,13 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val isOverwatchDB = dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE"
       if (!isOverwatchDB) {
         switch = false
-        throw new IllegalArgumentException(s"The Database: $dbName was not created by overwatch. Specify a " +
+        throw new BadConfigException(s"The Database: $dbName was not created by overwatch. Specify a " +
           s"database name that does not exist or was created by Overwatch.")
       }
       val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
       if (overwatchSchemaVersion != config.overwatchSchemaVersion) {
         switch = false
-        throw new IllegalArgumentException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
+        throw new BadConfigException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
           s" version of Overwatch requires ${config.overwatchSchemaVersion}. Upgrade Overwatch Schema to proceed " +
           s"or drop existing database and allow Overwatch to recreate.")
       }
@@ -159,7 +177,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       try {
         dbutils.fs.ls(dblocation)
         switch = false
-        throw new IllegalArgumentException(s"The target database location: ${dblocation} " +
+        throw new BadConfigException(s"The target database location: ${dblocation} " +
           s"already exists but does not appear to be associated with the Overwatch database name, $dbName " +
           s"specified. Specify a path that doesn't already exist or choose an existing overwatch database AND " +
           s"database its associated location.")
@@ -171,7 +189,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     switch
   }
 
-  @throws(classOf[IllegalArgumentException])
+  @throws(classOf[BadConfigException])
   private def validateScope(scopes: Seq[String]): Seq[OverwatchScope.OverwatchScope] = {
     val lcScopes = scopes.map(_.toLowerCase)
     if (lcScopes.contains("jobruns")) {
@@ -185,7 +203,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         s"the audit module.")
     }
 
-    if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters"))&& !lcScopes.contains("audit")) {
+    if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters")) && !lcScopes.contains("audit")) {
       println(s"WARNING: Cluster data without audit will result in loss of granularity. It's recommended to configure" +
         s"the audit module.")
     }
@@ -195,7 +213,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         "also be enabled as clusterID is a requirement for these scopes.")
     }
 
-    if (lcScopes.contains("clusterevents") && !lcScopes.contains("audit")) {
+    if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters") || lcScopes.contains("jobs"))
+      && !lcScopes.contains("audit")) {
       println(s"WARNING: JobRuns without audit will result in loss of granularity. It's recommended to configure" +
         s"the audit module.")
     }
@@ -215,7 +234,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 //      case "profiles" => profiles
       case scope => {
         val supportedScopes = s"${OverwatchScope.values.mkString(", ")}, all"
-        throw new IllegalArgumentException(s"Scope $scope is not supported. Supported scopes include: " +
+        throw new BadConfigException(s"Scope $scope is not supported. Supported scopes include: " +
           s"${supportedScopes}.")
       }
     }
