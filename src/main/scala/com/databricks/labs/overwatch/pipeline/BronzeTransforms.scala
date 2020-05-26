@@ -196,6 +196,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .drop("pathSize")
   }
 
+
   protected def collectEventLogPaths(fromTimeCol: Column,
                                      isFirstRun: Boolean,
                                      scope: Seq[OverwatchScope.OverwatchScope])(df: DataFrame): DataFrame = {
@@ -233,6 +234,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       //      }
 
       // get all relevant cluster log paths
+      // TODO -- Utilize spark to built the glob faster
+      //  .https://databricks.atlassian.net/wiki/spaces/UN/pages/802098643/Storage+clients#Storageclients-HowtorunFilesystemoperationsinparallelwithSpark(i.e.ontheexecutors)
       baseClusterLookupDF
         .filter('cluster_log_conf.isNotNull)
         .withColumn("s3", get_json_object('cluster_log_conf, "$.s3"))

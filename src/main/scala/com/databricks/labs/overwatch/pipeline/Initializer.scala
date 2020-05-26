@@ -22,6 +22,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
   import spark.implicits._
 
+  // TODO -- look for max incremental in all tables to build out module last run times instead of deriving it from
+  //  pipeline_report as this clearly can cause issues
   def initPipelineRun(): this.type = {
     if (spark.catalog.databaseExists(config.databaseName)) {
       val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
@@ -146,7 +148,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   @throws(classOf[IllegalArgumentException])
   private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
     val dbName = dataTarget.databaseName.getOrElse("overwatch")
-    val dblocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
+    val dblocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
     var switch = true
     if (spark.catalog.databaseExists(dbName)) {
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
@@ -186,6 +188,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
           s"is valid: will create database: $dbName at location: ${dblocation}")
       }
     }
+
     switch
   }
 

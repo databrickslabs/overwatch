@@ -137,37 +137,50 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private val appendJobsProcess = EtlDefinition(
     sparkEventsDF,
-    Some(Seq(jobs(sparkEventsDF))),
+    Some(Seq(sparkJobs(sparkEventsDF))),
     append(SilverTargets.jobsTarget, newDataOnly = true),
     Module(2006, "SPARK_Jobs_Raw")
   )
 
   lazy private val appendStagesProcess = EtlDefinition(
     sparkEventsDF,
-    Some(Seq(stages())),
+    Some(Seq(sparkStages())),
     append(SilverTargets.stagesTarget, newDataOnly = true),
     Module(2007, "SPARK_Stages_Raw")
   )
 
   lazy private val appendTasksProcess = EtlDefinition(
     sparkEventsDF,
-    Some(Seq(tasks())),
+    Some(Seq(sparkTasks())),
     append(SilverTargets.tasksTarget, newDataOnly = true),
     Module(2008, "SPARK_Tasks_Raw")
   )
 
   lazy private val appendJobStatusProcess = EtlDefinition(
     newAuditLogsDF,
-    Some(Seq(jobsStatusSummary())),
+    Some(Seq(dbJobsStatusSummary())),
     append(SilverTargets.dbJobsStatusTarget, newDataOnly = true),
     Module(2010, "Silver_JobsStatus")
   )
 
+  lazy private val appendClusterSpecProcess = EtlDefinition(
+    newAuditLogsDF,
+    Some(Seq(buildClusterSpec(BronzeTargets.clustersSnapshotTarget))),
+    append(SilverTargets.clustersSpecTarget, newDataOnly = true),
+    Module(2014, "Silver_ClusterSpec")
+  )
+
   lazy private val appendClusterStatusProcess = EtlDefinition(
     newAuditLogsDF,
-    Some(Seq(clustersStatusSummary())),
+    Some(Seq(
+      buildClusterStatus(
+        SilverTargets.clustersSpecTarget,
+        BronzeTargets.clustersSnapshotTarget,
+        BronzeTargets.cloudMachineDetail
+      )
+    )),
     append(SilverTargets.clustersStatusTarget, newDataOnly = true),
-    Module(2014, "Silver_ClusterStatus")
+    Module(2015, "Silver_ClusterStatus")
   )
 
   lazy private val appendUserLoginsProcess = EtlDefinition(
@@ -207,12 +220,17 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   def run(): Boolean = {
 
+    // TODO -- see which transforms are possible without audit and rebuild for no-audit
+    //  CURRENTLY -- audit is required for silver
     val reports = ArrayBuffer[ModuleStatusReport]()
     config.overwatchScope.foreach {
       case OverwatchScope.sparkEvents =>
         processSparkEvents.foreach(sparkReport => reports.append(sparkReport))
       case OverwatchScope.jobs => reports.append(appendJobStatusProcess.process())
-      case OverwatchScope.clusters => reports.append(appendClusterStatusProcess.process())
+      case OverwatchScope.clusters => {
+        reports.append(appendClusterSpecProcess.process())
+        reports.append(appendClusterStatusProcess.process())
+      }
       case OverwatchScope.notebooks => reports.append(appendNotebookSummaryProcess.process())
 //      case OverwatchScope.pools =>
       case OverwatchScope.audit =>

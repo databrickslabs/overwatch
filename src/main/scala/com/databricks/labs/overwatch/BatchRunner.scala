@@ -18,11 +18,10 @@ object BatchRunner extends SparkSessionWrapper{
 
     import spark.implicits._
 
-
-
     envInit()
 
     sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1.jar")
+//    sc.addFile("C:\\Dev\\git\\Databricks--Overwatch\\src\\main\\resources\\ec2_details_tbl", true)
 //    spark.sql("drop database if exists overwatch_local cascade")
 //
 
@@ -32,14 +31,16 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-    Bronze(workspace).run()
+//    Bronze(workspace).run()
 //    Silver(workspace).run()
 
 //    val config = workspace.getConfig
-//    val fakeTime = LocalDateTime.of(2020,4,30,13,44).atZone(ZoneId.of("Etc/UTC"))
+//    val fakeTime = LocalDateTime.of(2020,5,1,13,44).atZone(ZoneId.of("Etc/UTC"))
 //        .toInstant.toEpochMilli
 //    config.setPipelineSnapTime(fakeTime)
 
+//    Bronze(workspace).run()
+    Silver(workspace).run()
 
 //    val silver = Silver(workspace)
 //    silver.appendNotebookSummaryProcess.process()

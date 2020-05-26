@@ -19,6 +19,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   //    sparkEventsDF.count
 
   case class DerivedCluster(jobLevel: DataFrame, stageLevel: DataFrame)
+  private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
 
   object UDF {
     // eventlog default path
@@ -76,7 +77,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     }
 
-    def unionWithMissingAsNull(baseDF: DataFrame, lookupDF: DataFrame): DataFrame = {
+    private def unionWithMissingAsNull(baseDF: DataFrame, lookupDF: DataFrame): DataFrame = {
       val baseCols = baseDF.columns
       val lookupCols = lookupDF.columns
       val missingBaseCols = lookupCols.diff(baseCols)
@@ -277,7 +278,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'filenameGroup.alias("endFilenameGroup"))
   }
 
-  protected def jobs(clusterLookupDF: DataFrame)(df: DataFrame): DataFrame = {
+  protected def sparkJobs(clusterLookupDF: DataFrame)(df: DataFrame): DataFrame = {
     val jobStart = simplifyJobStart(df, clusterLookupDF)
     val jobEnd = simplifyJobEnd(df)
 
@@ -285,7 +286,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("JobRunTime", UDF.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
       .withColumn("startTimestamp", $"JobRunTime.startEpochMS")
-
   }
 
   protected def simplifyStageStart(df: DataFrame): DataFrame = {
@@ -304,7 +304,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
   }
 
-  protected def stages()(df: DataFrame): DataFrame = {
+  protected def sparkStages()(df: DataFrame): DataFrame = {
     val stageStart = simplifyStageStart(df)
     val stageEnd = simplifyStageEnd(df)
 
@@ -342,7 +342,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   // Orphan tasks are a result of "TaskEndReason.Reason" != "Success"
   // Failed tasks lose association with their chain
-  protected def tasks()(df: DataFrame): DataFrame = {
+  protected def sparkTasks()(df: DataFrame): DataFrame = {
     val taskStart = simplifyTaskStart(df)
     val taskEnd = simplifyTaskEnd(df)
 
@@ -367,7 +367,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"userIdentity.email" =!= "dbadmin")
       .select('timestamp, 'date, 'serviceName, 'actionName,
         $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
-        $"requestParams.user_name".alias("groups_user_name"),
+        $"requestParams.userName".alias("groups_user_name"),
         $"requestParams.userID".alias("account_admin_userID"),
         $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
   }
@@ -381,7 +381,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   private val auditBaseCols: Array[Column] = Array(
     'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
 
-  protected def clustersStatusSummary()(df: DataFrame): DataFrame = {
+  private def clusterBase(auditRawDF: DataFrame): DataFrame = {
     val cluster_id_gen_w = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
     val cluster_name_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
     val cluster_state_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
@@ -400,7 +400,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'acl_path_prefix, 'instance_pool_id, 'spark_version, 'cluster_creator, 'idempotency_token,
       'organization_id, 'user_id, 'sourceIPAddress, 'ssh_public_keys)
 
-    df
+    auditRawDF
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .select(clusterSummaryCols: _*)
@@ -409,7 +409,197 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("cluster_state", cluster_state_gen)
   }
 
-  protected def jobsStatusSummary()(df: DataFrame): DataFrame = {
+  protected def buildClusterSpec(bronze_cluster_snap: PipelineTable)(df: DataFrame): DataFrame = {
+    val lastClusterSnap = Window.partitionBy('cluster_id).orderBy('Pipeline_SnapTS.desc)
+    val clusterBefore = Window.partitionBy('cluster_id)
+      .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val clusterBaseDF = clusterBase(df)
+    val clusterSpecBaseCols = Array[Column]('serviceName, 'actionName,
+      'cluster_id, 'cluster_name, 'cluster_state, 'driver_node_type_id, 'node_type_id,
+      'num_workers, 'autoscale, 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
+      'aws_attributes, 'init_scripts, 'custom_tags, 'cluster_source, 'spark_env_vars, 'spark_conf,
+      'has_ssh_keys, 'acl_path_prefix, 'instance_pool_id, 'spark_version,
+      'idempotency_token, 'organization_id, 'timestamp, 'userEmail)
+
+    val clustersRemoved = clusterBaseDF
+      .filter($"response.statusCode" === 200)
+      .filter('actionName.isin("permanentDelete"))
+      .select('cluster_id, 'userEmail.alias("deleted_by"))
+
+    val creatorLookup = bronze_cluster_snap.asDF
+      .withColumn("rnk", rank().over(lastClusterSnap))
+      .withColumn("rn", row_number().over(lastClusterSnap))
+      .filter('rnk === 1 && 'rn === 1)
+      .select('cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
+
+    clusterBaseDF
+      .filter('actionName.isin("create", "edit"))
+      .filter($"response.statusCode" === 200)
+      .select(clusterSpecBaseCols: _*)
+      .join(creatorLookup, Seq("cluster_id"), "left")
+      .join(clustersRemoved, Seq("cluster_id"), "left")
+      .withColumn("createdBy",
+        when(isAutomatedCluster && 'actionName === "create", lit("JobsService"))
+          .when(!isAutomatedCluster && 'actionName === "create", 'userEmail))
+      .withColumn("createdBy", when(!isAutomatedCluster && 'createdBy.isNull, last('createdBy, true).over(clusterBefore)).otherwise('createdBy))
+      .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
+      .withColumn("lastEditedBy", when(!isAutomatedCluster && 'actionName === "edit", 'userEmail))
+      .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
+      .drop("userEmail", "cluster_creator_lookup")
+  }
+
+  protected def buildClusterStatus(clusterSpec: PipelineTable,
+                                   clusterSnapshot: PipelineTable,
+                                   cloudMachineDetail: PipelineTable
+                                  )(df: DataFrame): DataFrame = {
+    val lastClusterSnap = Window.partitionBy('cluster_id).orderBy('Pipeline_SnapTS.desc)
+    val clusterBefore = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val reset = Window.partitionBy('cluster_id).orderBy('timestamp)
+    val cumsum = Window.partitionBy('cluster_id, 'reset).orderBy('timestamp)
+
+    val clusterBaseDF = clusterBase(df)
+
+    // TODO -- Lookup missing cluster driver/worker by JobID/RunID cluster spec
+    //  May not help if all cluster specs from jobs properly get recorded in cluster_silver in the first place
+    val nodeTypeLookup = clusterSpec.asDF
+      .withColumn("driver_node_type_id",
+        when('driver_node_type_id.isNull, last('driver_node_type_id, true).over(clusterBefore))
+          .otherwise('driver_node_type_id))
+      .withColumn("node_type_id",
+        when('node_type_id.isNull, last('node_type_id, true).over(clusterBefore))
+          .otherwise('node_type_id))
+      .select('cluster_id, 'timestamp, 'driver_node_type_id, 'node_type_id)
+
+    val nodeTypeLookup2 = clusterSnapshot.asDF
+      .select('cluster_id, 'terminated_time, 'driver_node_type_id, 'node_type_id)
+
+    val creatorLookup = clusterSnapshot.asDF
+      .withColumn("rnk", rank().over(lastClusterSnap))
+      .withColumn("rn", row_number().over(lastClusterSnap))
+      .filter('rnk === 1 && 'rn === 1)
+      .select('cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
+
+    val clusterSize = clusterBaseDF
+      .filter($"response.statusCode" === 200)
+      .filter('actionName.like("%esult"))
+      .join(creatorLookup, Seq("cluster_id"), "left")
+      .withColumn("date", from_unixtime('timestamp.cast("double") / 1000).cast("timestamp"))
+      .withColumn("tsS", ('timestamp / 1000).cast("long"))
+      .withColumn("reset",
+        sum(when('actionName.isin("startResult", "restartResult", "createResult"), lit(1))
+          .otherwise(lit(0))).over(reset))
+      .withColumn("runtime_curr_stateS",
+        coalesce(
+          when(!'actionName.isin("startResult", "createResult"), ('tsS - lag('tsS, 1).over(reset)))
+          .otherwise(lit(0)), lit(0)
+        ))
+      .withColumn("cumulative_uptimeS", sum('runtime_curr_stateS).over(cumsum))
+      .withColumn("created_by",
+        when('actionName === "createResult", 'userEmail).otherwise(lit(null)))
+      .withColumn("created_by",
+        coalesce(
+          when('created_by.isNull, last('created_by, true).over(clusterBefore))
+            .otherwise('created_by)
+        ))
+      .withColumn("created_by",
+        when('created_by.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup)
+          .otherwise(lit("Unknown")))
+      .withColumn("last_started_by",
+        when('actionName === "startResult", 'userEmail)
+          .otherwise(lit(null)))
+      .withColumn("last_started_by",
+        coalesce(
+          when('last_started_by.isNull, last('last_started_by, true).over(clusterBefore))
+            .otherwise('last_started_by), lit("Unknown")
+        ))
+      .withColumn("last_restarted_by",
+        when('actionName === "restartResult", 'userEmail)
+          .otherwise(lit(null)))
+      .withColumn("last_restarted_by",
+        coalesce(
+          when('last_restarted_by.isNull, last('last_restarted_by, true).over(clusterBefore))
+            .otherwise('last_restarted_by), lit("Unknown")
+        ))
+      .withColumn("last_resized_by",
+        when('actionName === "resizeResult", 'userEmail)
+          .otherwise(lit(null)))
+      .withColumn("last_resized_by",
+        coalesce(
+          when('last_resized_by.isNull, last('last_resized_by, true).over(clusterBefore))
+            .otherwise('last_resized_by), lit("Unknown")
+        ))
+      .withColumn("last_terminated_by",
+        when('actionName === "deleteResult", 'userEmail)
+          .otherwise(lit(null)))
+      .withColumn("last_terminated_by",
+        coalesce(
+          when('last_terminated_by.isNull, last('last_terminated_by, true).over(clusterBefore))
+            .otherwise('last_terminated_by), lit("Unknown")
+        ))
+
+    val clusterStatusCols = Array[Column]('date, 'timestamp, 'serviceName, 'actionName, 'cluster_id,
+      'cluster_name, 'cluster_state, 'actual_workers, 'DriverNodeType, 'driverVCPUs, 'driverMemoryGB,
+      'WorkerNodeType, 'workerVCPUs, 'workerMemoryGB, 'cluster_worker_memory, 'cpu_time_curr_state,
+      'cpu_time_cumulative, 'runtime_curr_stateS, 'cumulative_uptimeS, 'driverHourlyCostOnDemand,
+      'driverHourlyCostReserved, 'driver_onDemand_cost_curr_state, 'driver_onDemand_cost_cumulative,
+      'driver_reserve_cost_curr_state, 'driver_reserve_cost_cumulative, 'workerHourlyCostOnDemand,
+      'workerHourlyCostReserved, 'worker_onDemand_cost_curr_state, 'worker_onDemand_cost_cumulative,
+      'worker_reserve_cost_curr_state, 'worker_reserve_cost_cumulative, 'created_by, 'last_started_by,
+      'last_resized_by, 'last_restarted_by, 'last_terminated_by)
+
+    val nodeTypeLookups = Array(nodeTypeLookup, nodeTypeLookup2)
+
+    // TODO -- NEED TO ADD AZURE SUPPORT
+    //  When azure is ready -- add if cloud type...
+    val ec2Lookup = cloudMachineDetail.asDF
+      .withColumn("DriverNodeType", 'API_Name)
+      .withColumn("WorkerNodeType", 'API_Name)
+
+    val driverLookup = ec2Lookup
+      .withColumnRenamed("On_Demand_Cost_Hourly", "driverHourlyCostOnDemand")
+      .withColumnRenamed("Linux_Reserved_Cost_Hourly", "driverHourlyCostReserved")
+      .withColumnRenamed("vCPUs", "driverVCPUs")
+      .withColumnRenamed("Memory_GB", "driverMemoryGB")
+      .drop("WorkerNodeType")
+
+    val workerLookup = ec2Lookup
+      .withColumnRenamed("On_Demand_Cost_Hourly", "workerHourlyCostOnDemand")
+      .withColumnRenamed("Linux_Reserved_Cost_Hourly", "workerHourlyCostReserved")
+      .withColumnRenamed("vCPUs", "workerVCPUs")
+      .withColumnRenamed("Memory_GB", "workerMemoryGB")
+      .drop("DriverNodeType")
+
+    UDF.fillFromLookupsByTS(
+      clusterSize, "serviceName",
+      Array("driver_node_type_id", "node_type_id"), clusterBefore, nodeTypeLookups: _*)
+      .withColumnRenamed("driver_node_type_id", "DriverNodeType")
+      .withColumnRenamed("node_type_id", "WorkerNodeType")
+      .join(workerLookup, Seq("WorkerNodeType"), "left")
+      .join(driverLookup, Seq("DriverNodeType"), "left")
+      .withColumn("cpu_time_curr_state", (('runtime_curr_stateS * 'actual_workers * 'workerVCPUs) + ('runtime_curr_stateS * 'driverVCPUs)))
+      .withColumn("cpu_time_cumulative", (('cumulative_uptimeS * 'actual_workers * 'workerVCPUs) + ('cumulative_uptimeS * 'driverVCPUs)))
+      .withColumn("driver_onDemand_cost_curr_state",
+        round('driverHourlyCostOnDemand * ('runtime_curr_stateS / 60 / 60), 2))
+      .withColumn("driver_onDemand_cost_cumulative",
+        round('driverHourlyCostOnDemand * ('cumulative_uptimeS / 60 / 60), 2))
+      .withColumn("driver_reserve_cost_curr_state",
+        round('driverHourlyCostReserved * ('runtime_curr_stateS / 60 / 60), 2))
+      .withColumn("driver_reserve_cost_cumulative",
+        round('driverHourlyCostReserved * ('cumulative_uptimeS / 60 / 60), 2))
+      .withColumn("worker_onDemand_cost_curr_state",
+        round('workerHourlyCostOnDemand * 'actual_workers * ('runtime_curr_stateS / 60 / 60), 2))
+      .withColumn("worker_onDemand_cost_cumulative",
+        round('workerHourlyCostOnDemand * 'actual_workers * ('cumulative_uptimeS / 60 / 60), 2))
+      .withColumn("worker_reserve_cost_curr_state",
+        round('workerHourlyCostReserved * 'actual_workers * ('runtime_curr_stateS / 60 / 60), 2))
+      .withColumn("worker_reserve_cost_cumulative",
+        round('workerHourlyCostReserved * 'actual_workers * ('cumulative_uptimeS / 60 / 60), 2))
+      .withColumn("cluster_worker_memory", 'actual_workers * 'workerMemoryGB)
+      .select(clusterStatusCols: _*)
+
+  }
+
+  protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
     val jobsCols = auditBaseCols ++ Array[Column](
       when('name.isNull && 'new_settings.isNotNull, get_json_object('new_settings, "$.name"))
         .otherwise('name).alias("job_name"),
@@ -436,6 +626,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("notebookName", when('notebookName.isNull, split('path, "/")('pathLength - 1)).otherwise('notebookName))
       .select(notebookCols: _*)
   }
+
+  /**
+   * Higher order Silver Tables
+   */
+
+
 
 
   //  object Session {

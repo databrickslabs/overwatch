@@ -141,7 +141,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
                                 newDataOnly: Boolean = false,
                                 cdc: Boolean = false)(df: DataFrame, module: Module): ModuleStatusReport = {
     try {
-      if (df.schema.fieldNames.contains("FAILURE")) throw new NoNewDataException("TEST")
+      if (df.schema.fieldNames.contains("FAILURE")) throw new NoNewDataException(s"FAILED to append: ${target.tableFullName}")
       var finalDF = df
       var fromTS: Long = 0L
       var untilTS: Long = 0L

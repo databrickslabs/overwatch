@@ -28,6 +28,7 @@ class Config() {
   private var _databaseName: String = _
   private var _databaseLocation: String = _
   private var _workspaceUrl: String = _
+  private var _cloudProvider: String = _
   private var _token: Array[Byte] = _
   private var _tokenType: String = _
   private var _apiEnv: ApiEnv = _
@@ -55,7 +56,7 @@ class Config() {
   }
 
   // TODO -- This is for local testing only
-  private[overwatch] def setPipelineSnapTime(tsMilli: Long): this.type = {
+  def setPipelineSnapTime(tsMilli: Long): this.type = {
 //    _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
     _pipelineSnapTime = tsMilli
     this
@@ -141,6 +142,8 @@ class Config() {
 
   private[overwatch] def debugFlag: Boolean = _debugFlag
 
+  private[overwatch] def cloudProvider: String = _cloudProvider
+
   private[overwatch] def databaseName: String = _databaseName
 
   private[overwatch] def databaseLocation: String = _databaseLocation
@@ -181,7 +184,8 @@ class Config() {
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.clusters)
+    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters, OverwatchScope.sparkEvents,
+      OverwatchScope.clusterEvents, OverwatchScope.jobs, OverwatchScope.jobRuns, OverwatchScope.notebooks)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
@@ -202,6 +206,7 @@ class Config() {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
         _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+        _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         val scope = tokenSecret.get.scope
         val key = tokenSecret.get.key
         rawToken = dbutils.secrets.get(scope, key)
@@ -212,6 +217,7 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
+          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _token = cipher.encrypt(System.getenv("OVERWATCH_TOKEN"))
           _tokenType = "Environment"

@@ -16,7 +16,13 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val jobRunsTarget: PipelineTable = PipelineTable("jobruns_bronze", Array("run_id", "job_id"), "start_time",
       config,
       statsColumns = "job_id, original_attempt_run_id, run_id, start_time, Pipeline_SnapTS, Overwatch_RunID".split(", "))
-    lazy private[overwatch] val clustersTarget: PipelineTable = PipelineTable("clusters_snapshot_bronze",
+    lazy private[overwatch] val jobRunsSnapshotTarget: PipelineTable = PipelineTable("jobruns_snapshot_bronze",
+      Array("run_id", "job_id"), "start_time",
+      config //,
+      // TODO -- change and put back
+//      statsColumns = "job_id, original_attempt_run_id, run_id, start_time, Pipeline_SnapTS, Overwatch_RunID".split(", ")
+    )
+    lazy private[overwatch] val clustersSnapshotTarget: PipelineTable = PipelineTable("clusters_snapshot_bronze",
       Array("cluster_id"), "last_activity_time",
       config, unpersistWhenComplete = false,
       statsColumns = ("cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
@@ -37,6 +43,12 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable("spark_events_bronze", Array("Event"), "timestamp",
       config,
       partitionBy = Array("Event"), zOrderBy = Array("SparkContextID"), statsColumns = "SparkContextID, ClusterID, JobGroupID, ExecutionID".split(", "))
+    lazy private[overwatch] val cloudMachineDetail: PipelineTable = if (config.cloudProvider == "azure") {
+      PipelineTable("instanceDetails", Array("API_Name"), "", config, mode = "overwrite")
+    } else {
+      // TODO -- implement for azure
+      PipelineTable("instanceDetails", Array("API_Name"), "", config, mode = "overwrite")
+    }
   }
 
 
@@ -78,7 +90,7 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumn = "Pipeline_SnapTS", config = config
     )
 
-    lazy private[overwatch] val dbClustersTarget: PipelineTable = BronzeTargets.clustersTarget.copy(
+    lazy private[overwatch] val dbClustersTarget: PipelineTable = BronzeTargets.clustersSnapshotTarget.copy(
       name = "db_clusters_silver",
       incrementalColumn = "Pipeline_SnapTS", config = config,
       zOrderBy = Array("cluster_id")
@@ -97,7 +109,10 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val newAccountsTarget: PipelineTable = PipelineTable("user_accounts_silver",
       Array("timestamp", "targetUserName"), "timestamp", config)
 
-    lazy private[overwatch] val clustersStatusTarget: PipelineTable = PipelineTable("clusters_silver",
+    lazy private[overwatch] val clustersSpecTarget: PipelineTable = PipelineTable("clusters_spec_silver",
+      Array("timestamp", "cluster_id"), "timestamp", config)
+
+    lazy private[overwatch] val clustersStatusTarget: PipelineTable = PipelineTable("clusters_status_silver",
       Array("timestamp", "cluster_id"), "timestamp", config)
 
     lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable("jobs_silver",
