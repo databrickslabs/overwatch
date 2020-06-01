@@ -27,11 +27,6 @@ trait SparkSessionWrapper extends Serializable {
       .getOrCreate()
   }
 
-//  esSparkConf.setIfMissing("spark.driver.port", "20002");
-//  esSparkConf.setIfMissing("spark.driver.host", "MAC_OS_LAN_IP");
-//  esSparkConf.setIfMissing("spark.driver.bindAddress", "0.0.0.0");
-//  esSparkConf.setIfMissing("spark.blockManager.port", "6060");
-
   lazy val sc: SparkContext = spark.sparkContext
   if (System.getenv("OVERWATCH") == "LOCAL") sc.setLogLevel("WARN") else sc.setLogLevel("INFO")
 //  sc.setLogLevel("DEBUG")

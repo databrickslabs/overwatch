@@ -22,6 +22,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private val results = ArrayBuffer[String]()
   private var _limit: Long = _
   private var _req: String = _
+  private var _maxResults: Int = _
   private var _status: String = "SUCCESS"
   private var _errorFlag: Boolean = false
   private val mapper = JsonUtils.objectMapper
@@ -37,6 +38,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     }
     _jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
     _getQueryString = "?" + _initialQueryMap.map { case(k, v) => s"$k=$v"}.mkString("&")
+    this
+  }
+
+  private def setMaxResults(value: Int): this.type = {
+    _maxResults = value
     this
   }
 
@@ -181,12 +187,15 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private def paginate(): Unit = {
     var hasMore = JsonUtils.jsonToMap(results(0)).getOrElse("has_more", false).toString.toBoolean
     var i: Int = 1
-    while (hasMore) {
+    var cumTotal: Long = 0
+    // This allows for duplicates but they will be removed in the df using .distinct
+    while (hasMore && cumTotal < _maxResults) {
       _initialQueryMap += ("offset" -> (_initialQueryMap.getOrElse("offset", 0).toString.toInt + limit))
       setQuery(Some(_initialQueryMap))
       executeGet(true)
       hasMore = JsonUtils.jsonToMap(results(i)).getOrElse("has_more", false).toString.toBoolean
       i+=1
+      cumTotal+=limit
     }
   }
 
@@ -251,9 +260,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
 object ApiCall {
 
-  def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None): ApiCall = {
+  def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None,
+            maxResults: Int = Int.MaxValue): ApiCall = {
     new ApiCall(apiEnv).setApiName(apiName)
       .setQuery(queryMap) //.decryptToken()
+      .setMaxResults(maxResults)
   }
 
   // TODO -- Accept jsonQuery as Map

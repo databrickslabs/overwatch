@@ -12,10 +12,6 @@ import org.apache.log4j.{Level, Logger}
 
 class Config() {
 
-  case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
-                       asUTCDateTime: LocalDateTime, asMidnightEpochMilli: Long,
-                       asTSString: String, asDTString: String)
-
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-","")
   private final val cipherKey = UUID.randomUUID().toString
@@ -184,8 +180,7 @@ class Config() {
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters, OverwatchScope.sparkEvents,
-      OverwatchScope.clusterEvents, OverwatchScope.jobs, OverwatchScope.jobRuns, OverwatchScope.notebooks)
+    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.jobs, OverwatchScope.jobRuns)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"

@@ -35,7 +35,6 @@ case class PipelineTable(
   private val logger: Logger = Logger.getLogger(this.getClass)
   import spark.implicits._
 
-
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try {
       Some(spark.sessionState.catalog.getDatabaseMetadata(config.databaseName))

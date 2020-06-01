@@ -112,19 +112,89 @@ trait BronzeTransforms extends SparkSessionWrapper {
     } else jobRuns.toSeq.toDF("FAILURE")
   }
 
-  protected def getNewJobRuns(apiEnv: ApiEnv, fromTimeCol: Column)(df: DataFrame): DataFrame = {
+  protected def getNewJobRuns(apiEnv: ApiEnv, fromTimeCol: TimeTypes,
+                              snapTime: TimeTypes, isFirstRun: Boolean)(df: DataFrame): DataFrame = {
+
     val runIDs = df
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .filter('actionName.isin("runSucceeded", "runFailed"))
-      .filter('date > fromTimeCol.cast("date"))
-      .select('runId.cast("int")).distinct.as[Int].collect()
-    val jobRuns = apiByID("jobs/runs/get", apiEnv,
-      "get", runIDs, "run_id", None)
+      .filter('date >= date_sub(current_timestamp(), 61) &&
+        'date >= fromTimeCol.asColumnTS.cast("date"))
 
-    if (newDataRetrieved) {
-      // TODO -- add filter to remove runs before fromTS
+    val runIDsInScope = runIDs.count()
+
+    if (runIDsInScope > 0) {
+      // get last 1500
+      val avgRunsPerDay = runIDs
+        .filter('date >= date_sub('date, 30))
+        .groupBy('date)
+        .count
+        .select(avg('count).cast("int").alias("avgRunsPerDay"))
+        .withColumn("avgRunsPerDay", when('avgRunsPerDay.isNull, 0).otherwise('avgRunsPerDay))
+        .as[Int].collect().head
+
+      val daysToAppend = runIDs
+        .select(
+          datediff(current_timestamp.cast("date"), max('date)).cast("int").alias("daysToAppend")
+        )
+        .withColumn("daysToAppend", when('daysToAppend.isNull, 0).otherwise('daysToAppend))
+        .as[Int].collect().head
+
+
+      // approx new runs with stddev of 2
+      val approxNewRuns = avgRunsPerDay * daysToAppend + (avgRunsPerDay * 2)
+
+      val parallelism = 8
+      val batchSize = math.ceil(approxNewRuns / parallelism).toInt
+      val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+      val batches = (0 to parallelism).toArray.par
+      batches.tasksupport = taskSupport
+      val jobRuns = batches.flatMap(batch => {
+        val batchOffsetStart = batch * batchSize
+        val batchQuery: Map[String, Any] = Map(
+          "offset" -> batchOffsetStart,
+          "completed_only" -> true,
+          "limit" -> 150
+        )
+
+        val debugTEST = ApiCall("jobs/runs/list", apiEnv, Some(batchQuery), maxResults = batchSize)
+          .executeGet().asStrings
+
+        debugTEST.length
+
+        debugTEST
+      }).toArray
+
       spark.read.json(Seq(jobRuns: _*).toDS())
-    } else jobRuns.toSeq.toDF("FAILURE")
+        .select(explode('runs).alias("runs")).select("runs.*")
+        .withColumn("rnk", rank().over(Window.partitionBy('job_id, 'run_id).orderBy('start_time.desc)))
+        .filter('rnk === 1)
+        .drop("rnk")
+        .filter('start_time <= snapTime.asUnixTimeMilli)
+
+
+      //    // TODO -- see if this is necessary and if so, find better way to handle
+      //    val outstandingRunIDs = runIDs.select('runId.alias("run_id"))
+      //      .except(jobRunsDF.select('run_id))
+      //
+      //    val DEBUGX = outstandingRunIDs.count
+      //
+      //    val finalRunsDF = if (outstandingRunIDs.count() > 0) {
+      //      val remainingRunIds = outstandingRunIDs.select('runId.cast("int")).distinct().as[Int].collect()
+      //      val remainingRuns = apiByID("jobs/runs/get", apiEnv,
+      //        "get", remainingRunIds, "run_id", None)
+      //
+      //      // TODO -- add filter to remove runs before fromTS
+      //      jobRuns.unionByName(spark.read.json(Seq(remainingRuns: _*).toDS()))
+      //
+      //    } else {
+      //      jobRuns
+      //    }.withColumn("rnk", rank().over(Window.partitionBy('job_id, 'run_id).orderBy('start_time.desc)))
+      //      .filter('rnk === 1)
+      //      .drop("rnk")
+      //      .filter('start_time <= snapTime.asUnixTimeMilli)
+
+    } else Array("NoJobRuns").toSeq.toDF("FAILURE")
   }
 
   protected def collectClusterIDs()(df: DataFrame): DataFrame = {
@@ -181,94 +251,96 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
 
-  def generateEventLogsDF(badRecordsPath: String, eventLogsTarget: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
+  def generateEventLogsDF (badRecordsPath: String, eventLogsTarget: PipelineTable) (eventLogsDF: DataFrame): DataFrame = {
 
-    val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, eventLogsTarget)
-    val dropCols = Array("Classpath Entries", "HadoopProperties", "SparkProperties", "SystemProperties", "sparkPlanInfo")
+  val pathsGlob = getUniqueSparkEventsFiles (badRecordsPath, eventLogsDF, eventLogsTarget)
+  val dropCols = Array ("Classpath Entries", "HadoopProperties", "SparkProperties", "SystemProperties", "sparkPlanInfo")
 
-    val rawEventsDF = spark.read.option("badRecordsPath", badRecordsPath)
-      .json(pathsGlob: _*).drop(dropCols: _*)
+  val rawEventsDF = spark.read.option ("badRecordsPath", badRecordsPath)
+  .json (pathsGlob: _*).drop (dropCols: _*)
 
-    SchemaTools.scrubSchema(rawEventsDF)
-      .withColumn("filename", input_file_name)
-      .withColumn("pathSize", size(split('filename, "/")) - lit(2))
-      .withColumn("SparkContextID", split('filename, "/")('pathSize))
-      .drop("pathSize")
-  }
+  SchemaTools.scrubSchema (rawEventsDF)
+  .withColumn ("filename", input_file_name)
+  .withColumn ("pathSize", size (split ('filename, "/") ) - lit (2) )
+  .withColumn ("SparkContextID", split ('filename, "/") ('pathSize) )
+  .drop ("pathSize")
+}
 
 
-  protected def collectEventLogPaths(fromTimeCol: Column,
-                                     isFirstRun: Boolean,
-                                     scope: Seq[OverwatchScope.OverwatchScope])(df: DataFrame): DataFrame = {
-    if (scope.contains(OverwatchScope.audit)) {
-      val cluster_id_gen_w = Window.partitionBy('cluster_name)
-        .orderBy('timestamp)
-        .rowsBetween(Window.currentRow, Window.unboundedFollowing)
+  protected def collectEventLogPaths (fromTimeCol: Column,
+  isFirstRun: Boolean,
+  scope: Seq[OverwatchScope.OverwatchScope] ) (df: DataFrame): DataFrame = {
+  if (scope.contains (OverwatchScope.audit) ) {
+  val cluster_id_gen_w = Window.partitionBy ('cluster_name)
+  .orderBy ('timestamp)
+  .rowsBetween (Window.currentRow, Window.unboundedFollowing)
 
-      // Lookup null cluster_ids
-      val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
+  // Lookup null cluster_ids
+  val cluster_id_gen = first ('cluster_id, ignoreNulls = true).over (cluster_id_gen_w)
 
-      // get edited and created clusters
-      var baseClusterLookupDF = df
-        .selectExpr("*", "requestParams.*")
-        .filter('serviceName === "clusters")
-        .filter('date > fromTimeCol.cast("date")) //Partition filter
-        .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+  // get edited and created clusters
+  var baseClusterLookupDF = df
+  .selectExpr ("*", "requestParams.*")
+  .filter ('serviceName === "clusters")
+  .filter ('date > fromTimeCol.cast ("date") ) //Partition filter
+  .select ('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
 
-      // get cluster ids with events since last run to get new cluster events from api
-      setClusterIDs(baseClusterLookupDF.select('cluster_id).distinct().as[String].collect())
+  // get cluster ids with events since last run to get new cluster events from api
+  setClusterIDs (baseClusterLookupDF.select ('cluster_id).distinct ().as[String].collect () )
 
-      // Removing this for now -- I don't think it's necessary to do the look back
-      // Combine edited and created clusters with historical clusters to get full list of event log paths
-      //      if (!isFirstRun) {
-      //        baseClusterLookupDF = baseClusterLookupDF
-      //          .filter('actionName.isin("create", "createResult", "edit"))
-      //          .unionByName(
-      //            df
-      //              .selectExpr("*", "requestParams.*")
-      //              .filter('serviceName === "clusters")
-      //              .filter('actionName.isin("create", "createResult", "edit"))
-      //              .filter('date <= fromTimeCol.cast("date")) //Partition filter
-      //              .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
-      //          ).distinct
-      //      }
+  // Removing this for now -- I don't think it's necessary to do the look back
+  // Combine edited and created clusters with historical clusters to get full list of event log paths
+  //      if (!isFirstRun) {
+  //        baseClusterLookupDF = baseClusterLookupDF
+  //          .filter('actionName.isin("create", "createResult", "edit"))
+  //          .unionByName(
+  //            df
+  //              .selectExpr("*", "requestParams.*")
+  //              .filter('serviceName === "clusters")
+  //              .filter('actionName.isin("create", "createResult", "edit"))
+  //              .filter('date <= fromTimeCol.cast("date")) //Partition filter
+  //              .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+  //          ).distinct
+  //      }
 
-      // get all relevant cluster log paths
-      // TODO -- Utilize spark to built the glob faster
-      //  .https://databricks.atlassian.net/wiki/spaces/UN/pages/802098643/Storage+clients#Storageclients-HowtorunFilesystemoperationsinparallelwithSpark(i.e.ontheexecutors)
-      baseClusterLookupDF
-        .filter('cluster_log_conf.isNotNull)
-        .withColumn("s3", get_json_object('cluster_log_conf, "$.s3"))
-        .withColumn("dbfs", get_json_object('cluster_log_conf, "$.dbfs"))
-        .withColumn("destination",
-          when('s3.isNotNull, regexp_replace(get_json_object('s3, "$.destination"), "\\/$", ""))
-            when('dbfs.isNotNull, regexp_replace(get_json_object('dbfs, "$.destination"), "\\/$", ""))
-        )
-        .withColumn("cluster_id", cluster_id_gen)
-        .select(
-          array(col("destination"), col("cluster_id"),
-            lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-        ).rdd
-        .map(r => r.getSeq[String](0).mkString("/")).collect()
-        .flatMap(Helpers.globPath)
-        .toSeq.toDF("filename")
-    } else { // TODO - TEST -- might have broken when not using audit
-      val colsDF = df.select($"cluster_log_conf.*")
-      val cols = colsDF.columns.map(c => s"${c}.destination")
-      val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
-      cols.flatMap(
-        c => {
-          logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
-            .select(
-              array(regexp_replace(col("destination"), "\\/$", ""), col("cluster_id"),
-                lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-            ).rdd
-            .map(r => r.getSeq[String](0).mkString("/")).collect()
-        }).distinct
-        .flatMap(Helpers.globPath)
-        .toSeq.toDF("filename")
-    }
-  }
+  // get all relevant cluster log paths
+  // TODO -- Utilize spark to built the glob faster
+  //  .https://databricks.atlassian.net/wiki/spaces/UN/pages/802098643/Storage+clients#Storageclients-HowtorunFilesystemoperationsinparallelwithSpark(i.e.ontheexecutors)
+  baseClusterLookupDF
+  .filter ('cluster_log_conf.isNotNull)
+  .withColumn ("s3", get_json_object ('cluster_log_conf, "$.s3") )
+  .withColumn ("dbfs", get_json_object ('cluster_log_conf, "$.dbfs") )
+  .withColumn ("destination",
+  when ('s3.isNotNull, regexp_replace (get_json_object ('s3, "$.destination"), "\\/$", "") )
+  when ('dbfs.isNotNull, regexp_replace (get_json_object ('dbfs, "$.destination"), "\\/$", "") )
+  )
+  .withColumn ("cluster_id", cluster_id_gen)
+  .select (
+  array (col ("destination"), col ("cluster_id"),
+  lit ("eventlog"), lit ("*"), lit ("*"), lit ("eventlo*") )
+  ).rdd
+  .map (r => r.getSeq[String] (0).mkString ("/") ).collect ()
+  .flatMap (Helpers.globPath)
+  .toSeq.toDF ("filename")
+} else { // TODO - TEST -- might have broken when not using audit
+  val colsDF = df.select ($"cluster_log_conf.*")
+  val cols = colsDF.columns.map (c => s"${
+  c
+}.destination")
+  val logsDF = df.select ($"cluster_log_conf.*", $"cluster_id".alias ("cluster_id") )
+  cols.flatMap (
+  c => {
+  logsDF.select (col ("cluster_id"), col (c) ).filter (col ("destination").isNotNull).distinct
+  .select (
+  array (regexp_replace (col ("destination"), "\\/$", ""), col ("cluster_id"),
+  lit ("eventlog"), lit ("*"), lit ("*"), lit ("eventlo*") )
+  ).rdd
+  .map (r => r.getSeq[String] (0).mkString ("/") ).collect ()
+}).distinct
+  .flatMap (Helpers.globPath)
+  .toSeq.toDF ("filename")
+}
+}
 
   //  protected def collectEventLogPaths()(df: DataFrame): DataFrame = {
   //

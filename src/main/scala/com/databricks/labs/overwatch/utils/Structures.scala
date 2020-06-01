@@ -1,7 +1,11 @@
 package com.databricks.labs.overwatch.utils
 
+import java.time.LocalDateTime
+import java.util.Date
+
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
+import org.apache.spark.sql.Column
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types._
@@ -17,6 +21,10 @@ case class TokenSecret(scope: String, key: String)
 case class DataTarget(databaseName: Option[String], databaseLocation: Option[String])
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encryptedToken: Array[Byte], cipher: Cipher)
+
+case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
+                     asUTCDateTime: LocalDateTime, asMidnightEpochMilli: Long,
+                     asTSString: String, asDTString: String)
 
 case class OverwatchParams(tokenSecret: Option[TokenSecret],
                            dataTarget: Option[DataTarget],

@@ -127,6 +127,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       DerivedCluster(clusterIDAtJobLevel, clusterIDAtStageLevel)
     }
 
+    // TODO -- Add validation that all desired power property columns exist
     def appendPowerProperties: Column = {
       struct(
         $"Properties.sparkappname".alias("AppName"),
@@ -139,7 +140,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           $"Properties.sparkdatabricksclusterUsageTagsclusterAllTags".alias("ClusterTags"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterAvailability".alias("CluserAvailability"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterId".alias("ClusterID"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterInstancePoolId".alias("InstancePoolID"),
+//          $"Properties.sparkdatabricksclusterUsageTagsclusterInstancePoolId".alias("InstancePoolID"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterMaxWorkers".alias("MaxWorkers"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterMinWorkers".alias("MinWorkers"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterName".alias("Name"),
@@ -457,6 +458,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val reset = Window.partitionBy('cluster_id).orderBy('timestamp)
     val cumsum = Window.partitionBy('cluster_id, 'reset).orderBy('timestamp)
 
+    df.schema.fields.map(_.name)
     val clusterBaseDF = clusterBase(df)
 
     // TODO -- Lookup missing cluster driver/worker by JobID/RunID cluster spec
