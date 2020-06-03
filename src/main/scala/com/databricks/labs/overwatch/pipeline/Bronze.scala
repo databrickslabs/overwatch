@@ -143,9 +143,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     if (config.overwatchScope.contains(OverwatchScope.audit)) {
       reports.append(appendAuditLogsProcess.process())
 
-      val debugx = config.fromTime(1008)
-      val debugy = config.pipelineSnapTime
-
       /** Current cluster snapshot is important because cluster spec details are only available from audit logs
        * during create/edit events. Thus all existing clusters created/edited last before the audit logs were
        * enabled will be missing all info. This is especially important for overwatch early stages

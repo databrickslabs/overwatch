@@ -28,6 +28,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
     finalDF = SchemaTools.scrubSchema(finalDF)
 
+
     try {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
       target.writer(finalDF).saveAsTable(target.tableFullName)

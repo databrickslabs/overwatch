@@ -33,7 +33,7 @@ abstract class PipelineTargets(config: Config) {
       statsColumns = ("instance_pool_id, node_type_id, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "))
     lazy private[overwatch] val auditLogsTarget: PipelineTable = PipelineTable("audit_log_bronze", Array("requestId", "timestamp"), "date",
-      config, unpersistWhenComplete = false,
+      config,
       partitionBy = Array("date"), statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "), dataFrequency = Frequency.daily)
     lazy private[overwatch] val clusterEventsTarget: PipelineTable = PipelineTable("cluster_events_bronze",

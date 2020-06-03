@@ -59,7 +59,7 @@ class Config() {
   }
 
   @throws(classOf[NoSuchElementException])
-  private[overwatch] def fromTime(moduleID: Int): TimeTypes = {
+  def fromTime(moduleID: Int): TimeTypes = {
     val lastRunStatus = if (!isFirstRun) lastRunDetail.filter(_.moduleID == moduleID) else lastRunDetail
     require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
     val fromTime = if (lastRunStatus.length != 1) primordealEpoch else lastRunStatus.head.untilTS
@@ -67,7 +67,7 @@ class Config() {
   }
 
   // Exclusive when used as untilTS logic will be < NOT <=
-  private[overwatch] def pipelineSnapTime: TimeTypes = {
+  def pipelineSnapTime: TimeTypes = {
     createTimeDetail(_pipelineSnapTime)
   }
 
@@ -181,7 +181,7 @@ class Config() {
 
     registeredEncryptedToken(None)
     _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.jobs, OverwatchScope.jobRuns)
-    _databaseName = "overwatch_local"
+    _databaseName = "overwatch_local_es"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
     _auditLogPath = Some("/mnt/tomesdata/logs/field_training_audit/")

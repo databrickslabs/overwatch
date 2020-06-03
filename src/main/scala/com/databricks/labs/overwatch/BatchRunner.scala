@@ -6,7 +6,7 @@ import java.time.temporal.ChronoUnit
 
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Pipeline, Silver}
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
@@ -38,7 +38,7 @@ object BatchRunner extends SparkSessionWrapper{
     }
 
     val config = workspace.getConfig
-    val fakeTime = LocalDateTime.of(2020,5,18,13,44).atZone(ZoneId.of("Etc/UTC"))
+    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
       .toInstant.toEpochMilli
     config.setPipelineSnapTime(fakeTime)
 

@@ -14,3 +14,4 @@ project/target/
 /metastore_db/
 /derby.log
 /schema/
+/src/main/scala/com/databricks/labs/overwatch/ESxxxx.scala

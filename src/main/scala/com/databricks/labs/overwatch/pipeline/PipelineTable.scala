@@ -61,7 +61,7 @@ case class PipelineTable(
 
   def asDF: DataFrame = {
     try{
-      if (!unpersistWhenComplete) {
+      if (!unpersistWhenComplete && !config.isLocalTesting) {
         spark.table(tableFullName).repartition().cache() // TODO -- ensure this cache is only caching filtered values
       } else spark.table(tableFullName)
     } catch {
