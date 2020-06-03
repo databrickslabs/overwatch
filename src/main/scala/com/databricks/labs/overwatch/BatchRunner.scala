@@ -1,19 +1,9 @@
 package com.databricks.labs.overwatch
 
-import java.io.FileNotFoundException
 import java.time.{LocalDateTime, ZoneId, ZoneOffset}
-import java.time.temporal.ChronoUnit
-
-import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Pipeline, Silver}
 import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions._
-
-import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.forkjoin.ForkJoinPool
 
 object BatchRunner extends SparkSessionWrapper{
 
@@ -25,7 +15,7 @@ object BatchRunner extends SparkSessionWrapper{
 
     envInit()
 
-    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1_wildlife.jar")
+//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1_wildlife.jar")
 //    sc.addFile("C:\\Dev\\git\\Databricks--Overwatch\\src\\main\\resources\\ec2_details_tbl", true)
 //    spark.sql("drop database if exists overwatch_local cascade")
 //
@@ -37,12 +27,15 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-    val config = workspace.getConfig
-    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
-      .toInstant.toEpochMilli
-    config.setPipelineSnapTime(fakeTime)
+//    val config = workspace.getConfig
+//    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
+//      .toInstant.toEpochMilli
+//    config.setPipelineSnapTime(fakeTime)
 
+    logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
+    logger.log(Level.INFO, "Starting Silver")
+    Silver(workspace).run()
 
 //    Silver(workspace).run()
 
@@ -69,9 +62,6 @@ object BatchRunner extends SparkSessionWrapper{
 //    spark.read.format("parquet")
 //      .load("C:\\Dev\\git\\Databricks--Overwatch\\spark-warehouse\\overwatch.db\\cluster_events_bronze")
 //      .show(20, false)
-
-
-    spark.read.table("overwatch_local.pipeline_report").orderBy('Pipeline_SnapTS.desc).show(20, false)
 
 
   }

@@ -601,6 +601,44 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
+  /**
+   * First shot At Silver Job Runs
+   * @param df
+   * @return
+   */
+    // TODO -- Job Runs Silver
+//  // Review new_cluster/existingCluster from runs...is it needed?
+//  val jobRunCompleteCols: Array[Column] = Array(
+//    'timestamp.alias("completeTimeStamp"), 'jobId.alias("jobIdCompletion"), 'runId, 'idInJob.alias("idInJobCompletion"), 'jobClusterType, 'userAgent.alias("userAgentCompletion"), 'jobTerminalState, 'jobTriggerType, 'jobTaskType, $"response.errorMessage".alias("errorMessage"), when($"userIdentity.email" === "unknown", lit(null)).otherwise($"userIdentity.email").alias("userEmailCompletion"))
+//
+//  val jobRunStartCols: Array[Column] = Array(
+//    'serviceName, 'actionName, 'timestamp.alias("startTimestamp"), 'job_id, when('runId.isNull, get_json_object($"response.result", "$.run_id")).otherwise('runId).alias("runId"),
+//    get_json_object($"response.result", "$.number_in_job").alias("idInJob"), 'run_name,
+//    $"userIdentity.email".alias("userEmail"), 'userAgent, get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"), 'timeout_seconds, 'sessionId, 'requestId, 'response, 'sourceIPAddress, 'version)
+//
+//  val jobRunsCols: Array[Column] = Array(
+//    'serviceName, 'actionName, when('jobIdCompletion.isNull, 'job_id).otherwise('jobIdCompletion).alias("jobId"), 'runId, 'jobClusterType, 'jobTerminalState, 'jobTriggerType, 'jobTaskType, 'errorMessage,
+//    'run_name, 'notebook_path, when('userAgent.isNull, 'userAgentCompletion).otherwise('userAgent).alias("userAgent"), 'timeout_seconds,
+//    when('idInJobCompletion.isNull, 'idInJob).otherwise('idInJobCompletion).alias("idInJob"),
+//    subtractTime('startTimestamp, 'completeTimeStamp).alias("JobRunTime"),
+//    when('userEmail.isNull, 'userEmailCompletion).otherwise('userEmail).alias("userEmail"), 'sessionId, 'requestId, 'response, 'sourceIPAddress, 'version
+//  )
+//
+//  val jobRunsStartDF = auditJobs
+//    .filter('actionName.isin("runNow", "submitRun"))
+//    .select(jobRunStartCols: _*)
+//    .filter('runId.isNotNull)
+//
+//  val jobRunsCompleteDF = auditJobs
+//    .filter('actionName.isin("runSucceeded", "cancel", "runFailed"))
+//    .select(jobRunCompleteCols: _*)
+//    .filter('runId.isNotNull)
+//
+//  val jobRunsSilver = jobRunsStartDF
+//    .join(jobRunsCompleteDF, Seq("runId"))
+//    .select(jobRunsCols: _*)
+
+
   protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
     val jobsCols = auditBaseCols ++ Array[Column](
       when('name.isNull && 'new_settings.isNotNull, get_json_object('new_settings, "$.name"))
