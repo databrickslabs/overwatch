@@ -34,10 +34,10 @@ object BatchRunner extends SparkSessionWrapper{
 
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
-    if (config.isFirstRun) {
-      spark.read.format("delta").load("/tmp/overwatch/aws_ec2_details_raw")
-        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
-    }
+//    if (config.isFirstRun) {
+//      spark.read.format("delta").load("/tmp/overwatch/aws_ec2_details_raw")
+//        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
+//    }
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
 
