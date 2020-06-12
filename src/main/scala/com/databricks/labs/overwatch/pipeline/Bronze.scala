@@ -12,49 +12,49 @@ import scala.collection.mutable.ArrayBuffer
 
 class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
-    with SparkSessionWrapper with BronzeTransforms {
-
-  envInit()
+    with BronzeTransforms {
 
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   lazy private val appendJobsProcess = EtlDefinition(
-    workspace.getJobsDF.cache(),
+    workspace.getJobsDF,
     Some(Seq(collectJobsIDs())),
-    append(BronzeTargets.jobsTarget),
+    append(BronzeTargets.jobsSnapshotTarget),
     Module(1001, "Bronze_Jobs_Snapshot")
   )
 
-  lazy private val appendJobRunsSnapshotProcess = EtlDefinition(
-    prepJobRunsDF(config.apiEnv, config.isFirstRun),
-    None,
-    append(BronzeTargets.jobRunsSnapshotTarget, newDataOnly = true),
-    Module(1007, "Bronze_JobRuns_Snapshot")
-  )
+//  lazy private val appendJobRunsSnapshotProcess = EtlDefinition(
+//    prepJobRunsDF(config.apiEnv, config.isFirstRun),
+//    None,
+//    append(BronzeTargets.jobRunsSnapshotTarget, newDataOnly = true),
+//    Module(1007, "Bronze_JobRuns_Snapshot")
+//  )
 
-  private val jobRunsModule = Module(1008, "Bronze_JobRuns")
-  lazy private val appendJobRunsAuditFilteredProcess = EtlDefinition(
-    BronzeTargets.auditLogsTarget.asDF,
-    Some(Seq(getNewJobRuns(
-      config.apiEnv,
-      config.fromTime(jobRunsModule.moduleID),
-      config.pipelineSnapTime,
-      config.isFirstRun
-    ))),
-    append(BronzeTargets.jobRunsTarget, newDataOnly = true),
-    jobRunsModule
-  )
+//  Removing module -- too inefficient
+//  private val jobRunsModule = Module(1008, "Bronze_JobRuns")
+//  lazy private val appendJobRunsAuditFilteredProcess = EtlDefinition(
+//    BronzeTargets.auditLogsTarget.asDF,
+//    Some(Seq(getNewJobRuns(
+//      config.apiEnv,
+//      config.fromTime(jobRunsModule.moduleID),
+//      config.pipelineSnapTime,
+//      config.isFirstRun
+//    ))),
+//    append(BronzeTargets.jobRunsTarget, newDataOnly = true),
+//    jobRunsModule
+//  )
 
   private val appendClustersModule = Module(1002, "Bronze_Clusters_Snapshot")
   lazy private val appendClustersAPIProcess = EtlDefinition(
-    workspace.getClustersDF.cache(),
+    workspace.getClustersDF,
     Some(Seq(collectClusterIDs())),
     append(BronzeTargets.clustersSnapshotTarget),
     appendClustersModule
   )
 
+  // TODO -- Not implemented
   lazy private val appendPoolsProcess = EtlDefinition(
     workspace.getPoolsDF,
     None,
@@ -95,12 +95,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     Some(Seq(
       collectEventLogPaths(
         config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
+        SilverTargets.clustersSpecTarget,
         config.isFirstRun,
         config.overwatchScope
       ),
       generateEventLogsDF(config.badRecordsPath, BronzeTargets.sparkEventLogsTarget)
     )),
-    append(BronzeTargets.sparkEventLogsTarget),
+    append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic
     sparkEventLogsModule
   )
 
@@ -152,7 +153,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       //  from the api than from audit -- VERIFY
       if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) reports.append(appendClusterEventLogsProcess.process())
       if (config.overwatchScope.contains(OverwatchScope.jobs)) reports.append(appendJobsProcess.process())
-      if (config.overwatchScope.contains(OverwatchScope.jobRuns)) reports.append(appendJobRunsAuditFilteredProcess.process())
+
+      // Too inefficient to pull job runs from api
+//      if (config.overwatchScope.contains(OverwatchScope.jobRuns)) reports.append(appendJobRunsAuditFilteredProcess.process())
 
       if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
         reports.append(appendSparkEventLogsProcess.process())
@@ -163,9 +166,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         reports.append(appendJobsProcess.process())
       }
       // TODO -- determine if jobRuns API pull has diff/more data than audit -- perhaps create runs from API
-      if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
-        reports.append(appendJobRunsSnapshotProcess.process())
-      }
+//      if (config.overwatchScope.contains(OverwatchScope.jobRuns)) {
+//        reports.append(appendJobRunsSnapshotProcess.process())
+//      }
       if (config.overwatchScope.contains(OverwatchScope.clusters)) {
         reports.append(appendClustersAPIProcess.process())
       }

@@ -22,9 +22,9 @@ case class PipelineTable(
                           mode: String = "append", // TODO -- Convert to Enum
                           autoOptimize: Boolean = false,
                           autoCompact: Boolean = false,
-                          unpersistWhenComplete: Boolean = true,
                           partitionBy: Array[String] = Array(),
                           statsColumns: Array[String] = Array(),
+                          optimizeFrequency: Int = 24 * 7,
                           zOrderBy: Array[String] = Array(),
                           vacuum: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
                           enableSchemaMerge: Boolean = true,
@@ -61,9 +61,7 @@ case class PipelineTable(
 
   def asDF: DataFrame = {
     try{
-      if (!unpersistWhenComplete && !config.isLocalTesting) {
-        spark.table(tableFullName).repartition().cache() // TODO -- ensure this cache is only caching filtered values
-      } else spark.table(tableFullName)
+      spark.table(tableFullName)
     } catch {
       case e: AnalysisException =>
         logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
@@ -76,7 +74,10 @@ case class PipelineTable(
     var writer = df.write.mode(mode).format(f)
     // TODO - Validate proper repartition to minimize files per partition. Could be autoOptimize
     writer = if (partitionBy.nonEmpty) writer.partitionBy(partitionBy: _*) else writer
-    writer = if (enableSchemaMerge) writer.option("mergeSchema", "true") else writer
+    writer = if (mode == "overwrite") writer.option("overwriteSchema", "true")
+    else if (enableSchemaMerge && mode != "overwrite")
+      writer.option("mergeSchema", "true")
+    else writer
     writer
   }
 

@@ -34,6 +34,7 @@ class Config() {
   private var _inputConfig: OverwatchParams = _
   private var _parsedConfig: ParsedConfig = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
+  private var _intialShuffleParts: Int = 200
 
   final private val cipher = new Cipher(cipherKey)
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -55,6 +56,11 @@ class Config() {
   def setPipelineSnapTime(tsMilli: Long): this.type = {
 //    _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
     _pipelineSnapTime = tsMilli
+    this
+  }
+
+  private[overwatch] def setInitialShuffleParts(value: Int): this.type = {
+    _intialShuffleParts = value
     this
   }
 
@@ -140,6 +146,8 @@ class Config() {
 
   private[overwatch] def cloudProvider: String = _cloudProvider
 
+  private[overwatch] def initialShuffleParts: Int = _intialShuffleParts
+
   private[overwatch] def databaseName: String = _databaseName
 
   private[overwatch] def databaseLocation: String = _databaseLocation
@@ -180,11 +188,13 @@ class Config() {
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.jobs, OverwatchScope.jobRuns)
-    _databaseName = "overwatch_local_es"
+    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters, OverwatchScope.clusterEvents,
+      OverwatchScope.jobs, OverwatchScope.jobRuns, OverwatchScope.sparkEvents)
+    _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
     _auditLogPath = Some("/mnt/tomesdata/logs/field_training_audit/")
+    _cloudProvider = "aws"
     this
 
   }
@@ -212,7 +222,6 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
-          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _token = cipher.encrypt(System.getenv("OVERWATCH_TOKEN"))
           _tokenType = "Environment"

@@ -29,6 +29,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalDF = SchemaTools.scrubSchema(finalDF)
 
 
+
     try {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
       target.writer(finalDF).saveAsTable(target.tableFullName)

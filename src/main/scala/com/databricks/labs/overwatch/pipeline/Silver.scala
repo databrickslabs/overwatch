@@ -34,14 +34,15 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     BronzeTargets.auditLogsTarget.asDF
   else null
 
-  private def cacheAuditLogs(auditModuleIDs: Array[Int]): Unit = {
-    val minAuditTS = config.lastRunDetail.filter(run => auditModuleIDs.contains(run.moduleID)).map(_.untilTS).min
-    val minAuditColTS = config.createTimeDetail(minAuditTS).asColumnTS
-    newAuditLogsDF = newAuditLogsDF
-      .filter('date >= minAuditColTS.cast("date"))
-      .repartition(getTotalCores).cache
-    newAuditLogsDF.count()
-  }
+//  According to Michael -- don't use rdd cache
+//  private def cacheAuditLogs(auditModuleIDs: Array[Int]): Unit = {
+//    val minAuditTS = config.lastRunDetail.filter(run => auditModuleIDs.contains(run.moduleID)).map(_.untilTS).min
+//    val minAuditColTS = config.createTimeDetail(minAuditTS).asColumnTS
+//    newAuditLogsDF = newAuditLogsDF
+//      .filter('date >= minAuditColTS.cast("date"))
+//      .repartition(getTotalCores).cache
+//    newAuditLogsDF.count()
+//  }
 
   // Slack Chat
   // https://databricks.slack.com/archives/C04SZU99Q/p1588959876188200
@@ -163,12 +164,26 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     Module(2010, "Silver_JobsStatus")
   )
 
+  lazy private val appendJobRunsProcess = EtlDefinition(
+    newAuditLogsDF,
+    Some(Seq(
+      dbJobRunsSummary(
+        SilverTargets.clustersSpecTarget,
+        SilverTargets.dbJobsStatusTarget,
+        BronzeTargets.jobsSnapshotTarget
+      )
+    )),
+    append(SilverTargets.dbJobRunsTarget, newDataOnly = true),
+    Module(2011, "Silver_JobsRuns")
+  )
+
   lazy private val appendClusterSpecProcess = EtlDefinition(
     newAuditLogsDF,
     Some(Seq(buildClusterSpec(BronzeTargets.clustersSnapshotTarget))),
     append(SilverTargets.clustersSpecTarget, newDataOnly = true),
     Module(2014, "Silver_ClusterSpec")
   )
+
 
   lazy private val appendClusterStatusProcess = EtlDefinition(
     newAuditLogsDF,
@@ -197,7 +212,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     Module(2017, "Silver_NewAccounts")
   )
 
-  lazy val appendNotebookSummaryProcess = EtlDefinition(
+  lazy private val appendNotebookSummaryProcess = EtlDefinition(
     newAuditLogsDF,
     Some(Seq(notebookSummary())),
     append(SilverTargets.notebookStatusTarget, newDataOnly = true),
@@ -223,26 +238,48 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     // TODO -- see which transforms are possible without audit and rebuild for no-audit
     //  CURRENTLY -- audit is required for silver
     val reports = ArrayBuffer[ModuleStatusReport]()
-    config.overwatchScope.foreach {
-      case OverwatchScope.sparkEvents =>
+    val scope = config.overwatchScope
+
+    if (scope.contains(OverwatchScope.audit)) {
+
+      reports.append(appendUserLoginsProcess.process())
+      reports.append(appendNewAccountsProcess.process())
+
+      if (scope.contains(OverwatchScope.sparkEvents))
         processSparkEvents.foreach(sparkReport => reports.append(sparkReport))
-      case OverwatchScope.jobs => reports.append(appendJobStatusProcess.process())
-      case OverwatchScope.clusters => {
+      if (scope.contains(OverwatchScope.clusters))
         reports.append(appendClusterSpecProcess.process())
-        reports.append(appendClusterStatusProcess.process())
-      }
-      case OverwatchScope.notebooks => reports.append(appendNotebookSummaryProcess.process())
-//      case OverwatchScope.pools =>
-      case OverwatchScope.audit =>
-//        val auditModuleIDs = Array(2010, 2014, 2016, 2017)
-//        cacheAuditLogs(auditModuleIDs)
-        reports.append(appendUserLoginsProcess.process())
-        reports.append(appendNewAccountsProcess.process())
-        // todo -- create notebook ETL
-        // todo -- create pools history from audit log
-//        newAuditLogsDF.unpersist()
-      case _ => ""
+      reports.append(appendClusterStatusProcess.process())
+      if (scope.contains(OverwatchScope.jobs))
+        reports.append(appendJobStatusProcess.process())
+      if (scope.contains(OverwatchScope.jobRuns))
+        reports.append(appendJobRunsProcess.process())
+      if (scope.contains(OverwatchScope.notebooks))
+        reports.append(appendNotebookSummaryProcess.process())
+    } else {
+      println(s"ERROR: Currently Silver is only supported with audit logs. Please enable audit logs and " +
+        s"ensure the initial run has completed in Bronze")
     }
+
+//    config.overwatchScope.foreach {
+//      case OverwatchScope.sparkEvents =>
+//        processSparkEvents.foreach(sparkReport => reports.append(sparkReport))
+//      case OverwatchScope.jobs => reports.append(appendJobStatusProcess.process())
+//      case OverwatchScope.clusters => {
+//        reports.append(appendClusterSpecProcess.process())
+//        reports.append(appendClusterStatusProcess.process())
+//      }
+//      case OverwatchScope.notebooks => reports.append(appendNotebookSummaryProcess.process())
+////      case OverwatchScope.pools =>
+//      case OverwatchScope.audit =>
+////        val auditModuleIDs = Array(2010, 2014, 2016, 2017)
+////        cacheAuditLogs(auditModuleIDs)
+//        reports.append(appendUserLoginsProcess.process())
+//        reports.append(appendNewAccountsProcess.process())
+//        // todo -- create notebook ETL
+//        // todo -- create pools history from audit log
+//      case _ => ""
+//    }
     finalizeRun(reports.toArray)
     true
   }

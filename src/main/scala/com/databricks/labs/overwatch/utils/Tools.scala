@@ -80,7 +80,7 @@ object SchemaTools extends SparkSessionWrapper {
 
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
     val r = new scala.util.Random(10)
-    val fieldNames = fields.map(_.name)
+    val fieldNames = fields.map(_.name.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
     val dupCount = dups.length
     if (dupCount == 0) {
@@ -88,7 +88,7 @@ object SchemaTools extends SparkSessionWrapper {
     } else {
       val uniqueSuffixes = (0 to fields.length + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
       fields.zipWithIndex.map(f => {
-        if (dups.contains(f._1.name)) f._1.copy(name = f._1.name + "_" + uniqueSuffixes(f._2))
+        if (dups.contains(f._1.name.toLowerCase())) f._1.copy(name = f._1.name + "_" + uniqueSuffixes(f._2))
         else f._1
       })
     }
@@ -192,6 +192,7 @@ object Helpers extends SparkSessionWrapper {
   def parOptimize(db: String, parallelism: Int = parallelism - 1,
                   zOrdersByTable: Map[String, Array[String]] = Map(),
                   vacuum: Boolean = true): Unit = {
+    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 256)
     val tables = getTables(db)
     val tablesPar = tables.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
@@ -216,6 +217,7 @@ object Helpers extends SparkSessionWrapper {
 
   def parOptimize(tables: Array[PipelineTable]): Unit = {
 
+    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 256)
     val tablesPar = tables.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     tablesPar.tasksupport = taskSupport
@@ -227,8 +229,10 @@ object Helpers extends SparkSessionWrapper {
         println(s"optimizing: ${tbl.tableFullName} --> $sql")
         spark.sql(sql)
         if (tbl.vacuum > 0) {
+          spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
           println(s"vacuuming: ${tbl.tableFullName}, Retention == ${tbl.vacuum}")
           spark.sql(s"VACUUM ${tbl.tableFullName} RETAIN ${tbl.vacuum} HOURS")
+          spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
         }
         println(s"Complete: ${tbl.tableFullName}")
       } catch {

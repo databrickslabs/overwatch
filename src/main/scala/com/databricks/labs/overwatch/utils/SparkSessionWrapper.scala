@@ -36,6 +36,7 @@ trait SparkSessionWrapper extends Serializable {
   private var _totalCores: Int = _
   private var _coresPerTask: Int = _
   private var _parTasks: Int = _
+  private val driverCores: Int = java.lang.Runtime.getRuntime.availableProcessors
 
   def setCoresPerWorker(value: Int): this.type = {
     _coresPerWorker = value
@@ -71,6 +72,8 @@ trait SparkSessionWrapper extends Serializable {
   def getCoresPerTask: Int = _coresPerTask
 
   def getParTasks: Int = _parTasks
+
+  def getDriverCores: Int = driverCores
 
   def envInit(): Boolean = {
     if (System.getenv("OVERWATCH") != "LOCAL") {

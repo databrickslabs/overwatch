@@ -257,6 +257,7 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
+    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
 
     // Todo - Move timestamp init to correct location
     logger.log(Level.INFO, "Initializing Environment")

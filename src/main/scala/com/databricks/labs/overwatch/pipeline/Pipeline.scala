@@ -209,12 +209,14 @@ class Pipeline(_workspace: Workspace, _database: Database,
         logger.log(Level.INFO, "Counts not calculated on first run.")
         0
       }
-      if (target.unpersistWhenComplete) df.unpersist()
 
       if (needsOptimize(module.moduleID)) {
         postProcessor.add(target)
         lastOptimizedTS = config.pipelineSnapTime.asUnixTimeMilli
       }
+
+      // TODO -- create func - Restore Default Global Spark Config
+      spark.conf.set("spark.sql.shuffle.partitions", config.initialShuffleParts)
 
       val endTime = System.currentTimeMillis()
 
