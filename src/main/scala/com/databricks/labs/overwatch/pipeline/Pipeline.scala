@@ -63,6 +63,17 @@ class Pipeline(_workspace: Workspace, _database: Database,
     postProcessor.optimize()
   }
 
+  private def restoreSparkConf(value: Map[String, String]) : Unit= {
+    value foreach { case (k, v) =>
+      try{
+        spark.conf.set(k, v)
+      } catch {
+        case e: org.apache.spark.sql.AnalysisException => logger.log(Level.WARN, s"Not Settable: $k", e)
+        case e: Throwable => println(s"ERROR: $k, --> $e")
+      }
+    }
+  }
+
   private def getLastOptimized(moduleID: Int): Long = {
     val lastRunOptimizeTS = config.lastRunDetail.filter(_.moduleID == moduleID)
     if (!config.isFirstRun && lastRunOptimizeTS.nonEmpty) lastRunOptimizeTS.head.lastOptimizedTS
@@ -215,8 +226,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         lastOptimizedTS = config.pipelineSnapTime.asUnixTimeMilli
       }
 
-      // TODO -- create func - Restore Default Global Spark Config
-      spark.conf.set("spark.sql.shuffle.partitions", config.initialShuffleParts)
+      restoreSparkConf(config.initialSparkConf())
 
       val endTime = System.currentTimeMillis()
 

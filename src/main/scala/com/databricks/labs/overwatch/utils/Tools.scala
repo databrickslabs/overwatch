@@ -16,6 +16,7 @@ import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.types._
+import org.apache.log4j.{Level, Logger}
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -123,6 +124,7 @@ object SchemaTools extends SparkSessionWrapper {
 
 object Helpers extends SparkSessionWrapper {
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
 
   private def parallelism: Int = {
@@ -182,6 +184,8 @@ object Helpers extends SparkSessionWrapper {
     val hadoopConf = spark.sessionState.newHadoopConf()
     val driverFS = new Path(path).getFileSystem(hadoopConf)
     val paths = driverFS.globStatus(new Path(path))
+    // TODO -- Switch this to DEBUG
+    logger.log(Level.INFO, s"${path} expanded in ${paths.length} files")
     paths.map(_.getPath.toString)
   }
 

@@ -28,11 +28,13 @@ case class PipelineTable(
                           zOrderBy: Array[String] = Array(),
                           vacuum: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
                           enableSchemaMerge: Boolean = true,
+                          sparkOverrides: Map[String, String] = Map[String, String](),
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+  private var currentSparkOverrides: Map[String, String] = sparkOverrides
   import spark.implicits._
 
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
@@ -58,6 +60,26 @@ case class PipelineTable(
   if (autoCompact) spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
 
+  /**
+   * This EITHER appends/changes the spark overrides OR sets them. This can only set spark params if updates
+   * are not passed --> setting the spark conf is really mean to be private action
+   * @param updates spark conf updates
+   */
+  private[overwatch] def setSparkOverrides(updates: Map[String, String] = Map()): Unit = {
+    if (updates.nonEmpty) {
+      currentSparkOverrides = currentSparkOverrides ++ updates
+    }
+    if (sparkOverrides.nonEmpty && updates.isEmpty) {
+      currentSparkOverrides foreach { case (k, v) =>
+      try {
+          spark.conf.set(k, v)
+      } catch {
+          case e: AnalysisException => logger.log(Level.WARN, s"Cannot Set Spark Param: ${k}", e)
+          case e: Throwable => logger.log(Level.ERROR, s"Failed trying to set $k", e)
+        }
+      }
+    }
+  }
 
   def asDF: DataFrame = {
     try{
@@ -70,6 +92,7 @@ case class PipelineTable(
   }
 
   def writer(df: DataFrame): DataFrameWriter[Row] = {
+    setSparkOverrides()
     val f = if (config.isLocalTesting && !config.isDBConnect) "parquet" else format
     var writer = df.write.mode(mode).format(f)
     // TODO - Validate proper repartition to minimize files per partition. Could be autoOptimize

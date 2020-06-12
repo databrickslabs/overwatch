@@ -43,7 +43,11 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable("spark_events_bronze", Array("Event"), "timestamp",
       config,
       partitionBy = Array("Event"), zOrderBy = Array("clusterId", "SparkContextID"),
-      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "))
+      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
+      sparkOverrides = Map(
+        "spark.databricks.delta.properties.defaults.dataSkippingNumIndexedCols" -> "2"
+      )
+    )
     lazy private[overwatch] val cloudMachineDetail: PipelineTable = if (config.cloudProvider == "azure") {
       PipelineTable("instanceDetails", Array("API_Name"), "", config, mode = "overwrite")
     } else {

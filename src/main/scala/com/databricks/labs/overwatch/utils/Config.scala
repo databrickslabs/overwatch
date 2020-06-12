@@ -34,6 +34,7 @@ class Config() {
   private var _inputConfig: OverwatchParams = _
   private var _parsedConfig: ParsedConfig = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
+  private var _initialSparkConf: Map[String, String] = Map()
   private var _intialShuffleParts: Int = 200
 
   final private val cipher = new Cipher(cipherKey)
@@ -184,12 +185,21 @@ class Config() {
     Seq(audit, jobs, jobRuns, clusters, clusterEvents, sparkEvents, notebooks)
   }
 
+  private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
+    _initialSparkConf = value
+    this
+  }
+
+  private[overwatch] def initialSparkConf(): Map[String, String] = {
+    _initialSparkConf
+  }
+
   // Set scope for local testing
   def buildLocalOverwatchParams(): this.type = {
 
     registeredEncryptedToken(None)
     _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters, OverwatchScope.clusterEvents,
-      OverwatchScope.jobs, OverwatchScope.jobRuns, OverwatchScope.sparkEvents)
+      OverwatchScope.jobs, OverwatchScope.jobRuns)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"

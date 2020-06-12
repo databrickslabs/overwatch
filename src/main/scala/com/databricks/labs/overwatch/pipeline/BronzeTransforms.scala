@@ -259,24 +259,31 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   def generateEventLogsDF(badRecordsPath: String, eventLogsTarget: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
 
+    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 48)
     val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, eventLogsTarget)
     val dropCols = Array("ClasspathEntries", "HadoopProperties", "SparkProperties", "SystemProperties", "sparkPlanInfo")
 
-    val rawEventsDF = SchemaTools.scrubSchema(
-    spark.read.option("badRecordsPath", badRecordsPath)
-      .json(pathsGlob: _*)
+    val sparkEventsSchemaBuilderDF = SchemaTools.scrubSchema(
+      spark.read.option("badRecordsPath", badRecordsPath)
+        .json(pathsGlob: _*)
     )
-      .drop(dropCols: _*)
 
-    val ingestParts = rawEventsDF.rdd.partitions.length
-    spark.conf.set("spark.sql.shuffle.partitions", ingestParts)
+    val inferredSchema = sparkEventsSchemaBuilderDF.schema
 
-    rawEventsDF
-      .withColumn("filename", input_file_name)
-      .withColumn("pathSize", size(split('filename, "/")))
-      .withColumn("SparkContextID", split('filename, "/")('pathSize - lit(2)))
-      .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-      .drop("pathSize")
+    val ingestParts = sparkEventsSchemaBuilderDF.rdd.partitions.length
+    eventLogsTarget.setSparkOverrides(Map("spark.sql.shuffle.partitions"-> ingestParts.toString))
+    SchemaTools.scrubSchema(
+      spark.read.option("badRecordsPath", badRecordsPath)
+        .schema(inferredSchema)
+        .json(pathsGlob: _*)
+        .drop(dropCols: _*)
+        .withColumn("filename", input_file_name)
+        .withColumn("pathSize", size(split('filename, "/")))
+        .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+        .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+        .drop("pathSize")
+    )
+
   }
 
 
@@ -285,6 +292,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      isFirstRun: Boolean,
                                      scope: Seq[OverwatchScope.OverwatchScope])(df: DataFrame): DataFrame = {
     if (scope.contains(OverwatchScope.audit)) {
+      logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
+        "number of new paths.")
       val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(128))
 
       val cluster_id_gen_w = Window.partitionBy('cluster_name)
@@ -349,6 +358,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       newEventLogGlobs.tasksupport = taskSupport
 
+      logger.log(Level.INFO, s"Building Blob for ${newEventLogGlobs.length} wildcard paths.")
       val r = new Random(42L)
       newEventLogGlobs.map(glob => {
         // Sleep each thread between 0 and 60 seconds to spread the driver load to launch all the threaded readers
