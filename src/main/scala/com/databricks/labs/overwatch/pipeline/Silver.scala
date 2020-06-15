@@ -27,7 +27,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- Compare all configurations against defaults and notate non-default configs
   private lazy val sparkEventsDF: DataFrame = BronzeTargets.sparkEventLogsTarget.asDF
-    .drop("ClasspathEntries", "HadoopProperties", "SparkProperties", "SystemProperties", "SparkPlanInfo") // TODO - TEMP
     .withColumn("filenameGroup", UDF.groupFilename('filename))
 
   private var newAuditLogsDF: DataFrame = if (config.overwatchScope.contains(OverwatchScope.audit))
@@ -138,7 +137,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private val appendJobsProcess = EtlDefinition(
     sparkEventsDF,
-    Some(Seq(sparkJobs(sparkEventsDF))),
+    Some(Seq(sparkJobs())),
     append(SilverTargets.jobsTarget, newDataOnly = true),
     Module(2006, "SPARK_Jobs_Raw")
   )
@@ -221,6 +220,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
 
   def processSparkEvents: Array[ModuleStatusReport] = {
+
     Array(
 //      appendJDBCSessionsProcess.process(),
 //      appendJDBCOperationsProcess.process(),
