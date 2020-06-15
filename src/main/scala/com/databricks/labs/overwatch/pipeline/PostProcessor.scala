@@ -22,7 +22,7 @@ class PostProcessor {
 //      "cluster_events_bronze" -> "cluster_id, timestamp".split(", ")
 //    )
     // TODO -- spark_events_bronze -- put in proper rules -- hot fix due to optimization issues
-    Helpers.parOptimize(tablesInScope.toArray.filterNot(_.name == "spark_events_bronze"), 128)
+    Helpers.parOptimize(tablesInScope.toArray.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128)
     Helpers.parOptimize(tablesInScope.toArray.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 2)
   }
 

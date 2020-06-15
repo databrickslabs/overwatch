@@ -221,7 +221,7 @@ object Helpers extends SparkSessionWrapper {
 
   def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
-    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 124 * maxFileSizeMB)
+    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * maxFileSizeMB)
 
     val tablesPar = tables.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
