@@ -1,15 +1,18 @@
 package com.databricks.labs.overwatch
 
 import java.time.{LocalDateTime, ZoneId, ZoneOffset}
-import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Pipeline, Silver}
+
+import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Pipeline, Silver, SilverTransforms}
 import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
-object BatchRunner extends SparkSessionWrapper{
+object BatchRunner extends SparkSessionWrapper with SilverTransforms{
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  import spark.implicits._
   private def setGlobalDeltaOverrides(): Unit = {
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
   }
@@ -19,7 +22,7 @@ object BatchRunner extends SparkSessionWrapper{
     envInit()
     setGlobalDeltaOverrides()
 
-//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1_wildlife.jar")
+//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1.jar")
 //    sc.addFile("C:\\Dev\\git\\Databricks--Overwatch\\src\\main\\resources\\ec2_details_tbl", true)
 //    spark.sql("drop database if exists overwatch_local cascade")
 //
@@ -31,10 +34,11 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-    val config = workspace.getConfig
-    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
-      .toInstant.toEpochMilli
-    config.setPipelineSnapTime(fakeTime)
+//
+//    val config = workspace.getConfig
+//    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
+//      .toInstant.toEpochMilli
+//    config.setPipelineSnapTime(fakeTime)
 
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()

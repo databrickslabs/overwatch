@@ -7,6 +7,7 @@ import org.apache.spark.sql.functions._
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
@@ -96,111 +97,111 @@ trait BronzeTransforms extends SparkSessionWrapper {
     df
   }
 
-//  Removed module, too expensive
-//  // TODO -- get from audit
-//  // TODO -- add assertion that df count == total count from API CALL
-//  protected def prepJobRunsDF(apiEnv: ApiEnv, isFirstRun: Boolean): DataFrame = {
-//    if (isFirstRun) println("As this is your first run, the job runs will be gathered as quickly as possible. " +
-//      "This is done via the API and thus needs to be loaded at a safe pace so as not to exceed the limits. " +
-//      "If you feel the job is stuck, look at the log4j output in driver logs, you'll notice the runIDs should be " +
-//      "steadily increasing. This may take some time.")
-//    val extraQuery = Map("completed_only" -> true)
-//    val jobRuns = apiByID("jobs/runs/list", apiEnv,
-//      "get", jobIDs, "job_id", Some(extraQuery))
-//
-//    if (newDataRetrieved) {
-//      // TODO -- add filter to remove runs before fromTS
-//      spark.read.json(Seq(jobRuns: _*).toDS()).select(explode('runs).alias("runs"))
-//        .select(col("runs.*"))
-//    } else jobRuns.toSeq.toDF("FAILURE")
-//  }
+  //  Removed module, too expensive
+  //  // TODO -- get from audit
+  //  // TODO -- add assertion that df count == total count from API CALL
+  //  protected def prepJobRunsDF(apiEnv: ApiEnv, isFirstRun: Boolean): DataFrame = {
+  //    if (isFirstRun) println("As this is your first run, the job runs will be gathered as quickly as possible. " +
+  //      "This is done via the API and thus needs to be loaded at a safe pace so as not to exceed the limits. " +
+  //      "If you feel the job is stuck, look at the log4j output in driver logs, you'll notice the runIDs should be " +
+  //      "steadily increasing. This may take some time.")
+  //    val extraQuery = Map("completed_only" -> true)
+  //    val jobRuns = apiByID("jobs/runs/list", apiEnv,
+  //      "get", jobIDs, "job_id", Some(extraQuery))
+  //
+  //    if (newDataRetrieved) {
+  //      // TODO -- add filter to remove runs before fromTS
+  //      spark.read.json(Seq(jobRuns: _*).toDS()).select(explode('runs).alias("runs"))
+  //        .select(col("runs.*"))
+  //    } else jobRuns.toSeq.toDF("FAILURE")
+  //  }
 
-//  Removed module, too expensive
-//  protected def getNewJobRuns(apiEnv: ApiEnv, fromTimeCol: TimeTypes,
-//                              snapTime: TimeTypes, isFirstRun: Boolean)(df: DataFrame): DataFrame = {
-//
-//    val runIDs = df
-//      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
-//      .filter('actionName.isin("runSucceeded", "runFailed"))
-//      .filter('date >= date_sub(current_timestamp().cast("date"), 61) &&
-//        'date >= fromTimeCol.asColumnTS.cast("date"))
-//
-//    val runIDsInScope = runIDs.count()
-//    println(s"Total RunIDs In Scope: ${runIDsInScope}")
-//
-//    if (runIDsInScope > 0) {
-//      // get last 1500
-//      val avgRunsPerDay = runIDs
-//        .filter('date >= date_sub('date, 30))
-//        .groupBy('date)
-//        .count
-//        .select(avg('count).cast("int").alias("avgRunsPerDay"))
-//        .withColumn("avgRunsPerDay", when('avgRunsPerDay.isNull, 0).otherwise('avgRunsPerDay))
-//        .as[Int].collect().head
-//
-//      val daysToAppend = runIDs
-//        .select(
-//          datediff(snapTime.asColumnTS.cast("date"), min('date)).cast("int").alias("daysToAppend")
-//        )
-//        .withColumn("daysToAppend", when('daysToAppend.isNull, 0).otherwise('daysToAppend))
-//        .as[Int].collect().head
-//
-//
-//      // approx new runs with stddev of 2
-//      val approxNewRuns = avgRunsPerDay * daysToAppend + (avgRunsPerDay * 2)
-//
-//      val parallelism = 24
-//      val batchSize = math.ceil(approxNewRuns / parallelism).toInt
-//
-//      println(s"Approx New Job Runs: ${approxNewRuns}\nApprox Batchsize: ${batchSize}")
-//      val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-//      val batches = (0 to parallelism).toArray.par
-//      batches.tasksupport = taskSupport
-//      val jobRuns = batches.flatMap(batch => {
-//        val batchOffsetStart = batch * batchSize
-//        val batchQuery: Map[String, Any] = Map(
-//          "offset" -> batchOffsetStart,
-//          "completed_only" -> true,
-//          "limit" -> 150
-//        )
-//
-//        val batchRuns = ApiCall("jobs/runs/list", apiEnv, Some(batchQuery), maxResults = batchSize)
-//          .executeGet().asStrings
-//        println(s"Completed Batch: ${batchOffsetStart} -> ${batchOffsetStart + batchSize}")
-//        batchRuns
-//      }).toArray
-//
-//      spark.read.json(Seq(jobRuns: _*).toDS())
-//        .select(explode('runs).alias("runs")).select("runs.*").drop("task")
-//        .withColumn("rnk", rank().over(Window.partitionBy('job_id, 'run_id).orderBy('start_time.desc)))
-//        .filter('rnk === 1)
-//        .drop("rnk")
-//        .filter('start_time <= snapTime.asUnixTimeMilli)
-//
-//
-//      //    // TODO -- see if this is necessary and if so, find better way to handle
-//      //    val outstandingRunIDs = runIDs.select('runId.alias("run_id"))
-//      //      .except(jobRunsDF.select('run_id))
-//      //
-//      //    val DEBUGX = outstandingRunIDs.count
-//      //
-//      //    val finalRunsDF = if (outstandingRunIDs.count() > 0) {
-//      //      val remainingRunIds = outstandingRunIDs.select('runId.cast("int")).distinct().as[Int].collect()
-//      //      val remainingRuns = apiByID("jobs/runs/get", apiEnv,
-//      //        "get", remainingRunIds, "run_id", None)
-//      //
-//      //      // TODO -- add filter to remove runs before fromTS
-//      //      jobRuns.unionByName(spark.read.json(Seq(remainingRuns: _*).toDS()))
-//      //
-//      //    } else {
-//      //      jobRuns
-//      //    }.withColumn("rnk", rank().over(Window.partitionBy('job_id, 'run_id).orderBy('start_time.desc)))
-//      //      .filter('rnk === 1)
-//      //      .drop("rnk")
-//      //      .filter('start_time <= snapTime.asUnixTimeMilli)
-//
-//    } else Array("NoJobRuns").toSeq.toDF("FAILURE")
-//  }
+  //  Removed module, too expensive
+  //  protected def getNewJobRuns(apiEnv: ApiEnv, fromTimeCol: TimeTypes,
+  //                              snapTime: TimeTypes, isFirstRun: Boolean)(df: DataFrame): DataFrame = {
+  //
+  //    val runIDs = df
+  //      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+  //      .filter('actionName.isin("runSucceeded", "runFailed"))
+  //      .filter('date >= date_sub(current_timestamp().cast("date"), 61) &&
+  //        'date >= fromTimeCol.asColumnTS.cast("date"))
+  //
+  //    val runIDsInScope = runIDs.count()
+  //    println(s"Total RunIDs In Scope: ${runIDsInScope}")
+  //
+  //    if (runIDsInScope > 0) {
+  //      // get last 1500
+  //      val avgRunsPerDay = runIDs
+  //        .filter('date >= date_sub('date, 30))
+  //        .groupBy('date)
+  //        .count
+  //        .select(avg('count).cast("int").alias("avgRunsPerDay"))
+  //        .withColumn("avgRunsPerDay", when('avgRunsPerDay.isNull, 0).otherwise('avgRunsPerDay))
+  //        .as[Int].collect().head
+  //
+  //      val daysToAppend = runIDs
+  //        .select(
+  //          datediff(snapTime.asColumnTS.cast("date"), min('date)).cast("int").alias("daysToAppend")
+  //        )
+  //        .withColumn("daysToAppend", when('daysToAppend.isNull, 0).otherwise('daysToAppend))
+  //        .as[Int].collect().head
+  //
+  //
+  //      // approx new runs with stddev of 2
+  //      val approxNewRuns = avgRunsPerDay * daysToAppend + (avgRunsPerDay * 2)
+  //
+  //      val parallelism = 24
+  //      val batchSize = math.ceil(approxNewRuns / parallelism).toInt
+  //
+  //      println(s"Approx New Job Runs: ${approxNewRuns}\nApprox Batchsize: ${batchSize}")
+  //      val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+  //      val batches = (0 to parallelism).toArray.par
+  //      batches.tasksupport = taskSupport
+  //      val jobRuns = batches.flatMap(batch => {
+  //        val batchOffsetStart = batch * batchSize
+  //        val batchQuery: Map[String, Any] = Map(
+  //          "offset" -> batchOffsetStart,
+  //          "completed_only" -> true,
+  //          "limit" -> 150
+  //        )
+  //
+  //        val batchRuns = ApiCall("jobs/runs/list", apiEnv, Some(batchQuery), maxResults = batchSize)
+  //          .executeGet().asStrings
+  //        println(s"Completed Batch: ${batchOffsetStart} -> ${batchOffsetStart + batchSize}")
+  //        batchRuns
+  //      }).toArray
+  //
+  //      spark.read.json(Seq(jobRuns: _*).toDS())
+  //        .select(explode('runs).alias("runs")).select("runs.*").drop("task")
+  //        .withColumn("rnk", rank().over(Window.partitionBy('job_id, 'run_id).orderBy('start_time.desc)))
+  //        .filter('rnk === 1)
+  //        .drop("rnk")
+  //        .filter('start_time <= snapTime.asUnixTimeMilli)
+  //
+  //
+  //      //    // TODO -- see if this is necessary and if so, find better way to handle
+  //      //    val outstandingRunIDs = runIDs.select('runId.alias("run_id"))
+  //      //      .except(jobRunsDF.select('run_id))
+  //      //
+  //      //    val DEBUGX = outstandingRunIDs.count
+  //      //
+  //      //    val finalRunsDF = if (outstandingRunIDs.count() > 0) {
+  //      //      val remainingRunIds = outstandingRunIDs.select('runId.cast("int")).distinct().as[Int].collect()
+  //      //      val remainingRuns = apiByID("jobs/runs/get", apiEnv,
+  //      //        "get", remainingRunIds, "run_id", None)
+  //      //
+  //      //      // TODO -- add filter to remove runs before fromTS
+  //      //      jobRuns.unionByName(spark.read.json(Seq(remainingRuns: _*).toDS()))
+  //      //
+  //      //    } else {
+  //      //      jobRuns
+  //      //    }.withColumn("rnk", rank().over(Window.partitionBy('job_id, 'run_id).orderBy('start_time.desc)))
+  //      //      .filter('rnk === 1)
+  //      //      .drop("rnk")
+  //      //      .filter('start_time <= snapTime.asUnixTimeMilli)
+  //
+  //    } else Array("NoJobRuns").toSeq.toDF("FAILURE")
+  //  }
 
   protected def collectClusterIDs()(df: DataFrame): DataFrame = {
     if (clusterIDs.isEmpty) setClusterIDs(df.select('cluster_id).distinct().as[String].collect())
@@ -261,29 +262,26 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 48)
     val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, eventLogsTarget)
-    val dropCols = Array("ClasspathEntries", "HadoopProperties", "SparkProperties", "SystemProperties", "sparkPlanInfo")
+    val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
+      "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id")
 
-    val sparkEventsSchemaBuilderDF = SchemaTools.scrubSchema(
+    val baseEventsDF = SchemaTools.scrubSchema(
       spark.read.option("badRecordsPath", badRecordsPath)
-        .json(pathsGlob: _*)
-    )
-
-    val inferredSchema = sparkEventsSchemaBuilderDF.schema
-
-    val ingestParts = sparkEventsSchemaBuilderDF.rdd.partitions.length
-    eventLogsTarget.setSparkOverrides(Map("spark.sql.shuffle.partitions"-> ingestParts.toString))
-    SchemaTools.scrubSchema(
-      spark.read.option("badRecordsPath", badRecordsPath)
-        .schema(inferredSchema)
         .json(pathsGlob: _*)
         .drop(dropCols: _*)
-        .withColumn("filename", input_file_name)
-        .withColumn("pathSize", size(split('filename, "/")))
-        .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-        .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-        .drop("pathSize")
     )
 
+    baseEventsDF
+      .withColumn("filename", input_file_name)
+      .withColumn("pathSize", size(split('filename, "/")))
+      .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+      .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+      .drop("pathSize")
+  }
+
+  def saveAndLoadTempEvents(database: Database, tempTarget: PipelineTable)(df: DataFrame): DataFrame = {
+    database.write(df, tempTarget)
+    tempTarget.asDF
   }
 
 
@@ -303,18 +301,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
       // Lookup null cluster_ids
       val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
 
+      val clusterIDsWithNewData = df
+        .filter('date >= fromTimeCol.cast("date"))
+        .selectExpr("*", "requestParams.*")
+        .filter('serviceName === "clusters" && 'cluster_id.isNotNull)
+        .select('cluster_id).distinct
+
       val newEventLogPrefixes = if (isFirstRun) {
         df
           .filter('date >= fromTimeCol.cast("date")) //Partition filter
           .selectExpr("*", "requestParams.*")
           .filter('serviceName === "clusters")
+          .join(clusterIDsWithNewData, Seq("cluster_id"))
+          .filter('cluster_log_conf.isNotNull)
       } else {
-
-        val clusterIDsWithNewData = df
-          .filter('date >= fromTimeCol.cast("date"))
-          .selectExpr("*", "requestParams.*")
-          .filter('serviceName === "clusters" && 'cluster_id.isNotNull)
-          .select('cluster_id).distinct
 
         val historicalClustersWithNewData = clusterSpec.asDF
           .withColumn("date", from_unixtime('timestamp.cast("double") / 1000).cast("date"))
@@ -333,6 +333,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .unionByName(historicalClustersWithNewData)
 
         val existingLogPrefixes = clusterSpec.asDF
+          .filter('cluster_id.isNotNull)
           .withColumn("date", from_unixtime('timestamp.cast("double") / 1000).cast("date"))
           .filter('cluster_log_conf.isNotNull && 'actionName.isin("create", "edit"))
           .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)

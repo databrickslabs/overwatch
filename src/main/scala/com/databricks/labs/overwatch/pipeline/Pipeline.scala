@@ -52,7 +52,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
   import spark.implicits._
 
   protected def finalizeRun(reports: Array[ModuleStatusReport]): Unit = {
-    println(s"Writing Pipeline Report for modules: ${reports.map(_.moduleID).mkString(",")}")
+    println(s"Writing Pipeline Report for modules: ${reports.map(_.moduleID).sorted.mkString(",")}")
     val pipelineReportTarget = PipelineTable("pipeline_report", Array("Overwatch_RunID"), "Pipeline_SnapTS", config)
     database.write(reports.toSeq.toDF, pipelineReportTarget)
     initiatePostProcessing()
@@ -197,9 +197,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
       }
 
-      //    DEBUG
-      //    println("DEBUG: DF AFTER TS Filter")
-      //    finalDF.show(20, false)
+//          DEBUG
+//          println("DEBUG: DF AFTER TS Filter")
+//      println(s"OUTPUT for ${target.tableFullName}")
+//      finalDF.show(10, false)
 
       val startLogMsg = if (newDataOnly) {
         s"Beginning append to ${target.tableFullName}. " +

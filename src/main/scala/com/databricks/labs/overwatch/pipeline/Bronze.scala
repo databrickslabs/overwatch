@@ -99,7 +99,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.isFirstRun,
         config.overwatchScope
       ),
-      generateEventLogsDF(config.badRecordsPath, BronzeTargets.sparkEventLogsTarget)
+      generateEventLogsDF(config.badRecordsPath, BronzeTargets.sparkEventLogsTarget),
+      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget)
     )),
     append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic
     sparkEventLogsModule
@@ -159,6 +160,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
       if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
         reports.append(appendSparkEventLogsProcess.process())
+        // TODO -- Temporary until refactor
+        spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+        spark.sql(s"truncate table ${BronzeTargets.sparkEventLogsTempTarget.tableFullName}")
+        spark.sql(s"VACUUM ${BronzeTargets.sparkEventLogsTempTarget.tableFullName} RETAIN 0 HOURS")
+        spark.sql(s"drop table if exists ${BronzeTargets.sparkEventLogsTempTarget.tableFullName}")
+        spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
       }
       //      if (config.overwatchScope.contains(OverwatchScope.pools)) reports.append(appendPoolsProcess.process())
     } else {

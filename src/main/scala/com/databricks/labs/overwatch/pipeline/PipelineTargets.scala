@@ -40,14 +40,17 @@ abstract class PipelineTargets(config: Config) {
       Array("cluster_id", "timestamp"), "timestamp",
       config,
       statsColumns = ("cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID").split(", "))
+    lazy private[overwatch] val sparkEventLogsTempTarget: PipelineTable = PipelineTable("spark_events_temp_raw", Array("Event"), "time",
+      config, mode = "overwrite", withCreateDate = false, withOverwatchRunID = false, isTemp = true
+    )
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable("spark_events_bronze", Array("Event"), "timestamp",
       config,
       partitionBy = Array("Event"), zOrderBy = Array("clusterId", "SparkContextID"),
-      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
-      sparkOverrides = Map(
-        "spark.databricks.delta.properties.defaults.dataSkippingNumIndexedCols" -> "2",
-        "spark.databricks.delta.optimize.maxFileSize" -> (1024 * 1024 * 2).toString
-      )
+      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", ") //,
+//      sparkOverrides = Map(
+//        "spark.databricks.delta.properties.defaults.dataSkippingNumIndexedCols" -> "2",
+//        "spark.databricks.delta.optimize.maxFileSize" -> (1024 * 1024 * 2).toString
+//      )
     )
     lazy private[overwatch] val cloudMachineDetail: PipelineTable = if (config.cloudProvider == "azure") {
       PipelineTable("instanceDetails", Array("API_Name"), "", config, mode = "overwrite")
