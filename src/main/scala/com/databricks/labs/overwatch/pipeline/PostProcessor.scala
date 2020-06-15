@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, Helpers}
+import com.databricks.labs.overwatch.utils.{Helpers}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -21,12 +21,14 @@ class PostProcessor {
 //      "jobruns_bronze" -> ("job_id, run_id, start_time").split(", "),
 //      "cluster_events_bronze" -> "cluster_id, timestamp".split(", ")
 //    )
-    Helpers.parOptimize(tablesInScope.toArray)
+    // TODO -- spark_events_bronze -- put in proper rules -- hot fix due to optimization issues
+    Helpers.parOptimize(tablesInScope.toArray.filterNot(_.name == "spark_events_bronze"), 128)
+    Helpers.parOptimize(tablesInScope.toArray.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 2)
   }
 
-  // TODO -- add for columns
+  // TODO -- add for columns -- might not be necessary with delta
   def analyze(): Unit = {
-    Helpers.parOptimize(tablesInScope.toArray)
+//    Helpers.parOptimize(tablesInScope.toArray)
 //    val forColumnsByTable: Map[String, Array[String]] = Map(
 //      "spark_events_bronze" -> "SparkContextID, ClusterID, JobGroupID, ExecutionID".split(", "),
 //      "audit_log_bronze" -> ("actionName, requestId, serviceName, sessionId, " +

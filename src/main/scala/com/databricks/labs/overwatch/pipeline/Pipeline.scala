@@ -59,7 +59,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
   }
 
   protected def initiatePostProcessing(): Unit = {
-    postProcessor.analyze()
+//    postProcessor.analyze()
     postProcessor.optimize()
   }
 

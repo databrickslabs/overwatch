@@ -219,9 +219,10 @@ object Helpers extends SparkSessionWrapper {
     })
   }
 
-  def parOptimize(tables: Array[PipelineTable]): Unit = {
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 124 * maxFileSizeMB)
 
-    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 256)
     val tablesPar = tables.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     tablesPar.tasksupport = taskSupport
@@ -233,16 +234,15 @@ object Helpers extends SparkSessionWrapper {
         println(s"optimizing: ${tbl.tableFullName} --> $sql")
         spark.sql(sql)
         if (tbl.vacuum > 0) {
-          spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
           println(s"vacuuming: ${tbl.tableFullName}, Retention == ${tbl.vacuum}")
           spark.sql(s"VACUUM ${tbl.tableFullName} RETAIN ${tbl.vacuum} HOURS")
-          spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
         }
         println(s"Complete: ${tbl.tableFullName}")
       } catch {
         case e: Throwable => println(e.printStackTrace())
       }
     })
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
   }
 
   def parOptimizeTables(tables: Array[String],

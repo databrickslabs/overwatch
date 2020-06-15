@@ -45,7 +45,8 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Array("Event"), zOrderBy = Array("clusterId", "SparkContextID"),
       statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
       sparkOverrides = Map(
-        "spark.databricks.delta.properties.defaults.dataSkippingNumIndexedCols" -> "2"
+        "spark.databricks.delta.properties.defaults.dataSkippingNumIndexedCols" -> "2",
+        "spark.databricks.delta.optimize.maxFileSize" -> (1024 * 1024 * 2).toString
       )
     )
     lazy private[overwatch] val cloudMachineDetail: PipelineTable = if (config.cloudProvider == "azure") {

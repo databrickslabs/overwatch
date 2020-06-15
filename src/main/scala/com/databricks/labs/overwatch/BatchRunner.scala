@@ -10,10 +10,14 @@ object BatchRunner extends SparkSessionWrapper{
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  private def setGlobalDeltaOverrides(): Unit = {
+    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
+  }
+
   def main(args: Array[String]): Unit = {
 
-
     envInit()
+    setGlobalDeltaOverrides()
 
 //    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1_wildlife.jar")
 //    sc.addFile("C:\\Dev\\git\\Databricks--Overwatch\\src\\main\\resources\\ec2_details_tbl", true)
@@ -27,7 +31,7 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-    val config = workspace.getConfig
+//    val config = workspace.getConfig
 //    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
 //      .toInstant.toEpochMilli
 //    config.setPipelineSnapTime(fakeTime)
