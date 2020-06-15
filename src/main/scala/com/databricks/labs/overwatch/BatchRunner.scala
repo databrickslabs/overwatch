@@ -31,7 +31,7 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-//    val config = workspace.getConfig
+    val config = workspace.getConfig
 //    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
 //      .toInstant.toEpochMilli
 //    config.setPipelineSnapTime(fakeTime)
