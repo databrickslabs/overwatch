@@ -1,10 +1,8 @@
 package com.databricks.labs.overwatch
 
-import java.time.{LocalDateTime, ZoneId, ZoneOffset}
-import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Pipeline, Silver}
-import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Silver}
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions._
 
 object BatchRunner extends SparkSessionWrapper{
 
@@ -31,17 +29,17 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-//    val config = workspace.getConfig
+    val config = workspace.getConfig
 //    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
 //      .toInstant.toEpochMilli
 //    config.setPipelineSnapTime(fakeTime)
 
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
-//    if (config.isFirstRun) {
-//      spark.read.format("delta").load("/tmp/overwatch/aws_ec2_details_raw")
-//        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
-//    }
+    if (config.isFirstRun) {
+      spark.table("overwatch_snap.aws_ec2_details")
+        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
+    }
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
 
