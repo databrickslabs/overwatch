@@ -30,7 +30,8 @@ case class PipelineTable(
                           enableSchemaMerge: Boolean = true,
                           sparkOverrides: Map[String, String] = Map[String, String](),
                           withCreateDate: Boolean = true,
-                          withOverwatchRunID: Boolean = true
+                          withOverwatchRunID: Boolean = true,
+                          isTemp: Boolean = false
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
