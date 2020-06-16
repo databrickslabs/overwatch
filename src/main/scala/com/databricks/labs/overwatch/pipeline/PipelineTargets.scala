@@ -52,12 +52,18 @@ abstract class PipelineTargets(config: Config) {
 //        "spark.databricks.delta.optimize.maxFileSize" -> (1024 * 1024 * 2).toString
 //      )
     )
+    lazy private[overwatch] val processedEventLogs: PipelineTable = PipelineTable("spark_events_processedFiles",
+      Array("filename"), "Pipeline_SnapTS",
+      config
+    )
+
     lazy private[overwatch] val cloudMachineDetail: PipelineTable = if (config.cloudProvider == "azure") {
       PipelineTable("instanceDetails", Array("API_Name"), "", config, mode = "overwrite")
     } else {
       // TODO -- implement for azure
       PipelineTable("instanceDetails", Array("API_Name"), "", config, mode = "overwrite")
     }
+
   }
 
 
