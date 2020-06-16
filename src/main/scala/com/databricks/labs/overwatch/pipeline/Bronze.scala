@@ -99,7 +99,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.isFirstRun,
         config.overwatchScope
       ),
-      generateEventLogsDF(config.badRecordsPath, BronzeTargets.sparkEventLogsTarget),
+      generateEventLogsDF(database, config.badRecordsPath, BronzeTargets.processedEventLogs),
       saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget)
     )),
     append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic
