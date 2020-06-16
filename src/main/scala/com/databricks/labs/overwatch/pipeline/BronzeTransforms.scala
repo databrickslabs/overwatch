@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.{OverwatchScope, SparkSessionWrapper}
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.sql.functions._
 
 import scala.collection.parallel.ForkJoinTaskSupport
@@ -9,8 +9,10 @@ import scala.concurrent.forkjoin.ForkJoinPool
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils._
+import org.apache.avro.generic.GenericData.StringType
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.types.{StructField, StructType}
 
 import scala.util.Random
 
@@ -240,17 +242,23 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  private def appendNewFilesToTracker(database: Database,
+                                      newFiles: Array[String],
+                                      trackerTarget: PipelineTable): Unit = {
+    database.write(newFiles.toSeq.toDF("filename"), trackerTarget)
+  }
+
   // Todo -- Put back to private
-  def getUniqueSparkEventsFiles(badRecordsPath: String,
+  private def getUniqueSparkEventsFiles(badRecordsPath: String,
                                 eventLogsDF: DataFrame,
-                                eventLogsTarget: PipelineTable): Array[String] = {
-    if (spark.catalog.tableExists(eventLogsTarget.tableFullName)) {
-      val existingFiles = eventLogsTarget.asDF.select('filename)
+                                processedLogFiles: PipelineTable): Array[String] = {
+    if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
+      val alreadyProcessed = processedLogFiles.asDF.select('filename)
         .distinct
       val badFiles = spark.read.format("json").load(s"${badRecordsPath}/*/*/")
         .select('path.alias("filename"))
         .distinct
-      eventLogsDF.except(existingFiles.unionByName(badFiles)).as[String].collect()
+      eventLogsDF.except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
     } else {
       eventLogsDF.select('filename)
         .distinct.as[String].collect()
@@ -258,25 +266,43 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
 
-  def generateEventLogsDF(badRecordsPath: String, eventLogsTarget: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
+  def generateEventLogsDF(database: Database,
+                          badRecordsPath: String,
+                          processedLogFiles: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
 
-    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 48)
-    val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, eventLogsTarget)
+    val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
+    appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
     val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
       "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id")
 
-    val baseEventsDF = SchemaTools.scrubSchema(
+    val baseEventsDF =
       spark.read.option("badRecordsPath", badRecordsPath)
         .json(pathsGlob: _*)
         .drop(dropCols: _*)
-    )
 
-    baseEventsDF
-      .withColumn("filename", input_file_name)
-      .withColumn("pathSize", size(split('filename, "/")))
-      .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-      .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-      .drop("pathSize")
+    // Temporary Solution for Speculative Tasks bad Schema - SC-38615
+    val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("Stage ID")) {
+      when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
+    } else 'StageID
+
+    if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
+      SchemaTools.scrubSchema(baseEventsDF
+        .withColumn("filename", input_file_name)
+        .withColumn("pathSize", size(split('filename, "/")))
+        .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+        .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+        .withColumn("StageID", stageIDColumnOverride)
+        .drop("pathSize", "Stage ID")
+      )
+    } else {
+      SchemaTools.scrubSchema(baseEventsDF
+        .withColumn("filename", input_file_name)
+        .withColumn("pathSize", size(split('filename, "/")))
+        .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+        .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+        .drop("pathSize")
+      )
+    }
   }
 
   def saveAndLoadTempEvents(database: Database, tempTarget: PipelineTable)(df: DataFrame): DataFrame = {
@@ -289,6 +315,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      clusterSpec: PipelineTable,
                                      isFirstRun: Boolean,
                                      scope: Seq[OverwatchScope.OverwatchScope])(df: DataFrame): DataFrame = {
+
+    // GZ files -- very compressed, need to get as much parallelism as possible
+    if (isFirstRun) spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 48)
+    else spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 1)
+
     if (scope.contains(OverwatchScope.audit)) {
       logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
         "number of new paths.")

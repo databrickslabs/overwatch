@@ -199,7 +199,7 @@ class Config() {
 
     registeredEncryptedToken(None)
     _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters,
-      OverwatchScope.jobs, OverwatchScope.jobRuns, OverwatchScope.sparkEvents)
+      OverwatchScope.jobs, OverwatchScope.jobRuns)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"

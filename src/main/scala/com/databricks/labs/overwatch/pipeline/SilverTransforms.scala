@@ -330,6 +330,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("startTimestamp", $"StageRunTime.startEpochMS")
   }
 
+  // TODO -- Add in Specualtive Tasks Event == org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted
   protected def simplifyTaskStart(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerTaskStart")
       .select('clusterId, 'SparkContextID,

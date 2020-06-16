@@ -82,10 +82,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   // TODO - make this timeframe configurable by module
   private def needsOptimize(moduleID: Int): Boolean = {
+    // TODO -- Don't use 7 days -- use optimizeFrequency in PipelineTable
     val WEEK = 1000L * 60L * 60L * 24L * 7L // week of milliseconds
     val tsLessSevenD = System.currentTimeMillis() - WEEK.toLong
-    if ((getLastOptimized(moduleID) < tsLessSevenD ||
-      config.isFirstRun) && !config.isLocalTesting) true
+    if ((getLastOptimized(moduleID) < tsLessSevenD || config.isFirstRun) && !config.isLocalTesting) true
     else false
   }
 
