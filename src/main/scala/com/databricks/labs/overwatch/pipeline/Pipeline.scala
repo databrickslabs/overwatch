@@ -120,7 +120,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
     partFields.map(partField => {
       partField.dataType match {
         case _: DateType =>
-          col(partField.name) >= fromTime.cast(DateType)
+          col(partField.name) > fromTime.cast(DateType)
       }
     }).head // TODO -- handle more than one partition filter
 
@@ -158,6 +158,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       var untilTS: Long = 0L
       var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
       val fromTime = config.fromTime(module.moduleID)
+      var updateProcessedFlag: Boolean = false
 
       finalDF = if (target.zOrderBy.nonEmpty) {
         SchemaTools.moveColumnsToFront(finalDF, target.zOrderBy)
@@ -182,6 +183,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
           case LongType => col(target.incrementalColumn)
             .between(fromTS + 1, untilTS)
           case DoubleType => col(target.incrementalColumn).between(fromTS + .001, untilTS)
+          case StringType => {
+            updateProcessedFlag = true
+            col(target.incrementalColumn) =!= "Processed"
+          }
           case e: DataType => // TODO -- add this back and handle other incremental types
             //          col(target.incrementalFromColumn)
             throw new IllegalArgumentException(s"IncreasingID Type: ${e.typeName} is Not supported")
@@ -191,14 +196,16 @@ class Pipeline(_workspace: Workspace, _database: Database,
           .filter(timeFilter)
 
         if (target.partitionBy.nonEmpty) {
-          val partitionFilter = buildIncrementalPartitionFilter(finalDF.schema, target, fromTime.asColumnTS)
-          finalDF = finalDF.filter(partitionFilter)
+          if (target.partitionBy.contains(target.incrementalColumn)) {
+            val partitionFilter = buildIncrementalPartitionFilter(finalDF.schema, target, fromTime.asColumnTS)
+            finalDF = finalDF.filter(partitionFilter)
+          }
         }
 
       }
 
 //          DEBUG
-//          println("DEBUG: DF AFTER TS Filter")
+//      println("DEBUG: DF AFTER TS Filter")
 //      println(s"OUTPUT for ${target.tableFullName}")
 //      finalDF.show(10, false)
 
@@ -209,9 +216,16 @@ class Pipeline(_workspace: Workspace, _database: Database,
       } else s"Beginning append to ${target.tableFullName}"
       logger.log(Level.INFO, startLogMsg)
 
+      val shufflePartsPrior = spark.conf.get("spark.sql.shuffle.partitions")
+      val finalDFPartCount = finalDF.rdd.partitions.length
+      val estimatedFinalDFSizeMB = finalDFPartCount * spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
+      val targetShuffleSize = math.max(200, finalDFPartCount)
+      logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
+        s"\nShufflePartitions: ${targetShuffleSize}")
+      spark.conf.set("spark.sql.shuffle.partitions", targetShuffleSize)
       val startTime = System.currentTimeMillis()
       _database.write(finalDF, target)
-      val debugCount = if (!config.isFirstRun) {
+      val debugCount = if (!config.isFirstRun || config.debugFlag) {
         val dfCount = finalDF.count()
         val msg = s"${module.moduleName} SUCCESS! ${dfCount} records appended."
         println(msg)
@@ -221,6 +235,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         logger.log(Level.INFO, "Counts not calculated on first run.")
         0
       }
+      spark.conf.set("spark.sql.shuffle.partitions", shufflePartsPrior)
 
       if (needsOptimize(module.moduleID)) {
         postProcessor.add(target)

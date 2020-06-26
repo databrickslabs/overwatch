@@ -300,4 +300,12 @@ object Helpers extends SparkSessionWrapper {
     })
   }
 
+  private[overwatch] def fastDrop(fullTableName: String): Unit = {
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+    spark.sql(s"truncate table ${fullTableName}")
+    spark.sql(s"VACUUM ${fullTableName} RETAIN 0 HOURS")
+    spark.sql(s"drop table if exists ${fullTableName}")
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+  }
+
 }

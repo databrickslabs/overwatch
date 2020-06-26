@@ -101,7 +101,7 @@ class Config() {
     this
   }
 
-  private[overwatch] def setDebugFlag(value: Boolean): this.type = {
+  def setDebugFlag(value: Boolean): this.type = {
     _debugFlag = value
     this
   }
@@ -199,7 +199,7 @@ class Config() {
 
     registeredEncryptedToken(None)
     _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters,
-      OverwatchScope.jobs, OverwatchScope.jobRuns)
+      OverwatchScope.sparkEvents)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
