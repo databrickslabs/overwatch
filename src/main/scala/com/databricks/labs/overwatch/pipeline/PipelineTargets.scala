@@ -43,9 +43,10 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val sparkEventLogsTempTarget: PipelineTable = PipelineTable("spark_events_temp_raw", Array("Event"), "time",
       config, mode = "overwrite", withCreateDate = false, withOverwatchRunID = false, isTemp = true
     )
-    lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable("spark_events_bronze", Array("Event"), "timestamp",
+    lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable("spark_events_bronze", Array("Event"),
+      "Pipeline_SnapTS", // Holder until refactor
       config,
-      partitionBy = Array("Event"), zOrderBy = Array("clusterId", "SparkContextID"),
+      partitionBy = Array("Event", "Downstream_Processed"), zOrderBy = Array("clusterId", "SparkContextID"),
       statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", ") //,
 //      sparkOverrides = Map(
 //        "spark.databricks.delta.properties.defaults.dataSkippingNumIndexedCols" -> "2",

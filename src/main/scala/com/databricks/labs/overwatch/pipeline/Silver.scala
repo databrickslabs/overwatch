@@ -27,6 +27,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- Compare all configurations against defaults and notate non-default configs
   private lazy val sparkEventsDF: DataFrame = BronzeTargets.sparkEventLogsTarget.asDF
+    .filter('Downstream_Processed === lit(false))
     .withColumn("filenameGroup", UDF.groupFilename('filename))
 
   private var newAuditLogsDF: DataFrame = if (config.overwatchScope.contains(OverwatchScope.audit))
@@ -218,10 +219,20 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     Module(2018, "Silver_Notebooks")
   )
 
+  // TODO -- temp until refactor
+  private def updateSparkEventsPipelineState(eventLogsBronze: PipelineTable): Unit = {
+    val updateSql =
+      s"""
+        |update ${eventLogsBronze.tableFullName}
+        |set Downstream_Processed = true
+        |where Downstream_Processed = false
+        |""".stripMargin
+    spark.sql(updateSql)
+  }
 
-  def processSparkEvents: Array[ModuleStatusReport] = {
+  private def processSparkEvents: Array[ModuleStatusReport] = {
 
-    Array(
+    val sparkEventsSilverReports = Array(
 //      appendJDBCSessionsProcess.process(),
 //      appendJDBCOperationsProcess.process(),
       appendExecutorsProcess.process(),
@@ -231,6 +242,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       appendStagesProcess.process(),
       appendTasksProcess.process()
     )
+    updateSparkEventsPipelineState(BronzeTargets.sparkEventLogsTarget)
+
+    sparkEventsSilverReports
   }
 
   def run(): Boolean = {

@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import java.io.{File, PrintWriter, StringWriter}
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
@@ -161,11 +161,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
         reports.append(appendSparkEventLogsProcess.process())
         // TODO -- Temporary until refactor
-        spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
-        spark.sql(s"truncate table ${BronzeTargets.sparkEventLogsTempTarget.tableFullName}")
-        spark.sql(s"VACUUM ${BronzeTargets.sparkEventLogsTempTarget.tableFullName} RETAIN 0 HOURS")
-        spark.sql(s"drop table if exists ${BronzeTargets.sparkEventLogsTempTarget.tableFullName}")
-        spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+        Helpers.fastDrop(BronzeTargets.sparkEventLogsTempTarget.tableFullName)
       }
       //      if (config.overwatchScope.contains(OverwatchScope.pools)) reports.append(appendPoolsProcess.process())
     } else {

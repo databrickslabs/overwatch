@@ -28,7 +28,6 @@ trait SparkSessionWrapper extends Serializable {
   }
 
   lazy val sc: SparkContext = spark.sparkContext
-  if (System.getenv("OVERWATCH") == "LOCAL") sc.setLogLevel("WARN") else sc.setLogLevel("INFO")
 //  sc.setLogLevel("DEBUG")
 
   private var _coresPerWorker: Int = _
@@ -75,7 +74,8 @@ trait SparkSessionWrapper extends Serializable {
 
   def getDriverCores: Int = driverCores
 
-  def envInit(): Boolean = {
+  def envInit(logLevel: String = "INFO"): Boolean = {
+    sc.setLogLevel(logLevel)
     if (System.getenv("OVERWATCH") != "LOCAL") {
       setCoresPerWorker(sc.parallelize("1", 1)
         .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0))

@@ -308,6 +308,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   def saveAndLoadTempEvents(database: Database, tempTarget: PipelineTable)(df: DataFrame): DataFrame = {
     database.write(df, tempTarget)
     tempTarget.asDF
+      .withColumn("Downstream_Processed", lit(false))
   }
 
 
@@ -333,14 +334,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
 
       val clusterIDsWithNewData = df
-        .filter('date >= fromTimeCol.cast("date"))
+        .filter('date > fromTimeCol.cast("date"))
         .selectExpr("*", "requestParams.*")
         .filter('serviceName === "clusters" && 'cluster_id.isNotNull)
         .select('cluster_id).distinct
 
       val newEventLogPrefixes = if (isFirstRun) {
         df
-          .filter('date >= fromTimeCol.cast("date")) //Partition filter
+          .filter('date > fromTimeCol.cast("date")) //Partition filter
           .selectExpr("*", "requestParams.*")
           .filter('serviceName === "clusters")
           .join(clusterIDsWithNewData, Seq("cluster_id"))
@@ -349,13 +350,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         val historicalClustersWithNewData = clusterSpec.asDF
           .withColumn("date", from_unixtime('timestamp.cast("double") / 1000).cast("date"))
-          .filter('date >= fromTimeCol.cast("date"))
+          .filter('date > fromTimeCol.cast("date"))
           .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
           .join(clusterIDsWithNewData, Seq("cluster_id"))
 
 
         val logPrefixesWithNewData = df
-          .filter('date >= fromTimeCol.cast("date")) //Partition filter
+          .filter('date > fromTimeCol.cast("date")) //Partition filter
           .selectExpr("*", "requestParams.*")
           .filter('serviceName === "clusters")
           .join(clusterIDsWithNewData, Seq("cluster_id"))
@@ -400,20 +401,24 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }).flatMap(Helpers.globPath).toArray.toSeq.toDF("filename")
 
     } else { // TODO - TEST -- might have broken when not using audit
-      val colsDF = df.select($"cluster_log_conf.*")
-      val cols = colsDF.columns.map(c => s"${c}.destination")
-      val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
-      cols.flatMap(
-        c => {
-          logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
-            .select(
-              array(regexp_replace(col("destination"), "\\/$", ""), col("cluster_id"),
-                lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-            ).rdd
-            .map(r => r.getSeq[String](0).mkString("/")).collect()
-        }).distinct
-        .flatMap(Helpers.globPath)
-        .toSeq.toDF("filename")
+      val localestEventLogs = Array("/cluster-logs/0827-194754-tithe1/eventlog/0827-194754-tithe1_10_111_255_26/*")
+      val debugTest = localestEventLogs.flatMap(Helpers.globPath).toSeq.toDF("filename")
+      debugTest.show(20, false)
+      debugTest
+//      val colsDF = df.select($"cluster_log_conf.*")
+//      val cols = colsDF.columns.map(c => s"${c}.destination")
+//      val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
+//      cols.flatMap(
+//        c => {
+//          logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
+//            .select(
+//              array(regexp_replace(col("destination"), "\\/$", ""), col("cluster_id"),
+//                lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
+//            ).rdd
+//            .map(r => r.getSeq[String](0).mkString("/")).collect()
+//        }).distinct
+//        .flatMap(Helpers.globPath)
+//        .toSeq.toDF("filename")
     }
   }
 
