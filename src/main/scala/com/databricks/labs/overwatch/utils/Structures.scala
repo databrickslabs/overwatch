@@ -60,7 +60,7 @@ case class ModuleStatusReport(
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, jobRuns, clusters, clusterEvents, sparkEvents, audit, notebooks  = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks  = Value
   // TODO - iamPassthrough, profiles, pools
 }
 

@@ -25,7 +25,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   // TODO -- look for max incremental in all tables to build out module last run times instead of deriving it from
   //  pipeline_report as this clearly can cause issues
   def initPipelineRun(): this.type = {
-    if (spark.catalog.databaseExists(config.databaseName)) {
+    if (spark.catalog.databaseExists(config.databaseName) &&
+      spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
       val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
       val lastRunDetail = spark.table(s"${config.databaseName}.pipeline_report")
         .filter('Status === "SUCCESS")
@@ -59,7 +60,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
       Database(config)
     } else {
-      logger.log(Level.INFO, s"Databsae ${config.databaseName} already exists, using append mode.")
+      logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
       Database(config)
     }
   }
@@ -195,16 +196,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   @throws(classOf[BadConfigException])
   private def validateScope(scopes: Seq[String]): Seq[OverwatchScope.OverwatchScope] = {
     val lcScopes = scopes.map(_.toLowerCase)
-    if (lcScopes.contains("jobruns")) {
-      require(lcScopes.contains("audit") || lcScopes.contains("jobs"),
-        "When jobruns are in scope, jobs and/or audit must also be in scope " +
-        "as jobruns depend on jobIDs captured from jobs scope.")
-    }
-
-    if (lcScopes.contains("jobRuns") && !lcScopes.contains("audit")) {
-      println(s"WARNING: JobRuns without audit will result in loss of granularity. It's recommended to configure" +
-        s"the audit module.")
-    }
 
     if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters")) && !lcScopes.contains("audit")) {
       println(s"WARNING: Cluster data without audit will result in loss of granularity. It's recommended to configure" +
@@ -226,7 +217,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     //  override parameter to ensure the user understands the data corruption/loss
     lcScopes.map {
       case "jobs" => jobs
-      case "jobruns" => jobRuns
       case "clusters" => clusters
       case "clusterevents" => clusterEvents
       case "sparkevents" => sparkEvents

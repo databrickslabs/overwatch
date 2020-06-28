@@ -7,6 +7,7 @@ import org.apache.spark.sql.catalog.Table
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogTable}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, DataFrameWriter, Row}
 
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
@@ -15,8 +16,8 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame, DataFrameWrit
 case class PipelineTable(
                           name: String,
                           keys: Array[String],
-                          incrementalColumn: String, // TODO -- Change to CDC incrementing ID (i.e. allow appender to handle ints/etc
                           config: Config,
+                          incrementalColumns: Array[String] = Array(),
                           dataFrequency: Frequency = Frequency.milliSecond,
                           format: String = "delta", // TODO -- Convert to Enum
                           mode: String = "append", // TODO -- Convert to Enum
@@ -82,9 +83,57 @@ case class PipelineTable(
     }
   }
 
+  private def addOneTick(ts: Column, dt: DataType = TimestampType): Column = {
+    dt match {
+      case _: TimestampType =>
+        ((ts.cast("double") * 1000 + 1) / 1000).cast("timestamp")
+      case _: DateType =>
+        date_add(ts, 1)
+      case _: DoubleType =>
+        ts + lit(0.001)
+      case _: LongType =>
+        ts + 1
+      case _: IntegerType =>
+        ts + 1
+      case _ => throw new UnsupportedOperationException(s"Cannot add milliseconds to ${dt.typeName}")
+    }
+  }
+
+  private def buildIncrementalDF(df: DataFrame, moduleID: Int): DataFrame = {
+    val from = config.fromTime(moduleID)
+    val until = config.pipelineSnapTime
+    val incrementalFilters = incrementalColumns.map(c => {
+      df.schema.fields.filter(_.name == c).head.dataType match {
+        case dt: TimestampType => col(c).between(addOneTick(from.asColumnTS), until.asColumnTS)
+        case dt: DateType => col(c).between(addOneTick(from.asColumnTS), until.asColumnTS)
+        case dt: LongType => col(c).between(from.asUnixTimeMilli + 1, until.asUnixTimeMilli)
+        case dt: DoubleType => col(c).between(from.asUnixTimeMilli + 0.001, until.asUnixTimeMilli)
+        case dt: BooleanType => col(c) === lit(false)
+        case dt: DataType =>
+          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
+      }
+    })
+
+    incrementalFilters.foldLeft(df) {
+      case (rawDF, incrementalFilter) =>
+        rawDF.filter(incrementalFilter)
+    }
+
+  }
+
   def asDF: DataFrame = {
     try{
       spark.table(tableFullName)
+    } catch {
+      case e: AnalysisException =>
+        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
+        Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
+    }
+  }
+
+  def asIncrementalDF(moduleID: Int): DataFrame = {
+    try{
+      buildIncrementalDF(spark.table(tableFullName), moduleID)
     } catch {
       case e: AnalysisException =>
         logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)

@@ -24,13 +24,13 @@ trait SilverTransforms extends SparkSessionWrapper {
   object UDF {
     // eventlog default path
     // Path == uri:/prefix/<cluster_id>/eventlog/<hostName>.replace("-", "_")/sparkContextId/<eventlog> || <eventlog-yyyy-MM-dd--HH-00.gz>
-    def groupFilename(filename: Column): Column = {
-      val segmentArray = split(filename, "/")
-      val byCluster = array_join(slice(segmentArray, 1, 3), "/").alias("byCluster")
-      val byClusterHost = array_join(slice(segmentArray, 1, 5), "/").alias("byDriverHost")
-      val bySparkContextID = array_join(slice(segmentArray, 1, 6), "/").alias("bySparkContext")
-      struct(filename, byCluster, byClusterHost, bySparkContextID).alias("filnameGroup")
-    }
+//    def groupFilename(filename: Column): Column = {
+//      val segmentArray = split(filename, "/")
+//      val byCluster = array_join(slice(segmentArray, 1, 3), "/").alias("byCluster")
+//      val byClusterHost = array_join(slice(segmentArray, 1, 5), "/").alias("byDriverHost")
+//      val bySparkContextID = array_join(slice(segmentArray, 1, 6), "/").alias("bySparkContext")
+//      struct(filename, byCluster, byClusterHost, bySparkContextID).alias("filnameGroup")
+//    }
 
     def subtractTime(start: Column, end: Column): Column = {
       val runTimeMS = end - start
@@ -296,6 +296,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("JobRunTime", UDF.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
       .withColumn("startTimestamp", $"JobRunTime.startEpochMS")
+      .withColumn("startDate", $"JobRunTime.startTS".cast("date"))
   }
 
   protected def simplifyStageStart(df: DataFrame): DataFrame = {
@@ -328,6 +329,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("StageRunTime", UDF.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
       .withColumn("startTimestamp", $"StageRunTime.startEpochMS")
+      .withColumn("startDate", $"StageRunTime.startTS".cast("date"))
   }
 
   // TODO -- Add in Specualtive Tasks Event == org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted
@@ -369,6 +371,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       )).drop("TaskStartInfo", "TaskEndInfo")
       .withColumn("TaskRunTime", UDF.subtractTime('LaunchTime, 'FinishTime)).drop("LaunchTime", "FinishTime")
       .withColumn("startTimestamp", $"TaskRunTime.startEpochMS")
+      .withColumn("startDate", $"TaskRunTime.startTS".cast("date"))
   }
 
   protected def userLogins()(df: DataFrame): DataFrame = {
@@ -659,8 +662,12 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobsBase = getJobsBase(df)
 
     val jobs_statusCols: Array[Column] = Array(
-      'serviceName, 'actionName, 'timestamp, when('job_id.isNull, get_json_object($"response.result", "$.job_id")).otherwise('job_id).alias("jobId"), 'job_type, 'name.alias("jobName"), 'timeout_seconds, 'schedule,
-      get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"), 'new_settings, 'existing_cluster_id, 'new_cluster,
+      'serviceName, 'actionName, 'timestamp,
+      when('job_id.isNull, get_json_object($"response.result", "$.job_id"))
+        .otherwise('job_id).alias("jobId"), 'job_type,
+      'name.alias("jobName"), 'timeout_seconds, 'schedule,
+      get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
+      'new_settings, 'existing_cluster_id, 'new_cluster,
       'sessionId, 'requestId, 'userAgent, 'response, 'sourceIPAddress, 'version
     )
 

@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.utils
 
 import java.text.SimpleDateFormat
 import java.time.temporal.ChronoUnit
-import java.time.{LocalDateTime, LocalTime, ZoneId, ZoneOffset}
+import java.time.{LocalDate, LocalDateTime, LocalTime, ZoneId, ZoneOffset}
 import java.util.{Calendar, Date, TimeZone, UUID}
 
 import org.apache.spark.sql.{Column, Dataset}
@@ -108,17 +108,6 @@ class Config() {
 
   private[overwatch] def setIsFirstRun(value: Boolean): this.type = {
     _isFirstRun = value
-    if (_isFirstRun) {
-      println(s"WARNING! First runs often require a large cluster for some modules and long API runs for others. " +
-        s"Below is the suggested method for running the first historical load. \n \nFirst Run --> With a sufficiently " +
-        s"large cluster load modules: audit, clusters, jobs, notebooks, pools, sparkEvents.\n\nFollowup Run --> " +
-        s"With a small cluster add the additional desired modules. For example, given the run above as the first run " +
-        s"the following would be a suggested second run (and future) module config:\n" +
-        s"audit, clusters, jobs, notebooks, pools, sparkEvents, clusterEvents, jobRuns")
-      if (overwatchScope.contains(OverwatchScope.jobRuns)) {
-        println(s"WARNING! It's not recommended to combine API modules and audit/events modules on the first run.")
-      }
-    }
     this
   }
 
@@ -182,7 +171,7 @@ class Config() {
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
     import OverwatchScope._
 //    jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles
-    Seq(audit, jobs, jobRuns, clusters, clusterEvents, sparkEvents, notebooks)
+    Seq(audit, jobs, clusters, clusterEvents, sparkEvents, notebooks)
   }
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
@@ -237,6 +226,7 @@ class Config() {
           _tokenType = "Environment"
         } else { // Use default token for job owner
           _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+          rawToken = dbutils.notebook.getContext().apiToken.get
           _token = cipher.encrypt(dbutils.notebook.getContext().apiToken.get)
           val authMessage = "No secret parameters provided: attempting to continue with job owner's token."
           logger.log(Level.WARN, authMessage)
