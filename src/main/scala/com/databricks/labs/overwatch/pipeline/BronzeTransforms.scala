@@ -250,8 +250,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   // Todo -- Put back to private
   private def getUniqueSparkEventsFiles(badRecordsPath: String,
-                                eventLogsDF: DataFrame,
-                                processedLogFiles: PipelineTable): Array[String] = {
+                                        eventLogsDF: DataFrame,
+                                        processedLogFiles: PipelineTable): Array[String] = {
     if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
       val alreadyProcessed = processedLogFiles.asDF.select('filename)
         .distinct
@@ -270,38 +270,42 @@ trait BronzeTransforms extends SparkSessionWrapper {
                           badRecordsPath: String,
                           processedLogFiles: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
 
-    val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
-    appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
-    val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
-      "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id")
+    if (eventLogsDF.take(1).nonEmpty) {
+      val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
+      appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
+      val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
+        "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id")
 
-    val baseEventsDF =
-      spark.read.option("badRecordsPath", badRecordsPath)
-        .json(pathsGlob: _*)
-        .drop(dropCols: _*)
+      val baseEventsDF =
+        spark.read.option("badRecordsPath", badRecordsPath)
+          .json(pathsGlob: _*)
+          .drop(dropCols: _*)
 
-    // Temporary Solution for Speculative Tasks bad Schema - SC-38615
-    val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("Stage ID")) {
-      when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
-    } else 'StageID
+      // Temporary Solution for Speculative Tasks bad Schema - SC-38615
+      val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("Stage ID")) {
+        when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
+      } else 'StageID
 
-    if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
-      SchemaTools.scrubSchema(baseEventsDF
-        .withColumn("filename", input_file_name)
-        .withColumn("pathSize", size(split('filename, "/")))
-        .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-        .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-        .withColumn("StageID", stageIDColumnOverride)
-        .drop("pathSize", "Stage ID")
-      )
+      if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
+        SchemaTools.scrubSchema(baseEventsDF
+          .withColumn("filename", input_file_name)
+          .withColumn("pathSize", size(split('filename, "/")))
+          .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+          .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+          .withColumn("StageID", stageIDColumnOverride)
+          .drop("pathSize", "Stage ID")
+        )
+      } else {
+        SchemaTools.scrubSchema(baseEventsDF
+          .withColumn("filename", input_file_name)
+          .withColumn("pathSize", size(split('filename, "/")))
+          .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+          .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+          .drop("pathSize")
+        )
+      }
     } else {
-      SchemaTools.scrubSchema(baseEventsDF
-        .withColumn("filename", input_file_name)
-        .withColumn("pathSize", size(split('filename, "/")))
-        .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-        .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-        .drop("pathSize")
-      )
+      Seq("No New Event Logs Found").toDF("FAILURE")
     }
   }
 
@@ -405,20 +409,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val debugTest = localestEventLogs.flatMap(Helpers.globPath).toSeq.toDF("filename")
       debugTest.show(20, false)
       debugTest
-//      val colsDF = df.select($"cluster_log_conf.*")
-//      val cols = colsDF.columns.map(c => s"${c}.destination")
-//      val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
-//      cols.flatMap(
-//        c => {
-//          logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
-//            .select(
-//              array(regexp_replace(col("destination"), "\\/$", ""), col("cluster_id"),
-//                lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-//            ).rdd
-//            .map(r => r.getSeq[String](0).mkString("/")).collect()
-//        }).distinct
-//        .flatMap(Helpers.globPath)
-//        .toSeq.toDF("filename")
+      //      val colsDF = df.select($"cluster_log_conf.*")
+      //      val cols = colsDF.columns.map(c => s"${c}.destination")
+      //      val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
+      //      cols.flatMap(
+      //        c => {
+      //          logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
+      //            .select(
+      //              array(regexp_replace(col("destination"), "\\/$", ""), col("cluster_id"),
+      //                lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
+      //            ).rdd
+      //            .map(r => r.getSeq[String](0).mkString("/")).collect()
+      //        }).distinct
+      //        .flatMap(Helpers.globPath)
+      //        .toSeq.toDF("filename")
     }
   }
 
