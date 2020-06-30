@@ -170,7 +170,7 @@ class Config() {
 
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
     import OverwatchScope._
-//    jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles
+//    jobs, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles
     Seq(audit, jobs, clusters, clusterEvents, sparkEvents, notebooks)
   }
 

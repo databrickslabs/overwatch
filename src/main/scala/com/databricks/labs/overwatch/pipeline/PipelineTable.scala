@@ -25,6 +25,7 @@ case class PipelineTable(
                           autoCompact: Boolean = false,
                           partitionBy: Array[String] = Array(),
                           statsColumns: Array[String] = Array(),
+                          shuffleFactor: Double = 1.0,
                           optimizeFrequency: Int = 24 * 7,
                           zOrderBy: Array[String] = Array(),
                           vacuum: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
@@ -39,6 +40,7 @@ case class PipelineTable(
   private var currentSparkOverrides: Map[String, String] = sparkOverrides
   import spark.implicits._
 
+//  col("c").get
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try {
       Some(spark.sessionState.catalog.getDatabaseMetadata(config.databaseName))

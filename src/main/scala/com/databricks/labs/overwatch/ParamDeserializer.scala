@@ -40,11 +40,12 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     while (overwatchScopesNode.hasNext) {
       overwatchScopes.append(overwatchScopesNode.next().asText())
     }
+    val moveProcessedFiles = masterNode.get("migrateProcessedEventLogs").asBoolean(false)
 
 //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
 //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
 
     OverwatchParams(token, Some(dataTarget), Some(auditLogPath),
-      Some(badRecordsPath), Some(overwatchScopes.toArray.toSeq))
+      Some(badRecordsPath), Some(overwatchScopes.toArray.toSeq), moveProcessedFiles)
   }
 }

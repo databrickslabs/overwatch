@@ -12,6 +12,7 @@ import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
+import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
@@ -31,7 +32,8 @@ object JsonUtils {
   private val encoder = JsonStringEncoder.getInstance
 
   def jsonToMap(message: String): Map[String, Any] = {
-    objectMapper.readValue(message, classOf[Map[String, Any]])
+    val cleanMessage = StringEscapeUtils.unescapeJson(message)
+    objectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
   }
 
   def objToJson(obj: Any): JsonStrings = {
@@ -195,8 +197,9 @@ object Helpers extends SparkSessionWrapper {
 
   def parOptimize(db: String, parallelism: Int = parallelism - 1,
                   zOrdersByTable: Map[String, Array[String]] = Map(),
-                  vacuum: Boolean = true): Unit = {
+                  vacuum: Boolean = true, retentionHrs: Int = 168): Unit = {
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 256)
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     val tables = getTables(db)
     val tablesPar = tables.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
@@ -210,13 +213,14 @@ object Helpers extends SparkSessionWrapper {
         spark.sql(sql)
         if (vacuum) {
           println(s"vacuuming: ${db}.${tbl}")
-          spark.sql(s"vacuum ${db}.${tbl}")
+          spark.sql(s"vacuum ${db}.${tbl} RETAIN ${retentionHrs} HOURS")
         }
         println(s"Complete: ${db}.${tbl}")
       } catch {
         case e: Throwable => println(e.printStackTrace())
       }
     })
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
   }
 
   def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {

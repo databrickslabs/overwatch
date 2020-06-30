@@ -15,6 +15,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     with SilverTransforms with SparkSessionWrapper {
 
   envInit()
+  setCloudProvider(config.cloudProvider)
 
   import spark.implicits._
 
@@ -181,7 +182,10 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val clusterSpecModule = Module(2014, "Silver_ClusterSpec")
   lazy private val appendClusterSpecProcess = EtlDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule.moduleID),
-    Some(Seq(buildClusterSpec(BronzeTargets.clustersSnapshotTarget))),
+    Some(Seq(
+      buildClusterSpec(
+        BronzeTargets.clustersSnapshotTarget
+      ))),
     append(SilverTargets.clustersSpecTarget),
     clusterSpecModule
   )
@@ -236,47 +240,56 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     spark.sql(updateSql)
   }
 
-  private def processSparkEvents: Array[ModuleStatusReport] = {
+  private def processSparkEvents(): Unit = {
 
-    val sparkEventsSilverReports = Array(
+    try {
       //      appendJDBCSessionsProcess.process(),
       //      appendJDBCOperationsProcess.process(),
-      appendExecutorsProcess.process(),
+      appendExecutorsProcess.process()
       //      appendApplicationsProcess.process(),
-      appendExecutionsProcess.process(),
-      appendJobsProcess.process(),
-      appendStagesProcess.process(),
+      appendExecutionsProcess.process()
+      appendJobsProcess.process()
+      appendStagesProcess.process()
       appendTasksProcess.process()
-    )
-    updateSparkEventsPipelineState(BronzeTargets.sparkEventLogsTarget)
+      updateSparkEventsPipelineState(BronzeTargets.sparkEventLogsTarget)
+    } catch{
+      case e: Throwable => {
+        println(s"Failures detected in spark events processing. Failing and rolling back spark events Silver. $e")
+        logger.log(Level.ERROR, s"Failed Spark Events Silver", e)
+      }
+    }
 
-    sparkEventsSilverReports
   }
 
   def run(): Boolean = {
 
     // TODO -- see which transforms are possible without audit and rebuild for no-audit
     //  CURRENTLY -- audit is required for silver
-    val reports = ArrayBuffer[ModuleStatusReport]()
     val scope = config.overwatchScope
 
-    reports.append(appendUserLoginsProcess.process())
-    reports.append(appendNewAccountsProcess.process())
+    if (scope.contains(OverwatchScope.accounts)) {
+      appendUserLoginsProcess.process()
+      appendNewAccountsProcess.process()
+    }
 
     if (scope.contains(OverwatchScope.sparkEvents))
-      processSparkEvents.foreach(sparkReport => reports.append(sparkReport))
+      processSparkEvents()
     if (scope.contains(OverwatchScope.clusters)) {
-      reports.append(appendClusterSpecProcess.process())
-      reports.append(appendClusterStatusProcess.process())
+      appendClusterSpecProcess.process()
+      appendClusterStatusProcess.process()
     }
     if (scope.contains(OverwatchScope.jobs)) {
-      reports.append(appendJobStatusProcess.process())
-      reports.append(appendJobRunsProcess.process())
+      appendJobStatusProcess.process()
     }
-    if (scope.contains(OverwatchScope.notebooks))
-      reports.append(appendNotebookSummaryProcess.process())
 
-    finalizeRun(reports.toArray)
+    if (scope.contains(OverwatchScope.jobs)) {
+      appendJobRunsProcess.process()
+    }
+
+    if (scope.contains(OverwatchScope.notebooks))
+      appendNotebookSummaryProcess.process()
+
+    initiatePostProcessing()
     true
   }
 

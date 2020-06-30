@@ -15,7 +15,7 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.avro.generic.GenericData.StringType
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types.{StructField, StructType}
+import org.apache.spark.sql.types.{ArrayType, DataType, DateType, StructField, StructType, TimestampType}
 
 import scala.util.Random
 
@@ -28,7 +28,38 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   private var _jobIDs: Array[Long] = Array()
   private var _newDataRetrieved: Boolean = true
-  private var _eventLogGlob: DataFrame = _
+  private var CLOUD_PROVIDER: String = "aws"
+
+  /**
+   * Converts column of seconds/milliseconds/nanoseconds to timestamp
+   *
+   * @param rawVal: Column of Longtype
+   * @param inputResolution: String of milli, or second (nano to come)
+   * @return
+   */
+  private def toTS(rawVal: Column, inputResolution: String = "milli", outputResultType: DataType = TimestampType): Column = {
+    outputResultType match {
+      case _: TimestampType => {
+        if (inputResolution == "milli") {
+          from_unixtime(rawVal.cast("double") / 1000).cast(outputResultType)
+        } else { // Seconds for Now
+          from_unixtime(rawVal).cast(outputResultType)
+        }
+      }
+      case _: DateType => {
+        if (inputResolution == "milli") {
+          from_unixtime(rawVal.cast("double") / 1000).cast(outputResultType)
+        } else { // Seconds for Now
+          from_unixtime(rawVal).cast(outputResultType)
+        }
+      }
+    }
+  }
+
+  protected def setCloudProvider(value: String): this.type = {
+    CLOUD_PROVIDER = value
+    this
+  }
 
   private def setJobIDs(value: Array[Long]): this.type = {
     _jobIDs = value
@@ -39,13 +70,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     _newDataRetrieved = value
     this
   }
-
-  protected def setEventLogGlob(value: DataFrame): this.type = {
-    _eventLogGlob = value
-    this
-  }
-
-  protected def sparkEventsLogGlob: DataFrame = _eventLogGlob
 
   protected def newDataRetrieved: Boolean = _newDataRetrieved
 
@@ -84,6 +108,49 @@ trait BronzeTransforms extends SparkSessionWrapper {
     else results
   }
 
+  // TODO -- For Paths
+//  def getChildDetail(df: StructType, c: Column): Array[Column] = {
+//    df.fields.filter(_.name == "children").map(f => {
+//      println(s"Top Level f type - ${f.dataType.typeName}")
+//      f.dataType match {
+//        case dt: ArrayType => {
+//          println(s"dt element type - ${dt.elementType.typeName}")
+//          dt.elementType match {
+//            case et: StructType => {
+//              when(size(c.getField("children")) > 0,
+//                getChildDetail(et, c.getField("children")(0)))
+//                  struct(
+//                    c.getField("estRowCount"),
+//                    c.getField("metadata")
+//                  ).alias("childDetail")
+//            }
+//            case _ => {
+//              struct(
+//                c.getField("estRowCount"),
+//                c.getField("metadata")
+//              ).alias("childDetail")
+//            }
+//          }
+//        }
+//      }
+//    })
+//  }
+
+//  private def flattenSchema(schema: StructType, prefix: String = null): Array[Column] = {
+//    val x = schema.fields.flatMap(f => {
+//      val colName = if (prefix == null) f.name else (prefix + "." + f.name)
+//
+//
+////      f.dataType match {
+////        case st: StructType => flattenSchema(st, colName)
+////        case at: ArrayType =>
+////          val st = at.elementType.asInstanceOf[StructType]
+////          flattenSchema(st, colName)
+////        case _ => Array(new Column(colName).alias(colName))
+////      }
+//    })
+//  }
+
   private def datesStream(fromDate: LocalDate): Stream[LocalDate] = {
     fromDate #:: datesStream(fromDate plusDays 1 )
   }
@@ -92,6 +159,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                isFirstRun: Boolean,
                                snapTime: LocalDateTime,
                                fromTime: LocalDateTime): DataFrame = {
+    val harmonizedTS: Column = if (CLOUD_PROVIDER == "azure") 'timestamp * 1000 else 'timestamp
+
     if (!isFirstRun) {
       val fromDT = fromTime.toLocalDate
       val yesterdate = snapTime.toLocalDate
@@ -100,11 +169,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       if (datesGlob.nonEmpty) {
         spark.read.json(datesGlob: _*)
+          .withColumn("timestamp", harmonizedTS)
       } else {
         Seq("No New Records").toDF("FAILURE")
       }
     } else {
       spark.read.json(auditLogPath)
+        .withColumn("timestamp", harmonizedTS)
     }
 
   }
@@ -235,7 +306,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // GZ files -- very compressed, need to get as much parallelism as possible
     if (isFirstRun) spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 48)
-    else spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 1)
+    else spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16)
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
@@ -264,7 +335,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     } else {
 
       val historicalClustersWithNewData = clusterSpec.asDF
-        .withColumn("date", from_unixtime('timestamp.cast("double") / 1000).cast("date"))
+        .withColumn("date", toTS('timestamp, outputResultType = DateType))
         .filter('date > fromTimeCol.cast("date"))
         .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
         .join(clusterIDsWithNewData, Seq("cluster_id"))
@@ -281,7 +352,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       val existingLogPrefixes = clusterSpec.asDF
         .filter('cluster_id.isNotNull)
-        .withColumn("date", from_unixtime('timestamp.cast("double") / 1000).cast("date"))
+        .withColumn("date", toTS('timestamp, outputResultType = DateType))
         .filter('cluster_log_conf.isNotNull && 'actionName.isin("create", "edit"))
         .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
 

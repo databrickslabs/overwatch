@@ -21,6 +21,15 @@ class Database(config: Config) extends SparkSessionWrapper {
 
   def getDatabaseName: String = _databaseName
 
+  def rollback(target: PipelineTable): Unit = {
+    val rollbackSql =
+      s"""
+         |delete from ${target.tableFullName}
+         |where Overwatch_RunID = ${config.runID}
+         |""".stripMargin
+    spark.sql(rollbackSql)
+  }
+
   def write(df: DataFrame, target: PipelineTable): Boolean = {
 
     var finalDF: DataFrame = df

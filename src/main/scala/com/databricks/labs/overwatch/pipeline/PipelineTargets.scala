@@ -99,13 +99,15 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val executorsTarget: PipelineTable = PipelineTable(
       name = "spark_executors_silver",
       keys = Array("SparkContextID", "ExecutorID"),
-      config
+      config,
+      shuffleFactor = 0.08
     )
 
     lazy private[overwatch] val executionsTarget: PipelineTable = PipelineTable(
       name = "spark_Executions_silver",
       keys = Array("SparkContextID", "ExecutionID"),
-      config
+      config,
+      shuffleFactor = 0.07
     )
 
     lazy private[overwatch] val jobsTarget: PipelineTable = PipelineTable(
@@ -113,7 +115,8 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "JobID"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
-      partitionBy = Array("startDate")
+      partitionBy = Array("startDate"),
+      shuffleFactor = 0.06
     )
 
     lazy private[overwatch] val stagesTarget: PipelineTable = PipelineTable(
@@ -121,7 +124,8 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "StageID", "StageAttemptID"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
-      partitionBy = Array("startDate")
+      partitionBy = Array("startDate"),
+      shuffleFactor = 0.07
     )
 
     lazy private[overwatch] val tasksTarget: PipelineTable = PipelineTable(
@@ -129,7 +133,8 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
-      partitionBy = Array("startDate")
+      partitionBy = Array("startDate"),
+      shuffleFactor = 1.2
     )
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(

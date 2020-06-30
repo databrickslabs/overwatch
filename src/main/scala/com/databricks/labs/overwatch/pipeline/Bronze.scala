@@ -122,27 +122,27 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 //      }
 //    }
 
-    val reports = ArrayBuffer[ModuleStatusReport]()
-
-      reports.append(appendAuditLogsProcess.process())
+    appendAuditLogsProcess.process()
 
       /** Current cluster snapshot is important because cluster spec details are only available from audit logs
        * during create/edit events. Thus all existing clusters created/edited last before the audit logs were
        * enabled will be missing all info. This is especially important for overwatch early stages
        */
-      if (config.overwatchScope.contains(OverwatchScope.clusters)) reports.append(appendClustersAPIProcess.process())
+      if (config.overwatchScope.contains(OverwatchScope.clusters))
+        appendClustersAPIProcess.process()
       // TODO -- keeping these api events with audit since there appears to be more granular data available
       //  from the api than from audit -- VERIFY
-      if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) reports.append(appendClusterEventLogsProcess.process())
-      if (config.overwatchScope.contains(OverwatchScope.jobs)) reports.append(appendJobsProcess.process())
-
+      if (config.overwatchScope.contains(OverwatchScope.clusterEvents))
+        appendClusterEventLogsProcess.process()
+      if (config.overwatchScope.contains(OverwatchScope.jobs))
+        appendJobsProcess.process()
       if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-        reports.append(appendSparkEventLogsProcess.process())
+        appendSparkEventLogsProcess.process()
         // TODO -- Temporary until refactor
         Helpers.fastDrop(BronzeTargets.sparkEventLogsTempTarget.tableFullName)
       }
 
-    finalizeRun(reports.toArray)
+    initiatePostProcessing()
 
   }
 

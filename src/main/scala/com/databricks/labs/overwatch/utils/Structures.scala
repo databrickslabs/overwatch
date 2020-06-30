@@ -30,7 +30,8 @@ case class OverwatchParams(tokenSecret: Option[TokenSecret],
                            dataTarget: Option[DataTarget],
                            auditLogPath: Option[String],
                            badRecordsPath: Option[String],
-                           overwatchScope: Option[Seq[String]]
+                           overwatchScope: Option[Seq[String]],
+                           migrateProcessedEventLogs: Boolean = false
                           )
 
 case class ParsedConfig(
@@ -60,7 +61,7 @@ case class ModuleStatusReport(
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks  = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts  = Value
   // TODO - iamPassthrough, profiles, pools
 }
 

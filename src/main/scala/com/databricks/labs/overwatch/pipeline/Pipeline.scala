@@ -16,6 +16,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
   protected final val config: Config = _config
   lazy protected final val postProcessor = new PostProcessor()
   private val sw = new StringWriter
+  private var sourceDFparts: Int = 200
 
   envInit()
 
@@ -27,12 +28,14 @@ class Pipeline(_workspace: Workspace, _database: Database,
   case class EtlDefinition(
                             sourceDF: DataFrame,
                             transforms: Option[Seq[DataFrame => DataFrame]],
-                            write: (DataFrame, Module) => ModuleStatusReport,
+                            write: (DataFrame, Module) => Unit,
                             module: Module
                           ) {
 
-    def process(): ModuleStatusReport = {
+    def process(): Unit = {
       println(s"Beginning: ${module.moduleName}")
+      sourceDFparts = sourceDF.rdd.partitions.length
+
       if (transforms.nonEmpty) {
         val transformedDF = transforms.get.foldLeft(sourceDF) {
           case (df, transform) =>
@@ -47,11 +50,9 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   import spark.implicits._
 
-  protected def finalizeRun(reports: Array[ModuleStatusReport]): Unit = {
-    println(s"Writing Pipeline Report for modules: ${reports.map(_.moduleID).sorted.mkString(",")}")
+  protected def finalizeModule(report: ModuleStatusReport): Unit = {
     val pipelineReportTarget = PipelineTable("pipeline_report", Array("Overwatch_RunID"), config, Array("Pipeline_SnapTS"))
-    database.write(reports.toSeq.toDF, pipelineReportTarget)
-    initiatePostProcessing()
+    database.write(Seq(report).toDF, pipelineReportTarget)
   }
 
   protected def initiatePostProcessing(): Unit = {
@@ -104,7 +105,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   }
 
-  private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
+  private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): Unit = {
     try {
       if (df.schema.fieldNames.contains("FAILURE")) throw new NoNewDataException(s"FAILED to append: ${target.tableFullName}")
       var finalDF = df
@@ -114,18 +115,24 @@ class Pipeline(_workspace: Workspace, _database: Database,
         SchemaTools.moveColumnsToFront(finalDF, target.zOrderBy)
       } else finalDF
 
+      val finalDFPartCount = sourceDFparts * target.shuffleFactor
+      val estimatedFinalDFSizeMB = finalDFPartCount * spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
+      val targetShuffleSize = math.max(100, finalDFPartCount).toInt
+
+      if (config.debugFlag) {
+        println(s"DEBUG: Target Shuffle Partitions: ${targetShuffleSize}")
+        println(s"DEBUG: Max PartitionBytes (MB): ${spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024}")
+      }
+
+      logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
+        s"\nShufflePartitions: ${targetShuffleSize}")
+
+      spark.conf.set("spark.sql.shuffle.partitions", targetShuffleSize)
 
       val startLogMsg = s"Beginning append to ${target.tableFullName}"
       logger.log(Level.INFO, startLogMsg)
 
-      val shufflePartsPrior = spark.conf.get("spark.sql.shuffle.partitions")
-      val finalDFPartCount = finalDF.rdd.partitions.length
-      val estimatedFinalDFSizeMB = finalDFPartCount * spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
-      val targetShuffleSize = math.max(200, finalDFPartCount)
 
-      logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
-        s"\nShufflePartitions: ${targetShuffleSize}")
-      spark.conf.set("spark.sql.shuffle.partitions", targetShuffleSize)
       val startTime = System.currentTimeMillis()
       _database.write(finalDF, target)
       val debugCount = if (!config.isFirstRun || config.debugFlag) {
@@ -138,7 +145,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
         logger.log(Level.INFO, "Counts not calculated on first run.")
         0
       }
-      spark.conf.set("spark.sql.shuffle.partitions", shufflePartsPrior)
+
+      spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 2)
 
       if (needsOptimize(module.moduleID)) {
         postProcessor.add(target)
@@ -149,7 +157,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
       val endTime = System.currentTimeMillis()
 
-      ModuleStatusReport(
+      val moduleStatusReport = ModuleStatusReport(
         moduleID = module.moduleID,
         moduleName = module.moduleName,
         runStartTS = startTime,
@@ -164,6 +172,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         inputConfig = config.inputConfig,
         parsedConfig = config.parsedConfig
       )
+      finalizeModule(moduleStatusReport)
     } catch {
       case e: NoNewDataException =>
         val msg = s"Failed: No New Data Retrieved for Module ${module.moduleID}! Skipping"
@@ -173,8 +182,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
       case e: Throwable =>
         val msg = s"${module.moduleName} FAILED, Unhandled Error ${e.printStackTrace(new PrintWriter(sw)).toString}"
         logger.log(Level.ERROR, msg, e)
+        val rollbackMsg = s"ROLLBACK: Rolling back ${module.moduleName}."
         println(msg)
-        failModule(module, "FAILED", msg)
+        println(rollbackMsg)
+        logger.log(Level.WARN, rollbackMsg)
+        val failedModuleReport = failModule(module, "FAILED", msg)
+        finalizeModule(failedModuleReport)
     }
 
   }
