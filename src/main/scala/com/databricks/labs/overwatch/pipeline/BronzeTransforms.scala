@@ -1,5 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
+import java.io.FileNotFoundException
+import java.net.URI
 import java.time.{LocalDate, LocalDateTime, ZoneId}
 import java.util.Date
 
@@ -12,10 +14,13 @@ import scala.concurrent.forkjoin.ForkJoinPool
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils._
-import org.apache.avro.generic.GenericData.StringType
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types.{ArrayType, DataType, DateType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.types.{DataType, DateType, StringType, TimestampType}
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.streaming.Trigger
 
 import scala.util.Random
 
@@ -25,8 +30,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-
-  private var _jobIDs: Array[Long] = Array()
   private var _newDataRetrieved: Boolean = true
   private var CLOUD_PROVIDER: String = "aws"
 
@@ -56,13 +59,18 @@ trait BronzeTransforms extends SparkSessionWrapper {
     }
   }
 
-  protected def setCloudProvider(value: String): this.type = {
-    CLOUD_PROVIDER = value
-    this
+  private def structFromJson(df: DataFrame, c: String): Column = {
+    require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col ${c}")
+    require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
+    val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
+    if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
+      println(s"WARNING: The json schema for column ${c} was not parsed correctly, please review.")
+    }
+    from_json(col(c), jsonSchema).alias(c)
   }
 
-  private def setJobIDs(value: Array[Long]): this.type = {
-    _jobIDs = value
+  protected def setCloudProvider(value: String): this.type = {
+    CLOUD_PROVIDER = value
     this
   }
 
@@ -72,8 +80,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def newDataRetrieved: Boolean = _newDataRetrieved
-
-  private def jobIDs: Array[Long] = _jobIDs
 
   @throws(classOf[NoNewDataException])
   private def apiByID[T](endpoint: String, apiEnv: ApiEnv,
@@ -155,35 +161,116 @@ trait BronzeTransforms extends SparkSessionWrapper {
     fromDate #:: datesStream(fromDate plusDays 1 )
   }
 
-  protected def getAuditLogsDF(auditLogPath: String,
-                               isFirstRun: Boolean,
-                               snapTime: LocalDateTime,
-                               fromTime: LocalDateTime): DataFrame = {
-    val harmonizedTS: Column = if (CLOUD_PROVIDER == "azure") 'timestamp * 1000 else 'timestamp
+  private def validateCleanPaths(isFirstRun: Boolean,
+                                 ehConfig: AzureAuditLogEventhubConfig): Boolean = {
+    var firstRunValid = true
+    var appendRunValid = true
+    val pathsToValidate = Array(
+      ehConfig.auditRawEventsChk.get,
+      ehConfig.auditLogChk.get
+    )
 
-    if (!isFirstRun) {
-      val fromDT = fromTime.toLocalDate
-      val yesterdate = snapTime.toLocalDate
-      val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(yesterdate)).toArray
-        .map(dt => s"${auditLogPath}/date=${dt}")
-
-      if (datesGlob.nonEmpty) {
-        spark.read.json(datesGlob: _*)
-          .withColumn("timestamp", harmonizedTS)
-      } else {
-        Seq("No New Records").toDF("FAILURE")
+    pathsToValidate.foreach(path => {
+      try {
+        dbutils.fs.ls(path).head.isDir
+        firstRunValid = false
+        logger.log(Level.ERROR, s"${path} is not empty.")
+        println(s"${path} is not empty.")
+      } catch {
+        case _: FileNotFoundException =>
+          appendRunValid = false
+          logger.log(Level.INFO, s"Path Verified Empty: ${path}")
       }
+    })
+
+    if (isFirstRun && firstRunValid) true
+    else if (!isFirstRun && appendRunValid) true
+    else false
+  }
+
+  @throws(classOf[BadConfigException])
+  protected def landAzureAuditLogDF(ehConfig: AzureAuditLogEventhubConfig,
+                                    isFirstRun: Boolean
+                                ): DataFrame = {
+
+    if (!validateCleanPaths(isFirstRun, ehConfig))
+      throw new BadConfigException("Azure Event Hub Paths are nto empty on first run")
+
+    val connectionString = ConnectionStringBuilder(ehConfig.connectionString)
+      .setEventHubName(ehConfig.eventHubName)
+      .build
+
+    val eventHubsConf = if (isFirstRun) {
+      EventHubsConf(connectionString)
+        .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+        .setStartingPosition(EventPosition.fromStartOfStream)
     } else {
-      spark.read.json(auditLogPath)
-        .withColumn("timestamp", harmonizedTS)
+      EventHubsConf(connectionString)
+        .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
     }
+
+    spark.readStream
+      .format("eventhubs")
+      .options(eventHubsConf.toMap)
+      .load()
+      .withColumn("deserializedBody", 'body.cast("string"))
 
   }
 
-  // TODO -- Get from audit if exists
-  protected def collectJobsIDs()(df: DataFrame): DataFrame = {
-    setJobIDs(df.select('job_id).distinct().as[Long].collect())
-    df
+  protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
+                               isFirstRun: Boolean,
+                               snapTime: LocalDateTime,
+                               fromTime: LocalDateTime,
+                               auditRawLand: PipelineTable
+                              ): DataFrame = {
+    if (CLOUD_PROVIDER == "azure") {
+      val rawBodyLookup = spark.table(auditRawLand.tableFullName)
+      rawBodyLookup.show(20, false)
+      val schemaBuilders = spark.table(auditRawLand.tableFullName)
+        .withColumn("deserializedBody", 'body.cast("string"))
+        .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
+        .select(explode($"parsedBody.records").alias("streamRecord"))
+        .selectExpr("streamRecord.*")
+        .withColumn("version", 'operationVersion)
+        .withColumn("time", 'time.cast("timestamp"))
+        .withColumn("timestamp", unix_timestamp('time) * 1000)
+        .withColumn("date", 'time.cast("date"))
+        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"))
+        .selectExpr("*", "properties.*").drop("properties")
+
+
+      spark.readStream.format("delta")
+        .load(s"/tmp/${auditRawLand.tableFullName}")
+        .withColumn("deserializedBody", 'body.cast("string"))
+        .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
+        .select(explode($"parsedBody.records").alias("streamRecord"))
+        .selectExpr("streamRecord.*")
+        .withColumn("version", 'operationVersion)
+        .withColumn("time", 'time.cast("timestamp"))
+        .withColumn("timestamp", unix_timestamp('time) * 1000)
+        .withColumn("date", 'time.cast("date"))
+        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"))
+        .selectExpr("*", "properties.*").drop("properties")
+        .withColumn("requestParams", structFromJson(schemaBuilders, "requestParams"))
+        .withColumn("response", structFromJson(schemaBuilders, "response"))
+        .drop("logId")
+
+    } else {
+      if (!isFirstRun) {
+        val fromDT = fromTime.toLocalDate
+        val yesterdate = snapTime.toLocalDate
+        val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(yesterdate)).toArray
+          .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
+
+        if (datesGlob.nonEmpty) {
+          spark.read.json(datesGlob: _*)
+        } else {
+          Seq("No New Records").toDF("FAILURE")
+        }
+      } else {
+        spark.read.json(auditLogConfig.rawAuditPath.get)
+      }
+    }
   }
 
   protected def prepClusterEventLogs(auditLogsTable: PipelineTable,

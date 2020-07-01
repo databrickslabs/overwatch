@@ -128,6 +128,7 @@ object Helpers extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
+  import spark.implicits._
 
   private def parallelism: Int = {
     Math.min(driverCores, 8)
@@ -304,12 +305,22 @@ object Helpers extends SparkSessionWrapper {
     })
   }
 
-  private[overwatch] def fastDrop(fullTableName: String): Unit = {
-    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
-    spark.sql(s"truncate table ${fullTableName}")
-    spark.sql(s"VACUUM ${fullTableName} RETAIN 0 HOURS")
-    spark.sql(s"drop table if exists ${fullTableName}")
-    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+  private[overwatch] def fastDrop(fullTableName: String, cloudProvider: String): Unit = {
+    if (cloudProvider == "aws") {
+      spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+      spark.sql(s"truncate table ${fullTableName}")
+      spark.sql(s"VACUUM ${fullTableName} RETAIN 0 HOURS")
+      spark.sql(s"drop table if exists ${fullTableName}")
+      spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+    } else {
+      Seq("").toDF("HOLD")
+        .write
+        .mode("overwrite")
+        .format("delta")
+        .option("overwriteSchema", "true")
+        .saveAsTable(fullTableName)
+      spark.sql(s"drop table if exists ${fullTableName}")
+    }
   }
 
 }

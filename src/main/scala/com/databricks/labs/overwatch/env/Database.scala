@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWra
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Dataset, Row}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
+import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery}
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 
 import scala.collection.mutable.ArrayBuffer
@@ -35,15 +36,19 @@ class Database(config: Config) extends SparkSessionWrapper {
     var finalDF: DataFrame = df
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
-    finalDF = SchemaTools.scrubSchema(finalDF)
 
 
 
     try {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
-      target.writer(finalDF).saveAsTable(target.tableFullName)
-//      if (!config.isLocalTesting) target.writer(finalDF).saveAsTable(target.tableFullName)
-//      else target.writer(finalDF).saveAsTable(target.tableFullName)
+      if (target.checkpointPath.nonEmpty) {
+        val streamWriter = target.writer(finalDF).asInstanceOf[DataStreamWriter[Row]].table(target.tableFullName)
+        streamWriter.processAllAvailable()
+        streamWriter.awaitTermination()
+      } else {
+        finalDF = SchemaTools.scrubSchema(finalDF)
+        target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
+      }
       logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
       true
     } catch {

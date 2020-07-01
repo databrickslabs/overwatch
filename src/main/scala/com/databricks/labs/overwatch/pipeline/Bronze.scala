@@ -20,7 +20,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private val appendJobsProcess = EtlDefinition(
     workspace.getJobsDF,
-    Some(Seq(collectJobsIDs())),
+    None,
     append(BronzeTargets.jobsSnapshotTarget),
     Module(1001, "Bronze_Jobs_Snapshot")
   )
@@ -44,10 +44,11 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private val appendAuditLogsModule = Module(1004, "Bronze_AuditLogs")
   lazy private val appendAuditLogsProcess = EtlDefinition(
     getAuditLogsDF(
-      config.auditLogPath.get,
+      config.auditLogConfig,
       config.isFirstRun,
       config.pipelineSnapTime.asUTCDateTime,
-      config.fromTime(appendAuditLogsModule.moduleID).asUTCDateTime
+      config.fromTime(appendAuditLogsModule.moduleID).asUTCDateTime,
+      BronzeTargets.auditLogAzureLandRaw
     ),
     None,
     append(BronzeTargets.auditLogsTarget),
@@ -122,6 +123,16 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 //      }
 //    }
 
+    if (config.debugFlag) println(s"DEBUG: CLOUD PROVIDER = ${config.cloudProvider}")
+    setCloudProvider(config.cloudProvider)
+    if (config.cloudProvider == "azure") {
+      val rawAzureAuditEvents = landAzureAuditLogDF(
+        config.auditLogConfig.azureAuditLogEventhubConfig.get,
+        config.isFirstRun
+      )
+      database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
+    }
+
     appendAuditLogsProcess.process()
 
       /** Current cluster snapshot is important because cluster spec details are only available from audit logs
@@ -139,7 +150,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
         appendSparkEventLogsProcess.process()
         // TODO -- Temporary until refactor
-        Helpers.fastDrop(BronzeTargets.sparkEventLogsTempTarget.tableFullName)
+        Helpers.fastDrop(
+          BronzeTargets.sparkEventLogsTempTarget.tableFullName,
+          config.cloudProvider
+        )
       }
 
     initiatePostProcessing()

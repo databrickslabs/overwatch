@@ -133,24 +133,6 @@ object BatchRunner extends SparkSessionWrapper with SilverTransforms{
 //      Initializer(Array())
 //    }
 
-    import com.fasterxml.jackson.databind.ObjectMapper
-    import com.fasterxml.jackson.databind.module.SimpleModule
-    import com.fasterxml.jackson.module.scala.DefaultScalaModule
-    import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-    val mapper: ObjectMapper with ScalaObjectMapper = (new ObjectMapper() with ScalaObjectMapper)
-      .registerModule(DefaultScalaModule)
-      .asInstanceOf[ObjectMapper with ScalaObjectMapper]
-    val test = mapper.readValue(StringEscapeUtils.unescapeJson(args(0)), classOf[OverwatchParams])
-    println("TEST OUTPUT OF PARAMS")
-    println(test)
-    println(test.badRecordsPath)
-    test.overwatchScope.get.foreach(println)
-    println(test.auditLogPath)
-    println(test.dataTarget.get.databaseLocation)
-    println(test.dataTarget.get.databaseName)
-    println(test.tokenSecret.get.key)
-    println(test.tokenSecret.get.scope)
-    logger.log(Level.FATAL, test)
 
 //    val config = workspace.getConfig
 //    if (config.debugFlag) envInit("DEBUG")

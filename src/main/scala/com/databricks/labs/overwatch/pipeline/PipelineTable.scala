@@ -33,7 +33,8 @@ case class PipelineTable(
                           sparkOverrides: Map[String, String] = Map[String, String](),
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true,
-                          isTemp: Boolean = false
+                          isTemp: Boolean = false,
+                          checkpointPath: Option[String] = None
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -143,17 +144,31 @@ case class PipelineTable(
     }
   }
 
-  def writer(df: DataFrame): DataFrameWriter[Row] = {
+  def writer(df: DataFrame): Any = {
     setSparkOverrides()
     val f = if (config.isLocalTesting && !config.isDBConnect) "parquet" else format
-    var writer = df.write.mode(mode).format(f)
+    if (checkpointPath.nonEmpty) {
+      if (config.debugFlag) println(s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}")
+      var streamWriter = df.writeStream.outputMode(mode).format(f).option("checkpointLocation", checkpointPath.get)
+      streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter
+      streamWriter = if (mode == "overwrite") streamWriter.option("overwriteSchema", "true")
+      else if (enableSchemaMerge && mode != "overwrite")
+        streamWriter.option("mergeSchema", "true")
+      else streamWriter
+      streamWriter
+    }else {
+      var dfWriter = df.write.mode(mode).format(f)
+      dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter
+      dfWriter = if (mode == "overwrite") dfWriter.option("overwriteSchema", "true")
+      else if (enableSchemaMerge && mode != "overwrite")
+        dfWriter.option("mergeSchema", "true")
+      else dfWriter
+      dfWriter
+    }
+
     // TODO - Validate proper repartition to minimize files per partition. Could be autoOptimize
-    writer = if (partitionBy.nonEmpty) writer.partitionBy(partitionBy: _*) else writer
-    writer = if (mode == "overwrite") writer.option("overwriteSchema", "true")
-    else if (enableSchemaMerge && mode != "overwrite")
-      writer.option("mergeSchema", "true")
-    else writer
-    writer
+
+
   }
 
 

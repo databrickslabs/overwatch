@@ -26,11 +26,22 @@ case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Colum
                      asUTCDateTime: LocalDateTime, asMidnightEpochMilli: Long,
                      asTSString: String, asDTString: String)
 
-case class OverwatchParams(tokenSecret: Option[TokenSecret],
-                           dataTarget: Option[DataTarget],
-                           auditLogPath: Option[String],
-                           badRecordsPath: Option[String],
-                           overwatchScope: Option[Seq[String]],
+case class AzureAuditLogEventhubConfig(
+                                        connectionString: String,
+                                        eventHubName: String,
+                                        auditRawEventsPrefix: String,
+                                        maxEventsPerTrigger: Int = 10000,
+                                        auditRawEventsChk: Option[String] = None,
+                                        auditLogChk: Option[String] = None
+                                      )
+
+case class AuditLogConfig(rawAuditPath: Option[String] = None, azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None)
+
+case class OverwatchParams(auditLogConfig: AuditLogConfig,
+                           tokenSecret: Option[TokenSecret] = None,
+                           dataTarget: Option[DataTarget] = None,
+                           badRecordsPath: Option[String] = None,
+                           overwatchScope: Option[Seq[String]] = None,
                            migrateProcessedEventLogs: Boolean = false
                           )
 
@@ -39,7 +50,7 @@ case class ParsedConfig(
                          tokenUsed: String, //TODO - Convert to enum
                          targetDatabase: String,
                          targetDatabaseLocation: String,
-                         auditLogPath: Option[String],
+                         auditLogPath: String,
                          passthroughLogPath: Option[String]
                        )
 

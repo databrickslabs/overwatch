@@ -28,7 +28,7 @@ class Config() {
   private var _token: Array[Byte] = _
   private var _tokenType: String = _
   private var _apiEnv: ApiEnv = _
-  private var _auditLogPath: Option[String] = None
+  private var _auditLogConfig: AuditLogConfig = _
   private var _badRecordsPath: String = _
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
@@ -150,7 +150,8 @@ class Config() {
 
   private[overwatch] def encryptedToken: Array[Byte] = _token
 
-  private[overwatch] def auditLogPath: Option[String] = _auditLogPath
+//  private[overwatch]
+  def auditLogConfig: AuditLogConfig = _auditLogConfig
 
   private[overwatch] def badRecordsPath: String = _badRecordsPath
 
@@ -192,7 +193,7 @@ class Config() {
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
-    _auditLogPath = Some("/mnt/tomesdata/logs/field_training_audit/")
+    _auditLogConfig = AuditLogConfig(Some("/mnt/tomesdata/logs/field_training_audit/"), None)
     _cloudProvider = "aws"
     this
 
@@ -221,6 +222,7 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
+          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _token = cipher.encrypt(System.getenv("OVERWATCH_TOKEN"))
           _tokenType = "Environment"
@@ -248,8 +250,8 @@ class Config() {
     this
   }
 
-  private[overwatch] def setAuditLogPath(value: Option[String]): this.type = {
-    _auditLogPath = value
+  private[overwatch] def setAuditLogConfig(value: AuditLogConfig): this.type = {
+    _auditLogConfig = value
     this
   }
 
@@ -269,7 +271,10 @@ class Config() {
       tokenUsed = _tokenType,
       targetDatabase = databaseName,
       targetDatabaseLocation = databaseLocation,
-      auditLogPath = auditLogPath,
+      auditLogPath = if (cloudProvider == "aws")
+        auditLogConfig.rawAuditPath.get
+        else
+        auditLogConfig.azureAuditLogEventhubConfig.get.eventHubName,
       passthroughLogPath = passthroughLogPath
     )
   }
