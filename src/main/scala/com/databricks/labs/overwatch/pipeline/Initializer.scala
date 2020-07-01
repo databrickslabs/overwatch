@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.ParamDeserializer
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.OverwatchScope._
 import com.databricks.labs.overwatch.utils._
+import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -131,12 +132,14 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       .asInstanceOf[ObjectMapper with ScalaObjectMapper]
 
     // Allow for local testing
-    if (config.isLocalTesting) {
-      config.buildLocalOverwatchParams()
-      println("Built Local Override Parameters")
+    val rawParams = if (config.isLocalTesting) {
+//      config.buildLocalOverwatchParams()
+      val synthArgs = config.buildLocalOverwatchParams()
+      mapper.readValue[OverwatchParams](synthArgs)
     } else {
       logger.log(Level.INFO, "Validating Input Parameters")
-      val rawParams = mapper.readValue[OverwatchParams](args(0))
+      mapper.readValue[OverwatchParams](args(0))
+    }
       config.setInputConfig(rawParams)
       val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
       val tokenSecret = rawParams.tokenSecret
@@ -169,7 +172,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         config.registeredEncryptedToken(Some(TokenSecret(scopeName, keyCheck.head.key)))
       } else config.registeredEncryptedToken(None)
 
-      dataTargetIsValid(dataTarget)
+      if (!config.isLocalTesting) dataTargetIsValid(dataTarget)
 
       val dbName = dataTarget.databaseName.get
       val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
@@ -181,7 +184,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       // Todo -- add validation to badRecordsPath
       config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
-    }
     this
   }
 

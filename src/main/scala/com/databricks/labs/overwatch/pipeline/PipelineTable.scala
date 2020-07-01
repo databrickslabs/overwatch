@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, Frequency, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, Frequency, JsonUtils, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalog.Table
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -148,8 +148,11 @@ case class PipelineTable(
     setSparkOverrides()
     val f = if (config.isLocalTesting && !config.isDBConnect) "parquet" else format
     if (checkpointPath.nonEmpty) {
-      if (config.debugFlag) println(s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}")
+      val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
+      if (config.debugFlag) println(streamWriterMessage)
+      logger.log(Level.INFO, streamWriterMessage)
       var streamWriter = df.writeStream.outputMode(mode).format(f).option("checkpointLocation", checkpointPath.get)
+          .queryName(s"StreamTo_${name}")
       streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter
       streamWriter = if (mode == "overwrite") streamWriter.option("overwriteSchema", "true")
       else if (enableSchemaMerge && mode != "overwrite")

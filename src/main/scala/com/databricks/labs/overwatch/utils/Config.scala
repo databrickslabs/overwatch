@@ -185,17 +185,37 @@ class Config() {
   }
 
   // Set scope for local testing
-  def buildLocalOverwatchParams(): this.type = {
+  def buildLocalOverwatchParams(): String = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters,
-      OverwatchScope.sparkEvents)
+    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters)
+    val inputOverwatchScope = Array("audit", "clusters")
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
-    _auditLogConfig = AuditLogConfig(Some("/mnt/tomesdata/logs/field_training_audit/"), None)
-    _cloudProvider = "aws"
-    this
+
+    // AWS TEST
+//    _cloudProvider = "aws"
+//    _auditLogConfig = AuditLogConfig(Some("/mnt/tomesdata/logs/field_training_audit/"), None)
+
+    // AZURE TEST
+//    _cloudProvider = "azure"
+//    val EVENT_HUB_CONNECTION_STRING = "Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ="
+//    val EVENT_HUB_NAME = "overwatch"
+//    val MAX_EVENTS_PER_TRIGGER = 10000
+//    val STATE_PREFIX = "abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state"
+//    val ehConfig = AzureAuditLogEventhubConfig(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME, STATE_PREFIX)
+//    _auditLogConfig = AuditLogConfig(None, Some(ehConfig))
+//
+//    OverwatchParams(
+//      _auditLogConfig, None, Some(DataTarget(Some(_databaseName), Some(_databaseLocation))),
+//      Some(_badRecordsPath), Some(inputOverwatchScope)
+//    )
+
+    // FROM RAW PARAMS TEST
+    """
+      |{"auditLogConfig":{"azureAuditLogEventhubConfig":{"connectionString":"Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ=","eventHubName":"overwatch","auditRawEventsPrefix":"abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state","maxEventsPerTrigger":10000}},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["audit","jobs","clusters","clusterEvents","notebooks"],"migrateProcessedEventLogs":false}
+      |""".stripMargin
 
   }
 
@@ -222,12 +242,13 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
-          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
+          //_cloudProvider setter not necessary -- done in local setup
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _token = cipher.encrypt(System.getenv("OVERWATCH_TOKEN"))
           _tokenType = "Environment"
         } else { // Use default token for job owner
           _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
           rawToken = dbutils.notebook.getContext().apiToken.get
           _token = cipher.encrypt(dbutils.notebook.getContext().apiToken.get)
           val authMessage = "No secret parameters provided: attempting to continue with job owner's token."

@@ -225,7 +225,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
                               ): DataFrame = {
     if (CLOUD_PROVIDER == "azure") {
       val rawBodyLookup = spark.table(auditRawLand.tableFullName)
-      rawBodyLookup.show(20, false)
       val schemaBuilders = spark.table(auditRawLand.tableFullName)
         .withColumn("deserializedBody", 'body.cast("string"))
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
@@ -240,7 +239,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
 
       spark.readStream.format("delta")
-        .load(s"/tmp/${auditRawLand.tableFullName}")
+        .table(auditRawLand.tableFullName)
         .withColumn("deserializedBody", 'body.cast("string"))
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"))
@@ -250,6 +249,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
         .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"))
+        .withColumn("userIdentity", structFromJson(schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
         .withColumn("requestParams", structFromJson(schemaBuilders, "requestParams"))
         .withColumn("response", structFromJson(schemaBuilders, "response"))

@@ -120,18 +120,19 @@ object BatchRunner extends SparkSessionWrapper with SilverTransforms{
 //    }
 
 
-    envInit()
+    envInit("WARN")
 //    setGlobalDeltaOverrides()
 
-//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1.jar")
+    spark.sql("drop database if exists overwatch_local cascade")
+    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2.jar")
 //    sc.addFile("C:\\Dev\\git\\Databricks--Overwatch\\src\\main\\resources\\ec2_details_tbl", true)
 //    spark.sql("drop database if exists overwatch_local cascade")
 //
-//    val workspace = if (args.length != 0) {
-//      Initializer(args)
-//    } else {
-//      Initializer(Array())
-//    }
+    val workspace = if (args.length != 0) {
+      Initializer(args, debugFlag = true)
+    } else {
+      Initializer(Array())
+    }
 
 
 //    val config = workspace.getConfig

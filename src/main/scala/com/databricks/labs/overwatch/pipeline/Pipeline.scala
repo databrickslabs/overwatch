@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport, NoNewDataException, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{Column, DataFrame, Row}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
 import java.io.{PrintWriter, StringWriter}
 
 class Pipeline(_workspace: Workspace, _database: Database,
@@ -34,7 +34,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     def process(): Unit = {
       println(s"Beginning: ${module.moduleName}")
-      sourceDFparts = sourceDF.rdd.partitions.length
+      try {
+        sourceDFparts = sourceDF.rdd.partitions.length
+      } catch {
+        case _: AnalysisException =>
+          println(s"Delaying source shuffle Partition Set since input is stream")
+      }
 
       if (transforms.nonEmpty) {
         val transformedDF = transforms.get.foldLeft(sourceDF) {
@@ -115,7 +120,15 @@ class Pipeline(_workspace: Workspace, _database: Database,
         SchemaTools.moveColumnsToFront(finalDF, target.zOrderBy)
       } else finalDF
 
-      val finalDFPartCount = sourceDFparts * target.shuffleFactor
+      // TODO -- handle streaming until Module refactor with source -> target mappings
+      val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
+        target.name match {
+          case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
+            .rdd.partitions.length * target.shuffleFactor
+        }
+      } else {
+        sourceDFparts * target.shuffleFactor
+      }
       val estimatedFinalDFSizeMB = finalDFPartCount * spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
       val targetShuffleSize = math.max(100, finalDFPartCount).toInt
 
@@ -180,10 +193,11 @@ class Pipeline(_workspace: Workspace, _database: Database,
         logger.log(Level.WARN, msg, e)
         failModule(module, "SKIPPED", msg)
       case e: Throwable =>
-        val msg = s"${module.moduleName} FAILED, Unhandled Error ${e.printStackTrace(new PrintWriter(sw)).toString}"
+        val msg = s"${module.moduleName} FAILED, Unhandled Error"
         logger.log(Level.ERROR, msg, e)
+        // TODO -- handle rollback
         val rollbackMsg = s"ROLLBACK: Rolling back ${module.moduleName}."
-        println(msg)
+        println(msg, e)
         println(rollbackMsg)
         logger.log(Level.WARN, rollbackMsg)
         val failedModuleReport = failModule(module, "FAILED", msg)

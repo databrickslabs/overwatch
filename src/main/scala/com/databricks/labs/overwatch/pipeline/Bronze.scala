@@ -125,13 +125,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
     if (config.debugFlag) println(s"DEBUG: CLOUD PROVIDER = ${config.cloudProvider}")
     setCloudProvider(config.cloudProvider)
-    if (config.cloudProvider == "azure") {
-      val rawAzureAuditEvents = landAzureAuditLogDF(
-        config.auditLogConfig.azureAuditLogEventhubConfig.get,
-        config.isFirstRun
-      )
-      database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
-    }
+//    if (config.cloudProvider == "azure") {
+//      val rawAzureAuditEvents = landAzureAuditLogDF(
+//        config.auditLogConfig.azureAuditLogEventhubConfig.get,
+//        config.isFirstRun
+//      )
+//      database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
+//    }
 
     appendAuditLogsProcess.process()
 

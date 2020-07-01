@@ -5,7 +5,8 @@ import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWra
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Dataset, Row}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
-import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery}
+import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
+import org.apache.spark.sql.streaming.StreamingQueryListener._
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 
 import scala.collection.mutable.ArrayBuffer
@@ -31,6 +32,28 @@ class Database(config: Config) extends SparkSessionWrapper {
     spark.sql(rollbackSql)
   }
 
+  private def getQueryListener(query: StreamingQuery): StreamingQueryListener = {
+    val streamManager = new StreamingQueryListener() {
+      override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
+        println("Query started: " + queryStarted.id)
+      }
+      override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
+        println("Query terminated: " + queryTerminated.id)
+      }
+      override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
+        println("Query made progress: " + queryProgress.progress)
+        if (config.debugFlag) {
+          queryProgress.progress.observedMetrics.values().toArray().foreach(println)
+          println(query.status.prettyJson)
+        }
+        if (queryProgress.progress.numInputRows == 0) {
+          query.stop()
+        }
+      }
+    }
+    streamManager
+  }
+
   def write(df: DataFrame, target: PipelineTable): Boolean = {
 
     var finalDF: DataFrame = df
@@ -42,9 +65,13 @@ class Database(config: Config) extends SparkSessionWrapper {
     try {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
       if (target.checkpointPath.nonEmpty) {
+
         val streamWriter = target.writer(finalDF).asInstanceOf[DataStreamWriter[Row]].table(target.tableFullName)
-        streamWriter.processAllAvailable()
+        val streamManager = getQueryListener(streamWriter)
+        spark.streams.addListener(streamManager)
         streamWriter.awaitTermination()
+        spark.streams.removeListener(streamManager)
+
       } else {
         finalDF = SchemaTools.scrubSchema(finalDF)
         target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)

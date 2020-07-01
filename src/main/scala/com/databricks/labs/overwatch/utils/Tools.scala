@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.io.JsonStringEncoder
 import java.util.{Date, UUID}
 
 import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.fasterxml.jackson.annotation.JsonInclude.Include
 import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
 import javax.crypto
 import javax.crypto.KeyGenerator
@@ -36,7 +37,9 @@ object JsonUtils {
     objectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
   }
 
-  def objToJson(obj: Any): JsonStrings = {
+  def objToJson(obj: Any, includeNulls: Boolean = false, includeEmpty: Boolean = false): JsonStrings = {
+    if (!includeNulls) objectMapper.setSerializationInclusion(Include.NON_NULL)
+    if (!includeEmpty) objectMapper.setSerializationInclusion(Include.NON_EMPTY)
     JsonStrings(
       objectMapper.writerWithDefaultPrettyPrinter.writeValueAsString(obj),
       objectMapper.writeValueAsString(obj),

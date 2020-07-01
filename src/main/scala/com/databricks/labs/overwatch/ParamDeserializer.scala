@@ -2,8 +2,11 @@ package com.databricks.labs.overwatch
 import java.io.IOException
 
 import com.databricks.labs.overwatch.utils.{AuditLogConfig, AzureAuditLogEventhubConfig, DataTarget, OverwatchParams, TokenSecret}
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.core.{JsonParser, JsonProcessingException}
-import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode}
+import com.fasterxml.jackson.databind.annotation.{JsonDeserialize, JsonSerialize}
+import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.node.ArrayNode
 
@@ -16,11 +19,12 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
   private def getNodeFromPath(parentNode: JsonNode, path: String): Option[JsonNode] = {
     val pathArray = path.split("\\.")
     try {
-      val lowestNode = pathArray.foldLeft(parentNode) {
+      pathArray.foldLeft(Some(parentNode)) {
         case (subNode, layer) =>
-          subNode.get(layer)
+          Some(subNode.get.get(layer))
+//          subNode.get(layer)
       }
-      Some(lowestNode)
+//      Some(lowestNode)
     } catch {
       case e: Throwable => {
         println(s"CANNOT FIND NODE AT PATH ${path}", e)
@@ -34,17 +38,19 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val lookupKey = pathArray.last
     val lowestNode = if (pathArray.length > 1) {
       val nodeLookup = pathArray.dropRight(1).mkString("\\.")
-      getNodeFromPath(node, nodeLookup).get
-    } else node
+      getNodeFromPath(node, nodeLookup)
+    } else None
 
-    if (lowestNode.has(lookupKey)) {
-      default match {
-        case _: Boolean => Some(lowestNode.get(lookupKey).asBoolean().asInstanceOf[T])
-        case _: Double => Some(lowestNode.get(lookupKey).asDouble().asInstanceOf[T])
-        case _: Int => Some(lowestNode.get(lookupKey).asInt().asInstanceOf[T])
-        case _: Long => Some(lowestNode.get(lookupKey).asLong().asInstanceOf[T])
-        case _ => Some(lowestNode.get(lookupKey).asText().asInstanceOf[T])
-      }
+    if (lowestNode.nonEmpty) {
+      if (lowestNode.get.has(lookupKey)) {
+        default match {
+          case _: Boolean => Some(lowestNode.get.get(lookupKey).asBoolean().asInstanceOf[T])
+          case _: Double => Some(lowestNode.get.get(lookupKey).asDouble().asInstanceOf[T])
+          case _: Int => Some(lowestNode.get.get(lookupKey).asInt().asInstanceOf[T])
+          case _: Long => Some(lowestNode.get.get(lookupKey).asLong().asInstanceOf[T])
+          case _ => Some(lowestNode.get.get(lookupKey).asText().asInstanceOf[T])
+        }
+      } else None
     } else None
 
   }
@@ -69,22 +75,26 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val azureEventHubNode = getNodeFromPath(masterNode, "auditLogConfig.azureAuditLogEventhubConfig")
 
     val azureAuditEventHubConfig = if (azureEventHubNode.nonEmpty) {
-      val ehNode = azureEventHubNode.get
       Some(AzureAuditLogEventhubConfig(
-        ehNode.get("connectionString").asText(""),
-        ehNode.get("eventHubName").asText(""),
-        ehNode.get("auditRawEventsPrefix").asText(""),
-        ehNode.get("maxEventsPerTrigger").asInt(10000),
-        getOption(ehNode, "auditRawEventsChk", ""),
-        getOption(ehNode, "auditLogChk", "")
+        azureEventHubNode.get.get("connectionString").asText(""),
+        azureEventHubNode.get.get("eventHubName").asText(""),
+        azureEventHubNode.get.get("auditRawEventsPrefix").asText(""),
+        azureEventHubNode.get.get("maxEventsPerTrigger").asInt(10000),
+        getOption(azureEventHubNode.get, "auditRawEventsChk", ""),
+        getOption(azureEventHubNode.get, "auditLogChk", "")
       ))
     } else None
 
     val auditLogConfig = AuditLogConfig(rawAuditPath, azureAuditEventHubConfig)
 
-    val dataTarget = DataTarget(
-      Some(masterNode.get("dataTarget").get("databaseName").asText()),
-      Some(masterNode.get("dataTarget").get("databaseLocation").asText()))
+    val dataTarget = if (masterNode.has("dataTarget")) {
+      Some(DataTarget(
+        getOption(masterNode, "dataTarget.databaseName", ""),
+        getOption(masterNode, "dataTarget.databaseLocation", "")
+      ))
+    } else None
+//      Some(masterNode.get("dataTarget").get("databaseName").asText()),
+//      Some(masterNode.get("dataTarget").get("databaseLocation").asText()))
 
     val badRecordsPath = masterNode.get("badRecordsPath").asText()
 
@@ -101,7 +111,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     OverwatchParams(
       auditLogConfig,
       token,
-      Some(dataTarget),
+      dataTarget,
       Some(badRecordsPath),
       Some(overwatchScopes.toArray.toSeq),
       moveProcessedFiles)

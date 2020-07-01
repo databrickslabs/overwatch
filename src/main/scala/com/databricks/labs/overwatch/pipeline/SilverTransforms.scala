@@ -677,6 +677,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       .selectExpr("*", "requestParams.*").drop("requestParams")
   }
 
+  // TODO -- Add union lookup to jobs snapshot to fill in holes
+  // TODO -- schedule is missing -- create function to check for missing columns and set them to null
+  //  schema validator
   protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
 
     val jobsBase = getJobsBase(df)
