@@ -65,13 +65,15 @@ class Pipeline(_workspace: Workspace, _database: Database,
     postProcessor.optimize()
   }
 
-  private def restoreSparkConf(value: Map[String, String]) : Unit= {
+  protected def restoreSparkConf(value: Map[String, String] = config.initialSparkConf) : Unit= {
     value foreach { case (k, v) =>
       try{
+        if (config.debugFlag && spark.conf.get(k) != v)
+          println(s"Resetting $k from ${spark.conf.get(k)} --> $v")
         spark.conf.set(k, v)
       } catch {
         case e: org.apache.spark.sql.AnalysisException => logger.log(Level.WARN, s"Not Settable: $k", e)
-        case e: Throwable => println(s"ERROR: $k, --> $e")
+        case e: Throwable => logger.log(Level.DEBUG, s"Spark Setting, $k could not be set.")
       }
     }
   }
@@ -159,14 +161,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
         0
       }
 
-      spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 2)
-
       if (needsOptimize(module.moduleID)) {
         postProcessor.add(target)
         lastOptimizedTS = config.pipelineSnapTime.asUnixTimeMilli
       }
 
-      restoreSparkConf(config.initialSparkConf())
+      restoreSparkConf()
 
       val endTime = System.currentTimeMillis()
 
@@ -188,7 +188,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       finalizeModule(moduleStatusReport)
     } catch {
       case e: NoNewDataException =>
-        val msg = s"Failed: No New Data Retrieved for Module ${module.moduleID}! Skipping"
+        val msg = s"ALERT: No New Data Retrieved for Module ${module.moduleID}! Skipping"
         println(msg)
         logger.log(Level.WARN, msg, e)
         failModule(module, "SKIPPED", msg)

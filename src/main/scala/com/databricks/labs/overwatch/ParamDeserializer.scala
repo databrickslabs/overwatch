@@ -1,4 +1,5 @@
 package com.databricks.labs.overwatch
+
 import java.io.IOException
 
 import com.databricks.labs.overwatch.utils.{AuditLogConfig, AzureAuditLogEventhubConfig, DataTarget, OverwatchParams, TokenSecret}
@@ -12,48 +13,48 @@ import com.fasterxml.jackson.databind.node.ArrayNode
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
+import scala.util.{Failure, Success, Try}
 
 // TODO -- Handle master nodes that don't exist
 class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[OverwatchParams]) {
 
   private def getNodeFromPath(parentNode: JsonNode, path: String): Option[JsonNode] = {
+    val getLowestNode = Try {
     val pathArray = path.split("\\.")
-    try {
-      pathArray.foldLeft(Some(parentNode)) {
+      pathArray.foldLeft(parentNode) {
         case (subNode, layer) =>
-          Some(subNode.get.get(layer))
-//          subNode.get(layer)
+          if (subNode.has(layer))
+            subNode.get(layer)
+          else throw new NullPointerException
+        //          subNode.get(layer)
       }
-//      Some(lowestNode)
-    } catch {
-      case e: Throwable => {
-        println(s"CANNOT FIND NODE AT PATH ${path}", e)
-        None
-      }
+      //      Some(lowestNode)
+    }
+    getLowestNode match {
+      case Success(lowestNode) => Some(lowestNode)
+      case Failure(_) => None
     }
   }
 
   private def getOption[T](node: JsonNode, path: String, default: T): Option[T] = {
-    val pathArray = path.split("\\.")
-    val lookupKey = pathArray.last
-    val lowestNode = if (pathArray.length > 1) {
+    val nodeValue = Try {
+      val pathArray = path.split("\\.")
+      val lookupKey = pathArray.last
       val nodeLookup = pathArray.dropRight(1).mkString("\\.")
-      getNodeFromPath(node, nodeLookup)
-    } else None
-
-    if (lowestNode.nonEmpty) {
-      if (lowestNode.get.has(lookupKey)) {
-        default match {
-          case _: Boolean => Some(lowestNode.get.get(lookupKey).asBoolean().asInstanceOf[T])
-          case _: Double => Some(lowestNode.get.get(lookupKey).asDouble().asInstanceOf[T])
-          case _: Int => Some(lowestNode.get.get(lookupKey).asInt().asInstanceOf[T])
-          case _: Long => Some(lowestNode.get.get(lookupKey).asLong().asInstanceOf[T])
-          case _ => Some(lowestNode.get.get(lookupKey).asText().asInstanceOf[T])
-        }
-      } else None
-    } else None
-
-  }
+      val lowestNode = getNodeFromPath(node, nodeLookup).get
+      default match {
+        case _: Boolean => lowestNode.get(lookupKey).asBoolean().asInstanceOf[T]
+        case _: Double => lowestNode.get(lookupKey).asDouble().asInstanceOf[T]
+        case _: Int => lowestNode.get(lookupKey).asInt().asInstanceOf[T]
+        case _: Long => lowestNode.get(lookupKey).asLong().asInstanceOf[T]
+        case _ => lowestNode.get(lookupKey).asText().asInstanceOf[T]
+      }
+    }
+    nodeValue match {
+      case Success(value) => Some(value)
+      case Failure(_) => None
+    }
+    }
 
   @throws(classOf[IOException])
   @throws(classOf[JsonProcessingException])
@@ -74,6 +75,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val rawAuditPath = getOption(masterNode, "auditLogConfig.rawAuditPath", "")
     val azureEventHubNode = getNodeFromPath(masterNode, "auditLogConfig.azureAuditLogEventhubConfig")
 
+
     val azureAuditEventHubConfig = if (azureEventHubNode.nonEmpty) {
       Some(AzureAuditLogEventhubConfig(
         azureEventHubNode.get.get("connectionString").asText(""),
@@ -93,8 +95,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         getOption(masterNode, "dataTarget.databaseLocation", "")
       ))
     } else None
-//      Some(masterNode.get("dataTarget").get("databaseName").asText()),
-//      Some(masterNode.get("dataTarget").get("databaseLocation").asText()))
+    //      Some(masterNode.get("dataTarget").get("databaseName").asText()),
+    //      Some(masterNode.get("dataTarget").get("databaseLocation").asText()))
 
     val badRecordsPath = masterNode.get("badRecordsPath").asText()
 
@@ -105,8 +107,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     }
     val moveProcessedFiles = masterNode.get("migrateProcessedEventLogs").asBoolean(false)
 
-//    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
-//    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
+    //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
+    //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
 
     OverwatchParams(
       auditLogConfig,

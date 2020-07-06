@@ -59,10 +59,16 @@ case class PipelineTable(
 
   val tableFullName: String = s"${config.databaseName}.${name}"
 
-  if (autoOptimize) spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+  if (autoOptimize) {
+    spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+    println(s"Setting Auto Optimize for ${name}")
+  }
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
 
-  if (autoCompact) spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
+  if (autoCompact) {
+    spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
+    println(s"Setting Auto Compact for ${name}")
+  }
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
 
   /**
@@ -77,10 +83,16 @@ case class PipelineTable(
     if (sparkOverrides.nonEmpty && updates.isEmpty) {
       currentSparkOverrides foreach { case (k, v) =>
       try {
-          spark.conf.set(k, v)
+        if (config.debugFlag && spark.conf.get(k) != v)
+          println(s"Overriding $k from ${spark.conf.get(k)} --> $v")
+        spark.conf.set(k, v)
       } catch {
-          case e: AnalysisException => logger.log(Level.WARN, s"Cannot Set Spark Param: ${k}", e)
-          case e: Throwable => logger.log(Level.ERROR, s"Failed trying to set $k", e)
+          case e: AnalysisException =>
+            logger.log(Level.WARN, s"Cannot Set Spark Param: ${k}", e)
+            if (config.debugFlag) println(s"Failed Setting $k", e)
+          case e: Throwable =>
+            if (config.debugFlag) println(s"Failed Setting $k", e)
+            logger.log(Level.WARN, s"Failed trying to set $k", e)
         }
       }
     }

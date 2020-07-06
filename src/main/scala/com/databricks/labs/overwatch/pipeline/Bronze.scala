@@ -82,8 +82,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         SilverTargets.clustersSpecTarget,
         config.isFirstRun
       ),
-      generateEventLogsDF(database, config.badRecordsPath, BronzeTargets.processedEventLogs),
-      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget)
+      generateEventLogsDF(database, config.badRecordsPath, BronzeTargets.processedEventLogs) //,
+//      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget) // TODO -- Perf testing without
     )),
     append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic
     sparkEventLogsModule
@@ -91,6 +91,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
   def run(): Unit = {
+
+    restoreSparkConf()
 
 //    try {
 //      if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, BronzeTargets.cloudMachineDetail.name)) {
@@ -149,11 +151,11 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         appendJobsProcess.process()
       if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
         appendSparkEventLogsProcess.process()
-        // TODO -- Temporary until refactor
-        Helpers.fastDrop(
-          BronzeTargets.sparkEventLogsTempTarget.tableFullName,
-          config.cloudProvider
-        )
+//        // TODO -- Temporary until refactor
+//        Helpers.fastDrop(
+//          BronzeTargets.sparkEventLogsTempTarget.tableFullName,
+//          config.cloudProvider
+//        )
       }
 
     initiatePostProcessing()

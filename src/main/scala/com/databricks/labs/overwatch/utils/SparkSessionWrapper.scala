@@ -99,8 +99,6 @@ trait SparkSessionWrapper extends Serializable {
 //    if (spark.conf.get("spark.sql.shuffle.partitions") == "200")
 //      spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 4)
 
-    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", "134217728")
-
     true
   }
 }

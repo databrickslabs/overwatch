@@ -47,7 +47,9 @@ abstract class PipelineTargets(config: Config) {
       name = "audit_log_raw_events",
       keys = Array("sequenceNumber"),
       config,
-      checkpointPath = config.auditLogConfig.azureAuditLogEventhubConfig.get.auditRawEventsChk
+      checkpointPath = if (config.cloudProvider == "azure")
+        config.auditLogConfig.azureAuditLogEventhubConfig.get.auditRawEventsChk
+      else None
     )
 
     lazy private[overwatch] val clusterEventsTarget: PipelineTable = PipelineTable(
@@ -57,16 +59,17 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("timestamp"),
       statsColumns = ("cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID").split(", "))
 
-    lazy private[overwatch] val sparkEventLogsTempTarget: PipelineTable = PipelineTable(
-      name = "spark_events_temp_raw",
-      keys = Array("Event"),
-      config,
-      incrementalColumns = Array("time"),
-      mode = "overwrite",
-      withCreateDate = false,
-      withOverwatchRunID = false,
-      isTemp = true
-    )
+    // TODO -- Removing -- perf testing
+//    lazy private[overwatch] val sparkEventLogsTempTarget: PipelineTable = PipelineTable(
+//      name = "spark_events_temp_raw",
+//      keys = Array("Event"),
+//      config,
+//      incrementalColumns = Array("time"),
+//      mode = "overwrite",
+//      withCreateDate = false,
+//      withOverwatchRunID = false,
+//      isTemp = true
+//    )
 
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
@@ -74,8 +77,11 @@ abstract class PipelineTargets(config: Config) {
       config,
       incrementalColumns = Array("Downstream_Processed"),
       partitionBy = Array("Event", "Downstream_Processed"),
-      zOrderBy = Array("clusterId", "SparkContextID"),
-      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", ")
+      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
+      sparkOverrides = Map(
+        "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 48).toString
+      ),
+      autoOptimize = true // TODO -- perftest
     )
 
     lazy private[overwatch] val processedEventLogs: PipelineTable = PipelineTable(
@@ -144,8 +150,9 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
-      partitionBy = Array("startDate"),
-      shuffleFactor = 1.2
+      partitionBy = Array("startDate", "clusterId"),
+      shuffleFactor = 1.2,
+      autoOptimize = true
     )
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(

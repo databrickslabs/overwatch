@@ -154,7 +154,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
       // validate token secret requirements
       // TODO - Validate if token has access to necessary assets. Warn/Fail if not
-      if (tokenSecret.nonEmpty) {
+      if (tokenSecret.nonEmpty && !config.isLocalTesting) {
         if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
           throw new BadConfigException(s"Secret AND Key must be provided together or neither of them. " +
             s"Either supply both or neither.")

@@ -46,11 +46,11 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                           )
 
 case class ParsedConfig(
+                         auditLogConfig: AuditLogConfig,
                          overwatchScope: Seq[String],
                          tokenUsed: String, //TODO - Convert to enum
                          targetDatabase: String,
                          targetDatabaseLocation: String,
-                         auditLogPath: String,
                          passthroughLogPath: Option[String]
                        )
 

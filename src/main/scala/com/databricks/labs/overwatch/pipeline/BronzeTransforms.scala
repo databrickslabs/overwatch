@@ -364,6 +364,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("StageID", stageIDColumnOverride)
           .drop("pathSize", "Stage ID")
           .withColumn("filenameGroup", groupFilename('filename))
+          .withColumn("Downstream_Processed", lit(false))
         )
       } else {
         SchemaTools.scrubSchema(baseEventsDF
@@ -373,6 +374,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
           .drop("pathSize")
           .withColumn("filenameGroup", groupFilename('filename))
+          .withColumn("Downstream_Processed", lit(false))
         )
       }
     } else {
@@ -383,7 +385,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
   def saveAndLoadTempEvents(database: Database, tempTarget: PipelineTable)(df: DataFrame): DataFrame = {
     database.write(df, tempTarget)
     tempTarget.asDF
-      .withColumn("Downstream_Processed", lit(false))
   }
 
 
@@ -392,8 +393,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
 
     // GZ files -- very compressed, need to get as much parallelism as possible
-    if (isFirstRun) spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 48)
-    else spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16)
+    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 48)
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")

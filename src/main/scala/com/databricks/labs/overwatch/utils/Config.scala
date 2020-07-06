@@ -176,11 +176,21 @@ class Config() {
   }
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
-    _initialSparkConf = value
+    val manualOverrides = Map(
+      "spark.databricks.delta.properties.defaults.autoOptimize.autoCompact" ->
+        value.getOrElse("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false"),
+      "spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite" ->
+        value.getOrElse("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false"),
+      "spark.databricks.delta.optimize.maxFileSize" ->
+        value.getOrElse("spark.databricks.delta.optimize.maxFileSize", (1024 * 1024 * 128).toString),
+      "spark.databricks.delta.retentionDurationCheck.enabled" ->
+        value.getOrElse("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+    )
+    _initialSparkConf = value ++ manualOverrides
     this
   }
 
-  private[overwatch] def initialSparkConf(): Map[String, String] = {
+  private[overwatch] def initialSparkConf: Map[String, String] = {
     _initialSparkConf
   }
 
@@ -195,7 +205,7 @@ class Config() {
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
 
     // AWS TEST
-//    _cloudProvider = "aws"
+    _cloudProvider = "aws"
 //    _auditLogConfig = AuditLogConfig(Some("/mnt/tomesdata/logs/field_training_audit/"), None)
 
     // AZURE TEST
@@ -214,7 +224,7 @@ class Config() {
 
     // FROM RAW PARAMS TEST
     """
-      |{"auditLogConfig":{"azureAuditLogEventhubConfig":{"connectionString":"Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ=","eventHubName":"overwatch","auditRawEventsPrefix":"abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state","maxEventsPerTrigger":10000}},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["audit","jobs","clusters","clusterEvents","notebooks"],"migrateProcessedEventLogs":false}
+      |{"auditLogConfig":{"rawAuditPath":"/mnt/tomesdata/logs/field_training_audit/"},"tokenSecret":{"scope":"data-eng","key":"overwatch"},"dataTarget":{"databaseName":"overwatch_local","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_local.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["clusters","clusterEvents","audit","sparkEvents","jobs"],"migrateProcessedEventLogs":false}
       |""".stripMargin
 
   }
@@ -288,14 +298,11 @@ class Config() {
 
   private[overwatch] def parsedConfig: ParsedConfig = {
     ParsedConfig(
+      auditLogConfig = auditLogConfig,
       overwatchScope = overwatchScope.map(_.toString),
       tokenUsed = _tokenType,
       targetDatabase = databaseName,
       targetDatabaseLocation = databaseLocation,
-      auditLogPath = if (cloudProvider == "aws")
-        auditLogConfig.rawAuditPath.get
-        else
-        auditLogConfig.azureAuditLogEventhubConfig.get.eventHubName,
       passthroughLogPath = passthroughLogPath
     )
   }
