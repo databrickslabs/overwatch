@@ -671,6 +671,9 @@ trait SilverTransforms extends SparkSessionWrapper {
    * @return
    */
 
+  //TODO -- jobs snapshot api seems to be returning more data than audit logs, review
+  //  example = maxRetries, max_concurrent_runs, jar_task, python_task
+  //  audit also seems to be missing many job_names (if true, retrieve from snap)
   private def getJobsBase(df: DataFrame): DataFrame = {
     df
       .filter('serviceName === "jobs")
