@@ -6,42 +6,61 @@ import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{ArrayType, DataType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{ArrayType, DataType, DateType, LongType, StringType, StructField, StructType, TimestampType}
 
 trait SilverTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
 
-  //  protected val sparkEventsDF: DataFrame = spark.table(s"${_dbName}.spark_events_bronze")
-  //    .drop("ClasspathEntries", "HadoopProperties", "SparkProperties", "SystemProperties", "SparkPlanInfo") // TODO - TEMP
-  //    .withColumn("filenameGroup", groupFilename('filename))
-  //      .repartition().cache
-  //    sparkEventsDF.count
+  // TODO -- temporary support for multi-cloud until proper schemas are derived and implemented
+  private var CLOUD_PROVIDER: String = "aws"
 
-//  case class DerivedCluster(jobLevel: DataFrame, stageLevel: DataFrame)
+  protected def setCloudProvider(value: String): this.type = {
+    CLOUD_PROVIDER = value
+    this
+  }
+
   private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
 
+
   object UDF {
-    // eventlog default path
-    // Path == uri:/prefix/<cluster_id>/eventlog/<hostName>.replace("-", "_")/sparkContextId/<eventlog> || <eventlog-yyyy-MM-dd--HH-00.gz>
-    def groupFilename(filename: Column): Column = {
-      val segmentArray = split(filename, "/")
-      val byCluster = array_join(slice(segmentArray, 1, 3), "/").alias("byCluster")
-      val byClusterHost = array_join(slice(segmentArray, 1, 5), "/").alias("byDriverHost")
-      val bySparkContextID = array_join(slice(segmentArray, 1, 6), "/").alias("bySparkContext")
-      struct(filename, byCluster, byClusterHost, bySparkContextID).alias("filnameGroup")
+
+    /**
+     * Converts column of seconds/milliseconds/nanoseconds to timestamp
+     *
+     * @param rawVal: Column of Longtype
+     * @param inputResolution: String of milli, or second (nano to come)
+     * @return
+     */
+    def toTS(rawVal: Column, inputResolution: String = "milli", outputResultType: DataType = TimestampType): Column = {
+      outputResultType match {
+        case _: TimestampType => {
+          if (inputResolution == "milli") {
+            from_unixtime(rawVal.cast("double") / 1000).cast(outputResultType)
+          } else { // Seconds for Now
+            from_unixtime(rawVal).cast(outputResultType)
+          }
+        }
+        case _: DateType => {
+          if (inputResolution == "milli") {
+            from_unixtime(rawVal.cast("double") / 1000).cast(outputResultType)
+          } else { // Seconds for Now
+            from_unixtime(rawVal).cast(outputResultType)
+          }
+        }
+      }
     }
 
-    def subtractTime(start: Column, end: Column): Column = {
+    def subtractTime(start: Column, end: Column, inputResolution: String = "milli"): Column = {
       val runTimeMS = end - start
       val runTimeS = runTimeMS / 1000
       val runTimeM = runTimeS / 60
       val runTimeH = runTimeM / 60
       struct(
         start.alias("startEpochMS"),
-        from_unixtime(start / 1000).cast("timestamp").alias("startTS"),
+        toTS(start, inputResolution).alias("startTS"),
         end.alias("endEpochMS"),
-        from_unixtime(end / 1000).cast("timestamp").alias("endTS"),
+        toTS(end, inputResolution).alias("endTS"),
         lit(runTimeMS).alias("runTimeMS"),
         lit(runTimeS).alias("runTimeS"),
         lit(runTimeM).alias("runTimeM"),
@@ -94,39 +113,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     }
 
-//    def clusterIDLookup(df: DataFrame): DerivedCluster = {
-//      val jobGroupIDW = Window.partitionBy('SparkContextID, 'JobGroupID).rangeBetween(Window.unboundedPreceding, Window.unboundedFollowing)
-//
-//      val jobsProps = df.filter('event === "SparkListenerJobStart")
-//        .withColumn("JobGroupID", $"Properties.sparkjobGroupid")
-//        .withColumn("ClusterID", $"Properties.sparkdatabricksclusterUsageTagsclusterId")
-//        .select('SparkContextID, 'JobGroupID, 'JobID, explode('StageIDs).alias("StageID"), 'ClusterID)
-//        .withColumn("ClusterID", when('ClusterID.isNull, first('ClusterID).over(jobGroupIDW)).otherwise('ClusterID))
-//        .withColumn("JobsClusterID", when('ClusterID.isNull, last('ClusterID).over(jobGroupIDW)).otherwise('ClusterID))
-//        .drop("ClusterID")
-//      val stagesProps = df.filter('event === "SparkListenerStageSubmitted")
-//        .withColumn("JobGroupID", $"Properties.sparkjobGroupid")
-//        .withColumn("ClusterID", $"Properties.sparkdatabricksclusterUsageTagsclusterId")
-//        .select('SparkContextID, 'JobGroupID, 'StageID, 'ClusterID)
-//        .withColumn("ClusterID", when('ClusterID.isNull, first('ClusterID).over(jobGroupIDW)).otherwise('ClusterID))
-//        .withColumn("StagesClusterID", when('ClusterID.isNull, last('ClusterID).over(jobGroupIDW)).otherwise('ClusterID))
-//        .drop("ClusterID")
-//
-//      val clusterIDByJobGroup = jobsProps.join(stagesProps, Seq("SparkContextID", "JobGroupID", "StageID"), "left")
-//        .withColumn("ClusterID", when('JobsClusterID.isNull, 'StagesClusterID).otherwise('JobsClusterID))
-//
-//      val clusterIDAtStageLevel = clusterIDByJobGroup
-//        .select('SparkContextID, 'StageID, 'ClusterID)
-//        .distinct
-//
-//      val clusterIDAtJobLevel = clusterIDByJobGroup
-//        .select('SparkContextID, 'JobID, 'ClusterID)
-//        .distinct
-//
-//      // TODO -- Add inference from logic of surrounding (time) records
-//      DerivedCluster(clusterIDAtJobLevel, clusterIDAtStageLevel)
-//    }
-
     def structFromJson(df: DataFrame, c: String): Column = {
       require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col ${c}")
       require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
@@ -139,7 +125,8 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // TODO -- Add validation that all desired power property columns exist
     def appendPowerProperties: Column = {
-      struct(
+
+      val azureProps = struct(
         $"Properties.sparkappname".alias("AppName"),
         $"Properties.sparkdatabricksapiurl".alias("WorkspaceURL"),
         $"Properties.sparkjobGroupid".alias("JobGroupID"),
@@ -148,9 +135,49 @@ trait SilverTransforms extends SparkSessionWrapper {
           $"Properties.sparkdatabricksclusterSource".alias("ClusterSource"),
           $"Properties.sparkdatabricksclusterUsageTagsautoTerminationMinutes".alias("AutoTerminationMinutes"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterAllTags".alias("ClusterTags"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterAvailability".alias("CluserAvailability"),
+          //          $"Properties.sparkdatabricksclusterUsageTagsclusterAvailability".alias("ClusterAvailability"), // Azure Missing
           $"Properties.sparkdatabricksclusterUsageTagsclusterId".alias("ClusterID"),
-//          $"Properties.sparkdatabricksclusterUsageTagsclusterInstancePoolId".alias("InstancePoolID"),
+          //          $"Properties.sparkdatabricksclusterUsageTagsclusterInstancePoolId".alias("InstancePoolID"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterMaxWorkers".alias("MaxWorkers"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterMinWorkers".alias("MinWorkers"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterName".alias("Name"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterOwnerUserId".alias("OwnerUserID"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterScalingType".alias("ScalingType"),
+          //          $"Properties.sparkdatabricksclusterUsageTagsclusterSpotBidPricePercent".alias("SpotBidPricePercent"), //Azure Missing
+          $"Properties.sparkdatabricksclusterUsageTagsclusterTargetWorkers".alias("TargetWorkers"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterWorkers".alias("ActualWorkers"),
+          //          $"Properties.sparkdatabricksclusterUsageTagscontainerZoneId".alias("ZoneID"), // Azure Missing
+          $"Properties.sparkdatabricksclusterUsageTagsdataPlaneRegion".alias("Region"),
+          $"Properties.sparkdatabricksclusterUsageTagsdriverNodeType".alias("DriverNodeType"),
+          $"Properties.sparkdatabricksworkerNodeTypeId".alias("WorkerNodeType"),
+          $"Properties.sparkdatabricksclusterUsageTagssparkVersion".alias("SparkVersion")
+        ).alias("ClusterDetails"),
+        $"Properties.sparkdatabricksnotebookid".alias("NotebookID"),
+        $"Properties.sparkdatabricksnotebookpath".alias("NotebookPath"),
+        $"Properties.sparkdatabrickssparkContextId".alias("SparkContextID"),
+        $"Properties.sparkdriverhost".alias("DriverHostIP"),
+        $"Properties.sparkdrivermaxResultSize".alias("DriverMaxResults"),
+        $"Properties.sparkexecutorid".alias("ExecutorID"),
+        $"Properties.sparkexecutormemory".alias("ExecutorMemory"),
+        $"Properties.sparksqlexecutionid".alias("ExecutionID"),
+        $"Properties.sparksqlexecutionparent".alias("ExecutionParent"),
+        $"Properties.sparksqlshufflepartitions".alias("ShufflePartitions"),
+        $"Properties.user".alias("UserEmail"),
+        $"Properties.userID".alias("UserID")
+      )
+
+      val awsProps = struct(
+        $"Properties.sparkappname".alias("AppName"),
+        $"Properties.sparkdatabricksapiurl".alias("WorkspaceURL"),
+        $"Properties.sparkjobGroupid".alias("JobGroupID"),
+        $"Properties.sparkdatabrickscloudProvider".alias("CloudProvider"),
+        struct(
+          $"Properties.sparkdatabricksclusterSource".alias("ClusterSource"),
+          $"Properties.sparkdatabricksclusterUsageTagsautoTerminationMinutes".alias("AutoTerminationMinutes"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterAllTags".alias("ClusterTags"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterAvailability".alias("ClusterAvailability"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterId".alias("ClusterID"),
+          //          $"Properties.sparkdatabricksclusterUsageTagsclusterInstancePoolId".alias("InstancePoolID"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterMaxWorkers".alias("MaxWorkers"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterMinWorkers".alias("MinWorkers"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterName".alias("Name"),
@@ -178,8 +205,13 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"Properties.user".alias("UserEmail"),
         $"Properties.userID".alias("UserID")
       )
+
+      if (CLOUD_PROVIDER == "aws") awsProps
+      else azureProps
+
     }
   }
+
 
   protected def getJDBCSession(sessionStartDF: DataFrame, sessionEndDF: DataFrame): DataFrame = {
     sessionStartDF
@@ -230,7 +262,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def enhanceApplication()(df: DataFrame): DataFrame = {
     df.select('SparkContextID, 'AppID, 'AppName,
-      from_unixtime('Timestamp / 1000).cast("timestamp").alias("AppStartTime"),
+      UDF.toTS('Timestamp).alias("AppStartTime"),
       'Pipeline_SnapTS, 'filenameGroup)
   }
 
@@ -238,7 +270,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   private def simplifyExecutionsStart(df: DataFrame): DataFrame = {
     df.filter('Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
-      .select( 'clusterId, 'SparkContextID, 'description, 'details, 'executionId.alias("ExecutionID"),
+      .select('clusterId, 'SparkContextID, 'description, 'details, 'executionId.alias("ExecutionID"),
         'time.alias("SqlExecStartTime"),
         'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup"))
       .withColumn("timeRnk", rank().over(uniqueTimeWindow.orderBy('SqlExecStartTime)))
@@ -296,6 +328,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("JobRunTime", UDF.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
       .withColumn("startTimestamp", $"JobRunTime.startEpochMS")
+      .withColumn("startDate", $"JobRunTime.startTS".cast("date"))
   }
 
   protected def simplifyStageStart(df: DataFrame): DataFrame = {
@@ -328,6 +361,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("StageRunTime", UDF.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
       .withColumn("startTimestamp", $"StageRunTime.startEpochMS")
+      .withColumn("startDate", $"StageRunTime.startTS".cast("date"))
   }
 
   // TODO -- Add in Specualtive Tasks Event == org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted
@@ -369,12 +403,14 @@ trait SilverTransforms extends SparkSessionWrapper {
       )).drop("TaskStartInfo", "TaskEndInfo")
       .withColumn("TaskRunTime", UDF.subtractTime('LaunchTime, 'FinishTime)).drop("LaunchTime", "FinishTime")
       .withColumn("startTimestamp", $"TaskRunTime.startEpochMS")
+      .withColumn("startDate", $"TaskRunTime.startTS".cast("date"))
   }
 
+  // TODO -- Azure Review
   protected def userLogins()(df: DataFrame): DataFrame = {
     df.filter(
       'serviceName === "accounts" &&
-      'actionName.isin("login", "tokenLogin", "samlLogin", "jwtLogin") &&
+        'actionName.isin("login", "tokenLogin", "samlLogin", "jwtLogin") &&
         $"userIdentity.email" =!= "dbadmin")
       .select('timestamp, 'date, 'serviceName, 'actionName,
         $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
@@ -383,6 +419,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
   }
 
+  // TODO -- Azure Review
   protected def newAccounts()(df: DataFrame): DataFrame = {
     df.filter('serviceName === "accounts" && 'actionName.isin("add"))
       .select('date, 'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"),
@@ -400,16 +437,29 @@ trait SilverTransforms extends SparkSessionWrapper {
     val cluster_name_gen = first('cluster_name, true).over(cluster_name_gen_w)
     val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
 
-    val clusterSummaryCols = auditBaseCols ++ Array[Column](
-      when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
-      when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
-      'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
-      'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
-      'aws_attributes, 'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags,
-      'cluster_source, 'spark_env_vars, 'spark_conf,
-      when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
-      'acl_path_prefix, 'instance_pool_id, 'spark_version, 'cluster_creator, 'idempotency_token,
-      'organization_id, 'user_id, 'sourceIPAddress, 'ssh_public_keys)
+    val clusterSummaryCols = if (CLOUD_PROVIDER == "azure") {
+      auditBaseCols ++ Array[Column](
+        when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
+        when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
+        'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
+        'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
+        'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags,
+        'cluster_source, 'spark_env_vars, 'spark_conf,
+        'acl_path_prefix, 'instance_pool_id, 'spark_version, 'cluster_creator, 'idempotency_token,
+        'organization_id, 'user_id, 'sourceIPAddress)
+    } else {
+      auditBaseCols ++ Array[Column](
+        when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
+        when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
+        'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
+        'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
+        'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'ssh_public_keys,
+        'cluster_source, 'spark_env_vars, 'spark_conf,
+        when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
+        'acl_path_prefix, 'instance_pool_id, 'spark_version, 'cluster_creator, 'idempotency_token,
+        'organization_id, 'user_id, 'sourceIPAddress)
+    }
+
 
     auditRawDF
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
@@ -420,16 +470,19 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("cluster_state", cluster_state_gen)
   }
 
-  protected def buildClusterSpec(bronze_cluster_snap: PipelineTable)(df: DataFrame): DataFrame = {
+  protected def buildClusterSpec(
+                                  bronze_cluster_snap: PipelineTable
+                                )(df: DataFrame): DataFrame = {
     val lastClusterSnap = Window.partitionBy('cluster_id).orderBy('Pipeline_SnapTS.desc)
     val clusterBefore = Window.partitionBy('cluster_id)
       .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
     val clusterBaseDF = clusterBase(df)
+
     val clusterSpecBaseCols = Array[Column]('serviceName, 'actionName,
       'cluster_id, 'cluster_name, 'cluster_state, 'driver_node_type_id, 'node_type_id,
       'num_workers, 'autoscale, 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster, 'cluster_log_conf,
-      'aws_attributes, 'init_scripts, 'custom_tags, 'cluster_source, 'spark_env_vars, 'spark_conf,
-      'has_ssh_keys, 'acl_path_prefix, 'instance_pool_id, 'spark_version,
+      'init_scripts, 'custom_tags, 'cluster_source, 'spark_env_vars, 'spark_conf,
+      'acl_path_prefix, 'instance_pool_id, 'spark_version,
       'idempotency_token, 'organization_id, 'timestamp, 'userEmail)
 
     val clustersRemoved = clusterBaseDF
@@ -494,7 +547,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter($"response.statusCode" === 200)
       .filter('actionName.like("%esult"))
       .join(creatorLookup, Seq("cluster_id"), "left")
-      .withColumn("date", from_unixtime('timestamp.cast("double") / 1000).cast("timestamp"))
+      .withColumn("date", UDF.toTS('timestamp))
       .withColumn("tsS", ('timestamp / 1000).cast("long"))
       .withColumn("reset",
         sum(when('actionName.isin("startResult", "restartResult", "createResult"), lit(1))
@@ -502,7 +555,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("runtime_curr_stateS",
         coalesce(
           when(!'actionName.isin("startResult", "createResult"), ('tsS - lag('tsS, 1).over(reset)))
-          .otherwise(lit(0)), lit(0)
+            .otherwise(lit(0)), lit(0)
         ))
       .withColumn("cumulative_uptimeS", sum('runtime_curr_stateS).over(cumsum))
       .withColumn("created_by",
@@ -548,6 +601,7 @@ trait SilverTransforms extends SparkSessionWrapper {
             .otherwise('last_terminated_by), lit("Unknown")
         ))
 
+    // TODO -- Azure -- fix this for azure instance types
     val clusterStatusCols = Array[Column]('date, 'timestamp, 'serviceName, 'actionName, 'cluster_id,
       'cluster_name, 'cluster_state, 'actual_workers, 'DriverNodeType, 'driverVCPUs, 'driverMemoryGB,
       'WorkerNodeType, 'workerVCPUs, 'workerMemoryGB, 'cluster_worker_memory, 'cpu_time_curr_state,
@@ -562,18 +616,18 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // TODO -- NEED TO ADD AZURE SUPPORT
     //  When azure is ready -- add if cloud type...
-    val ec2Lookup = cloudMachineDetail.asDF
+    val instanceDetailLookup = cloudMachineDetail.asDF
       .withColumn("DriverNodeType", 'API_Name)
       .withColumn("WorkerNodeType", 'API_Name)
 
-    val driverLookup = ec2Lookup
+    val driverLookup = instanceDetailLookup
       .withColumnRenamed("On_Demand_Cost_Hourly", "driverHourlyCostOnDemand")
       .withColumnRenamed("Linux_Reserved_Cost_Hourly", "driverHourlyCostReserved")
       .withColumnRenamed("vCPUs", "driverVCPUs")
       .withColumnRenamed("Memory_GB", "driverMemoryGB")
       .drop("WorkerNodeType")
 
-    val workerLookup = ec2Lookup
+    val workerLookup = instanceDetailLookup
       .withColumnRenamed("On_Demand_Cost_Hourly", "workerHourlyCostOnDemand")
       .withColumnRenamed("Linux_Reserved_Cost_Hourly", "workerHourlyCostReserved")
       .withColumnRenamed("vCPUs", "workerVCPUs")
@@ -612,55 +666,34 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   /**
    * First shot At Silver Job Runs
+   *
    * @param df
    * @return
    */
 
-    // TODO -- Job Runs Silver
-//  // Review new_cluster/existingCluster from runs...is it needed?
-//  val jobRunCompleteCols: Array[Column] = Array(
-//    'timestamp.alias("completeTimeStamp"), 'jobId.alias("jobIdCompletion"), 'runId, 'idInJob.alias("idInJobCompletion"), 'jobClusterType, 'userAgent.alias("userAgentCompletion"), 'jobTerminalState, 'jobTriggerType, 'jobTaskType, $"response.errorMessage".alias("errorMessage"), when($"userIdentity.email" === "unknown", lit(null)).otherwise($"userIdentity.email").alias("userEmailCompletion"))
-//
-//  val jobRunStartCols: Array[Column] = Array(
-//    'serviceName, 'actionName, 'timestamp.alias("startTimestamp"), 'job_id, when('runId.isNull, get_json_object($"response.result", "$.run_id")).otherwise('runId).alias("runId"),
-//    get_json_object($"response.result", "$.number_in_job").alias("idInJob"), 'run_name,
-//    $"userIdentity.email".alias("userEmail"), 'userAgent, get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"), 'timeout_seconds, 'sessionId, 'requestId, 'response, 'sourceIPAddress, 'version)
-//
-//  val jobRunsCols: Array[Column] = Array(
-//    'serviceName, 'actionName, when('jobIdCompletion.isNull, 'job_id).otherwise('jobIdCompletion).alias("jobId"), 'runId, 'jobClusterType, 'jobTerminalState, 'jobTriggerType, 'jobTaskType, 'errorMessage,
-//    'run_name, 'notebook_path, when('userAgent.isNull, 'userAgentCompletion).otherwise('userAgent).alias("userAgent"), 'timeout_seconds,
-//    when('idInJobCompletion.isNull, 'idInJob).otherwise('idInJobCompletion).alias("idInJob"),
-//    subtractTime('startTimestamp, 'completeTimeStamp).alias("JobRunTime"),
-//    when('userEmail.isNull, 'userEmailCompletion).otherwise('userEmail).alias("userEmail"), 'sessionId, 'requestId, 'response, 'sourceIPAddress, 'version
-//  )
-//
-//  val jobRunsStartDF = auditJobs
-//    .filter('actionName.isin("runNow", "submitRun"))
-//    .select(jobRunStartCols: _*)
-//    .filter('runId.isNotNull)
-//
-//  val jobRunsCompleteDF = auditJobs
-//    .filter('actionName.isin("runSucceeded", "cancel", "runFailed"))
-//    .select(jobRunCompleteCols: _*)
-//    .filter('runId.isNotNull)
-//
-//  val jobRunsSilver = jobRunsStartDF
-//    .join(jobRunsCompleteDF, Seq("runId"))
-//    .select(jobRunsCols: _*)
-
+  //TODO -- jobs snapshot api seems to be returning more data than audit logs, review
+  //  example = maxRetries, max_concurrent_runs, jar_task, python_task
+  //  audit also seems to be missing many job_names (if true, retrieve from snap)
   private def getJobsBase(df: DataFrame): DataFrame = {
-      df
-        .filter('serviceName === "jobs")
-        .selectExpr("*", "requestParams.*").drop("requestParams")
-    }
+    df
+      .filter('serviceName === "jobs")
+      .selectExpr("*", "requestParams.*").drop("requestParams")
+  }
 
+  // TODO -- Add union lookup to jobs snapshot to fill in holes
+  // TODO -- schedule is missing -- create function to check for missing columns and set them to null
+  //  schema validator
   protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
 
     val jobsBase = getJobsBase(df)
 
     val jobs_statusCols: Array[Column] = Array(
-      'serviceName, 'actionName, 'timestamp, when('job_id.isNull, get_json_object($"response.result", "$.job_id")).otherwise('job_id).alias("jobId"), 'job_type, 'name.alias("jobName"), 'timeout_seconds, 'schedule,
-      get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"), 'new_settings, 'existing_cluster_id, 'new_cluster,
+      'serviceName, 'actionName, 'timestamp,
+      when('job_id.isNull, get_json_object($"response.result", "$.job_id"))
+        .otherwise('job_id).alias("jobId"), 'job_type,
+      'name.alias("jobName"), 'timeout_seconds, 'schedule,
+      get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
+      'new_settings, 'existing_cluster_id, 'new_cluster,
       'sessionId, 'requestId, 'userAgent, 'response, 'sourceIPAddress, 'version
     )
 
@@ -761,7 +794,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .join(jobRunsCompleteDF, Seq("runId"))
       .select(jobRunsCols: _*)
       .withColumn("cluster_name", when('jobClusterType === "new",
-        concat(lit("job-"),'jobId,lit("-run-"),'idInJob)).otherwise(lit(null)))
+        concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
       .join(ephemeralClusterLookup, Seq("cluster_name"), "left")
       .withColumn("timestamp", $"JobRunTime.startEpochMS")
 

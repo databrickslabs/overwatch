@@ -5,6 +5,8 @@ import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWra
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Dataset, Row}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
+import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
+import org.apache.spark.sql.streaming.StreamingQueryListener._
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
 
 import scala.collection.mutable.ArrayBuffer
@@ -21,20 +23,59 @@ class Database(config: Config) extends SparkSessionWrapper {
 
   def getDatabaseName: String = _databaseName
 
+  def rollback(target: PipelineTable): Unit = {
+    val rollbackSql =
+      s"""
+         |delete from ${target.tableFullName}
+         |where Overwatch_RunID = ${config.runID}
+         |""".stripMargin
+    spark.sql(rollbackSql)
+  }
+
+  private def getQueryListener(query: StreamingQuery): StreamingQueryListener = {
+    val streamManager = new StreamingQueryListener() {
+      override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
+        println("Query started: " + queryStarted.id)
+      }
+      override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
+        println("Query terminated: " + queryTerminated.id)
+      }
+      override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
+        println("Query made progress: " + queryProgress.progress)
+        if (config.debugFlag) {
+          queryProgress.progress.observedMetrics.values().toArray().foreach(println)
+          println(query.status.prettyJson)
+        }
+        if (queryProgress.progress.numInputRows == 0) {
+          query.stop()
+        }
+      }
+    }
+    streamManager
+  }
+
   def write(df: DataFrame, target: PipelineTable): Boolean = {
 
     var finalDF: DataFrame = df
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
-    finalDF = SchemaTools.scrubSchema(finalDF)
 
 
 
     try {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
-      target.writer(finalDF).saveAsTable(target.tableFullName)
-//      if (!config.isLocalTesting) target.writer(finalDF).saveAsTable(target.tableFullName)
-//      else target.writer(finalDF).saveAsTable(target.tableFullName)
+      if (target.checkpointPath.nonEmpty) {
+
+        val streamWriter = target.writer(finalDF).asInstanceOf[DataStreamWriter[Row]].table(target.tableFullName)
+        val streamManager = getQueryListener(streamWriter)
+        spark.streams.addListener(streamManager)
+        streamWriter.awaitTermination()
+        spark.streams.removeListener(streamManager)
+
+      } else {
+        finalDF = SchemaTools.scrubSchema(finalDF)
+        target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
+      }
       logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
       true
     } catch {

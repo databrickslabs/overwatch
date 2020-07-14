@@ -8,10 +8,12 @@ import com.fasterxml.jackson.core.io.JsonStringEncoder
 import java.util.{Date, UUID}
 
 import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.fasterxml.jackson.annotation.JsonInclude.Include
 import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
+import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
@@ -31,10 +33,13 @@ object JsonUtils {
   private val encoder = JsonStringEncoder.getInstance
 
   def jsonToMap(message: String): Map[String, Any] = {
-    objectMapper.readValue(message, classOf[Map[String, Any]])
+    val cleanMessage = StringEscapeUtils.unescapeJson(message)
+    objectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
   }
 
-  def objToJson(obj: Any): JsonStrings = {
+  def objToJson(obj: Any, includeNulls: Boolean = false, includeEmpty: Boolean = false): JsonStrings = {
+    if (!includeNulls) objectMapper.setSerializationInclusion(Include.NON_NULL)
+    if (!includeEmpty) objectMapper.setSerializationInclusion(Include.NON_EMPTY)
     JsonStrings(
       objectMapper.writerWithDefaultPrettyPrinter.writeValueAsString(obj),
       objectMapper.writeValueAsString(obj),
@@ -126,6 +131,7 @@ object Helpers extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
+  import spark.implicits._
 
   private def parallelism: Int = {
     Math.min(driverCores, 8)
@@ -195,8 +201,9 @@ object Helpers extends SparkSessionWrapper {
 
   def parOptimize(db: String, parallelism: Int = parallelism - 1,
                   zOrdersByTable: Map[String, Array[String]] = Map(),
-                  vacuum: Boolean = true): Unit = {
+                  vacuum: Boolean = true, retentionHrs: Int = 168): Unit = {
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 256)
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     val tables = getTables(db)
     val tablesPar = tables.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
@@ -210,13 +217,14 @@ object Helpers extends SparkSessionWrapper {
         spark.sql(sql)
         if (vacuum) {
           println(s"vacuuming: ${db}.${tbl}")
-          spark.sql(s"vacuum ${db}.${tbl}")
+          spark.sql(s"vacuum ${db}.${tbl} RETAIN ${retentionHrs} HOURS")
         }
         println(s"Complete: ${db}.${tbl}")
       } catch {
         case e: Throwable => println(e.printStackTrace())
       }
     })
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
   }
 
   def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
@@ -298,6 +306,24 @@ object Helpers extends SparkSessionWrapper {
         case e: Throwable => println(s"FAILED: ${tbl.tableFullName} --> $sql")
       }
     })
+  }
+
+  private[overwatch] def fastDrop(fullTableName: String, cloudProvider: String): Unit = {
+    if (cloudProvider == "aws") {
+      spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+      spark.sql(s"truncate table ${fullTableName}")
+      spark.sql(s"VACUUM ${fullTableName} RETAIN 0 HOURS")
+      spark.sql(s"drop table if exists ${fullTableName}")
+      spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+    } else {
+      Seq("").toDF("HOLD")
+        .write
+        .mode("overwrite")
+        .format("delta")
+        .option("overwriteSchema", "true")
+        .saveAsTable(fullTableName)
+      spark.sql(s"drop table if exists ${fullTableName}")
+    }
   }
 
 }

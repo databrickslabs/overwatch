@@ -1,12 +1,13 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, Frequency, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, Frequency, JsonUtils, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalog.Table
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogTable}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, DataFrameWriter, Row}
 
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
@@ -15,8 +16,8 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame, DataFrameWrit
 case class PipelineTable(
                           name: String,
                           keys: Array[String],
-                          incrementalColumn: String, // TODO -- Change to CDC incrementing ID (i.e. allow appender to handle ints/etc
                           config: Config,
+                          incrementalColumns: Array[String] = Array(),
                           dataFrequency: Frequency = Frequency.milliSecond,
                           format: String = "delta", // TODO -- Convert to Enum
                           mode: String = "append", // TODO -- Convert to Enum
@@ -24,6 +25,7 @@ case class PipelineTable(
                           autoCompact: Boolean = false,
                           partitionBy: Array[String] = Array(),
                           statsColumns: Array[String] = Array(),
+                          shuffleFactor: Double = 1.0,
                           optimizeFrequency: Int = 24 * 7,
                           zOrderBy: Array[String] = Array(),
                           vacuum: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
@@ -31,13 +33,15 @@ case class PipelineTable(
                           sparkOverrides: Map[String, String] = Map[String, String](),
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true,
-                          isTemp: Boolean = false
+                          isTemp: Boolean = false,
+                          checkpointPath: Option[String] = None
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var currentSparkOverrides: Map[String, String] = sparkOverrides
   import spark.implicits._
 
+//  col("c").get
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try {
       Some(spark.sessionState.catalog.getDatabaseMetadata(config.databaseName))
@@ -55,10 +59,16 @@ case class PipelineTable(
 
   val tableFullName: String = s"${config.databaseName}.${name}"
 
-  if (autoOptimize) spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+  if (autoOptimize) {
+    spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+    println(s"Setting Auto Optimize for ${name}")
+  }
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
 
-  if (autoCompact) spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
+  if (autoCompact) {
+    spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
+    println(s"Setting Auto Compact for ${name}")
+  }
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
 
   /**
@@ -73,13 +83,57 @@ case class PipelineTable(
     if (sparkOverrides.nonEmpty && updates.isEmpty) {
       currentSparkOverrides foreach { case (k, v) =>
       try {
-          spark.conf.set(k, v)
+        if (config.debugFlag && spark.conf.get(k) != v)
+          println(s"Overriding $k from ${spark.conf.get(k)} --> $v")
+        spark.conf.set(k, v)
       } catch {
-          case e: AnalysisException => logger.log(Level.WARN, s"Cannot Set Spark Param: ${k}", e)
-          case e: Throwable => logger.log(Level.ERROR, s"Failed trying to set $k", e)
+          case e: AnalysisException =>
+            logger.log(Level.WARN, s"Cannot Set Spark Param: ${k}", e)
+            if (config.debugFlag) println(s"Failed Setting $k", e)
+          case e: Throwable =>
+            if (config.debugFlag) println(s"Failed Setting $k", e)
+            logger.log(Level.WARN, s"Failed trying to set $k", e)
         }
       }
     }
+  }
+
+  private def addOneTick(ts: Column, dt: DataType = TimestampType): Column = {
+    dt match {
+      case _: TimestampType =>
+        ((ts.cast("double") * 1000 + 1) / 1000).cast("timestamp")
+      case _: DateType =>
+        date_add(ts, 1)
+      case _: DoubleType =>
+        ts + lit(0.001)
+      case _: LongType =>
+        ts + 1
+      case _: IntegerType =>
+        ts + 1
+      case _ => throw new UnsupportedOperationException(s"Cannot add milliseconds to ${dt.typeName}")
+    }
+  }
+
+  private def buildIncrementalDF(df: DataFrame, moduleID: Int): DataFrame = {
+    val from = config.fromTime(moduleID)
+    val until = config.pipelineSnapTime
+    val incrementalFilters = incrementalColumns.map(c => {
+      df.schema.fields.filter(_.name == c).head.dataType match {
+        case dt: TimestampType => col(c).between(addOneTick(from.asColumnTS), until.asColumnTS)
+        case dt: DateType => col(c).between(addOneTick(from.asColumnTS), until.asColumnTS)
+        case dt: LongType => col(c).between(from.asUnixTimeMilli + 1, until.asUnixTimeMilli)
+        case dt: DoubleType => col(c).between(from.asUnixTimeMilli + 0.001, until.asUnixTimeMilli)
+        case dt: BooleanType => col(c) === lit(false)
+        case dt: DataType =>
+          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
+      }
+    })
+
+    incrementalFilters.foldLeft(df) {
+      case (rawDF, incrementalFilter) =>
+        rawDF.filter(incrementalFilter)
+    }
+
   }
 
   def asDF: DataFrame = {
@@ -92,17 +146,44 @@ case class PipelineTable(
     }
   }
 
-  def writer(df: DataFrame): DataFrameWriter[Row] = {
+  def asIncrementalDF(moduleID: Int): DataFrame = {
+    try{
+      buildIncrementalDF(spark.table(tableFullName), moduleID)
+    } catch {
+      case e: AnalysisException =>
+        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
+        Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
+    }
+  }
+
+  def writer(df: DataFrame): Any = {
     setSparkOverrides()
     val f = if (config.isLocalTesting && !config.isDBConnect) "parquet" else format
-    var writer = df.write.mode(mode).format(f)
+    if (checkpointPath.nonEmpty) {
+      val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
+      if (config.debugFlag) println(streamWriterMessage)
+      logger.log(Level.INFO, streamWriterMessage)
+      var streamWriter = df.writeStream.outputMode(mode).format(f).option("checkpointLocation", checkpointPath.get)
+          .queryName(s"StreamTo_${name}")
+      streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter
+      streamWriter = if (mode == "overwrite") streamWriter.option("overwriteSchema", "true")
+      else if (enableSchemaMerge && mode != "overwrite")
+        streamWriter.option("mergeSchema", "true")
+      else streamWriter
+      streamWriter
+    }else {
+      var dfWriter = df.write.mode(mode).format(f)
+      dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter
+      dfWriter = if (mode == "overwrite") dfWriter.option("overwriteSchema", "true")
+      else if (enableSchemaMerge && mode != "overwrite")
+        dfWriter.option("mergeSchema", "true")
+      else dfWriter
+      dfWriter
+    }
+
     // TODO - Validate proper repartition to minimize files per partition. Could be autoOptimize
-    writer = if (partitionBy.nonEmpty) writer.partitionBy(partitionBy: _*) else writer
-    writer = if (mode == "overwrite") writer.option("overwriteSchema", "true")
-    else if (enableSchemaMerge && mode != "overwrite")
-      writer.option("mergeSchema", "true")
-    else writer
-    writer
+
+
   }
 
 

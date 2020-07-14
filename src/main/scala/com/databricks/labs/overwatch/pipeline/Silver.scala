@@ -15,6 +15,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     with SilverTransforms with SparkSessionWrapper {
 
   envInit()
+  setCloudProvider(config.cloudProvider)
+
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -26,22 +28,16 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
    */
 
   // TODO -- Compare all configurations against defaults and notate non-default configs
-  private lazy val sparkEventsDF: DataFrame = BronzeTargets.sparkEventLogsTarget.asDF
-    .withColumn("filenameGroup", UDF.groupFilename('filename))
 
-  private var newAuditLogsDF: DataFrame = if (config.overwatchScope.contains(OverwatchScope.audit))
-    BronzeTargets.auditLogsTarget.asDF
-  else null
-
-//  According to Michael -- don't use rdd cache
-//  private def cacheAuditLogs(auditModuleIDs: Array[Int]): Unit = {
-//    val minAuditTS = config.lastRunDetail.filter(run => auditModuleIDs.contains(run.moduleID)).map(_.untilTS).min
-//    val minAuditColTS = config.createTimeDetail(minAuditTS).asColumnTS
-//    newAuditLogsDF = newAuditLogsDF
-//      .filter('date >= minAuditColTS.cast("date"))
-//      .repartition(getTotalCores).cache
-//    newAuditLogsDF.count()
-//  }
+  //  According to Michael -- don't use rdd cache
+  //  private def cacheAuditLogs(auditModuleIDs: Array[Int]): Unit = {
+  //    val minAuditTS = config.lastRunDetail.filter(run => auditModuleIDs.contains(run.moduleID)).map(_.untilTS).min
+  //    val minAuditColTS = config.createTimeDetail(minAuditTS).asColumnTS
+  //    newAuditLogsDF = newAuditLogsDF
+  //      .filter('date >= minAuditColTS.cast("date"))
+  //      .repartition(getTotalCores).cache
+  //    newAuditLogsDF.count()
+  //  }
 
   // Slack Chat
   // https://databricks.slack.com/archives/C04SZU99Q/p1588959876188200
@@ -82,15 +78,15 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
    * Executor
    */
 
-  lazy private val executorAddedDF: DataFrame = sparkEventsDF
-    .filter('Event === "SparkListenerExecutorAdded")
-    .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
-      'filenameGroup.alias("startFilenameGroup"))
-
-  lazy private val executorRemovedDF: DataFrame = sparkEventsDF
-    .filter('Event === "SparkListenerExecutorRemoved")
-    .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
-      'filenameGroup.alias("endFilenameGroup"))
+//  lazy private val executorAddedDF: DataFrame = sparkEventsDF
+//    .filter('Event === "SparkListenerExecutorAdded")
+//    .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
+//      'filenameGroup.alias("startFilenameGroup"))
+//
+//  lazy private val executorRemovedDF: DataFrame = sparkEventsDF
+//    .filter('Event === "SparkListenerExecutorRemoved")
+//    .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
+//      'filenameGroup.alias("endFilenameGroup"))
 
 
   /**
@@ -102,69 +98,76 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   //  lazy val appendJDBCSessionsProcess = EtlDefinition(
   //    getJDBCSession(Sources.serverSessionStartDF, Sources.serverSessionEndDF),
   //    None,
-  //    append(Silver.jdbcSessionsTarget, newDataOnly = true),
+  //    append(Silver.jdbcSessionsTarget),
   //    Module(2001, "SPARK_JDBC_Sessions_Raw")
   //  )
   //
   //  lazy val appendJDBCOperationsProcess = EtlDefinition(
   //    getJDBCOperation(Sources.serverOperationStartDF, Sources.serverOperationEndDF),
   //    None,
-  //    append(Silver.jdbcOperationsTarget, newDataOnly = true),
+  //    append(Silver.jdbcOperationsTarget),
   //    Module(2002, "SPARK_JDBC_Operations_Raw")
   //  )
 
+  private val executorsModule = Module(2003, "SPARK_Executors_Raw")
   lazy private val appendExecutorsProcess = EtlDefinition(
-    sparkEventsDF,
+    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(executorsModule.moduleID),
     Some(Seq(executor())),
-    append(SilverTargets.executorsTarget, newDataOnly = true),
-    Module(2003, "SPARK_Executors_Raw")
+    append(SilverTargets.executorsTarget),
+    executorsModule
   )
 
   // TODO -- Build Bronze
-//  lazy val appendApplicationsProcess = EtlDefinition(
-//    sparkEventsDF,
-//    Some(Seq(enhanceApplication())),
-//    append(Silver., newDataOnly = true),
-//    Module(2004, "SPARK_Applications_Raw")
-//  )
+  //  lazy val appendApplicationsProcess = EtlDefinition(
+  //    sparkEventsDF,
+  //    Some(Seq(enhanceApplication())),
+  //    append(Silver.),
+  //    Module(2004, "SPARK_Applications_Raw")
+  //  )
 
+  private val executionsModule = Module(2005, "SPARK_Executions_Raw")
   lazy private val appendExecutionsProcess = EtlDefinition(
-    sparkEventsDF,
+    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(executionsModule.moduleID),
     Some(Seq(sqlExecutions())),
-    append(SilverTargets.executionsTarget, newDataOnly = true),
-    Module(2005, "SPARK_Executions_Raw")
+    append(SilverTargets.executionsTarget),
+    executionsModule
   )
 
+  private val jobsModule = Module(2006, "SPARK_Jobs_Raw")
   lazy private val appendJobsProcess = EtlDefinition(
-    sparkEventsDF,
+    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(jobsModule.moduleID),
     Some(Seq(sparkJobs())),
-    append(SilverTargets.jobsTarget, newDataOnly = true),
-    Module(2006, "SPARK_Jobs_Raw")
+    append(SilverTargets.jobsTarget),
+    jobsModule
   )
 
+  private val stagesModule = Module(2007, "SPARK_Stages_Raw")
   lazy private val appendStagesProcess = EtlDefinition(
-    sparkEventsDF,
+    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(stagesModule.moduleID),
     Some(Seq(sparkStages())),
-    append(SilverTargets.stagesTarget, newDataOnly = true),
-    Module(2007, "SPARK_Stages_Raw")
+    append(SilverTargets.stagesTarget),
+    stagesModule
   )
 
+  private val tasksModule = Module(2008, "SPARK_Tasks_Raw")
   lazy private val appendTasksProcess = EtlDefinition(
-    sparkEventsDF,
+    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(tasksModule.moduleID),
     Some(Seq(sparkTasks())),
-    append(SilverTargets.tasksTarget, newDataOnly = true),
-    Module(2008, "SPARK_Tasks_Raw")
+    append(SilverTargets.tasksTarget),
+    tasksModule
   )
 
+  private val jobStatusModule = Module(2010, "Silver_JobsStatus")
   lazy private val appendJobStatusProcess = EtlDefinition(
-    newAuditLogsDF,
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule.moduleID),
     Some(Seq(dbJobsStatusSummary())),
-    append(SilverTargets.dbJobsStatusTarget, newDataOnly = true),
-    Module(2010, "Silver_JobsStatus")
+    append(SilverTargets.dbJobsStatusTarget),
+    jobStatusModule
   )
 
+  private val jobRunsModule = Module(2011, "Silver_JobsRuns")
   lazy private val appendJobRunsProcess = EtlDefinition(
-    newAuditLogsDF,
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule.moduleID),
     Some(Seq(
       dbJobRunsSummary(
         SilverTargets.clustersSpecTarget,
@@ -172,20 +175,25 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.jobsSnapshotTarget
       )
     )),
-    append(SilverTargets.dbJobRunsTarget, newDataOnly = true),
-    Module(2011, "Silver_JobsRuns")
+    append(SilverTargets.dbJobRunsTarget),
+    jobRunsModule
   )
 
+  private val clusterSpecModule = Module(2014, "Silver_ClusterSpec")
   lazy private val appendClusterSpecProcess = EtlDefinition(
-    newAuditLogsDF,
-    Some(Seq(buildClusterSpec(BronzeTargets.clustersSnapshotTarget))),
-    append(SilverTargets.clustersSpecTarget, newDataOnly = true),
-    Module(2014, "Silver_ClusterSpec")
+    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule.moduleID),
+    Some(Seq(
+      buildClusterSpec(
+        BronzeTargets.clustersSnapshotTarget
+      ))),
+    append(SilverTargets.clustersSpecTarget),
+    clusterSpecModule
   )
 
 
+  private val clusterStatusModule = Module(2015, "Silver_ClusterStatus")
   lazy private val appendClusterStatusProcess = EtlDefinition(
-    newAuditLogsDF,
+    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterStatusModule.moduleID),
     Some(Seq(
       buildClusterStatus(
         SilverTargets.clustersSpecTarget,
@@ -193,94 +201,97 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.cloudMachineDetail
       )
     )),
-    append(SilverTargets.clustersStatusTarget, newDataOnly = true),
-    Module(2015, "Silver_ClusterStatus")
+    append(SilverTargets.clustersStatusTarget),
+    clusterStatusModule
   )
 
+  private val userLoginsModule = Module(2016, "Silver_UserLogins")
   lazy private val appendUserLoginsProcess = EtlDefinition(
-    newAuditLogsDF,
+    BronzeTargets.auditLogsTarget.asIncrementalDF(userLoginsModule.moduleID),
     Some(Seq(userLogins())),
-    append(SilverTargets.userLoginsTarget, newDataOnly = true),
-    Module(2016, "Silver_UserLogins")
+    append(SilverTargets.userLoginsTarget),
+    userLoginsModule
   )
 
+  private val newAccountsModule = Module(2017, "Silver_NewAccounts")
   lazy private val appendNewAccountsProcess = EtlDefinition(
-    newAuditLogsDF,
+    BronzeTargets.auditLogsTarget.asIncrementalDF(newAccountsModule.moduleID),
     Some(Seq(newAccounts())),
-    append(SilverTargets.newAccountsTarget, newDataOnly = true),
-    Module(2017, "Silver_NewAccounts")
+    append(SilverTargets.newAccountsTarget),
+    newAccountsModule
   )
 
+  private val notebookSummaryModule = Module(2018, "Silver_Notebooks")
   lazy private val appendNotebookSummaryProcess = EtlDefinition(
-    newAuditLogsDF,
+    BronzeTargets.auditLogsTarget.asIncrementalDF(notebookSummaryModule.moduleID),
     Some(Seq(notebookSummary())),
-    append(SilverTargets.notebookStatusTarget, newDataOnly = true),
-    Module(2018, "Silver_Notebooks")
+    append(SilverTargets.notebookStatusTarget),
+    notebookSummaryModule
   )
 
+  // TODO -- temp until refactor
+  private def updateSparkEventsPipelineState(eventLogsBronze: PipelineTable): Unit = {
+    val updateSql =
+      s"""
+         |update ${eventLogsBronze.tableFullName}
+         |set Downstream_Processed = true
+         |where Downstream_Processed = false
+         |""".stripMargin
+    spark.sql(updateSql)
+  }
 
-  def processSparkEvents: Array[ModuleStatusReport] = {
+  private def processSparkEvents(): Unit = {
 
-    Array(
-//      appendJDBCSessionsProcess.process(),
-//      appendJDBCOperationsProcess.process(),
-      appendExecutorsProcess.process(),
-//      appendApplicationsProcess.process(),
-      appendExecutionsProcess.process(),
-      appendJobsProcess.process(),
-      appendStagesProcess.process(),
+    try {
+      //      appendJDBCSessionsProcess.process(),
+      //      appendJDBCOperationsProcess.process(),
+      appendExecutorsProcess.process()
+      //      appendApplicationsProcess.process(),
+      appendExecutionsProcess.process()
+      appendJobsProcess.process()
+      appendStagesProcess.process()
       appendTasksProcess.process()
-    )
+      updateSparkEventsPipelineState(BronzeTargets.sparkEventLogsTarget)
+    } catch{
+      case e: Throwable => {
+        println(s"Failures detected in spark events processing. Failing and rolling back spark events Silver. $e")
+        logger.log(Level.ERROR, s"Failed Spark Events Silver", e)
+      }
+    }
+
   }
 
   def run(): Boolean = {
 
+    restoreSparkConf()
+    setCloudProvider(config.cloudProvider)
     // TODO -- see which transforms are possible without audit and rebuild for no-audit
     //  CURRENTLY -- audit is required for silver
-    val reports = ArrayBuffer[ModuleStatusReport]()
     val scope = config.overwatchScope
 
-    if (scope.contains(OverwatchScope.audit)) {
-
-      reports.append(appendUserLoginsProcess.process())
-      reports.append(appendNewAccountsProcess.process())
-
-      if (scope.contains(OverwatchScope.sparkEvents))
-        processSparkEvents.foreach(sparkReport => reports.append(sparkReport))
-      if (scope.contains(OverwatchScope.clusters))
-        reports.append(appendClusterSpecProcess.process())
-      reports.append(appendClusterStatusProcess.process())
-      if (scope.contains(OverwatchScope.jobs))
-        reports.append(appendJobStatusProcess.process())
-      if (scope.contains(OverwatchScope.jobRuns))
-        reports.append(appendJobRunsProcess.process())
-      if (scope.contains(OverwatchScope.notebooks))
-        reports.append(appendNotebookSummaryProcess.process())
-    } else {
-      println(s"ERROR: Currently Silver is only supported with audit logs. Please enable audit logs and " +
-        s"ensure the initial run has completed in Bronze")
+    if (scope.contains(OverwatchScope.accounts)) {
+      appendUserLoginsProcess.process()
+      appendNewAccountsProcess.process()
     }
 
-//    config.overwatchScope.foreach {
-//      case OverwatchScope.sparkEvents =>
-//        processSparkEvents.foreach(sparkReport => reports.append(sparkReport))
-//      case OverwatchScope.jobs => reports.append(appendJobStatusProcess.process())
-//      case OverwatchScope.clusters => {
-//        reports.append(appendClusterSpecProcess.process())
-//        reports.append(appendClusterStatusProcess.process())
-//      }
-//      case OverwatchScope.notebooks => reports.append(appendNotebookSummaryProcess.process())
-////      case OverwatchScope.pools =>
-//      case OverwatchScope.audit =>
-////        val auditModuleIDs = Array(2010, 2014, 2016, 2017)
-////        cacheAuditLogs(auditModuleIDs)
-//        reports.append(appendUserLoginsProcess.process())
-//        reports.append(appendNewAccountsProcess.process())
-//        // todo -- create notebook ETL
-//        // todo -- create pools history from audit log
-//      case _ => ""
-//    }
-    finalizeRun(reports.toArray)
+    if (scope.contains(OverwatchScope.sparkEvents))
+      processSparkEvents()
+    if (scope.contains(OverwatchScope.clusters)) {
+      appendClusterSpecProcess.process()
+      appendClusterStatusProcess.process()
+    }
+    if (scope.contains(OverwatchScope.jobs)) {
+      appendJobStatusProcess.process()
+    }
+
+    if (scope.contains(OverwatchScope.jobs)) {
+      appendJobRunsProcess.process()
+    }
+
+    if (scope.contains(OverwatchScope.notebooks))
+      appendNotebookSummaryProcess.process()
+
+    initiatePostProcessing()
     true
   }
 

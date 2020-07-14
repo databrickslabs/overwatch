@@ -19,7 +19,7 @@ trait SparkSessionWrapper extends Serializable {
   } else {
     logger.log(Level.INFO, "Using Custom, local SparkSession")
     SparkSession.builder()
-      .master("local")
+      .master("local[*]")
       .appName("OverwatchBatch")
 //      .config("spark.driver.bindAddress", "0.0.0.0")
 //      .enableHiveSupport()
@@ -28,7 +28,6 @@ trait SparkSessionWrapper extends Serializable {
   }
 
   lazy val sc: SparkContext = spark.sparkContext
-  if (System.getenv("OVERWATCH") == "LOCAL") sc.setLogLevel("WARN") else sc.setLogLevel("INFO")
 //  sc.setLogLevel("DEBUG")
 
   private var _coresPerWorker: Int = _
@@ -75,7 +74,8 @@ trait SparkSessionWrapper extends Serializable {
 
   def getDriverCores: Int = driverCores
 
-  def envInit(): Boolean = {
+  def envInit(logLevel: String = "INFO"): Boolean = {
+    sc.setLogLevel(logLevel)
     if (System.getenv("OVERWATCH") != "LOCAL") {
       setCoresPerWorker(sc.parallelize("1", 1)
         .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0))
@@ -96,10 +96,8 @@ trait SparkSessionWrapper extends Serializable {
       }
     )
     setParTasks(scala.math.floor(getTotalCores / getCoresPerTask).toInt)
-    if (spark.conf.get("spark.sql.shuffle.partitions") == "200")
-      spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 4)
-
-    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", "134217728")
+//    if (spark.conf.get("spark.sql.shuffle.partitions") == "200")
+//      spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 4)
 
     true
   }
