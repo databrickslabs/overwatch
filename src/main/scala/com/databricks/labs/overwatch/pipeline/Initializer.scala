@@ -82,7 +82,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
             s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
         })
 
-      val finalAuditLogPath = auditLogPath.get.replaceAll("//", "/")
+      val finalAuditLogPath = if (auditLogPath.get.endsWith("/")) auditLogPath.get.dropRight(1) else auditLogPath.get
 
       config.setAuditLogConfig(
         auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), None)

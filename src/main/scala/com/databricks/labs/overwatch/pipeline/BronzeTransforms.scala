@@ -86,14 +86,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
                          apiType: String,
                          ids: Array[T], idsKey: String,
                          extraQuery: Option[Map[String, Any]] = None): Array[String] = {
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(4))
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(64))
     val idsPar = ids.par
     idsPar.tasksupport = taskSupport
     //    DEBUG
     //    val idsPar = Array("0827-194754-tithe1")
     // removing parallelization for now to see if it fixes some weird errors
     // CONFIRMED -- Parallelizing this breaks the token cipher
-    val results = ids.flatMap(id => {
+    val results = idsPar.flatMap(id => {
       val rawQuery = Map(
         idsKey -> id
       )
@@ -105,7 +105,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val apiCall = ApiCall(endpoint, apiEnv, Some(query))
       if (apiType == "post") apiCall.executePost().asStrings
       else apiCall.executeGet().asStrings
-    }) //.toArray
+    }).toArray
     if (results.isEmpty) {
       setNewDataRetrievedFlag(false)
       //      throw new NoNewDataException(s"${endpoint} returned no new data, skipping") // TODO -- BUBBLE THIS UP

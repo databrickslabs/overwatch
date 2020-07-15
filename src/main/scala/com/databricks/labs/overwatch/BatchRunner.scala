@@ -19,9 +19,9 @@ object BatchRunner extends SparkSessionWrapper{
     envInit()
     setGlobalDeltaOverrides()
 
-//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1_wildlife.jar")
+    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2_wildlife.jar")
 //    sc.addFile("C:\\Dev\\git\\Databricks--Overwatch\\src\\main\\resources\\ec2_details_tbl", true)
-//    spark.sql("drop database if exists overwatch_local cascade")
+    spark.sql("drop database if exists overwatch_local2 cascade")
 //
 
 
