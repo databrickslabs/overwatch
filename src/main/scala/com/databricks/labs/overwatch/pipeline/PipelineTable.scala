@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, Frequency, JsonUtils, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter, JsonUtils, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalog.Table
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -116,30 +116,31 @@ case class PipelineTable(
     }
   }
 
-  private def buildIncrementalDF(df: DataFrame, moduleID: Int): DataFrame = {
-    val from = config.fromTime(moduleID)
-    val until = config.pipelineSnapTime
-    val incrementalFilters = incrementalColumns.map(c => {
-      df.schema.fields.filter(_.name == c).head.dataType match {
-        case _: TimestampType => col(c).between(addOneTick(from.asColumnTS), until.asColumnTS)
-        case _: DateType => {
-          val maxVal = df.select(max(c)).as[String].collect().head
-          col(c).between(addOneTick(lit(maxVal).cast("date"), DateType), until.asColumnTS.cast("date"))
-        }
-        case _: LongType => col(c).between(from.asUnixTimeMilli + 1, until.asUnixTimeMilli)
-        case _: DoubleType => col(c).between(from.asUnixTimeMilli + 0.001, until.asUnixTimeMilli)
-        case _: BooleanType => col(c) === lit(false)
-        case dt: DataType =>
-          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
-      }
-    })
-
-    incrementalFilters.foldLeft(df) {
-      case (rawDF, incrementalFilter) =>
-        rawDF.filter(incrementalFilter)
-    }
-
-  }
+  // TODO -- Add partition filter
+//  private def buildIncrementalDF(df: DataFrame, filter: IncrementalFilter): DataFrame = {
+//    val low = filter.low
+//    val high = filter.high
+//    val incrementalFilters = incrementalColumns.map(c => {
+//      df.schema.fields.filter(_.name == c).head.dataType match {
+//        case _: TimestampType => col(c).between(addOneTick(low.asColumnTS), high.asColumnTS)
+//        case _: DateType => {
+//          val maxVal = df.select(max(c)).as[String].collect().head
+//          col(c).between(addOneTick(lit(maxVal).cast("date"), DateType), high.asColumnTS.cast("date"))
+//        }
+//        case _: LongType => col(c).between(low.asUnixTimeMilli + 1, high.asUnixTimeMilli)
+//        case _: DoubleType => col(c).between(low.asUnixTimeMilli + 0.001, high.asUnixTimeMilli)
+//        case _: BooleanType => col(c) === lit(false)
+//        case dt: DataType =>
+//          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
+//      }
+//    })
+//
+//    incrementalFilters.foldLeft(df) {
+//      case (rawDF, incrementalFilter) =>
+//        rawDF.filter(incrementalFilter)
+//    }
+//
+//  }
 
   def asDF: DataFrame = {
     try {
@@ -151,13 +152,42 @@ case class PipelineTable(
     }
   }
 
-  def asIncrementalDF(moduleID: Int): DataFrame = {
-    try {
-      buildIncrementalDF(spark.table(tableFullName), moduleID)
-    } catch {
-      case e: AnalysisException =>
-        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
-        Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
+  // TODO - REMOVE try/catch???
+//  def asIncrementalDF(moduleID: Int): DataFrame = {
+//    try {
+//      buildIncrementalDF(spark.table(tableFullName), moduleID)
+//    } catch {
+//      case e: AnalysisException =>
+//        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
+//        Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
+//    }
+//  }
+
+  def asIncrementalDF(filters: IncrementalFilter*): DataFrame = {
+    val df = spark.table(tableFullName)
+    val parsedFilters = filters.map(filter => {
+      val c = filter.sourceCol
+      val low = filter.low
+      val high = filter.high
+      df.schema.fields.filter(_.name == c).head.dataType match {
+        case _: TimestampType => col(c).between(addOneTick(low), high)
+        case _: DateType => {
+//          val maxVal = df.select(max(c)).as[String].collect().head
+          col(c).between(addOneTick(low.cast(DateType), DateType), high.cast(DateType))
+        }
+        case _: LongType => col(c).between(addOneTick(low, LongType), high.cast(LongType))
+        case _: DoubleType => col(c).between(addOneTick(low, DoubleType), high.cast(DoubleType))
+        case dt: DataType =>
+          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
+      }
+    })
+
+    val filterExpressions = parsedFilters.map(_.expr).foreach(println)
+    logger.log(Level.INFO, filterExpressions)
+    if (config.debugFlag) println(s"${tableFullName} Incremental Filter: ${filterExpressions}")
+    parsedFilters.foldLeft(df) {
+      case (rawDF, filter) =>
+        rawDF.filter(filter)
     }
   }
 
