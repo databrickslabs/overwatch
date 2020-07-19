@@ -66,6 +66,10 @@ class Database(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
       if (target.checkpointPath.nonEmpty) {
 
+        val msg = s"Checkpoint Path Set: ${target.checkpointPath.get} - proceeding with streaming write"
+        logger.log(Level.INFO, msg)
+        if (config.debugFlag) println(msg)
+
         val streamWriter = target.writer(finalDF).asInstanceOf[DataStreamWriter[Row]].table(target.tableFullName)
         val streamManager = getQueryListener(streamWriter)
         spark.streams.addListener(streamManager)
@@ -79,7 +83,13 @@ class Database(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
       true
     } catch {
-      case e: Throwable => logger.log(Level.ERROR, s"Failed to write to ${_databaseName}", e); false
+      case e: Throwable => {
+        val failMsg = s"Failed to write to ${_databaseName}. Attempting to rollback"
+        logger.log(Level.ERROR, failMsg, e)
+        println(s"ERROR --> ${target.tableFullName}", e)
+        rollback(target)
+        false
+      }
     }
   }
 
