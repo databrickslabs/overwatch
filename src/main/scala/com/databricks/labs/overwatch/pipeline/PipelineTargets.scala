@@ -31,7 +31,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val auditLogsTarget: PipelineTable = PipelineTable(
       name = "audit_log_bronze",
-      keys = Array("requestId", "timestamp"),
+      keys = Array("requestId"),
       config,
       incrementalColumns = Array("date", "timestamp"),
       partitionBy = Array("date"),
@@ -59,18 +59,6 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("timestamp"),
       statsColumns = ("cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID").split(", "))
 
-    // TODO -- Removing -- perf testing
-//    lazy private[overwatch] val sparkEventLogsTempTarget: PipelineTable = PipelineTable(
-//      name = "spark_events_temp_raw",
-//      keys = Array("Event"),
-//      config,
-//      incrementalColumns = Array("time"),
-//      mode = "overwrite",
-//      withCreateDate = false,
-//      withOverwatchRunID = false,
-//      isTemp = true
-//    )
-
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
       keys = Array("Event"),
@@ -78,9 +66,22 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("Downstream_Processed"),
       partitionBy = Array("Event", "Downstream_Processed"),
       statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
-      sparkOverrides = Map(
-        "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 48).toString
-      ),
+      sparkOverrides = if (config.isFirstRun) {
+        Map(
+          "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 48).toString,
+          "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+          "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
+          "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
+          "spark.hadoop.fs.s3a.multipart.size" -> "104857600"
+        )
+      } else {
+        Map(
+          "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 48).toString,
+          "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+          "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
+          "spark.hadoop.fs.s3a.multipart.size" -> "104857600"
+        )
+      },
       autoOptimize = true // TODO -- perftest
     )
 
@@ -152,7 +153,16 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Array("startDate", "clusterId"),
       shuffleFactor = 1.2,
-      autoOptimize = true
+      autoOptimize = true,
+      sparkOverrides = if (config.isFirstRun)
+        Map(
+          "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+          "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
+          "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
+          "spark.hadoop.fs.s3a.multipart.size" -> "104857600",
+          "spark.shuffle.io.serverThreads" -> "32"
+        )
+      else Map[String, String]()
     )
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(
