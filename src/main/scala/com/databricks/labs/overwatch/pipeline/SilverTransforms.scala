@@ -4,9 +4,9 @@ import java.util.UUID
 
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{ArrayType, DataType, DateType, IntegerType, LongType, StringType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.types.{ArrayType, DataType, DateType, LongType, StringType, StructField, StructType, TimestampType}
 
 trait SilverTransforms extends SparkSessionWrapper {
 
@@ -23,65 +23,13 @@ trait SilverTransforms extends SparkSessionWrapper {
   private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
 
 
-  def appendTypedNull(df: DataFrame, f: StructField): DataFrame = {
-    df.withColumn(f.name, lit(null).cast(f.dataType))
-  }
-
-  def prepDF(df: DataFrame, minFields: StructType, validateTypes: Boolean = false): DataFrame = {
-    minFields.fields.foldLeft(df) {
-      case (df, f) =>
-        val fieldsPresent = df.schema.fields
-        // required column exists
-        if (fieldsPresent.map(_.name.toLowerCase()).contains(f.name.toLowerCase()))
-        // required column exists and type validation IS required
-          if (validateTypes)
-          // matched col name and type
-            if (fieldsPresent.filter(_.name.toLowerCase() == f.name).head.dataType.typeName == f.dataType.typeName)
-              df
-            // matched col name but not col type
-            else throw new AnalysisException(s"Column: ${f.name} expected to be ${f.dataType.typeName} but found " +
-              s"${fieldsPresent.filter(_.name.toLowerCase() == f.name).head.dataType.typeName}")
-          // required column exists and type validation IS NOT required
-          else df
-        // required column DOES NOT exist and type validation is not required
-        else appendTypedNull(df, f)
-    }
-  }
-
-  private val minRequiredJobsSchema = StructType(Seq(
-    StructField("serviceName", StringType, nullable = true),
-    StructField("actionName", StringType, nullable = true),
-    StructField("timestamp", LongType, nullable = true),
-    StructField("jobId", StringType, nullable = true),
-    StructField("job_type", StringType, nullable = true),
-    StructField("name", StringType, nullable = true),
-    StructField("timeout_seconds", StringType, nullable = true),
-    StructField("schedule", StringType, nullable = true),
-    StructField("notebook_task", StringType, nullable = true),
-    StructField("new_settings", StringType, nullable = true),
-    StructField("existing_cluster_id", StringType, nullable = true),
-    StructField("new_cluster", StringType, nullable = true),
-    StructField("sessionId", StringType, nullable = true),
-    StructField("requestId", StringType, nullable = true),
-    StructField("userAgent", StringType, nullable = true),
-    StructField("response",
-      StructType(Seq(
-        StructField("errorMessage", StringType, nullable = true),
-        StructField("result", StringType, nullable = true),
-        StructField("statusCode", LongType, nullable = true)
-      )), nullable = true),
-    StructField("sourceIPAddress", StringType, nullable = true),
-    StructField("version", StringType, nullable = true)
-  ))
-
-
   object UDF {
 
     /**
      * Converts column of seconds/milliseconds/nanoseconds to timestamp
      *
-     * @param rawVal          : Column of Longtype
-     * @param inputResolution : String of milli, or second (nano to come)
+     * @param rawVal: Column of Longtype
+     * @param inputResolution: String of milli, or second (nano to come)
      * @return
      */
     def toTS(rawVal: Column, inputResolution: String = "milli", outputResultType: DataType = TimestampType): Column = {
