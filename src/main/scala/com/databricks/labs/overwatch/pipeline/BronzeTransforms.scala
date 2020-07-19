@@ -269,6 +269,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         if (datesGlob.nonEmpty) {
           spark.read.json(datesGlob: _*)
+            // When globbing the paths, the date must be reconstructed and re-added manually
+            .withColumn("filename", split(input_file_name, "/"))
+            .withColumn("date",
+              split(expr("filter(filename, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
+            .drop("filename")
         } else {
           Seq("No New Records").toDF("FAILURE")
         }

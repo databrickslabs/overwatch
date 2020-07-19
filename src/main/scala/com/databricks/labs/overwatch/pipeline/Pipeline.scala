@@ -150,7 +150,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
 
       val startTime = System.currentTimeMillis()
-      _database.write(finalDF, target)
+      if(!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
       val debugCount = if (!config.isFirstRun || config.debugFlag) {
         val dfCount = finalDF.count()
         val msg = s"${module.moduleName} SUCCESS! ${dfCount} records appended."
