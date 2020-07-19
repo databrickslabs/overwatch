@@ -219,7 +219,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
                                isFirstRun: Boolean,
-                               snapTime: LocalDateTime,
+                               untilTime: LocalDateTime,
                                fromTime: LocalDateTime,
                                auditRawLand: PipelineTable
                               ): DataFrame = {
@@ -257,9 +257,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     } else {
       if (!isFirstRun) {
+
+        // TODO -- fix this -- SO UGLY
+        //  might be good to build from time in initializer better on a source case basis
+        //  don't attempt this until after tests are in place
         val fromDT = fromTime.toLocalDate
-        val yesterdate = snapTime.toLocalDate
-        val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(yesterdate)).toArray
+        val today = untilTime.toLocalDate
+        // inclusive from exclusive to
+        val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(today)).toArray
           .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
 
         if (datesGlob.nonEmpty) {
