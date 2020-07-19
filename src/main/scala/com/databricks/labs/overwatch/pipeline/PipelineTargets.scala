@@ -68,7 +68,7 @@ abstract class PipelineTargets(config: Config) {
       statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
       sparkOverrides = if (config.isFirstRun) {
         Map(
-          "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 48).toString,
+          "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
           "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
           "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
           "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
@@ -76,7 +76,7 @@ abstract class PipelineTargets(config: Config) {
         )
       } else {
         Map(
-          "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 48).toString,
+          "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 32).toString,
           "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
           "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
           "spark.hadoop.fs.s3a.multipart.size" -> "104857600"

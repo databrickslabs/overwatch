@@ -70,6 +70,8 @@ case class ModuleStatusReport(
                                parsedConfig: ParsedConfig
                              )
 
+case class IncrementalFilter(sourceCol: String, low: Column, high: Column)
+
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
   val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts  = Value
