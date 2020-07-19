@@ -39,9 +39,10 @@ case class PipelineTable(
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var currentSparkOverrides: Map[String, String] = sparkOverrides
+
   import spark.implicits._
 
-//  col("c").get
+  //  col("c").get
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try {
       Some(spark.sessionState.catalog.getDatabaseMetadata(config.databaseName))
@@ -74,6 +75,7 @@ case class PipelineTable(
   /**
    * This EITHER appends/changes the spark overrides OR sets them. This can only set spark params if updates
    * are not passed --> setting the spark conf is really mean to be private action
+   *
    * @param updates spark conf updates
    */
   private[overwatch] def setSparkOverrides(updates: Map[String, String] = Map()): Unit = {
@@ -82,11 +84,11 @@ case class PipelineTable(
     }
     if (sparkOverrides.nonEmpty && updates.isEmpty) {
       currentSparkOverrides foreach { case (k, v) =>
-      try {
-        if (config.debugFlag && spark.conf.get(k) != v)
-          println(s"Overriding $k from ${spark.conf.get(k)} --> $v")
-        spark.conf.set(k, v)
-      } catch {
+        try {
+          if (config.debugFlag && spark.conf.get(k) != v)
+            println(s"Overriding $k from ${spark.conf.get(k)} --> $v")
+          spark.conf.set(k, v)
+        } catch {
           case e: AnalysisException =>
             logger.log(Level.WARN, s"Cannot Set Spark Param: ${k}", e)
             if (config.debugFlag) println(s"Failed Setting $k", e)
@@ -119,11 +121,14 @@ case class PipelineTable(
     val until = config.pipelineSnapTime
     val incrementalFilters = incrementalColumns.map(c => {
       df.schema.fields.filter(_.name == c).head.dataType match {
-        case dt: TimestampType => col(c).between(addOneTick(from.asColumnTS), until.asColumnTS)
-        case dt: DateType => col(c).between(addOneTick(from.asColumnTS), until.asColumnTS)
-        case dt: LongType => col(c).between(from.asUnixTimeMilli + 1, until.asUnixTimeMilli)
-        case dt: DoubleType => col(c).between(from.asUnixTimeMilli + 0.001, until.asUnixTimeMilli)
-        case dt: BooleanType => col(c) === lit(false)
+        case _: TimestampType => col(c).between(addOneTick(from.asColumnTS), until.asColumnTS)
+        case _: DateType => {
+          val maxVal = df.select(max(c)).as[String].collect().head
+          col(c).between(addOneTick(lit(maxVal).cast("date"), DateType), until.asColumnTS.cast("date"))
+        }
+        case _: LongType => col(c).between(from.asUnixTimeMilli + 1, until.asUnixTimeMilli)
+        case _: DoubleType => col(c).between(from.asUnixTimeMilli + 0.001, until.asUnixTimeMilli)
+        case _: BooleanType => col(c) === lit(false)
         case dt: DataType =>
           throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
       }
@@ -137,7 +142,7 @@ case class PipelineTable(
   }
 
   def asDF: DataFrame = {
-    try{
+    try {
       spark.table(tableFullName)
     } catch {
       case e: AnalysisException =>
@@ -147,7 +152,7 @@ case class PipelineTable(
   }
 
   def asIncrementalDF(moduleID: Int): DataFrame = {
-    try{
+    try {
       buildIncrementalDF(spark.table(tableFullName), moduleID)
     } catch {
       case e: AnalysisException =>
@@ -164,14 +169,14 @@ case class PipelineTable(
       if (config.debugFlag) println(streamWriterMessage)
       logger.log(Level.INFO, streamWriterMessage)
       var streamWriter = df.writeStream.outputMode(mode).format(f).option("checkpointLocation", checkpointPath.get)
-          .queryName(s"StreamTo_${name}")
+        .queryName(s"StreamTo_${name}")
       streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter
       streamWriter = if (mode == "overwrite") streamWriter.option("overwriteSchema", "true")
       else if (enableSchemaMerge && mode != "overwrite")
         streamWriter.option("mergeSchema", "true")
       else streamWriter
       streamWriter
-    }else {
+    } else {
       var dfWriter = df.write.mode(mode).format(f)
       dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter
       dfWriter = if (mode == "overwrite") dfWriter.option("overwriteSchema", "true")
