@@ -153,7 +153,16 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Array("startDate", "clusterId"),
       shuffleFactor = 1.2,
-      autoOptimize = true
+      autoOptimize = true,
+      sparkOverrides = if (config.isFirstRun)
+        Map(
+          "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+          "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
+          "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
+          "spark.hadoop.fs.s3a.multipart.size" -> "104857600",
+          "spark.shuffle.io.serverThreads" -> "32"
+        )
+      else Map[String, String]()
     )
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(

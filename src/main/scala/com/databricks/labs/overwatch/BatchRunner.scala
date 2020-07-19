@@ -19,22 +19,13 @@ object BatchRunner extends SparkSessionWrapper{
     envInit()
     setGlobalDeltaOverrides()
 
-    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2_wildlife.jar")
-//    sc.addFile("C:\\Dev\\git\\Databricks--Overwatch\\src\\main\\resources\\ec2_details_tbl", true)
-    spark.sql("drop database if exists overwatch_local2 cascade")
-//
-
-
     val workspace = if (args.length != 0) {
-      Initializer(args)
+      Initializer(args, debugFlag = true)
     } else {
       Initializer(Array())
     }
 
     val config = workspace.getConfig
-//    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
-//      .toInstant.toEpochMilli
-//    config.setPipelineSnapTime(fakeTime)
 
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
@@ -44,33 +35,6 @@ object BatchRunner extends SparkSessionWrapper{
     }
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
-
-//    Silver(workspace).run()
-
-//    Bronze(workspace).run()
-//    Silver(workspace).run()
-
-//    val silver = Silver(workspace)
-//    silver.appendNotebookSummaryProcess.process()
-
-//    spark.table("overwatch_local.spark_events_bronze").printSchema
-//    silver.appendJobRunsProcess.process()
-//    silver.appendTasksProcess.process()
-
-
-    //  //    TEST TABLE ACCESS
-//    spark.table("overwatch_local.cluster_events_bronze")
-//      .drop("details")
-//      .groupBy('cluster_id, 'type, 'Pipeline_SnapTS)
-//      .count()
-//      .orderBy('count.desc)
-//      .show(20, false)
-
-//
-//    spark.read.format("parquet")
-//      .load("C:\\Dev\\git\\Databricks--Overwatch\\spark-warehouse\\overwatch.db\\cluster_events_bronze")
-//      .show(20, false)
-
 
   }
 
