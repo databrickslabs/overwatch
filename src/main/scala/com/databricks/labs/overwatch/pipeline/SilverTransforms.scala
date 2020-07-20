@@ -547,7 +547,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter($"response.statusCode" === 200)
       .filter('actionName.like("%esult"))
       .join(creatorLookup, Seq("cluster_id"), "left")
-      .withColumn("date", UDF.toTS('timestamp, DateType))
+      .withColumn("date", UDF.toTS('timestamp, outputResultType = DateType))
       .withColumn("tsS", ('timestamp / 1000).cast("long"))
       .withColumn("reset",
         sum(when('actionName.isin("startResult", "restartResult", "createResult"), lit(1))
