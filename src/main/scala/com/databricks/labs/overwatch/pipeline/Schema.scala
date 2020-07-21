@@ -73,28 +73,40 @@ object Schema extends SparkSessionWrapper {
     2010 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
-      StructField("timestamp", LongType, nullable = true),
       StructField("date", DateType, nullable = true),
-      StructField("jobId", StringType, nullable = true),
-      StructField("job_type", StringType, nullable = true),
-      StructField("name", StringType, nullable = true),
-      StructField("timeout_seconds", StringType, nullable = true),
-      StructField("schedule", StringType, nullable = true),
-      StructField("notebook_task", StringType, nullable = true),
-      StructField("new_settings", StringType, nullable = true),
-      StructField("existing_cluster_id", StringType, nullable = true),
-      StructField("new_cluster", StringType, nullable = true),
+      StructField("timestamp", LongType, nullable = true),
       StructField("sessionId", StringType, nullable = true),
       StructField("requestId", StringType, nullable = true),
       StructField("userAgent", StringType, nullable = true),
+      StructField("sourceIPAddress", StringType, nullable = true),
+      StructField("version", StringType, nullable = true),
+      StructField("requestParams",
+        StructType(Seq(
+          StructField("jobId", StringType, nullable = true),
+          StructField("job_id", StringType, nullable = true),
+          StructField("name", StringType, nullable = true),
+          StructField("job_type", StringType, nullable = true),
+          StructField("jobTerminalState", StringType, nullable = true),
+          StructField("jobTriggerType", StringType, nullable = true),
+          StructField("jobTaskType", StringType, nullable = true),
+          StructField("jobClusterType", StringType, nullable = true),
+          StructField("timeout_seconds", StringType, nullable = true),
+          StructField("schedule", StringType, nullable = true),
+          StructField("notebook_task", StringType, nullable = true),
+          StructField("new_settings", StringType, nullable = true),
+          StructField("existing_cluster_id", StringType, nullable = true),
+          StructField("new_cluster", StringType, nullable = true)
+        )), nullable = true),
       StructField("response",
         StructType(Seq(
           StructField("errorMessage", StringType, nullable = true),
           StructField("result", StringType, nullable = true),
           StructField("statusCode", LongType, nullable = true)
         )), nullable = true),
-      StructField("sourceIPAddress", StringType, nullable = true),
-      StructField("version", StringType, nullable = true)
+      StructField("userIdentity",
+        StructType(Seq(
+          StructField("email", StringType, nullable = true)
+        )), nullable = true)
     )),
     // JobRuns
     2011 -> StructType(Seq(
@@ -114,6 +126,7 @@ object Schema extends SparkSessionWrapper {
           StructField("runId", StringType, nullable = true),
           StructField("run_id", StringType, nullable = true),
           StructField("run_name", StringType, nullable = true),
+          StructField("idInJob", StringType, nullable = true),
           StructField("job_type", StringType, nullable = true),
           StructField("jobTerminalState", StringType, nullable = true),
           StructField("jobTriggerType", StringType, nullable = true),
@@ -145,9 +158,12 @@ object Schema extends SparkSessionWrapper {
       StructField("date", DateType, nullable = true),
       StructField("sourceIPAddress", StringType, nullable = true),
       StructField("userAgent", StringType, nullable = true),
+      StructField("requestId", StringType, nullable = true),
       StructField("requestParams",
         StructType(Seq(
+          StructField("clusterId", StringType, nullable = true),
           StructField("cluster_id", StringType, nullable = true),
+          StructField("clusterName", StringType, nullable = true),
           StructField("cluster_name", StringType, nullable = true),
           StructField("clusterState", StringType, nullable = true),
           StructField("driver_node_type_id", StringType, nullable = true),
@@ -173,7 +189,7 @@ object Schema extends SparkSessionWrapper {
           StructField("idempotency_token", StringType, nullable = true),
           StructField("organization_id", StringType, nullable = true),
           StructField("user_id", StringType, nullable = true),
-          StructField("ssh_public_keys", StringType, nullable = true),
+          StructField("ssh_public_keys", StringType, nullable = true)
         )), nullable = true),
       StructField("userIdentity",
         StructType(Seq(
@@ -194,10 +210,13 @@ object Schema extends SparkSessionWrapper {
       StructField("date", DateType, nullable = true),
       StructField("sourceIPAddress", StringType, nullable = true),
       StructField("userAgent", StringType, nullable = true),
+      StructField("requestId", StringType, nullable = true),
       StructField("requestParams",
         StructType(Seq(
+          StructField("clusterId", StringType, nullable = true),
           StructField("cluster_id", StringType, nullable = true),
           StructField("cluster_name", StringType, nullable = true),
+          StructField("clusterName", StringType, nullable = true),
           StructField("clusterState", StringType, nullable = true),
           StructField("driver_node_type_id", StringType, nullable = true),
           StructField("node_type_id", StringType, nullable = true),
@@ -222,7 +241,7 @@ object Schema extends SparkSessionWrapper {
           StructField("idempotency_token", StringType, nullable = true),
           StructField("organization_id", StringType, nullable = true),
           StructField("user_id", StringType, nullable = true),
-          StructField("ssh_public_keys", StringType, nullable = true),
+          StructField("ssh_public_keys", StringType, nullable = true)
         )), nullable = true),
       StructField("userIdentity",
         StructType(Seq(
@@ -271,6 +290,7 @@ object Schema extends SparkSessionWrapper {
           StructField("notebookName", StringType, nullable = true),
           StructField("path", StringType, nullable = true),
           StructField("oldName", StringType, nullable = true),
+          StructField("newName", StringType, nullable = true),
           StructField("oldPath", StringType, nullable = true),
           StructField("newPath", StringType, nullable = true),
           StructField("parentPath", StringType, nullable = true),
@@ -289,6 +309,7 @@ object Schema extends SparkSessionWrapper {
     ))
   )
 
+  // TODO -- move this to schemaTools -- probably
   private def getPrefixedString(prefix: String, fieldName: String): String = {
     if (prefix == null) fieldName else s"${prefix}.${fieldName}"
   }

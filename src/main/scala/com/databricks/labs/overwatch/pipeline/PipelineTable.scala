@@ -142,6 +142,10 @@ case class PipelineTable(
 //
 //  }
 
+  def exists: Boolean = {
+    spark.catalog.tableExists(tableFullName)
+  }
+
   def asDF: DataFrame = {
     try {
       spark.table(tableFullName)

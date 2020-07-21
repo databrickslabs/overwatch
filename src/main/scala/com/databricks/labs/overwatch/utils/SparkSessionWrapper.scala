@@ -74,7 +74,7 @@ trait SparkSessionWrapper extends Serializable {
 
   def getDriverCores: Int = driverCores
 
-  def envInit(logLevel: String = "INFO"): Boolean = {
+  def envInit(logLevel: String = "WARN"): Boolean = {
     sc.setLogLevel(logLevel)
     if (System.getenv("OVERWATCH") != "LOCAL") {
       setCoresPerWorker(sc.parallelize("1", 1)

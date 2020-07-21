@@ -243,9 +243,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         s"the audit module.")
     }
 
-    if (lcScopes.contains("clusterevents") || lcScopes.contains("sparkevents")) {
-      require(lcScopes.contains("clusters"), "sparkEvents and clusterEvents scopes both require clusters scope to " +
-        "also be enabled as clusterID is a requirement for these scopes.")
+    if (lcScopes.contains("clusterevents") || lcScopes.contains("sparkevents") || lcScopes.contains("jobs")) {
+      require(lcScopes.contains("clusters"), "sparkEvents, clusterEvents, and jobs scopes require clusters scope to " +
+        "also be enabled as cluster metadata is used to build these scopes.")
     }
 
     if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters") || lcScopes.contains("jobs"))
@@ -253,6 +253,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       println(s"WARNING: JobRuns without audit will result in loss of granularity. It's recommended to configure" +
         s"the audit module.")
     }
+
 
     // TODO -- Check to see if audit scope was used previous and not now. If so, throw warning and require
     //  override parameter to ensure the user understands the data corruption/loss

@@ -8,6 +8,8 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
+import scala.collection.mutable.ArrayBuffer
+
 trait SilverTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
@@ -759,11 +761,11 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val lastJobStatus = Window.partitionBy('jobId).orderBy('timestamp)
       .rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val ephemeralClusterLookup = clusterSpec.asDF
+    lazy val ephemeralClusterLookup = clusterSpec.asDF
       .filter(isAutomatedCluster).select('cluster_id.alias("ephemeralClusterId"), 'cluster_name).distinct
-    val existingClusterLookup = jobsStatus.asDF
+    lazy val existingClusterLookup = jobsStatus.asDF
       .select('jobId, 'existing_cluster_id, 'timestamp)
-    val existingClusterLookup2 = jobsSnapshot.asDF
+    lazy val existingClusterLookup2 = jobsSnapshot.asDF
       .select('job_id.alias("jobId"), $"settings.existing_cluster_id", 'created_time.alias("timestamp"))
 
     val jobRunsStartDF = jobsBase
@@ -778,21 +780,36 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('runId.isNotNull)
       .dropDuplicates("runId", "completeTimestamp")
 
-    val jobRunsSilverBase = jobRunsStartDF
+    val jobRunsSilverBaseRaw = jobRunsStartDF
       .join(jobRunsCompleteDF, Seq("runId"))
       .select(jobRunsCols: _*)
       .withColumn("cluster_name", when('jobClusterType === "new",
         concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
-      .join(ephemeralClusterLookup, Seq("cluster_name"), "left")
-      .withColumn("timestamp", $"JobRunTime.startEpochMS")
 
-    UDF.fillFromLookupsByTS(jobRunsSilverBase, "runId", Array("existing_cluster_id"),
-      lastJobStatus, Array(existingClusterLookup, existingClusterLookup2): _*)
-      .withColumn("cluster_id", when('jobClusterType === "new", 'ephemeralClusterId)
+    val jobRunsSilverBase = if (clusterSpec.exists) {
+     jobRunsSilverBaseRaw.join(ephemeralClusterLookup, Seq("cluster_name"), "left")
+       .withColumn("timestamp", $"JobRunTime.startEpochMS")
+    } else jobRunsSilverBaseRaw
+
+    // TODO -- Handle null lookups -- rarely an issue but can be a very bad issue since parquet cannot write
+    //  empty tables if something causes 0 records to return for a lookup the pipeline fails
+    val clusterLookups = ArrayBuffer[DataFrame]()
+    if (jobsStatus.exists) clusterLookups.append(existingClusterLookup)
+    if (jobsSnapshot.exists) clusterLookups.append(existingClusterLookup2)
+
+    if (clusterLookups.nonEmpty) {
+      UDF.fillFromLookupsByTS(jobRunsSilverBase, "runId", Array("existing_cluster_id"),
+        lastJobStatus, clusterLookups.toArray: _*)
+        .withColumn("cluster_id", when('jobClusterType === "new", 'ephemeralClusterId)
+          .otherwise('existing_cluster_id))
+        .withColumnRenamed("timestamp", "startTimestamp")
+        .select(jobRunsColsFinalOrder: _*)
+    } else {
+      jobRunsSilverBase.withColumn("cluster_id", when('jobClusterType === "new", 'ephemeralClusterId)
         .otherwise('existing_cluster_id))
-      .withColumnRenamed("timestamp", "startTimestamp")
-      .select(jobRunsColsFinalOrder: _*)
-
+        .withColumnRenamed("timestamp", "startTimestamp")
+        .select(jobRunsColsFinalOrder: _*)
+    }
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {

@@ -298,9 +298,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     }
     if (scope.contains(OverwatchScope.jobs)) {
       appendJobStatusProcess.process()
-    }
-
-    if (scope.contains(OverwatchScope.jobs)) {
       appendJobRunsProcess.process()
     }
 

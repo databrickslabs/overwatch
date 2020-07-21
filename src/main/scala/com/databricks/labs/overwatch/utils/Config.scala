@@ -224,7 +224,7 @@ class Config() {
 
     // FROM RAW PARAMS TEST
     """
-      |{"auditLogConfig":{"rawAuditPath":"/mnt/tomesdata/logs/field_training_audit/"},"tokenSecret":{"scope":"data-eng","key":"overwatch"},"dataTarget":{"databaseName":"overwatch_local","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_local.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["clusters","clusterEvents","audit","sparkEvents","jobs"],"migrateProcessedEventLogs":false}
+      |{"auditLogConfig":{"rawAuditPath":"/mnt/tomesdata/logs/field_training_audit/"},"tokenSecret":{"scope":"data-eng","key":"overwatch"},"dataTarget":{"databaseName":"overwatch2","databaseLocation":"dbfs:/user/hive/warehouse/overwatch2.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["audit","accounts","jobs","clusters","clusterEvents","notebooks"],"migrateProcessedEventLogs":false}
       |""".stripMargin
 
   }
