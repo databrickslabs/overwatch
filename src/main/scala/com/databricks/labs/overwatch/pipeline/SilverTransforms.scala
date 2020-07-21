@@ -308,8 +308,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'clusterId, 'SparkContextID,
         $"PowerProperties.JobGroupID", $"PowerProperties.ExecutionID",
         'JobID, 'StageIDs, 'SubmissionTime, 'PowerProperties,
-        'Properties.alias("OriginalProperties"),
-        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup")
+        'filenameGroup.alias("startFilenameGroup")
       )
   }
 
@@ -335,7 +334,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select('clusterId, 'SparkContextID,
         $"StageInfo.StageID", $"StageInfo.SubmissionTime", $"StageInfo.StageAttemptID",
         'StageInfo.alias("StageStartInfo"),
-        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup"))
+        'filenameGroup.alias("startFilenameGroup"))
   }
 
   protected def simplifyStageEnd(df: DataFrame): DataFrame = {
@@ -370,7 +369,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'StageID, 'StageAttemptID, $"TaskInfo.TaskID", $"TaskInfo.ExecutorID",
         $"TaskInfo.Attempt".alias("TaskAttempt"),
         $"TaskInfo.Host", $"TaskInfo.LaunchTime", 'TaskInfo.alias("TaskStartInfo"),
-        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup")
+        'filenameGroup.alias("startFilenameGroup")
       )
   }
 
@@ -426,7 +425,9 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   private val auditBaseCols: Array[Column] = Array(
-    'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
+    'timestamp, 'date, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
+
+
 
   private def clusterBase(auditRawDF: DataFrame): DataFrame = {
     val cluster_id_gen_w = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
@@ -436,18 +437,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val cluster_name_gen = first('cluster_name, true).over(cluster_name_gen_w)
     val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
 
-    val clusterSummaryCols = if (CLOUD_PROVIDER == "azure") {
-      auditBaseCols ++ Array[Column](
-        when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
-        when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
-        'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
-        'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
-        'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags,
-        'cluster_source, 'spark_env_vars, 'spark_conf,
-        'acl_path_prefix, 'instance_pool_id, 'spark_version, 'cluster_creator, 'idempotency_token,
-        'organization_id, 'user_id, 'sourceIPAddress)
-    } else {
-      auditBaseCols ++ Array[Column](
+    val clusterSummaryCols = auditBaseCols ++ Array[Column](
         when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
         when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
         'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
@@ -455,9 +445,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'ssh_public_keys,
         'cluster_source, 'spark_env_vars, 'spark_conf,
         when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
-        'acl_path_prefix, 'instance_pool_id, 'spark_version, 'cluster_creator, 'idempotency_token,
+        'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
         'organization_id, 'user_id, 'sourceIPAddress)
-    }
 
 
     auditRawDF
@@ -481,7 +470,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'cluster_id, 'cluster_name, 'cluster_state, 'driver_node_type_id, 'node_type_id,
       'num_workers, 'autoscale, 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster, 'cluster_log_conf,
       'init_scripts, 'custom_tags, 'cluster_source, 'spark_env_vars, 'spark_conf,
-      'acl_path_prefix, 'instance_pool_id, 'spark_version,
+      'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version,
       'idempotency_token, 'organization_id, 'timestamp, 'userEmail)
 
     val clustersRemoved = clusterBaseDF
@@ -546,7 +535,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter($"response.statusCode" === 200)
       .filter('actionName.like("%esult"))
       .join(creatorLookup, Seq("cluster_id"), "left")
-      .withColumn("date", UDF.toTS('timestamp, DateType))
+      .withColumn("date", UDF.toTS('timestamp, outputResultType = DateType))
       .withColumn("tsS", ('timestamp / 1000).cast("long"))
       .withColumn("reset",
         sum(when('actionName.isin("startResult", "restartResult", "createResult"), lit(1))
@@ -807,7 +796,8 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {
-    val notebookCols = auditBaseCols ++ Array[Column]('notebookId, 'notebookName, 'path, 'oldName, 'oldPath, 'newName, 'newPath, 'parentPath, 'clusterId)
+    val notebookCols = auditBaseCols ++ Array[Column]('notebookId, 'notebookName, 'path, 'oldName, 'oldPath,
+      'newName, 'newPath, 'parentPath, 'clusterId)
 
     df.filter('serviceName === "notebook")
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")

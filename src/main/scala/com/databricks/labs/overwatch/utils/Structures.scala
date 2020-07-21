@@ -22,6 +22,9 @@ case class DataTarget(databaseName: Option[String], databaseLocation: Option[Str
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encryptedToken: Array[Byte], cipher: Cipher)
 
+// Todo Add Description
+case class Module(moduleID: Int, moduleName: String)
+
 case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
                      asUTCDateTime: LocalDateTime, asMidnightEpochMilli: Long,
                      asTSString: String, asDTString: String)

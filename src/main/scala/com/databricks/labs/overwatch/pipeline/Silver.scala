@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import java.io.StringWriter
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
 import org.apache.spark.sql.functions._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame

@@ -1,9 +1,11 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport, NoNewDataException, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport,
+  NoNewDataException, SchemaTools, SparkSessionWrapper, Module}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
+import Schema.verifyDF
 import java.io.{PrintWriter, StringWriter}
 
 class Pipeline(_workspace: Workspace, _database: Database,
@@ -20,10 +22,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   envInit()
 
-
-  // Todo Add Description
-  case class Module(moduleID: Int, moduleName: String)
-
   // TODO -- Add Rules engine
   //  additional field under transforms rules: Option[Seq[Rule => Boolean]]
   case class EtlDefinition(
@@ -35,21 +33,25 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     def process(): Unit = {
       println(s"Beginning: ${module.moduleName}")
+
+      println("Validating Input Schemas")
+      val verifiedSourceDF = verifyDF(sourceDF, module)
+
       try {
-        sourceDFparts = sourceDF.rdd.partitions.length
+        sourceDFparts = verifiedSourceDF.rdd.partitions.length
       } catch {
         case _: AnalysisException =>
           println(s"Delaying source shuffle Partition Set since input is stream")
       }
 
       if (transforms.nonEmpty) {
-        val transformedDF = transforms.get.foldLeft(sourceDF) {
+        val transformedDF = transforms.get.foldLeft(verifiedSourceDF) {
           case (df, transform) =>
             df.transform(transform)
         }
         write(transformedDF, module)
       } else {
-        write(sourceDF, module)
+        write(verifiedSourceDF, module)
       }
     }
   }
