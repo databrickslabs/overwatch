@@ -133,13 +133,11 @@ object BatchRunner extends SparkSessionWrapper with SilverTransforms{
     }
 
 
-    val config = workspace.getConfig
-    if (config.debugFlag) envInit("DEBUG")
-    val fakeTime = LocalDateTime.of(2020, 6, 1, 13, 44).atZone(ZoneId.of("Etc/UTC"))
-      .toInstant.toEpochMilli
-    config.setPipelineSnapTime(fakeTime)
-
-    sc.setLogLevel("WARN")
+//    val config = workspace.getConfig
+//    if (config.debugFlag) envInit("DEBUG")
+//    val fakeTime = LocalDateTime.of(2020, 6, 1, 13, 44).atZone(ZoneId.of("Etc/UTC"))
+//      .toInstant.toEpochMilli
+//    config.setPipelineSnapTime(fakeTime)
 
 //    logger.log(Level.INFO, "Starting Bronze")
 //    Bronze(workspace).run()
