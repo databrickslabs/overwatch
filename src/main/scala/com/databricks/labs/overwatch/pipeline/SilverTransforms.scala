@@ -124,50 +124,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       from_json(col(c), jsonSchema).alias(c)
     }
 
-    // TODO -- Add validation that all desired power property columns exist
     def appendPowerProperties: Column = {
-
-      val azureProps = struct(
-        $"Properties.sparkappname".alias("AppName"),
-        $"Properties.sparkdatabricksapiurl".alias("WorkspaceURL"),
-        $"Properties.sparkjobGroupid".alias("JobGroupID"),
-        $"Properties.sparkdatabrickscloudProvider".alias("CloudProvider"),
-        struct(
-          $"Properties.sparkdatabricksclusterSource".alias("ClusterSource"),
-          $"Properties.sparkdatabricksclusterUsageTagsautoTerminationMinutes".alias("AutoTerminationMinutes"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterAllTags".alias("ClusterTags"),
-          //          $"Properties.sparkdatabricksclusterUsageTagsclusterAvailability".alias("ClusterAvailability"), // Azure Missing
-          $"Properties.sparkdatabricksclusterUsageTagsclusterId".alias("ClusterID"),
-          //          $"Properties.sparkdatabricksclusterUsageTagsclusterInstancePoolId".alias("InstancePoolID"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterMaxWorkers".alias("MaxWorkers"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterMinWorkers".alias("MinWorkers"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterName".alias("Name"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterOwnerUserId".alias("OwnerUserID"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterScalingType".alias("ScalingType"),
-          //          $"Properties.sparkdatabricksclusterUsageTagsclusterSpotBidPricePercent".alias("SpotBidPricePercent"), //Azure Missing
-          $"Properties.sparkdatabricksclusterUsageTagsclusterTargetWorkers".alias("TargetWorkers"),
-          $"Properties.sparkdatabricksclusterUsageTagsclusterWorkers".alias("ActualWorkers"),
-          //          $"Properties.sparkdatabricksclusterUsageTagscontainerZoneId".alias("ZoneID"), // Azure Missing
-          $"Properties.sparkdatabricksclusterUsageTagsdataPlaneRegion".alias("Region"),
-          $"Properties.sparkdatabricksclusterUsageTagsdriverNodeType".alias("DriverNodeType"),
-          $"Properties.sparkdatabricksworkerNodeTypeId".alias("WorkerNodeType"),
-          $"Properties.sparkdatabricksclusterUsageTagssparkVersion".alias("SparkVersion")
-        ).alias("ClusterDetails"),
-        $"Properties.sparkdatabricksnotebookid".alias("NotebookID"),
-        $"Properties.sparkdatabricksnotebookpath".alias("NotebookPath"),
-        $"Properties.sparkdatabrickssparkContextId".alias("SparkContextID"),
-        $"Properties.sparkdriverhost".alias("DriverHostIP"),
-        $"Properties.sparkdrivermaxResultSize".alias("DriverMaxResults"),
-        $"Properties.sparkexecutorid".alias("ExecutorID"),
-        $"Properties.sparkexecutormemory".alias("ExecutorMemory"),
-        $"Properties.sparksqlexecutionid".alias("ExecutionID"),
-        $"Properties.sparksqlexecutionparent".alias("ExecutionParent"),
-        $"Properties.sparksqlshufflepartitions".alias("ShufflePartitions"),
-        $"Properties.user".alias("UserEmail"),
-        $"Properties.userID".alias("UserID")
-      )
-
-      val awsProps = struct(
+      struct(
         $"Properties.sparkappname".alias("AppName"),
         $"Properties.sparkdatabricksapiurl".alias("WorkspaceURL"),
         $"Properties.sparkjobGroupid".alias("JobGroupID"),
@@ -178,7 +136,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           $"Properties.sparkdatabricksclusterUsageTagsclusterAllTags".alias("ClusterTags"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterAvailability".alias("ClusterAvailability"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterId".alias("ClusterID"),
-          //          $"Properties.sparkdatabricksclusterUsageTagsclusterInstancePoolId".alias("InstancePoolID"),
+          $"Properties.sparkdatabricksclusterUsageTagsclusterInstancePoolId".alias("InstancePoolID"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterMaxWorkers".alias("MaxWorkers"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterMinWorkers".alias("MinWorkers"),
           $"Properties.sparkdatabricksclusterUsageTagsclusterName".alias("Name"),
@@ -206,10 +164,6 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"Properties.user".alias("UserEmail"),
         $"Properties.userID".alias("UserID")
       )
-
-      if (CLOUD_PROVIDER == "aws") awsProps
-      else azureProps
-
     }
   }
 
