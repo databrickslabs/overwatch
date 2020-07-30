@@ -122,7 +122,7 @@ object BatchRunner extends SparkSessionWrapper with SilverTransforms{
     setGlobalDeltaOverrides()
 
 //    spark.sql("drop database if exists overwatch_local cascade")
-    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2.jar")
+//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2.jar")
 //    sc.addFile("C:\\Dev\\git\\Databricks--Overwatch\\src\\main\\resources\\ec2_details_tbl", true)
 //    spark.sql("drop database if exists overwatch_local cascade")
 //
@@ -133,22 +133,22 @@ object BatchRunner extends SparkSessionWrapper with SilverTransforms{
     }
 
 
-//    val config = workspace.getConfig
-//    if (config.debugFlag) envInit("DEBUG")
+    val config = workspace.getConfig
+    if (config.debugFlag) envInit("DEBUG")
 //    val fakeTime = LocalDateTime.of(2020, 6, 1, 13, 44).atZone(ZoneId.of("Etc/UTC"))
 //      .toInstant.toEpochMilli
 //    config.setPipelineSnapTime(fakeTime)
 
-//    logger.log(Level.INFO, "Starting Bronze")
-//    Bronze(workspace).run()
-//    if (config.isFirstRun) {
-//      spark.read.format("delta").load("/tmp/overwatch/aws_ec2_details_raw")
-//        .coalesce(1).write.format("delta")
-//        .saveAsTable(s"${config.databaseName}.instanceDetails")
-//    }
+    logger.log(Level.INFO, "Starting Bronze")
+    Bronze(workspace).run()
+    if (config.isFirstRun) {
+      spark.read.format("parquet").load("/tmp/tomes/overwatch/ec2_details_tbl")
+        .coalesce(1).write.format("delta")
+        .saveAsTable(s"${config.databaseName}.instanceDetails")
+    }
 
     logger.log(Level.INFO, "Starting Silver")
-    val silver = Silver(workspace) //.run()
+    Silver(workspace).run()
 
 
 //    Silver(workspace).run()
