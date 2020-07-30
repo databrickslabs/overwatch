@@ -221,11 +221,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                isFirstRun: Boolean,
                                untilTime: LocalDateTime,
                                fromTime: LocalDateTime,
-                               auditRawLand: PipelineTable
+                               auditRawLand: PipelineTable,
+                               overwatchRunID: String
                               ): DataFrame = {
     if (CLOUD_PROVIDER == "azure") {
       val rawBodyLookup = spark.table(auditRawLand.tableFullName)
+        .filter('Overwatch_RunID === lit(overwatchRunID))
       val schemaBuilders = spark.table(auditRawLand.tableFullName)
+        .filter('Overwatch_RunID === lit(overwatchRunID))
         .withColumn("deserializedBody", 'body.cast("string"))
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"))
@@ -238,8 +241,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .selectExpr("*", "properties.*").drop("properties")
 
 
-      spark.readStream.format("delta")
-        .table(auditRawLand.tableFullName)
+      spark.table(auditRawLand.tableFullName)
+        .filter('Overwatch_RunID === lit(overwatchRunID))
         .withColumn("deserializedBody", 'body.cast("string"))
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"))
@@ -344,7 +347,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     struct(filename, byCluster, byClusterHost, bySparkContextID).alias("filnameGroup")
   }
 
-
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
                           processedLogFiles: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
@@ -360,6 +362,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .json(pathsGlob: _*)
           .drop(dropCols: _*)
 
+      // Handle custom metrics and listeners in streams
+      val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
+        to_json(col("progress")).alias("progress")
+      } else {
+        lit(null).cast("string").alias("progress")
+      }
+
       // Temporary Solution for Speculative Tasks bad Schema - SC-38615
       val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("Stage ID")) {
         when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
@@ -367,6 +376,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
         SchemaTools.scrubSchema(baseEventsDF
+          .withColumn("progress", progressCol)
           .withColumn("filename", input_file_name)
           .withColumn("pathSize", size(split('filename, "/")))
           .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
@@ -378,6 +388,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         )
       } else {
         SchemaTools.scrubSchema(baseEventsDF
+          .withColumn("progress", progressCol)
           .withColumn("filename", input_file_name)
           .withColumn("pathSize", size(split('filename, "/")))
           .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))

@@ -36,7 +36,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     BronzeTargets.auditLogsTarget.asIncrementalDF(filters: _*)
   }
 
-  lazy private val newSparkEvents = BronzeTargets.sparkEventLogsTarget.asDF.filter('Downstream_Processed)
+  lazy private val newSparkEvents = BronzeTargets.sparkEventLogsTarget.asDF.filter(!'Downstream_Processed)
 
   /**
    * Module sparkEvents

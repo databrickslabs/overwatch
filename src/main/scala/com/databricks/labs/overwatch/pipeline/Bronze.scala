@@ -48,7 +48,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       config.isFirstRun,
       config.pipelineSnapTime.asUTCDateTime,
       config.fromTime(appendAuditLogsModule.moduleID).asUTCDateTime,
-      BronzeTargets.auditLogAzureLandRaw
+      BronzeTargets.auditLogAzureLandRaw,
+      config.runID
     ),
     None,
     append(BronzeTargets.auditLogsTarget),
@@ -134,6 +135,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.isFirstRun
       )
       database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
+
+//      Helpers.fastDrop(BronzeTargets.auditLogAzureLandRaw.tableFullName, "azure")
+
+      val rawProcessCompleteMsg = "Azure audit ingest process complete"
+      if (config.debugFlag) println(rawProcessCompleteMsg)
+      logger.log(Level.INFO, rawProcessCompleteMsg)
     }
 
     appendAuditLogsProcess.process()

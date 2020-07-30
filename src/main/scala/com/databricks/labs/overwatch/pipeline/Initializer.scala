@@ -61,6 +61,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
       Database(config)
     } else {
+      // TODO -- get schema version of each table and perform upgrade if necessary
       logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
       Database(config)
     }

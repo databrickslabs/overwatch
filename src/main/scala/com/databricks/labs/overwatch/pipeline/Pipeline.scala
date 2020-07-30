@@ -75,8 +75,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
           println(s"Resetting $k from ${spark.conf.get(k)} --> $v")
         spark.conf.set(k, v)
       } catch {
-        case e: org.apache.spark.sql.AnalysisException => logger.log(Level.WARN, s"Not Settable: $k", e)
-        case e: Throwable => logger.log(Level.DEBUG, s"Spark Setting, $k could not be set.")
+        case e: org.apache.spark.sql.AnalysisException => logger.log(Level.DEBUG, s"Not Settable: $k", e)
+        case e: Throwable => logger.log(Level.WARN, s"Spark Setting, $k could not be set.", e)
       }
     }
   }

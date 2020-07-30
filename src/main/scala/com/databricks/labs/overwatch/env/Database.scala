@@ -70,9 +70,16 @@ class Database(config: Config) extends SparkSessionWrapper {
         logger.log(Level.INFO, msg)
         if (config.debugFlag) println(msg)
 
+        val beginMsg = s"Stream to ${target.tableFullName} beginning."
+        if (config.debugFlag) println(beginMsg)
+        logger.log(Level.INFO, beginMsg)
         val streamWriter = target.writer(finalDF).asInstanceOf[DataStreamWriter[Row]].table(target.tableFullName)
         val streamManager = getQueryListener(streamWriter)
         spark.streams.addListener(streamManager)
+        val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
+        if (config.debugFlag) println(listenerAddedMsg)
+        logger.log(Level.INFO, listenerAddedMsg)
+
         streamWriter.awaitTermination()
         spark.streams.removeListener(streamManager)
 

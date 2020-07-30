@@ -37,16 +37,14 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Array("date"),
       statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "),
-      dataFrequency = Frequency.daily,
-      checkpointPath = if (config.cloudProvider == "azure")
-        config.auditLogConfig.azureAuditLogEventhubConfig.get.auditLogChk
-      else None
+      dataFrequency = Frequency.daily
     )
 
     lazy private[overwatch] val auditLogAzureLandRaw: PipelineTable = PipelineTable(
       name = "audit_log_raw_events",
       keys = Array("sequenceNumber"),
       config,
+      partitionBy = Array("Overwatch_RunID"),
       checkpointPath = if (config.cloudProvider == "azure")
         config.auditLogConfig.azureAuditLogEventhubConfig.get.auditRawEventsChk
       else None

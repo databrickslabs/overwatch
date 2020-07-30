@@ -148,7 +148,8 @@ object BatchRunner extends SparkSessionWrapper with SilverTransforms{
 //    }
 
     logger.log(Level.INFO, "Starting Silver")
-    Silver(workspace).run()
+    val silver = Silver(workspace) //.run()
+
 
 //    Silver(workspace).run()
 
