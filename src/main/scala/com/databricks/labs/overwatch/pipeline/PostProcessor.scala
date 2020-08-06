@@ -23,7 +23,7 @@ class PostProcessor {
 //    )
     // TODO -- spark_events_bronze -- put in proper rules -- hot fix due to optimization issues
     Helpers.parOptimize(tablesInScope.toArray.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128)
-    Helpers.parOptimize(tablesInScope.toArray.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 2)
+    Helpers.parOptimize(tablesInScope.toArray.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32)
   }
 
   // TODO -- add for columns -- might not be necessary with delta

@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.utils
 
 import java.text.SimpleDateFormat
 import java.time.temporal.ChronoUnit
-import java.time.{LocalDateTime, LocalTime, ZoneId, ZoneOffset}
+import java.time.{LocalDate, LocalDateTime, LocalTime, ZoneId, ZoneOffset}
 import java.util.{Calendar, Date, TimeZone, UUID}
 
 import org.apache.spark.sql.{Column, Dataset}
@@ -28,7 +28,7 @@ class Config() {
   private var _token: Array[Byte] = _
   private var _tokenType: String = _
   private var _apiEnv: ApiEnv = _
-  private var _auditLogPath: Option[String] = None
+  private var _auditLogConfig: AuditLogConfig = _
   private var _badRecordsPath: String = _
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
@@ -108,17 +108,6 @@ class Config() {
 
   private[overwatch] def setIsFirstRun(value: Boolean): this.type = {
     _isFirstRun = value
-    if (_isFirstRun) {
-      println(s"WARNING! First runs often require a large cluster for some modules and long API runs for others. " +
-        s"Below is the suggested method for running the first historical load. \n \nFirst Run --> With a sufficiently " +
-        s"large cluster load modules: audit, clusters, jobs, notebooks, pools, sparkEvents.\n\nFollowup Run --> " +
-        s"With a small cluster add the additional desired modules. For example, given the run above as the first run " +
-        s"the following would be a suggested second run (and future) module config:\n" +
-        s"audit, clusters, jobs, notebooks, pools, sparkEvents, clusterEvents, jobRuns")
-      if (overwatchScope.contains(OverwatchScope.jobRuns)) {
-        println(s"WARNING! It's not recommended to combine API modules and audit/events modules on the first run.")
-      }
-    }
     this
   }
 
@@ -161,7 +150,8 @@ class Config() {
 
   private[overwatch] def encryptedToken: Array[Byte] = _token
 
-  private[overwatch] def auditLogPath: Option[String] = _auditLogPath
+//  private[overwatch]
+  def auditLogConfig: AuditLogConfig = _auditLogConfig
 
   private[overwatch] def badRecordsPath: String = _badRecordsPath
 
@@ -181,31 +171,61 @@ class Config() {
 
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
     import OverwatchScope._
-//    jobs, jobRuns, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles
-    Seq(audit, jobs, jobRuns, clusters, clusterEvents, sparkEvents, notebooks)
+//    jobs, clusters, clusterEvents, sparkEvents, pools, audit, iamPassthrough, profiles
+    Seq(audit, jobs, clusters, clusterEvents, sparkEvents, notebooks)
   }
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
-    _initialSparkConf = value
+    val manualOverrides = Map(
+      "spark.databricks.delta.properties.defaults.autoOptimize.autoCompact" ->
+        value.getOrElse("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false"),
+      "spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite" ->
+        value.getOrElse("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false"),
+      "spark.databricks.delta.optimize.maxFileSize" ->
+        value.getOrElse("spark.databricks.delta.optimize.maxFileSize", (1024 * 1024 * 128).toString),
+      "spark.databricks.delta.retentionDurationCheck.enabled" ->
+        value.getOrElse("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+    )
+    _initialSparkConf = value ++ manualOverrides
     this
   }
 
-  private[overwatch] def initialSparkConf(): Map[String, String] = {
+  private[overwatch] def initialSparkConf: Map[String, String] = {
     _initialSparkConf
   }
 
   // Set scope for local testing
-  def buildLocalOverwatchParams(): this.type = {
+  def buildLocalOverwatchParams(): String = {
 
     registeredEncryptedToken(None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters,
-      OverwatchScope.sparkEvents)
+    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters)
+    val inputOverwatchScope = Array("audit", "clusters")
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
 //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
-    _auditLogPath = Some("/mnt/tomesdata/logs/field_training_audit/")
+
+    // AWS TEST
     _cloudProvider = "aws"
-    this
+//    _auditLogConfig = AuditLogConfig(Some("/mnt/tomesdata/logs/field_training_audit/"), None)
+
+    // AZURE TEST
+//    _cloudProvider = "azure"
+//    val EVENT_HUB_CONNECTION_STRING = "Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ="
+//    val EVENT_HUB_NAME = "overwatch"
+//    val MAX_EVENTS_PER_TRIGGER = 10000
+//    val STATE_PREFIX = "abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state"
+//    val ehConfig = AzureAuditLogEventhubConfig(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME, STATE_PREFIX)
+//    _auditLogConfig = AuditLogConfig(None, Some(ehConfig))
+//
+//    OverwatchParams(
+//      _auditLogConfig, None, Some(DataTarget(Some(_databaseName), Some(_databaseLocation))),
+//      Some(_badRecordsPath), Some(inputOverwatchScope)
+//    )
+
+    // FROM RAW PARAMS TEST
+    """
+      |{"auditLogConfig":{"rawAuditPath":"/mnt/tomesdata/logs/field_training_audit/"},"tokenSecret":{"scope":"data-eng","key":"overwatch"},"dataTarget":{"databaseName":"overwatch2","databaseLocation":"dbfs:/user/hive/warehouse/overwatch2.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["audit","clusters","sparkEvents"],"migrateProcessedEventLogs":false}
+      |""".stripMargin
 
   }
 
@@ -232,11 +252,14 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
+          //_cloudProvider setter not necessary -- done in local setup
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _token = cipher.encrypt(System.getenv("OVERWATCH_TOKEN"))
           _tokenType = "Environment"
         } else { // Use default token for job owner
           _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
+          rawToken = dbutils.notebook.getContext().apiToken.get
           _token = cipher.encrypt(dbutils.notebook.getContext().apiToken.get)
           val authMessage = "No secret parameters provided: attempting to continue with job owner's token."
           logger.log(Level.WARN, authMessage)
@@ -258,8 +281,8 @@ class Config() {
     this
   }
 
-  private[overwatch] def setAuditLogPath(value: Option[String]): this.type = {
-    _auditLogPath = value
+  private[overwatch] def setAuditLogConfig(value: AuditLogConfig): this.type = {
+    _auditLogConfig = value
     this
   }
 
@@ -275,11 +298,11 @@ class Config() {
 
   private[overwatch] def parsedConfig: ParsedConfig = {
     ParsedConfig(
+      auditLogConfig = auditLogConfig,
       overwatchScope = overwatchScope.map(_.toString),
       tokenUsed = _tokenType,
       targetDatabase = databaseName,
       targetDatabaseLocation = databaseLocation,
-      auditLogPath = auditLogPath,
       passthroughLogPath = passthroughLogPath
     )
   }

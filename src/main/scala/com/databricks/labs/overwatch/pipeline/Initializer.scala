@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.ParamDeserializer
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.OverwatchScope._
 import com.databricks.labs.overwatch.utils._
+import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -25,7 +26,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   // TODO -- look for max incremental in all tables to build out module last run times instead of deriving it from
   //  pipeline_report as this clearly can cause issues
   def initPipelineRun(): this.type = {
-    if (spark.catalog.databaseExists(config.databaseName)) {
+    if (spark.catalog.databaseExists(config.databaseName) &&
+      spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
       val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
       val lastRunDetail = spark.table(s"${config.databaseName}.pipeline_report")
         .filter('Status === "SUCCESS")
@@ -59,25 +61,65 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
       Database(config)
     } else {
-      logger.log(Level.INFO, s"Databsae ${config.databaseName} already exists, using append mode.")
+      // TODO -- get schema version of each table and perform upgrade if necessary
+      logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
       Database(config)
     }
   }
 
   @throws(classOf[BadConfigException])
-  def validateAndSetAuditLogPaths(auditLogPath: Option[String]): this.type = {
+  def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): this.type = {
 
-    if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
-      throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
+    if (config.cloudProvider == "aws") {
+
+      val auditLogPath = auditLogConfig.rawAuditPath
+      if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
+        throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
+      }
+
+      if (auditLogPath.nonEmpty && !config.isLocalTesting)
+        dbutils.fs.ls(auditLogPath.get).foreach(auditFolder => {
+          if (auditFolder.isDir) require(auditFolder.name.startsWith("date="), s"Audit directory must contain " +
+            s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
+        })
+
+      val finalAuditLogPath = auditLogPath.get.replaceAll("//", "/")
+
+      config.setAuditLogConfig(
+        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), None)
+      )
+
+    } else {
+      val ehConfigOp = auditLogConfig.azureAuditLogEventhubConfig
+      require(ehConfigOp.nonEmpty, "When using Azure, an Eventhub must be configured for audit log retrieval")
+      val ehConfig = ehConfigOp.get
+      val ehPrefix = ehConfig.auditRawEventsPrefix
+
+      val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
+      val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
+      val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
+
+      if (config.debugFlag){
+        println("DEBUG FROM Init")
+        println(s"cleanPrefix = ${cleanPrefix}")
+        println(s"rawEventsCheck = ${rawEventsCheckpoint}")
+        println(s"auditLogsBronzeChk = ${auditLogBronzeChk}")
+        println(s"ehPrefix = ${ehPrefix}")
+      }
+
+      val ehFinalConfig = auditLogConfig.azureAuditLogEventhubConfig.get.copy(
+        auditRawEventsPrefix = cleanPrefix,
+        auditRawEventsChk = Some(rawEventsCheckpoint),
+        auditLogChk = Some(auditLogBronzeChk)
+      )
+
+      config.setAuditLogConfig(
+        auditLogConfig.copy(
+          None, Some(ehFinalConfig)
+        )
+      )
+
     }
-
-    if (auditLogPath.nonEmpty && !config.isLocalTesting)
-      dbutils.fs.ls(auditLogPath.get).foreach(auditFolder => {
-        if (auditFolder.isDir) require(auditFolder.name.startsWith("date="), s"Audit directory must contain " +
-          s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
-      })
-
-    config.setAuditLogPath(auditLogPath)
     this
   }
 
@@ -91,19 +133,21 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       .asInstanceOf[ObjectMapper with ScalaObjectMapper]
 
     // Allow for local testing
-    if (config.isLocalTesting) {
-      config.buildLocalOverwatchParams()
-      println("Built Local Override Parameters")
+    val rawParams = if (config.isLocalTesting) {
+//      config.buildLocalOverwatchParams()
+      val synthArgs = config.buildLocalOverwatchParams()
+      mapper.readValue[OverwatchParams](synthArgs)
     } else {
       logger.log(Level.INFO, "Validating Input Parameters")
-      val rawParams = mapper.readValue[OverwatchParams](args(0))
+      mapper.readValue[OverwatchParams](args(0))
+    }
       config.setInputConfig(rawParams)
       val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
       val tokenSecret = rawParams.tokenSecret
       // TODO -- PRIORITY -- If data target is null -- default table gets dbfs:/null
       val dataTarget = rawParams.dataTarget.getOrElse(
         DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db")))
-      val auditLogPath = rawParams.auditLogPath
+      val auditLogConfig = rawParams.auditLogConfig
       val badRecordsPath = rawParams.badRecordsPath
 
       if (overwatchScope.head == "all") config.setOverwatchScope(config.orderedOverwatchScope)
@@ -111,7 +155,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
       // validate token secret requirements
       // TODO - Validate if token has access to necessary assets. Warn/Fail if not
-      if (tokenSecret.nonEmpty) {
+      if (tokenSecret.nonEmpty && !config.isLocalTesting) {
         if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
           throw new BadConfigException(s"Secret AND Key must be provided together or neither of them. " +
             s"Either supply both or neither.")
@@ -129,19 +173,18 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         config.registeredEncryptedToken(Some(TokenSecret(scopeName, keyCheck.head.key)))
       } else config.registeredEncryptedToken(None)
 
-      dataTargetIsValid(dataTarget)
+      if (!config.isLocalTesting) dataTargetIsValid(dataTarget)
 
       val dbName = dataTarget.databaseName.get
       val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
 
       config.setDatabaseNameandLoc(dbName, dbLocation)
 
-      validateAndSetAuditLogPaths(auditLogPath)
+      validateAuditLogConfigs(auditLogConfig)
 
       // Todo -- add validation to badRecordsPath
       config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
-    }
     this
   }
 
@@ -195,25 +238,15 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   @throws(classOf[BadConfigException])
   private def validateScope(scopes: Seq[String]): Seq[OverwatchScope.OverwatchScope] = {
     val lcScopes = scopes.map(_.toLowerCase)
-    if (lcScopes.contains("jobruns")) {
-      require(lcScopes.contains("audit") || lcScopes.contains("jobs"),
-        "When jobruns are in scope, jobs and/or audit must also be in scope " +
-        "as jobruns depend on jobIDs captured from jobs scope.")
-    }
-
-    if (lcScopes.contains("jobRuns") && !lcScopes.contains("audit")) {
-      println(s"WARNING: JobRuns without audit will result in loss of granularity. It's recommended to configure" +
-        s"the audit module.")
-    }
 
     if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters")) && !lcScopes.contains("audit")) {
       println(s"WARNING: Cluster data without audit will result in loss of granularity. It's recommended to configure" +
         s"the audit module.")
     }
 
-    if (lcScopes.contains("clusterevents") || lcScopes.contains("sparkevents")) {
-      require(lcScopes.contains("clusters"), "sparkEvents and clusterEvents scopes both require clusters scope to " +
-        "also be enabled as clusterID is a requirement for these scopes.")
+    if (lcScopes.contains("clusterevents") || lcScopes.contains("sparkevents") || lcScopes.contains("jobs")) {
+      require(lcScopes.contains("clusters"), "sparkEvents, clusterEvents, and jobs scopes require clusters scope to " +
+        "also be enabled as cluster metadata is used to build these scopes.")
     }
 
     if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters") || lcScopes.contains("jobs"))
@@ -222,17 +255,18 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         s"the audit module.")
     }
 
+
     // TODO -- Check to see if audit scope was used previous and not now. If so, throw warning and require
     //  override parameter to ensure the user understands the data corruption/loss
     lcScopes.map {
       case "jobs" => jobs
-      case "jobruns" => jobRuns
       case "clusters" => clusters
       case "clusterevents" => clusterEvents
       case "sparkevents" => sparkEvents
       case "notebooks" => notebooks
 //      case "pools" => pools
       case "audit" => audit
+      case "accounts" => accounts
 //      case "iampassthrough" => iamPassthrough
 //      case "profiles" => profiles
       case scope => {
@@ -253,12 +287,13 @@ object Initializer extends SparkSessionWrapper {
   // Init the SparkSessionWrapper with envVars
   envInit()
 
-  def apply(args: Array[String]): Workspace = {
+  def apply(args: Array[String], debugFlag: Boolean = false): Workspace = {
 
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
+    config.setDebugFlag(debugFlag)
 
     // Todo - Move timestamp init to correct location
     logger.log(Level.INFO, "Initializing Environment")
