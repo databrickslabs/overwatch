@@ -97,6 +97,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
       val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
       val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
+      // TODO -- Audit log bronze is no longer streaming target -- remove this path
       val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
 
       if (config.debugFlag){

@@ -75,6 +75,12 @@ class Database(config: Config) extends SparkSessionWrapper {
         logger.log(Level.INFO, beginMsg)
         val streamWriter = target.writer(finalDF).asInstanceOf[DataStreamWriter[Row]].table(target.tableFullName)
         val streamManager = getQueryListener(streamWriter)
+
+
+//        val x = spark.streams.active
+//        spark.streams.get("").lastProgress.prettyJson
+
+
         spark.streams.addListener(streamManager)
         val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
         if (config.debugFlag) println(listenerAddedMsg)

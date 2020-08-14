@@ -166,26 +166,32 @@ trait BronzeTransforms extends SparkSessionWrapper {
     var firstRunValid = true
     var appendRunValid = true
     val pathsToValidate = Array(
-      ehConfig.auditRawEventsChk.get,
-      ehConfig.auditLogChk.get
+      ehConfig.auditRawEventsChk.get
     )
 
+    logger.log(Level.INFO, s"chkpoint paths for validation are ${pathsToValidate.mkString(",")}")
+
     pathsToValidate.foreach(path => {
-      try {
+      try { // succeeds if path does exist
+        logger.log(Level.INFO, s"Validating: ${path}")
         dbutils.fs.ls(path).head.isDir
         firstRunValid = false
-        logger.log(Level.ERROR, s"${path} is not empty.")
-        println(s"${path} is not empty.")
-      } catch {
+        if (isFirstRun) {
+          logger.log(Level.INFO, s"${path} exists as directory confirmed. Invalid first run")
+          logger.log(Level.ERROR, s"${path} is not empty.")
+          println(s"${path} is not empty. First run requires empty checkpoints.")
+        }
+      } catch { // path does not exist
         case _: FileNotFoundException =>
           appendRunValid = false
-          logger.log(Level.INFO, s"Path Verified Empty: ${path}")
+          logger.log(Level.INFO, s"Path: ${path} Does not exist. To append new data, a checkpoint dir must " +
+            s"exist and be current.")
+        case e: Throwable => logger.log(Level.ERROR, s"Could not validate path ${path}", e)
       }
     })
 
-    if (isFirstRun && firstRunValid) true
-    else if (!isFirstRun && appendRunValid) true
-    else false
+    if (isFirstRun) firstRunValid
+    else appendRunValid
   }
 
   @throws(classOf[BadConfigException])
@@ -229,7 +235,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter('Overwatch_RunID === lit(overwatchRunID))
       val schemaBuilders = spark.table(auditRawLand.tableFullName)
         .filter('Overwatch_RunID === lit(overwatchRunID))
-        .withColumn("deserializedBody", 'body.cast("string"))
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"))
         .selectExpr("streamRecord.*")
@@ -243,7 +248,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       spark.table(auditRawLand.tableFullName)
         .filter('Overwatch_RunID === lit(overwatchRunID))
-        .withColumn("deserializedBody", 'body.cast("string"))
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"))
         .selectExpr("streamRecord.*")

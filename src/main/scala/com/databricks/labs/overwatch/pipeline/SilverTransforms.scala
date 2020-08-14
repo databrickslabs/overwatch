@@ -4,11 +4,13 @@ import java.util.UUID
 
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 trait SilverTransforms extends SparkSessionWrapper {
 
@@ -25,6 +27,31 @@ trait SilverTransforms extends SparkSessionWrapper {
   private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
 
   object UDF {
+
+    case class ERP(erp: String, tables: Option[Array[String]] = None, paths: Option[Array[String]] = None, tablesToMigrate: Option[Int] = None)
+//    val x = dbutils.fs.ls(s"/mnt/prd_rawdelta/prd/raw/jet").toDF
+      val systemErp = Seq("").toDF
+      .withColumn("name", regexp_replace('name, "/", ""))
+      .groupBy()
+      .agg(
+        collect_set('name).alias("tables"),
+        collect_set('path).alias("paths")
+      )
+      .withColumn("erp", lit("jet"))
+      .withColumn("tablesToMigrate", size('tables).cast("int"))
+      .as[ERP]
+
+    systemErp.foreach(erp => {
+      val tables = erp.tables.get
+      val paths = erp.paths.get
+
+    })
+
+
+
+
+
+
 
     /**
      * Converts column of seconds/milliseconds/nanoseconds to timestamp
