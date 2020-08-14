@@ -4,11 +4,13 @@ import java.util.UUID
 
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 trait SilverTransforms extends SparkSessionWrapper {
 

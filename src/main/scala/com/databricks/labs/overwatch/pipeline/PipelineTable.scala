@@ -75,7 +75,6 @@ case class PipelineTable(
   /**
    * This EITHER appends/changes the spark overrides OR sets them. This can only set spark params if updates
    * are not passed --> setting the spark conf is really mean to be private action
-   *
    * @param updates spark conf updates
    */
   private[overwatch] def setSparkOverrides(updates: Map[String, String] = Map()): Unit = {

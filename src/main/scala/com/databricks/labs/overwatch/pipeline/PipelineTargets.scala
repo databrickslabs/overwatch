@@ -144,6 +144,7 @@ abstract class PipelineTargets(config: Config) {
       shuffleFactor = 0.07
     )
 
+    // TODO -- Optimization -- first write, minibatch by clusters and par write partitions
     lazy private[overwatch] val tasksTarget: PipelineTable = PipelineTable(
       name = "spark_tasks_silver",
       keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID"),
