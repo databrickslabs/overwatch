@@ -28,31 +28,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   object UDF {
 
-    case class ERP(erp: String, tables: Option[Array[String]] = None, paths: Option[Array[String]] = None, tablesToMigrate: Option[Int] = None)
-//    val x = dbutils.fs.ls(s"/mnt/prd_rawdelta/prd/raw/jet").toDF
-      val systemErp = Seq("").toDF
-      .withColumn("name", regexp_replace('name, "/", ""))
-      .groupBy()
-      .agg(
-        collect_set('name).alias("tables"),
-        collect_set('path).alias("paths")
-      )
-      .withColumn("erp", lit("jet"))
-      .withColumn("tablesToMigrate", size('tables).cast("int"))
-      .as[ERP]
-
-    systemErp.foreach(erp => {
-      val tables = erp.tables.get
-      val paths = erp.paths.get
-
-    })
-
-
-
-
-
-
-
     /**
      * Converts column of seconds/milliseconds/nanoseconds to timestamp
      *
