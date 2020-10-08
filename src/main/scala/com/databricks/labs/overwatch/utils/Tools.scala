@@ -1,7 +1,5 @@
 package com.databricks.labs.overwatch.utils
 
-import java.text.SimpleDateFormat
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.io.JsonStringEncoder

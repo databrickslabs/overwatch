@@ -496,6 +496,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("date", UDF.toTS('timestamp, outputResultType = DateType))
       .withColumn("tsS", ('timestamp / 1000).cast("long"))
       .withColumn("reset",
+        // TODO -- confirm that deleteResult and/or resizeResult are NOT REQUIRED HERE
         sum(when('actionName.isin("startResult", "restartResult", "createResult"), lit(1))
           .otherwise(lit(0))).over(reset))
       .withColumn("runtime_curr_stateS",
