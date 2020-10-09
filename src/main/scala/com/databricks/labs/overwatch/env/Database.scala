@@ -43,7 +43,6 @@ class Database(config: Config) extends SparkSessionWrapper {
       override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
         println("Query made progress: " + queryProgress.progress)
         if (config.debugFlag) {
-          queryProgress.progress.observedMetrics.values().toArray().foreach(println)
           println(query.status.prettyJson)
         }
         if (queryProgress.progress.numInputRows == 0) {

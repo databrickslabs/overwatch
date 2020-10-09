@@ -79,7 +79,7 @@ trait SparkSessionWrapper extends Serializable {
     if (System.getenv("OVERWATCH") != "LOCAL") {
       setCoresPerWorker(sc.parallelize("1", 1)
         .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0))
-
+      
       setNumberOfWorkerNodes(sc.statusTracker.getExecutorInfos.length - 1)
     } else {
       val env = System.getenv().asScala
