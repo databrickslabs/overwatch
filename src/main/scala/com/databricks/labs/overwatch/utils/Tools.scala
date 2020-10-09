@@ -84,7 +84,7 @@ object SchemaTools extends SparkSessionWrapper {
 
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
     val r = new scala.util.Random(10)
-    val fieldNames = fields.map(_.name.toLowerCase())
+    val fieldNames = fields.map(_.name.trim.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
     val dupCount = dups.length
     if (dupCount == 0) {
