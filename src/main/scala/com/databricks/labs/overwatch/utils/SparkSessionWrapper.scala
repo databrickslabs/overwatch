@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch.utils
 
-import com.sun.javaws.exceptions.InvalidArgumentException
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SparkSession
 
