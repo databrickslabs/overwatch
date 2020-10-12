@@ -86,7 +86,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                          apiType: String,
                          ids: Array[T], idsKey: String,
                          extraQuery: Option[Map[String, Any]] = None): Array[String] = {
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(64))
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(24))
     val idsPar = ids.par
     idsPar.tasksupport = taskSupport
     //    DEBUG
