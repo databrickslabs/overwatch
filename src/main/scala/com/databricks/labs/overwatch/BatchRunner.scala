@@ -1,5 +1,7 @@
 package com.databricks.labs.overwatch
 
+import java.time.{LocalDateTime, ZoneId}
+
 import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Silver}
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.log4j.{Level, Logger}
@@ -30,18 +32,18 @@ object BatchRunner extends SparkSessionWrapper{
     }
 
     val config = workspace.getConfig
-//    val fakeTime = LocalDateTime.of(2020,5,8,13,44).atZone(ZoneId.of("Etc/UTC"))
-//      .toInstant.toEpochMilli
-//    config.setPipelineSnapTime(fakeTime)
+    val fakeTime = LocalDateTime.of(2020, 10, 10, 13, 44).atZone(ZoneId.of("Etc/UTC"))
+      .toInstant.toEpochMilli
+    config.setPipelineSnapTime(fakeTime)
 
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
-    if (config.isFirstRun) {
-      spark.table("overwatch_snap.aws_ec2_details")
-        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
-    }
-    logger.log(Level.INFO, "Starting Silver")
-    Silver(workspace).run()
+//    if (config.isFirstRun) {
+//      spark.table("overwatch_snap.aws_ec2_details")
+//        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
+//    }
+//    logger.log(Level.INFO, "Starting Silver")
+//    Silver(workspace).run()
 
 //    Silver(workspace).run()
 

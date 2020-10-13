@@ -66,6 +66,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
   protected def initiatePostProcessing(): Unit = {
 //    postProcessor.analyze()
     postProcessor.optimize()
+    Helpers.fastrm(Array(
+      "/tmp/overwatch/bronze/clusterEventsBatches"
+    ))
+
   }
 
   protected def restoreSparkConf(value: Map[String, String] = config.initialSparkConf) : Unit= {
