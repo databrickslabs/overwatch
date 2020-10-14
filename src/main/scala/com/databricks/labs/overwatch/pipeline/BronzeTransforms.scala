@@ -101,7 +101,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     //    val idsPar = Array("0827-194754-tithe1")
     // removing parallelization for now to see if it fixes some weird errors
     // CONFIRMED -- Parallelizing this breaks the token cipher
-    // TODO - SWITCH BACK TO PAR
+    // TODO - Identify why parallel errors
     val results = ids.flatMap(id => {
       val rawQuery = Map(
         idsKey -> id
@@ -114,57 +114,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val apiCall = ApiCall(endpoint, apiEnv, Some(query))
       if (apiType == "post") apiCall.executePost().asStrings
       else apiCall.executeGet().asStrings
-    }).toArray
+    }) //.toArray -- needed when using par
     if (results.isEmpty) {
-      //      setNewDataRetrievedFlag(false)
-      //      throw new NoNewDataException(s"${endpoint} returned no new data, skipping") // TODO -- BUBBLE THIS UP
       Array()
     }
     else results
   }
-
-  // TODO -- For Paths
-  //  def getChildDetail(df: StructType, c: Column): Array[Column] = {
-  //    df.fields.filter(_.name == "children").map(f => {
-  //      println(s"Top Level f type - ${f.dataType.typeName}")
-  //      f.dataType match {
-  //        case dt: ArrayType => {
-  //          println(s"dt element type - ${dt.elementType.typeName}")
-  //          dt.elementType match {
-  //            case et: StructType => {
-  //              when(size(c.getField("children")) > 0,
-  //                getChildDetail(et, c.getField("children")(0)))
-  //                  struct(
-  //                    c.getField("estRowCount"),
-  //                    c.getField("metadata")
-  //                  ).alias("childDetail")
-  //            }
-  //            case _ => {
-  //              struct(
-  //                c.getField("estRowCount"),
-  //                c.getField("metadata")
-  //              ).alias("childDetail")
-  //            }
-  //          }
-  //        }
-  //      }
-  //    })
-  //  }
-
-  //  private def flattenSchema(schema: StructType, prefix: String = null): Array[Column] = {
-  //    val x = schema.fields.flatMap(f => {
-  //      val colName = if (prefix == null) f.name else (prefix + "." + f.name)
-  //
-  //
-  ////      f.dataType match {
-  ////        case st: StructType => flattenSchema(st, colName)
-  ////        case at: ArrayType =>
-  ////          val st = at.elementType.asInstanceOf[StructType]
-  ////          flattenSchema(st, colName)
-  ////        case _ => Array(new Column(colName).alias(colName))
-  ////      }
-  //    })
-  //  }
 
   private def datesStream(fromDate: LocalDate): Stream[LocalDate] = {
     fromDate #:: datesStream(fromDate plusDays 1)
@@ -367,19 +322,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "limit" -> 500
     )
 
-//    val clusterIDs = auditLogsTable.asDF
-//      .filter(
-//        'date.between(start_time.asColumnTS.cast("date"), end_time.asColumnTS.cast("date")) &&
-//        'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
-//      )
-//      .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
-//      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
-//      .filter('cluster_id.isNotNull)
-//      .select('cluster_id)
-//      .as[String]
-//      .collect()
+    val clusterIDs = auditLogsTable.asDF
+      .filter(
+        'date.between(start_time.asColumnTS.cast("date"), end_time.asColumnTS.cast("date")) &&
+        'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
+      )
+      .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
+      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .filter('cluster_id.isNotNull)
+      .select('cluster_id)
+      .as[String]
+      .collect()
 
-    val clusterIDs = """1004-141700-pins91,0819-200140-sag659,0918-161814-edits4,0814-173941-merit596,0711-120453-dotes18,0318-184242-dealt751,0711-120453-dotes18,1004-141700-pins91,0917-200813-ping33,0814-173941-merit596,0724-141619-this607,0724-141618-local604,0814-173940-envy590,0814-173943-arias608,0526-075326-mower2,0804-171430-picky968,0814-173941-newts595,0804-171429-howdy966,0917-200717-guilt32,0715-193200-wipes182,0917-200813-ping33,0814-173937-gouge579,0814-173941-merit596,1112-181811-jilts898,0814-173936-ovum572,0816-165511-songs94,0228-194538-shows5,0724-141622-brief621,0804-171429-crier963,0917-200813-ping33,0917-200717-guilt32,0616-182331-runt612,0917-200813-ping33,0526-075326-mower2,0716-160437-decaf361,0715-163318-piece155,0816-165511-songs94,0814-173936-alb571,0224-185747-jest918,0814-173938-vent583,0804-171422-dirk933,0814-173934-plum562,0715-163318-piece155,0817-161910-chomp205,0317-103623-rinse751,0917-200813-ping33,0715-163318-piece155,0724-141614-corn585,0917-200813-ping33,0816-165511-songs94,0814-173932-twos552,0724-141622-brief621,0819-200140-sag659,0317-103623-rinse751,0814-173936-alb571,0814-173936-newly574,0814-173938-fogs582,0917-200717-guilt32,0724-141619-coo609,0724-141617-hill600,0804-171425-nail948,0724-141622-brief621,1004-141700-pins91,1112-181811-jilts898,0310-052403-teen785,0715-163318-piece155,0814-173934-plum562,0918-161814-edits4,0526-075326-mower2,0816-165511-songs94,0207-162257-admit3,0828-205028-loon632,0827-184015-caned397,0724-141618-sears605,0819-200138-bacon649,0724-141614-corn585,0814-173938-vent583,0814-173938-stick580,0724-141615-union592,0828-150942-swath577,0724-141620-avast612,0831-192834-trims236,0109-132912-eves7,0804-171430-picky968,0814-173932-twos552,0724-141622-dozed622,0825-130849-toss837,0711-120453-dotes18,0917-200813-ping33,0814-173943-flirt607,0828-150942-swath577,0903-222609-bawdy413,0827-172349-hoses361,0804-171430-plug969,0819-201432-weigh671,0819-200140-sag659,0724-141616-acts595,0819-200142-moire665,0814-173936-newly574,0724-141617-any599,0724-141616-acts595,0831-192836-thou242,0716-160437-decaf361,0814-173942-tutor601,0828-205028-yoked630,0804-171429-crier963,0826-204714-scow178,0804-171422-dirk933,0819-200138-bacon649,0827-184426-dried398,0724-141613-inter583,0814-173933-flap557,0317-103623-rinse751,1004-141700-pins91,0724-141615-clef591,0825-130152-keen830,0224-185747-jest918,0827-172430-zaps375,0819-200142-moire665,0814-173938-stick580,0715-163318-piece155,0814-173941-newts595,0804-171425-nail948,0814-173933-jowls558,0814-173936-ovum572,0903-222609-bawdy413,0716-134539-twain7,0804-171430-picky968,0826-204714-scow178,0724-141618-local604,0724-141614-iota586,0825-130153-admit834,0831-192835-ducts237,1004-141700-pins91,0310-052403-teen785,1004-141700-pins91,0724-141619-matzo606,0814-173932-wises553,0825-130849-toss837,0109-132912-eves7,0715-163318-piece155,0814-173939-relic586,0724-141618-loses603,0724-141619-this607,0724-141617-hill600,0828-205027-cuter626,0228-194538-shows5,0813-191921-wadi350,0814-173942-tutor601,0814-173933-tier560,0109-132912-eves7,0616-182331-runt612,0814-173937-slier575,0724-141622-dozed622,0814-173931-wen550,0804-171432-now977,0526-075326-mower2,0724-141622-dozed622,0831-192834-trims236,0904-192312-gawk638,0814-173935-swank565,0917-200717-guilt32,0825-130849-gowns841,0804-171426-oases952,0224-185747-jest918,0902-145706-divan132,0816-165511-songs94,0814-173943-arias608,0814-173940-mown589,0917-200717-guilt32,0819-201432-weigh671,0804-171426-oases952,0616-182331-runt612,0310-052403-teen785,0827-184426-dried398,0724-141618-jag602,0816-165511-songs94,0724-141618-sears605,1004-141700-pins91,0904-143329-bungs571,0904-192312-gawk638,0903-222352-hath412,0814-173937-slier575,0814-173936-ovum572,0827-184015-caned397,0804-171432-now977,0814-173943-fibs606,0814-173941-merit596,0724-141615-clef591,0724-141623-made625,0825-130152-brag831,1004-141700-pins91,0926-173736-zinc29,1004-141700-pins91,0317-103623-rinse751,0814-173940-shuck591,0819-200142-toll667,0902-113358-nubs96,0825-130152-keen830,0825-130849-net839,0902-145706-divan132,0804-171429-howdy966,1112-181811-jilts898,0715-193200-wipes182,0814-173933-jowls558,0814-173934-plum562,0819-200138-uses648,0917-200813-ping33,0814-173942-pint603,0603-180134-oven821,0828-150942-swath577,0715-193200-wipes182,0724-141618-jag602,0926-173736-zinc29,0716-160437-celli362,0724-141619-this607,0831-192835-cents240,0814-173943-fibs606""".split(",")
+//    val clusterIDs = """1004-141700-pins91,0819-200140-sag659,0918-161814-edits4,0814-173941-merit596,0711-120453-dotes18,0318-184242-dealt751,0711-120453-dotes18,1004-141700-pins91,0917-200813-ping33,0814-173941-merit596,0724-141619-this607,0724-141618-local604,0814-173940-envy590,0814-173943-arias608,0526-075326-mower2,0804-171430-picky968,0814-173941-newts595,0804-171429-howdy966,0917-200717-guilt32,0715-193200-wipes182,0917-200813-ping33,0814-173937-gouge579,0814-173941-merit596,1112-181811-jilts898,0814-173936-ovum572,0816-165511-songs94,0228-194538-shows5,0724-141622-brief621,0804-171429-crier963,0917-200813-ping33,0917-200717-guilt32,0616-182331-runt612,0917-200813-ping33,0526-075326-mower2,0716-160437-decaf361,0715-163318-piece155,0816-165511-songs94,0814-173936-alb571,0224-185747-jest918,0814-173938-vent583,0804-171422-dirk933,0814-173934-plum562,0715-163318-piece155,0817-161910-chomp205,0317-103623-rinse751,0917-200813-ping33,0715-163318-piece155,0724-141614-corn585,0917-200813-ping33,0816-165511-songs94,0814-173932-twos552,0724-141622-brief621,0819-200140-sag659,0317-103623-rinse751,0814-173936-alb571,0814-173936-newly574,0814-173938-fogs582,0917-200717-guilt32,0724-141619-coo609,0724-141617-hill600,0804-171425-nail948,0724-141622-brief621,1004-141700-pins91,1112-181811-jilts898,0310-052403-teen785,0715-163318-piece155,0814-173934-plum562,0918-161814-edits4,0526-075326-mower2,0816-165511-songs94,0207-162257-admit3,0828-205028-loon632,0827-184015-caned397,0724-141618-sears605,0819-200138-bacon649,0724-141614-corn585,0814-173938-vent583,0814-173938-stick580,0724-141615-union592,0828-150942-swath577,0724-141620-avast612,0831-192834-trims236,0109-132912-eves7,0804-171430-picky968,0814-173932-twos552,0724-141622-dozed622,0825-130849-toss837,0711-120453-dotes18,0917-200813-ping33,0814-173943-flirt607,0828-150942-swath577,0903-222609-bawdy413,0827-172349-hoses361,0804-171430-plug969,0819-201432-weigh671,0819-200140-sag659,0724-141616-acts595,0819-200142-moire665,0814-173936-newly574,0724-141617-any599,0724-141616-acts595,0831-192836-thou242,0716-160437-decaf361,0814-173942-tutor601,0828-205028-yoked630,0804-171429-crier963,0826-204714-scow178,0804-171422-dirk933,0819-200138-bacon649,0827-184426-dried398,0724-141613-inter583,0814-173933-flap557,0317-103623-rinse751,1004-141700-pins91,0724-141615-clef591,0825-130152-keen830,0224-185747-jest918,0827-172430-zaps375,0819-200142-moire665,0814-173938-stick580,0715-163318-piece155,0814-173941-newts595,0804-171425-nail948,0814-173933-jowls558,0814-173936-ovum572,0903-222609-bawdy413,0716-134539-twain7,0804-171430-picky968,0826-204714-scow178,0724-141618-local604,0724-141614-iota586,0825-130153-admit834,0831-192835-ducts237,1004-141700-pins91,0310-052403-teen785,1004-141700-pins91,0724-141619-matzo606,0814-173932-wises553,0825-130849-toss837,0109-132912-eves7,0715-163318-piece155,0814-173939-relic586,0724-141618-loses603,0724-141619-this607,0724-141617-hill600,0828-205027-cuter626,0228-194538-shows5,0813-191921-wadi350,0814-173942-tutor601,0814-173933-tier560,0109-132912-eves7,0616-182331-runt612,0814-173937-slier575,0724-141622-dozed622,0814-173931-wen550,0804-171432-now977,0526-075326-mower2,0724-141622-dozed622,0831-192834-trims236,0904-192312-gawk638,0814-173935-swank565,0917-200717-guilt32,0825-130849-gowns841,0804-171426-oases952,0224-185747-jest918,0902-145706-divan132,0816-165511-songs94,0814-173943-arias608,0814-173940-mown589,0917-200717-guilt32,0819-201432-weigh671,0804-171426-oases952,0616-182331-runt612,0310-052403-teen785,0827-184426-dried398,0724-141618-jag602,0816-165511-songs94,0724-141618-sears605,1004-141700-pins91,0904-143329-bungs571,0904-192312-gawk638,0903-222352-hath412,0814-173937-slier575,0814-173936-ovum572,0827-184015-caned397,0804-171432-now977,0814-173943-fibs606,0814-173941-merit596,0724-141615-clef591,0724-141623-made625,0825-130152-brag831,1004-141700-pins91,0926-173736-zinc29,1004-141700-pins91,0317-103623-rinse751,0814-173940-shuck591,0819-200142-toll667,0902-113358-nubs96,0825-130152-keen830,0825-130849-net839,0902-145706-divan132,0804-171429-howdy966,1112-181811-jilts898,0715-193200-wipes182,0814-173933-jowls558,0814-173934-plum562,0819-200138-uses648,0917-200813-ping33,0814-173942-pint603,0603-180134-oven821,0828-150942-swath577,0715-193200-wipes182,0724-141618-jag602,0926-173736-zinc29,0716-160437-celli362,0724-141619-this607,0831-192835-cents240,0814-173943-fibs606""".split(",")
 
     val batchSize = 500000D
     val tmpClusterEventsPath = "/tmp/overwatch/bronze/clusterEventsBatches"
@@ -395,22 +350,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val clusterEvents = apiByID("clusters/events", apiEnv, "post",
         clusterIdsBatch, "cluster_id", Some(extraQuery))
 
-//      try {
+      try {
         val tdf = spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
           .select(col("events.*"))
-
-        tdf.show(4,false)
 
         SchemaTools.scrubSchema(tdf)
           .write.mode("append").format("delta")
           .option("mergeSchema", "true")
           .save(tmpClusterEventsPath)
-//      } catch {
-//        case e: Throwable => {
-//          logger.log(Level.WARN, s"While attempting to grab events data for clusters below, an error occurred" +
-//            s"\n${clusterIdsBatch.foreach(println)}", e)
-//        }
-//      }
+      } catch {
+        case e: Throwable => {
+          logger.log(Level.WARN, s"While attempting to grab events data for clusters below, an error occurred" +
+            s"\n${clusterIdsBatch.foreach(println)}", e)
+        }
+      }
 
     })
 

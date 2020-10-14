@@ -8,11 +8,12 @@ import java.util.{Date, UUID}
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
+import org.apache.hadoop.conf._
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
 import org.apache.commons.lang3.StringEscapeUtils
-import org.apache.hadoop.conf.Configuration
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
@@ -343,23 +344,27 @@ object Helpers extends SparkSessionWrapper {
     }
   }
 
-  private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
+  private def rmSer(file: String): Unit = {
     val conf = new Configuration()
     val fs = FileSystem.get(new java.net.URI("dbfs:/"), conf)
-    val filesToDelete = topPaths.map(p => {
+    try {
+      fs.delete(new Path(file), true)
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"ERROR: Could not delete file $file, skipping", e)
+      }
+    }
+  }
+
+  private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
+    topPaths.map(p => {
       if (p.reverse.head.toString == "/") s"${p}*" else s"${p}/*"
     }).flatMap(globPath).toSeq.toDF("filesToDelete")
       .as[String]
+      .foreach(f => rmSer(f))
 
-    filesToDelete.foreach(f => {
-      try {
-        fs.delete(new Path(f), true)
-      } catch {
-        case e: Throwable => {
-          logger.log(Level.ERROR, s"ERROR: Could not delete file $f, skipping", e)
-        }
-      }
-    })
+    topPaths.foreach(dir => dbutils.fs.rm(dir, true))
+
   }
 
 }
