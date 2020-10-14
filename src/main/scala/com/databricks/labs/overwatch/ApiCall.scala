@@ -21,6 +21,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private var _initialQueryMap: Map[String, Any] = _
   private val results = ArrayBuffer[String]()
   private var _limit: Long = _
+  private var _paginate: Boolean = false
   private var _req: String = _
   private var _maxResults: Int = _
   private var _status: String = "SUCCESS"
@@ -43,6 +44,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   private def setMaxResults(value: Int): this.type = {
     _maxResults = value
+    this
+  }
+
+  private def setPaginate(value: Boolean): this.type = {
+    _paginate = value
     this
   }
 
@@ -147,8 +153,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   //  and validate the error handling
   @throws(classOf[ApiCallFailure])
   def executeGet(pageCall: Boolean = false): this.type = {
+    logger.log(Level.INFO, s"Loading ${req} -> query: $getQueryString")
     try {
-      logger.log(Level.INFO, s"Loading ${req} -> query: $getQueryString")
       val result = Http(req + getQueryString)
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
@@ -170,7 +176,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       if (!pageCall) {
         // Append initial results
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
-        paginate()
+        if (_paginate) paginate()
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
@@ -184,6 +190,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
+  // Paginate for Get Calls
   private def paginate(): Unit = {
     var hasMore = JsonUtils.jsonToMap(results(0)).getOrElse("has_more", false).toString.toBoolean
     var i: Int = 1
@@ -200,6 +207,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   }
 
   // TODO - Use RDD if any of the results start getting to big
+  // Pagination for POST calls
   private def paginate(totalCount: Long): Unit = {
 
     val offsets = (limit to totalCount by limit).toArray
@@ -219,9 +227,9 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   def executePost(pageCall: Boolean = false): this.type = {
 
     // TODO -- Add proper try catch
+    val jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
+    logger.log(Level.INFO, s"Loading ${req} -> query: $jsonQuery")
     try {
-      val jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
-      logger.log(Level.INFO, s"Loading ${_apiName} -> query: $jsonQuery")
       val result = Http(req)
         .postData(jsonQuery)
         .headers(Map[String, String](
@@ -239,7 +247,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
         val totalCount = JsonUtils.jsonToMap(jsonResult).getOrElse("total_count", 0).toString.toLong
         if (totalCount > 0) results.append(jsonResult)
-        if (totalCount > limit) paginate(totalCount)
+        if (totalCount > limit && _paginate) paginate(totalCount)
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
@@ -261,10 +269,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 object ApiCall {
 
   def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None,
-            maxResults: Int = Int.MaxValue): ApiCall = {
+            maxResults: Int = Int.MaxValue, paginate: Boolean = true): ApiCall = {
     new ApiCall(apiEnv).setApiName(apiName)
       .setQuery(queryMap) //.decryptToken()
       .setMaxResults(maxResults)
+      .setPaginate(paginate)
   }
 
   // TODO -- Accept jsonQuery as Map

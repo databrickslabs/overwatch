@@ -8,6 +8,8 @@ import java.util.{Date, UUID}
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
+import org.apache.hadoop.conf._
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
@@ -24,6 +26,7 @@ import scala.concurrent.forkjoin.ForkJoinPool
 // TODO -- Add loggers to objects with throwables
 object JsonUtils {
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
   case class JsonStrings(prettyString: String, compactString: String, escapedString: String, fromObj: Any)
 
   private[overwatch] lazy val objectMapper = new ObjectMapper()
@@ -31,8 +34,15 @@ object JsonUtils {
   private val encoder = JsonStringEncoder.getInstance
 
   def jsonToMap(message: String): Map[String, Any] = {
-    val cleanMessage = StringEscapeUtils.unescapeJson(message)
-    objectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
+    try {
+      val cleanMessage = StringEscapeUtils.unescapeJson(message)
+      objectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"ERROR: Could not convert json to Map. \nJSON: ${message}", e)
+        Map("ERROR" -> "")
+      }
+    }
   }
 
   def objToJson(obj: Any, includeNulls: Boolean = false, includeEmpty: Boolean = false): JsonStrings = {
@@ -129,6 +139,7 @@ object Helpers extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
+
   import spark.implicits._
 
   private def parallelism: Int = {
@@ -154,14 +165,14 @@ object Helpers extends SparkSessionWrapper {
   }
 
   // TODO -- This is broken -- It looks like I may have to pass in the df.schema as well
-//  def getLocalTime(ts: Column, tz: String): Column = {
-//    ts.expr.dataType match {
-//      case _: TimestampType => from_utc_timestamp(ts, tz)
-//      case _: LongType => from_utc_timestamp(from_unixtime(ts.cast("double") / 1000).cast("timestamp"), tz)
-//      case _: DoubleType => from_utc_timestamp(from_unixtime(ts).cast("timestamp"), tz)
-//      case _: IntegerType => from_utc_timestamp(from_unixtime(ts).cast("timestamp"), tz)
-//    }
-//  }
+  //  def getLocalTime(ts: Column, tz: String): Column = {
+  //    ts.expr.dataType match {
+  //      case _: TimestampType => from_utc_timestamp(ts, tz)
+  //      case _: LongType => from_utc_timestamp(from_unixtime(ts.cast("double") / 1000).cast("timestamp"), tz)
+  //      case _: DoubleType => from_utc_timestamp(from_unixtime(ts).cast("timestamp"), tz)
+  //      case _: IntegerType => from_utc_timestamp(from_unixtime(ts).cast("timestamp"), tz)
+  //    }
+  //  }
 
   def pathExists(path: String): Boolean = {
     val conf = sc.hadoopConfiguration
@@ -184,9 +195,18 @@ object Helpers extends SparkSessionWrapper {
 
   // TODO - change this to the faster glob path here
   //  https://databricks.slack.com/archives/G95GCH8LT/p1589320667122200?thread_ts=1589317810.117200&cid=G95GCH8LT
+  //  def globPath(path: String): Array[String] = {
+  //    val hadoopConf = spark.sessionState.newHadoopConf()
+  //    val driverFS = new Path(path).getFileSystem(hadoopConf)
+  //    val paths = driverFS.globStatus(new Path(path))
+  //    // TODO -- Switch this to DEBUG
+  //    logger.log(Level.INFO, s"${path} expanded in ${paths.length} files")
+  //    paths.map(_.getPath.toString)
+  //  }
+
   def globPath(path: String): Array[String] = {
-    val hadoopConf = spark.sessionState.newHadoopConf()
-    val driverFS = new Path(path).getFileSystem(hadoopConf)
+    val conf = new Configuration()
+    val driverFS = new Path(path).getFileSystem(conf)
     val paths = driverFS.globStatus(new Path(path))
     // TODO -- Switch this to DEBUG
     logger.log(Level.INFO, s"${path} expanded in ${paths.length} files")
@@ -322,6 +342,29 @@ object Helpers extends SparkSessionWrapper {
         .saveAsTable(fullTableName)
       spark.sql(s"drop table if exists ${fullTableName}")
     }
+  }
+
+  private def rmSer(file: String): Unit = {
+    val conf = new Configuration()
+    val fs = FileSystem.get(new java.net.URI("dbfs:/"), conf)
+    try {
+      fs.delete(new Path(file), true)
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"ERROR: Could not delete file $file, skipping", e)
+      }
+    }
+  }
+
+  private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
+    topPaths.map(p => {
+      if (p.reverse.head.toString == "/") s"${p}*" else s"${p}/*"
+    }).flatMap(globPath).toSeq.toDF("filesToDelete")
+      .as[String]
+      .foreach(f => rmSer(f))
+
+    topPaths.foreach(dir => dbutils.fs.rm(dir, true))
+
   }
 
 }

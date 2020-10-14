@@ -61,7 +61,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget,
       config.fromTime(appendClusterEventLogsModule.moduleID),
-      config.pipelineSnapTime.asUnixTimeMilli,
+      config.pipelineSnapTime,
       config.apiEnv
     ),
     None,

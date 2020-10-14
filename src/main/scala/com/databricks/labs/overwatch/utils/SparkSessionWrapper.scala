@@ -19,7 +19,7 @@ trait SparkSessionWrapper extends Serializable {
   } else {
     logger.log(Level.INFO, "Using Custom, local SparkSession")
     SparkSession.builder()
-      .master("local[*]")
+      .master("local")
       .appName("OverwatchBatch")
 //      .config("spark.driver.bindAddress", "0.0.0.0")
 //      .enableHiveSupport()
@@ -74,7 +74,7 @@ trait SparkSessionWrapper extends Serializable {
 
   def getDriverCores: Int = driverCores
 
-  def envInit(logLevel: String = "WARN"): Boolean = {
+  def envInit(logLevel: String = "INFO"): Boolean = {
     sc.setLogLevel(logLevel)
     if (System.getenv("OVERWATCH") != "LOCAL") {
       setCoresPerWorker(sc.parallelize("1", 1)
