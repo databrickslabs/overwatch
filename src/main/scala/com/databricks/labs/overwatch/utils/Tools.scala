@@ -206,8 +206,8 @@ object Helpers extends SparkSessionWrapper {
 
   def globPath(path: String): Array[String] = {
     val conf = new Configuration()
-    val driverFS = new Path(path).getFileSystem(conf)
-    val paths = driverFS.globStatus(new Path(path))
+    val fs = new Path(path).getFileSystem(conf)
+    val paths = fs.globStatus(new Path(path))
     // TODO -- Switch this to DEBUG
     logger.log(Level.INFO, s"${path} expanded in ${paths.length} files")
     paths.map(_.getPath.toString)

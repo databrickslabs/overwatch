@@ -67,7 +67,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
 //    postProcessor.analyze()
     postProcessor.optimize()
     Helpers.fastrm(Array(
-      "/tmp/overwatch/bronze/clusterEventsBatches"
+      "/tmp/overwatch/bronze/clusterEventsBatches",
+      "/tmp/overwatch/bronze/sparkEventLogPaths"
     ))
 
   }

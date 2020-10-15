@@ -114,7 +114,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val apiCall = ApiCall(endpoint, apiEnv, Some(query))
       if (apiType == "post") apiCall.executePost().asStrings
       else apiCall.executeGet().asStrings
-    }) //.toArray -- needed when using par
+    }) //.toArray // -- needed when using par
     if (results.isEmpty) {
       Array()
     }
@@ -233,9 +233,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         //  might be good to build from time in initializer better on a source case basis
         //  don't attempt this until after tests are in place
         val fromDT = fromTime.toLocalDate
-        val today = untilTime.toLocalDate
+        val untilDT = untilTime.toLocalDate
         // inclusive from exclusive to
-        val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(today)).toArray
+        val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
           .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
 
         if (datesGlob.nonEmpty) {
@@ -471,6 +471,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
 
   protected def collectEventLogPaths(fromTimeCol: Column,
+                                     untilTimeCol: Column,
                                      clusterSpec: PipelineTable,
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
 
@@ -489,14 +490,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
 
     val clusterIDsWithNewData = df
-      .filter('date > fromTimeCol.cast("date"))
+      .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
       .selectExpr("*", "requestParams.*")
       .filter('serviceName === "clusters" && 'cluster_id.isNotNull)
       .select('cluster_id).distinct
 
     val newEventLogPrefixes = if (isFirstRun) {
       df
-        .filter('date > fromTimeCol.cast("date")) //Partition filter
+        .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
         .selectExpr("*", "requestParams.*")
         .filter('serviceName === "clusters")
         .join(clusterIDsWithNewData, Seq("cluster_id"))
@@ -505,13 +506,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       val historicalClustersWithNewData = clusterSpec.asDF
         .withColumn("date", toTS('timestamp, outputResultType = DateType))
-        .filter('date > fromTimeCol.cast("date"))
+        .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
         .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
         .join(clusterIDsWithNewData, Seq("cluster_id"))
 
 
       val logPrefixesWithNewData = df
-        .filter('date > fromTimeCol.cast("date")) //Partition filter
+        .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date"))) //Partition filter
         .selectExpr("*", "requestParams.*")
         .filter('serviceName === "clusters")
         .join(clusterIDsWithNewData, Seq("cluster_id"))
@@ -539,21 +540,31 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("cluster_id", cluster_id_gen)
       .select(
         array(col("destination"), col("cluster_id"),
-          lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-      ).rdd
-      .map(r => r.getSeq[String](0).mkString("/")).collect()
-      .distinct.par
+          lit("eventlog"), lit("*"), lit("*"), lit("eventlo*")).alias("wildPath")
+      ).withColumn("wildPath", concat_ws("/", 'wildPath))
+      .distinct
 
-    newEventLogGlobs.tasksupport = taskSupport
+    // ALERT! DO NOT DELETE THIS SECTION
+    // NOTE: In DBR 6.6 (and probably others) there's a bug in the
+    // org.apache.spark.util.ClosureCleaner$.ensureSerializable(ClosureCleaner.scala:403)
+    // that parses the entire spark plan to determine whether a DF is serializable. These DF plans are not but the result
+    // is which requires that the DF be materialized first.
+    val tmpEventLogPathsDir = "/tmp/overwatch/bronze/sparkEventLogPaths"
+    newEventLogGlobs.write
+      .mode("overwrite")
+      .option("overwriteSchema", "true")
+      .format("delta")
+      .save(tmpEventLogPathsDir)
 
-    logger.log(Level.INFO, s"Building Blob for ${newEventLogGlobs.length} wildcard paths.")
-    val r = new Random(42L)
-    newEventLogGlobs.map(glob => {
-      // Sleep each thread between 0 and 60 seconds to spread the driver load to launch all the threaded readers
-      val delay = r.nextInt(60 * 1000)
-      Thread.sleep(delay)
-      glob
-    }).flatMap(Helpers.globPath).toArray.toSeq.toDF("filename")
+    // TODO -- use intelligent partitions count
+    val strategicPartitions = if (isFirstRun) 2000 else 1000
+    spark.read.format("delta").load(tmpEventLogPathsDir)
+      .repartition(strategicPartitions)
+      .as[String]
+      .map(p => Helpers.globPath(p))
+      .filter(size('value) > 0)
+      .select(explode('value).alias("filename"))
+
   }
 
   //  protected def collectEventLogPaths()(df: DataFrame): DataFrame = {

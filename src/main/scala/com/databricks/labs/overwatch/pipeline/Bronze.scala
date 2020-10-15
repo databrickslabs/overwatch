@@ -80,6 +80,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     Some(Seq(
       collectEventLogPaths(
         config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
+        config.pipelineSnapTime.asColumnTS,
         SilverTargets.clustersSpecTarget,
         config.isFirstRun
       ),
