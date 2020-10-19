@@ -17,6 +17,7 @@ libraryDependencies += "com.databricks" % "dbutils-api_2.11" % "0.0.4"
 libraryDependencies += "org.scalaj" % "scalaj-http_2.11" % "2.4.2"
 libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.7"
 //libraryDependencies += "io.delta" %% "delta-core" % "0.6.1"
+libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.21.3" % "test"
 
 assemblyExcludedJars in assembly := {
   val cp = (fullClasspath in assembly).value
