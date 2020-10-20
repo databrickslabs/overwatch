@@ -6,11 +6,28 @@ import org.apache.spark.sql.SparkSession
 import scala.collection.JavaConverters._
 import org.apache.log4j.{Level, Logger}
 
+/**
+ * Enables access to the Spark variable.
+ * Additional logic can be added to the if statement to enable different types of spark environments
+ * Common uses include DBRemote and local, driver only spark, and local docker configured spark
+ */
 trait SparkSessionWrapper extends Serializable {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
+  /**
+   * Init environment. This structure alows for multiple calls to "reinit" the environment. Important in the case of
+   * autoscaling. When the cluster scales up/down envInit and then check for current cluster cores.
+   */
   @transient
   lazy protected val _envInit: Boolean = envInit()
+
+  /**
+   * Access to spark
+   * If testing locally or using DBConnect, the System variable "OVERWATCH" is set to "LOCAL" to make the code base
+   * behavior differently to work in remote execution AND/OR local only mode but local only mode
+   * requires some additional setup.
+   */
   lazy val spark: SparkSession = if (System.getenv("OVERWATCH") != "LOCAL") {
     logger.log(Level.INFO, "Using Databricks SparkSession")
     SparkSession
@@ -74,7 +91,13 @@ trait SparkSessionWrapper extends Serializable {
 
   def getDriverCores: Int = driverCores
 
-  def envInit(logLevel: String = "INFO"): Boolean = {
+  /**
+   * Set global, cluster details such as cluster cores, driver cores, logLevel, etc.
+   * This also provides a simple way to change the logging level throuhgout the package
+   * @param logLevel log4j log level
+   * @return
+   */
+  def envInit(logLevel: String = "WARN"): Boolean = {
     sc.setLogLevel(logLevel)
     if (System.getenv("OVERWATCH") != "LOCAL") {
       setCoresPerWorker(sc.parallelize("1", 1)

@@ -115,8 +115,6 @@ class Cipher(key: String) {
 object SchemaTools extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  private val logger: Logger = Logger.getLogger(this.getClass)
-
   def structToMap(df: DataFrame, colToConvert: String): Seq[Column] = {
     val schema = df.select(s"${colToConvert}.*").schema
     var mapCols = collection.mutable.LinkedHashSet[Column]()

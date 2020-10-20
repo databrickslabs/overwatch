@@ -3,21 +3,27 @@ package com.databricks.labs.overwatch
 import java.io.IOException
 
 import com.databricks.labs.overwatch.utils.{AuditLogConfig, AzureAuditLogEventhubConfig, DataTarget, OverwatchParams, TokenSecret}
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.core.{JsonParser, JsonProcessingException}
-import com.fasterxml.jackson.databind.annotation.{JsonDeserialize, JsonSerialize}
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.node.ArrayNode
 
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
-// TODO -- Handle master nodes that don't exist
+/**
+ * Custom deserializer to convert json string coming from jobs main class into validated, strongly typed object
+ * called OverwatchParams
+ */
 class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[OverwatchParams]) {
 
+  /**
+   * Helper function used to search for the node by dot-delimited path such as node1.node2.key and supports
+   * optionals and nulls
+   * @param parentNode JsonNode from which to look
+   * @param path dot-delimited coordinates path relative to the node (i.e. layer1.layer2.key)
+   * @return
+   */
   private def getNodeFromPath(parentNode: JsonNode, path: String): Option[JsonNode] = {
     val getLowestNode = Try {
     val pathArray = path.split("\\.")
@@ -36,6 +42,19 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     }
   }
 
+  /**
+   * Best method I could find for to successfully and consistently get optional json nodes that may be null and/or may
+   * be non-existent as keys. This helper function handles several types and can be extended to handle more types.
+   * Additionally, it greatly cleans up the forever ongoing code of drilling into a path to get an optional node by
+   * some type as it takes a dot delimited path coordinate (such as level1.level2.nodeName) and handles all the
+   * digging for the node. I'm certain there's a better/easier way to do this but couldn't find it.
+   * @param node top level JsonNode in which to look
+   * @param path dot-delimited coordinates path relative to the node (i.e. layer1.layer2.key)
+   * @param default default value if not found or is null, like "getOrElse" functions. The default type is also used
+   *                to implicitly cast the output to the same type
+   * @tparam T Type of default, return type will match this
+   * @return
+   */
   private def getOption[T](node: JsonNode, path: String, default: T): Option[T] = {
     val nodeValue = Try {
       val pathArray = path.split("\\.")
@@ -56,6 +75,14 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     }
     }
 
+  /**
+   * Implementation of deserialize method to return OverwatchParams
+   * @param jp
+   * @param ctxt
+   * @throws java.io.IOException
+   * @throws com.fasterxml.jackson.core.JsonProcessingException
+   * @return
+   */
   @throws(classOf[IOException])
   @throws(classOf[JsonProcessingException])
   override def deserialize(jp: JsonParser, ctxt: DeserializationContext): OverwatchParams = {
