@@ -7,7 +7,12 @@ version := "0.2"
 scalaVersion := "2.11.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 
-unmanagedBase := new java.io.File("/usr/local/anaconda3/envs/dbconnectdbr66/lib/python3.7/site-packages/pyspark/jars")
+// TODO -- alter code that requires this for build and get back to core spark, not dbr for build
+
+// SATEESH DBR DEP PATH
+//unmanagedBase := new java.io.File("/usr/local/anaconda3/envs/dbconnectdbr66/lib/python3.7/site-packages/pyspark/jars")
+// TOMES DBR DEP PATH
+unmanagedBase := new java.io.File("c:\\dev\\software\\anaconda\\envs\\ml37\\lib\\site-packages\\pyspark\\jars")
 
 //unmanagedBase := new java.io.File("c:\\dev\\software\\anaconda\\envs\\ml37\\lib\\site-packages\\pyspark\\jars")
 
