@@ -6,10 +6,25 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
+/**
+ * The purpose of this Object is to validate that AT LEAST the columns required for ETL are present. Furthermore,
+ * if all values of a target struct are null when a schema is derived, the output type of the structure won't be a
+ * structure at all but rather a simple string, thus in these cases, the required complex structure must be generated
+ * with all nulls so that it can be inserted into the target. To do this, the necessary null structs are created so
+ * that source DFs can match the target even when schema inference is used in the reader. The entry function is the
+ * "verifyDF" function.
+ */
 object Schema extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  /**
+   * Minimum required schema by module. "Minimum Requierd Schema" means that at least these columns of these types
+   * must exist for the downstream ETLs to function.
+   * The preceeding 2 in module ID 2XXX key integer maps to 2 being silver.
+   * Silver Layer modules 2xxx
+   * Gold Layer 3xxx
+   */
   private val requiredSchemas: Map[Int, StructType] = Map(
     // SparkJobs
     2006 -> StructType(Seq(
@@ -272,11 +287,27 @@ object Schema extends SparkSessionWrapper {
   )
 
   // TODO -- move this to schemaTools -- probably
+  /**
+   * In a nested struct this returns the entire dot delimited path to the current struct field.
+   * @param prefix All higher-level structs that supercede the current field
+   * @param fieldName Name of current field
+   * @return
+   */
   private def getPrefixedString(prefix: String, fieldName: String): String = {
     if (prefix == null) fieldName else s"${prefix}.${fieldName}"
   }
 
-  def correctAndValidate(dfSchema: StructType, minimumSchema: StructType, prefix: String = null): Array[Column] = {
+  /**
+   * The meat of this Object.
+   * Validates the required columns are present in the source DF and when NOT, and IF STRUCTTYPE, creates the structure
+   * with all nulls to allow downstream ETL to continue processing with the missing/nulled strings created from
+   * inferred schema df readers
+   * @param dfSchema schema from source df to compare with the minimum required schema
+   * @param minimumSchema Required minimum schema
+   * @param prefix if drilling into/through structs this will be set to track the depth map
+   * @return
+   */
+  private def correctAndValidate(dfSchema: StructType, minimumSchema: StructType, prefix: String = null): Array[Column] = {
 
     logger.log(Level.DEBUG, s"Top Level DFSchema Fields: ${dfSchema.fieldNames.mkString(",")}")
     logger.log(Level.DEBUG, s"Top Level DFSchema Fields: ${dfSchema.fieldNames.mkString(",")}")
@@ -326,6 +357,12 @@ object Schema extends SparkSessionWrapper {
     })
   }
 
+  /**
+   * Public facing function used to validate and correct a DF before the ETL stage.
+   * @param df DF to validate
+   * @param module Module for which the DF is the source
+   * @return
+   */
   def verifyDF(df: DataFrame, module: Module): DataFrame = {
     val requiredSchema = requiredSchemas.get(module.moduleID)
     if (requiredSchema.nonEmpty) {
