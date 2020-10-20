@@ -115,6 +115,22 @@ class Cipher(key: String) {
 object SchemaTools extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
+
+  def structToMap(df: DataFrame, colToConvert: String): Seq[Column] = {
+    val schema = df.select(s"${colToConvert}.*").schema
+    var mapCols = collection.mutable.LinkedHashSet[Column]()
+    schema.fields.foreach(field => {
+      mapCols.add(lit(field.name))
+      mapCols.add(col(s"${colToConvert}.${field.name}"))
+    })
+    mapCols.toSeq
+  }
+
+  // TODO -- Delta writer is schema case sensitive and will fail on write if column case is not identical on both sides
+  //  As such, schema case sensitive validation needs to be enabled and a handler for whether to assume the same data
+  //  and merge the data, or drop it, or quarantine it or what. This is very common in cases where a column is of
+  //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
   /**
    * Remove special characters from the field name
    * @param s
@@ -142,7 +158,7 @@ object SchemaTools extends SparkSessionWrapper {
    * @return
    */
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
-    val r = new scala.util.Random(10)
+    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
     val fieldNames = fields.map(_.name.trim.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
     val dupCount = dups.length

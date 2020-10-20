@@ -27,8 +27,9 @@ class Database(config: Config) extends SparkSessionWrapper {
     val rollbackSql =
       s"""
          |delete from ${target.tableFullName}
-         |where Overwatch_RunID = ${config.runID}
+         |where Overwatch_RunID = '${config.runID}'
          |""".stripMargin
+    println(s"Executing Rollback: STMT: ${rollbackSql}")
     spark.sql(rollbackSql)
   }
 
@@ -59,8 +60,8 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
 
-
-
+    // TODO -- Enhance schema scrubber. If target has an array of nested structs which is populated but the new
+    //  incoming data (finalDF) has nulls inside one of the nested structs the result is a schema failure.
     try {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
       if (target.checkpointPath.nonEmpty) {
@@ -72,6 +73,7 @@ class Database(config: Config) extends SparkSessionWrapper {
         val beginMsg = s"Stream to ${target.tableFullName} beginning."
         if (config.debugFlag) println(beginMsg)
         logger.log(Level.INFO, beginMsg)
+        finalDF = SchemaTools.scrubSchema(finalDF)
         val streamWriter = target.writer(finalDF).asInstanceOf[DataStreamWriter[Row]].table(target.tableFullName)
         val streamManager = getQueryListener(streamWriter)
         spark.streams.addListener(streamManager)
@@ -83,13 +85,30 @@ class Database(config: Config) extends SparkSessionWrapper {
         spark.streams.removeListener(streamManager)
 
       } else {
-        finalDF = SchemaTools.scrubSchema(finalDF)
+        finalDF = if (config.isFirstRun) SchemaTools.scrubSchema(finalDF) else SchemaTools.scrubSchema(finalDF)
         target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
       }
       logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
       true
     } catch {
       case e: Throwable => {
+        finalDF = df
+        finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS) else finalDF
+        finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
+        val newDataSchemaBeforeScrub = s"DEBUG: SCHEMA: Source Schema for: ${target.tableFullName} BEFORE SCRUBBER was: \n${finalDF.printSchema()}"
+        finalDF = SchemaTools.scrubSchema(finalDF)
+        val newDataSchemaMsg = s"DEBUG: SCHEMA: Source Schema for to be written to target: ${target.tableFullName} is \n${finalDF.printSchema()}"
+        val targetSchemaMsg = if (!config.isFirstRun) {
+          s"DEBUG: SCHEMA: Target Schema for target ${target.tableFullName}: \n${target.asDF.printSchema()}"
+        } else { "NO Target Schema -- First run or target doesn't yet exist" }
+        logger.log(Level.DEBUG, newDataSchemaBeforeScrub)
+        logger.log(Level.DEBUG, newDataSchemaMsg)
+        logger.log(Level.DEBUG, targetSchemaMsg)
+        if (config.debugFlag) {
+          println(newDataSchemaBeforeScrub)
+          println(newDataSchemaMsg)
+          println(targetSchemaMsg)
+        }
         val failMsg = s"Failed to write to ${_databaseName}. Attempting to rollback"
         logger.log(Level.ERROR, failMsg, e)
         println(s"ERROR --> ${target.tableFullName}", e)

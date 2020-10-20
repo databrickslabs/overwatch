@@ -206,7 +206,8 @@ case class PipelineTable(
       streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter
       streamWriter = if (mode == "overwrite") streamWriter.option("overwriteSchema", "true")
       else if (enableSchemaMerge && mode != "overwrite")
-        streamWriter.option("mergeSchema", "true")
+        streamWriter
+          .option("mergeSchema", "true")
       else streamWriter
       streamWriter
     } else {
@@ -214,7 +215,8 @@ case class PipelineTable(
       dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter
       dfWriter = if (mode == "overwrite") dfWriter.option("overwriteSchema", "true")
       else if (enableSchemaMerge && mode != "overwrite")
-        dfWriter.option("mergeSchema", "true")
+        dfWriter
+          .option("mergeSchema", "true")
       else dfWriter
       dfWriter
     }
