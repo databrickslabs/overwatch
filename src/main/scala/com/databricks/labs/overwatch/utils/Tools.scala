@@ -84,6 +84,22 @@ class Cipher(key: String) {
 
 object SchemaTools extends SparkSessionWrapper {
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
+
+  def structToMap(df: DataFrame, colToConvert: String): Seq[Column] = {
+    val schema = df.select(s"${colToConvert}.*").schema
+    var mapCols = collection.mutable.LinkedHashSet[Column]()
+    schema.fields.foreach(field => {
+      mapCols.add(lit(field.name))
+      mapCols.add(col(s"${colToConvert}.${field.name}"))
+    })
+    mapCols.toSeq
+  }
+
+  // TODO -- Delta writer is schema case sensitive and will fail on write if column case is not identical on both sides
+  //  As such, schema case sensitive validation needs to be enabled and a handler for whether to assume the same data
+  //  and merge the data, or drop it, or quarantine it or what. This is very common in cases where a column is of
+  //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
   private def sanitizeFieldName(s: String): String = {
     s.replaceAll("[^a-zA-Z0-9_]", "")
   }
@@ -93,16 +109,22 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
-    val r = new scala.util.Random(10)
+    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
     val fieldNames = fields.map(_.name.trim.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
     val dupCount = dups.length
     if (dupCount == 0) {
       fields
     } else {
-      val uniqueSuffixes = (0 to fields.length + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
+      logger.log(Level.WARN, s"Schema Found with duplicate field names. Correcting for this run but data " +
+        s"should be merged and repaired.\nFIELDS: ${dups.mkString(", ")}")
+      val uniqueSuffixes = (0 to fields.length + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct.map(_.toLowerCase.trim)
       fields.zipWithIndex.map(f => {
-        if (dups.contains(f._1.name.toLowerCase())) f._1.copy(name = f._1.name + "_" + uniqueSuffixes(f._2))
+        if (dups.contains(f._1.name.trim.toLowerCase())) {
+          val uniqueFieldName = f._1.name + "_" + uniqueSuffixes(f._2)
+          logger.log(Level.WARN, s"FIELDS RENAMED: \n ${f._1.name} --> ${uniqueFieldName}")
+          f._1.copy(name = uniqueFieldName)
+        }
         else f._1
       })
     }

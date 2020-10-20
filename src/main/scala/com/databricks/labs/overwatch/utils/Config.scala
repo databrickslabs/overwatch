@@ -224,7 +224,7 @@ class Config() {
 
     // FROM RAW PARAMS TEST
     """
-      |{"auditLogConfig":{"rawAuditPath":"/mnt/nu-databricks-audit"},"tokenSecret":{"scope":"databricks_tmp","key":"overwatch"},"dataTarget":{"databaseName":"overwatch_test","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_test.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords_overwatch_test","overwatchScope":["audit","clusters","clusterEvents"],"migrateProcessedEventLogs":false}
+      |{"auditLogConfig":{"rawAuditPath":"/mnt/nu-databricks-audit"},"tokenSecret":{"scope":"databricks_tmp","key":"overwatch"},"dataTarget":{"databaseName":"overwatch_test4","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_test4.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords_overwatch_test","overwatchScope":["audit","clusters","sparkEvents"],"migrateProcessedEventLogs":false}
       |""".stripMargin
 
   }
