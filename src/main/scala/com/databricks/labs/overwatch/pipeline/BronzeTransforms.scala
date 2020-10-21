@@ -17,7 +17,7 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types.{DataType, DateType, StringType, TimestampType}
+import org.apache.spark.sql.types.{DataType, DateType, StringType, StructType, TimestampType}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
@@ -408,15 +408,28 @@ trait BronzeTransforms extends SparkSessionWrapper {
     struct(filename, byCluster, byClusterHost, bySparkContextID).alias("filnameGroup")
   }
 
+
+
+//  val index = df.schema.fieldIndex("properties")
+//  val propSchema = df.schema(index).dataType.asInstanceOf[StructType]
+//  var columns = mutable.LinkedHashSet[Column]()
+//  propSchema.fields.foreach(field =>{
+//    columns.add(lit(field.name))
+//    columns.add(col("properties." + field.name))
+//  })
+
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
                           processedLogFiles: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
 
+    // Dropping 'Spark Infos' because Overwatch ETLs utilize joins to go from jobs -> stages -> tasks and thus
+    // No value is lost in dropping Spark Infos. Furthermore, Spark Infos is often null for some of the nested structs
+    // which causes a schema failure when appending to existing spark_events_bronze.
     if (eventLogsDF.take(1).nonEmpty) {
       val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
       appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
       val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
-        "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id")
+        "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Spark Infos")
 
       val baseEventsDF =
         spark.read.option("badRecordsPath", badRecordsPath)
@@ -436,7 +449,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       } else 'StageID
 
       if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
-        SchemaTools.scrubSchema(baseEventsDF
+        val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
           .withColumn("progress", progressCol)
           .withColumn("filename", input_file_name)
           .withColumn("pathSize", size(split('filename, "/")))
@@ -447,8 +460,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("filenameGroup", groupFilename('filename))
           .withColumn("Downstream_Processed", lit(false))
         )
+        rawScrubbed.withColumn("Properties", map(SchemaTools.structToMap(rawScrubbed, "Properties"): _* ))
       } else {
-        SchemaTools.scrubSchema(baseEventsDF
+        val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
           .withColumn("progress", progressCol)
           .withColumn("filename", input_file_name)
           .withColumn("pathSize", size(split('filename, "/")))
@@ -458,6 +472,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("filenameGroup", groupFilename('filename))
           .withColumn("Downstream_Processed", lit(false))
         )
+        rawScrubbed.withColumn("Properties", map(SchemaTools.structToMap(rawScrubbed, "Properties"): _* ))
       }
     } else {
       Seq("No New Event Logs Found").toDF("FAILURE")
@@ -476,7 +491,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
 
     // GZ files -- very compressed, need to get as much parallelism as possible
-    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 48)
+    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 8)
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")

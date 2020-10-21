@@ -16,7 +16,6 @@ object BatchRunner extends SparkSessionWrapper{
   }
 
   def main(args: Array[String]): Unit = {
-
     envInit()
     setGlobalDeltaOverrides()
 
@@ -33,18 +32,18 @@ object BatchRunner extends SparkSessionWrapper{
     }
 
     val config = workspace.getConfig
-    val fakeTime = LocalDateTime.of(2020, 10, 10, 13, 44).atZone(ZoneId.of("Etc/UTC"))
-      .toInstant.toEpochMilli
-    config.setPipelineSnapTime(fakeTime)
+//    val fakeTime = LocalDateTime.of(2020, 10, 10, 13, 44).atZone(ZoneId.of("Etc/UTC"))
+//      .toInstant.toEpochMilli
+//    config.setPipelineSnapTime(fakeTime)
 
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
-//    if (config.isFirstRun) {
-//      spark.table("overwatch_snap.aws_ec2_details")
-//        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
-//    }
-//    logger.log(Level.INFO, "Starting Silver")
-//    Silver(workspace).run()
+    if (config.isFirstRun) {
+      spark.table("overwatch_snap.aws_ec2_details")
+        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
+    }
+    logger.log(Level.INFO, "Starting Silver")
+    Silver(workspace).run()
 
 //    Silver(workspace).run()
 
