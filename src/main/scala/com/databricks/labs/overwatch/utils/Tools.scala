@@ -132,6 +132,7 @@ object SchemaTools extends SparkSessionWrapper {
   //  As such, schema case sensitive validation needs to be enabled and a handler for whether to assume the same data
   //  and merge the data, or drop it, or quarantine it or what. This is very common in cases where a column is of
   //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
+  // TODO -- throw exception if the string is empty
   /**
    * Remove special characters from the field name
    * @param s
@@ -224,6 +225,7 @@ object SchemaTools extends SparkSessionWrapper {
    * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
    *  If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
    *  array should be reversed before progressing through the logic
+   * TODO -- change colsToMove to the Seq[String]....
    * @param df Input dataframe
    * @param colsToMove Array of column names to be moved to front of schema
    * @return
@@ -346,6 +348,8 @@ object Helpers extends SparkSessionWrapper {
    * @param db
    * @return
    */
+  // TODO: switch to the "SHOW TABLES" instead - it's much faster
+  // TODO: also, should be a flag showing if we should omit temporary tables, etc.
   def getTables(db: String): Array[String] = {
     try {
       spark.sessionState.catalog.listTables(db).toDF.select(col("name")).as[String].collect()
