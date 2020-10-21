@@ -24,21 +24,27 @@ unmanagedBase := {
     // println("We have path from the environment variable! " + jarsPathEnv)
     new java.io.File(jarsPathEnv)
   } else {
-    val dbConenctPath: String = try {
-      Seq("databricks-connect", "get-jar-dir").!!.trim
-    } catch {
-      case e: Exception =>
-        // println(s"Exception running databricks-connect: ${e.getMessage}")
-        ""
-    }
-    if (!dbConenctPath.isEmpty && Files.isDirectory(Paths.get(dbConenctPath))) {
-      // println("We have path from the databricks-connect! " + dbConenctPath)
-      new java.io.File(dbConenctPath)
-    } else if (Files.isDirectory(Paths.get(jarsPathManual))) {
-      // println("We have path from the manual path! " + jarsPathManual)
-      new java.io.File(jarsPathManual)
+    val paramPathEnv = System.getProperty("DbConnectJars")
+    if (paramPathEnv != null && Files.isDirectory(Paths.get(paramPathEnv))) {
+      // println("We have path from the system parameter! " + paramPathEnv)
+      new java.io.File(paramPathEnv)
     } else {
-      throw new RuntimeException("Can't find DB jars required for build! Set DBCONNECT_JARS environment variable, activate conda environment, or set the 'jarsPathManual' variable")
+      val dbConenctPath: String = try {
+        Seq("databricks-connect", "get-jar-dir").!!.trim
+      } catch {
+        case e: Exception =>
+          // println(s"Exception running databricks-connect: ${e.getMessage}")
+          ""
+      }
+      if (!dbConenctPath.isEmpty && Files.isDirectory(Paths.get(dbConenctPath))) {
+        // println("We have path from the databricks-connect! " + dbConenctPath)
+        new java.io.File(dbConenctPath)
+      } else if (Files.isDirectory(Paths.get(jarsPathManual))) {
+        // println("We have path from the manual path! " + jarsPathManual)
+        new java.io.File(jarsPathManual)
+      } else {
+        throw new RuntimeException("Can't find DB jars required for build! Set DBCONNECT_JARS environment variable, set -DDbConnectJars=path in .sbtopts, activate conda environment, or set the 'jarsPathManual' variable")
+      }
     }
   }
 }

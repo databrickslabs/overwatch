@@ -14,6 +14,10 @@ export DBCONNECT_JARS=$(databricks-connect get-jar-dir)
 * (optional) Configure Databricks Connect as described in [documentation](https://docs.databricks.com/dev-tools/databricks-connect.html) - it
   could be useful if you want to run the artifact from your machine
 * (optional) Configure Databricks CLI as described in [documentation](https://docs.databricks.com/dev-tools/cli/index.html)
-* (optional) SBT will try to use the path from the environment variable `DBCONNECT_JARS` set above.  If it's not set, then it will try to execute `databricks-connect get-jar-dir`.  If it's not in the path, then open `build.sbt` in the root of the project, and change path in the `jarsPathManual` variable to point to location of `pyspark/jars` installed by Databricks Connect - it's printed when executing `databricks-connect get-jar-dir`
+* (optional) Setting the location of the DB jars.  It could be configured by multiple ways, in order of execution:
+  1. SBT will try to use the path from the environment variable `DBCONNECT_JARS` set above. 
+  1. try to get path from the `DbConnectJars` system property.  It could be set in the `.sbtopts` file, for example, as `-DDbConnectJars=....`
+  1. try to execute `databricks-connect get-jar-dir` if the `databricks-connect` is in the `PATH`
+  1. take path from the `jarsPathManual` that is defined in the `build.sbt` - open it in the editor, and set this variable to the path to jars obtained via `databricks-connect get-jar-dir`
 * Execute `sbt clean package` to build the project
 
