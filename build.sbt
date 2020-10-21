@@ -14,8 +14,6 @@ unmanagedBase := new java.io.File("/usr/local/anaconda3/envs/dbconnectdbr66/lib/
 // TOMES DBR DEP PATH
 //unmanagedBase := new java.io.File("c:\\dev\\software\\anaconda\\envs\\ml37\\lib\\site-packages\\pyspark\\jars")
 
-//unmanagedBase := new java.io.File("c:\\dev\\software\\anaconda\\envs\\ml37\\lib\\site-packages\\pyspark\\jars")
-
 //libraryDependencies += "org.apache.spark" %% "spark-core" % "2.4.0"
 //libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.0"
 //libraryDependencies += "org.apache.spark" %% "spark-hive" % "2.4.5"
