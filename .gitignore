@@ -15,3 +15,4 @@ project/target/
 /derby.log
 /schema/
 /src/main/scala/com/databricks/labs/overwatch/ESxxxx.scala
+*~

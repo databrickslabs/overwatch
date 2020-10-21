@@ -58,14 +58,17 @@ object JsonUtils {
    * @param includeNulls Whether to include nulled fields in the json output
    * @param includeEmpty Whether to include empty fields in the json output
    * @return
+   *
+   * TODO: refactor it - we shouldn't change options after use, and they are not working anyway
    */
   def objToJson(obj: Any, includeNulls: Boolean = false, includeEmpty: Boolean = false): JsonStrings = {
     if (!includeNulls) objectMapper.setSerializationInclusion(Include.NON_NULL)
     if (!includeEmpty) objectMapper.setSerializationInclusion(Include.NON_EMPTY)
+    val defaultString = objectMapper.writeValueAsString(obj)
     JsonStrings(
       objectMapper.writerWithDefaultPrettyPrinter.writeValueAsString(obj),
-      objectMapper.writeValueAsString(obj),
-      new String(encoder.quoteAsString(objectMapper.writeValueAsString(obj))),
+      defaultString,
+      new String(encoder.quoteAsString(defaultString)),
       obj
     )
   }
@@ -249,6 +252,8 @@ object Helpers extends SparkSessionWrapper {
   /**
    * Getter for parallelism between 8 and driver cores
    * @return
+   *
+   * TODO: rename to defaultParallelism
    */
   private def parallelism: Int = {
     Math.min(driverCores, 8)
