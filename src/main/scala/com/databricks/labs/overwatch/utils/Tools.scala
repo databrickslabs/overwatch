@@ -132,7 +132,7 @@ object SchemaTools extends SparkSessionWrapper {
   //  As such, schema case sensitive validation needs to be enabled and a handler for whether to assume the same data
   //  and merge the data, or drop it, or quarantine it or what. This is very common in cases where a column is of
   //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
-  // TODO -- throw exception if the string is empty
+  // TODO -- throw exception if the resulting string is empty
   /**
    * Remove special characters from the field name
    * @param s
@@ -226,17 +226,15 @@ object SchemaTools extends SparkSessionWrapper {
    *  If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
    *  array should be reversed before progressing through the logic
    * TODO -- change colsToMove to the Seq[String]....
+   * TODO: checks for empty list, for existence of columns, etc.
    * @param df Input dataframe
    * @param colsToMove Array of column names to be moved to front of schema
    * @return
    */
   def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val dropSuffix = UUID.randomUUID().toString.replace("-", "")
-    colsToMove.foldLeft(df) {
-      case (df, c) =>
-        val tempColName = s"${c}_${dropSuffix}"
-        df.selectExpr(s"$c as $tempColName", "*").drop(c).withColumnRenamed(tempColName, c)
-    }
+    val allNames = df.schema.names
+    val newColumns = (colsToMove ++ (allNames.diff(colsToMove))).map(col)
+    df.select(newColumns: _*)
   }
 
 }
