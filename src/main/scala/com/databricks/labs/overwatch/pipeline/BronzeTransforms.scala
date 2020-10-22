@@ -428,8 +428,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
     if (eventLogsDF.take(1).nonEmpty) {
       val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
       appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
+      // TODO don't drop stage infos but rather convert it (along with the other columns with nested structs) to a json
+      //  and use strctFromJson to reconstruct it later. Waiting on ES-44663
+      //  may continue to drop Stage Infos as it's such a large column and it is redundant for overwatch
       val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
-        "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Spark Infos")
+        "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Stage Infos")
 
       val baseEventsDF =
         spark.read.option("badRecordsPath", badRecordsPath)
