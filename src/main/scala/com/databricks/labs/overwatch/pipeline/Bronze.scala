@@ -79,8 +79,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     getEventLogPathsSourceDF,
     Some(Seq(
       collectEventLogPaths(
-        config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
-        config.pipelineSnapTime.asColumnTS,
+        config.fromTime(sparkEventLogsModule.moduleID),
+        config.pipelineSnapTime,
         SilverTargets.clustersSpecTarget,
         config.isFirstRun
       ),

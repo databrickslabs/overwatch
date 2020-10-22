@@ -488,8 +488,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
 
-  protected def collectEventLogPaths(fromTimeCol: Column,
-                                     untilTimeCol: Column,
+  protected def collectEventLogPaths(fromTime: TimeTypes,
+                                     untilTime: TimeTypes,
                                      clusterSpec: PipelineTable,
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
 
@@ -498,6 +498,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
+    val fromTimeCol = fromTime.asColumnTS
+    val untilTimeCol = untilTime.asColumnTS
+
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(128))
 
     val cluster_id_gen_w = Window.partitionBy('cluster_name)
@@ -579,7 +582,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     spark.read.format("delta").load(tmpEventLogPathsDir)
       .repartition(strategicPartitions)
       .as[String]
-      .map(p => Helpers.globPath(p))
+      .map(p => Helpers.globPath(p, Some(fromTime.asUnixTimeMilli), Some(untilTime.asUnixTimeMilli)))
       .filter(size('value) > 0)
       .select(explode('value).alias("filename"))
 
