@@ -224,7 +224,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("ExecutorAliveTime", struct(
         $"TaskRunTime.startEpochMS".alias("AddedEpochMS"),
         $"TaskRunTime.startTS".alias("AddedTS"),
-        $"TaskRunTime.endEpochMS".alias("RemovedTS"),
+        $"TaskRunTime.endEpochMS".alias("RemovedEpochMS"),
         $"TaskRunTime.endTS".alias("RemovedTS"),
         $"TaskRunTime.runTimeMS".alias("uptimeMS"),
         $"TaskRunTime.runTimeS".alias("uptimeS"),

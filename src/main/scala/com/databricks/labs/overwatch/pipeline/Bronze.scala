@@ -28,7 +28,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private val appendClustersModule = Module(1002, "Bronze_Clusters_Snapshot")
   lazy private val appendClustersAPIProcess = EtlDefinition(
     workspace.getClustersDF,
-    None,
+    Some(Seq(cleanseRawClusterSnapDF())),
     append(BronzeTargets.clustersSnapshotTarget),
     appendClustersModule
   )
@@ -79,8 +79,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     getEventLogPathsSourceDF,
     Some(Seq(
       collectEventLogPaths(
-        config.fromTime(sparkEventLogsModule.moduleID),
-        config.pipelineSnapTime,
+        config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
+        config.pipelineSnapTime.asColumnTS,
+        config.fromTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
+        config.pipelineSnapTime.asUnixTimeMilli,
         SilverTargets.clustersSpecTarget,
         config.isFirstRun
       ),

@@ -187,6 +187,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  protected def cleanseRawClusterSnapDF()(df: DataFrame): DataFrame = {
+    val rawScrubbedDF = SchemaTools.scrubSchema(df)
+    // TODO -- enable for Azure
+    // Cleanup the mess of structs where users define the keys
+    rawScrubbedDF
+      .withColumn("aws_attributes", map(SchemaTools.structToMap(rawScrubbedDF, "aws_attributes"): _*))
+      .withColumn("custom_tags", map(SchemaTools.structToMap(rawScrubbedDF, "custom_tags"): _*))
+      .withColumn("spark_conf", map(SchemaTools.structToMap(rawScrubbedDF, "spark_conf"): _*))
+      .withColumn("spark_env_vars", map(SchemaTools.structToMap(rawScrubbedDF, "spark_env_vars"): _*))
+  }
+
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
                                isFirstRun: Boolean,
                                untilTime: LocalDateTime,
@@ -296,7 +307,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
           val totalCount = mapper.readTree(lastEventRaw.head).get("total_count").asLong(0L)
           Some(ClusterIdsWEventCounts(clusterId, totalCount))
 
-        } else { None }
+        } else {
+          None
+        }
 
       } catch {
         case e: Throwable => {
@@ -325,7 +338,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val clusterIDs = auditLogsTable.asDF
       .filter(
         'date.between(start_time.asColumnTS.cast("date"), end_time.asColumnTS.cast("date")) &&
-        'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
+          'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
       )
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
@@ -334,7 +347,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .as[String]
       .collect()
 
-//    val clusterIDs = """1004-141700-pins91,0819-200140-sag659,0918-161814-edits4,0814-173941-merit596,0711-120453-dotes18,0318-184242-dealt751,0711-120453-dotes18,1004-141700-pins91,0917-200813-ping33,0814-173941-merit596,0724-141619-this607,0724-141618-local604,0814-173940-envy590,0814-173943-arias608,0526-075326-mower2,0804-171430-picky968,0814-173941-newts595,0804-171429-howdy966,0917-200717-guilt32,0715-193200-wipes182,0917-200813-ping33,0814-173937-gouge579,0814-173941-merit596,1112-181811-jilts898,0814-173936-ovum572,0816-165511-songs94,0228-194538-shows5,0724-141622-brief621,0804-171429-crier963,0917-200813-ping33,0917-200717-guilt32,0616-182331-runt612,0917-200813-ping33,0526-075326-mower2,0716-160437-decaf361,0715-163318-piece155,0816-165511-songs94,0814-173936-alb571,0224-185747-jest918,0814-173938-vent583,0804-171422-dirk933,0814-173934-plum562,0715-163318-piece155,0817-161910-chomp205,0317-103623-rinse751,0917-200813-ping33,0715-163318-piece155,0724-141614-corn585,0917-200813-ping33,0816-165511-songs94,0814-173932-twos552,0724-141622-brief621,0819-200140-sag659,0317-103623-rinse751,0814-173936-alb571,0814-173936-newly574,0814-173938-fogs582,0917-200717-guilt32,0724-141619-coo609,0724-141617-hill600,0804-171425-nail948,0724-141622-brief621,1004-141700-pins91,1112-181811-jilts898,0310-052403-teen785,0715-163318-piece155,0814-173934-plum562,0918-161814-edits4,0526-075326-mower2,0816-165511-songs94,0207-162257-admit3,0828-205028-loon632,0827-184015-caned397,0724-141618-sears605,0819-200138-bacon649,0724-141614-corn585,0814-173938-vent583,0814-173938-stick580,0724-141615-union592,0828-150942-swath577,0724-141620-avast612,0831-192834-trims236,0109-132912-eves7,0804-171430-picky968,0814-173932-twos552,0724-141622-dozed622,0825-130849-toss837,0711-120453-dotes18,0917-200813-ping33,0814-173943-flirt607,0828-150942-swath577,0903-222609-bawdy413,0827-172349-hoses361,0804-171430-plug969,0819-201432-weigh671,0819-200140-sag659,0724-141616-acts595,0819-200142-moire665,0814-173936-newly574,0724-141617-any599,0724-141616-acts595,0831-192836-thou242,0716-160437-decaf361,0814-173942-tutor601,0828-205028-yoked630,0804-171429-crier963,0826-204714-scow178,0804-171422-dirk933,0819-200138-bacon649,0827-184426-dried398,0724-141613-inter583,0814-173933-flap557,0317-103623-rinse751,1004-141700-pins91,0724-141615-clef591,0825-130152-keen830,0224-185747-jest918,0827-172430-zaps375,0819-200142-moire665,0814-173938-stick580,0715-163318-piece155,0814-173941-newts595,0804-171425-nail948,0814-173933-jowls558,0814-173936-ovum572,0903-222609-bawdy413,0716-134539-twain7,0804-171430-picky968,0826-204714-scow178,0724-141618-local604,0724-141614-iota586,0825-130153-admit834,0831-192835-ducts237,1004-141700-pins91,0310-052403-teen785,1004-141700-pins91,0724-141619-matzo606,0814-173932-wises553,0825-130849-toss837,0109-132912-eves7,0715-163318-piece155,0814-173939-relic586,0724-141618-loses603,0724-141619-this607,0724-141617-hill600,0828-205027-cuter626,0228-194538-shows5,0813-191921-wadi350,0814-173942-tutor601,0814-173933-tier560,0109-132912-eves7,0616-182331-runt612,0814-173937-slier575,0724-141622-dozed622,0814-173931-wen550,0804-171432-now977,0526-075326-mower2,0724-141622-dozed622,0831-192834-trims236,0904-192312-gawk638,0814-173935-swank565,0917-200717-guilt32,0825-130849-gowns841,0804-171426-oases952,0224-185747-jest918,0902-145706-divan132,0816-165511-songs94,0814-173943-arias608,0814-173940-mown589,0917-200717-guilt32,0819-201432-weigh671,0804-171426-oases952,0616-182331-runt612,0310-052403-teen785,0827-184426-dried398,0724-141618-jag602,0816-165511-songs94,0724-141618-sears605,1004-141700-pins91,0904-143329-bungs571,0904-192312-gawk638,0903-222352-hath412,0814-173937-slier575,0814-173936-ovum572,0827-184015-caned397,0804-171432-now977,0814-173943-fibs606,0814-173941-merit596,0724-141615-clef591,0724-141623-made625,0825-130152-brag831,1004-141700-pins91,0926-173736-zinc29,1004-141700-pins91,0317-103623-rinse751,0814-173940-shuck591,0819-200142-toll667,0902-113358-nubs96,0825-130152-keen830,0825-130849-net839,0902-145706-divan132,0804-171429-howdy966,1112-181811-jilts898,0715-193200-wipes182,0814-173933-jowls558,0814-173934-plum562,0819-200138-uses648,0917-200813-ping33,0814-173942-pint603,0603-180134-oven821,0828-150942-swath577,0715-193200-wipes182,0724-141618-jag602,0926-173736-zinc29,0716-160437-celli362,0724-141619-this607,0831-192835-cents240,0814-173943-fibs606""".split(",")
+    //    val clusterIDs = """1004-141700-pins91,0819-200140-sag659,0918-161814-edits4,0814-173941-merit596,0711-120453-dotes18,0318-184242-dealt751,0711-120453-dotes18,1004-141700-pins91,0917-200813-ping33,0814-173941-merit596,0724-141619-this607,0724-141618-local604,0814-173940-envy590,0814-173943-arias608,0526-075326-mower2,0804-171430-picky968,0814-173941-newts595,0804-171429-howdy966,0917-200717-guilt32,0715-193200-wipes182,0917-200813-ping33,0814-173937-gouge579,0814-173941-merit596,1112-181811-jilts898,0814-173936-ovum572,0816-165511-songs94,0228-194538-shows5,0724-141622-brief621,0804-171429-crier963,0917-200813-ping33,0917-200717-guilt32,0616-182331-runt612,0917-200813-ping33,0526-075326-mower2,0716-160437-decaf361,0715-163318-piece155,0816-165511-songs94,0814-173936-alb571,0224-185747-jest918,0814-173938-vent583,0804-171422-dirk933,0814-173934-plum562,0715-163318-piece155,0817-161910-chomp205,0317-103623-rinse751,0917-200813-ping33,0715-163318-piece155,0724-141614-corn585,0917-200813-ping33,0816-165511-songs94,0814-173932-twos552,0724-141622-brief621,0819-200140-sag659,0317-103623-rinse751,0814-173936-alb571,0814-173936-newly574,0814-173938-fogs582,0917-200717-guilt32,0724-141619-coo609,0724-141617-hill600,0804-171425-nail948,0724-141622-brief621,1004-141700-pins91,1112-181811-jilts898,0310-052403-teen785,0715-163318-piece155,0814-173934-plum562,0918-161814-edits4,0526-075326-mower2,0816-165511-songs94,0207-162257-admit3,0828-205028-loon632,0827-184015-caned397,0724-141618-sears605,0819-200138-bacon649,0724-141614-corn585,0814-173938-vent583,0814-173938-stick580,0724-141615-union592,0828-150942-swath577,0724-141620-avast612,0831-192834-trims236,0109-132912-eves7,0804-171430-picky968,0814-173932-twos552,0724-141622-dozed622,0825-130849-toss837,0711-120453-dotes18,0917-200813-ping33,0814-173943-flirt607,0828-150942-swath577,0903-222609-bawdy413,0827-172349-hoses361,0804-171430-plug969,0819-201432-weigh671,0819-200140-sag659,0724-141616-acts595,0819-200142-moire665,0814-173936-newly574,0724-141617-any599,0724-141616-acts595,0831-192836-thou242,0716-160437-decaf361,0814-173942-tutor601,0828-205028-yoked630,0804-171429-crier963,0826-204714-scow178,0804-171422-dirk933,0819-200138-bacon649,0827-184426-dried398,0724-141613-inter583,0814-173933-flap557,0317-103623-rinse751,1004-141700-pins91,0724-141615-clef591,0825-130152-keen830,0224-185747-jest918,0827-172430-zaps375,0819-200142-moire665,0814-173938-stick580,0715-163318-piece155,0814-173941-newts595,0804-171425-nail948,0814-173933-jowls558,0814-173936-ovum572,0903-222609-bawdy413,0716-134539-twain7,0804-171430-picky968,0826-204714-scow178,0724-141618-local604,0724-141614-iota586,0825-130153-admit834,0831-192835-ducts237,1004-141700-pins91,0310-052403-teen785,1004-141700-pins91,0724-141619-matzo606,0814-173932-wises553,0825-130849-toss837,0109-132912-eves7,0715-163318-piece155,0814-173939-relic586,0724-141618-loses603,0724-141619-this607,0724-141617-hill600,0828-205027-cuter626,0228-194538-shows5,0813-191921-wadi350,0814-173942-tutor601,0814-173933-tier560,0109-132912-eves7,0616-182331-runt612,0814-173937-slier575,0724-141622-dozed622,0814-173931-wen550,0804-171432-now977,0526-075326-mower2,0724-141622-dozed622,0831-192834-trims236,0904-192312-gawk638,0814-173935-swank565,0917-200717-guilt32,0825-130849-gowns841,0804-171426-oases952,0224-185747-jest918,0902-145706-divan132,0816-165511-songs94,0814-173943-arias608,0814-173940-mown589,0917-200717-guilt32,0819-201432-weigh671,0804-171426-oases952,0616-182331-runt612,0310-052403-teen785,0827-184426-dried398,0724-141618-jag602,0816-165511-songs94,0724-141618-sears605,1004-141700-pins91,0904-143329-bungs571,0904-192312-gawk638,0903-222352-hath412,0814-173937-slier575,0814-173936-ovum572,0827-184015-caned397,0804-171432-now977,0814-173943-fibs606,0814-173941-merit596,0724-141615-clef591,0724-141623-made625,0825-130152-brag831,1004-141700-pins91,0926-173736-zinc29,1004-141700-pins91,0317-103623-rinse751,0814-173940-shuck591,0819-200142-toll667,0902-113358-nubs96,0825-130152-keen830,0825-130849-net839,0902-145706-divan132,0804-171429-howdy966,1112-181811-jilts898,0715-193200-wipes182,0814-173933-jowls558,0814-173934-plum562,0819-200138-uses648,0917-200813-ping33,0814-173942-pint603,0603-180134-oven821,0828-150942-swath577,0715-193200-wipes182,0724-141618-jag602,0926-173736-zinc29,0716-160437-celli362,0724-141619-this607,0831-192835-cents240,0814-173943-fibs606""".split(",")
 
     val batchSize = 500000D
     val tmpClusterEventsPath = "/tmp/overwatch/bronze/clusterEventsBatches"
@@ -409,14 +422,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
 
-
-//  val index = df.schema.fieldIndex("properties")
-//  val propSchema = df.schema(index).dataType.asInstanceOf[StructType]
-//  var columns = mutable.LinkedHashSet[Column]()
-//  propSchema.fields.foreach(field =>{
-//    columns.add(lit(field.name))
-//    columns.add(col("properties." + field.name))
-//  })
+  //  val index = df.schema.fieldIndex("properties")
+  //  val propSchema = df.schema(index).dataType.asInstanceOf[StructType]
+  //  var columns = mutable.LinkedHashSet[Column]()
+  //  propSchema.fields.foreach(field =>{
+  //    columns.add(lit(field.name))
+  //    columns.add(col("properties." + field.name))
+  //  })
 
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
@@ -427,69 +439,69 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // which causes a schema failure when appending to existing spark_events_bronze.
     if (eventLogsDF.take(1).nonEmpty) {
       val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
-      appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
-      // TODO don't drop stage infos but rather convert it (along with the other columns with nested structs) to a json
-      //  and use strctFromJson to reconstruct it later. Waiting on ES-44663
-      //  may continue to drop Stage Infos as it's such a large column and it is redundant for overwatch
-      val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
-        "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Stage Infos")
+      if (pathsGlob.take(1).nonEmpty) {
+        appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
+        // TODO don't drop stage infos but rather convert it (along with the other columns with nested structs) to a json
+        //  and use strctFromJson to reconstruct it later. Waiting on ES-44663
+        //  may continue to drop Stage Infos as it's such a large column and it is redundant for overwatch
+        val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
+          "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Stage Infos")
 
-      val baseEventsDF =
-        spark.read.option("badRecordsPath", badRecordsPath)
-          .json(pathsGlob: _*)
-          .drop(dropCols: _*)
+        val baseEventsDF =
+          spark.read.option("badRecordsPath", badRecordsPath)
+            .json(pathsGlob: _*)
+            .drop(dropCols: _*)
 
-      // Handle custom metrics and listeners in streams
-      val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
-        to_json(col("progress")).alias("progress")
+        // Handle custom metrics and listeners in streams
+        val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
+          to_json(col("progress")).alias("progress")
+        } else {
+          lit(null).cast("string").alias("progress")
+        }
+
+        // Temporary Solution for Speculative Tasks bad Schema - SC-38615
+        val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("Stage ID")) {
+          when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
+        } else 'StageID
+
+        if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
+          val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
+            .withColumn("progress", progressCol)
+            .withColumn("filename", input_file_name)
+            .withColumn("pathSize", size(split('filename, "/")))
+            .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+            .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+            .withColumn("StageID", stageIDColumnOverride)
+            .drop("pathSize", "Stage ID")
+            .withColumn("filenameGroup", groupFilename('filename))
+            .withColumn("Downstream_Processed", lit(false))
+          )
+          rawScrubbed.withColumn("Properties", map(SchemaTools.structToMap(rawScrubbed, "Properties"): _*))
+        } else {
+          val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
+            .withColumn("progress", progressCol)
+            .withColumn("filename", input_file_name)
+            .withColumn("pathSize", size(split('filename, "/")))
+            .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+            .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+            .drop("pathSize")
+            .withColumn("filenameGroup", groupFilename('filename))
+            .withColumn("Downstream_Processed", lit(false))
+          )
+          rawScrubbed.withColumn("Properties", map(SchemaTools.structToMap(rawScrubbed, "Properties"): _*))
+        }
       } else {
-        lit(null).cast("string").alias("progress")
-      }
-
-      // Temporary Solution for Speculative Tasks bad Schema - SC-38615
-      val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("Stage ID")) {
-        when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
-      } else 'StageID
-
-      if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
-        val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
-          .withColumn("progress", progressCol)
-          .withColumn("filename", input_file_name)
-          .withColumn("pathSize", size(split('filename, "/")))
-          .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-          .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-          .withColumn("StageID", stageIDColumnOverride)
-          .drop("pathSize", "Stage ID")
-          .withColumn("filenameGroup", groupFilename('filename))
-          .withColumn("Downstream_Processed", lit(false))
-        )
-        rawScrubbed.withColumn("Properties", map(SchemaTools.structToMap(rawScrubbed, "Properties"): _* ))
-      } else {
-        val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
-          .withColumn("progress", progressCol)
-          .withColumn("filename", input_file_name)
-          .withColumn("pathSize", size(split('filename, "/")))
-          .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-          .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-          .drop("pathSize")
-          .withColumn("filenameGroup", groupFilename('filename))
-          .withColumn("Downstream_Processed", lit(false))
-        )
-        rawScrubbed.withColumn("Properties", map(SchemaTools.structToMap(rawScrubbed, "Properties"): _* ))
+        Seq("No New Event Logs Found").toDF("FAILURE")
       }
     } else {
       Seq("No New Event Logs Found").toDF("FAILURE")
     }
   }
 
-  def saveAndLoadTempEvents(database: Database, tempTarget: PipelineTable)(df: DataFrame): DataFrame = {
-    database.write(df, tempTarget)
-    tempTarget.asDF
-  }
-
-
-  protected def collectEventLogPaths(fromTime: TimeTypes,
-                                     untilTime: TimeTypes,
+  protected def collectEventLogPaths(fromTimeCol: Column,
+                                     untilTimeCol: Column,
+                                     fromTimeEpochMillis: Long,
+                                     untilTimeEpochMillis: Long,
                                      clusterSpec: PipelineTable,
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
 
@@ -498,8 +510,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
-    val fromTimeCol = fromTime.asColumnTS
-    val untilTimeCol = untilTime.asColumnTS
 
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(128))
 
@@ -582,7 +592,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     spark.read.format("delta").load(tmpEventLogPathsDir)
       .repartition(strategicPartitions)
       .as[String]
-      .map(p => Helpers.globPath(p, Some(fromTime.asUnixTimeMilli), Some(untilTime.asUnixTimeMilli)))
+      .map(p => Helpers.globPath(p, Some(fromTimeEpochMillis), Some(untilTimeEpochMillis)))
       .filter(size('value) > 0)
       .select(explode('value).alias("filename"))
 

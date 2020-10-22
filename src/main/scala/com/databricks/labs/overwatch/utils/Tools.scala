@@ -117,7 +117,7 @@ object SchemaTools extends SparkSessionWrapper {
 
   def structToMap(df: DataFrame, colToConvert: String): Seq[Column] = {
     val schema = df.select(s"${colToConvert}.*").schema
-    var mapCols = collection.mutable.LinkedHashSet[Column]()
+    val mapCols = collection.mutable.LinkedHashSet[Column]()
     schema.fields.foreach(field => {
       mapCols.add(lit(field.name))
       mapCols.add(col(s"${colToConvert}.${field.name}"))
@@ -328,8 +328,8 @@ object Helpers extends SparkSessionWrapper {
     }).filter(p => {
       var switch = true
       if (p._2.nonEmpty) {
-        if (fromEpochMillis.nonEmpty && fromEpochMillis.get < p._2.get) switch = false
-        if (untilEpochMillis.nonEmpty && untilEpochMillis.get > p._2.get) switch = false
+        if (fromEpochMillis.nonEmpty && fromEpochMillis.get >= p._2.get) switch = false
+        if (untilEpochMillis.nonEmpty && untilEpochMillis.get < p._2.get) switch = false
       }
       switch
     }).map(_._1)
