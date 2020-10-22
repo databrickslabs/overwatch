@@ -1,10 +1,9 @@
 package com.overwatch.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.utils.{JsonUtils, SchemaTools}
-import com.overwatch.labs.overwatch.SparkSessionTestWrapper
+import com.databricks.labs.overwatch.utils.{JsonUtils}
 import org.scalatest.funspec.AnyFunSpec
 
-class ToolSpec extends AnyFunSpec with SparkSessionTestWrapper {
+class ToolsTest extends AnyFunSpec  {
 
   describe("JsonUtils") {
     val jsonStr =
