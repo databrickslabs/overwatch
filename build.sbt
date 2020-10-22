@@ -62,6 +62,8 @@ libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.21.3" % 
 libraryDependencies += "org.mockito" % "mockito-core" % "3.5.15" % Test
 libraryDependencies += "org.scalatest" % "scalatest_2.11" % "3.2.2" % Test
 
+// enforce execution of tests during packaging - uncomment next line when we fix dependencies
+// Keys.`package` := (Compile / Keys.`package` dependsOn Test / test).value
 
 assemblyExcludedJars in assembly := {
   val cp = (fullClasspath in assembly).value
