@@ -2,9 +2,9 @@ package com.overwatch.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.utils.JsonUtils
 import com.overwatch.labs.overwatch.SparkSessionTestWrapper
-import org.scalatest.FunSpec
+import org.scalatest.funspec.AnyFunSpec
 
-class ToolSpec extends FunSpec with SparkSessionTestWrapper {
+class ToolSpec extends AnyFunSpec with SparkSessionTestWrapper {
 
   describe("JsonUtils") {
     val jsonStr =
