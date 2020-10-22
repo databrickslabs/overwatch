@@ -1,9 +1,13 @@
 package com.databricks.labs.overwatch.env
 
+import java.util
+
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Dataset, Row}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.catalog.{CatalogStorageFormat, CatalogTable, CatalogTableType}
 import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
 import org.apache.spark.sql.streaming.StreamingQueryListener._
@@ -23,7 +27,7 @@ class Database(config: Config) extends SparkSessionWrapper {
 
   def getDatabaseName: String = _databaseName
 
-  def rollback(target: PipelineTable): Unit = {
+  private def rollback(target: PipelineTable): Unit = {
     val rollbackSql =
       s"""
          |delete from ${target.tableFullName}
@@ -31,6 +35,12 @@ class Database(config: Config) extends SparkSessionWrapper {
          |""".stripMargin
     println(s"Executing Rollback: STMT: ${rollbackSql}")
     spark.sql(rollbackSql)
+  }
+
+  private def initializeStreamTarget(df: DataFrame, tableFullName: String): Unit = {
+    spark.createDataFrame(new util.ArrayList[Row](), df.schema)
+      .write.format("delta")
+      .saveAsTable(tableFullName)
   }
 
   private def getQueryListener(query: StreamingQuery): StreamingQueryListener = {
@@ -74,7 +84,14 @@ class Database(config: Config) extends SparkSessionWrapper {
         if (config.debugFlag) println(beginMsg)
         logger.log(Level.INFO, beginMsg)
         finalDF = SchemaTools.scrubSchema(finalDF)
-        val streamWriter = target.writer(finalDF).asInstanceOf[DataStreamWriter[Row]].table(target.tableFullName)
+        if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, target.name)) {
+          initializeStreamTarget(finalDF, target.tableFullName)
+        }
+        val targetTablePath = s"${config.databaseLocation}/${target.name}"
+        val streamWriter = target.writer(finalDF)
+            .asInstanceOf[DataStreamWriter[Row]]
+            .option("path", targetTablePath)
+            .start(target.tableFullName)
         val streamManager = getQueryListener(streamWriter)
         spark.streams.addListener(streamManager)
         val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
@@ -85,7 +102,7 @@ class Database(config: Config) extends SparkSessionWrapper {
         spark.streams.removeListener(streamManager)
 
       } else {
-        finalDF = if (config.isFirstRun) SchemaTools.scrubSchema(finalDF) else SchemaTools.scrubSchema(finalDF)
+        finalDF = SchemaTools.scrubSchema(finalDF)
         target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
       }
       logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
