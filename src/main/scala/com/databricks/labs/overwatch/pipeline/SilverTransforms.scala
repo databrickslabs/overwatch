@@ -126,6 +126,23 @@ trait SilverTransforms extends SparkSessionWrapper {
       from_json(col(c), jsonSchema).alias(c)
     }
 
+    def structFromJson(df: DataFrame, cs: String*): Column = {
+      val dfFields = df.schema.fields
+      cs.foreach(c => {
+        require(dfFields.map(_.name).contains(c), s"The dataframe does not contain col ${c}")
+        require(dfFields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
+      })
+      array(
+        cs.map(c => {
+          val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
+          if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
+            println(s"WARNING: The json schema for column ${c} was not parsed correctly, please review.")
+          }
+          from_json(col(c), jsonSchema).alias(c)
+        }): _*
+      )
+    }
+
     def appendPowerProperties: Column = {
       struct(
         element_at('Properties, "sparkappname").alias("AppName"),
@@ -386,7 +403,6 @@ trait SilverTransforms extends SparkSessionWrapper {
     'timestamp, 'date, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
 
 
-
   private def clusterBase(auditRawDF: DataFrame): DataFrame = {
     val cluster_id_gen_w = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
     val cluster_name_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
@@ -396,15 +412,15 @@ trait SilverTransforms extends SparkSessionWrapper {
     val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
 
     val clusterSummaryCols = auditBaseCols ++ Array[Column](
-        when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
-        when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
-        'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
-        'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
-        'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'ssh_public_keys,
-        'cluster_source, 'spark_env_vars, 'spark_conf,
-        when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
-        'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
-        'organization_id, 'user_id, 'sourceIPAddress)
+      when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
+      when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
+      'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
+      'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
+      'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'ssh_public_keys,
+      'cluster_source, 'spark_env_vars, 'spark_conf,
+      when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
+      'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
+      'organization_id, 'user_id, 'sourceIPAddress)
 
 
     auditRawDF
@@ -744,8 +760,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
 
     val jobRunsSilverBase = if (clusterSpec.exists) {
-     jobRunsSilverBaseRaw.join(ephemeralClusterLookup, Seq("cluster_name"), "left")
-       .withColumn("timestamp", $"JobRunTime.startEpochMS")
+      jobRunsSilverBaseRaw.join(ephemeralClusterLookup, Seq("cluster_name"), "left")
+        .withColumn("timestamp", $"JobRunTime.startEpochMS")
     } else jobRunsSilverBaseRaw
 
     // TODO -- Handle null lookups -- rarely an issue but can be a very bad issue since parquet cannot write

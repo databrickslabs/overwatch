@@ -313,13 +313,26 @@ object Helpers extends SparkSessionWrapper {
    * @param path wildcard path as string
    * @return list of all paths contained within the wildcard path
    */
-  def globPath(path: String): Array[String] = {
+  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[String] = {
     val conf = new Configuration()
     val fs = new Path(path).getFileSystem(conf)
     val paths = fs.globStatus(new Path(path))
-    // TODO -- Switch this to DEBUG
-    logger.log(Level.INFO, s"${path} expanded in ${paths.length} files")
-    paths.map(_.getPath.toString)
+    logger.log(Level.DEBUG, s"${path} expanded in ${paths.length} files")
+    paths.map(wildString => {
+      val path = wildString.getPath
+      val pathString = path.toString
+      val fileModEpochMillis = if (fromEpochMillis.nonEmpty) {
+        Some(fs.listStatus(path).filter(_.isFile).head.getModificationTime)
+      } else None
+      (pathString, fileModEpochMillis)
+    }).filter(p => {
+      var switch = true
+      if (p._2.nonEmpty) {
+        if (fromEpochMillis.nonEmpty && fromEpochMillis.get < p._2.get) switch = false
+        if (untilEpochMillis.nonEmpty && untilEpochMillis.get > p._2.get) switch = false
+      }
+      switch
+    }).map(_._1)
   }
 
   /**
@@ -544,7 +557,7 @@ object Helpers extends SparkSessionWrapper {
   private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
     topPaths.map(p => {
       if (p.reverse.head.toString == "/") s"${p}*" else s"${p}/*"
-    }).flatMap(globPath).toSeq.toDF("filesToDelete")
+    }).flatMap(p => globPath(p)).toSeq.toDF("filesToDelete")
       .as[String]
       .foreach(f => rmSer(f))
 
