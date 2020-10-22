@@ -1,9 +1,9 @@
-package com.overwatch.labs.overwatch.pipeline
+package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.pipeline.Schema
 import com.databricks.labs.overwatch.utils.Module
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
-import com.overwatch.labs.overwatch.SparkSessionTestWrapper
 import org.scalatest.funspec.AnyFunSpec
 
 
