@@ -58,14 +58,17 @@ object JsonUtils {
    * @param includeNulls Whether to include nulled fields in the json output
    * @param includeEmpty Whether to include empty fields in the json output
    * @return
+   *
+   * TODO: refactor it - we shouldn't change options after use, and they are not working anyway
    */
   def objToJson(obj: Any, includeNulls: Boolean = false, includeEmpty: Boolean = false): JsonStrings = {
     if (!includeNulls) objectMapper.setSerializationInclusion(Include.NON_NULL)
     if (!includeEmpty) objectMapper.setSerializationInclusion(Include.NON_EMPTY)
+    val defaultString = objectMapper.writeValueAsString(obj)
     JsonStrings(
       objectMapper.writerWithDefaultPrettyPrinter.writeValueAsString(obj),
-      objectMapper.writeValueAsString(obj),
-      new String(encoder.quoteAsString(objectMapper.writeValueAsString(obj))),
+      defaultString,
+      new String(encoder.quoteAsString(defaultString)),
       obj
     )
   }
@@ -129,6 +132,7 @@ object SchemaTools extends SparkSessionWrapper {
   //  As such, schema case sensitive validation needs to be enabled and a handler for whether to assume the same data
   //  and merge the data, or drop it, or quarantine it or what. This is very common in cases where a column is of
   //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
+  // TODO -- throw exception if the resulting string is empty
   /**
    * Remove special characters from the field name
    * @param s
@@ -221,17 +225,16 @@ object SchemaTools extends SparkSessionWrapper {
    * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
    *  If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
    *  array should be reversed before progressing through the logic
+   * TODO -- change colsToMove to the Seq[String]....
+   * TODO: checks for empty list, for existence of columns, etc.
    * @param df Input dataframe
    * @param colsToMove Array of column names to be moved to front of schema
    * @return
    */
   def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val dropSuffix = UUID.randomUUID().toString.replace("-", "")
-    colsToMove.foldLeft(df) {
-      case (df, c) =>
-        val tempColName = s"${c}_${dropSuffix}"
-        df.selectExpr(s"$c as $tempColName", "*").drop(c).withColumnRenamed(tempColName, c)
-    }
+    val allNames = df.schema.names
+    val newColumns = (colsToMove ++ (allNames.diff(colsToMove))).map(col)
+    df.select(newColumns: _*)
   }
 
 }
@@ -249,6 +252,8 @@ object Helpers extends SparkSessionWrapper {
   /**
    * Getter for parallelism between 8 and driver cores
    * @return
+   *
+   * TODO: rename to defaultParallelism
    */
   private def parallelism: Int = {
     Math.min(driverCores, 8)
@@ -341,6 +346,8 @@ object Helpers extends SparkSessionWrapper {
    * @param db
    * @return
    */
+  // TODO: switch to the "SHOW TABLES" instead - it's much faster
+  // TODO: also, should be a flag showing if we should omit temporary tables, etc.
   def getTables(db: String): Array[String] = {
     try {
       spark.sessionState.catalog.listTables(db).toDF.select(col("name")).as[String].collect()
