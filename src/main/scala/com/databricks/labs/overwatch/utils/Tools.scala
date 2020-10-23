@@ -1,24 +1,21 @@
 package com.databricks.labs.overwatch.utils
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.core.io.JsonStringEncoder
-import java.util.{Date, UUID}
-
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.Include
-import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
-import org.apache.hadoop.conf._
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.fasterxml.jackson.core.io.JsonStringEncoder
+import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import javax.crypto
 import javax.crypto.KeyGenerator
-import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
+import javax.crypto.spec.IvParameterSpec
 import org.apache.commons.lang3.StringEscapeUtils
-import org.apache.spark.util.SerializableConfiguration
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame}
-import org.apache.spark.sql.types._
+import org.apache.hadoop.conf._
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Column, DataFrame}
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -27,10 +24,36 @@ import scala.concurrent.forkjoin.ForkJoinPool
 object JsonUtils {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  case class JsonStrings(prettyString: String, compactString: String, escapedString: String, fromObj: Any)
+  case class JsonStrings(prettyString: String, compactString: String, fromObj: Any) {
+    lazy val escapedString = new String(encoder.quoteAsString(compactString))
+  }
 
-  private[overwatch] lazy val objectMapper = new ObjectMapper()
-  objectMapper.registerModule(DefaultScalaModule)
+  private def createObjectMapper(includeNulls: Boolean = false, includeEmpty: Boolean = false): ObjectMapper = {
+    val obj = new ObjectMapper()
+    obj.registerModule(DefaultScalaModule)
+    // order of sets does matter...
+    if (!includeNulls) {
+      obj.setSerializationInclusion(Include.NON_NULL)
+      obj.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false)
+    }
+    if (!includeEmpty) {
+      obj.setSerializationInclusion(Include.NON_EMPTY)
+    }
+    obj
+  }
+
+  private[overwatch] lazy val defaultObjectMapper: ObjectMapper =
+    createObjectMapper(includeNulls = true, includeEmpty = true)
+
+  // map of (includeNulls, includeEmpty) to corresponding ObjectMapper
+  // we need all combinations because we must not change configuration of already existing objects
+  private lazy val mappersMap = Map[(Boolean, Boolean), ObjectMapper](
+    (true, true) -> defaultObjectMapper,
+    (true, false) -> createObjectMapper(includeNulls = true),
+    (false, true) -> createObjectMapper(includeEmpty = true),
+    (false, false) -> createObjectMapper()
+  )
+
   private val encoder = JsonStringEncoder.getInstance
 
   /**
@@ -41,7 +64,7 @@ object JsonUtils {
   def jsonToMap(message: String): Map[String, Any] = {
     try {
       val cleanMessage = StringEscapeUtils.unescapeJson(message)
-      objectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
+      defaultObjectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
     } catch {
       case e: Throwable => {
         logger.log(Level.ERROR, s"ERROR: Could not convert json to Map. \nJSON: ${message}", e)
@@ -56,19 +79,17 @@ object JsonUtils {
    * so the json output can be used in any case.
    * @param obj Case Class instance to be converted to JSON
    * @param includeNulls Whether to include nulled fields in the json output
-   * @param includeEmpty Whether to include empty fields in the json output
+   * @param includeEmpty Whether to include empty fields in the json output.
+   *                     By default, setting includeEmpty to false automatically disables nulls as well
    * @return
    *
-   * TODO: refactor it - we shouldn't change options after use, and they are not working anyway
    */
   def objToJson(obj: Any, includeNulls: Boolean = false, includeEmpty: Boolean = false): JsonStrings = {
-    if (!includeNulls) objectMapper.setSerializationInclusion(Include.NON_NULL)
-    if (!includeEmpty) objectMapper.setSerializationInclusion(Include.NON_EMPTY)
-    val defaultString = objectMapper.writeValueAsString(obj)
+    val objMapper = mappersMap.getOrElse((includeNulls, includeEmpty), defaultObjectMapper)
+
     JsonStrings(
-      objectMapper.writerWithDefaultPrettyPrinter.writeValueAsString(obj),
-      defaultString,
-      new String(encoder.quoteAsString(defaultString)),
+      objMapper.writerWithDefaultPrettyPrinter.writeValueAsString(obj),
+      objMapper.writeValueAsString(obj),
       obj
     )
   }
@@ -85,9 +106,11 @@ object JsonUtils {
 class Cipher(key: String) {
 
   private val salt = Array[Byte](16)
-  private val spec = new PBEKeySpec(key.toCharArray, salt, 1000, 128 * 8)
-  private val keyGenner = KeyGenerator.getInstance("AES")
-  keyGenner.init(128)
+  private val keyGenner = {
+    val k = KeyGenerator.getInstance("AES")
+    k.init(128)
+    k
+  }
   private val aesKey = keyGenner.generateKey()
   private val iv = new IvParameterSpec("0102030405060708".getBytes("UTF-8"))
   private val cipher = crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
