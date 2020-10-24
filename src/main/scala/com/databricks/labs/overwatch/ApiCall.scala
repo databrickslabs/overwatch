@@ -245,7 +245,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       }
       if (!pageCall) {
         val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
-        val totalCount = JsonUtils.jsonToMap(jsonResult).getOrElse("total_count", 0).toString.toLong
+//        val totalCount = JsonUtils.jsonToMap(jsonResult).getOrElse("total_count", 0).toString.toLong
+        val totalCount = mapper.readTree(result.body).get("total_count").asInt(0)
         if (totalCount > 0) results.append(jsonResult)
         if (totalCount > limit && _paginate) paginate(totalCount)
       } else {

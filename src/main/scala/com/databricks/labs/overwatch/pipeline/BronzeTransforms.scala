@@ -192,10 +192,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // TODO -- enable for Azure
     // Cleanup the mess of structs where users define the keys
     rawScrubbedDF
-      .withColumn("aws_attributes", map(SchemaTools.structToMap(rawScrubbedDF, "aws_attributes"): _*))
-      .withColumn("custom_tags", map(SchemaTools.structToMap(rawScrubbedDF, "custom_tags"): _*))
-      .withColumn("spark_conf", map(SchemaTools.structToMap(rawScrubbedDF, "spark_conf"): _*))
-      .withColumn("spark_env_vars", map(SchemaTools.structToMap(rawScrubbedDF, "spark_env_vars"): _*))
+      .withColumn("aws_attributes", SchemaTools.structToMap(rawScrubbedDF, "aws_attributes"))
+      .withColumn("custom_tags", SchemaTools.structToMap(rawScrubbedDF, "custom_tags"))
+      .withColumn("spark_conf", SchemaTools.structToMap(rawScrubbedDF, "spark_conf"))
+      .withColumn("spark_env_vars", SchemaTools.structToMap(rawScrubbedDF, "spark_env_vars"))
   }
 
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
@@ -367,10 +367,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val tdf = spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
           .select(col("events.*"))
 
-        SchemaTools.scrubSchema(tdf)
+        val changeInventory = Map[String, Column](
+          "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
+          "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
+          "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
+          "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
+          "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
+          "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
+        )
+
+        SchemaTools.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
           .write.mode("append").format("delta")
           .option("mergeSchema", "true")
           .save(tmpClusterEventsPath)
+
       } catch {
         case e: Throwable => {
           logger.log(Level.WARN, s"While attempting to grab events data for clusters below, an error occurred" +
@@ -476,7 +486,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("filenameGroup", groupFilename('filename))
             .withColumn("Downstream_Processed", lit(false))
           )
-          rawScrubbed.withColumn("Properties", map(SchemaTools.structToMap(rawScrubbed, "Properties"): _*))
+          rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
         } else {
           val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
             .withColumn("progress", progressCol)
@@ -488,7 +498,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("filenameGroup", groupFilename('filename))
             .withColumn("Downstream_Processed", lit(false))
           )
-          rawScrubbed.withColumn("Properties", map(SchemaTools.structToMap(rawScrubbed, "Properties"): _*))
+          rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
         }
       } else {
         Seq("No New Event Logs Found").toDF("FAILURE")
@@ -526,7 +536,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .filter('serviceName === "clusters" && 'cluster_id.isNotNull)
       .select('cluster_id).distinct
 
-    val newEventLogPrefixes = if (isFirstRun) {
+    val newEventLogPrefixes = if (isFirstRun || !clusterSpec.exists) {
       df
         .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
         .selectExpr("*", "requestParams.*")

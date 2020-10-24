@@ -154,8 +154,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
        */
       if (config.overwatchScope.contains(OverwatchScope.clusters))
         appendClustersAPIProcess.process()
-      // TODO -- keeping these api events with audit since there appears to be more granular data available
-      //  from the api than from audit -- VERIFY
       if (config.overwatchScope.contains(OverwatchScope.clusterEvents))
         appendClusterEventLogsProcess.process()
       if (config.overwatchScope.contains(OverwatchScope.jobs))
