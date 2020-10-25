@@ -11,4 +11,6 @@ trait SparkSessionTestWrapper {
       .getOrCreate()
   }
 
+  lazy val sc = spark.sparkContext
+
 }

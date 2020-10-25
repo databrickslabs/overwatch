@@ -63,6 +63,9 @@ libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.21.3" % 
 // https://mvnrepository.com/artifact/org.mockito/mockito-core
 libraryDependencies += "org.mockito" % "mockito-core" % "3.5.15" % Test
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.2" % Test
+// https://mvnrepository.com/artifact/com.holdenkarau/spark-testing-base
+libraryDependencies += "com.holdenkarau" %% "spark-testing-base" % "2.4.5_0.14.0" % Test
+
 
 // enforce execution of tests during packaging - uncomment next line when we fix dependencies
 // Keys.`package` := (Compile / Keys.`package` dependsOn Test / test).value
