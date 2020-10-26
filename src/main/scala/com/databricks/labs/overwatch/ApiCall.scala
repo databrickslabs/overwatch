@@ -26,7 +26,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private var _maxResults: Int = _
   private var _status: String = "SUCCESS"
   private var _errorFlag: Boolean = false
-  private val mapper = JsonUtils.objectMapper
+  private val mapper = JsonUtils.defaultObjectMapper
   private var _decryptedToken: String = env.rawToken
 
   private def setQuery(value: Option[Map[String, Any]]): this.type = {
