@@ -40,7 +40,7 @@ object BatchRunner extends SparkSessionWrapper{
     Bronze(workspace).run()
     if (config.isFirstRun) {
       spark.table("overwatch_snap.aws_ec2_details")
-        .coalesce(1).write.format("delta").saveAsTable("overwatch.instanceDetails")
+        .coalesce(1).write.format("delta").saveAsTable(s"${config.databaseName}.instanceDetails")
     }
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
