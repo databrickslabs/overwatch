@@ -35,6 +35,17 @@ class Database(config: Config) extends SparkSessionWrapper {
          |""".stripMargin
     println(s"Executing Rollback: STMT: ${rollbackSql}")
     spark.sql(rollbackSql)
+    if (target.name == "spark_events_bronze") {
+      println(s"Dropping any additions found in tacked event logs")
+      // TODO -- remove hardcoded reference to table name during refactor
+      val processedFilesRollbackSql =
+        s"""
+           |delete from ${config.databaseName}.spark_events_processedFiles
+           |where Overwatch_RunID = '${config.runID}'
+           |""".stripMargin
+      println(s"Executing Rollback STMT: ${processedFilesRollbackSql}")
+      spark.sql(processedFilesRollbackSql)
+    }
   }
 
   private def initializeStreamTarget(df: DataFrame, tableFullName: String): Unit = {

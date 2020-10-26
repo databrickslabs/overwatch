@@ -5,14 +5,23 @@ import java.time.{LocalDateTime, ZoneId}
 import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Silver}
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
 object BatchRunner extends SparkSessionWrapper{
 
+  import spark.implicits._
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   private def setGlobalDeltaOverrides(): Unit = {
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
+  }
+
+  def testDFLoader(): DataFrame = {
+    val fileLocation = getClass.getResourceAsStream("/AWS_Instance_Details.csv.gz")
+    val source = scala.io.Source.fromInputStream(fileLocation).mkString
+    val csvData = spark.sparkContext.parallelize(source.stripMargin.lines.toList).toDS()
+    spark.read.option("header", true).option("inferSchema",true).csv(csvData)
   }
 
   def main(args: Array[String]): Unit = {
@@ -39,8 +48,13 @@ object BatchRunner extends SparkSessionWrapper{
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
     if (config.isFirstRun) {
-      spark.table("overwatch_snap.aws_ec2_details")
-        .coalesce(1).write.format("delta").saveAsTable(s"${config.databaseName}.instanceDetails")
+      val pathToInstanceDetails = if (config.cloudProvider == "aws")
+        Thread.currentThread().getContextClassLoader.getResource("AWS_Instance_Details.csv.gz").toString
+      else Thread.currentThread().getContextClassLoader.getResource("Azure_Instance_Details.csv.gz").toString
+
+      spark.read.format("csv").option("header", "true").load(pathToInstanceDetails)
+        .coalesce(1).write.format("delta")
+        .saveAsTable(s"${config.databaseName}.instanceDetails")
     }
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
