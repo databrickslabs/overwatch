@@ -27,6 +27,7 @@ import scala.concurrent.forkjoin.ForkJoinPool
 object JsonUtils {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
   case class JsonStrings(prettyString: String, compactString: String, escapedString: String, fromObj: Any)
 
   private[overwatch] lazy val objectMapper = new ObjectMapper()
@@ -35,6 +36,7 @@ object JsonUtils {
 
   /**
    * Converts json strings to map using default scala module.
+   *
    * @param message JSON-formatted string
    * @return
    */
@@ -54,7 +56,8 @@ object JsonUtils {
    * Take in a case class and output the equivalent json string object with the proper schema. The output is a
    * custom type, "JsonStrings" which includes a pretty print json, a compact string, and a quote escaped string
    * so the json output can be used in any case.
-   * @param obj Case Class instance to be converted to JSON
+   *
+   * @param obj          Case Class instance to be converted to JSON
    * @param includeNulls Whether to include nulled fields in the json output
    * @param includeEmpty Whether to include empty fields in the json output
    * @return
@@ -77,6 +80,7 @@ object JsonUtils {
  * no keys were ever logged. This was abandoned due to some errors but should be revisited. This code should either
  * be removed (along with removed from the APIEnv structure) after it's confirmed that the API key is not stored
  * anywhere in clear text in logs or otherwise.
+ *
  * @param key
  */
 class Cipher(key: String) {
@@ -115,15 +119,80 @@ class Cipher(key: String) {
 object SchemaTools extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def structToMap(df: DataFrame, colToConvert: String): Seq[Column] = {
-    val schema = df.select(s"${colToConvert}.*").schema
-    val mapCols = collection.mutable.LinkedHashSet[Column]()
-    schema.fields.foreach(field => {
-      mapCols.add(lit(field.name))
-      mapCols.add(col(s"${colToConvert}.${field.name}"))
+  def flattenSchema(schema: StructType, prefix: String = null): Array[Column] = {
+    schema.fields.flatMap(f => {
+      val columnName = if (prefix == null) f.name else (prefix + "." + f.name)
+
+      f.dataType match {
+        case st: StructType => flattenSchema(st, columnName)
+        case _ => Array(col(columnName).as(columnName.replace(".", "_")))
+      }
     })
-    mapCols.toSeq
   }
+
+  def getAllColumnNames(schema: StructType, prefix: String = null): Array[String] = {
+    schema.fields.flatMap(f => {
+      val columnName = if (prefix == null) f.name else (prefix + "." + f.name)
+
+      f.dataType match {
+        case st: StructType => getAllColumnNames(st, columnName)
+        case _ => Array(columnName)
+      }
+    })
+  }
+
+  def modifyStruct(structToModify: StructType, changeInventory: Map[String, Column], prefix: String = null): Array[Column] = {
+      structToModify.fields.map(f => {
+        val fullFieldName = if (prefix == null) f.name else (prefix + "." + f.name)
+
+        f.dataType match {
+          case c: StructType => {
+            changeInventory.getOrElse(fullFieldName, struct(modifyStruct(c, changeInventory, prefix = fullFieldName): _*)).alias(f.name)
+          }
+          case _ => changeInventory.getOrElse(fullFieldName, col(fullFieldName)).alias(f.name)
+        }
+      })
+  }
+
+//  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
+//    //    val columnInventory = df.select(s"${structColToModify}.*").columns
+//    //    val newStructInventory = columnInventory.map(cName => )
+//    val columnInventory = getAllColumnNames(df.select(s"${structColToModify}.*").schema).map(cn => {
+//      if (cn.contains(".")) {
+//        cn.split("\\.").dropRight(1).mkString(".")
+//      } else { cn }
+//    }).distinct
+//    // returning flat columns, need to return the struct column and stop
+//    val newStructInventory = columnInventory.map(cName => {
+//      changeInventory.getOrElse(cName, col(s"${structColToModify}.${cName}")).alias(cName)
+//    })
+//    struct(newStructInventory: _*)
+//  }
+
+  // TODO -- How to remove keys with nulls from maps?
+  def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
+
+    val mapColName = colToConvert.split("\\.").reverse.head
+    val removeEmptyKeys = udf((m: Map[String, String]) => m.filterNot(_._2 == null))
+
+    val dfFlatColumnNames = getAllColumnNames(df.schema)
+    if (dfFlatColumnNames.contains(colToConvert)) {
+      val schema = df.select(s"${colToConvert}.*").schema
+      val mapCols = collection.mutable.LinkedHashSet[Column]()
+      schema.fields.foreach(field => {
+        mapCols.add(lit(field.name))
+        mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
+      })
+      val newRawMap = map(mapCols.toSeq: _*)
+      if (dropEmptyKeys) {
+        when(newRawMap.isNull, lit(null)).otherwise(removeEmptyKeys(newRawMap)).alias(mapColName)
+      } else newRawMap.alias(mapColName)
+    } else {
+      lit(null).cast(MapType(StringType, StringType, true)).alias(mapColName)
+    }
+  }
+
+  //    .cast(MapType(StringType, StringType, true))
 
   // TODO -- Delta writer is schema case sensitive and will fail on write if column case is not identical on both sides
   //  As such, schema case sensitive validation needs to be enabled and a handler for whether to assume the same data
@@ -131,6 +200,7 @@ object SchemaTools extends SparkSessionWrapper {
   //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
   /**
    * Remove special characters from the field name
+   *
    * @param s
    * @return
    */
@@ -140,6 +210,7 @@ object SchemaTools extends SparkSessionWrapper {
 
   /**
    * Clean field name and recurse
+   *
    * @param field
    * @return
    */
@@ -152,6 +223,7 @@ object SchemaTools extends SparkSessionWrapper {
    * schemas. At times schemas have the same name multiple times which cannot be saved. We cannot have Overwatch break
    * due to one bad record in a run, so instead, we add a unique suffix to the end of the offending columns and log
    * / note the issue as a warning as well as print it out in the run log via stdOUT.
+   *
    * @param fields
    * @return
    */
@@ -186,6 +258,7 @@ object SchemaTools extends SparkSessionWrapper {
   /**
    * Recursive function to drill into the schema. Currently only supports recursion through structs and array.
    * TODO -- add support for recursion through Maps
+   *
    * @param dataType
    * @return
    */
@@ -205,6 +278,7 @@ object SchemaTools extends SparkSessionWrapper {
    * Main function for cleaning a schema. The point is to remove special characters and duplicates all the way down
    * into the Arrays / Structs.
    * TODO -- Add support for map type recursion cleansing
+   *
    * @param df Input dataframe to be cleansed
    * @return
    */
@@ -219,9 +293,10 @@ object SchemaTools extends SparkSessionWrapper {
    * front of the dataframe to allow them to be "indexed" in front of others.
    *
    * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
-   *  If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
-   *  array should be reversed before progressing through the logic
-   * @param df Input dataframe
+   * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
+   * array should be reversed before progressing through the logic
+   *
+   * @param df         Input dataframe
    * @param colsToMove Array of column names to be moved to front of schema
    * @return
    */
@@ -248,6 +323,7 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * Getter for parallelism between 8 and driver cores
+   *
    * @return
    */
   private def parallelism: Int = {
@@ -258,10 +334,11 @@ object Helpers extends SparkSessionWrapper {
   /**
    * Generates a complex time struct to simplify time conversions.
    * TODO - Currently ony supports input as a unix epoch time in milliseconds, check for column input type
-   *  and support non millis (Long / Int / Double / etc.)
-   *  This function should also support input column types of timestamp and date as well for robustness
+   * and support non millis (Long / Int / Double / etc.)
+   * This function should also support input column types of timestamp and date as well for robustness
+   *
    * @param start LongType input as a column
-   * @param end TimestampType input as a column
+   * @param end   TimestampType input as a column
    * @return
    */
   def SubtractTime(start: Column, end: Column): Column = {
@@ -294,6 +371,7 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * Check whether a path exists
+   *
    * @param path
    * @return
    */
@@ -309,7 +387,8 @@ object Helpers extends SparkSessionWrapper {
    * is ensuring spark is used to serialize it meaning make sure that it's called from the lambda of a Dataset
    *
    * TODO - This function can be easily enhanced to take in String* so that multiple, unrelated wildcards can be
-   *  globbed simultaneously
+   * globbed simultaneously
+   *
    * @param path wildcard path as string
    * @return list of all paths contained within the wildcard path
    */
@@ -338,6 +417,7 @@ object Helpers extends SparkSessionWrapper {
   /**
    * Return tables from a given database. Try to use Databricks' fast version if that fails for some reason, revert
    * back to using standard open source version
+   *
    * @param db
    * @return
    */
@@ -354,15 +434,16 @@ object Helpers extends SparkSessionWrapper {
   /**
    * Parallel optimizer with support for vacuum and zordering. This version of parOptimize will optimize (and zorder)
    * all tables in a Database
-   * @param db Database to optimize
-   * @param parallelism How many tables to optimize at once. Be careful here -- if the parallelism is too high relative
-   *                    to the cluster size issues will arise. There are also optimize parallelization configs to take
-   *                    into account as well (i.e. spark.databricks.delta.optimize.maxThreads)
+   *
+   * @param db             Database to optimize
+   * @param parallelism    How many tables to optimize at once. Be careful here -- if the parallelism is too high relative
+   *                       to the cluster size issues will arise. There are also optimize parallelization configs to take
+   *                       into account as well (i.e. spark.databricks.delta.optimize.maxThreads)
    * @param zOrdersByTable Map of tablename -> Array(field names) to be zordered. Order matters here
-   * @param vacuum Whether or not to vacuum the tables
-   * @param retentionHrs Number of hours for retention regarding vacuum. Defaulted to standard 168 hours (7 days) but
-   *                     can be overridden. NOTE: the safeguard has been removed here, so if 0 hours is used, no error
-   *                     will be thrown.
+   * @param vacuum         Whether or not to vacuum the tables
+   * @param retentionHrs   Number of hours for retention regarding vacuum. Defaulted to standard 168 hours (7 days) but
+   *                       can be overridden. NOTE: the safeguard has been removed here, so if 0 hours is used, no error
+   *                       will be thrown.
    */
   def parOptimize(db: String, parallelism: Int = parallelism - 1,
                   zOrdersByTable: Map[String, Array[String]] = Map(),
@@ -395,7 +476,8 @@ object Helpers extends SparkSessionWrapper {
   /**
    * Same purpose as parOptimize above but instead of optimizing an entire database, only specific tables are
    * optimized.
-   * @param tables Array of Overwatch PipelineTable
+   *
+   * @param tables        Array of Overwatch PipelineTable
    * @param maxFileSizeMB Optimizer's max file size in MB. Default is 1000 but that's too large so it's commonly
    *                      reduced to improve parallelism
    */
@@ -428,7 +510,8 @@ object Helpers extends SparkSessionWrapper {
   /**
    * Simplified version of parOptimize that allows for the input of array of string where the strings are the fully
    * qualified database.tablename
-   * @param tables Fully-qualified database.tablename
+   *
+   * @param tables      Fully-qualified database.tablename
    * @param parallelism Number of tables to optimize simultaneously
    */
   def parOptimizeTables(tables: Array[String],
@@ -454,8 +537,9 @@ object Helpers extends SparkSessionWrapper {
    * Manual compute stats function for an entire database -- useful for parquet tables but generally unecessary for delta tables.
    * Better to use the moveColumnsToFront and have those columns auto-indexed, in most cases.
    * TODO -- Add input param "computeDelta: Boolean" and if false, omit delta tables from being computed
-   * @param db Database for which to compute stats Note: this will compute stats for all tables currently
-   * @param parallelism How many tables to compute stats simultaneously
+   *
+   * @param db                Database for which to compute stats Note: this will compute stats for all tables currently
+   * @param parallelism       How many tables to compute stats simultaneously
    * @param forColumnsByTable Which columns should have stats calculated.
    */
   def computeStats(db: String, parallelism: Int = parallelism - 1,
@@ -480,6 +564,7 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * Compute stats for Array of PipelineTables
+   *
    * @param tables
    */
   def computeStats(tables: Array[PipelineTable]): Unit = {
@@ -507,7 +592,8 @@ object Helpers extends SparkSessionWrapper {
    * Be VERY CAREFUL with this function as it's a nuke. There's a different methodology to make this work depending
    * on the cloud platform. At present Azure and AWS are both supported
    * TODO - This function could be further improved by calling the fastrm function below, listing all files and dropping
-   *  them in parallel, then dropping the table from the metastore. Testing needed to enable this.
+   * them in parallel, then dropping the table from the metastore. Testing needed to enable this.
+   *
    * @param fullTableName
    * @param cloudProvider
    */
@@ -533,6 +619,7 @@ object Helpers extends SparkSessionWrapper {
    * Helper private function for fastrm. Enables serialization
    * This version only supports dbfs but s3 is easy to add it just wasn't necessary at the time this was written
    * TODO -- add support for s3/abfs direct paths
+   *
    * @param file
    */
   private def rmSer(file: String): Unit = {
@@ -551,6 +638,7 @@ object Helpers extends SparkSessionWrapper {
    * SERIALIZABLE drop function
    * Drop all files from an array of top-level paths in parallel. Top-level paths can have wildcards.
    * BE VERY CAREFUL with this function, it's a nuke.
+   *
    * @param topPaths Array of wildcard strings to act as parent paths. Every path that is returned from the glob of
    *                 globs will be dropped in parallel
    */

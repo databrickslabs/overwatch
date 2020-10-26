@@ -97,7 +97,7 @@ trait SparkSessionWrapper extends Serializable {
    * @param logLevel log4j log level
    * @return
    */
-  def envInit(logLevel: String = "WARN"): Boolean = {
+  def envInit(logLevel: String = "INFO"): Boolean = {
     sc.setLogLevel(logLevel)
     if (System.getenv("OVERWATCH") != "LOCAL") {
       setCoresPerWorker(sc.parallelize("1", 1)

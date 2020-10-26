@@ -253,7 +253,9 @@ class Config() {
     this
   }
 
-  private[overwatch] def setLastRunDetail(value: Array[ModuleStatusReport]): this.type = {
+  //TODO -- switch back to private -- public for testing only
+  //private[overwatch]
+  def setLastRunDetail(value: Array[ModuleStatusReport]): this.type = {
     // Todo -- Add assertion --> number of rows <= number of modules or something to that effect
     _lastRunDetail = value
     this
