@@ -172,7 +172,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
       if (needsOptimize(module.moduleID)) {
         postProcessor.add(target)
-        lastOptimizedTS = config.pipelineSnapTime.asUnixTimeMilli
+        lastOptimizedTS = config.untilTime(module.moduleID).asUnixTimeMilli
       }
 
       restoreSparkConf()
@@ -185,7 +185,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         runStartTS = startTime,
         runEndTS = endTime,
         fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
-        untilTS = config.pipelineSnapTime.asUnixTimeMilli,
+        untilTS = config.untilTime(module.moduleID).asUnixTimeMilli,
         dataFrequency = target.dataFrequency.toString,
         status = "SUCCESS",
         recordsAppended = debugCount,

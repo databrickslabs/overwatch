@@ -132,7 +132,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     while (overwatchScopesNode.hasNext) {
       overwatchScopes.append(overwatchScopesNode.next().asText())
     }
-    val maxDaysToLoad = masterNode.get("maxDaysToProcess").asInt(60)
+    val maxDaysToLoad = masterNode.get("maxDaysToLoad").asInt(60)
 
     //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
     //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}

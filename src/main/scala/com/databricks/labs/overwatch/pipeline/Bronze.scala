@@ -46,7 +46,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     getAuditLogsDF(
       config.auditLogConfig,
       config.isFirstRun,
-      config.pipelineSnapTime.asUTCDateTime,
+      config.untilTime(appendAuditLogsModule.moduleID).asUTCDateTime,
       config.fromTime(appendAuditLogsModule.moduleID).asUTCDateTime,
       BronzeTargets.auditLogAzureLandRaw,
       config.runID
@@ -61,7 +61,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget,
       config.fromTime(appendClusterEventLogsModule.moduleID),
-      config.pipelineSnapTime,
+      config.untilTime(appendClusterEventLogsModule.moduleID),
       config.apiEnv
     ),
     None,
@@ -69,20 +69,20 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     appendClusterEventLogsModule
   )
 
+  private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
   private def getEventLogPathsSourceDF: DataFrame = {
     if (config.overwatchScope.contains(OverwatchScope.audit)) BronzeTargets.auditLogsTarget.asDF
-    else BronzeTargets.clustersSnapshotTarget.asDF.filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
+    else BronzeTargets.clustersSnapshotTarget.asDF
+      .filter('Pipeline_SnapTS === config.untilTime(sparkEventLogsModule.moduleID).asColumnTS)
   }
-
-  private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
     getEventLogPathsSourceDF,
     Some(Seq(
       collectEventLogPaths(
         config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
-        config.pipelineSnapTime.asColumnTS,
+        config.untilTime(sparkEventLogsModule.moduleID).asColumnTS,
         config.fromTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
-        config.pipelineSnapTime.asUnixTimeMilli,
+        config.untilTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
         SilverTargets.clustersSpecTarget,
         config.isFirstRun
       ),

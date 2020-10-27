@@ -25,12 +25,13 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private def getIncrementalAuditLogDFByTimestamp(moduleID: Int): DataFrame = {
     val filters = Array(
       IncrementalFilter(
-        "timestamp", lit(config.fromTime(moduleID).asUnixTimeMilli), lit(config.pipelineSnapTime.asUnixTimeMilli)
+        "timestamp", lit(config.fromTime(moduleID).asUnixTimeMilli),
+        lit(config.untilTime(moduleID).asUnixTimeMilli)
       ),
       IncrementalFilter(
         "date",
         date_sub(config.fromTime(moduleID).asColumnTS.cast("date"), 2),
-        config.pipelineSnapTime.asColumnTS.cast("date")
+        config.untilTime(moduleID).asColumnTS.cast("date")
       )
     )
     BronzeTargets.auditLogsTarget.asIncrementalDF(filters: _*)

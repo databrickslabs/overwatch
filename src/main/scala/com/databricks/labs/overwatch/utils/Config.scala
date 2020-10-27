@@ -103,7 +103,7 @@ class Config() {
    */
 
   /**
-   * Getter for Pipeline Sanp Time
+   * Getter for Pipeline Snap Time
    * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
    * @return
    */
@@ -112,12 +112,18 @@ class Config() {
   }
 
   /**
-   * test commit
+   * Defines the latest timestamp to be used for a give module as a TimeType
+   * @param moduleID moduleID for which to get the until Time
    * @return
    */
-  def untilTime: TimeTypes = {
-
-    createTimeDetail(_pipelineSnapTime)
+  def untilTime(moduleID: Int): TimeTypes = {
+    val startSecondPlusMaxDays = fromTime(moduleID).asUTCDateTime.plusDays(maxDays).toInstant(ZoneOffset.UTC).toEpochMilli
+    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
+    if (startSecondPlusMaxDays < defaultUntilSecond) {
+      createTimeDetail(startSecondPlusMaxDays)
+    } else {
+      createTimeDetail(defaultUntilSecond)
+    }
   }
 
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
