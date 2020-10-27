@@ -50,7 +50,7 @@ scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 //}
 
 
-val sparkVersion = "2.4.0"
+val sparkVersion = "2.4.5"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion
@@ -69,6 +69,10 @@ libraryDependencies += "com.holdenkarau" %% "spark-testing-base" % "2.4.5_0.14.0
 
 // enforce execution of tests during packaging - uncomment next line when we fix dependencies
 // Keys.`package` := (Compile / Keys.`package` dependsOn Test / test).value
+
+coverageEnabled := true
+//coverageMinimum := 80
+//coverageFailOnMinimum := true
 
 assemblyExcludedJars in assembly := {
   val cp = (fullClasspath in assembly).value
