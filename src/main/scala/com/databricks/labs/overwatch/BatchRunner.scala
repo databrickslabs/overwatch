@@ -17,11 +17,11 @@ object BatchRunner extends SparkSessionWrapper{
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
   }
 
-  def testDFLoader(): DataFrame = {
-    val fileLocation = getClass.getResourceAsStream("/AWS_Instance_Details.csv.gz")
+  private def loadLocalResource(path: String): DataFrame = {
+    val fileLocation = getClass.getResourceAsStream("/AWS_Instance_Details.csv")
     val source = scala.io.Source.fromInputStream(fileLocation).mkString
     val csvData = spark.sparkContext.parallelize(source.stripMargin.lines.toList).toDS()
-    spark.read.option("header", true).option("inferSchema",true).csv(csvData)
+    spark.read.option("header", true).option("inferSchema",true).csv(csvData).coalesce(1)
   }
 
   def main(args: Array[String]): Unit = {
@@ -48,12 +48,14 @@ object BatchRunner extends SparkSessionWrapper{
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
     if (config.isFirstRun) {
-      val pathToInstanceDetails = if (config.cloudProvider == "aws")
-        Thread.currentThread().getContextClassLoader.getResource("AWS_Instance_Details.csv.gz").toString
-      else Thread.currentThread().getContextClassLoader.getResource("Azure_Instance_Details.csv.gz").toString
+      val instanceDetailsDF = config.cloudProvider match {
+        case "aws" =>  loadLocalResource("/AWS_Instance_Details.csv")
+        case "azure" =>  loadLocalResource("/Azure_Instance_Details.csv")
+        case _ => throw(new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure."))
+      }
 
-      spark.read.format("csv").option("header", "true").load(pathToInstanceDetails)
-        .coalesce(1).write.format("delta")
+      instanceDetailsDF
+        .write.format("delta")
         .saveAsTable(s"${config.databaseName}.instanceDetails")
     }
     logger.log(Level.INFO, "Starting Silver")

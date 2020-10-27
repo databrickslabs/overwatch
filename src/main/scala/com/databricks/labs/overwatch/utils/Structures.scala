@@ -45,7 +45,7 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            dataTarget: Option[DataTarget] = None,
                            badRecordsPath: Option[String] = None,
                            overwatchScope: Option[Seq[String]] = None,
-                           migrateProcessedEventLogs: Boolean = false
+                           maxDaysToLoad: Int
                           )
 
 case class ParsedConfig(

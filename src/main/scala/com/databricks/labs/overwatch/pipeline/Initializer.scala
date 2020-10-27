@@ -222,6 +222,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     // Todo -- add validation to badRecordsPath
     config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
+    config.setMaxDays(rawParams.maxDaysToLoad)
+
     this
   }
 

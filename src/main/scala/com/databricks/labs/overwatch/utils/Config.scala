@@ -30,6 +30,7 @@ class Config() {
   private var _apiEnv: ApiEnv = _
   private var _auditLogConfig: AuditLogConfig = _
   private var _badRecordsPath: String = _
+  private var _maxDays: Int = 60
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _parsedConfig: ParsedConfig = _
@@ -110,6 +111,11 @@ class Config() {
     createTimeDetail(_pipelineSnapTime)
   }
 
+  def untilTime: TimeTypes = {
+
+    createTimeDetail(_pipelineSnapTime)
+  }
+
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
   private[overwatch] def lastRunDetail: Array[ModuleStatusReport] = _lastRunDetail
@@ -125,6 +131,8 @@ class Config() {
   private[overwatch] def cloudProvider: String = _cloudProvider
 
   private[overwatch] def initialShuffleParts: Int = _intialShuffleParts
+
+  private[overwatch] def maxDays: Int = _maxDays
 
   private[overwatch] def databaseName: String = _databaseName
 
@@ -235,6 +243,11 @@ class Config() {
    */
   private[overwatch] def setInitialShuffleParts(value: Int): this.type = {
     _intialShuffleParts = value
+    this
+  }
+
+  private[overwatch] def setMaxDays(value: Int): this.type = {
+    _maxDays = value
     this
   }
 
@@ -411,7 +424,7 @@ class Config() {
 
     // FROM RAW PARAMS TEST
     """
-      |{"auditLogConfig":{"rawAuditPath":"/mnt/nu-databricks-audit"},"tokenSecret":{"scope":"databricks_tmp","key":"overwatch"},"dataTarget":{"databaseName":"overwatch_test4","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_test4.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords_overwatch_test","overwatchScope":["audit","clusters","sparkEvents"],"migrateProcessedEventLogs":false}
+      |{"auditLogConfig":{"rawAuditPath":"/mnt/nu-databricks-audit"},"tokenSecret":{"scope":"databricks_tmp","key":"overwatch"},"dataTarget":{"databaseName":"overwatch_test4","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_test4.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords_overwatch_test","overwatchScope":["audit","clusters","sparkEvents"],"maxDaysToLoad":60}
       |""".stripMargin
 
   }
