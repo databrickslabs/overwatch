@@ -1,18 +1,11 @@
-baseURL = "http://localhost"
+baseURL = "https://tomesdata.z20.web.core.windows.net/"
 title = "Overwatch"
-theme = "hugo-geekdoc"
+theme = "hugo-theme-learn-2.5.0"
 
-# Geekdoc required configuration
-pygmentsUseClasses = true
-pygmentsCodeFences = true
-disablePathToLower = true
 pluralizeListTitles = false
 
-# Needed for mermaid shortcodes
-[markup]
-  [markup.goldmark.renderer]
-    # Needed for mermaid shortcode
-    unsafe = true
-  [markup.tableOfContents]
-    startLevel = 1
-    endLevel = 9
+[params]
+    description = "Overwatch Documentation"
+    themeVariant = "blue"
+    DisableShortcutsTitle = "true"
+    author = "Daniel Tomes -- DatabricksLabs"

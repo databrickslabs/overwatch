@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Welcome To OverWatch on Overwatch</title>
+    <link>https://tomesdata.z20.web.core.windows.net/</link>
+    <description>Recent content in Welcome To OverWatch on Overwatch</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Wed, 28 Oct 2020 13:43:52 -0400</lastBuildDate><atom:link href="https://tomesdata.z20.web.core.windows.net/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Getting Started</title>
+      <link>https://tomesdata.z20.web.core.windows.net/userguide/getting-started/</link>
+      <pubDate>Tue, 27 Oct 2020 16:40:00 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/userguide/getting-started/</guid>
+      <description>Run Methods Overwatch is usually run via one of two methods:
+ As a job controlling running a notebook As a job running the main class with the configs  Below are instructions for both methods. The primary difference is the way by which the configuration is implemented and the choice of which to use is entirely user preference. Overwatch is meant to control itself from soup to nuts meaning it creates its own databases and tables and manages all spark parameters and optimization requirements to operate efficiently.</description>
+    </item>
+    
+    <item>
+      <title>Configuration</title>
+      <link>https://tomesdata.z20.web.core.windows.net/userguide/configuration/</link>
+      <pubDate>Wed, 28 Oct 2020 11:55:12 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/userguide/configuration/</guid>
+      <description>The configuration for Overwatch is fairly basic for the initial release but the plan is to open a lot of options and make the config much more robust to allow for much more granular control over operations. The ongoing changes will be documented here.
+Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.databricks.labs.overwatch.BatchRunner. When passed in as a json string, it is deserialized into an instance of OverwatchParams.</description>
+    </item>
+    
+    <item>
+      <title>Modules</title>
+      <link>https://tomesdata.z20.web.core.windows.net/userguide/modules/</link>
+      <pubDate>Wed, 28 Oct 2020 09:38:28 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/userguide/modules/</guid>
+      <description>What is a Module Current Modules  Audit Logs &amp;ndash; Base &amp;ndash; All modules Module Name  Module Dependencies What is it, What benefit What data is included    Planned Modules </description>
+    </item>
+    
+    <item>
+      <title>Advanced Topics</title>
+      <link>https://tomesdata.z20.web.core.windows.net/userguide/advancedtopics/</link>
+      <pubDate>Wed, 28 Oct 2020 13:43:52 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/userguide/advancedtopics/</guid>
+      <description> Multiple Workspaces Security / Views  Recommendations for Token (Ownership) Required Privileges / Access for Token Job owner must have access to the secret   Directory Lifecycle (dropping raw log files)  SC-38627 filed to improve raw log delivery   Moving the Overwatch Database Getting through the historical load (first run)  </description>
+    </item>
+    
+    <item>
+      <title>Troubleshooting</title>
+      <link>https://tomesdata.z20.web.core.windows.net/userguide/troubleshooting/</link>
+      <pubDate>Wed, 28 Oct 2020 09:05:57 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/userguide/troubleshooting/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Upgrading</title>
+      <link>https://tomesdata.z20.web.core.windows.net/userguide/upgrading/</link>
+      <pubDate>Wed, 28 Oct 2020 09:42:06 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/userguide/upgrading/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Roadmap</title>
+      <link>https://tomesdata.z20.web.core.windows.net/userguide/roadmap/</link>
+      <pubDate>Wed, 28 Oct 2020 09:37:43 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/userguide/roadmap/</guid>
+      <description> Screenshot of Roadmap items from git tag  </description>
+    </item>
+    
+    <item>
+      <title>Azure</title>
+      <link>https://tomesdata.z20.web.core.windows.net/environmentsetup/azure/</link>
+      <pubDate>Wed, 28 Oct 2020 09:12:32 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/environmentsetup/azure/</guid>
+      <description>Configuring Overwatch on Azure Databricks Historical / Batch Environment Configuration Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+Basic Deployment  Audit Log Delivery  At present the only supported method for audit log delivery is through Eventhub delivery in LogAnalytics.</description>
+    </item>
+    
+    <item>
+      <title>AWS</title>
+      <link>https://tomesdata.z20.web.core.windows.net/environmentsetup/aws/</link>
+      <pubDate>Wed, 28 Oct 2020 09:12:28 -0400</pubDate>
+      
+      <guid>https://tomesdata.z20.web.core.windows.net/environmentsetup/aws/</guid>
+      <description>Configuring Overwatch on AWS - Databricks Historical / Batch Environment Configuration Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+Basic Deployment  Audit Log Delivery Create Service User and/or Token for Overwatch to use  Grant required privileges to the Overwatch token Register the token secret as a Databricks Secret If a secret is not created and defined the user that owns the process must have the necessary permissions to perform all Overwatch tasks.</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en" class="js csstransforms3d">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="Hugo 0.76.5" />
+    <meta name="description" content="Overwatch Documentation">
+<meta name="author" content="Daniel Tomes -- DatabricksLabs">
+
+    <link rel="icon" href="/images/favicon.png" type="image/png">
+
+    <title>AWS :: Overwatch</title>
+
+    
+    <link href="/css/nucleus.css?1603925781" rel="stylesheet">
+    <link href="/css/fontawesome-all.min.css?1603925781" rel="stylesheet">
+    <link href="/css/hybrid.css?1603925781" rel="stylesheet">
+    <link href="/css/featherlight.min.css?1603925781" rel="stylesheet">
+    <link href="/css/perfect-scrollbar.min.css?1603925781" rel="stylesheet">
+    <link href="/css/auto-complete.css?1603925781" rel="stylesheet">
+    <link href="/css/atom-one-dark-reasonable.css?1603925781" rel="stylesheet">
+    <link href="/css/theme.css?1603925781" rel="stylesheet">
+    <link href="/css/hugo-theme.css?1603925781" rel="stylesheet">
+    
+    <link href="/css/theme-blue.css?1603925781" rel="stylesheet">
+    
+    
+
+    <script src="/js/jquery-3.3.1.min.js?1603925781"></script>
+
+    <style>
+      :root #header + #content > #left > #rlblock_left{
+          display:none !important;
+      }
+      
+    </style>
+    
+  </head>
+  <body class="" data-url="/environmentsetup/aws/">
+    <nav id="sidebar" class="">
+
+
+
+  <div id="header-wrapper">
+    <div id="header">
+      <a id="logo" href="https://tomesdata.z20.web.core.windows.net/">
+    <img src="/images/tmp_logo4.png", width="85%">
+</a>
+
+    </div>
+    
+        <div class="searchbox">
+    <label for="search-by"><i class="fas fa-search"></i></label>
+    <input data-search-input id="search-by" type="search" placeholder="Search...">
+    <span data-search-clear=""><i class="fas fa-times"></i></span>
+</div>
+
+<script type="text/javascript" src="/js/lunr.min.js?1603925781"></script>
+<script type="text/javascript" src="/js/auto-complete.js?1603925781"></script>
+<script type="text/javascript">
+    
+        var baseurl = "https:\/\/tomesdata.z20.web.core.windows.net\/";
+    
+</script>
+<script type="text/javascript" src="/js/search.js?1603925781"></script>
+
+    
+  </div>
+
+    <div class="highlightable">
+    <ul class="topics">
+
+        
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/userguide/" title="UserGuide" class="dd-item 
+        
+        
+        
+        ">
+      <a href="/userguide/">
+          UserGuide
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+          
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/getting-started/" title="Getting Started" class="dd-item ">
+        <a href="/userguide/getting-started/">
+        Getting Started
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/configuration/" title="Configuration" class="dd-item ">
+        <a href="/userguide/configuration/">
+        Configuration
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/modules/" title="Modules" class="dd-item ">
+        <a href="/userguide/modules/">
+        Modules
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/advancedtopics/" title="Advanced Topics" class="dd-item ">
+        <a href="/userguide/advancedtopics/">
+        Advanced Topics
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/troubleshooting/" title="Troubleshooting" class="dd-item ">
+        <a href="/userguide/troubleshooting/">
+        Troubleshooting
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/upgrading/" title="Upgrading" class="dd-item ">
+        <a href="/userguide/upgrading/">
+        Upgrading
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/roadmap/" title="Roadmap" class="dd-item ">
+        <a href="/userguide/roadmap/">
+        Roadmap
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+              
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/environmentsetup/" title="EnvironmentSetup" class="dd-item 
+        parent
+        
+        
+        ">
+      <a href="/environmentsetup/">
+          EnvironmentSetup
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+          
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/environmentsetup/azure/" title="Azure" class="dd-item ">
+        <a href="/environmentsetup/azure/">
+        Azure
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/environmentsetup/aws/" title="AWS" class="dd-item active">
+        <a href="/environmentsetup/aws/">
+        AWS
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+              
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/contributing/" title="" class="dd-item 
+        
+        
+        
+        ">
+      <a href="/contributing/">
+          
+          
+      </a>
+      
+              
+    </li>
+  
+ 
+
+          
+         
+    </ul>
+
+    
+    
+
+    
+    <section id="footer">
+      <p>A <a href="https://github.com/databrickslabs">Databricks Labs</a> project.</p>
+    </section>
+  </div>
+</nav>
+
+
+
+
+        <section id="body">
+        <div id="overlay"></div>
+        <div class="padding highlightable">
+              
+              <div>
+                <div id="top-bar">
+                
+                
+                <div id="breadcrumbs" itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb">
+                    <span id="sidebar-toggle-span">
+                        <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
+                          <i class="fas fa-bars"></i>
+                        </a>
+                    </span>
+                  
+                  <span id="toc-menu"><i class="fas fa-list-alt"></i></span>
+                  
+                  <span class="links">
+                 
+                 
+                    
+          
+          
+            
+            
+          
+          
+            
+            
+          
+          
+            <a href='/'>Welcome To OverWatch</a> > <a href='/environmentsetup/'>EnvironmentSetup</a> > AWS
+          
+        
+          
+        
+          
+        
+                 
+                  </span>
+                </div>
+                
+                    <div class="progress">
+    <div class="wrapper">
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#configuring-overwatch-on-aws---databricks">Configuring Overwatch on AWS - Databricks</a>
+      <ul>
+        <li><a href="#historical--batch-environment-configuration">Historical / Batch Environment Configuration</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+    </div>
+</div>
+
+                
+              </div>
+            </div>
+            
+        <div id="head-tags">
+        
+        </div>
+        
+        <div id="body-inner">
+          
+            <h1>
+              
+              AWS
+            </h1>
+          
+
+        
+
+
+<h2 id="configuring-overwatch-on-aws---databricks">Configuring Overwatch on AWS - Databricks</h2>
+<h3 id="historical--batch-environment-configuration">Historical / Batch Environment Configuration</h3>
+<p>Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
+<!-- raw HTML omitted -->
+To get started, the <a href="#basic-deployment">Basic Deployment</a> configuration. As more modules are enabled, additional
+environment configuration may be required in addition to the Basic Deployment.</p>
+<h4 id="basic-deployment">Basic Deployment</h4>
+<ul>
+<li>Audit Log Delivery</li>
+<li>Create Service User and/or Token for Overwatch to use
+<ul>
+<li>Grant required privileges to the Overwatch token</li>
+<li>Register the token secret as a <a href="https://docs.databricks.com/security/secrets/index.html">Databricks Secret</a>
+
+<div class="notices warning" ><p>If a secret is not created and defined the user that owns the process must have the necessary permissions to 
+perform all Overwatch tasks.</p>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+<h4 id="with-iam-passthrough-security-capture">With IAM Passthrough Security Capture</h4>
+
+<div class="notices info" ><p>Targeted Q1 2021 &ndash; See <a href="/userguide/roadmap/">Roadmap</a></p>
+</div>
+
+<h4 id="with-databricks-billable-usage-delivery-logs">With Databricks Billable Usage Delivery Logs</h4>
+<p>Detailed costs data 
+<a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">directly from Databricks</a>. 
+This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn&rsquo;t support this just yet, 
+if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
+to load all the historical data from the day that you began receiving it. 
+
+<div class="notices info" ><p>Targeted Q1 2021 &ndash; See <a href="/userguide/roadmap/">Roadmap</a></p>
+</div>
+</p>
+<h4 id="with-cloud-provider-costs">With Cloud Provider Costs</h4>
+<p>There can be substantial cloud provider costs associated with a cluster. Databricks (and Overwatch) has no visibility 
+to this by default. The plan here is to work with a few pilot customers to build API keys with appropriate 
+permissions to allow Overwatch to capture the compute, storage, etc costs associated with cluster machines. The 
+primary focus here would be to help customers visualize and optimize SPOT markets by illuminating costs 
+and opportunities across different AZs in your region given you machine types. Additionally, Overwatch could 
+make recommendations on:</p>
+<ul>
+<li>Actual compute/disk costs associated with clusters</li>
+<li>Optimal time of day for large jobs</li>
+<li>Small adjustments to node type by hour of day (i.e. i3.4xlarge instead of i3.2xlarge)</li>
+</ul>
+<p>The goal is to go even deeper than compute by looking at disk IO as well to determine the benefit/need of NVMEs 
+vs SSDs vs HDDs. Picking the right storage type and amount can save large sums over the course of a year. Picking 
+the wrong type (or not enough) can result in elevated compute bills due to inefficiencies. If you&rsquo;re interested in 
+this feature and would like to participate, please inform your CSE and/or Databricks Account Team.</p>
+
+<div class="notices info" ><p>Targeted 2021 &ndash; See <a href="/userguide/roadmap/">Roadmap</a></p>
+</div>
+
+<h4 id="realtime-enablement">Realtime Enablement</h4>
+
+<div class="notices info" ><p>2021 Feature Release &ndash; See <a href="/userguide/roadmap/">Roadmap</a></p>
+</div>
+
+
+
+<footer class="footline">
+	
+</footer>
+
+        
+        </div> 
+        
+
+      </div>
+
+    <div id="navigation">
+        
+        
+        
+        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+        
+        
+
+
+	 
+	 
+		
+			<a class="nav nav-prev" href="/environmentsetup/azure/" title="Azure"> <i class="fa fa-chevron-left"></i></a>
+		
+		
+			<a class="nav nav-next" href="/contributing/" title="" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+	
+    </div>
+
+    </section>
+    
+    <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
+      <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
+    </div>
+    <script src="/js/clipboard.min.js?1603925781"></script>
+    <script src="/js/perfect-scrollbar.min.js?1603925781"></script>
+    <script src="/js/perfect-scrollbar.jquery.min.js?1603925781"></script>
+    <script src="/js/jquery.sticky.js?1603925781"></script>
+    <script src="/js/featherlight.min.js?1603925781"></script>
+    <script src="/js/highlight.pack.js?1603925781"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="/js/modernizr.custom-3.6.0.js?1603925781"></script>
+    <script src="/js/learn.js?1603925781"></script>
+    <script src="/js/hugo-learn.js?1603925781"></script>
+
+    <link href="/mermaid/mermaid.css?1603925781" rel="stylesheet" />
+    <script src="/mermaid/mermaid.js?1603925781"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    
+
+  </body>
+</html>
+
