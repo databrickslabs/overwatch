@@ -98,37 +98,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
     restoreSparkConf()
 
-//    try {
-//      if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, BronzeTargets.cloudMachineDetail.name)) {
-//        // TODO -- Get data from local resources folder
-//        val cloudProviderInstanceLookup = if (config.isDBConnect) {
-//          spark.read.format("parquet").load("/tmp/tomes/overwatch/ec2_details_tbl")
-//            .withColumn("DriverNodeType", 'API_Name)
-//            .withColumn("WorkerNodeType", 'API_Name)
-//        } else {
-//          if (config.cloudProvider == "aws") {
-//            val ec2LookupPath = getClass.getResource("/ec2_details_tbl").toString
-//            val x = spark.read.format("parquet").load(ec2LookupPath)
-//            x.show(20, false)
-//            spark.read.format("parquet").load("ec2_details_tbl")
-//              .withColumn("DriverNodeType", 'API_Name)
-//              .withColumn("WorkerNodeType", 'API_Name)
-//          } else {
-//            // TODO -- Build this lookup table for azure
-//            Seq("TO BUILD OUT").toDF("NotImplemented")
-//            //        spark.read.format("parquet").load("azure_instance_details_tbl")
-//          }
-//        }
-//        database.write(cloudProviderInstanceLookup, BronzeTargets.cloudMachineDetail)
-//      }
-//    } catch {
-//      case e: Throwable => {
-//        println("FAILED: Could not load cloud provider's instance metadata. This will need to be created before " +
-//          "running silver.")
-//        logger.log(Level.ERROR, "Failed to create cloudMachineDetail Target", e)
-//      }
-//    }
-
     if (config.debugFlag) println(s"DEBUG: CLOUD PROVIDER = ${config.cloudProvider}")
     setCloudProvider(config.cloudProvider)
 
