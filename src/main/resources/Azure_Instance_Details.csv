@@ -1,5 +1,4 @@
-﻿instance,API_name,vCPUs,ram_gb,linux_vm_price_hour,pay_as_you_go_total_price_hour,3_year_reserved_total_price_hour
-,,,,,,
+﻿instance,API_name,vCPUs,Memory_GB,linux_vm_price_hour,On_Demand_Cost_Hourly,Linux_Reserved_Cost_Hourly
 DS4 v2,Standard_DS4_v2,8,28,0.56,1.38,1.04
 DS5 v2,Standard_DS5_v2,16,56,1.12,2.77,2.09
 D3 v2,Standard_D3_v2,4,14,0.28,0.69,0.52

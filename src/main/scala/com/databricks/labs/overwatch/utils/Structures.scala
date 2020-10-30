@@ -92,6 +92,7 @@ object Frequency extends Enumeration {
 }
 
 private[overwatch] class NoNewDataException(s: String) extends Exception(s) {}
+private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}

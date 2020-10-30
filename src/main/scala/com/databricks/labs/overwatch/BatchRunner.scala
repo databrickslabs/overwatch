@@ -17,13 +17,6 @@ object BatchRunner extends SparkSessionWrapper{
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
   }
 
-  private def loadLocalResource(path: String): DataFrame = {
-    val fileLocation = getClass.getResourceAsStream("/AWS_Instance_Details.csv")
-    val source = scala.io.Source.fromInputStream(fileLocation).mkString
-    val csvData = spark.sparkContext.parallelize(source.stripMargin.lines.toList).toDS()
-    spark.read.option("header", true).option("inferSchema",true).csv(csvData).coalesce(1)
-  }
-
   def main(args: Array[String]): Unit = {
     envInit()
     setGlobalDeltaOverrides()
@@ -38,21 +31,9 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-    val config = workspace.getConfig
-
     logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
-    if (config.isFirstRun) {
-      val instanceDetailsDF = config.cloudProvider match {
-        case "aws" =>  loadLocalResource("/AWS_Instance_Details.csv")
-        case "azure" =>  loadLocalResource("/Azure_Instance_Details.csv")
-        case _ => throw(new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure."))
-      }
 
-      instanceDetailsDF
-        .write.format("delta")
-        .saveAsTable(s"${config.databaseName}.instanceDetails")
-    }
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
 

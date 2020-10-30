@@ -73,7 +73,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private def getEventLogPathsSourceDF: DataFrame = {
     if (config.overwatchScope.contains(OverwatchScope.audit)) BronzeTargets.auditLogsTarget.asDF
     else BronzeTargets.clustersSnapshotTarget.asDF
-      .filter('Pipeline_SnapTS === config.untilTime(sparkEventLogsModule.moduleID).asColumnTS)
+      .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
   }
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
     getEventLogPathsSourceDF,

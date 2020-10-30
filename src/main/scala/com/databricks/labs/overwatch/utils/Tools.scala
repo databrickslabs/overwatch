@@ -405,12 +405,14 @@ object Helpers extends SparkSessionWrapper {
       } else None
       (pathString, fileModEpochMillis)
     }).filter(p => {
-      var switch = true
+      // Ensure that the last modified time of the file was between from --> until
       if (p._2.nonEmpty) {
-        if (fromEpochMillis.nonEmpty && fromEpochMillis.get >= p._2.get) switch = false
-        if (untilEpochMillis.nonEmpty && untilEpochMillis.get < p._2.get) switch = false
-      }
-      switch
+        val lastModifiedTS = p._2.get
+        // TODO -- Switch to Debug
+        println(s"PROOF: ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
+        (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
+        untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
+      } else false
     }).map(_._1)
   }
 
