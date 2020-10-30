@@ -1,14 +1,16 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
+import com.databricks.labs.overwatch.utils.IncrementalFilter
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
-import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
 import org.scalatest.funspec.AnyFunSpec
 
 class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
+  import spark.implicits._
 
-  describe("Tests for PipelineFunctions") {
+  describe("Tests for addOneTick") {
 
     it("add tick to every column") {
       val generatedDf = spark.createDataFrame(
@@ -39,6 +41,41 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       assertThrows[UnsupportedOperationException] {
         df.withColumn("abc", PipelineFunctions.addOneTick(col("id"), StringType))
       }
+    }
+  }
+
+  describe("Tests for withIncrementalFilters") {
+
+    it("should filter out not necessary data (single column)") {
+      val filters = Seq(
+        IncrementalFilter("int", lit(10), lit(20))
+      )
+
+      val sourceDF = spark.createDataFrame(Seq((100, 1), (10, 1), (15, 1))).toDF("int", "dummy")
+      val actualDF = PipelineFunctions.withIncrementalFilters(sourceDF, filters)
+
+      assertResult("`int` INT,`dummy` INT") {
+        actualDF.schema.toDDL
+      }
+
+      val expectedDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
+      assertSmallDataFrameEquality(actualDF, expectedDF)
+    }
+
+    it("should filter out not necessary data (two columns)") {
+      val filters = Seq(
+        IncrementalFilter("int", lit(10), lit(20)),
+        IncrementalFilter("dummy", lit(10), lit(20))
+      )
+
+      val sourceDF = spark.createDataFrame(Seq((100, 1), (10, 1), (15, 11), (15, 1))).toDF("int", "dummy")
+      val actualDF = PipelineFunctions.withIncrementalFilters(sourceDF, filters)
+      assertResult("`int` INT,`dummy` INT") {
+        actualDF.schema.toDDL
+      }
+
+      val expectedDF = spark.createDataFrame(Seq((15, 11))).toDF("int", "dummy")
+      assertSmallDataFrameEquality(actualDF, expectedDF)
     }
 
   }

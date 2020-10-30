@@ -1,10 +1,14 @@
 package com.databricks.labs.overwatch.pipeline
 
-import org.apache.spark.sql.Column
+import com.databricks.labs.overwatch.utils.IncrementalFilter
+import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.functions.{lit, date_add}
+import org.apache.spark.sql.functions.{col, date_add, lit}
 
 object PipelineFunctions {
+  private val logger: Logger = Logger.getLogger(this.getClass)
+
   def addOneTick(ts: Column, dt: DataType = TimestampType): Column = {
     dt match {
       case _: TimestampType =>
@@ -21,4 +25,36 @@ object PipelineFunctions {
         new UnsupportedOperationException(s"Cannot add milliseconds to ${dt.typeName}")
     }
   }
+
+  def withIncrementalFilters(df: DataFrame, filters: Seq[IncrementalFilter]): DataFrame = {
+    val parsedFilters = filters.map(filter => {
+      val c = filter.sourceCol
+      val low = filter.low
+      val high = filter.high
+      val dt = df.schema.fields.filter(_.name == c).head.dataType
+      dt match {
+        case _: TimestampType =>
+          col(c).between(PipelineFunctions.addOneTick(low), high)
+        case _: DateType => {
+          col(c).between(PipelineFunctions.addOneTick(low.cast(DateType), DateType), high.cast(DateType))
+        }
+        case _: LongType =>
+          col(c).between(PipelineFunctions.addOneTick(low, LongType), high.cast(LongType))
+        case _: IntegerType =>
+          col(c).between(PipelineFunctions.addOneTick(low, IntegerType), high.cast(IntegerType))
+        case _: DoubleType =>
+          col(c).between(PipelineFunctions.addOneTick(low, DoubleType), high.cast(DoubleType))
+        case _ =>
+          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
+      }
+    })
+
+    val filterExpressions = parsedFilters.map(_.expr).foreach(println)
+    logger.log(Level.INFO, filterExpressions)
+    parsedFilters.foldLeft(df) {
+      case (rawDF, filter) =>
+        rawDF.filter(filter)
+    }
+  }
+
 }

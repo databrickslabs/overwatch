@@ -148,36 +148,8 @@ case class PipelineTable(
 //    }
 //  }
 
-  // TODO: refactor it to for testability
-  def asIncrementalDF(filters: IncrementalFilter*): DataFrame = {
-    val df = spark.table(tableFullName)
-    val parsedFilters = filters.map(filter => {
-      val c = filter.sourceCol
-      val low = filter.low
-      val high = filter.high
-      df.schema.fields.filter(_.name == c).head.dataType match {
-        case _: TimestampType =>
-          col(c).between(PipelineFunctions.addOneTick(low), high)
-        case _: DateType => {
-//          val maxVal = df.select(max(c)).as[String].collect().head
-          col(c).between(PipelineFunctions.addOneTick(low.cast(DateType), DateType), high.cast(DateType))
-        }
-        case _: LongType =>
-          col(c).between(PipelineFunctions.addOneTick(low, LongType), high.cast(LongType))
-        case _: DoubleType =>
-          col(c).between(PipelineFunctions.addOneTick(low, DoubleType), high.cast(DoubleType))
-        case dt: DataType =>
-          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
-      }
-    })
-
-    val filterExpressions = parsedFilters.map(_.expr).foreach(println)
-    logger.log(Level.INFO, filterExpressions)
-    if (config.debugFlag) println(s"${tableFullName} Incremental Filter: ${filterExpressions}")
-    parsedFilters.foldLeft(df) {
-      case (rawDF, filter) =>
-        rawDF.filter(filter)
-    }
+  def asIncrementalDF(filters: Seq[IncrementalFilter]): DataFrame = {
+    PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), filters)
   }
 
   def writer(df: DataFrame): Any = {
