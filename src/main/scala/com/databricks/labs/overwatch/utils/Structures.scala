@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
@@ -26,7 +26,7 @@ case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encr
 case class Module(moduleID: Int, moduleName: String)
 
 case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
-                     asUTCDateTime: LocalDateTime, asMidnightEpochMilli: Long,
+                     asUTCDateTime: ZonedDateTime, asLocalDateTime: LocalDateTime, asMidnightEpochMilli: Long,
                      asTSString: String, asDTString: String)
 
 case class AzureAuditLogEventhubConfig(

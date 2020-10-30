@@ -187,15 +187,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def cleanseRawClusterSnapDF()(df: DataFrame): DataFrame = {
-    val rawScrubbedDF = SchemaTools.scrubSchema(df)
+  protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+    var rawScrubbedDF = SchemaTools.scrubSchema(df)
     // TODO -- enable for Azure
     // Cleanup the mess of structs where users define the keys
-    rawScrubbedDF
-      .withColumn("aws_attributes", SchemaTools.structToMap(rawScrubbedDF, "aws_attributes"))
+    rawScrubbedDF = rawScrubbedDF
       .withColumn("custom_tags", SchemaTools.structToMap(rawScrubbedDF, "custom_tags"))
       .withColumn("spark_conf", SchemaTools.structToMap(rawScrubbedDF, "spark_conf"))
       .withColumn("spark_env_vars", SchemaTools.structToMap(rawScrubbedDF, "spark_env_vars"))
+
+    if (cloudProvider == "aws") rawScrubbedDF = rawScrubbedDF
+      .withColumn("aws_attributes", SchemaTools.structToMap(rawScrubbedDF, "aws_attributes"))
+
+    rawScrubbedDF
   }
 
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
@@ -423,10 +427,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
     if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
       val alreadyProcessed = processedLogFiles.asDF.select('filename)
         .distinct
-      val badFiles = spark.read.format("json").load(s"${badRecordsPath}/*/*/")
-        .select('path.alias("filename"))
-        .distinct
-      eventLogsDF.except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
+
+      if (Helpers.pathExists(badRecordsPath)) {
+        val badFiles = spark.read.format("json").load(s"${badRecordsPath}/*/*/")
+          .select('path.alias("filename"))
+          .distinct
+        eventLogsDF.except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
+      } else {
+        eventLogsDF.except(alreadyProcessed).as[String].collect()
+      }
     } else {
       eventLogsDF.select('filename)
         .distinct.as[String].collect()

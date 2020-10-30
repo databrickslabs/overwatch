@@ -22,7 +22,7 @@ object BatchRunner extends SparkSessionWrapper{
     setGlobalDeltaOverrides()
 
 //    JARS for databricks remote
-//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.1_wildlife.jar")
+    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2.jar")
 //    spark.sql("drop database if exists overwatch_local cascade")
 
     val workspace = if (args.length != 0) {
@@ -31,8 +31,8 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-    logger.log(Level.INFO, "Starting Bronze")
-    Bronze(workspace).run()
+//    logger.log(Level.INFO, "Starting Bronze")
+//    Bronze(workspace).run()
 
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()

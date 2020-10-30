@@ -28,7 +28,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private val appendClustersModule = Module(1002, "Bronze_Clusters_Snapshot")
   lazy private val appendClustersAPIProcess = EtlDefinition(
     workspace.getClustersDF,
-    Some(Seq(cleanseRawClusterSnapDF())),
+    Some(Seq(cleanseRawClusterSnapDF(config.cloudProvider))),
     append(BronzeTargets.clustersSnapshotTarget),
     appendClustersModule
   )
@@ -46,8 +46,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     getAuditLogsDF(
       config.auditLogConfig,
       config.isFirstRun,
-      config.untilTime(appendAuditLogsModule.moduleID).asUTCDateTime,
-      config.fromTime(appendAuditLogsModule.moduleID).asUTCDateTime,
+      config.untilTime(appendAuditLogsModule.moduleID).asLocalDateTime,
+      config.fromTime(appendAuditLogsModule.moduleID).asLocalDateTime,
       BronzeTargets.auditLogAzureLandRaw,
       config.runID
     ),
