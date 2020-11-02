@@ -227,16 +227,16 @@ class Pipeline(_workspace: Workspace, _database: Database,
         // TODO -- handle rollback
         // TODO -- Capture e message in failReport
         val rollbackMsg = s"ROLLBACK: Attempting Roll back ${module.moduleName}."
-        println(msg, e)
         println(rollbackMsg)
+        println(msg, e)
         logger.log(Level.WARN, rollbackMsg)
         try {
           database.rollbackTarget(target)
         } catch {
           case eSub: Throwable => {
             val rollbackFailedMsg = s"ROLLBACK FAILED: ${module.moduleName} -->\nMessage: ${eSub.getMessage}\nCause:" +
-              s" ${eSub.getCause}", eSub
-            println(rollbackFailedMsg)
+              s" ${eSub.getCause}"
+            println(rollbackFailedMsg, eSub)
             logger.log(Level.ERROR, rollbackFailedMsg, eSub)
           }
         }
