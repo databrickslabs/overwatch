@@ -102,18 +102,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
   }
 
   private def failModule(module: Module, outcome: String, msg: String): ModuleStatusReport = {
-    if (module.moduleID == 1006) {
-      val eventsFileTrackerTable = BronzeTargets.processedEventLogs.tableFullName
-      val updateStmt =
-        s"""
-          |update ${eventsFileTrackerTable}
-          |set failed = true
-          |where Overwatch_RunID = '${config.runID}'
-          |""".stripMargin
-      logger.log(Level.INFO, s"Failing Files for ${config.runID}.\nSTMT: $updateStmt")
-      spark.sql(updateStmt)
-
-    }
 
     ModuleStatusReport(
       moduleID = module.moduleID,
@@ -234,14 +222,24 @@ class Pipeline(_workspace: Workspace, _database: Database,
         println(msg)
         logger.log(Level.WARN, msg, e)
       case e: Throwable =>
-        val msg = s"${module.moduleName} FAILED, Unhandled Error"
+        val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
         logger.log(Level.ERROR, msg, e)
         // TODO -- handle rollback
         // TODO -- Capture e message in failReport
-        val rollbackMsg = s"ROLLBACK: Rolling back ${module.moduleName}."
+        val rollbackMsg = s"ROLLBACK: Attempting Roll back ${module.moduleName}."
         println(msg, e)
         println(rollbackMsg)
         logger.log(Level.WARN, rollbackMsg)
+        try {
+          database.rollbackTarget(target)
+        } catch {
+          case eSub: Throwable => {
+            val rollbackFailedMsg = s"ROLLBACK FAILED: ${module.moduleName} -->\nMessage: ${eSub.getMessage}\nCause:" +
+              s" ${eSub.getCause}", eSub
+            println(rollbackFailedMsg)
+            logger.log(Level.ERROR, rollbackFailedMsg, eSub)
+          }
+        }
         val failedModuleReport = failModule(module, "FAILED", msg)
         finalizeModule(failedModuleReport)
     }

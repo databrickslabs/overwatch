@@ -27,24 +27,33 @@ class Database(config: Config) extends SparkSessionWrapper {
 
   def getDatabaseName: String = _databaseName
 
-  private def rollback(target: PipelineTable): Unit = {
+  def rollbackTarget(target: PipelineTable): Unit = {
     val rollbackSql =
       s"""
          |delete from ${target.tableFullName}
          |where Overwatch_RunID = '${config.runID}'
          |""".stripMargin
-    println(s"Executing Rollback: STMT: ${rollbackSql}")
+    val rollBackMsg = s"Executing Rollback: STMT: ${rollbackSql}"
+    if (config.debugFlag) println(rollBackMsg)
+    logger.log(Level.WARN, rollBackMsg)
     spark.sql(rollbackSql)
+
+    // Specific Rollback logic
     if (target.name == "spark_events_bronze") {
-      println(s"Dropping any additions found in tacked event logs")
-      // TODO -- remove hardcoded reference to table name during refactor
-      val processedFilesRollbackSql =
+      val eventsFileTrackerTable = target.tableFullName
+      val updateStmt =
         s"""
-           |delete from ${config.databaseName}.spark_events_processedFiles
+           |update ${eventsFileTrackerTable}
+           |set failed = true
            |where Overwatch_RunID = '${config.runID}'
            |""".stripMargin
-      println(s"Executing Rollback STMT: ${processedFilesRollbackSql}")
-      spark.sql(processedFilesRollbackSql)
+      val fileFailMsg = s"Failing Files for ${config.runID}.\nSTMT: $updateStmt"
+      logger.log(Level.WARN, fileFailMsg)
+      if (config.debugFlag) {
+        println(updateStmt)
+        println(fileFailMsg)
+      }
+      spark.sql(updateStmt)
     }
   }
 
