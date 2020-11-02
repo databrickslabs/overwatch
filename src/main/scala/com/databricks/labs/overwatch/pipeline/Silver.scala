@@ -23,7 +23,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val sw = new StringWriter
 
   private def getIncrementalAuditLogDFByTimestamp(moduleID: Int): DataFrame = {
-    val filters = Array(
+    val filters = Seq(
       IncrementalFilter(
         "timestamp", lit(config.fromTime(moduleID).asUnixTimeMilli),
         lit(config.untilTime(moduleID).asUnixTimeMilli)
@@ -34,7 +34,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         config.untilTime(moduleID).asColumnTS.cast("date")
       )
     )
-    BronzeTargets.auditLogsTarget.asIncrementalDF(filters: _*)
+    BronzeTargets.auditLogsTarget.asIncrementalDF(filters)
   }
 
   lazy private val newSparkEvents = BronzeTargets.sparkEventLogsTarget.asDF.filter(!'Downstream_Processed)

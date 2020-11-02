@@ -1,14 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter, JsonUtils, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.catalog.Table
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogTable}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, DataFrameWriter, Row}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
 //  also add ruleStrateg: Enum(Kill, Quarantine, Ignore) to determine when to require them
@@ -99,22 +97,6 @@ case class PipelineTable(
     }
   }
 
-  private def addOneTick(ts: Column, dt: DataType = TimestampType): Column = {
-    dt match {
-      case _: TimestampType =>
-        ((ts.cast("double") * 1000 + 1) / 1000).cast("timestamp")
-      case _: DateType =>
-        date_add(ts, 1)
-      case _: DoubleType =>
-        ts + lit(0.001)
-      case _: LongType =>
-        ts + 1
-      case _: IntegerType =>
-        ts + 1
-      case _ => throw new UnsupportedOperationException(s"Cannot add milliseconds to ${dt.typeName}")
-    }
-  }
-
   // TODO -- Add partition filter
 //  private def buildIncrementalDF(df: DataFrame, filter: IncrementalFilter): DataFrame = {
 //    val low = filter.low
@@ -166,32 +148,8 @@ case class PipelineTable(
 //    }
 //  }
 
-  def asIncrementalDF(filters: IncrementalFilter*): DataFrame = {
-    val df = spark.table(tableFullName)
-    val parsedFilters = filters.map(filter => {
-      val c = filter.sourceCol
-      val low = filter.low
-      val high = filter.high
-      df.schema.fields.filter(_.name == c).head.dataType match {
-        case _: TimestampType => col(c).between(addOneTick(low), high)
-        case _: DateType => {
-//          val maxVal = df.select(max(c)).as[String].collect().head
-          col(c).between(addOneTick(low.cast(DateType), DateType), high.cast(DateType))
-        }
-        case _: LongType => col(c).between(addOneTick(low, LongType), high.cast(LongType))
-        case _: DoubleType => col(c).between(addOneTick(low, DoubleType), high.cast(DoubleType))
-        case dt: DataType =>
-          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
-      }
-    })
-
-    val filterExpressions = parsedFilters.map(_.expr).foreach(println)
-    logger.log(Level.INFO, filterExpressions)
-    if (config.debugFlag) println(s"${tableFullName} Incremental Filter: ${filterExpressions}")
-    parsedFilters.foldLeft(df) {
-      case (rawDF, filter) =>
-        rawDF.filter(filter)
-    }
+  def asIncrementalDF(filters: Seq[IncrementalFilter]): DataFrame = {
+    PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), filters)
   }
 
   def writer(df: DataFrame): Any = {
