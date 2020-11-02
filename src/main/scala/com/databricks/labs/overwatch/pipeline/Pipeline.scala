@@ -1,8 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, Helpers, ModuleStatusReport,
-  NoNewDataException, SchemaTools, SparkSessionWrapper, Module}
+import com.databricks.labs.overwatch.utils.{Config, Helpers, Module, ModuleStatusReport, NoNewDataException, SchemaTools, SparkSessionWrapper, UnhandledException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
 import Schema.verifyDF
@@ -121,9 +120,31 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   }
 
+  // TODO -- refactor the module status report process
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): Unit = {
+    val startTime = System.currentTimeMillis()
+
     try {
-      if (df.schema.fieldNames.contains("FAILURE")) throw new NoNewDataException(s"FAILED to append: ${target.tableFullName}")
+      if (df.schema.fieldNames.contains("__OVERWATCHEMPTY")) {
+        val emptyStatusReport = ModuleStatusReport(
+          moduleID = module.moduleID,
+          moduleName = module.moduleName,
+          runStartTS = startTime,
+          runEndTS = startTime,
+          fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
+          untilTS = config.untilTime(module.moduleID).asUnixTimeMilli,
+          dataFrequency = target.dataFrequency.toString,
+          status = "EMPTY",
+          recordsAppended = 0L,
+          lastOptimizedTS = getLastOptimized(module.moduleID),
+          vacuumRetentionHours = 24 * 7,
+          inputConfig = config.inputConfig,
+          parsedConfig = config.parsedConfig
+        )
+        finalizeModule(emptyStatusReport)
+        throw new NoNewDataException(s"FAILED to append: ${target.tableFullName}")
+      }
+      if (df.schema.fieldNames.contains("FAILURE")) throw new UnhandledException(s"FAILED to append: ${target.tableFullName}")
       var finalDF = df
       var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
 
@@ -157,7 +178,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
       logger.log(Level.INFO, startLogMsg)
 
 
-      val startTime = System.currentTimeMillis()
       if(!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
       val debugCount = if (!config.isFirstRun || config.debugFlag) {
         val dfCount = finalDF.count()
@@ -172,7 +192,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
       if (needsOptimize(module.moduleID)) {
         postProcessor.add(target)
-        lastOptimizedTS = config.pipelineSnapTime.asUnixTimeMilli
+        lastOptimizedTS = config.untilTime(module.moduleID).asUnixTimeMilli
       }
 
       restoreSparkConf()
@@ -185,7 +205,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         runStartTS = startTime,
         runEndTS = endTime,
         fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
-        untilTS = config.pipelineSnapTime.asUnixTimeMilli,
+        untilTS = config.untilTime(module.moduleID).asUnixTimeMilli,
         dataFrequency = target.dataFrequency.toString,
         status = "SUCCESS",
         recordsAppended = debugCount,
@@ -200,7 +220,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
         val msg = s"ALERT: No New Data Retrieved for Module ${module.moduleID}! Skipping"
         println(msg)
         logger.log(Level.WARN, msg, e)
-        failModule(module, "SKIPPED", msg)
       case e: Throwable =>
         val msg = s"${module.moduleName} FAILED, Unhandled Error"
         logger.log(Level.ERROR, msg, e)

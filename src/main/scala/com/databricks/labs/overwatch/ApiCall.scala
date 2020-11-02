@@ -152,6 +152,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   // TODO -- Simplify differences between get and post
   //  and validate the error handling
   @throws(classOf[ApiCallFailure])
+  @throws(classOf[java.lang.NoClassDefFoundError])
   def executeGet(pageCall: Boolean = false): this.type = {
     logger.log(Level.INFO, s"Loading ${req} -> query: $getQueryString")
     try {
@@ -182,6 +183,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       }
       this
     } catch {
+      case e: java.lang.NoClassDefFoundError => {
+        val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
+        println(msg, e)
+        throw new java.lang.NoClassDefFoundError
+      }
       case e: Throwable => {
         val msg = "Could not execute API call."
         setStatus(msg, Level.ERROR, Some(e))
@@ -245,7 +251,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       }
       if (!pageCall) {
         val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
-        val totalCount = JsonUtils.jsonToMap(jsonResult).getOrElse("total_count", 0).toString.toLong
+//        val totalCount = JsonUtils.jsonToMap(jsonResult).getOrElse("total_count", 0).toString.toLong
+        val totalCount = mapper.readTree(result.body).get("total_count").asInt(0)
         if (totalCount > 0) results.append(jsonResult)
         if (totalCount > limit && _paginate) paginate(totalCount)
       } else {
@@ -253,6 +260,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       }
       this
     } catch {
+      case e: java.lang.NoClassDefFoundError => {
+        val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
+        println(msg, e)
+        throw new java.lang.NoClassDefFoundError
+      }
       case _: JsonMappingException =>
         val msg = s"API POST: NO NEW DATA -> ${_apiName} Query: ${jsonQuery}"
         setStatus(msg, Level.WARN)

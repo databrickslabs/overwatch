@@ -1,0 +1,43 @@
+﻿instance,API_name,vCPUs,Memory_GB,linux_vm_price_hour,On_Demand_Cost_Hourly,Linux_Reserved_Cost_Hourly
+DS4 v2,Standard_DS4_v2,8,28,0.56,1.38,1.04
+DS5 v2,Standard_DS5_v2,16,56,1.12,2.77,2.09
+D3 v2,Standard_D3_v2,4,14,0.28,0.69,0.52
+D8s v3,Standard_D8s_v3,8,32,0.47,1.29,1.03
+D16s v3,Standard_D16s_v3,16,64,0.94,2.59,2.06
+D32s v3,Standard_D32s_v3,32,128,1.87,5.17,4.11
+D64s v3,Standard_D64s_v3,64,256,3.74,10.34,8.23
+D8 v3,Standard_D8_v3,8,32,0.47,1.29,1.03
+D16 v3,Standard_D16_v3,16,64,0.94,2.59,2.06
+D32 v3,Standard_D32_v3,32,128,1.87,5.17,4.11
+D64 v3,Standard_D64_v3,64,256,3.74,10.34,8.23
+DS12 v2,Standard_DS12_v2,4,28,0.37,0.92,0.70
+DS13 v2,Standard_DS13_v2,8,56,0.74,1.84,1.40
+DS14 v2,Standard_DS14_v2,16,112,1.48,3.68,2.81
+DS15 v2,Standard_DS15_v2,20,140,1.85,4.60,3.51
+D12 v2,Standard_D12_v2,4,28,0.37,0.92,0.70
+D13 v2,Standard_D13_v2,8,56,0.74,1.84,1.40
+D14 v2,Standard_D14_v2,16,112,1.48,3.68,2.81
+D15 v2,Standard_D15_v2,20,140,1.85,4.60,3.51
+E8s v3,Standard_E8s_v3,8,64,0.56,1.66,1.32
+E16s v3,Standard_E16s_v3,16,128,1.12,3.32,2.65
+E32s v3,Standard_E32s_v3,32,256,2.24,6.64,5.29
+E64s v3,Standard_E64s_v3,64,432,4.03,12.83,10.48
+L4s,Standard_L4s,4,32,0.34,0.89,0.83
+L8s,Standard_L8s,8,64,0.69,1.79,1.65
+L16s,Standard_L16s,16,128,1.38,3.58,3.30
+L32s,Standard_L32s,32,256,2.75,7.15,6.61
+L8s v2,Standard_L8s_v2,8,64,0.69,1.79,1.39
+L16s v2,Standard_L16s_v2,16,128,1.38,3.58,2.78
+L32s v2,Standard_L32s_v2,32,256,2.75,7.15,5.57
+L64s v2,Standard_L64s_v2,64,512,5.50,14.30,11.13
+L80s v2,Standard_L80s_v2,80,640,6.88,17.88,13.91
+F4s v2,Standard_F4s_v2,4,8,0.21,0.76,0.63
+F8s v2,Standard_F8s_v2,8,16,0.42,1.52,1.25
+F16s v2,Standard_F16s_v2,16,32,0.85,3.05,2.51
+F32s v2,Standard_F32s_v2,32,64,1.70,6.10,5.01
+F64s v2,Standard_F64s_v2,64,128,3.39,12.19,10.02
+F72s v2,Standard_F72s_v2,72,144,3.82,13.72,11.28
+F4,Standard_F4s,4,8,0.25,0.52,0.38
+F8,Standard_F8s,8,16,0.50,1.05,0.76
+F16,Standard_F16s,16,32,1.00,2.10,1.51
+H16,Standard_H16,16,112,1.94,4.14,3.18

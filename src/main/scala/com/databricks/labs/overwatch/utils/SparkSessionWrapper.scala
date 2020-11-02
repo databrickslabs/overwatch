@@ -97,27 +97,28 @@ trait SparkSessionWrapper extends Serializable {
    * @param logLevel log4j log level
    * @return
    */
-  def envInit(logLevel: String = "WARN"): Boolean = {
+  def envInit(logLevel: String = "INFO"): Boolean = {
     sc.setLogLevel(logLevel)
     if (System.getenv("OVERWATCH") != "LOCAL") {
       setCoresPerWorker(sc.parallelize("1", 1)
         .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0))
       
       setNumberOfWorkerNodes(sc.statusTracker.getExecutorInfos.length - 1)
+      setCoresPerTask(
+        try {
+          spark.conf.get("spark.task.cpus").toInt
+        }
+        catch {
+          case e: java.util.NoSuchElementException => 1
+        }
+      )
     } else {
       val env = System.getenv().asScala
       setCoresPerWorker(env("coresPerWorker").toInt)
       setNumberOfWorkerNodes(env("numberOfWorkerNodes").toInt)
+      setCoresPerTask(1)
     }
     setTotalCores(getCoresPerWorker * getNumberOfWorkerNodes)
-    setCoresPerTask(
-      try {
-        spark.conf.get("spark.task.cpus").toInt
-      }
-      catch {
-        case e: java.util.NoSuchElementException => 1
-      }
-    )
     setParTasks(scala.math.floor(getTotalCores / getCoresPerTask).toInt)
 //    if (spark.conf.get("spark.sql.shuffle.partitions") == "200")
 //      spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 4)

@@ -28,7 +28,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private val appendClustersModule = Module(1002, "Bronze_Clusters_Snapshot")
   lazy private val appendClustersAPIProcess = EtlDefinition(
     workspace.getClustersDF,
-    None,
+    Some(Seq(cleanseRawClusterSnapDF(config.cloudProvider))),
     append(BronzeTargets.clustersSnapshotTarget),
     appendClustersModule
   )
@@ -46,8 +46,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     getAuditLogsDF(
       config.auditLogConfig,
       config.isFirstRun,
-      config.pipelineSnapTime.asUTCDateTime,
-      config.fromTime(appendAuditLogsModule.moduleID).asUTCDateTime,
+      config.untilTime(appendAuditLogsModule.moduleID).asLocalDateTime,
+      config.fromTime(appendAuditLogsModule.moduleID).asLocalDateTime,
       BronzeTargets.auditLogAzureLandRaw,
       config.runID
     ),
@@ -61,7 +61,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget,
       config.fromTime(appendClusterEventLogsModule.moduleID),
-      config.pipelineSnapTime,
+      config.untilTime(appendClusterEventLogsModule.moduleID),
       config.apiEnv
     ),
     None,
@@ -69,18 +69,20 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     appendClusterEventLogsModule
   )
 
+  private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
   private def getEventLogPathsSourceDF: DataFrame = {
     if (config.overwatchScope.contains(OverwatchScope.audit)) BronzeTargets.auditLogsTarget.asDF
-    else BronzeTargets.clustersSnapshotTarget.asDF.filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
+    else BronzeTargets.clustersSnapshotTarget.asDF
+      .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
   }
-
-  private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
     getEventLogPathsSourceDF,
     Some(Seq(
       collectEventLogPaths(
         config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
-        config.pipelineSnapTime.asColumnTS,
+        config.untilTime(sparkEventLogsModule.moduleID).asColumnTS,
+        config.fromTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
+        config.untilTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
         SilverTargets.clustersSpecTarget,
         config.isFirstRun
       ),
@@ -95,37 +97,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   def run(): Unit = {
 
     restoreSparkConf()
-
-//    try {
-//      if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, BronzeTargets.cloudMachineDetail.name)) {
-//        // TODO -- Get data from local resources folder
-//        val cloudProviderInstanceLookup = if (config.isDBConnect) {
-//          spark.read.format("parquet").load("/tmp/tomes/overwatch/ec2_details_tbl")
-//            .withColumn("DriverNodeType", 'API_Name)
-//            .withColumn("WorkerNodeType", 'API_Name)
-//        } else {
-//          if (config.cloudProvider == "aws") {
-//            val ec2LookupPath = getClass.getResource("/ec2_details_tbl").toString
-//            val x = spark.read.format("parquet").load(ec2LookupPath)
-//            x.show(20, false)
-//            spark.read.format("parquet").load("ec2_details_tbl")
-//              .withColumn("DriverNodeType", 'API_Name)
-//              .withColumn("WorkerNodeType", 'API_Name)
-//          } else {
-//            // TODO -- Build this lookup table for azure
-//            Seq("TO BUILD OUT").toDF("NotImplemented")
-//            //        spark.read.format("parquet").load("azure_instance_details_tbl")
-//          }
-//        }
-//        database.write(cloudProviderInstanceLookup, BronzeTargets.cloudMachineDetail)
-//      }
-//    } catch {
-//      case e: Throwable => {
-//        println("FAILED: Could not load cloud provider's instance metadata. This will need to be created before " +
-//          "running silver.")
-//        logger.log(Level.ERROR, "Failed to create cloudMachineDetail Target", e)
-//      }
-//    }
 
     if (config.debugFlag) println(s"DEBUG: CLOUD PROVIDER = ${config.cloudProvider}")
     setCloudProvider(config.cloudProvider)
@@ -152,8 +123,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
        */
       if (config.overwatchScope.contains(OverwatchScope.clusters))
         appendClustersAPIProcess.process()
-      // TODO -- keeping these api events with audit since there appears to be more granular data available
-      //  from the api than from audit -- VERIFY
       if (config.overwatchScope.contains(OverwatchScope.clusterEvents))
         appendClusterEventLogsProcess.process()
       if (config.overwatchScope.contains(OverwatchScope.jobs))

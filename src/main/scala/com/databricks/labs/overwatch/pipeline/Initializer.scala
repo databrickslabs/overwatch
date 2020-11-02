@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{rank, row_number}
 
@@ -26,26 +27,57 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   import spark.implicits._
 
   /**
+   * Load database for cloud provider node details
+   * @param path
+   * @return
+   */
+  private def loadLocalResource(path: String): DataFrame = {
+    val fileLocation = getClass.getResourceAsStream(path)
+    val source = scala.io.Source.fromInputStream(fileLocation).mkString
+    val csvData = spark.sparkContext.parallelize(source.stripMargin.lines.toList).toDS()
+    spark.read.option("header", true).option("inferSchema",true).csv(csvData).coalesce(1)
+  }
+
+  private def showRangeReport(lastRunDetail: Array[ModuleStatusReport]): Unit = {
+    val rangeReport = lastRunDetail.map(lr =>
+      (
+        lr.moduleID,
+        lr.moduleName,
+        config.fromTime(lr.moduleID).asTSString,
+        config.untilTime(lr.moduleID).asTSString,
+        config.pipelineSnapTime.asTSString
+      )
+    )
+
+    rangeReport.toSeq.toDF("moduleID", "moduleName", "fromTS", "untilTS", "snapTS")
+      .orderBy('snapTS.desc, 'moduleId)
+      .show(false)
+  }
+
+  /**
    * initialize the pipeline run
    * Identify the timestamps to use by module and set them
    * @return
    */
   private def initPipelineRun(): this.type = {
-    if (spark.catalog.databaseExists(config.databaseName) &&
+    val rangeDetail = if (spark.catalog.databaseExists(config.databaseName) &&
       spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
       val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
       val lastRunDetail = spark.table(s"${config.databaseName}.pipeline_report")
-        .filter('Status === "SUCCESS")
+        .filter('Status.isin("SUCCESS", "EMPTY"))
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter('rnk === 1 && 'rn === 1)
         .as[ModuleStatusReport]
         .collect()
       config.setLastRunDetail(lastRunDetail)
+      lastRunDetail
     } else {
       config.setIsFirstRun(true)
+      Array[ModuleStatusReport]()
     }
     config.setPipelineSnapTime()
+    if (config.debugFlag) showRangeReport(rangeDetail)
     this
   }
 
@@ -77,6 +109,26 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
       Database(config)
     }
+  }
+
+  /**
+   * Ensure all static datasets exist in the newly initialized Database. This function must be called after
+   * the database has been initialized.
+   * @return
+   */
+  private def loadStaticDatasets: this.type = {
+    if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, "instanceDetails")) {
+      val instanceDetailsDF = config.cloudProvider match {
+        case "aws" => loadLocalResource("/AWS_Instance_Details.csv")
+        case "azure" => loadLocalResource("/Azure_Instance_Details.csv")
+        case _ => throw (new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure."))
+      }
+
+      instanceDetailsDF
+        .write.format("delta")
+        .saveAsTable(s"${config.databaseName}.instanceDetails")
+    }
+    this
   }
 
   @throws(classOf[BadConfigException])
@@ -221,6 +273,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
     // Todo -- add validation to badRecordsPath
     config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
+
+    config.setMaxDays(rawParams.maxDaysToLoad)
 
     this
   }
@@ -371,10 +425,13 @@ object Initializer extends SparkSessionWrapper {
     }
 
     logger.log(Level.INFO, "Initializing Environment")
-    val database = new Initializer(config)
+    val initializer = new Initializer(config)
+    val database = initializer
       .validateAndRegisterArgs(args)
       .initPipelineRun()
       .initializeDatabase()
+
+    initializer.loadStaticDatasets
 
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)

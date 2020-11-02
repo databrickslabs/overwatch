@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import java.util.UUID
 
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
@@ -224,7 +224,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("ExecutorAliveTime", struct(
         $"TaskRunTime.startEpochMS".alias("AddedEpochMS"),
         $"TaskRunTime.startTS".alias("AddedTS"),
-        $"TaskRunTime.endEpochMS".alias("RemovedTS"),
+        $"TaskRunTime.endEpochMS".alias("RemovedEpochMS"),
         $"TaskRunTime.endTS".alias("RemovedTS"),
         $"TaskRunTime.runTimeMS".alias("uptimeMS"),
         $"TaskRunTime.runTimeS".alias("uptimeS"),
@@ -381,22 +381,28 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   // TODO -- Azure Review
   protected def userLogins()(df: DataFrame): DataFrame = {
-    df.filter(
+    val userLoginsDF = df.filter(
       'serviceName === "accounts" &&
         'actionName.isin("login", "tokenLogin", "samlLogin", "jwtLogin") &&
         $"userIdentity.email" =!= "dbadmin")
-      .select('timestamp, 'date, 'serviceName, 'actionName,
-        $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
-        $"requestParams.user_name".alias("groups_user_name"),
-        $"requestParams.userID".alias("account_admin_userID"),
-        $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
+
+    if (userLoginsDF.rdd.take(1).nonEmpty) {
+     userLoginsDF.select('timestamp, 'date, 'serviceName, 'actionName,
+       $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
+       $"requestParams.user_name".alias("groups_user_name"),
+       $"requestParams.userID".alias("account_admin_userID"),
+       $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
+    } else Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   // TODO -- Azure Review
   protected def newAccounts()(df: DataFrame): DataFrame = {
-    df.filter('serviceName === "accounts" && 'actionName.isin("add"))
-      .select('date, 'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"),
-        $"requestParams.targetUserName", 'sourceIPAddress, 'userAgent)
+    val newAccountsDF = df.filter('serviceName === "accounts" && 'actionName.isin("add"))
+    if (newAccountsDF.rdd.take(1).nonEmpty) {
+      newAccountsDF
+        .select('date, 'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"),
+          $"requestParams.targetUserName", 'sourceIPAddress, 'userAgent)
+    } else Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   private val auditBaseCols: Array[Column] = Array(

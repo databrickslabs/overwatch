@@ -30,6 +30,7 @@ class Config() {
   private var _apiEnv: ApiEnv = _
   private var _auditLogConfig: AuditLogConfig = _
   private var _badRecordsPath: String = _
+  private var _maxDays: Int = 60
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _parsedConfig: ParsedConfig = _
@@ -41,7 +42,6 @@ class Config() {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
-  // TODO - Set Global timezone to UTC
   /**
    * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
    * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
@@ -81,15 +81,16 @@ class Config() {
    * @return
    */
   private[overwatch] def createTimeDetail(tsMilli: Long): TimeTypes = {
-    val dt = new Date(tsMilli)
-    val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
+    val localDT = new Date(tsMilli).toInstant.atZone(ZoneId.systemDefault()).toLocalDateTime
+    //    val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
     TimeTypes(
       tsMilli, // asUnixTimeMilli
       tsMilli / 1000, // asUnixTimeS -- NOTE: THIS IS LOSSY
-      from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp"), // asColumnTS
-      dt, // asJavaDate
-      localDT, // asUTCDateTime
-      localDT.toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS).toEpochMilli, // asMidnightEpochMilli
+      lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
+      new Date(java.time.Instant.ofEpochMilli(tsMilli).toEpochMilli), // asLocalDateTime
+      new Date(tsMilli).toInstant.atZone(ZoneId.of("Etc/UTC")), // asUTCZonedDateTime
+      localDT, // asLocalDateTime
+      localDT.toLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant.toEpochMilli, // asMidnightEpochMilli
       tsFormat.format(new Date(tsMilli)), // asTSString
       dtFormat.format(new Date(tsMilli)) // asDTString
     )
@@ -102,12 +103,28 @@ class Config() {
    */
 
   /**
-   * Getter for Pipeline Sanp Time
+   * Getter for Pipeline Snap Time
    * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
    * @return
    */
   def pipelineSnapTime: TimeTypes = {
     createTimeDetail(_pipelineSnapTime)
+  }
+
+  /**
+   * Defines the latest timestamp to be used for a give module as a TimeType
+   * @param moduleID moduleID for which to get the until Time
+   * @return
+   */
+  def untilTime(moduleID: Int): TimeTypes = {
+    val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(maxDays)
+      .atZone(ZoneId.systemDefault()).toInstant.toEpochMilli
+    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
+    if (startSecondPlusMaxDays < defaultUntilSecond) {
+      createTimeDetail(startSecondPlusMaxDays)
+    } else {
+      createTimeDetail(defaultUntilSecond)
+    }
   }
 
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
@@ -125,6 +142,8 @@ class Config() {
   private[overwatch] def cloudProvider: String = _cloudProvider
 
   private[overwatch] def initialShuffleParts: Int = _intialShuffleParts
+
+  private[overwatch] def maxDays: Int = _maxDays
 
   private[overwatch] def databaseName: String = _databaseName
 
@@ -238,6 +257,11 @@ class Config() {
     this
   }
 
+  private[overwatch] def setMaxDays(value: Int): this.type = {
+    _maxDays = value
+    this
+  }
+
   private[overwatch] def setOverwatchScope(value: Seq[OverwatchScope.Value]): this.type = {
     _overwatchScope = value
     this
@@ -253,7 +277,9 @@ class Config() {
     this
   }
 
-  private[overwatch] def setLastRunDetail(value: Array[ModuleStatusReport]): this.type = {
+  //TODO -- switch back to private -- public for testing only
+  //private[overwatch]
+  def setLastRunDetail(value: Array[ModuleStatusReport]): this.type = {
     // Todo -- Add assertion --> number of rows <= number of modules or something to that effect
     _lastRunDetail = value
     this
@@ -390,7 +416,7 @@ class Config() {
     //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
 
     // AWS TEST
-    _cloudProvider = "aws"
+    _cloudProvider = "azure"
     //    _auditLogConfig = AuditLogConfig(Some("/mnt/tomesdata/logs/field_training_audit/"), None)
 
     // AZURE TEST
@@ -409,7 +435,7 @@ class Config() {
 
     // FROM RAW PARAMS TEST
     """
-      |{"auditLogConfig":{"rawAuditPath":"/mnt/nu-databricks-audit"},"tokenSecret":{"scope":"databricks_tmp","key":"overwatch"},"dataTarget":{"databaseName":"overwatch_test4","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_test4.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords_overwatch_test","overwatchScope":["audit","clusters","sparkEvents"],"migrateProcessedEventLogs":false}
+      |{"auditLogConfig":{"azureAuditLogEventhubConfig":{"connectionString":"Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ=","eventHubName":"overwatch","auditRawEventsPrefix":"abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state/overwatch","maxEventsPerTrigger":10000}},"tokenSecret":{"scope":"overwatch_test","key":"overwatch_temp"},"dataTarget":{"databaseName":"overwatch_schematest","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_schematest.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["audit","accounts","sparkEvents","jobs","clusters","clusterEvents","notebooks"],"maxDaysToLoad":60}
       |""".stripMargin
 
   }
