@@ -417,7 +417,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private def appendNewFilesToTracker(database: Database,
                                       newFiles: Array[String],
                                       trackerTarget: PipelineTable): Unit = {
-    database.write(newFiles.toSeq.toDF("filename"), trackerTarget)
+    val fileTrackerDF = newFiles.toSeq.toDF("filename")
+        .withColumn("failed", lit(false))
+    database.write(fileTrackerDF, trackerTarget)
   }
 
   // Todo -- Put back to private
@@ -426,6 +428,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                         processedLogFiles: PipelineTable): Array[String] = {
     if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
       val alreadyProcessed = processedLogFiles.asDF.select('filename)
+        .filter(!'failed)
         .distinct
 
       if (Helpers.pathExists(badRecordsPath)) {
@@ -541,12 +544,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
 
     // GZ files -- very compressed, need to get as much parallelism as possible
-    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 8)
+    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16)
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
-
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(128))
 
     val cluster_id_gen_w = Window.partitionBy('cluster_name)
       .orderBy('timestamp)

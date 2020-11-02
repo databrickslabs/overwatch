@@ -32,7 +32,7 @@ object BatchRunner extends SparkSessionWrapper{
     }
 
 //    logger.log(Level.INFO, "Starting Bronze")
-//    Bronze(workspace).run()
+    Bronze(workspace).run()
 
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()

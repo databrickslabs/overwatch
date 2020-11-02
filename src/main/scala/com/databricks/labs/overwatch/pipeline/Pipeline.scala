@@ -102,6 +102,19 @@ class Pipeline(_workspace: Workspace, _database: Database,
   }
 
   private def failModule(module: Module, outcome: String, msg: String): ModuleStatusReport = {
+    if (module.moduleID == 1006) {
+      val eventsFileTrackerTable = BronzeTargets.processedEventLogs.tableFullName
+      val updateStmt =
+        s"""
+          |update ${eventsFileTrackerTable}
+          |set failed = true
+          |where Overwatch_RunID = '${config.runID}'
+          |""".stripMargin
+      logger.log(Level.INFO, s"Failing Files for ${config.runID}.\nSTMT: $updateStmt")
+      spark.sql(updateStmt)
+
+    }
+
     ModuleStatusReport(
       moduleID = module.moduleID,
       moduleName = module.moduleName,
@@ -224,6 +237,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         val msg = s"${module.moduleName} FAILED, Unhandled Error"
         logger.log(Level.ERROR, msg, e)
         // TODO -- handle rollback
+        // TODO -- Capture e message in failReport
         val rollbackMsg = s"ROLLBACK: Rolling back ${module.moduleName}."
         println(msg, e)
         println(rollbackMsg)

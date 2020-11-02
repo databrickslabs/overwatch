@@ -387,7 +387,7 @@ object Helpers extends SparkSessionWrapper {
    * is ensuring spark is used to serialize it meaning make sure that it's called from the lambda of a Dataset
    *
    * TODO - This function can be easily enhanced to take in String* so that multiple, unrelated wildcards can be
-   * globbed simultaneously
+   *  globbed simultaneously
    *
    * @param path wildcard path as string
    * @return list of all paths contained within the wildcard path
