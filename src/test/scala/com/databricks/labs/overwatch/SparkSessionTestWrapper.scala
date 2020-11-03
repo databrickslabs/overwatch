@@ -1,4 +1,5 @@
-package com.overwatch.labs.overwatch
+package com.databricks.labs.overwatch
+
 import org.apache.spark.sql.SparkSession
 trait SparkSessionTestWrapper {
   lazy val spark: SparkSession = {
@@ -9,5 +10,7 @@ trait SparkSessionTestWrapper {
       .config("spark.sql.shuffle.partitions", "1")
       .getOrCreate()
   }
+
+  lazy val sc = spark.sparkContext
 
 }

@@ -1,24 +1,21 @@
 package com.databricks.labs.overwatch.utils
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.core.io.JsonStringEncoder
-import java.util.{Date, UUID}
-
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.Include
-import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
-import org.apache.hadoop.conf._
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.fasterxml.jackson.core.io.JsonStringEncoder
+import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import javax.crypto
 import javax.crypto.KeyGenerator
-import javax.crypto.spec.{IvParameterSpec, PBEKeySpec}
+import javax.crypto.spec.IvParameterSpec
 import org.apache.commons.lang3.StringEscapeUtils
-import org.apache.spark.util.SerializableConfiguration
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame}
-import org.apache.spark.sql.types._
+import org.apache.hadoop.conf._
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Column, DataFrame}
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -28,10 +25,36 @@ object JsonUtils {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  case class JsonStrings(prettyString: String, compactString: String, escapedString: String, fromObj: Any)
+  case class JsonStrings(prettyString: String, compactString: String, fromObj: Any) {
+    lazy val escapedString = new String(encoder.quoteAsString(compactString))
+  }
 
-  private[overwatch] lazy val objectMapper = new ObjectMapper()
-  objectMapper.registerModule(DefaultScalaModule)
+  private def createObjectMapper(includeNulls: Boolean = false, includeEmpty: Boolean = false): ObjectMapper = {
+    val obj = new ObjectMapper()
+    obj.registerModule(DefaultScalaModule)
+    // order of sets does matter...
+    if (!includeNulls) {
+      obj.setSerializationInclusion(Include.NON_NULL)
+      obj.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false)
+    }
+    if (!includeEmpty) {
+      obj.setSerializationInclusion(Include.NON_EMPTY)
+    }
+    obj
+  }
+
+  private[overwatch] lazy val defaultObjectMapper: ObjectMapper =
+    createObjectMapper(includeNulls = true, includeEmpty = true)
+
+  // map of (includeNulls, includeEmpty) to corresponding ObjectMapper
+  // we need all combinations because we must not change configuration of already existing objects
+  private lazy val mappersMap = Map[(Boolean, Boolean), ObjectMapper](
+    (true, true) -> defaultObjectMapper,
+    (true, false) -> createObjectMapper(includeNulls = true),
+    (false, true) -> createObjectMapper(includeEmpty = true),
+    (false, false) -> createObjectMapper()
+  )
+
   private val encoder = JsonStringEncoder.getInstance
 
   /**
@@ -43,7 +66,7 @@ object JsonUtils {
   def jsonToMap(message: String): Map[String, Any] = {
     try {
       val cleanMessage = StringEscapeUtils.unescapeJson(message)
-      objectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
+      defaultObjectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
     } catch {
       case e: Throwable => {
         logger.log(Level.ERROR, s"ERROR: Could not convert json to Map. \nJSON: ${message}", e)
@@ -59,16 +82,17 @@ object JsonUtils {
    *
    * @param obj          Case Class instance to be converted to JSON
    * @param includeNulls Whether to include nulled fields in the json output
-   * @param includeEmpty Whether to include empty fields in the json output
+   * @param includeEmpty Whether to include empty fields in the json output.
+   *                     By default, setting includeEmpty to false automatically disables nulls as well
    * @return
+   *
    */
   def objToJson(obj: Any, includeNulls: Boolean = false, includeEmpty: Boolean = false): JsonStrings = {
-    if (!includeNulls) objectMapper.setSerializationInclusion(Include.NON_NULL)
-    if (!includeEmpty) objectMapper.setSerializationInclusion(Include.NON_EMPTY)
+    val objMapper = mappersMap.getOrElse((includeNulls, includeEmpty), defaultObjectMapper)
+
     JsonStrings(
-      objectMapper.writerWithDefaultPrettyPrinter.writeValueAsString(obj),
-      objectMapper.writeValueAsString(obj),
-      new String(encoder.quoteAsString(objectMapper.writeValueAsString(obj))),
+      objMapper.writerWithDefaultPrettyPrinter.writeValueAsString(obj),
+      objMapper.writeValueAsString(obj),
       obj
     )
   }
@@ -86,9 +110,11 @@ object JsonUtils {
 class Cipher(key: String) {
 
   private val salt = Array[Byte](16)
-  private val spec = new PBEKeySpec(key.toCharArray, salt, 1000, 128 * 8)
-  private val keyGenner = KeyGenerator.getInstance("AES")
-  keyGenner.init(128)
+  private val keyGenner = {
+    val k = KeyGenerator.getInstance("AES")
+    k.init(128)
+    k
+  }
   private val aesKey = keyGenner.generateKey()
   private val iv = new IvParameterSpec("0102030405060708".getBytes("UTF-8"))
   private val cipher = crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
@@ -198,6 +224,7 @@ object SchemaTools extends SparkSessionWrapper {
   //  As such, schema case sensitive validation needs to be enabled and a handler for whether to assume the same data
   //  and merge the data, or drop it, or quarantine it or what. This is very common in cases where a column is of
   //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
+  // TODO -- throw exception if the resulting string is empty
   /**
    * Remove special characters from the field name
    *
@@ -295,18 +322,18 @@ object SchemaTools extends SparkSessionWrapper {
    * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
    * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
    * array should be reversed before progressing through the logic
-   *
-   * @param df         Input dataframe
+   * 
+   * TODO -- change colsToMove to the Seq[String]....
+   * TODO: checks for empty list, for existence of columns, etc.
+   *  
+   * @param df Input dataframe
    * @param colsToMove Array of column names to be moved to front of schema
    * @return
    */
   def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val dropSuffix = UUID.randomUUID().toString.replace("-", "")
-    colsToMove.foldLeft(df) {
-      case (df, c) =>
-        val tempColName = s"${c}_${dropSuffix}"
-        df.selectExpr(s"$c as $tempColName", "*").drop(c).withColumnRenamed(tempColName, c)
-    }
+    val allNames = df.schema.names
+    val newColumns = (colsToMove ++ (allNames.diff(colsToMove))).map(col)
+    df.select(newColumns: _*)
   }
 
 }
@@ -325,6 +352,8 @@ object Helpers extends SparkSessionWrapper {
    * Getter for parallelism between 8 and driver cores
    *
    * @return
+   *
+   * TODO: rename to defaultParallelism
    */
   private def parallelism: Int = {
     Math.min(driverCores, 8)
@@ -433,6 +462,8 @@ object Helpers extends SparkSessionWrapper {
    * @param db
    * @return
    */
+  // TODO: switch to the "SHOW TABLES" instead - it's much faster
+  // TODO: also, should be a flag showing if we should omit temporary tables, etc.
   def getTables(db: String): Array[String] = {
     try {
       spark.sessionState.catalog.listTables(db).toDF.select(col("name")).as[String].collect()
