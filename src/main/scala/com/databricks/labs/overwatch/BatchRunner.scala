@@ -1,31 +1,40 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.utils.GlobalStructures._
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.module.SimpleModule
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils0
+import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Silver}
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import org.apache.log4j.{Level, Logger}
 
-object BatchRunner {
+object BatchRunner extends SparkSessionWrapper{
+
+  private val logger: Logger = Logger.getLogger(this.getClass)
+
+  private def setGlobalDeltaOverrides(): Unit = {
+    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
+  }
 
   def main(args: Array[String]): Unit = {
-    val paramModule: SimpleModule = new SimpleModule()
-      .addDeserializer(classOf[OverwatchParams], new ParamDeserializer)
-    val mapper: ObjectMapper with ScalaObjectMapper = (new ObjectMapper() with ScalaObjectMapper)
-      .registerModule(DefaultScalaModule)
-      .registerModule(paramModule)
-      .asInstanceOf[ObjectMapper with ScalaObjectMapper]
+    envInit()
+    setGlobalDeltaOverrides()
 
-    val myParams = mapper.readValue[OverwatchParams](args(0))
+//    JARS for databricks remote
+//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2.jar")
+//    spark.sql("drop database if exists overwatch_local cascade")
 
-    val workspace = Workspace(myParams)
-    val jobsDF = workspace.getJobs
-    jobsDF.show()
+    val workspace = if (args.length != 0) {
+      Initializer(args)
+    } else {
+      Initializer(Array())
+    }
 
+    logger.log(Level.INFO, "Starting Bronze")
+    Bronze(workspace).run()
+
+    logger.log(Level.INFO, "Starting Silver")
+    Silver(workspace).run()
 
 
   }
 
+
 }
+

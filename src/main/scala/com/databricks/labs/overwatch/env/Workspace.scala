@@ -1,79 +1,128 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.backend.common.rpc.CommandContext
-import com.databricks.labs.overwatch.utils.GlobalStructures._
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.DBWrapper
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{AnalysisException, DataFrame}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.StructType
 
-class Workspace(
-                 ctx: CommandContext,
-                 url: String,
-                 token: String
-               ) extends SparkSessionWrapper {
+import scala.io.Source
 
-  import spark.implicits._
-  val dbWrapper: DBWrapper = new DBWrapper
+/**
+ * The Workspace class gets instantiated once per run per Databricks workspace. THe need for this class evolved
+ * over time and is being restructured as part of an outstanding refactor branch which is likely not to be completed
+ * until after v1.0 release.
+ * @param config
+ */
+class Workspace(config: Config) extends SparkSessionWrapper {
 
-  def getJobs: DataFrame = {
-    dbWrapper
+  private val logger: Logger = Logger.getLogger(this.getClass)
+  private var _database: Database = _
+
+  private[overwatch] def database: Database = _database
+
+  private def setDatabase(value: Database): this.type = {
+    _database = value
+    this
+  }
+
+  /**
+   * Most of the jobs data comes from the audit logs but there are several edge cases that result in incomplete
+   * jobs log data in the audit logs (same true for cluster specs). As such, each time the jobs module executes
+   * a snapshot of actively defined jobs is captured and used to fill in the blanks in the silver+ layers.
+   * @return
+   */
+  def getJobsDF: DataFrame = {
 
     val jobsEndpoint = "jobs/list"
 
-    spark.read.json(Seq(dbWrapper.executeGet(jobsEndpoint)).toDS).toDF
-      .withColumn("data", explode('jobs))
-      .drop("jobs")
+    try {
+      ApiCall(jobsEndpoint, config.apiEnv)
+        .executeGet()
+        .asDF
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.ERROR, "ERROR: Failed to execute jobs/list API call.", e)
+        spark.sql("select ERROR")
+      }
+    }
 
   }
-  def getClusters = ???
+
+  // TODO -- switch back to private overwatch after dev complete
+  /**
+   * Exposed config as a public getter to enable access to config for testing. This should not be public facing
+   * public function.
+   * @return
+   */
+  def getConfig: Config = config
+
+  def getClustersDF: DataFrame = {
+    val clustersEndpoint = "clusters/list"
+    ApiCall(clustersEndpoint, config.apiEnv)
+      .executeGet()
+      .asDF
+  }
+
+  /**
+   * For future development
+   * @param dbfsPath
+   * @return
+   */
+  def getDBFSPaths(dbfsPath: String): DataFrame = {
+    val dbfsEndpoint = "dbfs/list"
+    val queryMap = Map[String, Any](
+      "path" -> dbfsPath
+    )
+    ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap))
+      .executeGet()
+      .asDF
+  }
+
+  /**
+   * Placeholder for future dev
+   * @return
+   */
+  def getPoolsDF: DataFrame = {
+    val poolsEndpoint = "instance-pools/list"
+    ApiCall(poolsEndpoint, config.apiEnv)
+      .executeGet()
+      .asDF
+  }
+
+  /**
+   * Placeholder for future dev
+   * @return
+   */
+  def getProfilesDF: DataFrame = {
+    val profilesEndpoint = "instance-profiles/list"
+    ApiCall(profilesEndpoint, config.apiEnv)
+      .executeGet()
+      .asDF
+  }
+
+  /**
+   * Placeholder for future dev
+   * @return
+   */
+  def getWorkspaceUsersDF: DataFrame = {
+    val workspaceEndpoint = "workspace/list"
+    ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")))
+      .executeGet()
+      .asDF
+  }
 
 }
 
 object Workspace {
-
-  private val logger: Logger = Logger.getLogger(this.getClass)
-  private val ctx: CommandContext = dbutils.notebook.getContext()
-
-  private def initUrl: String = {
-
-    try {
-      ctx.apiUrl.get
-    } catch {
-      case e: Throwable => {
-        val e = new Exception("Cannot Acquire Databricks URL")
-        logger.log(Level.FATAL, e.getStackTrace.toString)
-        throw e
-      }
-    }
-  }
-
-  private def initToken(tokenSecret: Option[TokenSecret]): String = {
-    if (tokenSecret.nonEmpty &&
-      tokenSecret.get.key.nonEmpty &&
-      tokenSecret.get.scope.nonEmpty) {
-      try {
-        val scope = tokenSecret.get.scope.get
-        val key = tokenSecret.get.key.get
-        dbutils.secrets.get(scope, key)
-      } catch {
-        case e: Throwable => logger.log(Level.FATAL, e); "NULL"
-      }
-    } else {
-      try {
-        val token = ctx.apiToken.get
-        println("No valid scope provided, running with default credentials.")
-        token
-      } catch {
-        case e: Throwable => logger.log(Level.FATAL, e); "NULL"
-      }
-    }
-  }
-
-  def apply(params: OverwatchParams): Workspace = {
-    new Workspace(ctx, initUrl, initToken(params.tokenSecret))
+  /**
+   * Workspace companion object initializer.
+   */
+  def apply(database: Database, config: Config): Workspace = {
+    new Workspace(config).setDatabase(database)
   }
 
 }
