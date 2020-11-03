@@ -1,11 +1,19 @@
 # Overwatch
-Welcome to Overwatch. <br> <br> Master is the current RC branch.
+Welcome to Overwatch. 
+* `Master` is the current RC branch.
+* `Develop` is the developer branch, contributors please branch from here.
 
-## Docs (VPN REQUIRED)
-Living docs can be found [here](https://tomesdata.z20.web.core.windows.net/) <br> Docs development is in progress. 
+## [Docs (VPN REQUIRED)](https://tomesdata.z20.web.core.windows.net/)
+* User docs target completion is Nov 13, 2020. 
+* Developer docs target delivery is Dec 4, 2020
 
 ## CUSTOMER USAGE IS BY APPROVAL ONLY
 At the moment, customer usage is by APPROVAL ONLY. Sales & CS leadership must approve a customer. To submit your request for approval, please go [here](https://docs.google.com/forms/d/e/1FAIpQLSd7sOjSDnBV_iHbOEc-kxapwIRm_9VXQxY8oaBZg3XrtFZG1g/viewform). More details about the optimize & grow strategy can be found @ [go/optimize&grow](https://sites.google.com/databricks.com/cssalesenablement/working-with-cs/optimize-grow)
+
+## Addnlt Resources
+For additional resources please go to the following slack channels and review the pinned items.
+* #overwatch -- general high-level announcements, discussions, questions
+* #overwatch-devteam -- invite only -- if you'd like to contribute and/or are deploying at a customer, please request to be added to the devteam channel in #overwatch
 
 ## Building the Project
 [DOCS HERE](https://github.com/databrickslabs/overwatch/blob/master/Building.md)
