@@ -196,7 +196,8 @@ class Config() {
       "spark.databricks.delta.optimize.maxFileSize" ->
         value.getOrElse("spark.databricks.delta.optimize.maxFileSize", (1024 * 1024 * 128).toString),
       "spark.databricks.delta.retentionDurationCheck.enabled" ->
-        value.getOrElse("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+        value.getOrElse("spark.databricks.delta.retentionDurationCheck.enabled", "true"),
+      "spark.sql.caseSensitive" -> "false"
     )
     _initialSparkConf = value ++ manualOverrides
     this
@@ -435,7 +436,7 @@ class Config() {
 
     // FROM RAW PARAMS TEST
     """
-      |{"auditLogConfig":{"azureAuditLogEventhubConfig":{"connectionString":"Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ=","eventHubName":"overwatch","auditRawEventsPrefix":"abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state/overwatch","maxEventsPerTrigger":10000}},"tokenSecret":{"scope":"overwatch_test","key":"overwatch_temp"},"dataTarget":{"databaseName":"overwatch_schematest","databaseLocation":"dbfs:/user/hive/warehouse/overwatch_schematest.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["audit","accounts","sparkEvents","jobs","clusters","clusterEvents","notebooks"],"maxDaysToLoad":60}
+      |{"auditLogConfig":{"azureAuditLogEventhubConfig":{"connectionString":"Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ=","eventHubName":"overwatch","auditRawEventsPrefix":"abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state/overwatch","maxEventsPerTrigger":10000}},"tokenSecret":{"scope":"overwatch_test","key":"overwatch_updated"},"dataTarget":{"databaseName":"overwatch","databaseLocation":"dbfs:/user/hive/warehouse/overwatch.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["audit","clusters","clusterEvents"],"maxDaysToLoad":60}
       |""".stripMargin
 
   }

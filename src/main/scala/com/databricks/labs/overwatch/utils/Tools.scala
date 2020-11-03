@@ -176,7 +176,7 @@ object SchemaTools extends SparkSessionWrapper {
     val removeEmptyKeys = udf((m: Map[String, String]) => m.filterNot(_._2 == null))
 
     val dfFlatColumnNames = getAllColumnNames(df.schema)
-    if (dfFlatColumnNames.contains(colToConvert)) {
+    if (dfFlatColumnNames.exists(_.startsWith(colToConvert))) {
       val schema = df.select(s"${colToConvert}.*").schema
       val mapCols = collection.mutable.LinkedHashSet[Column]()
       schema.fields.foreach(field => {
@@ -356,6 +356,16 @@ object Helpers extends SparkSessionWrapper {
       lit(runTimeM).alias("runTimeM"),
       lit(runTimeH).alias("runTimeH")
     ).alias("RunTime")
+  }
+
+  /**
+   * Converts string ts column from standard spark ts string format to unix epoch millis. The input column must be a
+   * string and must be in the format of yyyy-dd-mmTHH:mm:ss.SSSz
+   * @param tsStringCol
+   * @return
+   */
+  def stringtsToUnixMillis(tsStringCol: Column): Column = {
+    (unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)
   }
 
   // TODO -- This is broken -- It looks like I may have to pass in the df.schema as well

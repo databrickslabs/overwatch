@@ -17,7 +17,7 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types.{DataType, DateType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types.{DataType, DateType, MapType, StringType, StructType, TimestampType}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
@@ -202,6 +202,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
     rawScrubbedDF
   }
 
+  protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
+    df.withColumn("custom_tags", SchemaTools.structToMap(df, "custom_tags"))
+  }
+
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
                                isFirstRun: Boolean,
                                untilTime: LocalDateTime,
@@ -335,7 +339,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def prepClusterEventLogs(auditLogsTable: PipelineTable,
+//  protected
+  def prepClusterEventLogs(auditLogsTable: PipelineTable,
                                      start_time: TimeTypes, end_time: TimeTypes,
                                      apiEnv: ApiEnv): DataFrame = {
 
@@ -357,9 +362,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .as[String]
       .collect()
 
-    //    val clusterIDs = """1004-141700-pins91,0819-200140-sag659,0918-161814-edits4,0814-173941-merit596,0711-120453-dotes18,0318-184242-dealt751,0711-120453-dotes18,1004-141700-pins91,0917-200813-ping33,0814-173941-merit596,0724-141619-this607,0724-141618-local604,0814-173940-envy590,0814-173943-arias608,0526-075326-mower2,0804-171430-picky968,0814-173941-newts595,0804-171429-howdy966,0917-200717-guilt32,0715-193200-wipes182,0917-200813-ping33,0814-173937-gouge579,0814-173941-merit596,1112-181811-jilts898,0814-173936-ovum572,0816-165511-songs94,0228-194538-shows5,0724-141622-brief621,0804-171429-crier963,0917-200813-ping33,0917-200717-guilt32,0616-182331-runt612,0917-200813-ping33,0526-075326-mower2,0716-160437-decaf361,0715-163318-piece155,0816-165511-songs94,0814-173936-alb571,0224-185747-jest918,0814-173938-vent583,0804-171422-dirk933,0814-173934-plum562,0715-163318-piece155,0817-161910-chomp205,0317-103623-rinse751,0917-200813-ping33,0715-163318-piece155,0724-141614-corn585,0917-200813-ping33,0816-165511-songs94,0814-173932-twos552,0724-141622-brief621,0819-200140-sag659,0317-103623-rinse751,0814-173936-alb571,0814-173936-newly574,0814-173938-fogs582,0917-200717-guilt32,0724-141619-coo609,0724-141617-hill600,0804-171425-nail948,0724-141622-brief621,1004-141700-pins91,1112-181811-jilts898,0310-052403-teen785,0715-163318-piece155,0814-173934-plum562,0918-161814-edits4,0526-075326-mower2,0816-165511-songs94,0207-162257-admit3,0828-205028-loon632,0827-184015-caned397,0724-141618-sears605,0819-200138-bacon649,0724-141614-corn585,0814-173938-vent583,0814-173938-stick580,0724-141615-union592,0828-150942-swath577,0724-141620-avast612,0831-192834-trims236,0109-132912-eves7,0804-171430-picky968,0814-173932-twos552,0724-141622-dozed622,0825-130849-toss837,0711-120453-dotes18,0917-200813-ping33,0814-173943-flirt607,0828-150942-swath577,0903-222609-bawdy413,0827-172349-hoses361,0804-171430-plug969,0819-201432-weigh671,0819-200140-sag659,0724-141616-acts595,0819-200142-moire665,0814-173936-newly574,0724-141617-any599,0724-141616-acts595,0831-192836-thou242,0716-160437-decaf361,0814-173942-tutor601,0828-205028-yoked630,0804-171429-crier963,0826-204714-scow178,0804-171422-dirk933,0819-200138-bacon649,0827-184426-dried398,0724-141613-inter583,0814-173933-flap557,0317-103623-rinse751,1004-141700-pins91,0724-141615-clef591,0825-130152-keen830,0224-185747-jest918,0827-172430-zaps375,0819-200142-moire665,0814-173938-stick580,0715-163318-piece155,0814-173941-newts595,0804-171425-nail948,0814-173933-jowls558,0814-173936-ovum572,0903-222609-bawdy413,0716-134539-twain7,0804-171430-picky968,0826-204714-scow178,0724-141618-local604,0724-141614-iota586,0825-130153-admit834,0831-192835-ducts237,1004-141700-pins91,0310-052403-teen785,1004-141700-pins91,0724-141619-matzo606,0814-173932-wises553,0825-130849-toss837,0109-132912-eves7,0715-163318-piece155,0814-173939-relic586,0724-141618-loses603,0724-141619-this607,0724-141617-hill600,0828-205027-cuter626,0228-194538-shows5,0813-191921-wadi350,0814-173942-tutor601,0814-173933-tier560,0109-132912-eves7,0616-182331-runt612,0814-173937-slier575,0724-141622-dozed622,0814-173931-wen550,0804-171432-now977,0526-075326-mower2,0724-141622-dozed622,0831-192834-trims236,0904-192312-gawk638,0814-173935-swank565,0917-200717-guilt32,0825-130849-gowns841,0804-171426-oases952,0224-185747-jest918,0902-145706-divan132,0816-165511-songs94,0814-173943-arias608,0814-173940-mown589,0917-200717-guilt32,0819-201432-weigh671,0804-171426-oases952,0616-182331-runt612,0310-052403-teen785,0827-184426-dried398,0724-141618-jag602,0816-165511-songs94,0724-141618-sears605,1004-141700-pins91,0904-143329-bungs571,0904-192312-gawk638,0903-222352-hath412,0814-173937-slier575,0814-173936-ovum572,0827-184015-caned397,0804-171432-now977,0814-173943-fibs606,0814-173941-merit596,0724-141615-clef591,0724-141623-made625,0825-130152-brag831,1004-141700-pins91,0926-173736-zinc29,1004-141700-pins91,0317-103623-rinse751,0814-173940-shuck591,0819-200142-toll667,0902-113358-nubs96,0825-130152-keen830,0825-130849-net839,0902-145706-divan132,0804-171429-howdy966,1112-181811-jilts898,0715-193200-wipes182,0814-173933-jowls558,0814-173934-plum562,0819-200138-uses648,0917-200813-ping33,0814-173942-pint603,0603-180134-oven821,0828-150942-swath577,0715-193200-wipes182,0724-141618-jag602,0926-173736-zinc29,0716-160437-celli362,0724-141619-this607,0831-192835-cents240,0814-173943-fibs606""".split(",")
-
+    /**
+     * NOTE *** IMPORTANT
+     * Large batches are more efficient but can result in OOM with driver.maxResultSize. To avoid this it's
+     * important to increase the driver.maxResultSize for non-periodic runs with this module
+     * Ensure large enough driver (memory) and add this to cluster config
+     * spark.driver.maxResultSize 32g
+     */
     val batchSize = 500000D
+//    val batchSize = 50000D // DEBUG
     val tmpClusterEventsPath = "/tmp/overwatch/bronze/clusterEventsBatches"
     val clusterEventsBuffer = buildClusterEventBatches(apiEnv, batchSize, start_time.asUnixTimeMilli, end_time.asUnixTimeMilli, clusterIDs)
 
@@ -374,8 +385,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
         clusterIdsBatch, "cluster_id", Some(extraQuery))
 
       try {
-        val tdf = spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
+        val tdf = SchemaTools.scrubSchema(
+          spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
           .select(col("events.*"))
+        )
+
+        // DEBUG
+//        tdf.printSchema()
 
         val changeInventory = Map[String, Column](
           "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
@@ -472,17 +488,55 @@ trait BronzeTransforms extends SparkSessionWrapper {
     if (eventLogsDF.take(1).nonEmpty) {
       val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
       if (pathsGlob.take(1).nonEmpty) {
-        appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
+        try {
+          appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
+        } catch {
+          case e: Throwable => {
+            val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +
+              s"${pathsGlob.mkString(", ")}"
+            logger.log(Level.ERROR, appendTrackerErrorMsg, e)
+            println(appendTrackerErrorMsg, e)
+            throw e
+          }
+        }
         // TODO don't drop stage infos but rather convert it (along with the other columns with nested structs) to a json
         //  and use strctFromJson to reconstruct it later. Waiting on ES-44663
         //  may continue to drop Stage Infos as it's such a large column and it is redundant for overwatch
         val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
           "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Stage Infos")
 
-        val baseEventsDF =
-          spark.read.option("badRecordsPath", badRecordsPath)
-            .json(pathsGlob: _*)
-            .drop(dropCols: _*)
+        val baseEventsDF = try {
+            spark.read.option("badRecordsPath", badRecordsPath)
+              .json(pathsGlob: _*)
+              .drop(dropCols: _*)
+        } catch {
+          /**
+           * Event org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent has a duplicate column
+           * "timestamp" where the type is a string and the column name is "timestamp". This conflicts with the rest
+           * of the event log where the column name is "Timestamp" and its type is "Long"; thus, the catch for
+           * the aforementioned event is specifically there to resolve the timestamp issue when this event is present.
+           */
+          case e: AnalysisException if (e.getMessage().trim
+            .equalsIgnoreCase("""Found duplicate column(s) in the data schema: `timestamp`;""")) => {
+
+            val streamingQueryListenerTS = 'Timestamp.isNull && 'timestamp.isNotNull && 'Event === "org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent"
+
+            // Enable Spark to read case sensitive columns
+            spark.conf.set("spark.sql.caseSensitive", "true")
+
+            // read the df and convert the timestamp column
+            spark.read.option("badRecordsPath", badRecordsPath)
+              .json(pathsGlob: _*)
+              .drop(dropCols: _*)
+              .withColumn("Timestamp",
+                when(streamingQueryListenerTS,
+                  Helpers.stringtsToUnixMillis('timestamp)
+                ).otherwise('Timestamp))
+              .drop("timestamp")
+          } case e: Throwable => {
+            Seq("").toDF("__OVERWATCHFAILURE")
+          }
+        }
 
         // Handle custom metrics and listeners in streams
         val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
@@ -544,7 +598,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
 
     // GZ files -- very compressed, need to get as much parallelism as possible
-    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16)
+    val tempMaxPartBytes = 1024 * 1024 * 16
+    logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
+    spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")

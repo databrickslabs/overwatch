@@ -11,9 +11,6 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogStorageFormat, CatalogTable
 import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
 import org.apache.spark.sql.streaming.StreamingQueryListener._
-import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
-
-import scala.collection.mutable.ArrayBuffer
 
 class Database(config: Config) extends SparkSessionWrapper {
 
@@ -40,7 +37,7 @@ class Database(config: Config) extends SparkSessionWrapper {
 
     // Specific Rollback logic
     if (target.name == "spark_events_bronze") {
-      val eventsFileTrackerTable = target.tableFullName
+      val eventsFileTrackerTable = s"${config.databaseName}.spark_events_processedfiles"
       val updateStmt =
         s"""
            |update ${eventsFileTrackerTable}

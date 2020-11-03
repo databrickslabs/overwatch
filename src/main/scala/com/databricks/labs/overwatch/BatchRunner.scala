@@ -31,11 +31,21 @@ object BatchRunner extends SparkSessionWrapper{
       Initializer(Array())
     }
 
-//    logger.log(Level.INFO, "Starting Bronze")
+    logger.log(Level.INFO, "Starting Bronze")
     Bronze(workspace).run()
 
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
+
+//    // DEBUG
+//    val bronze = Bronze(workspace)
+//    val config = workspace.getConfig
+//    bronze.prepClusterEventLogs(
+//      bronze.BronzeTargets.auditLogsTarget,
+//      config.fromTime(1005),
+//      config.untilTime(1005),
+//      config.apiEnv
+//    )
 
 
   }

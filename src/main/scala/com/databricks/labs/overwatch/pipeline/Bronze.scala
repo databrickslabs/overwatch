@@ -33,10 +33,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     appendClustersModule
   )
 
-  // TODO -- Not implemented
   lazy private val appendPoolsProcess = EtlDefinition(
     workspace.getPoolsDF,
-    None,
+    Some(Seq(cleanseRawPoolsDF())),
     append(BronzeTargets.poolsTarget),
     Module(1003, "Bronze_Pools")
   )
@@ -70,11 +69,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
+
   private def getEventLogPathsSourceDF: DataFrame = {
     if (config.overwatchScope.contains(OverwatchScope.audit)) BronzeTargets.auditLogsTarget.asDF
     else BronzeTargets.clustersSnapshotTarget.asDF
       .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
   }
+
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
     getEventLogPathsSourceDF,
     Some(Seq(
@@ -87,7 +88,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.isFirstRun
       ),
       generateEventLogsDF(database, config.badRecordsPath, BronzeTargets.processedEventLogs) //,
-//      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget) // TODO -- Perf testing without
+      //      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget) // TODO -- Perf testing without
     )),
     append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic
     sparkEventLogsModule
@@ -108,7 +109,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       )
       database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
 
-//      Helpers.fastDrop(BronzeTargets.auditLogAzureLandRaw.tableFullName, "azure")
+      //      Helpers.fastDrop(BronzeTargets.auditLogAzureLandRaw.tableFullName, "azure")
 
       val rawProcessCompleteMsg = "Azure audit ingest process complete"
       if (config.debugFlag) println(rawProcessCompleteMsg)
@@ -117,24 +118,26 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
     appendAuditLogsProcess.process()
 
-      /** Current cluster snapshot is important because cluster spec details are only available from audit logs
-       * during create/edit events. Thus all existing clusters created/edited last before the audit logs were
-       * enabled will be missing all info. This is especially important for overwatch early stages
-       */
-      if (config.overwatchScope.contains(OverwatchScope.clusters))
-        appendClustersAPIProcess.process()
-      if (config.overwatchScope.contains(OverwatchScope.clusterEvents))
-        appendClusterEventLogsProcess.process()
-      if (config.overwatchScope.contains(OverwatchScope.jobs))
-        appendJobsProcess.process()
-      if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-        appendSparkEventLogsProcess.process()
-//        // TODO -- Temporary until refactor
-//        Helpers.fastDrop(
-//          BronzeTargets.sparkEventLogsTempTarget.tableFullName,
-//          config.cloudProvider
-//        )
-      }
+    /** Current cluster snapshot is important because cluster spec details are only available from audit logs
+     * during create/edit events. Thus all existing clusters created/edited last before the audit logs were
+     * enabled will be missing all info. This is especially important for overwatch early stages
+     */
+    if (config.overwatchScope.contains(OverwatchScope.clusters))
+      appendClustersAPIProcess.process()
+    if (config.overwatchScope.contains(OverwatchScope.clusterEvents))
+      appendClusterEventLogsProcess.process()
+    if (config.overwatchScope.contains(OverwatchScope.jobs))
+      appendJobsProcess.process()
+    if (config.overwatchScope.contains(OverwatchScope.pools))
+      appendPoolsProcess.process()
+    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
+      appendSparkEventLogsProcess.process()
+      //        // TODO -- Temporary until refactor
+      //        Helpers.fastDrop(
+      //          BronzeTargets.sparkEventLogsTempTarget.tableFullName,
+      //          config.cloudProvider
+      //        )
+    }
 
     initiatePostProcessing()
 

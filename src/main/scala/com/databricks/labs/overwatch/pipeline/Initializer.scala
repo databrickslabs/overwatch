@@ -356,9 +356,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         "also be enabled as cluster metadata is used to build these scopes.")
     }
 
-    if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters") || lcScopes.contains("jobs"))
-      && !lcScopes.contains("audit")) {
-      println(s"WARNING: JobRuns without audit will result in loss of granularity. It's recommended to configure" +
+    if (lcScopes.contains("jobs") && !lcScopes.contains("audit")) {
+      println(s"WARNING: Jobs / JobRuns without audit will result in loss of granularity. It's recommended to configure" +
         s"the audit module.")
     }
 
@@ -375,7 +374,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       case "clusterevents" => clusterEvents
       case "sparkevents" => sparkEvents
       case "notebooks" => notebooks
-      //      case "pools" => pools
+      case "pools" => pools
       case "audit" => audit
       case "accounts" => accounts
       //      case "iampassthrough" => iamPassthrough

@@ -145,7 +145,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         finalizeModule(emptyStatusReport)
         throw new NoNewDataException(s"FAILED to append: ${target.tableFullName}")
       }
-      if (df.schema.fieldNames.contains("FAILURE")) throw new UnhandledException(s"FAILED to append: ${target.tableFullName}")
+      if (df.schema.fieldNames.contains("__OVERWATCHFAILURE")) throw new UnhandledException(s"FAILED to append: ${target.tableFullName}")
       var finalDF = df
       var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
 
