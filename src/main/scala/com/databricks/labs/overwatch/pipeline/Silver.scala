@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import java.io.StringWriter
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, IncrementalFilter, Module, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
 import org.apache.spark.sql.functions._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -95,15 +95,15 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
    * Executor
    */
 
-//  lazy private val executorAddedDF: DataFrame = sparkEventsDF
-//    .filter('Event === "SparkListenerExecutorAdded")
-//    .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
-//      'filenameGroup.alias("startFilenameGroup"))
-//
-//  lazy private val executorRemovedDF: DataFrame = sparkEventsDF
-//    .filter('Event === "SparkListenerExecutorRemoved")
-//    .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
-//      'filenameGroup.alias("endFilenameGroup"))
+  //  lazy private val executorAddedDF: DataFrame = sparkEventsDF
+  //    .filter('Event === "SparkListenerExecutorAdded")
+  //    .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
+  //      'filenameGroup.alias("startFilenameGroup"))
+  //
+  //  lazy private val executorRemovedDF: DataFrame = sparkEventsDF
+  //    .filter('Event === "SparkListenerExecutorRemoved")
+  //    .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
+  //      'filenameGroup.alias("endFilenameGroup"))
 
 
   /**
@@ -259,22 +259,15 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private def processSparkEvents(): Unit = {
 
-    try {
-      //      appendJDBCSessionsProcess.process(),
-      //      appendJDBCOperationsProcess.process(),
-      appendExecutorsProcess.process()
-      //      appendApplicationsProcess.process(),
-      appendExecutionsProcess.process()
-      appendJobsProcess.process()
-      appendStagesProcess.process()
-      appendTasksProcess.process()
-      updateSparkEventsPipelineState(BronzeTargets.sparkEventLogsTarget)
-    } catch{
-      case e: Throwable => {
-        println(s"Failures detected in spark events processing. Failing and rolling back spark events Silver. $e")
-        logger.log(Level.ERROR, s"Failed Spark Events Silver", e)
-      }
-    }
+    //      appendJDBCSessionsProcess.process(),
+    //      appendJDBCOperationsProcess.process(),
+    appendExecutorsProcess.process()
+    //      appendApplicationsProcess.process(),
+    appendExecutionsProcess.process()
+    appendJobsProcess.process()
+    appendStagesProcess.process()
+    appendTasksProcess.process()
+    updateSparkEventsPipelineState(BronzeTargets.sparkEventLogsTarget)
 
   }
 
@@ -287,23 +280,50 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     val scope = config.overwatchScope
 
     if (scope.contains(OverwatchScope.accounts)) {
-      appendUserLoginsProcess.process()
-      appendNewAccountsProcess.process()
+      try {
+        appendUserLoginsProcess.process()
+        appendNewAccountsProcess.process()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: Accounts Module")
+      }
     }
 
     if (scope.contains(OverwatchScope.sparkEvents))
-      processSparkEvents()
+      try {
+        processSparkEvents()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: SparkEvents Module")
+      }
+
     if (scope.contains(OverwatchScope.clusters)) {
-      appendClusterSpecProcess.process()
-      appendClusterStatusProcess.process()
+      try {
+        appendClusterSpecProcess.process()
+        appendClusterStatusProcess.process()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: Clusters Module")
+      }
     }
+
     if (scope.contains(OverwatchScope.jobs)) {
-      appendJobStatusProcess.process()
-      appendJobRunsProcess.process()
+      try {
+        appendJobStatusProcess.process()
+        appendJobRunsProcess.process()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: Jobs Module")
+      }
     }
 
     if (scope.contains(OverwatchScope.notebooks))
-      appendNotebookSummaryProcess.process()
+      try {
+        appendNotebookSummaryProcess.process()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: Notebooks Module")
+      }
 
     initiatePostProcessing()
     true
