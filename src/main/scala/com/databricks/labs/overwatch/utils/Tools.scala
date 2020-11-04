@@ -394,7 +394,7 @@ object Helpers extends SparkSessionWrapper {
    * @return
    */
   def stringtsToUnixMillis(tsStringCol: Column): Column = {
-    (unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)
+    ((unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)).cast("long")
   }
 
   // TODO -- This is broken -- It looks like I may have to pass in the df.schema as well
