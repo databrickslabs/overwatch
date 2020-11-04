@@ -70,8 +70,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
 
+  // TODO -- Error if auditLogsTarget does not exist -- determine how to handle
   private def getEventLogPathsSourceDF: DataFrame = {
-    if (config.overwatchScope.contains(OverwatchScope.audit)) BronzeTargets.auditLogsTarget.asDF
+    if (BronzeTargets.auditLogsTarget.exists) BronzeTargets.auditLogsTarget.asDF
     else BronzeTargets.clustersSnapshotTarget.asDF
       .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
   }

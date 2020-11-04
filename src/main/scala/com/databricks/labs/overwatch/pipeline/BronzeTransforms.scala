@@ -505,6 +505,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
           "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Stage Infos")
 
+        // GZ files -- very compressed, need to get as much parallelism as possible
+        val tempMaxPartBytes = 1024 * 1024 * 16
+        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
+        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
+        
         val baseEventsDF = try {
             spark.read.option("badRecordsPath", badRecordsPath)
               .json(pathsGlob: _*)
@@ -596,11 +601,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      untilTimeEpochMillis: Long,
                                      clusterSpec: PipelineTable,
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
-
-    // GZ files -- very compressed, need to get as much parallelism as possible
-    val tempMaxPartBytes = 1024 * 1024 * 16
-    logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
-    spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
