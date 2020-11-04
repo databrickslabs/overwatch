@@ -72,18 +72,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   }
 
-  protected def restoreSparkConf(value: Map[String, String] = config.initialSparkConf) : Unit= {
-    value foreach { case (k, v) =>
-      try{
-        if (config.debugFlag && spark.conf.get(k) != v)
-          println(s"Resetting $k from ${spark.conf.get(k)} --> $v")
-        spark.conf.set(k, v)
-      } catch {
-        case e: org.apache.spark.sql.AnalysisException => if (config.debugFlag) logger.log(Level.DEBUG, s"Not Settable: $k", e)
-        case e: java.util.NoSuchElementException => if (config.debugFlag) logger.log(Level.DEBUG, s"Not Settable: $k", e)
-        case e: Throwable => logger.log(Level.WARN, s"Spark Setting, $k could not be set.", e)
-      }
-    }
+  protected def restoreSparkConf() : Unit = {
+    restoreSparkConf(config.initialSparkConf)
+  }
+
+  protected def restoreSparkConf(value: Map[String, String]) : Unit = {
+    PipelineFunctions.setSparkOverrides(spark, value, config.debugFlag)
   }
 
   private def getLastOptimized(moduleID: Int): Long = {

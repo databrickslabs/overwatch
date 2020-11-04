@@ -80,20 +80,7 @@ case class PipelineTable(
       currentSparkOverrides = currentSparkOverrides ++ updates
     }
     if (sparkOverrides.nonEmpty && updates.isEmpty) {
-      currentSparkOverrides foreach { case (k, v) =>
-        try {
-          if (config.debugFlag && spark.conf.get(k) != v)
-            println(s"Overriding $k from ${spark.conf.get(k)} --> $v")
-          spark.conf.set(k, v)
-        } catch {
-          case e: AnalysisException =>
-            logger.log(Level.WARN, s"Cannot Set Spark Param: ${k}", e)
-            if (config.debugFlag) println(s"Failed Setting $k", e)
-          case e: Throwable =>
-            if (config.debugFlag) println(s"Failed Setting $k", e)
-            logger.log(Level.WARN, s"Failed trying to set $k", e)
-        }
-      }
+      PipelineFunctions.setSparkOverrides(spark, currentSparkOverrides, config.debugFlag)
     }
   }
 
