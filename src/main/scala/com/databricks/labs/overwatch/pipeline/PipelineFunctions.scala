@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.IncrementalFilter
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions.{col, date_add, lit}
 
@@ -57,4 +57,27 @@ object PipelineFunctions {
     }
   }
 
+  def setSparkOverrides(spark: SparkSession, sparkOverrides: Map[String, String],
+                        debugFlag: Boolean = false): Unit = {
+    sparkOverrides foreach { case (k, v) =>
+      try {
+        if (debugFlag) {
+          val opt = spark.conf.getOption(k)
+          if (opt.isEmpty || opt.get != v) {
+            println(s"Overriding $k from $opt --> $v")
+          }
+        }
+        spark.conf.set(k, v)
+      } catch {
+        case e: AnalysisException =>
+          logger.log(Level.WARN, s"Cannot Set Spark Param: $k", e)
+          if (debugFlag)
+            println(s"Failed Setting $k", e)
+        case e: Throwable =>
+          if (debugFlag)
+            println(s"Failed Setting $k", e)
+          logger.log(Level.WARN, s"Failed trying to set $k", e)
+      }
+    }
+  }
 }

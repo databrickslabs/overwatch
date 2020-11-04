@@ -10,7 +10,6 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{rank, row_number}
 
@@ -25,18 +24,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   import spark.implicits._
-
-  /**
-   * Load database for cloud provider node details
-   * @param path
-   * @return
-   */
-  private def loadLocalResource(path: String): DataFrame = {
-    val fileLocation = getClass.getResourceAsStream(path)
-    val source = scala.io.Source.fromInputStream(fileLocation).mkString
-    val csvData = spark.sparkContext.parallelize(source.stripMargin.lines.toList).toDS()
-    spark.read.option("header", true).option("inferSchema",true).csv(csvData).coalesce(1)
-  }
 
   private def showRangeReport(lastRunDetail: Array[ModuleStatusReport]): Unit = {
     val rangeReport = lastRunDetail.map(lr =>
@@ -119,9 +106,12 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   private def loadStaticDatasets: this.type = {
     if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, "instanceDetails")) {
       val instanceDetailsDF = config.cloudProvider match {
-        case "aws" => loadLocalResource("/AWS_Instance_Details.csv")
-        case "azure" => loadLocalResource("/Azure_Instance_Details.csv")
-        case _ => throw (new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure."))
+        case "aws" =>
+          InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
+        case "azure" =>
+          InitializerFunctions.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
+        case _ =>
+          throw new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure.")
       }
 
       instanceDetailsDF
@@ -437,5 +427,5 @@ object Initializer extends SparkSessionWrapper {
 
     workspace
   }
-
 }
+

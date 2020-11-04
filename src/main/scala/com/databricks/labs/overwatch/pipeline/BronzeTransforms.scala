@@ -41,32 +41,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
   //  case class ClusterEventsBuffer(clusterId: String, batch: Int, extraQuery: Map[String, Long])
   case class ClusterIdsWEventCounts(clusterId: String, count: Long)
 
-  /**
-   * Converts column of seconds/milliseconds/nanoseconds to timestamp
-   *
-   * @param rawVal          : Column of Longtype
-   * @param inputResolution : String of milli, or second (nano to come)
-   * @return
-   */
-  private def toTS(rawVal: Column, inputResolution: String = "milli", outputResultType: DataType = TimestampType): Column = {
-    outputResultType match {
-      case _: TimestampType => {
-        if (inputResolution == "milli") {
-          from_unixtime(rawVal.cast("double") / 1000).cast(outputResultType)
-        } else { // Seconds for Now
-          from_unixtime(rawVal).cast(outputResultType)
-        }
-      }
-      case _: DateType => {
-        if (inputResolution == "milli") {
-          from_unixtime(rawVal.cast("double") / 1000).cast(outputResultType)
-        } else { // Seconds for Now
-          from_unixtime(rawVal).cast(outputResultType)
-        }
-      }
-    }
-  }
-
   private def structFromJson(df: DataFrame, c: String): Column = {
     require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col ${c}")
     require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
@@ -664,7 +638,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       val existingLogPrefixes = clusterSpec.asDF
         .filter('cluster_id.isNotNull)
-        .withColumn("date", toTS('timestamp, outputResultType = DateType))
+        .withColumn("date", TransformFunctions.toTS('timestamp, outputResultType = DateType))
         .filter('cluster_log_conf.isNotNull && 'actionName.isin("create", "edit"))
         .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
 

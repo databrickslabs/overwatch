@@ -4,11 +4,11 @@ import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.utils.IncrementalFilter
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
 import org.scalatest.funspec.AnyFunSpec
 
 class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
-  import spark.implicits._
 
   describe("Tests for addOneTick") {
 
@@ -77,6 +77,26 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       val expectedDF = spark.createDataFrame(Seq((15, 11))).toDF("int", "dummy")
       assertSmallDataFrameEquality(actualDF, expectedDF)
     }
-
   }
+
+  describe("Tests for setSparkOverrides") {
+
+    it("should set necessary configuration params") {
+      val overrides = Map("spark.cassandra.connection.host" -> "localhost",
+        "spark.sql.globalTempDatabase" -> "my_global"
+      )
+      PipelineFunctions.setSparkOverrides(spark, overrides)
+      assertResult("localhost") {
+        spark.conf.get("spark.cassandra.connection.host")
+      }
+      assertResult(StaticSQLConf.GLOBAL_TEMP_DATABASE.defaultValueString) {
+        spark.conf.get("spark.sql.globalTempDatabase")
+      }
+      assertThrows[java.util.NoSuchElementException](
+        spark.conf.get("unknown_key")
+      )
+
+    }
+  }
+
 }
