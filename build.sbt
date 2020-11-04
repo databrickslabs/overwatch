@@ -27,7 +27,7 @@ libraryDependencies += "com.holdenkarau" %% "spark-testing-base" % "2.4.5_0.14.0
 // enforce execution of tests during packaging - uncomment next line when we fix dependencies
 // Keys.`package` := (Compile / Keys.`package` dependsOn Test / test).value
 
-coverageEnabled := true
+//coverageEnabled := true
 //coverageMinimum := 80
 //coverageFailOnMinimum := true
 
