@@ -28,94 +28,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   object UDF {
 
-    /**
-     * Converts column of seconds/milliseconds/nanoseconds to timestamp
-     *
-     * @param rawVal          : Column of Longtype
-     * @param inputResolution : String of milli, or second (nano to come)
-     * @return
-     */
-    def toTS(rawVal: Column, inputResolution: String = "milli", outputResultType: DataType = TimestampType): Column = {
-      outputResultType match {
-        case _: TimestampType => {
-          if (inputResolution == "milli") {
-            from_unixtime(rawVal.cast("double") / 1000).cast(outputResultType)
-          } else { // Seconds for Now
-            from_unixtime(rawVal).cast(outputResultType)
-          }
-        }
-        case _: DateType => {
-          if (inputResolution == "milli") {
-            from_unixtime(rawVal.cast("double") / 1000).cast(outputResultType)
-          } else { // Seconds for Now
-            from_unixtime(rawVal).cast(outputResultType)
-          }
-        }
-      }
-    }
-
-    def subtractTime(start: Column, end: Column, inputResolution: String = "milli"): Column = {
-      val runTimeMS = end - start
-      val runTimeS = runTimeMS / 1000
-      val runTimeM = runTimeS / 60
-      val runTimeH = runTimeM / 60
-      struct(
-        start.alias("startEpochMS"),
-        toTS(start, inputResolution).alias("startTS"),
-        end.alias("endEpochMS"),
-        toTS(end, inputResolution).alias("endTS"),
-        lit(runTimeMS).alias("runTimeMS"),
-        lit(runTimeS).alias("runTimeS"),
-        lit(runTimeM).alias("runTimeM"),
-        lit(runTimeH).alias("runTimeH")
-      ).alias("RunTime")
-    }
-
-    // Does not remove null structs
-    def removeNullCols(df: DataFrame): (Array[Column], DataFrame) = {
-      val cntsDF = df.summary("count").drop("summary")
-      val nonNullCols = cntsDF
-        .collect().flatMap(r => r.getValuesMap(cntsDF.columns).filter(_._2 != "0").keys).map(col)
-      val complexTypeFields = df.schema.fields
-        .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType])
-        .map(_.name).map(col)
-      val cleanDF = df.select(nonNullCols ++ complexTypeFields: _*)
-      (nonNullCols ++ complexTypeFields, cleanDF)
-    }
-
-    private def unionWithMissingAsNull(baseDF: DataFrame, lookupDF: DataFrame): DataFrame = {
-      val baseCols = baseDF.columns
-      val lookupCols = lookupDF.columns
-      val missingBaseCols = lookupCols.diff(baseCols)
-      val missingLookupCols = baseCols.diff(lookupCols)
-      val df1Complete = missingBaseCols.foldLeft(baseDF) {
-        case (df, c) =>
-          df.withColumn(c, lit(null))
-      }
-      val df2Complete = missingLookupCols.foldLeft(lookupDF) {
-        case (df, c) =>
-          df.withColumn(c, lit(null))
-      }
-
-      df1Complete.unionByName(df2Complete)
-    }
-
-    def fillFromLookupsByTS(primaryDF: DataFrame, primaryOnlyNoNulls: String,
-                            columnsToLookup: Array[String], w: WindowSpec,
-                            lookupDF: DataFrame*): DataFrame = {
-      val finalDFWNulls = lookupDF.foldLeft(primaryDF) {
-        case (primaryDF, lookup) =>
-          unionWithMissingAsNull(primaryDF, lookup)
-      }
-
-      columnsToLookup.foldLeft((finalDFWNulls)) {
-        case (df, c) =>
-          val dt = df.schema.fields.filter(_.name == c).head.dataType
-          df.withColumn(c, coalesce(last(col(c), ignoreNulls = true).over(w), lit(0).cast(dt)))
-      }.filter(col(primaryOnlyNoNulls).isNotNull)
-
-    }
-
     def structFromJson(df: DataFrame, c: String): Column = {
       require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col ${c}")
       require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
@@ -190,14 +102,16 @@ trait SilverTransforms extends SparkSessionWrapper {
   protected def getJDBCSession(sessionStartDF: DataFrame, sessionEndDF: DataFrame): DataFrame = {
     sessionStartDF
       .join(sessionEndDF, Seq("SparkContextID", "sessionId"))
-      .withColumn("ServerSessionRunTime", UDF.subtractTime('startTime, 'finishTime))
+      .withColumn("ServerSessionRunTime",
+        TransformFunctions.subtractTime('startTime, 'finishTime))
       .drop("startTime", "finishTime")
   }
 
   protected def getJDBCOperation(operationStartDF: DataFrame, operationEndDF: DataFrame): DataFrame = {
     operationStartDF
       .join(operationEndDF, Seq("SparkContextID", "id"))
-      .withColumn("ServerOperationRunTime", UDF.subtractTime('startTime, 'closeTime))
+      .withColumn("ServerOperationRunTime",
+        TransformFunctions.subtractTime('startTime, 'closeTime))
       .drop("startTime", "finishTime")
   }
 
@@ -219,7 +133,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     val executorRemoved = simplifyExecutorRemoved(df)
 
     executorAdded.join(executorRemoved, Seq("clusterId", "SparkContextID", "ExecutorID"))
-      .withColumn("TaskRunTime", UDF.subtractTime('executorAddedTS, 'executorRemovedTS))
+      .withColumn("TaskRunTime",
+        TransformFunctions.subtractTime('executorAddedTS, 'executorRemovedTS))
       .drop("executorAddedTS", "executorRemovedTS")
       .withColumn("ExecutorAliveTime", struct(
         $"TaskRunTime.startEpochMS".alias("AddedEpochMS"),
@@ -236,7 +151,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def enhanceApplication()(df: DataFrame): DataFrame = {
     df.select('SparkContextID, 'AppID, 'AppName,
-      UDF.toTS('Timestamp).alias("AppStartTime"),
+      TransformFunctions.toTS('Timestamp).alias("AppStartTime"),
       'Pipeline_SnapTS, 'filenameGroup)
   }
 
@@ -271,7 +186,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     //TODO -- review if skew is necessary -- on all DFs
     executionsStart
       .join(executionsEnd, Seq("clusterId", "SparkContextID", "ExecutionID"))
-      .withColumn("SqlExecutionRunTime", UDF.subtractTime('SqlExecStartTime, 'SqlExecEndTime))
+      .withColumn("SqlExecutionRunTime",
+        TransformFunctions.subtractTime('SqlExecStartTime, 'SqlExecEndTime))
       .drop("SqlExecStartTime", "SqlExecEndTime")
       .withColumn("startTimestamp", $"SqlExecutionRunTime.startEpochMS")
   }
@@ -298,7 +214,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobEnd = simplifyJobEnd(df)
 
     jobStart.join(jobEnd, Seq("clusterId", "SparkContextID", "JobId"))
-      .withColumn("JobRunTime", UDF.subtractTime('SubmissionTime, 'CompletionTime))
+      .withColumn("JobRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
       .withColumn("startTimestamp", $"JobRunTime.startEpochMS")
       .withColumn("startDate", $"JobRunTime.startTS".cast("date"))
@@ -331,7 +247,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"StageStartInfo.FailureReason", $"StageEndInfo.NumberofTasks",
         $"StageStartInfo.ParentIDs", $"StageStartInfo.SubmissionTime"
       )).drop("StageEndInfo", "StageStartInfo")
-      .withColumn("StageRunTime", UDF.subtractTime('SubmissionTime, 'CompletionTime))
+      .withColumn("StageRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
       .withColumn("startTimestamp", $"StageRunTime.startEpochMS")
       .withColumn("startDate", $"StageRunTime.startTS".cast("date"))
@@ -374,7 +290,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"TaskEndInfo.Host", $"TaskEndInfo.Index", $"TaskEndInfo.Killed", $"TaskStartInfo.LaunchTime",
         $"TaskEndInfo.Locality", $"TaskEndInfo.Speculative"
       )).drop("TaskStartInfo", "TaskEndInfo")
-      .withColumn("TaskRunTime", UDF.subtractTime('LaunchTime, 'FinishTime)).drop("LaunchTime", "FinishTime")
+      .withColumn("TaskRunTime", TransformFunctions.subtractTime('LaunchTime, 'FinishTime)).drop("LaunchTime", "FinishTime")
       .withColumn("startTimestamp", $"TaskRunTime.startEpochMS")
       .withColumn("startDate", $"TaskRunTime.startTS".cast("date"))
   }
@@ -387,12 +303,13 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"userIdentity.email" =!= "dbadmin")
 
     if (userLoginsDF.rdd.take(1).nonEmpty) {
-     userLoginsDF.select('timestamp, 'date, 'serviceName, 'actionName,
-       $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
-       $"requestParams.user_name".alias("groups_user_name"),
-       $"requestParams.userID".alias("account_admin_userID"),
-       $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
-    } else Seq("No New Records").toDF("__OVERWATCHEMPTY")
+      userLoginsDF.select('timestamp, 'date, 'serviceName, 'actionName,
+        $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
+        $"requestParams.user_name".alias("groups_user_name"),
+        $"requestParams.userID".alias("account_admin_userID"),
+        $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
+    } else
+      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   // TODO -- Azure Review
@@ -402,7 +319,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       newAccountsDF
         .select('date, 'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"),
           $"requestParams.targetUserName", 'sourceIPAddress, 'userAgent)
-    } else Seq("No New Records").toDF("__OVERWATCHEMPTY")
+    } else
+      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   private val auditBaseCols: Array[Column] = Array(
@@ -515,7 +433,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter($"response.statusCode" === 200)
       .filter('actionName.like("%esult"))
       .join(creatorLookup, Seq("cluster_id"), "left")
-      .withColumn("date", UDF.toTS('timestamp, outputResultType = DateType))
+      .withColumn("date",
+        TransformFunctions.toTS('timestamp, outputResultType = DateType))
       .withColumn("tsS", ('timestamp / 1000).cast("long"))
       .withColumn("reset",
         // TODO -- confirm that deleteResult and/or resizeResult are NOT REQUIRED HERE
@@ -603,7 +522,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumnRenamed("Memory_GB", "workerMemoryGB")
       .drop("DriverNodeType")
 
-    UDF.fillFromLookupsByTS(
+    TransformFunctions.fillFromLookupsByTS(
       clusterSize, "serviceName",
       Array("driver_node_type_id", "node_type_id"), clusterBefore, nodeTypeLookups: _*)
       .withColumnRenamed("driver_node_type_id", "DriverNodeType")
@@ -633,28 +552,12 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
-  /**
-   * First shot At Silver Job Runs
-   *
-   * @param df
-   * @return
-   */
-
-  //TODO -- jobs snapshot api seems to be returning more data than audit logs, review
-  //  example = maxRetries, max_concurrent_runs, jar_task, python_task
-  //  audit also seems to be missing many job_names (if true, retrieve from snap)
-  private def getJobsBase(df: DataFrame): DataFrame = {
-    df
-      .filter('serviceName === "jobs")
-      .selectExpr("*", "requestParams.*").drop("requestParams")
-  }
-
   // TODO -- Add union lookup to jobs snapshot to fill in holes
   // TODO -- schedule is missing -- create function to check for missing columns and set them to null
   //  schema validator
   protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
 
-    val jobsBase = getJobsBase(df)
+    val jobsBase = TransformFunctions.getJobsBase(df)
 
     val jobs_statusCols: Array[Column] = Array(
       'serviceName, 'actionName, 'timestamp,
@@ -703,7 +606,7 @@ trait SilverTransforms extends SparkSessionWrapper {
                                  jobsSnapshot: PipelineTable)(df: DataFrame): DataFrame = {
     // Review new_cluster/existingCluster from runs...is it needed?
 
-    val jobsBase = getJobsBase(df)
+    val jobsBase = TransformFunctions.getJobsBase(df)
 
     val jobRunCompleteCols: Array[Column] = Array(
       'timestamp.alias("completeTimestamp"), 'jobId.alias("jobIdCompletion"), 'runId,
@@ -727,7 +630,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'run_name, 'notebook_path, when('userAgent.isNull, 'userAgentCompletion)
         .otherwise('userAgent).alias("userAgent"), 'timeout_seconds,
       when('idInJobCompletion.isNull, 'idInJob).otherwise('idInJobCompletion).alias("idInJob"),
-      UDF.subtractTime('startTimestamp, 'completeTimeStamp).alias("JobRunTime"),
+      TransformFunctions.subtractTime('startTimestamp, 'completeTimeStamp).alias("JobRunTime"),
       when('userEmail.isNull, 'userEmailCompletion).otherwise('userEmail).alias("userEmail"),
       'sessionId, 'requestId, 'response, 'sourceIPAddress, 'version
     )
@@ -777,7 +680,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     if (jobsSnapshot.exists) clusterLookups.append(existingClusterLookup2)
 
     if (clusterLookups.nonEmpty) {
-      UDF.fillFromLookupsByTS(jobRunsSilverBase, "runId", Array("existing_cluster_id"),
+      TransformFunctions.fillFromLookupsByTS(jobRunsSilverBase, "runId", Array("existing_cluster_id"),
         lastJobStatus, clusterLookups.toArray: _*)
         .withColumn("cluster_id", when('jobClusterType === "new", 'ephemeralClusterId)
           .otherwise('existing_cluster_id))
