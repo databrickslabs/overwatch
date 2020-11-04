@@ -503,7 +503,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 //        val tempMaxPartBytes = if (daysToProcess >= 3) 1024 * 1024 * 32 else 1024 * 1024 * 16
 //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
 //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
-        
+
         val baseEventsDF = try {
             spark.read.option("badRecordsPath", badRecordsPath)
               .json(pathsGlob: _*)
