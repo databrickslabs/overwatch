@@ -88,7 +88,11 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         SilverTargets.clustersSpecTarget,
         config.isFirstRun
       ),
-      generateEventLogsDF(database, config.badRecordsPath, BronzeTargets.processedEventLogs) //,
+      generateEventLogsDF(
+        database,
+        config.badRecordsPath,
+        config.daysToProcess(sparkEventLogsModule.moduleID),
+        BronzeTargets.processedEventLogs) //,
       //      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget) // TODO -- Perf testing without
     )),
     append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic

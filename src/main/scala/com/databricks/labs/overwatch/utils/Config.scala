@@ -96,6 +96,10 @@ class Config() {
     )
   }
 
+  private[overwatch] def daysToProcess(moduleId: Int): Long = {
+    ChronoUnit.DAYS.between(fromTime(moduleId).asLocalDateTime, untilTime(moduleId).asLocalDateTime)
+  }
+
   /**
    * BEGIN GETTERS
    * The next section is getters that provide access to local configuration variables. Only adding details where
