@@ -44,6 +44,15 @@ object TransformFunctions {
     }
   }
 
+  /**
+   *
+   * @param start : Column of LongType with start time in milliseconds
+   * @param end : Column of LongType with end time  in milliseconds
+   * @param inputResolution : String of milli, or second (nano to come)
+   * @return
+   *
+   * TODO: should we check for the start < end?
+   */
   def subtractTime(start: Column, end: Column, inputResolution: String = "milli"): Column = {
     val runTimeMS = end - start
     val runTimeS = runTimeMS / 1000
@@ -61,19 +70,37 @@ object TransformFunctions {
     ).alias("RunTime")
   }
 
-  // Does not remove null structs
+  /**
+   *
+   * Warning Does not remove null structs, arrays, etc.
+   *
+   * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
+   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns
+   *
+   * @param df dataframe to more data
+   * @return
+   *
+   */
   def removeNullCols(df: DataFrame): (Seq[Column], DataFrame) = {
     val cntsDF = df.summary("count").drop("summary")
-    val nonNullCols = cntsDF
-      .collect().flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys).map(col)
+    val nonNullCols = cntsDF.collect()
+      .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
+      .map(col)
     val complexTypeFields = df.schema.fields
-      .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType])
+      .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType]  || f.dataType.isInstanceOf[MapType])
       .map(_.name).map(col)
-    val cleanDF = df.select(nonNullCols ++ complexTypeFields: _*)
-    (nonNullCols ++ complexTypeFields, cleanDF)
+    val columns = nonNullCols ++ complexTypeFields
+    val cleanDF = df.select(columns: _*)
+    (columns, cleanDF)
   }
 
-  private def unionWithMissingAsNull(baseDF: DataFrame, lookupDF: DataFrame): DataFrame = {
+  /**
+   *
+   * @param baseDF
+   * @param lookupDF
+   * @return
+   */
+  def unionWithMissingAsNull(baseDF: DataFrame, lookupDF: DataFrame): DataFrame = {
     val baseCols = baseDF.columns
     val lookupCols = lookupDF.columns
     val missingBaseCols = lookupCols.diff(baseCols)
@@ -90,6 +117,15 @@ object TransformFunctions {
     df1Complete.unionByName(df2Complete)
   }
 
+  /**
+   *
+   * @param primaryDF
+   * @param primaryOnlyNoNulls
+   * @param columnsToLookup
+   * @param w
+   * @param lookupDF
+   * @return
+   */
   def fillFromLookupsByTS(primaryDF: DataFrame, primaryOnlyNoNulls: String,
                           columnsToLookup: Array[String], w: WindowSpec,
                           lookupDF: DataFrame*): DataFrame = {
