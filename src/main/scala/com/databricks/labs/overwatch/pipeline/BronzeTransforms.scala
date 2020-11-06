@@ -188,18 +188,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
-    var rawScrubbedDF = SchemaTools.scrubSchema(df)
-    // TODO -- enable for Azure
-    // Cleanup the mess of structs where users define the keys
-    rawScrubbedDF = rawScrubbedDF
-      .withColumn("custom_tags", SchemaTools.structToMap(rawScrubbedDF, "custom_tags"))
-      .withColumn("spark_conf", SchemaTools.structToMap(rawScrubbedDF, "spark_conf"))
-      .withColumn("spark_env_vars", SchemaTools.structToMap(rawScrubbedDF, "spark_env_vars"))
+    var outputDF = SchemaTools.scrubSchema(df)
 
-    if (cloudProvider == "aws") rawScrubbedDF = rawScrubbedDF
-      .withColumn("aws_attributes", SchemaTools.structToMap(rawScrubbedDF, "aws_attributes"))
+    outputDF = outputDF
+      .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
+      .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
+      .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
 
-    rawScrubbedDF
+    if (cloudProvider == "aws") outputDF = outputDF
+      .withColumn("aws_attributes", SchemaTools.structToMap(outputDF, "aws_attributes"))
+
+    outputDF
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {

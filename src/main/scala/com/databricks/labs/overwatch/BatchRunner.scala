@@ -10,6 +10,7 @@ object BatchRunner extends SparkSessionWrapper{
 
   private def setGlobalDeltaOverrides(): Unit = {
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
+    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 128)
   }
 
   def main(args: Array[String]): Unit = {

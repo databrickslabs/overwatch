@@ -142,7 +142,6 @@ class Database(config: Config) extends SparkSessionWrapper {
       val beginMsg = s"Stream to ${target.tableFullName} beginning."
       if (config.debugFlag) println(beginMsg)
       logger.log(Level.INFO, beginMsg)
-      //        finalDF = SchemaTools.scrubSchema(finalDF)
       if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, target.name)) {
         initializeStreamTarget(finalDF, target)
       }
@@ -161,7 +160,6 @@ class Database(config: Config) extends SparkSessionWrapper {
       spark.streams.removeListener(streamManager)
 
     } else {
-      finalDF = SchemaTools.scrubSchema(finalDF)
       target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
     }
     logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
