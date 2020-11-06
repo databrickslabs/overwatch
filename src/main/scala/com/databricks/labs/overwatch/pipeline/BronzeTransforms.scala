@@ -1,33 +1,25 @@
 package com.databricks.labs.overwatch.pipeline
 
 import java.io.FileNotFoundException
-import java.net.URI
-import java.time.{LocalDate, LocalDateTime, ZoneId}
-import java.util.Date
+import java.time.{LocalDate, LocalDateTime}
 
-import com.databricks.labs.overwatch.utils.{OverwatchScope, SparkSessionWrapper}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
-import org.apache.spark.sql.functions._
-
-import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.forkjoin.ForkJoinPool
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
-import com.databricks.labs.overwatch.utils._
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types.{DataType, DateType, MapType, StringType, StructType, TimestampType}
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.streaming.Trigger
+import org.apache.log4j.{Level, Logger}
+import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{DateType, StringType}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
-import scala.collection.mutable.ArrayBuffer
-import scala.util.Random
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 
 trait BronzeTransforms extends SparkSessionWrapper {
@@ -42,11 +34,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
   case class ClusterIdsWEventCounts(clusterId: String, count: Long)
 
   private def structFromJson(df: DataFrame, c: String): Column = {
-    require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col ${c}")
+    require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col $c")
     require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
     val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
     if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-      println(s"WARNING: The json schema for column ${c} was not parsed correctly, please review.")
+      println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
     }
     from_json(col(c), jsonSchema).alias(c)
   }
@@ -312,10 +304,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def prepClusterEventLogs(auditLogsTable: PipelineTable,
-                                     start_time: TimeTypes, end_time: TimeTypes,
-                                     apiEnv: ApiEnv): DataFrame = {
-
+//  protected
+  def prepClusterEventLogs(auditLogsTable: PipelineTable,
+                           start_time: TimeTypes, end_time: TimeTypes,
+                           apiEnv: ApiEnv): DataFrame = {
     val extraQuery = Map(
       "start_time" -> start_time.asUnixTimeMilli, // 1588935326000L, //
       "end_time" -> end_time.asUnixTimeMilli, //1589021726000L //
@@ -425,7 +417,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       newFiles: Array[String],
                                       trackerTarget: PipelineTable): Unit = {
     val fileTrackerDF = newFiles.toSeq.toDF("filename")
-        .withColumn("failed", lit(false))
+      .withColumn("failed", lit(false))
     database.write(fileTrackerDF, trackerTarget)
   }
 
@@ -504,9 +496,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
 //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
         val baseEventsDF = try {
-            spark.read.option("badRecordsPath", badRecordsPath)
-              .json(pathsGlob: _*)
-              .drop(dropCols: _*)
+          spark.read.option("badRecordsPath", badRecordsPath)
+            .json(pathsGlob: _*)
+            .drop(dropCols: _*)
         } catch {
           /**
            * Event org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent has a duplicate column
@@ -530,7 +522,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
               .drop(dropCols: _*)
               .withColumn("Timestamp",
                 when(streamingQueryListenerTS,
-                  Helpers.stringtsToUnixMillis('timestamp)
+                  TransformFunctions.stringTsToUnixMillis('timestamp)
                 ).otherwise('Timestamp))
               .drop("timestamp")
           } case e: Throwable => {

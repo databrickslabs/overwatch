@@ -4,7 +4,6 @@ import java.sql.{Date, Timestamp}
 import java.time.Instant
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
-import com.databricks.labs.overwatch.pipeline.TransformFunctions.toTS
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions.{col, lit, struct}
@@ -15,12 +14,13 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
   import spark.implicits._
   spark.conf.set("spark.sql.session.timeZone", "UTC")
 
-  describe("SilverTransformFunctions.fillFromLookupsByTS") {
+  describe("TransformFunctions.fillFromLookupsByTS") {
     it("should fillFromLookupsByTS") {
 
     }
   }
-  describe("SilverTransformFunctions.subtractTime") {
+
+  describe("TransformFunctions.subtractTime") {
     it("should subtractTime") {
       val schema = StructType(
         Seq(StructField("start", LongType, false),
@@ -56,7 +56,7 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
     }
 
   }
-  describe("SilverTransformFunctions.removeNullCols") {
+  describe("TransformFunctions.removeNullCols") {
     val schema = StructType(
       Seq(StructField("serviceName", StringType, true),
         StructField("abc", LongType, true),
@@ -82,7 +82,7 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
     }
   }
 
-  describe("SilverTransformFunctions.toTS") {
+  describe("TransformFunctions.toTS") {
     it("should work for TimestampType") {
       val sourceTS = 123456789L
       val sourceDF = Seq((sourceTS)).toDF("long")
@@ -116,7 +116,7 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
     }
   }
 
-  describe("SilverTransformFunctions.getJobsBase") {
+  describe("TransformFunctions.getJobsBase") {
     val schema = StructType(
       Seq(StructField("serviceName", StringType, true),
         StructField("requestParams",
@@ -145,5 +145,30 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
       assertResult(0)(df.count())
     }
 
+  }
+
+  describe("TransformFunctions.moveColumnsToFront") {
+    it("should moveColumnsToFront") {
+      assertResult(Seq("field3", "field2", "field1")){
+        val df = spark.createDataFrame(Seq((1,2,3))).toDF("field1", "field2", "field3")
+        TransformFunctions.moveColumnsToFront(df, Array("field3", "field2")).schema.names.toSeq
+      }
+    }
+  }
+
+  describe("TransformFunctions.stringTsToUnixMillis") {
+    it("should convert timestamp string to milliseconds") {
+      val df = Seq(("2020-11-06T08:10:12.123Z")).toDF("col1")
+      val expectedDF = Seq((1604650212123L)).toDF("col1")
+      val actualDF = df.withColumn("col1", TransformFunctions.stringTsToUnixMillis($"col1"))
+      assertSmallDataFrameEquality(actualDF, expectedDF, ignoreNullable = true)
+    }
+
+    it("should not convert timestamp string to milliseconds") {
+      val df = Seq(("2020-11-06T08:10:12Z")).toDF("col1")
+      val expectedDF = Seq((1L)).toDF("col1").select(lit(null).cast("long").as("col1"))
+      val actualDF = df.withColumn("col1", TransformFunctions.stringTsToUnixMillis($"col1"))
+      assertSmallDataFrameEquality(actualDF, expectedDF)
+    }
   }
 }
