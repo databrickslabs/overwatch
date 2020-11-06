@@ -323,15 +323,34 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "limit" -> 500
     )
 
-    val clusterIDs = auditLogsTable.asDF
+    val auditDFBase = auditLogsTable.asDF
       .filter(
         'date.between(start_time.asColumnTS.cast("date"), end_time.asColumnTS.cast("date")) &&
           'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
       )
+
+    val interactiveClusterIDs = auditDFBase
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
-      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .select($"requestParams.cluster_id")
       .filter('cluster_id.isNotNull)
-      .select('cluster_id)
+      .distinct
+
+    val jobsClusterIDs = auditDFBase
+      .filter('serviceName === "clusters" && 'actionName === "create")
+      .select(get_json_object($"response.result", "$.cluster_id").alias("cluster_id"))
+      .filter('cluster_id.isNotNull)
+      .distinct
+
+    val jobsInteractiveClusterIDs = auditDFBase
+      .filter('serviceName === "jobs")
+      .select($"requestParams.existing_cluster_id".alias("cluster_id"))
+      .filter('cluster_id.isNotNull)
+      .distinct
+
+    val clusterIDs = interactiveClusterIDs
+      .unionByName(jobsClusterIDs)
+      .unionByName(jobsInteractiveClusterIDs)
+      .distinct
       .as[String]
       .collect()
 
