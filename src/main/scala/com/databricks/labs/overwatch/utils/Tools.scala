@@ -423,9 +423,12 @@ object Helpers extends SparkSessionWrapper {
   // TODO: also, should be a flag showing if we should omit temporary tables, etc.
   def getTables(db: String): Array[String] = {
     try {
-      spark.sessionState.catalog.listTables(db).toDF.select(col("name")).as[String].collect()
+      // TODO: change to spark.sessionState.catalog.listTables(db).map(_.table).toArray
+      spark.sessionState.catalog.listTables(db).map(_.table).toArray
     } catch {
-      case _: Throwable => spark.catalog.listTables(db).rdd.map(row => row.name).collect()
+      case _: Throwable =>
+        // TODO: change to spark.catalog.listTables(db).select("name").as[String].collect()
+        spark.catalog.listTables(db).select("name").as[String].collect()
     }
   }
 
