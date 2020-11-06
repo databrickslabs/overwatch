@@ -1,15 +1,15 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Helpers}
+import com.databricks.labs.overwatch.utils.Helpers
 
 import scala.collection.mutable.ArrayBuffer
 
 class PostProcessor {
 
-  private val tablesInScope: ArrayBuffer[PipelineTable] = ArrayBuffer[PipelineTable]()
+  private val tablesToOptimize: ArrayBuffer[PipelineTable] = ArrayBuffer[PipelineTable]()
 
-  private[overwatch] def add(table: PipelineTable): Unit = {
-    tablesInScope.append(table)
+  private[overwatch] def markOptimize(table: PipelineTable): Unit = {
+    tablesToOptimize.append(table)
   }
 
   // Todo -- Add these optimization columns to the abstract class def of Table
@@ -22,8 +22,8 @@ class PostProcessor {
 //      "cluster_events_bronze" -> "cluster_id, timestamp".split(", ")
 //    )
     // TODO -- spark_events_bronze -- put in proper rules -- hot fix due to optimization issues
-    Helpers.parOptimize(tablesInScope.toArray.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128)
-    Helpers.parOptimize(tablesInScope.toArray.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32)
+    Helpers.parOptimize(tablesToOptimize.toArray.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128)
+    Helpers.parOptimize(tablesToOptimize.toArray.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32)
   }
 
   // TODO -- add for columns -- might not be necessary with delta

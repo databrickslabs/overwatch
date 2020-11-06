@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import java.io.{File, PrintWriter, StringWriter}
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, Helpers, Module, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpers, Module, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
@@ -70,8 +70,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
 
+  // TODO -- Error if auditLogsTarget does not exist -- determine how to handle
   private def getEventLogPathsSourceDF: DataFrame = {
-    if (config.overwatchScope.contains(OverwatchScope.audit)) BronzeTargets.auditLogsTarget.asDF
+    if (BronzeTargets.auditLogsTarget.exists) BronzeTargets.auditLogsTarget.asDF
     else BronzeTargets.clustersSnapshotTarget.asDF
       .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
   }
@@ -87,7 +88,11 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         SilverTargets.clustersSpecTarget,
         config.isFirstRun
       ),
-      generateEventLogsDF(database, config.badRecordsPath, BronzeTargets.processedEventLogs) //,
+      generateEventLogsDF(
+        database,
+        config.badRecordsPath,
+        config.daysToProcess(sparkEventLogsModule.moduleID),
+        BronzeTargets.processedEventLogs) //,
       //      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget) // TODO -- Perf testing without
     )),
     append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic
@@ -122,21 +127,54 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
      * during create/edit events. Thus all existing clusters created/edited last before the audit logs were
      * enabled will be missing all info. This is especially important for overwatch early stages
      */
-    if (config.overwatchScope.contains(OverwatchScope.clusters))
-      appendClustersAPIProcess.process()
-    if (config.overwatchScope.contains(OverwatchScope.clusterEvents))
-      appendClusterEventLogsProcess.process()
-    if (config.overwatchScope.contains(OverwatchScope.jobs))
-      appendJobsProcess.process()
-    if (config.overwatchScope.contains(OverwatchScope.pools))
-      appendPoolsProcess.process()
+    if (config.overwatchScope.contains(OverwatchScope.clusters)) {
+      try {
+        appendClustersAPIProcess.process()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: Clusters Module")
+      }
+    }
+    if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
+      try {
+        appendClusterEventLogsProcess.process()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: ClusterEvents Module")
+      }
+    }
+
+    if (config.overwatchScope.contains(OverwatchScope.jobs)) {
+      try {
+        appendJobsProcess.process()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: Jobs Module")
+      }
+    }
+
+    if (config.overwatchScope.contains(OverwatchScope.pools)) {
+      try {
+        appendPoolsProcess.process()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: Pools Module")
+      }
+    }
+
     if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-      appendSparkEventLogsProcess.process()
-      //        // TODO -- Temporary until refactor
-      //        Helpers.fastDrop(
-      //          BronzeTargets.sparkEventLogsTempTarget.tableFullName,
-      //          config.cloudProvider
-      //        )
+      try {
+        appendSparkEventLogsProcess.process()
+        //        // TODO -- Temporary until refactor
+        //        Helpers.fastDrop(
+        //          BronzeTargets.sparkEventLogsTempTarget.tableFullName,
+        //          config.cloudProvider
+        //        )
+      }
+      catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: Spark Events Module")
+      }
     }
 
     initiatePostProcessing()

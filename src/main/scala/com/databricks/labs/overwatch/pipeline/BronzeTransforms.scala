@@ -162,18 +162,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
-    var rawScrubbedDF = SchemaTools.scrubSchema(df)
-    // TODO -- enable for Azure
-    // Cleanup the mess of structs where users define the keys
-    rawScrubbedDF = rawScrubbedDF
-      .withColumn("custom_tags", SchemaTools.structToMap(rawScrubbedDF, "custom_tags"))
-      .withColumn("spark_conf", SchemaTools.structToMap(rawScrubbedDF, "spark_conf"))
-      .withColumn("spark_env_vars", SchemaTools.structToMap(rawScrubbedDF, "spark_env_vars"))
+    var outputDF = SchemaTools.scrubSchema(df)
 
-    if (cloudProvider == "aws") rawScrubbedDF = rawScrubbedDF
-      .withColumn("aws_attributes", SchemaTools.structToMap(rawScrubbedDF, "aws_attributes"))
+    outputDF = outputDF
+      .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
+      .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
+      .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
 
-    rawScrubbedDF
+    if (cloudProvider == "aws") outputDF = outputDF
+      .withColumn("aws_attributes", SchemaTools.structToMap(outputDF, "aws_attributes"))
+
+    outputDF
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
@@ -454,6 +453,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
+                          daysToProcess: Long,
                           processedLogFiles: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
 
     // Dropping 'Spark Infos' because Overwatch ETLs utilize joins to go from jobs -> stages -> tasks and thus
@@ -479,6 +479,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
           "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Stage Infos")
 
+        // GZ files -- very compressed, need to get sufficienct parallelism but too much and there can be too
+        // many tasks to serialize the returned schema from each task
+//        val tempMaxPartBytes = if (daysToProcess >= 3) 1024 * 1024 * 32 else 1024 * 1024 * 16
+//        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
+//        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
+        
         val baseEventsDF = try {
             spark.read.option("badRecordsPath", badRecordsPath)
               .json(pathsGlob: _*)
@@ -492,6 +498,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
            */
           case e: AnalysisException if (e.getMessage().trim
             .equalsIgnoreCase("""Found duplicate column(s) in the data schema: `timestamp`;""")) => {
+
+            logger.log(Level.WARN, "Found duplicate column(s) in the data schema: `timestamp`; attempting to handle")
 
             val streamingQueryListenerTS = 'Timestamp.isNull && 'timestamp.isNotNull && 'Event === "org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent"
 
@@ -508,6 +516,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                 ).otherwise('Timestamp))
               .drop("timestamp")
           } case e: Throwable => {
+            logger.log(Level.ERROR, "FAILED spark events bronze", e)
             Seq("").toDF("__OVERWATCHFAILURE")
           }
         }
@@ -570,11 +579,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      untilTimeEpochMillis: Long,
                                      clusterSpec: PipelineTable,
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
-
-    // GZ files -- very compressed, need to get as much parallelism as possible
-    val tempMaxPartBytes = 1024 * 1024 * 16
-    logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
-    spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")

@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, Helpers, Module, ModuleStatusReport, NoNewDataException, SchemaTools, SparkSessionWrapper, UnhandledException}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpers, Module, ModuleStatusReport, NoNewDataException, SchemaTools, SparkSessionWrapper, UnhandledException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
 import Schema.verifyDF
@@ -95,7 +95,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
     else false
   }
 
-  private def failModule(module: Module, outcome: String, msg: String): ModuleStatusReport = {
+  private def failModule(module: Module, target: PipelineTable, outcome: String, msg: String): ModuleStatusReport = {
 
     ModuleStatusReport(
       moduleID = module.moduleID,
@@ -186,7 +186,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       }
 
       if (needsOptimize(module.moduleID)) {
-        postProcessor.add(target)
+        postProcessor.markOptimize(target)
         lastOptimizedTS = config.untilTime(module.moduleID).asUnixTimeMilli
       }
 
@@ -234,8 +234,9 @@ class Pipeline(_workspace: Workspace, _database: Database,
             logger.log(Level.ERROR, rollbackFailedMsg, eSub)
           }
         }
-        val failedModuleReport = failModule(module, "FAILED", msg)
+        val failedModuleReport = failModule(module, target, "FAILED", msg)
         finalizeModule(failedModuleReport)
+        throw new FailedModuleException(s"MODULE FAILED: ${module.moduleID} --> ${module.moduleName}\n ${e.getMessage}")
     }
 
   }

@@ -64,22 +64,7 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("Downstream_Processed"),
       partitionBy = Array("Event", "Downstream_Processed"),
       statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
-      sparkOverrides = if (config.isFirstRun) {
-        Map(
-          "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
-          "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
-          "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
-          "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
-          "spark.hadoop.fs.s3a.multipart.size" -> "104857600"
-        )
-      } else {
-        Map(
-          "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 32).toString,
-          "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
-          "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
-          "spark.hadoop.fs.s3a.multipart.size" -> "104857600"
-        )
-      },
+      sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000"),
       autoOptimize = true // TODO -- perftest
     )
 
@@ -150,18 +135,10 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
-      partitionBy = Array("startDate", "clusterId"),
-      shuffleFactor = 1.2,
+      partitionBy = Array("startDate"),
+      shuffleFactor = 5,
       autoOptimize = true,
-      sparkOverrides = if (config.isFirstRun)
-        Map(
-          "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
-          "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
-          "spark.hadoop.fs.s3a.multipart.threshold" -> "204857600",
-          "spark.hadoop.fs.s3a.multipart.size" -> "104857600",
-          "spark.shuffle.io.serverThreads" -> "32"
-        )
-      else Map[String, String]()
+      sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "100000")
     )
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(

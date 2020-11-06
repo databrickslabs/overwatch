@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, Config, JsonUtils, NoNewDataException, SparkSessionWrapper, TokenError}
+import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, Config, JsonUtils, NoNewDataException, SchemaTools, SparkSessionWrapper, TokenError}
 import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -108,7 +108,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   def asStrings: Array[String] = results.toArray
 
   def asDF: DataFrame = {
-    try {
+    val apiDF = try {
       if (dataCol == "*") spark.read.json(Seq(results: _*).toDS)
       else spark.read.json(Seq(results: _*).toDS).select(explode(col(dataCol)).alias(dataCol))
         .select(col(s"${dataCol}.*"))
@@ -126,6 +126,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           emptyDF
         }
     }
+    SchemaTools.scrubSchema(apiDF)
   }
 
   private def dataCol: String = {
