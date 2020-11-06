@@ -160,7 +160,6 @@ class Database(config: Config) extends SparkSessionWrapper {
       spark.streams.removeListener(streamManager)
 
     } else {
-      finalDF = SchemaTools.scrubSchema(finalDF)
       target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
     }
     logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
