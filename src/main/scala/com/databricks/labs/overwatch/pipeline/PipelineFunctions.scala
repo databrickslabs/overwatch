@@ -57,6 +57,11 @@ object PipelineFunctions {
     }
   }
 
+  def isIgnorableException(e: Exception): Boolean = {
+    val message = e.getMessage()
+    message.contains("Cannot modify the value of a static config")
+  }
+
   def setSparkOverrides(spark: SparkSession, sparkOverrides: Map[String, String],
                         debugFlag: Boolean = false): Unit = {
     sparkOverrides foreach { case (k, v) =>
@@ -70,9 +75,12 @@ object PipelineFunctions {
         spark.conf.set(k, v)
       } catch {
         case e: AnalysisException =>
-          logger.log(Level.WARN, s"Cannot Set Spark Param: $k", e)
-          if (debugFlag)
-            println(s"Failed Setting $k", e)
+
+          if (!isIgnorableException(e)) {
+            logger.log(Level.WARN, s"Cannot Set Spark Param: $k", e)
+            if (debugFlag)
+              println(s"Failed Setting $k", e)
+          }
         case e: Throwable =>
           if (debugFlag)
             println(s"Failed Setting $k", e)
