@@ -181,8 +181,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
                                isFirstRun: Boolean,
-                               untilTime: LocalDateTime,
                                fromTime: LocalDateTime,
+                               untilTime: LocalDateTime,
                                auditRawLand: PipelineTable,
                                overwatchRunID: String
                               ): DataFrame = {
@@ -312,8 +312,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-//  protected
-  def prepClusterEventLogs(auditLogsTable: PipelineTable,
+  protected def prepClusterEventLogs(auditLogsTable: PipelineTable,
                                      start_time: TimeTypes, end_time: TimeTypes,
                                      apiEnv: ApiEnv): DataFrame = {
 
@@ -323,15 +322,34 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "limit" -> 500
     )
 
-    val clusterIDs = auditLogsTable.asDF
+    val auditDFBase = auditLogsTable.asDF
       .filter(
         'date.between(start_time.asColumnTS.cast("date"), end_time.asColumnTS.cast("date")) &&
           'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
       )
+
+    val interactiveClusterIDs = auditDFBase
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
-      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .select($"requestParams.cluster_id")
       .filter('cluster_id.isNotNull)
-      .select('cluster_id)
+      .distinct
+
+    val jobsClusterIDs = auditDFBase
+      .filter('serviceName === "clusters" && 'actionName === "create")
+      .select(get_json_object($"response.result", "$.cluster_id").alias("cluster_id"))
+      .filter('cluster_id.isNotNull)
+      .distinct
+
+    val jobsInteractiveClusterIDs = auditDFBase
+      .filter('serviceName === "jobs")
+      .select($"requestParams.existing_cluster_id".alias("cluster_id"))
+      .filter('cluster_id.isNotNull)
+      .distinct
+
+    val clusterIDs = interactiveClusterIDs
+      .unionByName(jobsClusterIDs)
+      .unionByName(jobsInteractiveClusterIDs)
+      .distinct
       .as[String]
       .collect()
 
@@ -484,7 +502,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 //        val tempMaxPartBytes = if (daysToProcess >= 3) 1024 * 1024 * 32 else 1024 * 1024 * 16
 //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
 //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
-        
+
         val baseEventsDF = try {
             spark.read.option("badRecordsPath", badRecordsPath)
               .json(pathsGlob: _*)
