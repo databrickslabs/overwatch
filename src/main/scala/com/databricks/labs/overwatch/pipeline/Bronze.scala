@@ -45,8 +45,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     getAuditLogsDF(
       config.auditLogConfig,
       config.isFirstRun,
-      config.untilTime(appendAuditLogsModule.moduleID).asLocalDateTime,
       config.fromTime(appendAuditLogsModule.moduleID).asLocalDateTime,
+      config.untilTime(appendAuditLogsModule.moduleID).asLocalDateTime,
       BronzeTargets.auditLogAzureLandRaw,
       config.runID
     ),

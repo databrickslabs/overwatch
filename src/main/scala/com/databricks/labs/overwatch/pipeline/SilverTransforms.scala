@@ -336,7 +336,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
 
     val clusterSummaryCols = auditBaseCols ++ Array[Column](
-      when('cluster_id.isNull, 'clusterId).otherwise('cluster_id).alias("cluster_id"),
+      when('actionName === "create", get_json_object($"response.result", "$.cluster_id"))
+        .when('actionName =!= "create" && 'cluster_id.isNull, 'clusterId)
+        .otherwise('cluster_id).alias("cluster_id"),
       when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
       'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
       'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
@@ -555,14 +557,16 @@ trait SilverTransforms extends SparkSessionWrapper {
   // TODO -- Add union lookup to jobs snapshot to fill in holes
   // TODO -- schedule is missing -- create function to check for missing columns and set them to null
   //  schema validator
+  // TODO -- Remove the window lookups from here -- this should be in gold model
   protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
 
     val jobsBase = TransformFunctions.getJobsBase(df)
 
     val jobs_statusCols: Array[Column] = Array(
       'serviceName, 'actionName, 'timestamp,
-      when('job_id.isNull, get_json_object($"response.result", "$.job_id"))
-        .otherwise('job_id).alias("jobId"), 'job_type,
+      when('actionName === "create", get_json_object($"response.result", "$.job_id"))
+        .otherwise('job_id).alias("jobId"),
+      'job_type,
       'name.alias("jobName"), 'timeout_seconds, 'schedule,
       get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
       'new_settings, 'existing_cluster_id, 'new_cluster,
@@ -571,27 +575,33 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val lastJobStatus = Window.partitionBy('jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
     val jobCluster = struct(
-      struct('existing_cluster_id.alias("existing_cluster_id")).alias("existing_cluster"),
-      struct('new_cluster.alias("new_cluster_spec")).alias("new_cluster")
+      'existing_cluster_id.alias("existing_cluster_id"),
+      'new_cluster.alias("new_cluster")
     )
 
     val jobStatusBase = jobsBase
-      .filter('actionName.isin("create", "reset", "update"))
+      .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl"))
       .select(jobs_statusCols: _*)
-      .withColumn("existing_cluster_id",
-        when('existing_cluster_id.isNull &&
-          get_json_object('new_settings, "$.existing_cluster_id").isNotNull, get_json_object('new_settings, "$.existing_cluster_id"))
-          .otherwise('existing_cluster_id))
-      .withColumn("new_cluster", when('new_cluster.isNull, get_json_object('new_settings, "$.new_cluster")).otherwise('new_cluster))
+      .withColumn("existing_cluster_id", coalesce('existing_cluster_id, get_json_object('new_settings, "$.existing_cluster_id")))
+      .withColumn("new_cluster",
+        when('actionName.isin("reset", "update"), get_json_object('new_settings, "$.new_cluster"))
+          .otherwise('new_cluster)
+      )
       .withColumn("job_type", when('job_type.isNull, last('job_type, true).over(lastJobStatus)).otherwise('job_type))
       .withColumn("schedule", when('schedule.isNull, last('schedule, true).over(lastJobStatus)).otherwise('schedule))
       .withColumn("timeout_seconds", when('timeout_seconds.isNull, last('timeout_seconds, true).over(lastJobStatus)).otherwise('timeout_seconds))
       .withColumn("notebook_path", when('notebook_path.isNull, last('notebook_path, true).over(lastJobStatus)).otherwise('notebook_path))
       .withColumn("jobName", when('jobName.isNull, last('jobName, true).over(lastJobStatus)).otherwise('jobName))
 
+    // TODO -- during gold build, new cluster needs to use modifyStruct and structToMap funcs to cleanse
+    //    val baseJobStatus = SchemaTools.scrubSchema(spark.table("overwatch.job_status_silver"))
+    //    private val changeInventory = Map[String, Column](
+    //      "new_cluster.custom_tags" -> SchemaTools.structToMap(baseJobStatus, "new_cluster.custom_tags"),
+    //      "new_cluster.spark_conf" -> SchemaTools.structToMap(baseJobStatus, "new_cluster.spark_conf"),
+    //      "new_cluster.spark_env_vars" -> SchemaTools.structToMap(baseJobStatus, "new_cluster.spark_env_vars")
+    //    )
+
     jobStatusBase
-      .withColumn("new_cluster", when('new_cluster.isNotNull,
-        UDF.structFromJson(jobStatusBase, "new_cluster")).otherwise(lit(null)))
       .withColumn("jobCluster",
         last(
           when('existing_cluster_id.isNull && 'new_cluster.isNull, lit(null))
@@ -604,7 +614,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   protected def dbJobRunsSummary(clusterSpec: PipelineTable,
                                  jobsStatus: PipelineTable,
                                  jobsSnapshot: PipelineTable)(df: DataFrame): DataFrame = {
-    // Review new_cluster/existingCluster from runs...is it needed?
+    // TODO - Review new_cluster/existingCluster from runs...is it needed?
 
     val jobsBase = TransformFunctions.getJobsBase(df)
 

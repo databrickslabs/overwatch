@@ -415,8 +415,8 @@ object Helpers extends SparkSessionWrapper {
    * @return
    */
   def pathExists(path: String): Boolean = {
-    val conf = sc.hadoopConfiguration
-    val fs = FileSystem.get(conf)
+    val conf = new Configuration()
+    val fs = new Path(path).getFileSystem(conf)
     fs.exists(new Path(path))
   }
 

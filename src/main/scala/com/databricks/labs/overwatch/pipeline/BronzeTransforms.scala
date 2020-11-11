@@ -181,8 +181,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
                                isFirstRun: Boolean,
-                               untilTime: LocalDateTime,
                                fromTime: LocalDateTime,
+                               untilTime: LocalDateTime,
                                auditRawLand: PipelineTable,
                                overwatchRunID: String
                               ): DataFrame = {
@@ -312,8 +312,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-//  protected
-  def prepClusterEventLogs(auditLogsTable: PipelineTable,
+  protected def prepClusterEventLogs(auditLogsTable: PipelineTable,
                                      start_time: TimeTypes, end_time: TimeTypes,
                                      apiEnv: ApiEnv): DataFrame = {
 

@@ -95,6 +95,24 @@ class Pipeline(_workspace: Workspace, _database: Database,
     else false
   }
 
+
+  /**
+   * Some modules should never progress through time while being empty
+   * For example, cluster events may get ahead of audit logs and be empty but that doesn't mean there are
+   * no cluster events for that time period
+   *
+   * @param moduleID
+   * @return
+   */
+  private def getVerifiedUntilTS(moduleID: Int): Long = {
+    val nonEmptyModules = Array(1005)
+    if (nonEmptyModules.contains(moduleID)) {
+      config.fromTime(moduleID).asUnixTimeMilli
+    } else {
+      config.untilTime(moduleID).asUnixTimeMilli
+    }
+  }
+
   private def failModule(module: Module, target: PipelineTable, outcome: String, msg: String): ModuleStatusReport = {
 
     ModuleStatusReport(
@@ -102,12 +120,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
       moduleName = module.moduleName,
       runStartTS = 0L,
       runEndTS = 0L,
-      fromTS = 0L,
-      untilTS = 0L,
-      dataFrequency = "",
+      fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
+      untilTS = getVerifiedUntilTS(module.moduleID),
+      dataFrequency = target.dataFrequency.toString,
       status = s"${outcome}: $msg",
       recordsAppended = 0L,
-      lastOptimizedTS = 0L,
+      lastOptimizedTS = getLastOptimized(module.moduleID),
       vacuumRetentionHours = 0,
       inputConfig = config.inputConfig,
       parsedConfig = config.parsedConfig
@@ -127,7 +145,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
           runStartTS = startTime,
           runEndTS = startTime,
           fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
-          untilTS = config.untilTime(module.moduleID).asUnixTimeMilli,
+          untilTS = getVerifiedUntilTS(module.moduleID),
           dataFrequency = target.dataFrequency.toString,
           status = "EMPTY",
           recordsAppended = 0L,
