@@ -1,14 +1,12 @@
 package com.databricks.labs.overwatch.utils
 
-import java.text.SimpleDateFormat
 import java.time.temporal.ChronoUnit
-import java.time.{LocalDate, LocalDateTime, LocalTime, ZoneId, ZoneOffset}
+import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
 import java.util.{Calendar, Date, TimeZone, UUID}
 
-import org.apache.spark.sql.{Column, Dataset}
-import org.apache.spark.sql.functions.{from_unixtime, lit}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.functions.{from_unixtime, lit}
 
 class Config() {
 
@@ -40,7 +38,6 @@ class Config() {
 
   final private val cipher = new Cipher(cipherKey)
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private val fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   /**
    * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
@@ -51,7 +48,7 @@ class Config() {
    * @return
    */
   private def primordealEpoch: Long = {
-    LocalDateTime.now(ZoneId.of("Etc/UTC")).minusDays(60).toInstant(ZoneOffset.UTC)
+    LocalDateTime.now(Config.utcZone).minusDays(60).toInstant(ZoneOffset.UTC)
       .truncatedTo(ChronoUnit.DAYS)
       .toEpochMilli
   }
@@ -67,33 +64,16 @@ class Config() {
    */
   @throws(classOf[NoSuchElementException])
   def fromTime(moduleID: Int): TimeTypes = {
-    val lastRunStatus = if (!isFirstRun) lastRunDetail.filter(_.moduleID == moduleID) else lastRunDetail
+    val lastRunStatus = if (!isFirstRun)
+      lastRunDetail.filter(_.moduleID == moduleID)
+    else
+      lastRunDetail
     require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
-    val fromTime = if (lastRunStatus.length != 1) primordealEpoch else lastRunStatus.head.untilTS
-    createTimeDetail(fromTime)
-  }
-
-  /**
-   * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
-   * of time. The sheer number of sources and heterogeneous time rules makes time management very challenging,
-   * the idea here is to get it right once and just get the time type necessary.
-   * @param tsMilli Unix epoch as a Long in milliseconds
-   * @return
-   */
-  private[overwatch] def createTimeDetail(tsMilli: Long): TimeTypes = {
-    val localDT = new Date(tsMilli).toInstant.atZone(ZoneId.systemDefault()).toLocalDateTime
-    //    val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
-    TimeTypes(
-      tsMilli, // asUnixTimeMilli
-      tsMilli / 1000, // asUnixTimeS -- NOTE: THIS IS LOSSY
-      lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
-      new Date(java.time.Instant.ofEpochMilli(tsMilli).toEpochMilli), // asLocalDateTime
-      new Date(tsMilli).toInstant.atZone(ZoneId.of("Etc/UTC")), // asUTCZonedDateTime
-      localDT, // asLocalDateTime
-      localDT.toLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant.toEpochMilli, // asMidnightEpochMilli
-      tsFormat.format(new Date(tsMilli)), // asTSString
-      dtFormat.format(new Date(tsMilli)) // asDTString
-    )
+    val fromTime = if (lastRunStatus.length != 1)
+      primordealEpoch
+    else
+      lastRunStatus.head.untilTS
+    Config.createTimeDetail(fromTime)
   }
 
   private[overwatch] def daysToProcess(moduleId: Int): Long = {
@@ -112,7 +92,7 @@ class Config() {
    * @return
    */
   def pipelineSnapTime: TimeTypes = {
-    createTimeDetail(_pipelineSnapTime)
+    Config.createTimeDetail(_pipelineSnapTime)
   }
 
   /**
@@ -125,9 +105,9 @@ class Config() {
       .atZone(ZoneId.systemDefault()).toInstant.toEpochMilli
     val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
     if (startSecondPlusMaxDays < defaultUntilSecond) {
-      createTimeDetail(startSecondPlusMaxDays)
+      Config.createTimeDetail(startSecondPlusMaxDays)
     } else {
-      createTimeDetail(defaultUntilSecond)
+      Config.createTimeDetail(defaultUntilSecond)
     }
   }
 
@@ -186,10 +166,6 @@ class Config() {
   private[overwatch] def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
 
   private[overwatch] def cal: Calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-
-  private[overwatch] def tsFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-
-  private[overwatch] def dtFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
     val manualOverrides = Map(
@@ -444,6 +420,30 @@ class Config() {
       |""".stripMargin
 
   }
+}
 
+object Config {
+  val utcZone: ZoneId = ZoneId.of("Etc/UTC")
 
+  /**
+   * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
+   * of time. The sheer number of sources and heterogeneous time rules makes time management very challenging,
+   * the idea here is to get it right once and just get the time type necessary.
+   * @param tsMilli Unix epoch as a Long in milliseconds
+   * @return
+   */
+  def createTimeDetail(tsMilli: Long): TimeTypes = {
+    // TODO: systemDefault is the ticking mine
+    val localDT = new Date(tsMilli).toInstant.atZone(ZoneId.systemDefault()).toLocalDateTime
+    //    val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
+    val instant = Instant.ofEpochMilli(tsMilli)
+    TimeTypes(
+      tsMilli, // asUnixTimeMilli
+      lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
+      Date.from(instant), // asLocalDateTime at UTC
+      instant.atZone(utcZone), // asUTCZonedDateTime
+      localDT, // asLocalDateTime
+      localDT.toLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant.toEpochMilli // asMidnightEpochMilli
+    )
+  }
 }

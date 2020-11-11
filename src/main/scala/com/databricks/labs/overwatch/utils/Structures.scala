@@ -1,14 +1,14 @@
 package com.databricks.labs.overwatch.utils
 
+import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.catalyst.ScalaReflection
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.types.StructType
 
 case class DBDetail()
 
@@ -25,9 +25,19 @@ case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encr
 // Todo Add Description
 case class Module(moduleID: Int, moduleName: String)
 
-case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
-                     asUTCDateTime: ZonedDateTime, asLocalDateTime: LocalDateTime, asMidnightEpochMilli: Long,
-                     asTSString: String, asDTString: String)
+object TimeTypesConstants {
+  val tsFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+  val dtFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
+}
+
+// TODO: we need to try to get rid of the local date/time everywhere...
+case class TimeTypes(asUnixTimeMilli: Long, asColumnTS: Column, asJavaDate: Date,
+                     asUTCDateTime: ZonedDateTime, asLocalDateTime: LocalDateTime, asMidnightEpochMilli: Long) {
+
+  lazy val asUnixTimeS: Long = asUnixTimeMilli / 1000
+  lazy val asTSString: String = TimeTypesConstants.tsFormat.format(asJavaDate)
+  lazy val asDTString: String = TimeTypesConstants.dtFormat.format(asJavaDate)
+}
 
 case class AzureAuditLogEventhubConfig(
                                         connectionString: String,

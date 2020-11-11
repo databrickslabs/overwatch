@@ -145,6 +145,16 @@ class Cipher(key: String) {
 object SchemaTools extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  def flattenSchema(df: DataFrame): Array[Column] = {
+    flattenSchema(df.schema)
+  }
+
+  /**
+   *
+   * @param schema
+   * @param prefix
+   * @return
+   */
   def flattenSchema(schema: StructType, prefix: String = null): Array[Column] = {
     schema.fields.flatMap(f => {
       val columnName = if (prefix == null) f.name else (prefix + "." + f.name)
@@ -156,6 +166,14 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+  /**
+   *
+   * TODO: should it handle things like Array/Map(Struct) ?
+   *
+   * @param schema
+   * @param prefix
+   * @return
+   */
   def getAllColumnNames(schema: StructType, prefix: String = null): Array[String] = {
     schema.fields.flatMap(f => {
       val columnName = if (prefix == null) f.name else (prefix + "." + f.name)
@@ -168,16 +186,16 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   def modifyStruct(structToModify: StructType, changeInventory: Map[String, Column], prefix: String = null): Array[Column] = {
-      structToModify.fields.map(f => {
-        val fullFieldName = if (prefix == null) f.name else (prefix + "." + f.name)
+    structToModify.fields.map(f => {
+      val fullFieldName = if (prefix == null) f.name else (prefix + "." + f.name)
 
-        f.dataType match {
-          case c: StructType => {
-            changeInventory.getOrElse(fullFieldName, struct(modifyStruct(c, changeInventory, prefix = fullFieldName): _*)).alias(f.name)
-          }
-          case _ => changeInventory.getOrElse(fullFieldName, col(fullFieldName)).alias(f.name)
+      f.dataType match {
+        case c: StructType => {
+          changeInventory.getOrElse(fullFieldName, struct(modifyStruct(c, changeInventory, prefix = fullFieldName): _*)).alias(f.name)
         }
-      })
+        case _ => changeInventory.getOrElse(fullFieldName, col(fullFieldName)).alias(f.name)
+      }
+    })
   }
 
 //  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
@@ -312,30 +330,6 @@ object SchemaTools extends SparkSessionWrapper {
   def scrubSchema(df: DataFrame): DataFrame = {
     spark.createDataFrame(df.rdd, SchemaTools.sanitizeSchema(df.schema).asInstanceOf[StructType])
   }
-
-  /**
-   * Delta, by default, calculates statistics on the first 32 columns and there's no way to specify which columns
-   * on which to calc stats. Delta can be configured to calc stats on less than 32 columns but it still starts
-   * from left to right moving to the nth position as configured. This simplifies the migration of columns to the
-   * front of the dataframe to allow them to be "indexed" in front of others.
-   *
-   * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
-   * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
-   * array should be reversed before progressing through the logic
-   * 
-   * TODO -- change colsToMove to the Seq[String]....
-   * TODO: checks for empty list, for existence of columns, etc.
-   *  
-   * @param df Input dataframe
-   * @param colsToMove Array of column names to be moved to front of schema
-   * @return
-   */
-  def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val allNames = df.schema.names
-    val newColumns = (colsToMove ++ (allNames.diff(colsToMove))).map(col)
-    df.select(newColumns: _*)
-  }
-
 }
 
 /**
@@ -359,43 +353,6 @@ object Helpers extends SparkSessionWrapper {
     Math.min(driverCores, 8)
   }
 
-
-  /**
-   * Generates a complex time struct to simplify time conversions.
-   * TODO - Currently ony supports input as a unix epoch time in milliseconds, check for column input type
-   * and support non millis (Long / Int / Double / etc.)
-   * This function should also support input column types of timestamp and date as well for robustness
-   *
-   * @param start LongType input as a column
-   * @param end   TimestampType input as a column
-   * @return
-   */
-  def SubtractTime(start: Column, end: Column): Column = {
-    val runTimeMS = end - start
-    val runTimeS = runTimeMS / 1000
-    val runTimeM = runTimeS / 60
-    val runTimeH = runTimeM / 60
-    struct(
-      start.alias("startEpochMS"),
-      from_unixtime(start / 1000).cast("timestamp").alias("startTS"),
-      end.alias("endEpochMS"),
-      from_unixtime(end / 1000).cast("timestamp").alias("endTS"),
-      lit(runTimeMS).alias("runTimeMS"),
-      lit(runTimeS).alias("runTimeS"),
-      lit(runTimeM).alias("runTimeM"),
-      lit(runTimeH).alias("runTimeH")
-    ).alias("RunTime")
-  }
-
-  /**
-   * Converts string ts column from standard spark ts string format to unix epoch millis. The input column must be a
-   * string and must be in the format of yyyy-dd-mmTHH:mm:ss.SSSz
-   * @param tsStringCol
-   * @return
-   */
-  def stringtsToUnixMillis(tsStringCol: Column): Column = {
-    ((unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)).cast("long")
-  }
 
   // TODO -- This is broken -- It looks like I may have to pass in the df.schema as well
   //
@@ -450,7 +407,7 @@ object Helpers extends SparkSessionWrapper {
         // TODO -- Switch to Debug
         println(s"PROOF: ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
         (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
-        untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
+          untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
       } else false
     }).map(_._1)
   }
@@ -466,9 +423,12 @@ object Helpers extends SparkSessionWrapper {
   // TODO: also, should be a flag showing if we should omit temporary tables, etc.
   def getTables(db: String): Array[String] = {
     try {
-      spark.sessionState.catalog.listTables(db).toDF.select(col("name")).as[String].collect()
+      // TODO: change to spark.sessionState.catalog.listTables(db).map(_.table).toArray
+      spark.sessionState.catalog.listTables(db).map(_.table).toArray
     } catch {
-      case _: Throwable => spark.catalog.listTables(db).rdd.map(row => row.name).collect()
+      case _: Throwable =>
+        // TODO: change to spark.catalog.listTables(db).select("name").as[String].collect()
+        spark.catalog.listTables(db).select("name").as[String].collect()
     }
   }
 
