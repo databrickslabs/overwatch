@@ -334,7 +334,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val jobsInteractiveClusterIDs = auditDFBase
       .filter('serviceName === "jobs")
-      .select($"requestParams.existing_cluster_id".alias("cluster_id"))
+      .select($"requestParams.cluster_id".alias("cluster_id"))
       .filter('cluster_id.isNotNull)
       .distinct
 
