@@ -23,12 +23,13 @@ Add the following dependencies to your cluster
 * plotly -- pretty reporting for some reports, whether or not you will need this depends on the reports you wish 
 to run
     * Default PyPi - Tested with version 4.8.2
+* (only for Azure deployment) azure-eventhubs-spark - integration with Azure EventHubs
+    * Maven Coordinate: `~com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.17`
     
 ### Environment Setup
 There are some basic environment configuration steps that need to be enabled to allow Overwatch to do its job. 
-These activities include things like 
-[enabling Audit Logs](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html), 
-setting up security (as desired), etc. The setup activities
+
+These activities include things like [enabling Audit Logs](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html) (**at least one cluster in the workspace should have audit logs enabled!**), setting up security (as desired), etc. The setup activities
 are slightly different depending on your cloud provider, currently Overwatch can operate on 
 [**aws**]({{%relref "EnvironmentSetup/AWS.md"%}}) and [**azure**]({{%relref "EnvironmentSetup/Azure.md"%}}). Please 
 reference the page that's right for you.
