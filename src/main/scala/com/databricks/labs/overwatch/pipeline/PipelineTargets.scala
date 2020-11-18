@@ -145,7 +145,7 @@ abstract class PipelineTargets(config: Config) {
       name = "jobrun_silver",
       keys = Array("startTimestamp", "runId"),
       config,
-      incrementalColumns = Array("startTimestamp"),
+      incrementalColumns = Array("jobRunTime.startEpochMS"),
       zOrderBy = Array("runId", "jobId")
     )
 

@@ -554,13 +554,28 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
+  /**
+   * First shot At Silver Job Runs
+   *
+   * @param df
+   * @return
+   */
+
+  //TODO -- jobs snapshot api seems to be returning more data than audit logs, review
+  //  example = maxRetries, max_concurrent_runs, jar_task, python_task
+  //  audit also seems to be missing many job_names (if true, retrieve from snap)
+  private def getJobsBase(df: DataFrame): DataFrame = {
+    df.filter(col("serviceName") === "jobs")
+      .selectExpr("*", "requestParams.*").drop("requestParams")
+  }
+
   // TODO -- Add union lookup to jobs snapshot to fill in holes
   // TODO -- schedule is missing -- create function to check for missing columns and set them to null
   //  schema validator
   // TODO -- Remove the window lookups from here -- this should be in gold model
   protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
 
-    val jobsBase = TransformFunctions.getJobsBase(df)
+    val jobsBase = getJobsBase(df)
 
     val jobs_statusCols: Array[Column] = Array(
       'serviceName, 'actionName, 'timestamp,
@@ -611,97 +626,250 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
   }
 
-  protected def dbJobRunsSummary(clusterSpec: PipelineTable,
+  /**
+   * The lifecycle of a job as seen from the audit logs and its actions are "runStart" which begins the run process.
+   * Depending on how the run was launched, a log will be generated with either the "runNow" or the "submitRun" action.
+   * The following log actionName for the run will either be "cancelled", "runSucceeded", or "runFailed". A typical
+   * job run will generate several log entries and each of the fields (even when they have the same name) have
+   * differing meanings depending ont he context of the "actionName".
+   * Furthermore, depending on the actionName, the runID will be found in one of the following columns, "run_id",
+   * "runId", or in the "response.result.run_id" fields.
+   *
+   * To build the logs, the incremental audit logs are reviewed for jobs COMPLETED and CANCELLED in the time scope
+   * of this overwatch run. If completed during this run then the entire audit log jobs service is searched for
+   * the start of that run
+   *
+   * @param completeAuditTable
+   * @param clusterSpec
+   * @param jobsStatus
+   * @param jobsSnapshot
+   * @param df
+   * @return
+   */
+  protected def dbJobRunsSummary(completeAuditTable: PipelineTable,
+                                 clusterSpec: PipelineTable,
+                                 clusterSnapshot: PipelineTable,
                                  jobsStatus: PipelineTable,
                                  jobsSnapshot: PipelineTable)(df: DataFrame): DataFrame = {
-    // TODO - Review new_cluster/existingCluster from runs...is it needed?
 
-    val jobsBase = TransformFunctions.getJobsBase(df)
+    // TODO -- limit the lookback period to about 7 days -- no job should run for more than 7 days except
+    //  streaming jobs. This is only needed to improve performance if needed.
+    val repartitionCount = spark.conf.get("spark.sql.shuffle.partitions").toInt * 2
+    val jobsAuditComplete = completeAuditTable.asDF
+      .filter('serviceName === "jobs")
+      .selectExpr("*", "requestParams.*").drop("requestParams")
+      .repartition(repartitionCount)
+      .cache()
+    jobsAuditComplete.count()
 
-    val jobRunCompleteCols: Array[Column] = Array(
-      'timestamp.alias("completeTimestamp"), 'jobId.alias("jobIdCompletion"), 'runId,
-      'idInJob.alias("idInJobCompletion"), 'jobClusterType, 'userAgent.alias("userAgentCompletion"),
-      'jobTerminalState, 'jobTriggerType, 'jobTaskType, $"response.errorMessage".alias("errorMessage"),
-      when($"userIdentity.email" === "unknown", lit(null)).otherwise($"userIdentity.email")
-        .alias("userEmailCompletion"))
+    val jobsAuditIncremental = getJobsBase(df)
 
-    val jobRunStartCols: Array[Column] = Array(
-      'serviceName, 'actionName, 'timestamp.alias("startTimestamp"), 'job_id, when('runId.isNull,
-        get_json_object($"response.result", "$.run_id")).otherwise('runId).alias("runId"),
-      get_json_object($"response.result", "$.number_in_job").alias("idInJob"), 'run_name,
-      $"userIdentity.email".alias("userEmail"), 'userAgent,
-      get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
-      'timeout_seconds, 'sessionId, 'requestId, 'response, 'sourceIPAddress, 'version)
+    // Identify all completed jobs in scope for this overwatch run
+    val allCompletes = jobsAuditIncremental
+      .filter('actionName.isin("runSucceeded", "runFailed"))
+      .select(
+        'runId.cast("int"),
+        'jobId.cast("int"),
+        'idInJob, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
+        'jobTriggerType, 'orgId,
+        'requestId.alias("completionRequest"),
+        'response.alias("completionResponse"),
+        'timestamp.alias("completionTime")
+      )
 
-    val jobRunsCols: Array[Column] = Array(
-      'serviceName, 'actionName,
-      when('jobIdCompletion.isNull, 'job_id).otherwise('jobIdCompletion).alias("jobId"),
-      'runId, 'jobClusterType, 'jobTerminalState, 'jobTriggerType, 'jobTaskType, 'errorMessage,
-      'run_name, 'notebook_path, when('userAgent.isNull, 'userAgentCompletion)
-        .otherwise('userAgent).alias("userAgent"), 'timeout_seconds,
-      when('idInJobCompletion.isNull, 'idInJob).otherwise('idInJobCompletion).alias("idInJob"),
-      TransformFunctions.subtractTime('startTimestamp, 'completeTimeStamp).alias("JobRunTime"),
-      when('userEmail.isNull, 'userEmailCompletion).otherwise('userEmail).alias("userEmail"),
-      'sessionId, 'requestId, 'response, 'sourceIPAddress, 'version
+    // Identify all cancelled jobs in scope for this overwatch run
+    val allCancellations = jobsAuditIncremental
+      .filter('actionName.isin("cancel"))
+      .select(
+        'run_id.cast("int").alias("runId"),
+        struct(
+          'requestId.alias("cancellationRequestId"),
+          'response.alias("cancellationResponse"),
+          'sessionId.alias("cancellationSessionId"),
+          'sourceIPAddress.alias("cancellationSourceIP"),
+          'timestamp.alias("cancellationTime"),
+          'userAgent.alias("cancelledUserAgent"),
+          'userIdentity.alias("cancelledBy")
+        ).alias("cancellationDetails")
+      )
+
+    // DF for jobs launched with actionName == "runNow"
+    val runNowStart = jobsAuditComplete
+      .filter('actionName.isin("runNow"))
+      .select(
+        get_json_object($"response.result", "$.run_id").cast("int").alias("runId"),
+        lit(null).cast("string").alias("run_name"),
+        'timestamp.alias("submissionTime"),
+        lit(null).cast("string").alias("new_cluster"),
+        lit(null).cast("string").alias("existing_cluster_id"),
+        'notebook_params, 'workflow_context,
+        struct(
+          lit(null).cast("string").alias("notebook_task"),
+          lit(null).cast("string").alias("spark_python_task"),
+          lit(null).cast("string").alias("spark_jar_task"),
+          lit(null).cast("string").alias("shell_command_task")
+        ).alias("taskDetail"),
+        lit(null).cast("string").alias("libraries"),
+        lit(null).cast("string").alias("timeout_seconds"),
+        'sourceIPAddress.alias("startSourceIP"),
+        'sessionId.alias("startSessionId"),
+        'requestId.alias("startRequestID"),
+        'response.alias("startResponse"),
+        'userAgent.alias("startUserAgent"),
+        'userIdentity.alias("startedBy")
+      )
+
+    // DF for jobs launched with actionName == "submitRun"
+    val runSubmitStart = jobsAuditComplete
+      .filter('actionName.isin("submitRun"))
+      .select(
+        get_json_object($"response.result", "$.run_id").cast("int").alias("runId"),
+        'run_name,
+        'timestamp.alias("submissionTime"),
+        'new_cluster, 'existing_cluster_id,
+        'notebook_params, 'workflow_context,
+        struct(
+          'notebook_task,
+          'spark_python_task,
+          'spark_jar_task,
+          'shell_command_task
+        ).alias("taskDetail"),
+        'libraries,
+        'timeout_seconds,
+        'sourceIPAddress.alias("startSourceIP"),
+        'sessionId.alias("startSessionId"),
+        'requestId.alias("startRequestID"),
+        'response.alias("startResponse"),
+        'userAgent.alias("startUserAgent"),
+        'userIdentity.alias("startedBy")
+      )
+
+    // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
+    val allStarts = runNowStart
+      .unionByName(runSubmitStart)
+
+    // Find the corresponding runStart action for the completed jobs
+    val jobRunBegin = jobsAuditComplete
+      .filter('actionName.isin("runStart"))
+      .select('runId, 'timestamp.alias("runBeginTime"))
+
+    // Lookup to populate the clusterID/clusterName where missing from jobs
+    lazy val clusterSpecLookup = spark.table("overwatch.audit_log_bronze") // change to cluster_spec eventually?
+      .filter('serviceName === "clusters" && 'actionName.isin("create"))
+      .select('timestamp, $"requestParams.cluster_name",
+        get_json_object($"response.result", "$.cluster_id").alias("clusterId")
+      )
+
+    // Lookup to populate the clusterID/clusterName where missing from jobs
+    lazy val clusterSnapLookup = spark.table("overwatch.clusters_snapshot_bronze")
+      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS))
+      .select('timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
+
+    // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
+    lazy val existingClusterLookup = spark.table("overwatch.job_status_silver")
+      .select('timestamp, 'jobId, 'existing_cluster_id)
+      .filter('existing_cluster_id.isNotNull)
+
+    // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
+    lazy val existingClusterLookup2 = spark.table("overwatch.jobs_snapshot_bronze")
+      .select('job_id.alias("jobId"), $"settings.existing_cluster_id",
+        'created_time.alias("timestamp"))
+      .filter('existing_cluster_id.isNotNull)
+
+    // Ensure the lookups have data -- this will be improved when the module unification occurs during the next
+    // scheduled refactor
+    val clusterLookups = Array(clusterSpecLookup, clusterSnapLookup)
+    val jobStatusClusterLookups = ArrayBuffer[DataFrame]()
+    if (jobsStatus.exists) jobStatusClusterLookups.append(existingClusterLookup)
+    if (jobsSnapshot.exists) jobStatusClusterLookups.append(existingClusterLookup2)
+
+    // Unify each run onto a single record and structure the df
+    val jobRunsBase = allCompletes
+      .join(allStarts, Seq("runId"), "left")
+      .join(allCancellations, Seq("runId"), "left")
+      .join(jobRunBegin, Seq("runId"), "left")
+      .withColumn("jobTerminalState", when('cancellationDetails.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
+      .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('runBeginTime, 'submissionTime)), array_max(array('completionTime, $"cancellationDetails.cancellationTime"))))
+      .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
+      .select(
+        'runId, 'jobId, 'idInJob, 'jobRunTime, 'run_name, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
+        'jobTriggerType, 'new_cluster,
+        'existing_cluster_id, //.alias("clusterId"),
+        'cluster_name,
+        'orgId, 'notebook_params, 'libraries,
+        'workflow_context, 'taskDetail, 'cancellationDetails, 'startedBy,
+        struct(
+          'runBeginTime,
+          'submissionTime,
+          'completionTime,
+          'timeout_seconds
+        ).alias("timeDetails"),
+        struct(
+          'completionRequest,
+          'completionResponse,
+          'startRequestID,
+          'startResponse,
+          'startSessionId,
+          'startSourceIP,
+          'startUserAgent
+        ).alias("requestDetails")
+      )
+      .withColumn("timestamp", $"jobRunTime.endEpochMS")
+
+    val clusterByIdAsOfW = Window.partitionBy('clusterId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val clusterByNameAsOfW = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val lastJobStatusW = Window.partitionBy('jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+    // If the lookups are present (likely will be unless is first run or modules are turned off somehow)
+    // use the lookups to populate the null clusterIds and cluster_names
+    val jobRunsWHistoricalClusterDetail = if (jobStatusClusterLookups.nonEmpty) {
+      val jobRunsWIDs = TransformFunctions.fillFromLookupsByTS(
+        jobRunsBase, "runId",
+        Array("existing_cluster_id"), lastJobStatusW, jobStatusClusterLookups: _*
+      )
+        .withColumnRenamed("existing_cluster_id", "clusterId")
+        .withColumn("clusterId", when('clusterId === 0, lit(null).cast("string")).otherwise('clusterId))
+
+      val jobRunsWIDsAndNames = TransformFunctions.fillFromLookupsByTS(
+        jobRunsWIDs, "runId",
+        Array("cluster_name"), clusterByIdAsOfW, clusterLookups: _*
+      )
+        .withColumn("cluster_name", when('cluster_name === 0, lit(null).cast("string")).otherwise('cluster_name))
+
+      jobRunsWIDsAndNames
+    } else jobRunsBase
+
+    val jobRunsWClusterIDs = TransformFunctions.fillFromLookupsByTS(
+      jobRunsWHistoricalClusterDetail, "runId",
+      Array("clusterId"), clusterByNameAsOfW, clusterLookups: _*
     )
 
-    val jobRunsColsFinalOrder: Array[Column] = Array(
-      'serviceName, 'actionName, 'startTimestamp, 'jobId, 'runId, 'run_name, 'cluster_id, 'notebook_path,
-      'jobClusterType, 'jobTerminalState, 'jobTriggerType, 'jobTaskType, 'errorMessage, 'userAgent, 'timeout_seconds,
-      'idInJob, 'JobRunTime, 'userEmail, 'sessionId, 'requestId, 'response, 'sourceIPAddress, 'version
+    val jobNameLookup = completeAuditTable.asDF.filter('actionName === "create")
+      .select(
+        'timestamp,
+        get_json_object($"response.result", "$.job_id").alias("jobId"),
+        'name.alias("jobName")
+      )
+
+    val jobNameLookup2 = spark.table("overwatch.jobs_snapshot_bronze")
+      .select(unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
+        'job_id.alias("jobId"),
+        $"settings.name".alias("jobName")
+      )
+
+    val jobNameLookups = Array(jobNameLookup, jobNameLookup2)
+
+    // Backfill the jobNames
+    val jobRunsFinal = TransformFunctions.fillFromLookupsByTS(
+      jobRunsWClusterIDs, "runId",
+      Array("jobName"), lastJobStatusW, jobNameLookups: _*
     )
+      .drop("timestamp") // duplicated to enable asOf Lookups
+      .repartition(256)
 
-    val lastJobStatus = Window.partitionBy('jobId).orderBy('timestamp)
-      .rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    lazy val ephemeralClusterLookup = clusterSpec.asDF
-      .filter(isAutomatedCluster).select('cluster_id.alias("ephemeralClusterId"), 'cluster_name).distinct
-    lazy val existingClusterLookup = jobsStatus.asDF
-      .select('jobId, 'existing_cluster_id, 'timestamp)
-    lazy val existingClusterLookup2 = jobsSnapshot.asDF
-      .select('job_id.alias("jobId"), $"settings.existing_cluster_id", 'created_time.alias("timestamp"))
+    jobsAuditComplete.unpersist()
 
-    val jobRunsStartDF = jobsBase
-      .filter('actionName.isin("runNow", "submitRun"))
-      .select(jobRunStartCols: _*)
-      .filter('runId.isNotNull)
-      .dropDuplicates("runId", "startTimestamp")
-
-    val jobRunsCompleteDF = jobsBase
-      .filter('actionName.isin("runSucceeded", "cancel", "runFailed"))
-      .select(jobRunCompleteCols: _*)
-      .filter('runId.isNotNull)
-      .dropDuplicates("runId", "completeTimestamp")
-
-    val jobRunsSilverBaseRaw = jobRunsStartDF
-      .join(jobRunsCompleteDF, Seq("runId"))
-      .select(jobRunsCols: _*)
-      .withColumn("cluster_name", when('jobClusterType === "new",
-        concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
-
-    val jobRunsSilverBase = if (clusterSpec.exists) {
-      jobRunsSilverBaseRaw.join(ephemeralClusterLookup, Seq("cluster_name"), "left")
-        .withColumn("timestamp", $"JobRunTime.startEpochMS")
-    } else jobRunsSilverBaseRaw
-
-    // TODO -- Handle null lookups -- rarely an issue but can be a very bad issue since parquet cannot write
-    //  empty tables if something causes 0 records to return for a lookup the pipeline fails
-    val clusterLookups = ArrayBuffer[DataFrame]()
-    if (jobsStatus.exists) clusterLookups.append(existingClusterLookup)
-    if (jobsSnapshot.exists) clusterLookups.append(existingClusterLookup2)
-
-    if (clusterLookups.nonEmpty) {
-      TransformFunctions.fillFromLookupsByTS(jobRunsSilverBase, "runId", Array("existing_cluster_id"),
-        lastJobStatus, clusterLookups.toArray: _*)
-        .withColumn("cluster_id", when('jobClusterType === "new", 'ephemeralClusterId)
-          .otherwise('existing_cluster_id))
-        .withColumnRenamed("timestamp", "startTimestamp")
-        .select(jobRunsColsFinalOrder: _*)
-    } else {
-      jobRunsSilverBase.withColumn("cluster_id", when('jobClusterType === "new", 'ephemeralClusterId)
-        .otherwise('existing_cluster_id))
-        .withColumnRenamed("timestamp", "startTimestamp")
-        .select(jobRunsColsFinalOrder: _*)
-    }
+    jobRunsFinal
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {
