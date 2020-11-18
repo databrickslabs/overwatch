@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
-import scalaj.http.Http
+import scalaj.http.{Http, HttpOptions}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -162,7 +162,10 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${_decryptedToken}"
-        )).asString
+        ))
+        .option(HttpOptions.connTimeout(10000))
+        .option(HttpOptions.readTimeout(60000))
+        .asString
       if (result.isError) {
         if (result.code == 429) {
           Thread.sleep(2000)
@@ -243,7 +246,10 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${_decryptedToken}"
-        )).asString
+        ))
+        .option(HttpOptions.connTimeout(10000))
+        .option(HttpOptions.readTimeout(60000))
+        .asString
       if (result.isError) {
         val err = mapper.readTree(result.body).get("error_code").asText()
         val msg = mapper.readTree(result.body).get("message").asText()
