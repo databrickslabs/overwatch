@@ -143,7 +143,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(
       name = "jobrun_silver",
-      keys = Array("startTimestamp", "runId"),
+      keys = Array("timestamp", "runId"),
       config,
       incrementalColumns = Array("timestamp"),
       zOrderBy = Array("runId", "jobId")
