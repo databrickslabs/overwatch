@@ -627,13 +627,13 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   /**
-   * The lifecycle of a job as seen from the audit logs and its actions are "runStart" which begins the run process.
-   * Depending on how the run was launched, a log will be generated with either the "runNow" or the "submitRun" action.
-   * The following log actionName for the run will either be "cancelled", "runSucceeded", or "runFailed". A typical
-   * job run will generate several log entries and each of the fields (even when they have the same name) have
-   * differing meanings depending ont he context of the "actionName".
-   * Furthermore, depending on the actionName, the runID will be found in one of the following columns, "run_id",
+   * Depending on the actionName, the runID will be found in one of the following columns, "run_id",
    * "runId", or in the "response.result.run_id" fields.
+   *
+   * The lineage of a run is as follows:
+   * runNow or submitRun: RPC service, happens at RPC request received
+   * runStart: JobRunner service, happens when a run starts on a cluster
+   * runSucceeded or runFailed, JobRunner service, happens when job ends
    *
    * To build the logs, the incremental audit logs are reviewed for jobs COMPLETED and CANCELLED in the time scope
    * of this overwatch run. If completed during this run then the entire audit log jobs service is searched for
@@ -844,7 +844,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       Array("clusterId"), clusterByNameAsOfW, clusterLookups: _*
     )
 
-    val jobNameLookup = completeAuditTable.asDF.filter('actionName === "create")
+    val jobNameLookup = completeAuditTable.asDF
+      .filter('serviceName === "jobs" && 'actionName === "create")
+      .selectExpr("*", "requestParams.*").drop("requestParams")
       .select(
         'timestamp,
         get_json_object($"response.result", "$.job_id").alias("jobId"),
