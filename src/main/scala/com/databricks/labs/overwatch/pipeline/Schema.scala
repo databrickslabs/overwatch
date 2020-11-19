@@ -140,7 +140,8 @@ object Schema extends SparkSessionWrapper {
           StructField("email", StringType, nullable = true)
         )), nullable = true)
     )),
-  2011 -> StructType(Seq(
+    // JobRuns
+    2011 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
       StructField("date", DateType, nullable = true),
@@ -362,7 +363,7 @@ object Schema extends SparkSessionWrapper {
         StructField("current_num_workers",LongType,nullable = true),
         StructField("did_not_expand_reason",StringType,nullable = true),
         StructField("disk_size",LongType,nullable = true),
-        StructField("free_space",LongType,nullable = true), 
+        StructField("free_space",LongType,nullable = true),
         StructField("init_scripts",
           StructType(Seq(
             StructField("cluster",
