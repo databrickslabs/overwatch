@@ -17,10 +17,10 @@ resource "databricks_job" "overwatch" {
     notebook_path = databricks_notebook.overwatch.path
   }
 
-  schedule {
-    quartz_cron_expression = var.cron_expression
-    timezone_id = var.timezone
-  }
+  # schedule {
+  #   quartz_cron_expression = var.cron_expression
+  #   timezone_id = var.timezone
+  # }
 
   library {
     maven {

@@ -11,7 +11,7 @@ resource "azurerm_eventhub_namespace" "overwatch" {
 resource "azurerm_eventhub" "overwatch" {
   name                = "${var.name_prefix}-evhub"
   namespace_name      = azurerm_eventhub_namespace.overwatch.name
-  resource_group_name = var.resource_group
+  resource_group_name = azurerm_eventhub_namespace.overwatch.resource_group_name
   partition_count     = 32
   message_retention   = 2
 }
@@ -30,4 +30,14 @@ resource "azurerm_eventhub_authorization_rule" "overwatch_listen" {
 
 output "eventhub_conn_read" {
   value = azurerm_eventhub_authorization_rule.overwatch_listen.primary_connection_string
+}
+
+resource "azurerm_eventhub_namespace_authorization_rule" "overwatch" {
+  name                = "overwatch"
+  namespace_name      = azurerm_eventhub_namespace.overwatch.name
+  resource_group_name = azurerm_eventhub.overwatch.resource_group_name
+
+  listen = true
+  send   = true
+  manage = true
 }

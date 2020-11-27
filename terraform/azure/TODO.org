@@ -1,9 +1,0 @@
-* TODOs
-
- - [ ] Add [[https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network][network configuration]]
- - [ ] Add network rules for EventHubs
- - [ ] Add a separate EventHubs consumer group?
-
-* Open questions
-
- - [ ] Should we define [[https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/stream_analytics_stream_input_eventhub][shared policy for analytics]] ?
