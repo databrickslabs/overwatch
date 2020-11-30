@@ -376,4 +376,16 @@ object Schema extends SparkSessionWrapper {
     }
   }
 
+  /**
+   * validate and correct a DF before an ETL stage given a minimum required schema.
+   * @param df
+   * @param atLeastSchema schema as StructType of all required columns
+   * @return
+   */
+  def verifyDF(df: DataFrame, atLeastSchema: StructType): DataFrame = {
+    df.select(
+      correctAndValidate(df.schema, atLeastSchema): _*
+    )
+  }
+
 }

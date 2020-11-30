@@ -15,7 +15,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DateType, StringType}
+import org.apache.spark.sql.types.{DateType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
 import scala.collection.parallel.ForkJoinTaskSupport
@@ -332,7 +332,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .filter('cluster_id.isNotNull)
       .distinct
 
-    val jobsInteractiveClusterIDs = auditDFBase
+    val minSchema = StructType(Seq(
+      StructField("requestParams",
+        StructType(Seq(
+          StructField("existing_cluster_id", StringType, nullable = true)
+        )), nullable = true)
+    ))
+
+    val jobsInteractiveClusterIDs = Schema.verifyDF(auditDFBase, minSchema)
       .filter('serviceName === "jobs")
       .select($"requestParams.existing_cluster_id".alias("cluster_id"))
       .filter('cluster_id.isNotNull)
