@@ -374,7 +374,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'idempotency_token, 'organization_id, 'timestamp, 'userEmail)
 
     val clustersRemoved = clusterBaseDF
-      .filter($"response.statusCode" === 200)
+      .filter($"response.statusCode" === 200) //?
       .filter('actionName.isin("permanentDelete"))
       .select('cluster_id, 'userEmail.alias("deleted_by"))
 
@@ -386,7 +386,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     clusterBaseDF
       .filter('actionName.isin("create", "edit"))
-      .filter($"response.statusCode" === 200)
+      .filter($"response.statusCode" === 200) //?
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("cluster_id"), "left")
       .join(clustersRemoved, Seq("cluster_id"), "left")
