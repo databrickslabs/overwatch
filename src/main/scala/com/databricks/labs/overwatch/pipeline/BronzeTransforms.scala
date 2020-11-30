@@ -618,8 +618,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create" AND "changeClusterAcl" actions
     val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
 
+
+    val minSchema = StructType(Seq(
+      StructField("requestParams",
+        StructType(Seq(
+          StructField("cluster_name", StringType, nullable = true),
+          StructField("clusterName", StringType, nullable = true),
+          StructField("cluster_id", StringType, nullable = true),
+          StructField("clusterId", StringType, nullable = true)
+        )), nullable = true)
+    ))
+
     // Filling in blank cluster names and ids
-    val dfClusterService = df
+    val dfClusterService = Schema.verifyDF(df, minSchema)
       .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
       .selectExpr("*", "requestParams.*")
       .filter('serviceName === "clusters")
