@@ -85,28 +85,6 @@ object Schema extends SparkSessionWrapper {
           StructField("email", StringType, nullable = true)
         )), nullable = true)
     )),
-    // JobRuns
-//    'runId.cast("int"),
-//    'jobId.cast("int"),
-//    'idInJob, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
-//    'jobTriggerType, 'orgId,
-//    'requestId.alias("completionRequest"),
-//    'response.alias("completionResponse"),
-//    'timestamp.alias("completionTime")
-//    |-- runId: integer (nullable = true)
-//  |-- jobId: integer (nullable = true)
-//  |-- idInJob: string (nullable = true)
-//  |-- jobClusterType: string (nullable = true)
-//  |-- jobTaskType: string (nullable = true)
-//  |-- jobTerminalState: string (nullable = true)
-//  |-- jobTriggerType: string (nullable = true)
-//  |-- orgId: string (nullable = true)
-//  |-- completionRequest: string (nullable = true)
-//  |-- completionResponse: struct (nullable = true)
-//  |    |-- errorMessage: string (nullable = true)
-//  |    |-- result: string (nullable = true)
-//  |    |-- statusCode: long (nullable = true)
-//  |-- completionTime: long (nullable = true)
 
   2011 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
@@ -405,5 +383,4 @@ object Schema extends SparkSessionWrapper {
       df
     }
   }
-
 }

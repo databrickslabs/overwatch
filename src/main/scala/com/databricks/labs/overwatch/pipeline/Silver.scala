@@ -187,7 +187,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     getIncrementalAuditLogDFByTimestamp(jobRunsModule.moduleID),
     Some(Seq(
       dbJobRunsSummary(
-        BronzeTargets.auditLogsTarget,
+        Schema.verifyDF(BronzeTargets.auditLogsTarget.asDF, jobRunsModule),
         SilverTargets.clustersSpecTarget,
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,

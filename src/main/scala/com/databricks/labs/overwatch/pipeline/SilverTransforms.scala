@@ -646,7 +646,7 @@ trait SilverTransforms extends SparkSessionWrapper {
    * @param df
    * @return
    */
-  protected def dbJobRunsSummary(completeAuditTable: PipelineTable,
+  protected def dbJobRunsSummary(completeAuditTable: DataFrame,
                                  clusterSpec: PipelineTable,
                                  clusterSnapshot: PipelineTable,
                                  jobsStatus: PipelineTable,
@@ -655,7 +655,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     // TODO -- limit the lookback period to about 7 days -- no job should run for more than 7 days except
     //  streaming jobs. This is only needed to improve performance if needed.
     val repartitionCount = spark.conf.get("spark.sql.shuffle.partitions").toInt * 2
-    val jobsAuditComplete = completeAuditTable.asDF
+    val jobsAuditComplete = completeAuditTable
       .filter('serviceName === "jobs")
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .repartition(repartitionCount)
@@ -844,7 +844,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       Array("clusterId"), clusterByNameAsOfW, clusterLookups: _*
     )
 
-    val jobNameLookup = completeAuditTable.asDF
+    val jobNameLookup = completeAuditTable
       .filter('serviceName === "jobs" && 'actionName === "create")
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .select(
