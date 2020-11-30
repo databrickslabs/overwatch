@@ -163,8 +163,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${_decryptedToken}"
         ))
-        .option(HttpOptions.connTimeout(10000))
-        .option(HttpOptions.readTimeout(60000))
+        .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+        .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
         .asString
       if (result.isError) {
         if (result.code == 429) {
@@ -247,8 +247,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${_decryptedToken}"
         ))
-        .option(HttpOptions.connTimeout(10000))
-        .option(HttpOptions.readTimeout(60000))
+        .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+        .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
         .asString
       if (result.isError) {
         val err = mapper.readTree(result.body).get("error_code").asText()
@@ -287,6 +287,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
 object ApiCall {
 
+  val readTimeoutMS = 60000
+  val connTimeoutMS = 10000
   def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None,
             maxResults: Int = Int.MaxValue, paginate: Boolean = true): ApiCall = {
     new ApiCall(apiEnv).setApiName(apiName)
