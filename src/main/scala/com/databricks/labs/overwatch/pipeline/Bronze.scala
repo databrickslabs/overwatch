@@ -71,14 +71,16 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
 
   // TODO -- Error if auditLogsTarget does not exist -- determine how to handle
-  private def getEventLogPathsSourceDF: DataFrame = {
-    if (BronzeTargets.auditLogsTarget.exists) BronzeTargets.auditLogsTarget.asDF
-    else BronzeTargets.clustersSnapshotTarget.asDF
-      .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
-  }
+  //  decided -- audit logs are required for sparkEvents anyway -- just remove the
+  //  if statement
+//  private def getEventLogPathsSourceDF: DataFrame = {
+//    if (BronzeTargets.auditLogsTarget.exists) BronzeTargets.auditLogsTarget.asDF
+//    else BronzeTargets.clustersSnapshotTarget.asDF
+//      .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
+//  }
 
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
-    getEventLogPathsSourceDF,
+    BronzeTargets.auditLogsTarget.asDF,
     Some(Seq(
       collectEventLogPaths(
         config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
