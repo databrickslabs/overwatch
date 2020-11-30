@@ -29,7 +29,7 @@ to run
 ### Environment Setup
 There are some basic environment configuration steps that need to be enabled to allow Overwatch to do its job. 
 
-These activities include things like [enabling Audit Logs](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html) (**at least one cluster in the workspace should have audit logs enabled!**), setting up security (as desired), etc. The setup activities
+These activities include things like [enabling Audit Logs](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html), setting up security (as desired), etc. The setup activities
 are slightly different depending on your cloud provider, currently Overwatch can operate on 
 [**aws**]({{%relref "EnvironmentSetup/AWS.md"%}}) and [**azure**]({{%relref "EnvironmentSetup/Azure.md"%}}). Please 
 reference the page that's right for you.
