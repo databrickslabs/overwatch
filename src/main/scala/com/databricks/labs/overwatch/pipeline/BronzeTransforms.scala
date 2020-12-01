@@ -320,34 +320,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
           'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
       )
 
-    val interactiveClusterIDs = auditDFBase
-      .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
-      .select($"requestParams.cluster_id")
+    val existingClusterIds = auditDFBase
+      .filter('serviceName === "clusters" && 'actionName.like("%Result"))
+      .select($"requestParams.clusterId".alias("cluster_id"))
       .filter('cluster_id.isNotNull)
       .distinct
 
-    val jobsClusterIDs = auditDFBase
+    val newClusterIds = auditDFBase
       .filter('serviceName === "clusters" && 'actionName === "create")
       .select(get_json_object($"response.result", "$.cluster_id").alias("cluster_id"))
       .filter('cluster_id.isNotNull)
       .distinct
 
-    val minSchema = StructType(Seq(
-      StructField("requestParams",
-        StructType(Seq(
-          StructField("existing_cluster_id", StringType, nullable = true)
-        )), nullable = true)
-    ))
-
-    val jobsInteractiveClusterIDs = Schema.verifyDF(auditDFBase, minSchema)
-      .filter('serviceName === "jobs")
-      .select($"requestParams.existing_cluster_id".alias("cluster_id"))
-      .filter('cluster_id.isNotNull)
-      .distinct
-
-    val clusterIDs = interactiveClusterIDs
-      .unionByName(jobsClusterIDs)
-      .unionByName(jobsInteractiveClusterIDs)
+    val clusterIDs = existingClusterIds
+      .unionByName(newClusterIds)
       .distinct
       .as[String]
       .collect()
@@ -618,19 +604,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create" AND "changeClusterAcl" actions
     val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
 
-
-    val minSchema = StructType(Seq(
-      StructField("requestParams",
-        StructType(Seq(
-          StructField("cluster_name", StringType, nullable = true),
-          StructField("clusterName", StringType, nullable = true),
-          StructField("cluster_id", StringType, nullable = true),
-          StructField("clusterId", StringType, nullable = true)
-        )), nullable = true)
-    ))
-
     // Filling in blank cluster names and ids
-    val dfClusterService = Schema.verifyDF(df, minSchema)
+    val dfClusterService = df
       .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
       .selectExpr("*", "requestParams.*")
       .filter('serviceName === "clusters")
