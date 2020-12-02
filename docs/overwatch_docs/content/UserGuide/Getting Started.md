@@ -18,8 +18,6 @@ and the job run setup, Overwatch runs best as a black box -- enable it and forge
 
 ## Dependencies
 Add the following dependencies to your cluster
-* scalaj -- reliable API calls
-    * Maven Coordinate: `org.scalaj:scalaj-http_2.11:2.4.2`
 * plotly -- pretty reporting for some reports, whether or not you will need this depends on the reports you wish 
 to run
     * Default PyPi - Tested with version 4.8.2
