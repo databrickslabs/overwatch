@@ -17,3 +17,5 @@ project/target/
 /src/main/scala/com/databricks/labs/overwatch/ESxxxx.scala
 *~
 /Logo/
+\.terraform
+terraform.tfstate*

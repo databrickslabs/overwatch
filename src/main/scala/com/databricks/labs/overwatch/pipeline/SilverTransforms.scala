@@ -117,8 +117,8 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   private def simplifyExecutorAdded(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerExecutorAdded")
-      .select('clusterId, 'SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
-        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup"))
+      .select('clusterId, 'SparkContextID, 'ExecutorID, 'executorInfo, 'Timestamp.alias("executorAddedTS"),
+        'filenameGroup.alias("startFilenameGroup"))
   }
 
   private def simplifyExecutorRemoved(df: DataFrame): DataFrame = {
@@ -161,7 +161,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     df.filter('Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
       .select('clusterId, 'SparkContextID, 'description, 'details, 'executionId.alias("ExecutionID"),
         'time.alias("SqlExecStartTime"),
-        'Pipeline_SnapTS, 'filenameGroup.alias("startFilenameGroup"))
+        'filenameGroup.alias("startFilenameGroup"))
       .withColumn("timeRnk", rank().over(uniqueTimeWindow.orderBy('SqlExecStartTime)))
       .withColumn("timeRn", row_number().over(uniqueTimeWindow.orderBy('SqlExecStartTime)))
       .filter('timeRnk === 1 && 'timeRn === 1)

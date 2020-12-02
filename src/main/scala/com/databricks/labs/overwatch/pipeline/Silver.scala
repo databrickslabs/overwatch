@@ -291,14 +291,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       }
     }
 
-    if (scope.contains(OverwatchScope.sparkEvents))
-      try {
-        processSparkEvents()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: SparkEvents Module")
-      }
-
     if (scope.contains(OverwatchScope.clusters)) {
       try {
         appendClusterSpecProcess.process()
@@ -325,6 +317,14 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       } catch {
         case _: FailedModuleException =>
           logger.log(Level.ERROR, "FAILED: Notebooks Module")
+      }
+
+    if (scope.contains(OverwatchScope.sparkEvents))
+      try {
+        processSparkEvents()
+      } catch {
+        case _: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: SparkEvents Module")
       }
 
     initiatePostProcessing()
