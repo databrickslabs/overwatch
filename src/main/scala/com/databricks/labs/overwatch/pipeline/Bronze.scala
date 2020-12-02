@@ -88,6 +88,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.fromTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
         config.untilTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
         SilverTargets.clustersSpecTarget,
+        BronzeTargets.clustersSnapshotTarget,
         config.isFirstRun
       ),
       generateEventLogsDF(
