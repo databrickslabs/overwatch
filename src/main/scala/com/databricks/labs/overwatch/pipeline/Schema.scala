@@ -26,6 +26,57 @@ object Schema extends SparkSessionWrapper {
    * Gold Layer 3xxx
    */
   private val requiredSchemas: Map[Int, StructType] = Map(
+    // SparkExecutors
+    2003 -> StructType(Seq(
+      StructField("Event", StringType, nullable = true),
+      StructField("clusterId", StringType, nullable = true),
+      StructField("SparkContextID", StringType, nullable = true),
+      StructField("ExecutorID", StringType, nullable = true),
+      StructField("RemovedReason", StringType, nullable = true),
+      StructField("Timestamp", LongType, nullable = true),
+      StructField("executorInfo",
+        StructType(Seq(
+          StructField("Host", StringType, nullable = true),
+          StructField("LogUrls",
+            StructType(Seq(
+              StructField("stderr", StringType, nullable = true),
+              StructField("stdout", StringType, nullable = true)
+            )), nullable = true),
+          StructField("Resources",
+            StructType(Seq(
+              StructField("gpu",
+                StructType(Seq(
+                  StructField("addresses", ArrayType(StringType), nullable = true),
+                  StructField("name", StringType, nullable = true)
+                )), nullable = true)
+            )), nullable = true),
+          StructField("TotalCores", LongType, nullable = true)
+        )), nullable = true),
+      StructField("filenameGroup",
+        StructType(Seq(
+          StructField("filename", StringType, nullable = true),
+          StructField("byCluster", StringType, nullable = true),
+          StructField("byDriverHost", StringType, nullable = true),
+          StructField("bySparkContext", StringType, nullable = true)
+        )), nullable = true)
+    )),
+    // SparkExecutions
+    2005 -> StructType(Seq(
+      StructField("Event", StringType, nullable = true),
+      StructField("clusterId", StringType, nullable = true),
+      StructField("SparkContextID", StringType, nullable = true),
+      StructField("description", StringType, nullable = true),
+      StructField("details", StringType, nullable = true),
+      StructField("executionId", LongType, nullable = true),
+      StructField("time", LongType, nullable = true),
+      StructField("filenameGroup",
+        StructType(Seq(
+          StructField("filename", StringType, nullable = true),
+          StructField("byCluster", StringType, nullable = true),
+          StructField("byDriverHost", StringType, nullable = true),
+          StructField("bySparkContext", StringType, nullable = true)
+        )), nullable = true)
+    )),
     // SparkJobs
     2006 -> StructType(Seq(
       StructField("Event", StringType, nullable = true),
@@ -374,6 +425,18 @@ object Schema extends SparkSessionWrapper {
         s"Attempting without validation")
       df
     }
+  }
+
+  /**
+   * validate and correct a DF before an ETL stage given a minimum required schema.
+   * @param df
+   * @param atLeastSchema schema as StructType of all required columns
+   * @return
+   */
+  def verifyDF(df: DataFrame, atLeastSchema: StructType): DataFrame = {
+    df.select(
+      correctAndValidate(df.schema, atLeastSchema): _*
+    )
   }
 
 }

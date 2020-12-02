@@ -15,7 +15,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DateType, StringType}
+import org.apache.spark.sql.types.{DateType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
 import scala.collection.parallel.ForkJoinTaskSupport
@@ -320,27 +320,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
           'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
       )
 
-    val interactiveClusterIDs = auditDFBase
-      .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
-      .select($"requestParams.cluster_id")
+    val existingClusterIds = auditDFBase
+      .filter('serviceName === "clusters" && 'actionName.like("%Result"))
+      .select($"requestParams.clusterId".alias("cluster_id"))
       .filter('cluster_id.isNotNull)
       .distinct
 
-    val jobsClusterIDs = auditDFBase
+    val newClusterIds = auditDFBase
       .filter('serviceName === "clusters" && 'actionName === "create")
       .select(get_json_object($"response.result", "$.cluster_id").alias("cluster_id"))
       .filter('cluster_id.isNotNull)
       .distinct
 
-    val jobsInteractiveClusterIDs = auditDFBase
-      .filter('serviceName === "jobs")
-      .select($"requestParams.existing_cluster_id".alias("cluster_id"))
-      .filter('cluster_id.isNotNull)
-      .distinct
-
-    val clusterIDs = interactiveClusterIDs
-      .unionByName(jobsClusterIDs)
-      .unionByName(jobsInteractiveClusterIDs)
+    val clusterIDs = existingClusterIds
+      .unionByName(newClusterIds)
       .distinct
       .as[String]
       .collect()
@@ -588,6 +581,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                      fromTimeEpochMillis: Long,
                                      untilTimeEpochMillis: Long,
                                      clusterSpec: PipelineTable,
+                                     clusterSnapshot: PipelineTable,
                                      isFirstRun: Boolean)(df: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -611,21 +605,35 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create" AND "changeClusterAcl" actions
     val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
 
-    // Filling in blank cluster names and ids
+    val latestSnapDate = clusterSnapshot.asDF.select(max('Pipeline_SnapTS).cast("date").cast("string"))
+      .as[String].first
+    val existingClustersWithLogs = clusterSnapshot.asDF
+      .filter('Pipeline_SnapTS.cast("date") === latestSnapDate)
+      .select(
+        unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
+        'cluster_id,
+        'cluster_name,
+        to_json('cluster_log_conf).alias("cluster_log_conf")
+      )
+      .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
+
+    // Populating cluster Ids
     val dfClusterService = df
       .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
       .selectExpr("*", "requestParams.*")
       .filter('serviceName === "clusters")
-      .withColumn("cluster_name",
-        when('cluster_name.isNull, 'clusterName).otherwise('cluster_name)
-      )
       .withColumn("cluster_id",
         when('cluster_id.isNull, 'clusterId).otherwise('cluster_id)
       )
       .withColumn("cluster_id",
+        when('cluster_id.isNull, get_json_object(to_json('response), "$.result.cluster_id")).otherwise('cluster_id)
+      )
+      .withColumn("cluster_id",
         when('cluster_id.isNull, cluster_id_gen).otherwise('cluster_id)
       )
-      .filter('cluster_id.isNotNull)
+      .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
+      .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+      .unionByName(existingClustersWithLogs)
     //      .cache() //Not caching because delta cache is likely more efficient
 
     val clusterIDsWithNewData = dfClusterService
@@ -634,8 +642,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val newEventLogPrefixes = if (isFirstRun || !clusterSpec.exists) {
       dfClusterService
-        .join(clusterIDsWithNewData, Seq("cluster_id"))
-        .filter('cluster_log_conf.isNotNull)
     } else {
 
       val historicalClustersWithNewData = clusterSpec.asDF
