@@ -12,7 +12,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class Silver(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
-    with SilverTransforms with SparkSessionWrapper {
+    with SilverTransforms {
 
   envInit()
 
