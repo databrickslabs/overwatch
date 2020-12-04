@@ -116,36 +116,37 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
     }
   }
 
-  describe("TransformFunctions.getJobsBase") {
-    val schema = StructType(
-      Seq(StructField("serviceName", StringType, true),
-        StructField("requestParams",
-          StructType(Seq(
-            StructField("par1", StringType, true),
-            StructField("par2", IntegerType, true)
-          )),true)))
-
-    it("should get job base") {
-      val sourceData = sc.parallelize(Seq(Row("jobs", Row("t1", 1)),Row("non-jobs", Row("t2", 2))))
-      val sourceDF = spark.createDataFrame(sourceData, schema)
-      val df = TransformFunctions.getJobsBase(sourceDF)
-      assertResult("`serviceName` STRING,`par1` STRING,`par2` INT")(df.schema.toDDL)
-      assertResult(1)(df.count())
-      val first = df.first()
-      assertResult("jobs")(first.getAs[String]("serviceName"))
-      assertResult("t1")(first.getAs[String]("par1"))
-      assertResult(1)(first.getAs[Int]("par2"))
-    }
-
-    it("should not get job base") {
-      val sourceData = sc.parallelize(Seq(Row("no-jobs2", Row("t1", 1)),Row("non-jobs", Row("t2", 2))))
-      val sourceDF = spark.createDataFrame(sourceData, schema)
-      val df = TransformFunctions.getJobsBase(sourceDF)
-      assertResult("`serviceName` STRING,`par1` STRING,`par2` INT")(df.schema.toDDL)
-      assertResult(0)(df.count())
-    }
-
-  }
+//  TOMES -- removed this test as the getJobsBase function does not belong in TransformFunctions
+//  describe("TransformFunctions.getJobsBase") {
+//    val schema = StructType(
+//      Seq(StructField("serviceName", StringType, true),
+//        StructField("requestParams",
+//          StructType(Seq(
+//            StructField("par1", StringType, true),
+//            StructField("par2", IntegerType, true)
+//          )),true)))
+//
+//    it("should get job base") {
+//      val sourceData = sc.parallelize(Seq(Row("jobs", Row("t1", 1)),Row("non-jobs", Row("t2", 2))))
+//      val sourceDF = spark.createDataFrame(sourceData, schema)
+//      val df = TransformFunctions.getJobsBase(sourceDF)
+//      assertResult("`serviceName` STRING,`par1` STRING,`par2` INT")(df.schema.toDDL)
+//      assertResult(1)(df.count())
+//      val first = df.first()
+//      assertResult("jobs")(first.getAs[String]("serviceName"))
+//      assertResult("t1")(first.getAs[String]("par1"))
+//      assertResult(1)(first.getAs[Int]("par2"))
+//    }
+//
+//    it("should not get job base") {
+//      val sourceData = sc.parallelize(Seq(Row("no-jobs2", Row("t1", 1)),Row("non-jobs", Row("t2", 2))))
+//      val sourceDF = spark.createDataFrame(sourceData, schema)
+//      val df = TransformFunctions.getJobsBase(sourceDF)
+//      assertResult("`serviceName` STRING,`par1` STRING,`par2` INT")(df.schema.toDDL)
+//      assertResult(0)(df.count())
+//    }
+//
+//  }
 
   describe("TransformFunctions.moveColumnsToFront") {
     it("should moveColumnsToFront") {

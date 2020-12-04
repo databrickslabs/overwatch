@@ -136,8 +136,8 @@ object Schema extends SparkSessionWrapper {
           StructField("email", StringType, nullable = true)
         )), nullable = true)
     )),
-    // JobRuns
-    2011 -> StructType(Seq(
+
+  2011 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
       StructField("date", DateType, nullable = true),
@@ -151,21 +151,29 @@ object Schema extends SparkSessionWrapper {
         StructType(Seq(
           StructField("jobId", StringType, nullable = true),
           StructField("job_id", StringType, nullable = true),
+          StructField("name", StringType, nullable = true),
           StructField("runId", StringType, nullable = true),
           StructField("run_id", StringType, nullable = true),
           StructField("run_name", StringType, nullable = true),
           StructField("idInJob", StringType, nullable = true),
           StructField("job_type", StringType, nullable = true),
+          StructField("orgId", StringType, nullable = true),
           StructField("jobTerminalState", StringType, nullable = true),
           StructField("jobTriggerType", StringType, nullable = true),
           StructField("jobTaskType", StringType, nullable = true),
           StructField("jobClusterType", StringType, nullable = true),
+          StructField("libraries", StringType, nullable = true),
           StructField("timeout_seconds", StringType, nullable = true),
           StructField("schedule", StringType, nullable = true),
           StructField("notebook_task", StringType, nullable = true),
+          StructField("notebook_params", StringType, nullable = true),
           StructField("new_settings", StringType, nullable = true),
           StructField("existing_cluster_id", StringType, nullable = true),
-          StructField("new_cluster", StringType, nullable = true)
+          StructField("new_cluster", StringType, nullable = true),
+          StructField("workflow_context", StringType, nullable = true),
+          StructField("spark_python_task", StringType, nullable = true),
+          StructField("spark_jar_task", StringType, nullable = true),
+          StructField("shell_command_task", StringType, nullable = true)
         )), nullable = true),
       StructField("response",
         StructType(Seq(
@@ -426,17 +434,4 @@ object Schema extends SparkSessionWrapper {
       df
     }
   }
-
-  /**
-   * validate and correct a DF before an ETL stage given a minimum required schema.
-   * @param df
-   * @param atLeastSchema schema as StructType of all required columns
-   * @return
-   */
-  def verifyDF(df: DataFrame, atLeastSchema: StructType): DataFrame = {
-    df.select(
-      correctAndValidate(df.schema, atLeastSchema): _*
-    )
-  }
-
 }

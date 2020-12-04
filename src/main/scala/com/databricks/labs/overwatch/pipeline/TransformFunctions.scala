@@ -8,22 +8,6 @@ import org.apache.spark.sql.types._
 object TransformFunctions {
 
   /**
-   * First shot At Silver Job Runs
-   *
-   * @param df
-   * @return
-   */
-
-  //TODO -- jobs snapshot api seems to be returning more data than audit logs, review
-  //  example = maxRetries, max_concurrent_runs, jar_task, python_task
-  //  audit also seems to be missing many job_names (if true, retrieve from snap)
-  def getJobsBase(df: DataFrame): DataFrame = {
-    df.filter(col("serviceName") === "jobs")
-      .selectExpr("*", "requestParams.*").drop("requestParams")
-  }
-
-
-  /**
    * Converts column of seconds/milliseconds/nanoseconds to timestamp
    *
    * @param rawVal          : Column of LongType
