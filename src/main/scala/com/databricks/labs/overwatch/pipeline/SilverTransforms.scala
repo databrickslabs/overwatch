@@ -16,14 +16,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
 
-  // TODO -- temporary support for multi-cloud until proper schemas are derived and implemented
-  private var CLOUD_PROVIDER: String = "aws"
-
-  protected def setCloudProvider(value: String): this.type = {
-    CLOUD_PROVIDER = value
-    this
-  }
-
   private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
 
   object UDF {

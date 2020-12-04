@@ -195,5 +195,22 @@ abstract class PipelineTargets(config: Config) {
 
   }
 
+  object GoldTargets {
+
+    lazy private[overwatch] val clusterTarget: PipelineTable = PipelineTable(
+      name = "cluster_gold",
+      keys = Array("cluster_id", "timestamp"),
+      config,
+      incrementalColumns = Array("timestamp")
+    )
+
+    lazy private[overwatch] val clusterViewTarget: PipelineView = PipelineView(
+      name = "cluster",
+      clusterTarget,
+      config
+    )
+
+  }
+
 
 }

@@ -12,10 +12,9 @@ import scala.collection.mutable.ArrayBuffer
 
 class Silver(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
-    with SilverTransforms with SparkSessionWrapper {
+    with SilverTransforms {
 
   envInit()
-  setCloudProvider(config.cloudProvider)
 
   import spark.implicits._
 
@@ -328,7 +327,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       }
 
     initiatePostProcessing()
-    true
+    true // to be used as fail switch later if necessary
   }
 
 
