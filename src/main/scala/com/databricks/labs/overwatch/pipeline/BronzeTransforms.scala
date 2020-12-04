@@ -43,11 +43,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     from_json(col(c), jsonSchema).alias(c)
   }
 
-  protected def setCloudProvider(value: String): this.type = {
-    CLOUD_PROVIDER = value
-    this
-  }
-
   protected def setNewDataRetrievedFlag(value: Boolean): this.type = {
     _newDataRetrieved = value
     this

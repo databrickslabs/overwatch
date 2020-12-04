@@ -9,7 +9,7 @@ import org.apache.spark.sql.functions._
 
 class Gold(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
-  with GoldTransforms {
+    with GoldTransforms {
 
   import spark.implicits._
 
@@ -29,9 +29,39 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     SilverTargets.clustersSpecTarget.asIncrementalDF(
       buildIncrementalFilter("timestamp", clusterModule.moduleID)
     ),
-    buildCluster(),
+    Some(Seq(buildCluster())),
     append(GoldTargets.clusterTarget),
     clusterModule
+  )
+
+  private val jobsModule = Module(3002, "Gold_Job")
+  lazy private val appendJobsProcess = EtlDefinition(
+    SilverTargets.dbJobsStatusTarget.asIncrementalDF(
+      buildIncrementalFilter("timestamp", jobsModule.moduleID)
+    ),
+    Some(Seq(buildJobs())),
+    append(GoldTargets.jobTarget),
+    jobsModule
+  )
+
+  private val jobRunsModule = Module(3003, "Gold_JobRun")
+  lazy private val appendJobRunsProcess = EtlDefinition(
+    SilverTargets.dbJobRunsTarget.asIncrementalDF(
+      buildIncrementalFilter("timestamp", jobRunsModule.moduleID)
+    ),
+    Some(Seq(buildJobRuns())),
+    append(GoldTargets.jobRunTarget),
+    jobRunsModule
+  )
+
+  private val notebookModule = Module(3004, "Gold_Notebook")
+  lazy private val appendNotebookProcess = EtlDefinition(
+    SilverTargets.notebookStatusTarget.asIncrementalDF(
+      buildIncrementalFilter("timestamp", notebookModule.moduleID)
+    ),
+    Some(Seq(buildNotebook())),
+    append(GoldTargets.notebookTarget),
+    notebookModule
   )
 
   def run(): Boolean = {
@@ -51,18 +81,22 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
 
     if (scope.contains(OverwatchScope.jobs)) {
-
+      appendJobsProcess.process()
+      appendJobRunsProcess.process()
+      GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
+      GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
     }
 
     if (scope.contains(OverwatchScope.notebooks)) {
-
+      appendNotebookProcess.process()
+      GoldTargets.notebookViewTarget.publish(notebookViewColumnMappings)
     }
 
     if (scope.contains(OverwatchScope.sparkEvents)) {
 
     }
 
-   true // to be used as fail switch later if necessary
+    true // to be used as fail switch later if necessary
   }
 
 

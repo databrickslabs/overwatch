@@ -199,14 +199,53 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterTarget: PipelineTable = PipelineTable(
       name = "cluster_gold",
-      keys = Array("cluster_id", "timestamp"),
+      keys = Array("cluster_id", "unixTimeMS"),
       config,
-      incrementalColumns = Array("timestamp")
+      incrementalColumns = Array("unixTimeMS")
     )
 
     lazy private[overwatch] val clusterViewTarget: PipelineView = PipelineView(
       name = "cluster",
       clusterTarget,
+      config
+    )
+
+    lazy private[overwatch] val jobTarget: PipelineTable = PipelineTable(
+      name = "job_gold",
+      keys = Array("job_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val jobViewTarget: PipelineView = PipelineView(
+      name = "job",
+      jobTarget,
+      config
+    )
+
+    lazy private[overwatch] val jobRunTarget: PipelineTable = PipelineTable(
+      name = "jobRun_gold",
+      keys = Array("run_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val jobRunsViewTarget: PipelineView = PipelineView(
+      name = "jobRun",
+      jobRunTarget,
+      config
+    )
+
+    lazy private[overwatch] val notebookTarget: PipelineTable = PipelineTable(
+      name = "notebook_gold",
+      keys = Array("notebook_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val notebookViewTarget: PipelineView = PipelineView(
+      name = "notebook",
+      notebookTarget,
       config
     )
 

@@ -581,6 +581,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     val lastJobStatus = Window.partitionBy('jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val lastJobStatusUnbound = Window.partitionBy('jobId).orderBy('timestamp)
     val jobCluster = struct(
       'existing_cluster_id.alias("existing_cluster_id"),
       'new_cluster.alias("new_cluster")
@@ -599,6 +600,18 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("timeout_seconds", when('timeout_seconds.isNull, last('timeout_seconds, true).over(lastJobStatus)).otherwise('timeout_seconds))
       .withColumn("notebook_path", when('notebook_path.isNull, last('notebook_path, true).over(lastJobStatus)).otherwise('notebook_path))
       .withColumn("jobName", when('jobName.isNull, last('jobName, true).over(lastJobStatus)).otherwise('jobName))
+      .withColumn("created_by", when('actionName === "create", $"userIdentity.email"))
+      .withColumn("created_by", last('created_by, true).over(lastJobStatus))
+      .withColumn("created_ts", when('actionName === "create", 'timestamp))
+      .withColumn("created_ts", last('created_ts, true).over(lastJobStatus))
+      .withColumn("deleted_by", when('actionName === "delete", $"userIdentity.email"))
+      .withColumn("deleted_by", last('deleted_by, true).over(lastJobStatusUnbound))
+      .withColumn("deleted_ts", when('actionName === "delete", 'timestamp))
+      .withColumn("deleted_ts", last('deleted_ts, true).over(lastJobStatusUnbound))
+      .withColumn("last_edited_by", when('actionName.isin("update", "reset"), $"userIdentity.email"))
+      .withColumn("last_edited_by", last('last_edited_by, true).over(lastJobStatus))
+      .withColumn("last_edited_ts", when('actionName.isin("update", "reset"), 'timestamp))
+      .withColumn("last_edited_ts", last('last_edited_ts, true).over(lastJobStatus))
 
     // TODO -- during gold build, new cluster needs to use modifyStruct and structToMap funcs to cleanse
     //    val baseJobStatus = SchemaTools.scrubSchema(spark.table("overwatch.job_status_silver"))
