@@ -342,8 +342,38 @@ trait GoldTransforms extends SparkSessionWrapper {
     df.select(sparkTaskCols: _*)
   }
 
-  protected def buildSparkExecution()(df: DataFrame): DataFrame = {}
-  protected def buildSparkExecutor()(df: DataFrame): DataFrame = {}
+  protected def buildSparkExecution()(df: DataFrame): DataFrame = {
+    val sparkExecutionCols: Array[Column] = Array(
+      'SparkContextID.alias("spark_context_id"),
+      'ExecutionID.alias("execution_id"),
+      'clusterId.alias("cluster_id"),
+      'description,
+      'details,
+      'startTimestamp.alias("unixTimeMS"),
+      from_unixtime('startTimestamp.cast("double") / 1000).cast("timestamp").alias("timestamp"),
+      from_unixtime('startTimestamp.cast("double") / 1000).cast("timestamp").cast("date").alias("date"),
+      'SqlExecutionRunTime.alias("sql_execution_runtime"),
+      'startFilenameGroup.alias("event_log_start"),
+      'endFilenameGroup.alias("event_log_end")
+    )
+    df.select(sparkExecutionCols: _*)
+  }
+  protected def buildSparkExecutor()(df: DataFrame): DataFrame = {
+    val sparkExecutorCols: Array[Column] = Array(
+      'SparkContextID.alias("spark_context_id"),
+      'ExecutorID.alias("executor_id"),
+      'clusterId.alias("cluster_id"),
+      'ExecutorInfo.alias("executor_info"),
+      'RemovedReason.alias("removed_reason"),
+      'ExecutorAliveTime.alias("executor_alivetime"),
+      'addedTimestamp.alias("unixTimeMS"),
+      from_unixtime('addedTimestamp.cast("double") / 1000).cast("timestamp").alias("timestamp"),
+      from_unixtime('addedTimestamp.cast("double") / 1000).cast("timestamp").cast("date").alias("date"),
+      'startFilenameGroup.alias("event_log_start"),
+      'endFilenameGroup.alias("event_log_end")
+    )
+    df.select(sparkExecutorCols: _*)
+  }
 
   protected val clusterViewColumnMapping: String =
     """
