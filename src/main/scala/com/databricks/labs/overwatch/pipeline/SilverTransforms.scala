@@ -191,6 +191,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("startTimestamp", $"SqlExecutionRunTime.startEpochMS")
   }
 
+
   protected def simplifyJobStart(sparkEventsBronze: DataFrame): DataFrame = {
     sparkEventsBronze.filter('Event.isin("SparkListenerJobStart"))
       .withColumn("PowerProperties", UDF.appendPowerProperties)
