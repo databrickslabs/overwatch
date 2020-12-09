@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, OverwatchScope}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, IncrementalFilter, Module, OverwatchScope}
 import org.apache.ivy.core.module.id.ModuleId
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Column
@@ -31,6 +31,20 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     ),
     Some(Seq(buildCluster())),
     append(GoldTargets.clusterTarget),
+    clusterModule
+  )
+
+  private val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact")
+  lazy private val appendClusterStateFactProccess = EtlDefinition(
+    BronzeTargets.clusterEventsTarget.asIncrementalDF(
+      buildIncrementalFilter("timestamp", clusterStateFactModule.moduleID)
+    ),
+    Some(Seq(buildClusterStateFact(
+      BronzeTargets.cloudMachineDetail,
+      BronzeTargets.clustersSnapshotTarget,
+      SilverTargets.clustersSpecTarget
+    ))),
+    append(GoldTargets.clusterStateFactTarget),
     clusterModule
   )
 
@@ -64,6 +78,75 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     notebookModule
   )
 
+  private val sparkJobModule = Module(3010, "Gold_SparkJob")
+  lazy private val appendSparkJobProcess = EtlDefinition(
+    SilverTargets.jobsTarget.asIncrementalDF(
+      buildIncrementalFilter("startTimestamp", sparkJobModule.moduleID)
+    ),
+    Some(Seq(buildSparkJob(config.cloudProvider))),
+    append(GoldTargets.sparkJobTarget),
+    sparkJobModule
+  )
+
+  private val sparkStageModule = Module(3011, "Gold_SparkJob")
+  lazy private val appendSparkStageProcess = EtlDefinition(
+    SilverTargets.stagesTarget.asIncrementalDF(
+      buildIncrementalFilter("startTimestamp", sparkStageModule.moduleID)
+    ),
+    Some(Seq(buildSparkStage())),
+    append(GoldTargets.sparkStageTarget),
+    sparkStageModule
+  )
+
+  private val sparkTaskModule = Module(3012, "Gold_SparkJob")
+  lazy private val appendSparkTaskProcess = EtlDefinition(
+    SilverTargets.tasksTarget.asIncrementalDF(
+      buildIncrementalFilter("startTimestamp", sparkTaskModule.moduleID)
+    ),
+    Some(Seq(buildSparkTask())),
+    append(GoldTargets.sparkTaskTarget),
+    sparkTaskModule
+  )
+
+  private val sparkExecutionModule = Module(3013, "Gold_SparkExecution")
+  lazy private val appendSparkExecutionProcess = EtlDefinition(
+    SilverTargets.executionsTarget.asIncrementalDF(
+      buildIncrementalFilter("startTimestamp", sparkExecutionModule.moduleID)
+    ),
+    Some(Seq(buildSparkExecution())),
+    append(GoldTargets.sparkExecutionTarget),
+    sparkExecutionModule
+  )
+
+  private val sparkExecutorModule = Module(3014, "Gold_SparkExecutor")
+  lazy private val appendSparkExecutorProcess = EtlDefinition(
+    SilverTargets.executorsTarget.asIncrementalDF(
+      buildIncrementalFilter("addedTimestamp", sparkExecutorModule.moduleID)
+    ),
+    Some(Seq(buildSparkExecutor())),
+    append(GoldTargets.sparkExecutorTarget),
+    sparkExecutorModule
+  )
+
+
+  private def processSparkEvents(): Unit = {
+
+    appendSparkJobProcess.process()
+    appendSparkStageProcess.process()
+    appendSparkTaskProcess.process()
+    appendSparkExecutionProcess.process()
+    appendSparkExecutorProcess.process()
+
+    GoldTargets.sparkJobViewTarget.publish(sparkJobViewColumnMapping)
+    GoldTargets.sparkStageViewTarget.publish(sparkStageViewColumnMapping)
+    GoldTargets.sparkTaskViewTarget.publish(sparkTaskViewColumnMapping)
+    GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
+    GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+
+  }
+
+
+
   def run(): Boolean = {
 
     restoreSparkConf()
@@ -77,7 +160,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
     if (scope.contains(OverwatchScope.clusters)) {
       appendClusterProccess.process()
+      appendClusterStateFactProccess.process()
       GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping)
+      GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings)
     }
 
     if (scope.contains(OverwatchScope.jobs)) {
@@ -93,7 +178,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
 
     if (scope.contains(OverwatchScope.sparkEvents)) {
+      try {
 
+      } catch {
+        case e: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: SparkEvents Gold Module", e)
+      }
     }
 
     true // to be used as fail switch later if necessary

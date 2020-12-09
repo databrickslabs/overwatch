@@ -83,6 +83,13 @@ trait SilverTransforms extends SparkSessionWrapper {
         element_at('Properties, "sparkexecutormemory").alias("ExecutorMemory"),
         element_at('Properties, "sparksqlexecutionid").alias("ExecutionID"),
         element_at('Properties, "sparksqlexecutionparent").alias("ExecutionParent"),
+        element_at('Properties, "sparkdatabricksisolationID").alias("SparkDBIsolationID"),
+        element_at('Properties, "sparkhadoopfsazureaccountoauth2clientid").alias("AzureOAuth2ClientID"),
+        element_at('Properties, "sparkrddscope").alias("RDDScope"),
+        element_at('Properties, "sparkdatabricksreplId").alias("SparkDBREPLID"),
+        element_at('Properties, "sparkdatabricksjobid").alias("SparkDBJobID"),
+        element_at('Properties, "sparkdatabricksjobrunId").alias("SparkDBRunID"),
+        element_at('Properties, "sparkdatabricksjobtype").alias("sparkDBJobType"),
         element_at('Properties, "sparksqlshufflepartitions").alias("ShufflePartitions"),
         element_at('Properties, "user").alias("UserEmail"),
         element_at('Properties, "userID").alias("UserID")
@@ -183,6 +190,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .drop("SqlExecStartTime", "SqlExecEndTime")
       .withColumn("startTimestamp", $"SqlExecutionRunTime.startEpochMS")
   }
+
 
   protected def simplifyJobStart(sparkEventsBronze: DataFrame): DataFrame = {
     sparkEventsBronze.filter('Event.isin("SparkListenerJobStart"))
@@ -576,8 +584,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'job_type,
       'name.alias("jobName"), 'timeout_seconds, 'schedule,
       get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
-      'new_settings, 'existing_cluster_id, 'new_cluster,
-      'sessionId, 'requestId, 'userAgent, 'response, 'sourceIPAddress, 'version
+      'new_settings, 'existing_cluster_id, 'new_cluster, 'aclPermissionSet, 'grants, 'targetUserId,
+      'sessionId, 'requestId, 'userAgent, 'userIdentity, 'response, 'sourceIPAddress, 'version
     )
 
     val lastJobStatus = Window.partitionBy('jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
@@ -588,7 +596,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     val jobStatusBase = jobsBase
-      .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl"))
+      .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
+      .withColumn("jobId", when('actionName === "changeJobAcl", 'resourceId).otherwise('jobId))
       .select(jobs_statusCols: _*)
       .withColumn("existing_cluster_id", coalesce('existing_cluster_id, get_json_object('new_settings, "$.existing_cluster_id")))
       .withColumn("new_cluster",
@@ -612,6 +621,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("last_edited_by", last('last_edited_by, true).over(lastJobStatus))
       .withColumn("last_edited_ts", when('actionName.isin("update", "reset"), 'timestamp))
       .withColumn("last_edited_ts", last('last_edited_ts, true).over(lastJobStatus))
+      .drop("userIdentity")
 
     // TODO -- during gold build, new cluster needs to use modifyStruct and structToMap funcs to cleanse
     //    val baseJobStatus = SchemaTools.scrubSchema(spark.table("overwatch.job_status_silver"))

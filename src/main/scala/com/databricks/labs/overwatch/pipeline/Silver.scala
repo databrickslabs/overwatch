@@ -322,8 +322,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       try {
         processSparkEvents()
       } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: SparkEvents Module")
+        case e: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: SparkEvents Silver Module", e)
       }
 
     initiatePostProcessing()

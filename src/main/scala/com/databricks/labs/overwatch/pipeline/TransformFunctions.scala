@@ -1,11 +1,14 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.spark.sql.expressions.WindowSpec
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
-import org.apache.spark.sql.functions.{coalesce, col, from_json, from_unixtime, last, lit, struct, substring, unix_timestamp}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
-object TransformFunctions {
+object TransformFunctions extends SparkSessionWrapper {
+
+  import spark.implicits._
 
   /**
    * Converts column of seconds/milliseconds/nanoseconds to timestamp
@@ -161,6 +164,26 @@ object TransformFunctions {
    */
   def stringTsToUnixMillis(tsStringCol: Column): Column = {
     ((unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)).cast("long")
+  }
+
+  private val applicableWorkers = when('type === "RESIZING" && 'target_num_workers < 'current_num_workers, 'target_num_workers).otherwise('current_num_workers)
+
+  def getNodeInfo(nodeType: String, metric: String, multiplyTime: Boolean): Column = {
+    val baseMetric = if (nodeType.toLowerCase == "driver") {
+      col(s"driverSpecs.${metric}")
+    } else if(nodeType.toLowerCase == "worker") {
+      col(s"workerSpecs.${metric}") * applicableWorkers
+    } else {
+      throw new Exception("nodeType must be either 'driver' or 'worker'")
+    }
+
+    if (multiplyTime) {
+      when('type === "TERMINATING", lit(0))
+        .otherwise(round(baseMetric * 'uptime_in_state_S, 2)).alias(s"${nodeType}_${baseMetric}S")
+    } else {
+      when('type === "TERMINATING", lit(0))
+        .otherwise(round(baseMetric, 2).alias(s"${nodeType}_${baseMetric}"))
+    }
   }
 
 
