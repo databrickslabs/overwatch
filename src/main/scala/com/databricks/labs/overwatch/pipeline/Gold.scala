@@ -18,6 +18,15 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   private def buildIncrementalFilter(incrementalColumn: String, moduleId: Int): Seq[IncrementalFilter] = {
+    val logStatement =
+      s"""
+         |ModuleID: ${moduleId}
+         |IncrementalColumn: ${incrementalColumn}
+         |FromTime: ${config.fromTime(moduleId).asTSString} --> ${config.fromTime(moduleId).asUnixTimeMilli}
+         |UntilTime: ${config.untilTime(moduleId).asTSString} --> ${config.untilTime(moduleId).asUnixTimeMilli}
+         |""".stripMargin
+    logger.log(Level.INFO, logStatement)
+
     Seq(IncrementalFilter(incrementalColumn,
       lit(config.fromTime(moduleId).asUnixTimeMilli),
       lit(config.untilTime(moduleId).asUnixTimeMilli)
@@ -88,7 +97,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     sparkJobModule
   )
 
-  private val sparkStageModule = Module(3011, "Gold_SparkJob")
+  private val sparkStageModule = Module(3011, "Gold_SparkStage")
   lazy private val appendSparkStageProcess = EtlDefinition(
     SilverTargets.stagesTarget.asIncrementalDF(
       buildIncrementalFilter("startTimestamp", sparkStageModule.moduleID)
@@ -98,7 +107,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     sparkStageModule
   )
 
-  private val sparkTaskModule = Module(3012, "Gold_SparkJob")
+  private val sparkTaskModule = Module(3012, "Gold_SparkTask")
   lazy private val appendSparkTaskProcess = EtlDefinition(
     SilverTargets.tasksTarget.asIncrementalDF(
       buildIncrementalFilter("startTimestamp", sparkTaskModule.moduleID)
@@ -150,7 +159,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   def run(): Boolean = {
 
     restoreSparkConf()
-    setCloudProvider(config.cloudProvider)
 
     val scope = config.overwatchScope
 
@@ -179,7 +187,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
     if (scope.contains(OverwatchScope.sparkEvents)) {
       try {
-
+        processSparkEvents()
       } catch {
         case e: FailedModuleException =>
           logger.log(Level.ERROR, "FAILED: SparkEvents Gold Module", e)

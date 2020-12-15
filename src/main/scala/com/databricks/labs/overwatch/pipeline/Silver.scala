@@ -275,7 +275,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   def run(): Boolean = {
 
     restoreSparkConf()
-    setCloudProvider(config.cloudProvider)
     // TODO -- see which transforms are possible without audit and rebuild for no-audit
     //  CURRENTLY -- audit is required for silver
     val scope = config.overwatchScope

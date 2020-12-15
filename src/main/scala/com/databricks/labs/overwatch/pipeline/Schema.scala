@@ -123,7 +123,11 @@ object Schema extends SparkSessionWrapper {
           StructField("notebook_task", StringType, nullable = true),
           StructField("new_settings", StringType, nullable = true),
           StructField("existing_cluster_id", StringType, nullable = true),
-          StructField("new_cluster", StringType, nullable = true)
+          StructField("new_cluster", StringType, nullable = true),
+          StructField("resourceId", StringType, nullable = true),
+          StructField("aclPermissionSet", StringType, nullable = true),
+          StructField("grants", StringType, nullable = true),
+          StructField("targetUserId", StringType, nullable = true)
         )), nullable = true),
       StructField("response",
         StructType(Seq(

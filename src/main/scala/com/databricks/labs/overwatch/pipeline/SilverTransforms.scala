@@ -881,7 +881,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       jobRunsWClusterIDs, "runId",
       Array("jobName"), lastJobStatusW, jobNameLookups: _*
     )
-      .drop("timestamp") // duplicated to enable asOf Lookups
+      .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
+      .withColumn("timestamp", $"jobRunTime.startEpochMS") // for incremental downstream
       .repartition(256)
 
     jobsAuditComplete.unpersist()

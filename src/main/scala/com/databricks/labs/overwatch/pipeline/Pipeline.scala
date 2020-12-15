@@ -21,14 +21,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   envInit()
 
-  // TODO -- temporary support for multi-cloud until proper schemas are derived and implemented
-  private var CLOUD_PROVIDER: String = "aws"
-
-  protected def setCloudProvider(value: String): this.type = {
-    CLOUD_PROVIDER = value
-    this
-  }
-
   // TODO -- Add Rules engine
   //  additional field under transforms rules: Option[Seq[Rule => Boolean]]
   case class EtlDefinition(

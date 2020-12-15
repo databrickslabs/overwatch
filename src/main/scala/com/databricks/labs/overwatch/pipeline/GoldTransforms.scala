@@ -58,6 +58,9 @@ trait GoldTransforms extends SparkSessionWrapper {
         'existing_cluster_id,
         'new_cluster
       ).alias("cluster"),
+      'aclPermissionSet,
+      'grants,
+      'targetUserId,
       'sessionId.alias("session_id"),
       'requestId.alias("request_id"),
       'userAgent.alias("user_agent"),
@@ -196,7 +199,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
       .withColumn("uptime_in_state_S", lead('timestamp, 1).over(stateUnboundW) - 'timestamp)
       .withColumn("cloud_billable", lit(true))
-      .withColumn("databricks_billable", when('type.isin(billableTypes), lit(false))
+      .withColumn("databricks_billable", when('type.isin(billableTypes: _*), lit(false))
         .otherwise(lit(true)
         ))
       .join(driverNodeDetails, Seq("driver_node_type_id"), "left")
@@ -386,7 +389,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val jobViewColumnMapping: String =
     """
       |job_id, action, unixTimeMS, timestamp, date, job_name, job_type, timeout_seconds, schedule, notebook_path,
-      |new_settings, cluster, 'aclPermissionSet, 'grants, 'targetUserId, session_id, request_id, user_agent, response,
+      |new_settings, cluster, aclPermissionSet, grants, targetUserId, session_id, request_id, user_agent, response,
       |source_ip_address, created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
       |""".stripMargin
 

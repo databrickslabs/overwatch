@@ -26,6 +26,7 @@ object PipelineFunctions {
     }
   }
 
+  // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
   def withIncrementalFilters(df: DataFrame, filters: Seq[IncrementalFilter]): DataFrame = {
     val parsedFilters = filters.map(filter => {
       val c = filter.sourceCol
