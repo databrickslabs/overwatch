@@ -21,6 +21,8 @@ class Config() {
   private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
+  private var _consumerDatabaseName: String = _
+  private var _consumerDatabaseLocation: String = _
   private var _workspaceUrl: String = _
   private var _cloudProvider: String = _
   private var _token: Array[Byte] = _
@@ -35,6 +37,8 @@ class Config() {
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
   private var _initialSparkConf: Map[String, String] = Map()
   private var _intialShuffleParts: Int = 200
+  private var _contractInteractiveDBUPrice: Double = 0.56
+  private var _contractAutomatedDBUPrice: Double = 0.26
 
   final private val cipher = new Cipher(cipherKey)
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -133,6 +137,10 @@ class Config() {
 
   private[overwatch] def databaseLocation: String = _databaseLocation
 
+  private[overwatch] def consumerDatabaseName: String = _consumerDatabaseName
+
+  private[overwatch] def consumerDatabaseLocation: String = _consumerDatabaseLocation
+
   private[overwatch] def workspaceURL: String = _workspaceUrl
 
   private[overwatch] def token: String = cipher.decrypt(_token)
@@ -150,6 +158,10 @@ class Config() {
   private[overwatch] def inputConfig: OverwatchParams = _inputConfig
 
   private[overwatch] def runID: String = _runID
+
+  private[overwatch] def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
+
+  private[overwatch] def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
 
   /**
    * OverwatchScope defines the modules active for the current run
@@ -258,6 +270,16 @@ class Config() {
     this
   }
 
+  private[overwatch] def setContractInteractiveDBUPrice(value: Double): this.type = {
+    _contractInteractiveDBUPrice = value
+    this
+  }
+
+  private[overwatch] def setContractAutomatedDBUPrice(value: Double): this.type = {
+    _contractAutomatedDBUPrice = value
+    this
+  }
+
   //TODO -- switch back to private -- public for testing only
   //private[overwatch]
   def setLastRunDetail(value: Array[ModuleStatusReport]): this.type = {
@@ -347,7 +369,14 @@ class Config() {
   private[overwatch] def setDatabaseNameandLoc(dbName: String, dbLocation: String): this.type = {
     _databaseLocation = dbLocation
     _databaseName = dbName
-    println(s"DEBUG: Database Name and Locations set to ${_databaseName} and ${_databaseLocation}")
+    println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}")
+    this
+  }
+
+  private[overwatch] def setConsumerDatabaseNameandLoc(consumerDBName: String, consumerDBLocation: String): this.type = {
+    _consumerDatabaseName = consumerDBName
+    _consumerDatabaseLocation = consumerDBLocation
+    println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
     this
   }
 
