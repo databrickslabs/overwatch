@@ -32,3 +32,28 @@ variable "overwatch_jar_path" {
 variable "overwatch_remote_path" {
   description = "Path to the Overwatch jar on DBFS"
 }
+
+variable "overwatch_job_secrets_scope" {
+  description = "Name of the secret scope"
+}
+
+variable "overwatch_job_secrets_evhub_key_name" {
+  description = "Secret key name for EventHubs connection string"
+}
+
+variable "overwatch_job_secrets_dbpat_key_name" {
+  description = "Secret key name for DB PAT (personal access token)"
+}
+
+variable "overwatch_job_evh_name" {
+  description = "Name of the EventHubs topic with diagnostic data"
+}
+
+variable "overwatch_job_dbname" {
+  description = "Overwatch database name"
+}
+
+variable "overwatch_job_temppath" {
+  description = "Path on DBFS to store broken records, checkpoints, etc."
+  default = "/tmp/overwatch"
+}

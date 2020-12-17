@@ -13,7 +13,7 @@ resource "azurerm_eventhub" "overwatch" {
   namespace_name      = azurerm_eventhub_namespace.overwatch.name
   resource_group_name = azurerm_eventhub_namespace.overwatch.resource_group_name
   partition_count     = 32
-  message_retention   = 2
+  message_retention   = 7
 }
 
 # do we need it?

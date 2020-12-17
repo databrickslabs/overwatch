@@ -15,22 +15,24 @@ resource "databricks_job" "overwatch" {
 
   notebook_task {
     notebook_path = databricks_notebook.overwatch.path
-  }
-
-  # schedule {
-  #   quartz_cron_expression = var.cron_expression
-  #   timezone_id = var.timezone
-  # }
-
-  library {
-    maven {
-      coordinates = "com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.17"
+    base_parameters = {
+      dbName = var.overwatch_job_dbname
+      evhName = var.overwatch_job_evh_name
+      secretsScope = var.overwatch_job_secrets_scope
+      secretsEvHubKey = var.overwatch_job_secrets_evhub_key_name
+      overwatchDBKey = var.overwatch_job_secrets_dbpat_key_name
+      tempPath = var.overwatch_job_temppath
     }
   }
 
+  schedule {
+    quartz_cron_expression = var.cron_expression
+    timezone_id = var.timezone
+  }
+
   library {
     maven {
-      coordinates = "org.scalaj:scalaj-http_2.11:2.4.2"
+      coordinates = "com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.17"
     }
   }
 
@@ -41,7 +43,7 @@ resource "databricks_job" "overwatch" {
   }
 
   library {
-    jar = databricks_dbfs_file.overwatch_jar.path
+    jar = "dbfs:${databricks_dbfs_file.overwatch_jar.path}"
   }
 }
 
