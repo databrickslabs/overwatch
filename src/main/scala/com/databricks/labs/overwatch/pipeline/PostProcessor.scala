@@ -1,11 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Helpers
-
+import org.apache.log4j.{Level, Logger}
 import scala.collection.mutable.ArrayBuffer
 
 class PostProcessor {
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
   private val tablesToOptimize: ArrayBuffer[PipelineTable] = ArrayBuffer[PipelineTable]()
 
   private[overwatch] def markOptimize(table: PipelineTable): Unit = {
@@ -15,6 +16,9 @@ class PostProcessor {
   // Todo -- Add these optimization columns to the abstract class def of Table
 
   def optimize(): Unit = {
+    logger.log(Level.INFO, s"BEGINNING OPTIMIZE & ZORDER. " +
+      s"Tables in scope are: ${tablesToOptimize.map(_.tableFullName).mkString(",")}")
+
 //    tablesInScope.map(tbl => )
 //    val zordersByTable: Map[String, Array[String]] = Map(
 //      "spark_events_bronze" -> "SparkContextID, ClusterID, JobGroupID".split(", "),

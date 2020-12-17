@@ -54,7 +54,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.clustersSpecTarget
     ))),
     append(GoldTargets.clusterStateFactTarget),
-    clusterModule
+    clusterStateFactModule
   )
 
   private val jobsModule = Module(3002, "Gold_Job")
@@ -194,6 +194,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
     }
 
+    initiatePostProcessing()
     true // to be used as fail switch later if necessary
   }
 

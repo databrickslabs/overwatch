@@ -229,6 +229,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     clusterPotential
       .select(clusterStateFactCols: _*)
+      .withColumn("unixTimeMS", ('unixTimeMS * lit(1000)).cast("long"))
 
   }
 
