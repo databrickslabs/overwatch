@@ -665,7 +665,8 @@ trait SilverTransforms extends SparkSessionWrapper {
                                  clusterSpec: PipelineTable,
                                  clusterSnapshot: PipelineTable,
                                  jobsStatus: PipelineTable,
-                                 jobsSnapshot: PipelineTable)(df: DataFrame): DataFrame = {
+                                 jobsSnapshot: PipelineTable,
+                                 etl_db: String)(df: DataFrame): DataFrame = {
 
     // TODO -- limit the lookback period to about 7 days -- no job should run for more than 7 days except
     //  streaming jobs. This is only needed to improve performance if needed.
@@ -769,24 +770,24 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select('runId, 'timestamp.alias("runBeginTime"))
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSpecLookup = spark.table("overwatch.audit_log_bronze") // change to cluster_spec eventually?
+    lazy val clusterSpecLookup = spark.table(s"${etl_db}.audit_log_bronze") // change to cluster_spec eventually?
       .filter('serviceName === "clusters" && 'actionName.isin("create"))
       .select('timestamp, $"requestParams.cluster_name",
         get_json_object($"response.result", "$.cluster_id").alias("clusterId")
       )
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSnapLookup = spark.table("overwatch.clusters_snapshot_bronze")
+    lazy val clusterSnapLookup = spark.table(s"${etl_db}.clusters_snapshot_bronze")
       .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS))
       .select('timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    lazy val existingClusterLookup = spark.table("overwatch.job_status_silver")
+    lazy val existingClusterLookup = spark.table(s"${etl_db}.job_status_silver")
       .select('timestamp, 'jobId, 'existing_cluster_id)
       .filter('existing_cluster_id.isNotNull)
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    lazy val existingClusterLookup2 = spark.table("overwatch.jobs_snapshot_bronze")
+    lazy val existingClusterLookup2 = spark.table(s"${etl_db}.jobs_snapshot_bronze")
       .select('job_id.alias("jobId"), $"settings.existing_cluster_id",
         'created_time.alias("timestamp"))
       .filter('existing_cluster_id.isNotNull)
@@ -868,7 +869,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'name.alias("jobName")
       )
 
-    val jobNameLookup2 = spark.table("overwatch.jobs_snapshot_bronze")
+    val jobNameLookup2 = spark.table(s"${etl_db}.jobs_snapshot_bronze")
       .select(unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
         'job_id.alias("jobId"),
         $"settings.name".alias("jobName")

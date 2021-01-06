@@ -190,7 +190,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         SilverTargets.clustersSpecTarget,
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
-        BronzeTargets.jobsSnapshotTarget
+        BronzeTargets.jobsSnapshotTarget,
+        config.databaseName
       )
     )),
     append(SilverTargets.dbJobRunsTarget),
