@@ -11,7 +11,7 @@ case class PipelineView(name: String,
   def publish(colDefinition: String): Unit = {
     val pubStatement =
       s"""
-         |create or replace view ${config.databaseName}.${name} as select ${colDefinition}
+         |create or replace view ${config.consumerDatabaseName}.${name} as select ${colDefinition}
          |from ${dataSource.tableFullName}
          |""".stripMargin
 

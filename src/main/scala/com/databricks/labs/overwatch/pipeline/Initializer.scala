@@ -25,7 +25,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
   import spark.implicits._
 
-  private def showRangeReport(lastRunDetail: Array[ModuleStatusReport]): Unit = {
+  private def showRangeReport(lastRunDetail: Array[SimplifiedModuleStatusReport]): Unit = {
     val rangeReport = lastRunDetail.map(lr =>
       (
         lr.moduleID,
@@ -56,13 +56,14 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter('rnk === 1 && 'rn === 1)
-        .as[ModuleStatusReport]
+        .drop("inputConfig", "parsedConfig")
+        .as[SimplifiedModuleStatusReport]
         .collect()
       config.setLastRunDetail(lastRunDetail)
       lastRunDetail
     } else {
       config.setIsFirstRun(true)
-      Array[ModuleStatusReport]()
+      Array[SimplifiedModuleStatusReport]()
     }
     config.setPipelineSnapTime()
     if (config.debugFlag) showRangeReport(rangeDetail)
@@ -80,7 +81,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   private def initializeDatabase(): Database = {
     // TODO -- Add metadata table
     // TODO -- refactor and clean up duplicity
-    logger.log(Level.INFO, "Initializing Database")
+    logger.log(Level.INFO, "Initializing ETL Database")
     if (!spark.catalog.databaseExists(config.databaseName)) {
       logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
         s"${config.databaseLocation}.")
@@ -98,9 +99,11 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
     }
 
+    // Create consumer database if one is configured
     if (config.consumerDatabaseName != config.databaseName) {
+      logger.log(Level.INFO, "Initializing Consumer Database")
       if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
-        val createConsumerDBSTMT = s"create database if not exists ${config.databaseName} " +
+        val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
           s"location '${config.consumerDatabaseLocation}'"
         spark.sql(createConsumerDBSTMT)
         logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")

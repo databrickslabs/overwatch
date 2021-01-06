@@ -17,7 +17,7 @@ class Config() {
   private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
   private var _isFirstRun: Boolean = false
   private var _debugFlag: Boolean = false
-  private var _lastRunDetail: Array[ModuleStatusReport] = Array[ModuleStatusReport]()
+  private var _lastRunDetail: Array[SimplifiedModuleStatusReport] = Array[SimplifiedModuleStatusReport]()
   private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
@@ -117,7 +117,7 @@ class Config() {
 
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
-  private[overwatch] def lastRunDetail: Array[ModuleStatusReport] = _lastRunDetail
+  private[overwatch] def lastRunDetail: Array[SimplifiedModuleStatusReport] = _lastRunDetail
 
   private[overwatch] def isLocalTesting: Boolean = _isLocalTesting
 
@@ -282,7 +282,7 @@ class Config() {
 
   //TODO -- switch back to private -- public for testing only
   //private[overwatch]
-  def setLastRunDetail(value: Array[ModuleStatusReport]): this.type = {
+  def setLastRunDetail(value: Array[SimplifiedModuleStatusReport]): this.type = {
     // Todo -- Add assertion --> number of rows <= number of modules or something to that effect
     _lastRunDetail = value
     this

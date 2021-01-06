@@ -87,6 +87,20 @@ case class ModuleStatusReport(
                                parsedConfig: ParsedConfig
                              )
 
+case class SimplifiedModuleStatusReport(
+                               moduleID: Int,
+                               moduleName: String,
+                               runStartTS: Long,
+                               runEndTS: Long,
+                               fromTS: Long,
+                               untilTS: Long,
+                               dataFrequency: String,
+                               status: String,
+                               recordsAppended: Long,
+                               lastOptimizedTS: Long,
+                               vacuumRetentionHours: Int
+                             )
+
 case class IncrementalFilter(sourceCol: String, low: Column, high: Column)
 
 object OverwatchScope extends Enumeration {
