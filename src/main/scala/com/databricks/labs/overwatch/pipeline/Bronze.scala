@@ -45,6 +45,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     getAuditLogsDF(
       config.auditLogConfig,
       config.isFirstRun,
+      config.cloudProvider,
       config.fromTime(appendAuditLogsModule.moduleID).asLocalDateTime,
       config.untilTime(appendAuditLogsModule.moduleID).asLocalDateTime,
       BronzeTargets.auditLogAzureLandRaw,
@@ -108,7 +109,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     restoreSparkConf()
 
     if (config.debugFlag) println(s"DEBUG: CLOUD PROVIDER = ${config.cloudProvider}")
-    setCloudProvider(config.cloudProvider)
 
     if (config.cloudProvider == "azure") {
       val rawAzureAuditEvents = landAzureAuditLogDF(

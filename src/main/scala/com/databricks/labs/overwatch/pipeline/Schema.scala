@@ -123,7 +123,11 @@ object Schema extends SparkSessionWrapper {
           StructField("notebook_task", StringType, nullable = true),
           StructField("new_settings", StringType, nullable = true),
           StructField("existing_cluster_id", StringType, nullable = true),
-          StructField("new_cluster", StringType, nullable = true)
+          StructField("new_cluster", StringType, nullable = true),
+          StructField("resourceId", StringType, nullable = true),
+          StructField("aclPermissionSet", StringType, nullable = true),
+          StructField("grants", StringType, nullable = true),
+          StructField("targetUserId", StringType, nullable = true)
         )), nullable = true),
       StructField("response",
         StructType(Seq(
@@ -136,7 +140,6 @@ object Schema extends SparkSessionWrapper {
           StructField("email", StringType, nullable = true)
         )), nullable = true)
     )),
-
   2011 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
@@ -342,6 +345,261 @@ object Schema extends SparkSessionWrapper {
         StructType(Seq(
           StructField("email", StringType, nullable = true)
         )), nullable = true)
+    )),
+    3005 -> StructType(Seq(
+      StructField("cluster_id",StringType,nullable = true),
+      StructField("details",StructType(Seq(
+        StructField("cause",StringType,nullable = true),
+        StructField("cluster_size",
+          StructType(Seq(
+            StructField("autoscale",
+              StructType(Seq(
+                StructField("max_workers",LongType,nullable = true),
+                StructField("min_workers",LongType,nullable = true)
+              )),nullable = true),
+            StructField("num_workers",LongType,nullable = true)
+          )),nullable = true),
+        StructField("current_num_workers",LongType,nullable = true),
+        StructField("did_not_expand_reason",StringType,nullable = true),
+        StructField("disk_size",LongType,nullable = true),
+        StructField("free_space",LongType,nullable = true), 
+        StructField("init_scripts",
+          StructType(Seq(
+            StructField("cluster",
+              ArrayType(
+                StructType(Seq(
+                  StructField("dbfs",
+                    StructType(Seq(
+                      StructField("destination",StringType,nullable = true)
+                    )),nullable = true),
+                  StructField("error_message",StringType,nullable = true),
+                  StructField("execution_duration_seconds",LongType,nullable = true),
+                  StructField("status",StringType,nullable = true)
+                )),containsNull = true)
+              ,nullable = true),
+            StructField("reported_for_node",StringType,nullable = true)
+          )),nullable = true),
+        StructField("instance_id",StringType,nullable = true),
+        StructField("job_run_name",StringType,nullable = true),
+        StructField("previous_cluster_size",
+          StructType(Seq(
+            StructField("autoscale",
+              StructType(Seq(
+                StructField("max_workers",LongType,nullable = true),
+                StructField("min_workers",LongType,nullable = true)
+              )),nullable = true),
+            StructField("num_workers",LongType,nullable = true)
+          )),nullable = true),
+        StructField("previous_disk_size",LongType,nullable = true),
+        StructField("reason",
+          StructType(Seq(
+            StructField("code",StringType,nullable = true),
+            StructField("parameters",
+              StructType(Seq(
+                StructField("azure_error_code",StringType,nullable = true),
+                StructField("azure_error_message",StringType,nullable = true),
+                StructField("databricks_error_message",StringType,nullable = true),
+                StructField("inactivity_duration_min",StringType,nullable = true),
+                StructField("instance_id",StringType,nullable = true),
+                StructField("username",StringType,nullable = true)
+              )),nullable = true),
+            StructField("type",StringType,nullable = true)
+          )),nullable = true),
+        StructField("target_num_workers",LongType,nullable = true),
+        StructField("user",StringType,nullable = true),
+        StructField("driver_state_message",StringType,nullable = true)
+      )),nullable = true),
+      StructField("timestamp",LongType,nullable = true),
+      StructField("type",StringType,nullable = true),
+      StructField("Pipeline_SnapTS",TimestampType,nullable = true),
+      StructField("Overwatch_RunID",StringType,nullable = true)
+    )),
+    // sparkStage
+    3011 -> StructType(Seq(
+      StructField("clusterId",StringType,nullable = true),
+      StructField("SparkContextID",StringType,nullable = true),
+      StructField("StageID",LongType,nullable = true),
+      StructField("StageAttemptID",LongType,nullable = true),
+      StructField("startFilenameGroup",
+        StructType(Seq(
+          StructField("filename",StringType,nullable = true),
+          StructField("byCluster",StringType,nullable = true),
+          StructField("byDriverHost",StringType,nullable = true),
+          StructField("bySparkContext",StringType,nullable = true)
+        )),nullable = true),
+      StructField("endFilenameGroup",
+        StructType(Seq(
+          StructField("filename",StringType,nullable = true),
+          StructField("byCluster",StringType,nullable = true),
+          StructField("byDriverHost",StringType,nullable = true),
+          StructField("bySparkContext",StringType,nullable = true)
+        )),nullable = true),
+      StructField("StageInfo",
+        StructType(Seq(
+          StructField("Accumulables",
+            ArrayType(
+              StructType(Seq(
+                StructField("CountFailedValues",BooleanType,nullable = true),
+                StructField("ID",LongType,nullable = true),
+                StructField("Internal",BooleanType,nullable = true),
+                StructField("Metadata",StringType,nullable = true),
+                StructField("Name",StringType,nullable = true),
+                StructField("Value",StringType,nullable = true)
+              )),containsNull = true
+            ),nullable = true),
+          StructField("CompletionTime",LongType,nullable = true),
+          StructField("Details",StringType,nullable = true),
+          StructField("FailureReason",StringType,nullable = true),
+          StructField("NumberofTasks",LongType,nullable = true),
+          StructField("ParentIDs",ArrayType(LongType,containsNull = true),nullable = true),
+          StructField("SubmissionTime",LongType,nullable = true)
+        )),nullable = true),
+      StructField("StageRunTime",
+        StructType(Seq(
+          StructField("startEpochMS",LongType,nullable = true),
+          StructField("startTS",TimestampType,nullable = true),
+          StructField("endEpochMS",LongType,nullable = true),
+          StructField("endTS",TimestampType,nullable = true),
+          StructField("runTimeMS",LongType,nullable = true),
+          StructField("runTimeS",DoubleType,nullable = true),
+          StructField("runTimeM",DoubleType,nullable = true),
+          StructField("runTimeH",DoubleType,nullable = true)
+        )),nullable = true),
+      StructField("startTimestamp",LongType,nullable = true),
+      StructField("startDate",DateType,nullable = true),
+      StructField("Pipeline_SnapTS",TimestampType,nullable = true),
+      StructField("Overwatch_RunID",StringType,nullable = true)
+    )),
+    // sparkTasks
+    3012 -> StructType(Seq(
+      StructField("clusterId",StringType,nullable = true),
+      StructField("SparkContextID",StringType,nullable = true),
+      StructField("StageID",LongType,nullable = true),
+      StructField("StageAttemptID",LongType,nullable = true),
+      StructField("TaskID",LongType,nullable = true),
+      StructField("TaskAttempt",LongType,nullable = true),
+      StructField("ExecutorID",StringType,nullable = true),
+      StructField("Host",StringType,nullable = true),
+      StructField("startFilenameGroup",
+        StructType(Seq(
+          StructField("filename",StringType,nullable = true),
+          StructField("byCluster",StringType,nullable = true),
+          StructField("byDriverHost",StringType,nullable = true),
+          StructField("bySparkContext",StringType,nullable = true)
+        )),nullable = true),
+      StructField("TaskEndReason",
+        StructType(Seq(
+          StructField("AccumulatorUpdates",
+            ArrayType(
+              StructType(Seq(
+                StructField("CountFailedValues",BooleanType,nullable = true),
+                StructField("ID",LongType,nullable = true),
+                StructField("Internal",BooleanType,nullable = true),
+                StructField("Update",StringType,nullable = true)
+              )),containsNull = true)
+            ,nullable = true),
+          StructField("ClassName",StringType,nullable = true),
+          StructField("Description",StringType,nullable = true),
+          StructField("FullStackTrace",StringType,nullable = true),
+          StructField("KillReason",StringType,nullable = true),
+          StructField("Reason",StringType,nullable = true),
+          StructField("StackTrace",
+            ArrayType(
+              StructType(Seq(
+                StructField("DeclaringClass",StringType,nullable = true),
+                StructField("FileName",StringType,nullable = true),
+                StructField("LineNumber",LongType,nullable = true),
+                StructField("MethodName",StringType,nullable = true)
+              )),containsNull = true)
+            ,nullable = true)
+        )),nullable = true),
+      StructField("TaskMetrics",
+        StructType(Seq(
+          StructField("DiskBytesSpilled",LongType,nullable = true),
+          StructField("ExecutorCPUTime",LongType,nullable = true),
+          StructField("ExecutorDeserializeCPUTime",LongType,nullable = true),
+          StructField("ExecutorDeserializeTime",LongType,nullable = true),
+          StructField("ExecutorRunTime",LongType,nullable = true),
+          StructField("InputMetrics",
+            StructType(Seq(
+              StructField("BytesRead",LongType,nullable = true),
+              StructField("RecordsRead",LongType,nullable = true)
+            )),nullable = true),
+          StructField("JVMGCTime",LongType,nullable = true),
+          StructField("MemoryBytesSpilled",LongType,nullable = true),
+          StructField("OutputMetrics",
+            StructType(Seq(
+              StructField("BytesWritten",LongType,nullable = true),
+              StructField("RecordsWritten",LongType,nullable = true)
+            )),nullable = true),
+          StructField("PeakExecutionMemory",LongType,nullable = true),
+          StructField("ResultSerializationTime",LongType,nullable = true),
+          StructField("ResultSize",LongType,nullable = true),
+          StructField("ShuffleReadMetrics",
+            StructType(Seq(
+              StructField("FetchWaitTime",LongType,nullable = true),
+              StructField("LocalBlocksFetched",LongType,nullable = true),
+              StructField("LocalBytesRead",LongType,nullable = true),
+              StructField("RemoteBlocksFetched",LongType,nullable = true),
+              StructField("RemoteBytesRead",LongType,nullable = true),
+              StructField("RemoteBytesReadToDisk",LongType,nullable = true),
+              StructField("TotalRecordsRead",LongType,nullable = true)
+            )),nullable = true),
+          StructField("ShuffleWriteMetrics",
+            StructType(Seq(
+              StructField("ShuffleBytesWritten",LongType,nullable = true),
+              StructField("ShuffleRecordsWritten",LongType,nullable = true),
+              StructField("ShuffleWriteTime",LongType,nullable = true)
+            )),nullable = true),
+          StructField("UpdatedBlocks", ArrayType(StringType,containsNull = true),nullable = true)
+        )),nullable = true),
+      StructField("TaskType",StringType,nullable = true),
+      StructField("endFilenameGroup",
+        StructType(Seq(
+          StructField("filename",StringType,nullable = true),
+          StructField("byCluster",StringType,nullable = true),
+          StructField("byDriverHost",StringType,nullable = true),
+          StructField("bySparkContext",StringType,nullable = true)
+        )),nullable = true),
+      StructField("TaskInfo",
+        StructType(Seq(
+          StructField("Accumulables",
+            ArrayType(
+              StructType(Seq(
+                StructField("CountFailedValues",BooleanType,nullable = true),
+                StructField("ID",LongType,nullable = true),
+                StructField("Internal",BooleanType,nullable = true),
+                StructField("Metadata",StringType,nullable = true),
+                StructField("Name",StringType,nullable = true),
+                StructField("Update",StringType,nullable = true),
+                StructField("Value",StringType,nullable = true)
+              )),containsNull = true)
+            ,nullable = true),
+          StructField("Failed",BooleanType,nullable = true),
+          StructField("FinishTime",LongType,nullable = true),
+          StructField("GettingResultTime",LongType,nullable = true),
+          StructField("Host",StringType,nullable = true),
+          StructField("Index",LongType,nullable = true),
+          StructField("Killed",BooleanType,nullable = true),
+          StructField("LaunchTime",LongType,nullable = true),
+          StructField("Locality",StringType,nullable = true),
+          StructField("Speculative",BooleanType,nullable = true)
+        )),nullable = true),
+      StructField("TaskRunTime",
+        StructType(Seq(
+          StructField("startEpochMS",LongType,nullable = true),
+          StructField("startTS",TimestampType,nullable = true),
+          StructField("endEpochMS",LongType,nullable = true),
+          StructField("endTS",TimestampType,nullable = true),
+          StructField("runTimeMS",LongType,nullable = true),
+          StructField("runTimeS",DoubleType,nullable = true),
+          StructField("runTimeM",DoubleType,nullable = true),
+          StructField("runTimeH",DoubleType,nullable = true)
+        )),nullable = true),
+      StructField("startTimestamp",LongType,nullable = true),
+      StructField("startDate",DateType,nullable = true),
+      StructField("Pipeline_SnapTS",TimestampType,nullable = true),
+      StructField("Overwatch_RunID",StringType,nullable = true)
     ))
   )
 

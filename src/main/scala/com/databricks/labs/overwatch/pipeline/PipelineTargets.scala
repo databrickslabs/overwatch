@@ -145,7 +145,7 @@ abstract class PipelineTargets(config: Config) {
       name = "jobrun_silver",
       keys = Array("startTimestamp", "runId"),
       config,
-      incrementalColumns = Array("jobRunTime.startEpochMS"),
+      incrementalColumns = Array("timestamp"),
       zOrderBy = Array("runId", "jobId")
     )
 
@@ -191,6 +191,146 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("timestamp", "notebook_id"),
       config,
       incrementalColumns = Array("timestamp")
+    )
+
+  }
+
+  object GoldTargets {
+
+    lazy private[overwatch] val clusterTarget: PipelineTable = PipelineTable(
+      name = "cluster_gold",
+      keys = Array("cluster_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val clusterViewTarget: PipelineView = PipelineView(
+      name = "cluster",
+      clusterTarget,
+      config
+    )
+
+    lazy private[overwatch] val jobTarget: PipelineTable = PipelineTable(
+      name = "job_gold",
+      keys = Array("job_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val jobViewTarget: PipelineView = PipelineView(
+      name = "job",
+      jobTarget,
+      config
+    )
+
+    lazy private[overwatch] val jobRunTarget: PipelineTable = PipelineTable(
+      name = "jobRun_gold",
+      keys = Array("run_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val jobRunsViewTarget: PipelineView = PipelineView(
+      name = "jobRun",
+      jobRunTarget,
+      config
+    )
+
+    lazy private[overwatch] val notebookTarget: PipelineTable = PipelineTable(
+      name = "notebook_gold",
+      keys = Array("notebook_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val notebookViewTarget: PipelineView = PipelineView(
+      name = "notebook",
+      notebookTarget,
+      config
+    )
+
+    lazy private[overwatch] val clusterStateFactTarget: PipelineTable = PipelineTable(
+      name = "clusterStateFact_gold",
+      keys = Array("cluster_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(
+      name = "clusterStateFact",
+      clusterStateFactTarget,
+      config
+    )
+
+    lazy private[overwatch] val sparkJobTarget: PipelineTable = PipelineTable(
+      name = "sparkJob_gold",
+      keys = Array("spark_context_id", "job_id"),
+      config,
+      partitionBy = Array("date"),
+      zOrderBy = Array("spark_context_id"),
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val sparkJobViewTarget: PipelineView = PipelineView(
+      name = "sparkJob",
+      sparkJobTarget,
+      config
+    )
+
+    lazy private[overwatch] val sparkStageTarget: PipelineTable = PipelineTable(
+      name = "sparkStage_gold",
+      keys = Array("spark_context_id", "stage_id", "stage_attempt_id"),
+      config,
+      partitionBy = Array("date"),
+      zOrderBy = Array("spark_context_id"),
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val sparkStageViewTarget: PipelineView = PipelineView(
+      name = "sparkStage",
+      sparkStageTarget,
+      config
+    )
+
+    lazy private[overwatch] val sparkTaskTarget: PipelineTable = PipelineTable(
+      name = "sparkTask_gold",
+      keys = Array("spark_context_id", "task_id", "task_attempt_id"),
+      config,
+      partitionBy = Array("date"),
+      zOrderBy = Array("spark_context_id"),
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val sparkTaskViewTarget: PipelineView = PipelineView(
+      name = "sparkTask",
+      sparkTaskTarget,
+      config
+    )
+
+    lazy private[overwatch] val sparkExecutionTarget: PipelineTable = PipelineTable(
+      name = "sparkExecution_gold",
+      keys = Array("spark_context_id", "execution_id"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val sparkExecutionViewTarget: PipelineView = PipelineView(
+      name = "sparkExecution",
+      sparkExecutionTarget,
+      config
+    )
+
+    lazy private[overwatch] val sparkExecutorTarget: PipelineTable = PipelineTable(
+      name = "sparkExecutor_gold",
+      keys = Array("spark_context_id", "executor_id"),
+      config,
+      incrementalColumns = Array("unixTimeMS")
+    )
+
+    lazy private[overwatch] val sparkExecutorViewTarget: PipelineView = PipelineView(
+      name = "sparkExecutor",
+      sparkExecutorTarget,
+      config
     )
 
   }

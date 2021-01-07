@@ -12,10 +12,9 @@ import scala.collection.mutable.ArrayBuffer
 
 class Silver(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
-    with SilverTransforms with SparkSessionWrapper {
+    with SilverTransforms {
 
   envInit()
-  setCloudProvider(config.cloudProvider)
 
   import spark.implicits._
 
@@ -276,7 +275,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   def run(): Boolean = {
 
     restoreSparkConf()
-    setCloudProvider(config.cloudProvider)
     // TODO -- see which transforms are possible without audit and rebuild for no-audit
     //  CURRENTLY -- audit is required for silver
     val scope = config.overwatchScope
@@ -323,12 +321,12 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       try {
         processSparkEvents()
       } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: SparkEvents Module")
+        case e: FailedModuleException =>
+          logger.log(Level.ERROR, "FAILED: SparkEvents Silver Module", e)
       }
 
     initiatePostProcessing()
-    true
+    true // to be used as fail switch later if necessary
   }
 
 

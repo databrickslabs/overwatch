@@ -28,7 +28,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _newDataRetrieved: Boolean = true
-  private var CLOUD_PROVIDER: String = "aws"
 
   //  case class ClusterEventsBuffer(clusterId: String, batch: Int, extraQuery: Map[String, Long])
   case class ClusterIdsWEventCounts(clusterId: String, count: Long)
@@ -41,11 +40,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
     }
     from_json(col(c), jsonSchema).alias(c)
-  }
-
-  protected def setCloudProvider(value: String): this.type = {
-    CLOUD_PROVIDER = value
-    this
   }
 
   protected def setNewDataRetrievedFlag(value: Boolean): this.type = {
@@ -173,12 +167,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
                                isFirstRun: Boolean,
+                               cloudProvider: String,
                                fromTime: LocalDateTime,
                                untilTime: LocalDateTime,
                                auditRawLand: PipelineTable,
                                overwatchRunID: String
                               ): DataFrame = {
-    if (CLOUD_PROVIDER == "azure") {
+    if (cloudProvider == "azure") {
       val rawBodyLookup = spark.table(auditRawLand.tableFullName)
         .filter('Overwatch_RunID === lit(overwatchRunID))
       val schemaBuilders = spark.table(auditRawLand.tableFullName)

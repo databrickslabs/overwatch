@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Silver}
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Silver}
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.log4j.{Level, Logger}
 
@@ -33,6 +33,8 @@ object BatchRunner extends SparkSessionWrapper{
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
 
+    logger.log(Level.INFO, "Starting Gold")
+    Gold(workspace).run()
 
   }
 

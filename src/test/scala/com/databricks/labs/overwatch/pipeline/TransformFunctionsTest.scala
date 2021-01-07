@@ -92,8 +92,8 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
       assertResult(1)(actualDF.count())
       val first = actualDF.first()
       assertResult(sourceTS)(first.getLong(0))
-      assertResult(Timestamp.valueOf("1970-01-02 11:17:36"))(first.getTimestamp(1))
-      assertResult(Timestamp.valueOf("1973-11-29 22:33:09"))(first.getTimestamp(2))
+      assertResult(Instant.parse("1970-01-02T10:17:36Z"))(first.getTimestamp(1).toInstant)
+      assertResult(Instant.parse("1973-11-29T21:33:09Z"))(first.getTimestamp(2).toInstant)
     }
 
     it("should work for DateType") {
