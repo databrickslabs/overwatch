@@ -132,7 +132,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
       instanceDetailsDF
         .write.format("delta")
-        .saveAsTable(s"${config.databaseName}.instanceDetails")
+        .saveAsTable(s"${config.consumerDatabaseName}.instanceDetails")
     }
     this
   }
