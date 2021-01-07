@@ -169,9 +169,9 @@ object TransformFunctions extends SparkSessionWrapper {
   private val applicableWorkers = when('type === "RESIZING" && 'target_num_workers < 'current_num_workers, 'target_num_workers).otherwise('current_num_workers)
 
   def getNodeInfo(nodeType: String, metric: String, multiplyTime: Boolean): Column = {
-    val baseMetric = if (nodeType.toLowerCase == "driver") {
+    val baseMetric = if ("driver".compareToIgnoreCase(nodeType) == 0) {
       col(s"driverSpecs.${metric}")
-    } else if(nodeType.toLowerCase == "worker") {
+    } else if("worker".compareToIgnoreCase(nodeType) == 0) {
       col(s"workerSpecs.${metric}") * applicableWorkers
     } else {
       throw new Exception("nodeType must be either 'driver' or 'worker'")
