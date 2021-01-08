@@ -75,10 +75,10 @@ abstract class PipelineTargets(config: Config) {
     )
 
     lazy private[overwatch] val cloudMachineDetail: PipelineTable = if (config.cloudProvider == "azure") {
-      PipelineTable("instanceDetails", Array("API_Name"), config, mode = "overwrite")
+      PipelineTable("instanceDetails", Array("API_Name"), config, mode = "overwrite", _databaseName = config.consumerDatabaseName)
     } else {
       // TODO -- implement for azure
-      PipelineTable("instanceDetails", Array("API_Name"), config, mode = "overwrite")
+      PipelineTable("instanceDetails", Array("API_Name"), config, mode = "overwrite", _databaseName = config.consumerDatabaseName)
     }
 
   }
