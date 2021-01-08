@@ -211,9 +211,12 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val clusterStateFactCols: Array[Column] = Array(
       'cluster_id,
-      'timestamp.alias("unixTimeMS"),
-      from_unixtime('timestamp.cast("double") / 1000).cast("timestamp").alias("timestamp"),
-      from_unixtime('timestamp.cast("double") / 1000).cast("timestamp").cast("date").alias("date"),
+      ('timestamp * lit(1000)).alias("unixTimeMS_state_start"),
+      from_unixtime(('timestamp * lit(1000)).cast("double") / 1000).cast("timestamp").alias("timestamp_state_start"),
+      from_unixtime(('timestamp * lit(1000)).cast("double") / 1000).cast("timestamp").cast("date").alias("date_state_start"),
+      ((lead('timestamp, 1).over(stateUnboundW) * lit(1000) - 1)).alias("unixTimeMS_state_end"),
+      from_unixtime(((lead('timestamp, 1).over(stateUnboundW) * lit(1000)).cast("double") - 1.0) / 1000).cast("timestamp").alias("timestamp_state_end"),
+      from_unixtime(((lead('timestamp, 1).over(stateUnboundW) * lit(1000)).cast("double") - 1.0) / 1000).cast("timestamp").cast("date").alias("date_state_end"),
       'type.alias("state"),
       'current_num_workers,
       'target_num_workers,
@@ -229,8 +232,6 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     clusterPotential
       .select(clusterStateFactCols: _*)
-      .withColumn("unixTimeMS", ('unixTimeMS * lit(1000)).cast("long"))
-
   }
 
   protected def buildSparkJob(
@@ -409,7 +410,8 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val clusterStateFactViewColumnMappings: String =
     """
-      |cluster_id, unixTimeMS, timestamp, date, state, current_num_workers, target_num_workers, counter_reset,
+      |cluster_id, unixTimeMS_state_start, timestamp_state_start, date_state_start, unixTimeMS_state_end,
+      |timestamp_state_end, date_state_end, state, current_num_workers, target_num_workers, counter_reset,
       |uptime_since_restart_S, uptime_in_state_S, driver_node_type_id, node_type_id, cloud_billable,
       |databricks_billable, core_hours
       |""".stripMargin
