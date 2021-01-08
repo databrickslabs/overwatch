@@ -120,7 +120,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * @return
    */
   private def loadStaticDatasets: this.type = {
-    if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, "instanceDetails")) {
+    if (config.isFirstRun || !spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
           InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
