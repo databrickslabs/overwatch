@@ -18,7 +18,10 @@ case class GangliaDetail()
 
 case class TokenSecret(scope: String, key: String)
 
-case class DataTarget(databaseName: Option[String], databaseLocation: Option[String])
+case class DataTarget(databaseName: Option[String], databaseLocation: Option[String],
+                      consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
+
+case class DatabricksContractPrices(interactiveDBUCostUSD: Double, automatedDBUCostUSD: Double)
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encryptedToken: Array[Byte], cipher: Cipher)
 
@@ -55,7 +58,8 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            dataTarget: Option[DataTarget] = None,
                            badRecordsPath: Option[String] = None,
                            overwatchScope: Option[Seq[String]] = None,
-                           maxDaysToLoad: Int
+                           maxDaysToLoad: Int = 60,
+                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(0.56, 0.26)
                           )
 
 case class ParsedConfig(
@@ -81,6 +85,20 @@ case class ModuleStatusReport(
                                vacuumRetentionHours: Int,
                                inputConfig: OverwatchParams,
                                parsedConfig: ParsedConfig
+                             )
+
+case class SimplifiedModuleStatusReport(
+                               moduleID: Int,
+                               moduleName: String,
+                               runStartTS: Long,
+                               runEndTS: Long,
+                               fromTS: Long,
+                               untilTS: Long,
+                               dataFrequency: String,
+                               status: String,
+                               recordsAppended: Long,
+                               lastOptimizedTS: Long,
+                               vacuumRetentionHours: Int
                              )
 
 case class IncrementalFilter(sourceCol: String, low: Column, high: Column)

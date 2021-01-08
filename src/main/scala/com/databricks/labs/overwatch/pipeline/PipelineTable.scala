@@ -19,6 +19,7 @@ case class PipelineTable(
                           dataFrequency: Frequency = Frequency.milliSecond,
                           format: String = "delta", // TODO -- Convert to Enum
                           mode: String = "append", // TODO -- Convert to Enum
+                          _databaseName: String = "default",
                           autoOptimize: Boolean = false,
                           autoCompact: Boolean = false,
                           partitionBy: Array[String] = Array(),
@@ -40,6 +41,8 @@ case class PipelineTable(
 
   import spark.implicits._
 
+  private val databaseName = if(_databaseName == "default") config.databaseName else config.consumerDatabaseName
+
   //  col("c").get
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try {
@@ -56,7 +59,7 @@ case class PipelineTable(
     (dbCatalog, dbCatalog)
   } else (None, None)
 
-  val tableFullName: String = s"${config.databaseName}.${name}"
+  val tableFullName: String = s"${databaseName}.${name}"
 
   if (autoOptimize) {
     spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")

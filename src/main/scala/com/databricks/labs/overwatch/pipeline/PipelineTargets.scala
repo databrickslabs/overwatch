@@ -75,10 +75,10 @@ abstract class PipelineTargets(config: Config) {
     )
 
     lazy private[overwatch] val cloudMachineDetail: PipelineTable = if (config.cloudProvider == "azure") {
-      PipelineTable("instanceDetails", Array("API_Name"), config, mode = "overwrite")
+      PipelineTable("instanceDetails", Array("API_Name"), config, mode = "overwrite", _databaseName = config.consumerDatabaseName)
     } else {
       // TODO -- implement for azure
-      PipelineTable("instanceDetails", Array("API_Name"), config, mode = "overwrite")
+      PipelineTable("instanceDetails", Array("API_Name"), config, mode = "overwrite", _databaseName = config.consumerDatabaseName)
     }
 
   }
@@ -143,7 +143,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(
       name = "jobrun_silver",
-      keys = Array("startTimestamp", "runId"),
+      keys = Array("timestamp", "runId"),
       config,
       incrementalColumns = Array("timestamp"),
       zOrderBy = Array("runId", "jobId")

@@ -57,6 +57,13 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     clusterStateFactModule
   )
 
+//  private val poolsModule = Module(3006, "Gold_Pools")
+//  lazy private val appendPoolsProcess = EtlDefinition(
+//    BronzeTargets.poolsTarget.asIncrementalDF(
+//      buildIncrementalFilter("")
+//    )
+//  )
+
   private val jobsModule = Module(3002, "Gold_Job")
   lazy private val appendJobsProcess = EtlDefinition(
     SilverTargets.dbJobsStatusTarget.asIncrementalDF(
@@ -172,6 +179,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping)
       GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings)
     }
+
+//    if (scope.contains(OverwatchScope.pools)) {
+//
+//    }
 
     if (scope.contains(OverwatchScope.jobs)) {
       appendJobsProcess.process()

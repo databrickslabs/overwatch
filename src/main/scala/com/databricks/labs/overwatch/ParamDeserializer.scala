@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch
 
 import java.io.IOException
 
-import com.databricks.labs.overwatch.utils.{AuditLogConfig, AzureAuditLogEventhubConfig, DataTarget, OverwatchParams, TokenSecret}
+import com.databricks.labs.overwatch.utils.{AuditLogConfig, AzureAuditLogEventhubConfig, DataTarget, DatabricksContractPrices, OverwatchParams, TokenSecret}
 import com.fasterxml.jackson.core.{JsonParser, JsonProcessingException}
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
@@ -119,7 +119,9 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val dataTarget = if (masterNode.has("dataTarget")) {
       Some(DataTarget(
         getOption(masterNode, "dataTarget.databaseName", ""),
-        getOption(masterNode, "dataTarget.databaseLocation", "")
+        getOption(masterNode, "dataTarget.databaseLocation", ""),
+        getOption(masterNode, "dataTarget.consumerDatabaseName", ""),
+        getOption(masterNode, "dataTarget.consumerDatabaseLocation", "")
       ))
     } else None
     //      Some(masterNode.get("dataTarget").get("databaseName").asText()),
@@ -134,6 +136,11 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     }
     val maxDaysToLoad = masterNode.get("maxDaysToLoad").asInt(60)
 
+    val dbContractPrices = DatabricksContractPrices(
+      getOption(masterNode, "databricksContractPrices.interactiveDBUCostUSD",0.56 ).getOrElse(0.56),
+      getOption(masterNode, "databricksContractPrices.automatedDBUCostUSD",0.26 ).getOrElse(0.26)
+    )
+
     //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
     //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
 
@@ -143,7 +150,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       dataTarget,
       Some(badRecordsPath),
       Some(overwatchScopes.toArray.toSeq),
-      maxDaysToLoad
+      maxDaysToLoad,
+      dbContractPrices
     )
   }
 }

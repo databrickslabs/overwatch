@@ -25,7 +25,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
   import spark.implicits._
 
-  private def showRangeReport(lastRunDetail: Array[ModuleStatusReport]): Unit = {
+  private def showRangeReport(lastRunDetail: Array[SimplifiedModuleStatusReport]): Unit = {
     val rangeReport = lastRunDetail.map(lr =>
       (
         lr.moduleID,
@@ -44,6 +44,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   /**
    * initialize the pipeline run
    * Identify the timestamps to use by module and set them
+   *
    * @return
    */
   private def initPipelineRun(): this.type = {
@@ -55,13 +56,14 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter('rnk === 1 && 'rn === 1)
-        .as[ModuleStatusReport]
+        .drop("inputConfig", "parsedConfig")
+        .as[SimplifiedModuleStatusReport]
         .collect()
       config.setLastRunDetail(lastRunDetail)
       lastRunDetail
     } else {
       config.setIsFirstRun(true)
-      Array[ModuleStatusReport]()
+      Array[SimplifiedModuleStatusReport]()
     }
     config.setPipelineSnapTime()
     if (config.debugFlag) showRangeReport(rangeDetail)
@@ -73,11 +75,13 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * If creating the database special properties will be created to allow overwatch to identify that the db was
    * created through this process. Additionally, the schema version will be noded. This allows for upgrades based on
    * version of Overwatch being executed.
+   *
    * @return
    */
   private def initializeDatabase(): Database = {
     // TODO -- Add metadata table
-    logger.log(Level.INFO, "Initializing Database")
+    // TODO -- refactor and clean up duplicity
+    logger.log(Level.INFO, "Initializing ETL Database")
     if (!spark.catalog.databaseExists(config.databaseName)) {
       logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
         s"${config.databaseLocation}.")
@@ -89,22 +93,34 @@ class Initializer(config: Config) extends SparkSessionWrapper {
           s"WITH DBPROPERTIES (OVERWATCHDB='TRUE',SCHEMA=${config.overwatchSchemaVersion})"
       }
       spark.sql(createDBIfNotExists)
-      logger.log(Level.INFO, s"Sucessfully created database. $createDBIfNotExists")
-      Database(config)
+      logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
     } else {
       // TODO -- get schema version of each table and perform upgrade if necessary
       logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
-      Database(config)
     }
+
+    // Create consumer database if one is configured
+    if (config.consumerDatabaseName != config.databaseName) {
+      logger.log(Level.INFO, "Initializing Consumer Database")
+      if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
+        val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
+          s"location '${config.consumerDatabaseLocation}'"
+        spark.sql(createConsumerDBSTMT)
+        logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+      }
+    }
+
+    Database(config)
   }
 
   /**
    * Ensure all static datasets exist in the newly initialized Database. This function must be called after
    * the database has been initialized.
+   *
    * @return
    */
   private def loadStaticDatasets: this.type = {
-    if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, "instanceDetails")) {
+    if (config.isFirstRun || !spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
           InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
@@ -116,7 +132,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
       instanceDetailsDF
         .write.format("delta")
-        .saveAsTable(s"${config.databaseName}.instanceDetails")
+        .saveAsTable(s"${config.consumerDatabaseName}.instanceDetails")
     }
     this
   }
@@ -258,6 +274,15 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
     config.setDatabaseNameandLoc(dbName, dbLocation)
 
+    val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
+    val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+    config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
+
+    // Set Databricks Contract Prices from Config
+    // Defaulted to 0.56 interactive and 0.26 automated
+    config.setContractInteractiveDBUPrice(rawParams.databricksContractPrices.interactiveDBUCostUSD)
+    config.setContractAutomatedDBUPrice(rawParams.databricksContractPrices.automatedDBUCostUSD)
+
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     validateAuditLogConfigs(auditLogConfig)
 
@@ -273,6 +298,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * It's critical to ensure that the database Overwatch is interacting with is truly an Overwatch database as it can be
    * very dangerous to interact with the wrong database. This function validates that the DB was actually created
    * by this process, that the db default paths match as well as the schema versions are ==
+   *
    * @param dataTarget data target as parsed into OverwatchParams
    * @throws java.lang.IllegalArgumentException
    * @return
@@ -280,16 +306,16 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   @throws(classOf[IllegalArgumentException])
   private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
     val dbName = dataTarget.databaseName.getOrElse("overwatch")
-    val dblocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
+    val dbLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
     var switch = true
     if (spark.catalog.databaseExists(dbName)) {
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
       val dbProperties = dbMeta.properties
-      val existingDBLocaion = dbMeta.locationUri.toString
-      if (existingDBLocaion != dblocation) {
+      val existingDBLocation = dbMeta.locationUri.toString
+      if (existingDBLocation != dbLocation) {
         switch = false
         throw new BadConfigException(s"The DB: $dbName exists" +
-          s"at location $existingDBLocaion which is different than the location entered in the config. Ensure" +
+          s"at location $existingDBLocation which is different than the location entered in the config. Ensure" +
           s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
           s"dbfs:/...")
       }
@@ -309,17 +335,63 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       }
     } else { // Database does not exist
       try { // If the fs.ls below doesn't not throw a FileNotFound exception the target is not empty and will fail the run
-        dbutils.fs.ls(dblocation)
+        dbutils.fs.ls(dbLocation)
         switch = false
-        throw new BadConfigException(s"The target database location: ${dblocation} " +
+        throw new BadConfigException(s"The target database location: ${dbLocation} " +
           s"already exists but does not appear to be associated with the Overwatch database name, $dbName " +
           s"specified. Specify a path that doesn't already exist or choose an existing overwatch database AND " +
           s"database its associated location.")
       } catch { // If the fs.ls throws fileNotFound exception, the db target does not exist and the db will be created
         case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Target location " +
-          s"is valid: will create database: $dbName at location: ${dblocation}")
+          s"is valid: will create database: $dbName at location: ${dbLocation}", e)
       }
     }
+
+    // todo - refactor away duplicity
+    /**
+     * Many of the validation above are required for the consumer DB but the consumer DB will only contain
+     * views. It's important that the basic db checks are completed but the checks don't need to be as extensive
+     * since there's no chance of data corruption given only creating views. This section needs to be refactored
+     * to remove duplicity while still enabling control between which checks are done for which DataTarget.
+     */
+    val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
+    val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+    if (consumerDBName != dbName) { // separate consumer db
+      if (spark.catalog.databaseExists(consumerDBName)) {
+        val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
+        val existingConsumerDBLocation = consumerDBMeta.locationUri.toString
+        if (existingConsumerDBLocation != consumerDBLocation) {
+          switch = false
+          throw new BadConfigException(s"The DB: $dbName exists" +
+            s"at location $existingConsumerDBLocation which is different than the location entered in the config. Ensure" +
+            s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
+            s"dbfs:/...")
+        }
+      } else { // consumer DB is different from ETL DB AND db does not exist
+        try { // If the fs.ls below doesn't not throw a FileNotFound exception the target is not empty and will fail the run
+          dbutils.fs.ls(consumerDBLocation)
+          switch = false
+          throw new BadConfigException(s"The target database location: ${consumerDBLocation} " +
+            s"already exists but does not appear to be associated with the Overwatch database name, $consumerDBName " +
+            s"specified. Specify a path that doesn't already exist or choose an existing overwatch database AND " +
+            s"database its associated location.")
+        } catch { // If the fs.ls throws fileNotFound exception, the db target does not exist and the db will be created
+          case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Target location " +
+            s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}", e)
+        }
+      }
+
+      if (consumerDBLocation == dbLocation) { // separate db AND same location ERROR
+        switch = false
+        throw new BadConfigException("Consumer DB Name cannot differ from ETL DB Name while having the same location.")
+      }
+    } else { // same consumer db as etl db
+      if (consumerDBLocation != dbLocation) { // same db AND DIFFERENT location ERROR
+        switch = false
+        throw new BadConfigException("Consumer DB cannot match ETL DB Name while having different locations.")
+      }
+    }
+
     switch
   }
 
@@ -328,6 +400,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * must work together. This will be made clear in the documentation.
    * Assuming all checks pass, this function converts the list of strings into an enum and stores it in the config
    * to be referenced throughout the package
+   *
    * @param scopes List of modules to be executed during the run as a string.
    * @throws com.databricks.labs.overwatch.utils.BadConfigException
    * @return
