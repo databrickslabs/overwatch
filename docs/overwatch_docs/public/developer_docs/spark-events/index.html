@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en" class="js csstransforms3d">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="Hugo 0.76.5" />
+    <meta name="description" content="Overwatch Documentation">
+<meta name="author" content="Daniel Tomes -- DatabricksLabs">
+
+    <link rel="icon" href="/images/favicon.png" type="image/png">
+
+    <title>Spark Events :: Overwatch</title>
+
+    
+    <link href="/css/nucleus.css?1610412122" rel="stylesheet">
+    <link href="/css/fontawesome-all.min.css?1610412122" rel="stylesheet">
+    <link href="/css/hybrid.css?1610412122" rel="stylesheet">
+    <link href="/css/featherlight.min.css?1610412122" rel="stylesheet">
+    <link href="/css/perfect-scrollbar.min.css?1610412122" rel="stylesheet">
+    <link href="/css/auto-complete.css?1610412122" rel="stylesheet">
+    <link href="/css/atom-one-dark-reasonable.css?1610412122" rel="stylesheet">
+    <link href="/css/theme.css?1610412122" rel="stylesheet">
+    <link href="/css/hugo-theme.css?1610412122" rel="stylesheet">
+    
+    <link href="/css/theme-blue.css?1610412122" rel="stylesheet">
+    
+    
+
+    <script src="/js/jquery-3.3.1.min.js?1610412122"></script>
+
+    <style>
+      :root #header + #content > #left > #rlblock_left{
+          display:none !important;
+      }
+      
+    </style>
+    
+  </head>
+  <body class="" data-url="/developer_docs/spark-events/">
+    <nav id="sidebar" class="">
+
+
+
+  <div id="header-wrapper">
+    <div id="header">
+      <a id="logo" href="https://tomesdata.z20.web.core.windows.net/">
+    <img src="/images/tmp_logo4.png", width="85%">
+</a>
+
+    </div>
+    
+        <div class="searchbox">
+    <label for="search-by"><i class="fas fa-search"></i></label>
+    <input data-search-input id="search-by" type="search" placeholder="Search...">
+    <span data-search-clear=""><i class="fas fa-times"></i></span>
+</div>
+
+<script type="text/javascript" src="/js/lunr.min.js?1610412122"></script>
+<script type="text/javascript" src="/js/auto-complete.js?1610412122"></script>
+<script type="text/javascript">
+    
+        var baseurl = "https:\/\/tomesdata.z20.web.core.windows.net\/";
+    
+</script>
+<script type="text/javascript" src="/js/search.js?1610412122"></script>
+
+    
+  </div>
+
+    <div class="highlightable">
+    <ul class="topics">
+
+        
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/dataengineer/" title="Data Engineering" class="dd-item 
+        
+        
+        
+        ">
+      <a href="/dataengineer/">
+          Data Engineering
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+          
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/upgrading_etl/" title="Upgrading And ETL" class="dd-item ">
+        <a href="/dataengineer/upgrading_etl/">
+        Upgrading And ETL
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/promotion-process/" title="Promotion Process" class="dd-item ">
+        <a href="/dataengineer/promotion-process/">
+        Promotion Process
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/definitions/" title="Definitions" class="dd-item ">
+        <a href="/dataengineer/definitions/">
+        Definitions
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+              
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/developer_docs/" title="Developer_Docs" class="dd-item 
+        parent
+        
+        
+        ">
+      <a href="/developer_docs/">
+          Developer_Docs
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+          
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/accounts/" title="Accounts" class="dd-item ">
+        <a href="/developer_docs/accounts/">
+        Accounts
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/notebooks/" title="Notebooks" class="dd-item ">
+        <a href="/developer_docs/notebooks/">
+        Notebooks
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/cluster-events/" title="Cluster Events" class="dd-item ">
+        <a href="/developer_docs/cluster-events/">
+        Cluster Events
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/audit/" title="Audit" class="dd-item ">
+        <a href="/developer_docs/audit/">
+        Audit
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/jobs/" title="Jobs" class="dd-item ">
+        <a href="/developer_docs/jobs/">
+        Jobs
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/resuming/" title="Resuming" class="dd-item ">
+        <a href="/developer_docs/resuming/">
+        Resuming
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/error-handling/" title="Error Handling" class="dd-item ">
+        <a href="/developer_docs/error-handling/">
+        Error Handling
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/spark-events/" title="Spark Events" class="dd-item active">
+        <a href="/developer_docs/spark-events/">
+        Spark Events
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/clusters/" title="Clusters" class="dd-item ">
+        <a href="/developer_docs/clusters/">
+        Clusters
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+              
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/userguide/" title="UserGuide" class="dd-item 
+        
+        
+        
+        ">
+      <a href="/userguide/">
+          UserGuide
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+          
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/getting-started/" title="Getting Started" class="dd-item ">
+        <a href="/userguide/getting-started/">
+        Getting Started
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/configuration/" title="Configuration" class="dd-item ">
+        <a href="/userguide/configuration/">
+        Configuration
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/modules/" title="Modules" class="dd-item ">
+        <a href="/userguide/modules/">
+        Modules
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/advancedtopics/" title="Advanced Topics" class="dd-item ">
+        <a href="/userguide/advancedtopics/">
+        Advanced Topics
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/troubleshooting/" title="Troubleshooting" class="dd-item ">
+        <a href="/userguide/troubleshooting/">
+        Troubleshooting
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/upgrading/" title="Upgrading" class="dd-item ">
+        <a href="/userguide/upgrading/">
+        Upgrading
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/userguide/roadmap/" title="Roadmap" class="dd-item ">
+        <a href="/userguide/roadmap/">
+        Roadmap
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+              
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/environmentsetup/" title="EnvironmentSetup" class="dd-item 
+        
+        
+        
+        ">
+      <a href="/environmentsetup/">
+          EnvironmentSetup
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+          
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/environmentsetup/azure/" title="Azure" class="dd-item ">
+        <a href="/environmentsetup/azure/">
+        Azure
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/environmentsetup/aws/" title="AWS" class="dd-item ">
+        <a href="/environmentsetup/aws/">
+        AWS
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+              
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/contributing/" title="" class="dd-item 
+        
+        
+        
+        ">
+      <a href="/contributing/">
+          
+          
+      </a>
+      
+              
+    </li>
+  
+ 
+
+          
+         
+    </ul>
+
+    
+    
+
+    
+    <section id="footer">
+      <p>A <a href="https://github.com/databrickslabs">Databricks Labs</a> project.</p>
+    </section>
+  </div>
+</nav>
+
+
+
+
+        <section id="body">
+        <div id="overlay"></div>
+        <div class="padding highlightable">
+              
+              <div>
+                <div id="top-bar">
+                
+                
+                <div id="breadcrumbs" itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb">
+                    <span id="sidebar-toggle-span">
+                        <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
+                          <i class="fas fa-bars"></i>
+                        </a>
+                    </span>
+                  
+                  <span id="toc-menu"><i class="fas fa-list-alt"></i></span>
+                  
+                  <span class="links">
+                 
+                 
+                    
+          
+          
+            
+            
+          
+          
+            
+            
+          
+          
+            <a href='/'>Welcome To OverWatch</a> > <a href='/developer_docs/'>Developer_Docs</a> > Spark Events
+          
+        
+          
+        
+          
+        
+                 
+                  </span>
+                </div>
+                
+                    <div class="progress">
+    <div class="wrapper">
+<nav id="TableOfContents"></nav>
+    </div>
+</div>
+
+                
+              </div>
+            </div>
+            
+        <div id="head-tags">
+        
+        </div>
+        
+        <div id="body-inner">
+          
+            <h1>
+              
+              Spark Events
+            </h1>
+          
+
+        
+
+
+<p>TODO
+Discuss manipulation of spark_events_processedfiles to reload and/or cleanup files
+Discuss the need for landing cluster logs in a storage location with TTL and/or using this table to do your own cleanup</p>
+
+
+<footer class="footline">
+	
+</footer>
+
+        
+        </div> 
+        
+
+      </div>
+
+    <div id="navigation">
+        
+        
+        
+        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+        
+        
+
+
+	 
+	 
+		
+			<a class="nav nav-prev" href="/developer_docs/error-handling/" title="Error Handling"> <i class="fa fa-chevron-left"></i></a>
+		
+		
+			<a class="nav nav-next" href="/developer_docs/clusters/" title="Clusters" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+	
+    </div>
+
+    </section>
+    
+    <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
+      <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
+    </div>
+    <script src="/js/clipboard.min.js?1610412122"></script>
+    <script src="/js/perfect-scrollbar.min.js?1610412122"></script>
+    <script src="/js/perfect-scrollbar.jquery.min.js?1610412122"></script>
+    <script src="/js/jquery.sticky.js?1610412122"></script>
+    <script src="/js/featherlight.min.js?1610412122"></script>
+    <script src="/js/highlight.pack.js?1610412122"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="/js/modernizr.custom-3.6.0.js?1610412122"></script>
+    <script src="/js/learn.js?1610412122"></script>
+    <script src="/js/hugo-learn.js?1610412122"></script>
+
+    <link href="/mermaid/mermaid.css?1610412122" rel="stylesheet" />
+    <script src="/mermaid/mermaid.js?1610412122"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    
+
+  </body>
+</html>
+
