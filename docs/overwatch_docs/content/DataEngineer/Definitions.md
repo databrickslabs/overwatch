@@ -2,6 +2,7 @@
 title: "Definitions"
 date: 2021-01-11T12:21:19-05:00
 draft: true
+weight: 1
 ---
 
 * [Consumption Layer](#consumption-layer-tables-views)

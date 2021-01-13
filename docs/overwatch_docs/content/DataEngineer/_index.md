@@ -1,5 +1,6 @@
 ---
 title: "Data Engineering"
+weight: 3
 ---
 
 ## Overwatch ERD
@@ -14,7 +15,7 @@ suffixed in the ETL database with *\_layer*.
 
 {{% notice note %}}
 Note, the ETL database and consumption database are usually different,
-determined by the [**configuration**]({{%relref "UserGuide/Configuration.md"%}}).
+determined by the [**configuration**]({{%relref "GettingStarted/Configuration.md"%}}).
 {{% /notice %}}
 
 ## Common Terms & Concepts

@@ -12,7 +12,7 @@ To get started, the [Basic Deployment](#basic-deployment) configuration. As more
 environment configuration may be required in addition to the Basic Deployment.
 
 #### Basic Deployment
-* Audit Log Delivery
+* [Audit Log Delivery](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)
 * Create Service User and/or Token for Overwatch to use
     * Grant required privileges to the Overwatch token
     * Register the token secret as a [Databricks Secret](https://docs.databricks.com/security/secrets/index.html)
@@ -23,7 +23,7 @@ perform all Overwatch tasks.
     
 #### With IAM Passthrough Security Capture
 {{% notice info %}}
-Targeted Q1 2021 -- See [Roadmap]({{%relref "UserGuide/Roadmap.md"%}})
+Targeted Q1 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
 #### With Databricks Billable Usage Delivery Logs
@@ -33,7 +33,7 @@ This data can significantly enhance deeper level cost metrics. Even though Overw
 if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
 to load all the historical data from the day that you began receiving it. 
 {{% notice info %}}
-Targeted Q1 2021 -- See [Roadmap]({{%relref "UserGuide/Roadmap.md"%}})
+Targeted Q1 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
 #### With Cloud Provider Costs
@@ -53,10 +53,10 @@ the wrong type (or not enough) can result in elevated compute bills due to ineff
 this feature and would like to participate, please inform your CSE and/or Databricks Account Team.
 
 {{% notice info %}}
-Targeted 2021 -- See [Roadmap]({{%relref "UserGuide/Roadmap.md"%}})
+Targeted 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
 #### Realtime Enablement
 {{% notice info %}}
-2021 Feature Release -- See [Roadmap]({{%relref "UserGuide/Roadmap.md"%}})
+2021 Feature Release -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
