@@ -45,49 +45,81 @@ The large gray boxes in the simplified ERD below depict the two major, logical s
 Complete column descriptions are only provided for the consumption layer. The entity names are linked below.
 
 * [cluster](#cluster)
-* [clusterStateFact]()
-* [job]()
-* [jobrun]()
-* [notebook]()
-* [userLoginFact]()
-* [sparkExecution]()
-* [sparkExecutor]()
-* [sparkJob]()
-* [sparkStage]()
-* [sparkTask]()
+* [clusterStateFact](#clusterstatefact)
+* [job](#job)
+* [jobrun](#jobrun)
+* [notebook](#notebook)
+* [user](#user)
+* [userLoginFact](#userloginfact)
+* [sparkExecution](#sparkexecution)
+* [sparkExecutor](#sparkexecutor)
+* [sparkJob](#sparkjob)
+* [sparkStage](#sparkstage)
+* [sparkTask](#sparktask)
+* [Common Meta Fields](#common-meta-fields)
+  * There are several fields that are present in all tables. Instead of cluttering each table with them, this section
+  was created as a reference to each of these.
+
+{{% notice info %}}
+Most tables below provide a data **SAMPLE** that you can download and review in Excel or your favorite CSV viewer.
+To do this, just right click the SAMPLE link and click saveTargetAs or saveLinkAs and save the file.
+{{% /notice %}}
 
 #### Cluster
+[**SAMPLE**](/assets/TableSamples/cluster.csv)
+
 Column | Type | Description
 :---------------------------|:--------------|:--------------------------------------------------
-cluster_id                  |string         |HOLD
-action                      |string         |HOLD
-unixTimeMS                  |string         |HOLD
-timestamp                   |string         |HOLD
-date                        |string         |HOLD
-cluster_name                |string         |HOLD
-driver_node_type            |string         |HOLD
-node_type                   |string         |HOLD
-num_workers                 |string         |HOLD
-autoscale                   |string         |HOLD
-auto_termination_minutes    |string         |HOLD
-enable_elastic_disk         |string         |HOLD
-cluster_log_conf            |string         |HOLD
-init_script                 |string         |HOLD
-custom_tags                 |string         |HOLD
-cluster_source              |string         |HOLD
-spark_env_vars              |string         |HOLD
-spark_conf                  |string         |HOLD
-acl_path_prefix             |string         |HOLD
-instance_pool_id            |string         |HOLD
-spark_version               |string         |HOLD
-idempotency_token           |string         |HOLD
-organization_id             |string         |HOLD
-deleted_by                  |string         |HOLD
-created_by                  |string         |HOLD
-last_edited_by              |string         |HOLD
-Pipeline_SnapTS             |string         |HOLD
-Overwatch_RunID             |string         |HOLD
+cluster_id                  |string           |Canonical Databricks cluster ID (more info in [Common Meta Fields]())
+action                      |string           |Either **create** OR **edit** -- depicts the type of action for the cluster 
+unixTimeMS                  |long             |Epoch time in milliseconds the action occurred on the cluster
+cluster_name                |string           |user-defined name of the cluster
+driver_node_type            |string           |Canonical name of the driver node type.
+node_type                   |string           |Canonical name of the worker node type.
+num_workers                 |int              |The number of workers defined WHEN autoscaling is disabled
+autoscale                   |struct           |The min/max workers defined WHEN autoscaling is enabled
+auto_termination_minutes    |int              |The number of minutes before the cluster auto-terminates due to inactivity
+enable_elastic_disk         |boolean          |Whether autoscaling disk was enabled or not
+cluster_log_conf            |string           |Logging directory if configured
+init_script                 |Array\[Struct\]  |Array of init scripts
+custom_tags                 |string           |User-Defined tags AND also includes Databricks JobID and Databricks RunName when the cluster is created by a Databricks Job as an automated cluster. Other Databricks services that create clusters also store unique information here such as SqlEndpointID when a cluster is created by "SqlAnalytics" 
+cluster_source              |string           |Shows the source of the action **(TODO -- checking on why null scenario with BUI)
+spark_env_vars              |string           |Spark environment variables defined on the cluster
+spark_conf                  |string           |custom spark configuration on the cluster that deviate from default
+acl_path_prefix             |string           |Automated jobs pass acl to clusters via a path format, the path is defined here
+instance_pool_id            |string           |Canononical pool id from which the cluster receives its nodes
+spark_version               |string           |DBR version - scala version
+idempotency_token           |string           |Idempotent jobs token if used
+organization_id             |string           |Workspace / Organization ID on which the cluster was instantiated
 
+#### ClusterStateFact
+
+#### Job
+
+#### JobRun
+
+#### Notebook
+
+#### User
+
+#### UserLoginFact
+
+#### SparkExecution
+
+#### SparkExecutor
+
+#### SparkJob
+
+#### SparkStage
+
+#### SparkTask
+
+#### Common Meta Fields
+Column | Type | Description
+:---------------------------|:--------------|:--------------------------------------------------
+cluster_id                  |string         | HOLD
+timestamp                   |string         |unixTimeMS as a timestamp type in milliseconds
+date                        |string         |unixTimeMS as a date type
 
 ## ETL Tables
 The following are the list of potential tables, the module with which it's created and the layer in which it lives.

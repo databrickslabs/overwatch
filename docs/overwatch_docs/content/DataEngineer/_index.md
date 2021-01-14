@@ -37,6 +37,11 @@ in silver such as *cluster_spec_silver*. If the raw data you require has not bee
 likely have no other choice than to go directly to the audit logs, *audit_log_bronze*, and filter down to the 
 relevant *service_name* and *action*.
 
-### Spark Job vs Databricks Job
+### Job
+{{% notice note %}}
+Be weary of the term **JOB** when working with Overwatch (and Spark on Databricks in general). A Databricks Job is
+a very different entity than a Spark Job. The documentation attempts to be very clear, please file a ticket if you 
+find a section in which the difference is not made clear.
+{{% /notice %}}
 
-### Spark Job Composition & Hierarchy
+### [Spark Context Composition & Hierarchy]({{%relref "GettingStarted/Modules.md"%}})
