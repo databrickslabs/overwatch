@@ -203,7 +203,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     getIncrementalAuditLogDFByTimestamp(clusterSpecModule.moduleID),
     Some(Seq(
       buildClusterSpec(
-        BronzeTargets.clustersSnapshotTarget
+        BronzeTargets.clustersSnapshotTarget,
+        BronzeTargets.auditLogsTarget
       ))),
     append(SilverTargets.clustersSpecTarget),
     clusterSpecModule

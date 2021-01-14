@@ -9,8 +9,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.forkjoin.ForkJoinPool
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 
 trait SilverTransforms extends SparkSessionWrapper {
 
@@ -359,19 +358,43 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   protected def buildClusterSpec(
-                                  bronze_cluster_snap: PipelineTable
+                                  bronze_cluster_snap: PipelineTable,
+                                  auditRawTable: PipelineTable
                                 )(df: DataFrame): DataFrame = {
     val lastClusterSnap = Window.partitionBy('cluster_id).orderBy('Pipeline_SnapTS.desc)
     val clusterBefore = Window.partitionBy('cluster_id)
       .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val isSingleNode = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
+      "$.spark_databricks_cluster_profile") === lit("singleNode")
+    val isServerless = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
+      "$.spark_databricks_cluster_profile") === lit("serverless")
+
     val clusterBaseDF = clusterBase(df)
 
+    val instancePoolLookup = auditRawTable.asDF
+      .filter('serviceName === "instancePools" && 'actionName === "create")
+      .select(
+        get_json_object($"response.result", "$.instance_pool_id").alias("instance_pool_id"),
+        $"requestParams.node_type_id".alias("pool_node_type")
+      )
+
+    val filledDriverType = when('cluster_name.like("job-%-run-%"), coalesce('driver_node_type_id, 'node_type_id))
+      .when('instance_pool_id.isNotNull, 'pool_node_type)
+      .when(isSingleNode, 'node_type_id)
+      .otherwise(coalesce('driver_node_type_id, first('driver_node_type_id, true).over(clusterBefore), 'node_type_id))
+
+    val filledWorkerType = when('instance_pool_id.isNotNull, 'pool_node_type)
+      .when(isSingleNode, lit(null).cast("string")) // singleNode clusters don't have worker nodes
+      .otherwise('node_type_id)
+
     val clusterSpecBaseCols = Array[Column]('serviceName, 'actionName,
-      'cluster_id, 'cluster_name, 'cluster_state, 'driver_node_type_id, 'node_type_id,
-      'num_workers, 'autoscale, 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster, 'cluster_log_conf,
-      'init_scripts, 'custom_tags, 'cluster_source, 'spark_env_vars, 'spark_conf,
-      'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version,
-      'idempotency_token, 'organization_id, 'timestamp, 'userEmail)
+      'cluster_id, 'cluster_name, 'cluster_state, filledDriverType.alias("driver_node_type_id"),
+      filledWorkerType.alias("node_type_id"), 'num_workers, 'autoscale, 'autotermination_minutes,
+      'enable_elastic_disk, 'start_cluster, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'cluster_source,
+      'spark_env_vars, 'spark_conf, 'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version,
+      'idempotency_token,
+      coalesce('organization_id, lit(dbutils.notebook.getContext.tags("orgId"))).alias("organization_id"),
+      'timestamp, 'userEmail)
 
     val clustersRemoved = clusterBaseDF
       .filter($"response.statusCode" === 200) //?
@@ -387,6 +410,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     clusterBaseDF
       .filter('actionName.isin("create", "edit"))
       .filter($"response.statusCode" === 200) //?
+      .join(instancePoolLookup, Seq("instance_pool_id"), "left") //node_type must be derived from pool when cluster is pooled
+      // TODO -- this will need to be reviewed for mixed pools (i.e. driver of different type)
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("cluster_id"), "left")
       .join(clustersRemoved, Seq("cluster_id"), "left")
@@ -432,7 +457,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select('cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
 
     val clusterSize = clusterBaseDF
-      .filter($"response.statusCode" === 200)
+      .filter($"response.statusCode" === 200) //? TODO -- validate that we should only be returning successful action requests
       .filter('actionName.like("%esult"))
       .join(creatorLookup, Seq("cluster_id"), "left")
       .withColumn("date",
