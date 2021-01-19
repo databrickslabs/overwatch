@@ -419,7 +419,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val sparkJobViewColumnMapping: String =
     """
       |spark_context_id, job_id, job_group_id, execution_id, stage_ids, cluster_id, notebook_id, notebook_path,
-      |db_job_id, db_run_id, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
+      |db_job_id, db_run_id as db_id_in_job, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
       |event_log_end, user_email
       |""".stripMargin
 

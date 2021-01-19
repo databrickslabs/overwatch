@@ -129,7 +129,7 @@ object TransformFunctions extends SparkSessionWrapper {
     columnsToLookup.foldLeft(finalDFWNulls) {
       case (df, c) =>
         val dt = df.schema.fields.filter(_.name == c).head.dataType
-        df.withColumn(c, coalesce(last(col(c), ignoreNulls = true).over(w), lit(0).cast(dt)))
+        df.withColumn(c, coalesce(last(col(c), ignoreNulls = true).over(w), lit(null).cast(dt)))
     }.filter(col(primaryOnlyNoNulls).isNotNull)
   }
 

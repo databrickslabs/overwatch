@@ -387,14 +387,39 @@ trait SilverTransforms extends SparkSessionWrapper {
       .when(isSingleNode, lit(null).cast("string")) // singleNode clusters don't have worker nodes
       .otherwise('node_type_id)
 
-    val clusterSpecBaseCols = Array[Column]('serviceName, 'actionName,
-      'cluster_id, 'cluster_name, 'cluster_state, filledDriverType.alias("driver_node_type_id"),
-      filledWorkerType.alias("node_type_id"), 'num_workers, 'autoscale, 'autotermination_minutes,
-      'enable_elastic_disk, 'start_cluster, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'cluster_source,
-      'spark_env_vars, 'spark_conf, 'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version,
+    val numWorkers = when(isSingleNode, lit(0).cast("int")).otherwise('num_workers.cast("int"))
+    val startCluster = when('start_cluster === "false" || 'start_cluster.isNull, lit(false))
+      .otherwise(lit(true))
+    val enableElasticDisk = when('enable_elastic_disk === "false" || 'enable_elastic_disk.isNull, lit(false))
+      .otherwise(lit(true))
+
+    val clusterSpecBaseCols = Array[Column](
+      'serviceName,
+      'actionName,
+      'cluster_id,
+      'cluster_name,
+      'cluster_state,
+      filledDriverType.alias("driver_node_type_id"),
+      filledWorkerType.alias("node_type_id"),
+      numWorkers.alias("num_workers"),
+      'autoscale,
+      'autotermination_minutes.cast("int").alias("autotermination_minutes"),
+      enableElasticDisk.alias("enable_elastic_disk"),
+      startCluster.alias("start_cluster"),
+      'cluster_log_conf,
+      'init_scripts,
+      'custom_tags,
+      'cluster_source,
+      'spark_env_vars,
+      'spark_conf,
+      'acl_path_prefix,
+      'instance_pool_id,
+      'instance_pool_name,
+      'spark_version,
       'idempotency_token,
       coalesce('organization_id, lit(dbutils.notebook.getContext.tags("orgId"))).alias("organization_id"),
-      'timestamp, 'userEmail)
+      'timestamp,
+      'userEmail)
 
     val clustersRemoved = clusterBaseDF
       .filter($"response.statusCode" === 200) //?
