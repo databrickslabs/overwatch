@@ -368,6 +368,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       "$.spark_databricks_cluster_profile") === lit("singleNode")
     val isServerless = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
       "$.spark_databricks_cluster_profile") === lit("serverless")
+    val isSQLAnalytics = get_json_object('custom_tags, "$.SqlEndpointId").isNotNull
 
     val clusterBaseDF = clusterBase(df)
 
@@ -397,7 +398,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'serviceName,
       'actionName,
       'cluster_id,
-      'cluster_name,
+      when(isSQLAnalytics, lit("SQLAnalytics")).otherwise('cluster_name).alias("cluster_name"),
       'cluster_state,
       filledDriverType.alias("driver_node_type_id"),
       filledWorkerType.alias("node_type_id"),
