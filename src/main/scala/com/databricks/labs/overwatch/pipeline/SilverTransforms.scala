@@ -16,6 +16,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   import spark.implicits._
 
   private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
+  final private val orgId = dbutils.notebook.getContext.tags("orgId")
 
   object UDF {
 
@@ -418,7 +419,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'instance_pool_name,
       'spark_version,
       'idempotency_token,
-      coalesce('organization_id, lit(dbutils.notebook.getContext.tags("orgId"))).alias("organization_id"),
+      coalesce('organization_id, lit(orgId).alias("organization_id"),
       'timestamp,
       'userEmail)
 
@@ -655,6 +656,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         when('actionName.isin("reset", "update"), get_json_object('new_settings, "$.new_cluster"))
           .otherwise('new_cluster)
       )
+      .withColumn("organization_id", lit(orgId))
       .withColumn("job_type", when('job_type.isNull, last('job_type, true).over(lastJobStatus)).otherwise('job_type))
       .withColumn("schedule", when('schedule.isNull, last('schedule, true).over(lastJobStatus)).otherwise('schedule))
       .withColumn("timeout_seconds", when('timeout_seconds.isNull, last('timeout_seconds, true).over(lastJobStatus)).otherwise('timeout_seconds))
@@ -863,7 +865,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         'jobTriggerType, 'new_cluster,
         'existing_cluster_id, //.alias("clusterId"),
         'cluster_name,
-        'orgId, 'notebook_params, 'libraries,
+        coalesce('orgId, lit(orgId)).alias("organization_id"),
+        'notebook_params, 'libraries,
         'workflow_context, 'taskDetail, 'cancellationDetails, 'startedBy,
         struct(
           'runBeginTime,

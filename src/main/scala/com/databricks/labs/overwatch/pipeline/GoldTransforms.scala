@@ -390,15 +390,15 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val jobViewColumnMapping: String =
     """
-      |job_id, action, unixTimeMS, timestamp, date, job_name, job_type, timeout_seconds, schedule, notebook_path,
-      |new_settings, cluster, aclPermissionSet, grants, targetUserId, session_id, request_id, user_agent, response,
-      |source_ip_address, created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
+      |organization_id, job_id, action, unixTimeMS, timestamp, date, job_name, job_type, timeout_seconds, schedule,
+      |notebook_path, new_settings, cluster, aclPermissionSet, grants, targetUserId, session_id, request_id, user_agent,
+      |response, source_ip_address, created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
       |""".stripMargin
 
   protected val jobRunViewColumnMapping: String =
     """
-      |run_id, run_name, job_runtime, job_id, id_in_job, job_cluster_type, job_task_type, job_terminal_state,
-      |job_trigger_type, cluster_id, organization_id, notebook_params, libraries, workflow_context, task_detail,
+      |organization_id, run_id, run_name, job_runtime, job_id, id_in_job, job_cluster_type, job_task_type,
+      |job_terminal_state, job_trigger_type, cluster_id, notebook_params, libraries, workflow_context, task_detail,
       |cancellation_detail, time_detail, started_by, request_detail
       |""".stripMargin
 
