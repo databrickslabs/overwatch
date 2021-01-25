@@ -39,13 +39,14 @@ The large gray boxes in the simplified ERD below depict the two major, logical s
   present in *spark_events_bronze* albeit extremely complex to derive. The Overwatch development team is working 
   tirelessly to expose additional SparkUI data and will publish as soon as it's ready.
 
-![OverwatchERD](/images/DataEngineer/_index/Overwatch_Gold.png)
+![OverwatchERD](/images/_index/Overwatch_Gold.png)
 
 ### Column Descriptions
 Complete column descriptions are only provided for the consumption layer. The entity names are linked below.
 
 * [cluster](#cluster)
 * [clusterStateFact](#clusterstatefact)
+* [instanceDetails](#instancedetails)
 * [job](#job)
 * [jobrun](#jobrun)
 * [notebook](#notebook)
@@ -68,11 +69,12 @@ To do this, just right click the SAMPLE link and click saveTargetAs or saveLinkA
 #### Cluster
 [**SAMPLE**](/assets/TableSamples/cluster.csv)
 
+**KEY** -- organization_id + cluster_id + action + unixTimeMS_state_start
+
 Column | Type | Description
-:---------------------------|:--------------|:--------------------------------------------------
+:---------------------------|:----------------|:--------------------------------------------------
 cluster_id                  |string           |Canonical Databricks cluster ID (more info in [Common Meta Fields]())
-action                      |string           |Either **create** OR **edit** -- depicts the type of action for the cluster 
-unixTimeMS                  |long             |Epoch time in milliseconds the action occurred on the cluster
+action                      |string           |Either **create** OR **edit** -- depicts the type of action for the cluster
 cluster_name                |string           |user-defined name of the cluster
 driver_node_type            |string           |Canonical name of the driver node type.
 node_type                   |string           |Canonical name of the worker node type.
@@ -93,33 +95,319 @@ idempotency_token           |string           |Idempotent jobs token if used
 organization_id             |string           |Workspace / Organization ID on which the cluster was instantiated
 
 #### ClusterStateFact
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + cluster_id + unixTimeMS_state_start
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+cluster_id                  |string           |Canonical Databricks cluster ID (more info in [Common Meta Fields]())
+\*_state_start              |various          |timestamp reference column at the time the state began
+\*_state_end                |various          |timestamp reference column at the time the state ended
+state                       |string           |state of the cluster -- full list [HERE](https://docs.databricks.com/dev-tools/api/latest/clusters.html#clustereventtype)
+current_num_workers         |long             |number of workers in use by the cluster at the start of the state
+target_num_worers           |long             |number of workers targeted to be present by the completion of the state. Should be equal to *current_num_workers* except during RESIZING state
+uptime_since_restart_S      |double           |Seconds since the cluster was last restarted / terminated
+uptime_in_state_S           |double           |Seconds the cluster spent in current state
+driver_node_type_id         |string           |KEY of driver node type to enable join to [instanceDetails](#instanceDetails)
+node_type_id                |string           |KEY of worker node type to enable join to [instanceDetails](#instanceDetails)
+cloud_billable              |boolean          |All current known states are cloud billable. This means that cloud provider charges are present during this state
+databricks_billable         |boolean          |State incurs databricks DBU costs. All states incur DBU costs except: INIT_SCRIPTS_FINISHED, INIT_SCRIPTS_STARTED, STARTING, TERMINATING, CREATING, RESTARTING
+core_hours                  |double           |All core hours of entire cluster (including driver). Nodes * cores * hours in state 
+
+### InstanceDetails
+
+**KEY** -- API_name
+
+This table is a bit unique and it's purpose is to enable users to identify node specific details for the relevant
+cloud provider. Default examples are loaded by default and should closely (if not perfectly) represent your cloud
+node details including costs, CPUs, etc. This is a table not a view like the rest of the entities in the consumer 
+database. Everytime Overwatch runs, it checks to validate the presence of this table, if it does not exist it creates
+it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their needs.
+If you decide to completely customize the table, it's critical to note that some of the columns are required for the ETL
+to function; these fields include: API_name, vCPUs, On_Demand_Cost_Hourly, Hourly_DBUs. As long as these columns exist
+this table may be dropped and recreated to suit your needs.
+
+[Azure VM Pricing Page](https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/)
+
+[AWS EC2 Pricing Page](https://aws.amazon.com/ec2/pricing/on-demand/)
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+instance                    |string           |Common name of instance type 
+API_name                    |string           |Canonical KEY name of the node type -- use this to join to node_ids elsewhere
+vCPUs                       |int              |Number of virtual cpus provisioned for the node type
+Memory_GB                   |int              |Gigabyes of memory provisioned for the node type
+linux_vm_price_hour         |double           |?? Itai ??
+On_Demand_Cost_Hourly       |double           |On demand, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
+Linux_Reserved_Cost_Hourly  |double           |Reserved, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
+Hourly_DBUs                 |double           |Number of DBUs charged for the node type
 
 #### Job
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + job_id
+
+Slow changing dimension of Databricks Jobs. Databricks jobs that are created / edited / deleted through time 
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+job_id                      |string           |Databricks job id
+action                      |string           |Action type defined by the record. One of: create, reset, update, delete, resetJobAcl, changeJobAcl. More information about these actions can be found [here](https://docs.databricks.com/dev-tools/api/latest/jobs.html)
+job_name                    |string           |User defined name of job. NOTE, all jobs created through the UI are initialized with the name, "Untitled" therefore UI-created-named jobs will have an edit action to set the name. The cluster is also set to automated and defaulted on UI create as well
+job_type                    |string           |?? TBD ?? -- there is a job_task_type but that's in Run_id
+timeout_seconds             |string           |null unless specified, default == null. Timeout seconds specified in UI or via api
+schedule                    |string           |JSON - quartz cron expression of scheduled job and timezone_id
+notebook_path               |string           |null if job task does not point to a notebook task. If job points to notebook for execution, this is path to that notebook
+new_settings                |string JSON      |job action with "reset" or "update" where settings were changed. Includes complex type of cluster. [JobSettings Structure Found Here](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobsjobsettings)
+cluster                     |struct           |Where relevant, contains the "new_cluster" spec when cluster definition is "new_cluster" or automated. If job definition points to existing cluster the cluster_id can be found here
+aclPermissionSet            |string           |Predefined aclPermissionsSet such as "Admin" or "Owner". More information on these can be found [HERE](https://docs.databricks.com/security/access-control/jobs-acl.html#jobs-access-control)
+grants                      |string JSON      |Array of explicit grants given to explicit user list
+target_user_id              |string           |Databricks canonical user id to which the aclPermissionSet is to be applied
+session_id                  |string           |session_id that requested the action
+request_id                  |string           |request_id of the action
+user_agent                  |string           |request origin such as browser, terraform, api, etc.
+response                    |struct           |response of api call including errorMessage, result, and statusCode (HTTP 200,400, etc)
+source_ip_address           |string           |Origin IP of action requested
 
 #### JobRun
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + run_id
+
+Inventory of every canonical job run executed in a databricks workspace.
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+run_id                      |int              |Incremental Canonical run ID for the workspaced
+run_name                    |string           |Name of run (if named)
+job_runtime                 |struct           |Complex type with all, standard, runtime information regarding the runtime of the job. The start begins from the moment the job run start is requested (including cluster create time if relevant) and the end time marks the moment the workspace identifies the run as terminated
+job_id                      |int              |Canonical ID of job
+id_in_job                   |int              |Run instance of the job_id. This can be seen in the UI in a job spec denoted as "Run N". Each Job ID has first id_in_job as "Run 1" and is incrented and canonical ONLY for the job_id. This field omits the "Run " prefix and results in an integer value of run instance within job.
+job_cluster_type            |string           |Either new OR existing. New == automated and existing == interactive cluster type
+job_task_type               |string           |Job Task Type - such as Notebook, Python, etc. See [JobTask](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobtask)
+job_terminal_state          |string           |Result state of run such as SUCCESS, FAILED, TIMEDOUT, CANCELLED. See [RunResultState](https://docs.databricks.com/dev-tools/api/latest/jobs.html#runresultstate)
+job_trigger_type            |string           |Type of trigger: PERIODIC, ONE_TIME, RETRY. See [TriggerType](https://docs.databricks.com/dev-tools/api/latest/jobs.html#triggertype)
+cluster_id                  |string           |Canonical workspace cluster id
+notebook_params             |string JSON      |A map of (String, String) parameters sent to notebook parameter overrides. See [ParamPair](https://docs.databricks.com/dev-tools/api/latest/jobs.html#parampair) 
+libraries                   |string JSON      |Array of Libraries in the format defined [HERE](https://docs.databricks.com/dev-tools/api/latest/libraries.html#library)
+workflow_context            |string           |?? REVIEW ??
+task_detail                 |struct           |Unified location for JobTask contingent upon jobrun task. See [JobTask](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobtask)
+cancellation_detail         |struct           |All cancellation request detail and status
+time_detail                 |struct           |All time dimensions tied to the run. runBeginTime == Time the run began to execute on the cluster, SubmissionTime == Time the run request was received by the endpoint (before cluster build/start), completionTime == time the workspace denoted the runID was terminal state 
+started_by                  |struct           |Run request received from user -- email is recorded here -- usage == started_by.email
+request_detail              |struct           |Complete request detail received by the endpoint
 
 #### Notebook
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + notebook_id * action * unixTimeMS
+
+Slow changing dimension of the notebook entities through time. This table does not capture the edits of the 
+notebook contents but rather the state of the notebook itself such as location, name, etc. Primary use case for 
+this table is notebook_id lookup by path/name and/or understanding state/status of notebook entity. It's important
+to utilize this table as a slow-changing dimension. A notebook state should be identified AS OF a point in time.
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+notebook_id                 |string           |Canonical notebook id
+notebook_name               |string           |Name of notebook at time of action requested
+notebook_path               |string           |Path of notebook at time of action requested
+cluster_id                  |string           |Canonical workspace cluster id
+action                      |string           |action recorded
+old_name                    |string           |When action is "renameNotebook" this holds notebook name before rename
+old_path                    |string           |When action is "moveNotebook" this holds notebook path before move
+new_name                    |string           |When action is "renameNotebook" this holds notebook name after rename
+new_path                    |string           |When action is "moveNotebook" this holds notebook path after move
+parent_path                 |string           |When action is "renameNotebook" notebook containing, workspace path is recorded here
+user_email                  |string           |Email of the user requesting the action
+request_id                  |string           |Canonical request_id
+response                    |struct           |HTTP response including errorMessage, result, and statusCode
 
 #### User
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + user_id * action * unixTimeMS
+
+{{% notice note%}}
+**Not exposed in the consumer database**. This table contains more sensitive information and by default is not
+exposed in the consumer database but held back in the etl datbase. This is done purposely to simplify security when/if
+desired. If desired, this can be exposed in consumer database with a simple vew definition exposing the columns desired.
+{{% /notice %}}
+
+{{% notice note%}}
+For deeper insights regarding audit, please reference [auditLogSchema](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html#request-parameters).
+This is simplified through the use of the *ETL_DB.audit_log_bronze* and filter where serviceName == accounts for example.
+Additionally, you may filter down to specific actions using "actionName". An example query is provided below:
+{{% /notice %}}
+
+```scala
+spark.table("overwatch.audit_log_bronze")
+  .filter('serviceName === "accounts" && 'actionName === "createGroup")
+  .selectExpr("*", "requestParams.*").drop("requestParams")      
+```
+
+Slow changing dimension of user entity through time. Also used as reference map from user_email to user_id
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+user_id                     |string           |Canonical user id for which the action was requested (within the workspace) (target)
+user_email                  |string           |User's email for which the action was requested (target) 
+action                      |string           |Action requested to be performed
+added_from_ip_address       |string           |Source IP of the request
+added_by                    |string           |Authenticated user that made the request
+user_agent                  |string           |request origin such as browser, terraform, api, etc.
 
 #### UserLoginFact
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + user_id + login_type + UnixTimeMS
+
+{{% notice note%}}
+**Not exposed in the consumer database**. This table contains more sensitive information and by default is not
+exposed in the consumer database but held back in the etl datbase. This is done purposely to simplify security when/if
+desired. If desired, this can be exposed in consumer database with a simple vew definition exposing the columns desired.
+{{% /notice %}}
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+user_id                     |string           |Canonical user id (within the workspace)
+user_email                  |string           |User's email
+login_type                  |string           |Type of login such as web, ssh, token
+ssh_username                |string           |username used to login via SSH
+groups_user_name            |string           |?? To research ??
+account_admin_userID        |string           |?? To research ??
+login_from_ip_address       |string           |Source IP from which login was initiated
+user_agent                  |string           |request origin such as browser, terraform, api, etc.
+
+{{% notice note%}}
+The following sections are related to Spark. Everything that can be seend/found in the SparkUI is visibel in the 
+spark tables below. A reasonable understanding of the Spark hierarchy is necessary to 
+make this section simpler. Please [**reference Spark Hierarchy For More Details**](({{%relref "GettingStarted/Modules.md"%}}/#sparkevents)) for more details.
+{{% /notice %}}
 
 #### SparkExecution
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + spark_context_id + execution_id + cluster_id
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+spark_context_id            |string           |Canonical context ID -- One Spark Context per Cluster
+cluster_id                  |string           |Canonical workspace cluster id
+execution_id                |long             |Spark Execution ID
+description                 |string           |Description provided by spark
+details                     |string           |Execution StackTrace
+sql_execution_runtime       |struct           |Complete runtime detail breakdown
 
 #### SparkExecutor
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + spark_context_id + executor_id + cluster_id
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+spark_context_id            |string           |Canonical context ID -- One Spark Context per Cluster
+cluster_id                  |string           |Canonical workspace cluster id
+executor_id                 |int              |Executor ID
+executor_info               |string           |Executor Detail
+removed_reason              |string           |Reason executor was removed
+executor_alivetime          |struct           |Complete lifetime detail breakdown
 
 #### SparkJob
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + spark_context_id + job_id + cluster_id
+
+**Partition Column[s]** -- date
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+spark_context_id            |string           |Canonical context ID -- One Spark Context per Cluster
+cluster_id                  |string           |Canonical workspace cluster id
+job_id                      |string           |Spark Job ID
+job_group_id                |string           |Spark Job Group ID -- NOTE very powerful for many reasons. See [SparkEvents]({{%relref "GettingStarted/Modules.md"%}}/#sparkevents)
+execution_id                |string           |Spark Execution ID
+stage_ids                   |array\[long\]    |Array of all Spark Stage IDs nested within this Spark Job
+notebook_id                 |string           |Canonical Databricks Workspace Notebook ID 
+notebook_path               |string           |Databricks Notebook Path
+user_email                  |string           |email of user that owned the request, for Databricks jobs this will be the job owner
+db_job_id                   |string           |Databricks Job Id executing the Spark Job
+db_id_in_job                |string           |"id_in_job" such as "Run 10" without "Run " prefix. This is a critical join column when working looking up Databricks Jobs metadata
+job_runtime                 |string           |Complete job runtime detail breakdown
+job_result                  |struct           |Job Result and Exception if present
 
 #### SparkStage
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + spark_context_id + stage_id + stage_attempt_id + cluster_id
+
+**Partition Column[s]** -- date
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+spark_context_id            |string           |Canonical context ID -- One Spark Context per Cluster
+cluster_id                  |string           |Canonical workspace cluster id
+stage_id                    |string           |Spark Stage ID
+stage_attempt_id            |string           |Spark Stage Attempt ID
+stage_runtime               |string           |Complete stage runtime detail
+stage_info                  |string           |Lineage of all accumulables for the Spark Stage
 
 #### SparkTask
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + spark_context_id + task_id + task_attempt_id + stage_id + stage_attempt_id + cluster_id
+
+**Partition Column[s]** -- date
+
+{{% notice warning%}}
+**USE THE PARTITION COLUMN** (date) and Indexed Column (cluster_id) in all joins and filters where possible. 
+This table can get extremely large, select samples or smaller date ranges and reduce joins and columns selected 
+to improve performance. 
+{{% /notice %}}
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+spark_context_id            |string           |Canonical context ID -- One Spark Context per Cluster
+cluster_id                  |string           |Canonical workspace cluster id
+task_id                     |string           |Spark Task ID
+task_attempt_id             |string           |Spark Task Attempt ID
+stage_id                    |string           |Spark Stage ID
+stage_attempt_id            |string           |Spark Stage Attempt ID
+executor_id                 |string           |Spark Executor ID
+host                        |string           |Internal IP address of node
+task_runtime                |string           |Complete task runtime detail 
+task_metrics                |string           |Lowest level compute metrics provided by spark such as spill bytes, read/write bytes, shuffle info, GC time, Serialization, etc.
+task_info                   |string           |Lineage of all accumulables for the Spark Task
+task_type                   |string           |Spark task Type (i.e. ResultTask, ShuffleMapTask, etc)
+task_end_reason             |string           |Task end status, state, and details plus stake trace when error
 
 #### Common Meta Fields
 Column | Type | Description
 :---------------------------|:--------------|:--------------------------------------------------
-cluster_id                  |string         | HOLD
+cluster_id                  |string         |Canonical workspace cluster id
+unixTimeMS                  |long           |unix time epoch as a long in milliseconds
 timestamp                   |string         |unixTimeMS as a timestamp type in milliseconds
 date                        |string         |unixTimeMS as a date type
+created_by                  |string         |
+last_edited_by              |string         |last user to edit the state of the entity
+last_edited_ts              |string         |timestamp at which the entitiy's sated was last edited
+deleted_by                  |string         |user that deleted the entity
+deleted_ts                  |string         |timestamp at which the entity was deleted
+event_log_start             |string         |Spark Event Log BEGIN file name / path
+event_log_end               |string         |Spark Event Log END file name / path
+Pipeline_SnapTS             |string         |Snapshot timestmap of Overwatch run that added the record
+Overwatch_RunID             |string         |Overwatch canonical ID that resulted in the record load
 
 ## ETL Tables
 The following are the list of potential tables, the module with which it's created and the layer in which it lives.

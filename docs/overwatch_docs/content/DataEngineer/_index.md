@@ -4,7 +4,7 @@ weight: 3
 ---
 
 ## Overwatch ERD
-![OverwatchERD](/images/DataEngineer/_index/Overwatch_Gold.png)
+![OverwatchERD](/images/_index/Overwatch_Gold.png)
 
 ## Overwatch Data Promotion Process
 Overwatch data is promoted from bronze - silver - gold - presentation to ensure data consistency and quality as the 

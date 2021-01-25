@@ -177,6 +177,8 @@ and over to Databricks Environment metadata. The image below attempts to depict 
 the interactions. A few bullet points have been provided below to help you digest the visual. Additionally, if you're
 familiar with the SparkUI, the hierarchy and encapsulations are identical.
 
+Additional clarification of the Spark Hierachy can be found on this [Spark+AI Summit YT Video](https://youtu.be/daXEp4HmS-E?t=108)
+
 ![SparkHierarchyVix](/images/GettingStarted/Modules/SparkJobHierarchy.png)
 
 * A **SparkExecutionID** is only present when the spark job\[s\] are spawned from a SparkSQL command. RDD and Delta 
