@@ -1,12 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
 import java.io.StringWriter
-
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, IncrementalFilter, Module, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
 import org.apache.spark.sql.functions._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.expressions.Window
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -36,6 +36,30 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     BronzeTargets.auditLogsTarget.asIncrementalDF(filters)
   }
 
+  /**
+   * Start and End events can be separated across rolled log files. For example, if a job runs for 22 hours, there
+   * will be n Overwatch runs that are processed and the start/end events will not be able to be pieced together
+   * since Overwatch only processes the new data for Spark Events especially for spark modules due to performance
+   * @param moduleId ETL ModuleID
+   * @param event The spark event by which to filter
+   * @param previousRuns Number of previous Overwatch Runs to include in the search for joins (inclusive). Defaulted
+   *                     to 3
+   * @return
+   */
+  private def getLaggingStartEvents(moduleId: Int, event: String, previousRuns: Int = 3): DataFrame = {
+    val previousThree = spark.table(s"${config.databaseName}.pipeline_report")
+      .filter('status === "SUCCESS" && 'moduleID === moduleId)
+      .select('Overwatch_RunID, 'Pipeline_SnapTS)
+      .orderBy('Pipeline_SnapTS.desc)
+      .limit(previousRuns)
+      .select('Overwatch_RunID).as[String].collect
+
+    BronzeTargets.sparkEventLogsTarget.asDF
+      .filter('Downstream_Processed)
+      .filter('Event === event)
+      .filter('Overwatch_RunID.isin(previousThree: _*))
+
+  }
   lazy private val newSparkEvents = BronzeTargets.sparkEventLogsTarget.asDF.filter(!'Downstream_Processed)
 
   /**
@@ -128,7 +152,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val executorsModule = Module(2003, "SPARK_Executors_Raw")
   lazy private val appendExecutorsProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(executor())),
+    Some(Seq(executor(
+      getLaggingStartEvents(executorsModule.moduleID, "SparkListenerExecutorAdded")
+    ))),
     append(SilverTargets.executorsTarget),
     executorsModule
   )
@@ -144,7 +170,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val executionsModule = Module(2005, "SPARK_Executions_Raw")
   lazy private val appendExecutionsProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(sqlExecutions())),
+    Some(Seq(sqlExecutions(
+      getLaggingStartEvents(executionsModule.moduleID, "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
+    ))),
     append(SilverTargets.executionsTarget),
     executionsModule
   )
@@ -152,7 +180,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val jobsModule = Module(2006, "SPARK_Jobs_Raw")
   lazy private val appendJobsProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(sparkJobs())),
+    Some(Seq(sparkJobs(
+      getLaggingStartEvents(jobsModule.moduleID, "SparkListenerJobStart")
+    ))),
     append(SilverTargets.jobsTarget),
     jobsModule
   )
@@ -160,7 +190,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val stagesModule = Module(2007, "SPARK_Stages_Raw")
   lazy private val appendStagesProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(sparkStages())),
+    Some(Seq(sparkStages(
+      getLaggingStartEvents(stagesModule.moduleID, "SparkListenerStageSubmitted")
+    ))),
     append(SilverTargets.stagesTarget),
     stagesModule
   )
@@ -168,7 +200,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val tasksModule = Module(2008, "SPARK_Tasks_Raw")
   lazy private val appendTasksProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(sparkTasks())),
+    Some(Seq(sparkTasks(
+      getLaggingStartEvents(tasksModule.moduleID, "SparkListenerTaskStart")
+    ))),
     append(SilverTargets.tasksTarget),
     tasksModule
   )

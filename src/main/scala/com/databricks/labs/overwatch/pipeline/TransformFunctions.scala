@@ -110,12 +110,14 @@ object TransformFunctions extends SparkSessionWrapper {
   }
 
   /**
-   *
-   * @param primaryDF
-   * @param primaryOnlyNoNulls
-   * @param columnsToLookup
-   * @param w
-   * @param lookupDF
+   * This is an AS OF lookup function -- return the most recent slow-changing dim as of some timestamp. The window
+   * partition column[s] act like the join keys. The Window partition column must be present in driving and lookup DF.
+   * EX: Get latest columnsToLookup by Window's Partition column[s] as of latest Window's OrderByColumn
+   * @param primaryDF Driving dataframe to which the lookup values are to be added
+   * @param primaryOnlyNoNulls Non-null column present only in the primary DF, not the lookup[s]
+   * @param columnsToLookup Column names to be looked up -- must be in driving DF AND all lookup DFs from which the value is to be looked up
+   * @param w Window spec to partition/sort the lookups. The partition and sort columns must be present in all DFs
+   * @param lookupDF One more more dataframes from which to lookup the values
    * @return
    */
   def fillFromLookupsByTS(primaryDF: DataFrame, primaryOnlyNoNulls: String,

@@ -114,8 +114,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       .drop("startTime", "finishTime")
   }
 
-  private def simplifyExecutorAdded(df: DataFrame): DataFrame = {
+  private def simplifyExecutorAdded(df: DataFrame, laggingStartEvents: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerExecutorAdded")
+      .unionByName(laggingStartEvents)
       .select('clusterId, 'SparkContextID, 'ExecutorID, 'executorInfo, 'Timestamp.alias("executorAddedTS"),
         'filenameGroup.alias("startFilenameGroup"))
   }
@@ -126,9 +127,9 @@ trait SilverTransforms extends SparkSessionWrapper {
         'filenameGroup.alias("endFilenameGroup"))
   }
 
-  protected def executor()(df: DataFrame): DataFrame = {
+  protected def executor(laggingStartEvents: DataFrame)(df: DataFrame): DataFrame = {
 
-    val executorAdded = simplifyExecutorAdded(df)
+    val executorAdded = simplifyExecutorAdded(df, laggingStartEvents)
     val executorRemoved = simplifyExecutorRemoved(df)
 
     executorAdded.join(executorRemoved, Seq("clusterId", "SparkContextID", "ExecutorID"))
@@ -156,8 +157,9 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   private val uniqueTimeWindow = Window.partitionBy("SparkContextID", "executionId")
 
-  private def simplifyExecutionsStart(df: DataFrame): DataFrame = {
+  private def simplifyExecutionsStart(df: DataFrame, laggingStartEvents: DataFrame): DataFrame = {
     df.filter('Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
+      .unionByName(laggingStartEvents)
       .select('clusterId, 'SparkContextID, 'description, 'details, 'executionId.alias("ExecutionID"),
         'time.alias("SqlExecStartTime"),
         'filenameGroup.alias("startFilenameGroup"))
@@ -178,8 +180,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       .drop("timeRnk", "timeRn")
   }
 
-  protected def sqlExecutions()(df: DataFrame): DataFrame = {
-    val executionsStart = simplifyExecutionsStart(df)
+  protected def sqlExecutions(laggingStartEvents: DataFrame)(df: DataFrame): DataFrame = {
+    val executionsStart = simplifyExecutionsStart(df, laggingStartEvents)
     val executionsEnd = simplifyExecutionsEnd(df)
 
     //TODO -- review if skew is necessary -- on all DFs
@@ -192,8 +194,9 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
 
-  protected def simplifyJobStart(sparkEventsBronze: DataFrame): DataFrame = {
+  protected def simplifyJobStart(sparkEventsBronze: DataFrame, laggingStartEvents: DataFrame): DataFrame = {
     sparkEventsBronze.filter('Event.isin("SparkListenerJobStart"))
+      .unionByName(laggingStartEvents)
       .withColumn("PowerProperties", UDF.appendPowerProperties)
       .select(
         'clusterId, 'SparkContextID,
@@ -209,8 +212,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         'filenameGroup.alias("endFilenameGroup"))
   }
 
-  protected def sparkJobs()(df: DataFrame): DataFrame = {
-    val jobStart = simplifyJobStart(df)
+  protected def sparkJobs(laggingStartEvents: DataFrame)(df: DataFrame): DataFrame = {
+    val jobStart = simplifyJobStart(df, laggingStartEvents)
     val jobEnd = simplifyJobEnd(df)
 
     jobStart.join(jobEnd, Seq("clusterId", "SparkContextID", "JobId"))
@@ -220,8 +223,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("startDate", $"JobRunTime.startTS".cast("date"))
   }
 
-  protected def simplifyStageStart(df: DataFrame): DataFrame = {
+  protected def simplifyStageStart(df: DataFrame, laggingStartEvents: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerStageSubmitted")
+      .unionByName(laggingStartEvents)
       .select('clusterId, 'SparkContextID,
         $"StageInfo.StageID", $"StageInfo.SubmissionTime", $"StageInfo.StageAttemptID",
         'StageInfo.alias("StageStartInfo"),
@@ -236,8 +240,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
   }
 
-  protected def sparkStages()(df: DataFrame): DataFrame = {
-    val stageStart = simplifyStageStart(df)
+  protected def sparkStages(laggingStartEvents: DataFrame)(df: DataFrame): DataFrame = {
+    val stageStart = simplifyStageStart(df, laggingStartEvents)
     val stageEnd = simplifyStageEnd(df)
 
     stageStart
@@ -254,8 +258,9 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   // TODO -- Add in Specualtive Tasks Event == org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted
-  protected def simplifyTaskStart(df: DataFrame): DataFrame = {
+  protected def simplifyTaskStart(df: DataFrame, laggingStartEvents: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerTaskStart")
+      .unionByName(laggingStartEvents)
       .select('clusterId, 'SparkContextID,
         'StageID, 'StageAttemptID, $"TaskInfo.TaskID", $"TaskInfo.ExecutorID",
         $"TaskInfo.Attempt".alias("TaskAttempt"),
@@ -276,8 +281,8 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   // Orphan tasks are a result of "TaskEndReason.Reason" != "Success"
   // Failed tasks lose association with their chain
-  protected def sparkTasks()(df: DataFrame): DataFrame = {
-    val taskStart = simplifyTaskStart(df)
+  protected def sparkTasks(laggingStartEvents: DataFrame)(df: DataFrame): DataFrame = {
+    val taskStart = simplifyTaskStart(df, laggingStartEvents)
     val taskEnd = simplifyTaskEnd(df)
 
     taskStart.join(
@@ -419,7 +424,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'instance_pool_name,
       'spark_version,
       'idempotency_token,
-      coalesce('organization_id, lit(orgId).alias("organization_id"),
+      coalesce('organization_id, lit(orgId).alias("organization_id")),
       'timestamp,
       'userEmail)
 
@@ -828,11 +833,13 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select('timestamp, $"requestParams.cluster_name",
         get_json_object($"response.result", "$.cluster_id").alias("clusterId")
       )
+      .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
     lazy val clusterSnapLookup = spark.table(s"${etl_db}.clusters_snapshot_bronze")
       .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS))
       .select('timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
+      .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
     lazy val existingClusterLookup = spark.table(s"${etl_db}.job_status_silver")
@@ -890,29 +897,31 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterByNameAsOfW = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
     val lastJobStatusW = Window.partitionBy('jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
+    // JobRuns with interactive clusters
     // If the lookups are present (likely will be unless is first run or modules are turned off somehow)
     // use the lookups to populate the null clusterIds and cluster_names
-    val jobRunsWHistoricalClusterDetail = if (jobStatusClusterLookups.nonEmpty) {
-      val jobRunsWIDs = TransformFunctions.fillFromLookupsByTS(
-        jobRunsBase, "runId",
+    val interactiveRunsWIDAndName = if (jobStatusClusterLookups.nonEmpty) {
+      val interactiveJobRunsWIDs = TransformFunctions.fillFromLookupsByTS(
+        jobRunsBase.filter('jobClusterType === "existing"), "runId",
         Array("existing_cluster_id"), lastJobStatusW, jobStatusClusterLookups: _*
       )
         .withColumnRenamed("existing_cluster_id", "clusterId")
-        .withColumn("clusterId", when('clusterId === 0, lit(null).cast("string")).otherwise('clusterId))
 
-      val jobRunsWIDsAndNames = TransformFunctions.fillFromLookupsByTS(
-        jobRunsWIDs, "runId",
+      TransformFunctions.fillFromLookupsByTS(
+        interactiveJobRunsWIDs, "runId",
         Array("cluster_name"), clusterByIdAsOfW, clusterLookups: _*
       )
-        .withColumn("cluster_name", when('cluster_name === 0, lit(null).cast("string")).otherwise('cluster_name))
-
-      jobRunsWIDsAndNames
     } else jobRunsBase
 
-    val jobRunsWClusterIDs = TransformFunctions.fillFromLookupsByTS(
-      jobRunsWHistoricalClusterDetail, "runId",
-      Array("clusterId"), clusterByNameAsOfW, clusterLookups: _*
+    // JobRuns using Automated clusters -- get clusterID by derived name
+    val automatedRunsWIDAndName = TransformFunctions.fillFromLookupsByTS(
+      jobRunsBase.filter('jobClusterType === "new").withColumnRenamed("existing_cluster_id", "clusterId"),
+      "runId", Array("clusterId"), clusterByNameAsOfW, clusterLookups: _*
     )
+
+    // Union the interactive and automated back together with the cluster ids and names
+    val jobRunsWClusterIDAndName = interactiveRunsWIDAndName.unionByName(automatedRunsWIDAndName)
+
 
     val jobNameLookup = completeAuditTable
       .filter('serviceName === "jobs" && 'actionName === "create")
@@ -933,7 +942,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // Backfill the jobNames
     val jobRunsFinal = TransformFunctions.fillFromLookupsByTS(
-      jobRunsWClusterIDs, "runId",
+      jobRunsWClusterIDAndName, "runId",
       Array("jobName"), lastJobStatusW, jobNameLookups: _*
     )
       .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up

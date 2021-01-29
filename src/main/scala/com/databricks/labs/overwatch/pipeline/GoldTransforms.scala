@@ -43,6 +43,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected def buildJobs()(df: DataFrame): DataFrame = {
     val jobCols: Array[Column] = Array(
+      'organization_id,
       'jobId.alias("job_id"),
       'actionName.alias("action"),
       'timestamp.alias("unixTimeMS"),
@@ -89,7 +90,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'jobTerminalState.alias("job_terminal_state"),
       'jobTriggerType.alias("job_trigger_type"),
       'clusterId.alias("cluster_id"),
-      'orgId.alias("organization_id"),
+      'organization_id,
       'notebook_params,
       'libraries,
       'workflow_context,
