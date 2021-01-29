@@ -640,7 +640,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .otherwise('job_id).alias("jobId"),
       'job_type,
       'name.alias("jobName"),
-      'timeout_seconds.cast("timeout_seconds").alias("timeout_seconds"),
+      'timeout_seconds.cast("long").alias("timeout_seconds"),
       'schedule,
       get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
       'new_settings, 'existing_cluster_id, 'new_cluster, 'aclPermissionSet, 'grants, 'targetUserId,
