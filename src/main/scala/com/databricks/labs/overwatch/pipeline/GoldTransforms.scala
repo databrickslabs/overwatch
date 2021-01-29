@@ -302,10 +302,21 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val sparkContextW = Window.partitionBy('spark_context_id)
 
+    val isDatabricksJob = 'job_group_id.like("%job-%-run-%")
+
     sparkJobsWImputedUser
       .select(sparkJobCols: _*)
       .withColumn("cluster_id", first('cluster_id, ignoreNulls = true).over(sparkContextW))
-
+      .withColumn("db_job_id",
+        when(isDatabricksJob && 'db_job_id.isNull,
+          split(regexp_extract('jobGroupAr, "(job-\\d+)", 1), "-")(1))
+          .otherwise('db_job_id)
+      )
+      .withColumn("db_run_id",
+        when(isDatabricksJob && 'db_run_id.isNull,
+          split(regexp_extract('jobGroupAr, "(-run-\\d+)", 1), "-")(2))
+          .otherwise('db_run_id)
+      )
   }
 
   protected def buildSparkStage()(df: DataFrame): DataFrame = {
