@@ -639,7 +639,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       when('actionName === "create", get_json_object($"response.result", "$.job_id"))
         .otherwise('job_id).alias("jobId"),
       'job_type,
-      'name.alias("jobName"), 'timeout_seconds, 'schedule,
+      'name.alias("jobName"),
+      'timeout_seconds.cast("timeout_seconds").alias("timeout_seconds"),
+      'schedule,
       get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
       'new_settings, 'existing_cluster_id, 'new_cluster, 'aclPermissionSet, 'grants, 'targetUserId,
       'sessionId, 'requestId, 'userAgent, 'userIdentity, 'response, 'sourceIPAddress, 'version
@@ -654,7 +656,10 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobStatusBase = jobsBase
       .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
-      .withColumn("jobId", when('actionName === "changeJobAcl", 'resourceId).otherwise('jobId))
+      .withColumn("jobId",
+        when('actionName === "changeJobAcl", 'resourceId.cast("long"))
+          .otherwise('jobId.cast("long"))
+      )
       .select(jobs_statusCols: _*)
       .withColumn("existing_cluster_id", coalesce('existing_cluster_id, get_json_object('new_settings, "$.existing_cluster_id")))
       .withColumn("new_cluster",
@@ -788,7 +793,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           lit(null).cast("string").alias("shell_command_task")
         ).alias("taskDetail"),
         lit(null).cast("string").alias("libraries"),
-        lit(null).cast("string").alias("timeout_seconds"),
+        lit(null).cast("long").alias("timeout_seconds"),
         'sourceIPAddress.alias("submitSourceIP"),
         'sessionId.alias("submitSessionId"),
         'requestId.alias("submitRequestID"),
@@ -814,7 +819,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'shell_command_task
         ).alias("taskDetail"),
         'libraries,
-        'timeout_seconds,
+        'timeout_seconds.cast("long").alias("timeout_seconds"),
         'sourceIPAddress.alias("submitSourceIP"),
         'sessionId.alias("submitSessionId"),
         'requestId.alias("submitRequestID"),
@@ -974,6 +979,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
       .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
       .withColumn("timestamp", $"jobRunTime.startEpochMS") // for incremental downstream
+      .withColumn("runId", 'runId.cast("long"))
+      .withColumn("jobId", 'jobId.cast("long"))
+      .withColumn("idInJob", 'idInJob.cast("long"))
       .repartition(256)
 
     jobsAuditComplete.unpersist()
