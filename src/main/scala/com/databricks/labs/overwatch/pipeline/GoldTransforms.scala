@@ -95,10 +95,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       'libraries,
       'workflow_context,
       'taskDetail.alias("task_detail"),
-      'cancellationDetails.alias("cancellation_detail"),
-      'timeDetails.alias("time_detail"),
-      'startedBy.alias("started_by"),
-      'requestDetails.alias("request_detail")
+      'requestDetails.alias("request_detail"),
+      'timeDetails.alias("time_detail")
     )
     df.select(jobRunCols: _*)
   }
@@ -307,6 +305,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     sparkJobsWImputedUser
       .select(sparkJobCols: _*)
       .withColumn("cluster_id", first('cluster_id, ignoreNulls = true).over(sparkContextW))
+      .withColumn("jobGroupAr", split('job_group_id, "_")(2))
       .withColumn("db_job_id",
         when(isDatabricksJob && 'db_job_id.isNull,
           split(regexp_extract('jobGroupAr, "(job-\\d+)", 1), "-")(1))
@@ -411,7 +410,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, run_id, run_name, job_runtime, job_id, id_in_job, job_cluster_type, job_task_type,
       |job_terminal_state, job_trigger_type, cluster_id, notebook_params, libraries, workflow_context, task_detail,
-      |cancellation_detail, time_detail, started_by, request_detail
+      |request_detail, time_detail
       |""".stripMargin
 
   protected val notebookViewColumnMappings: String =

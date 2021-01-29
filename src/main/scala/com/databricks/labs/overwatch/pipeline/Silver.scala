@@ -46,18 +46,21 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
    *                     to 3
    * @return
    */
-  private def getLaggingStartEvents(moduleId: Int, event: String, previousRuns: Int = 3): DataFrame = {
+  private def getLaggingStartEvents(module: Module, event: String, previousRuns: Int = 3): DataFrame = {
     val previousThree = spark.table(s"${config.databaseName}.pipeline_report")
-      .filter('status === "SUCCESS" && 'moduleID === moduleId)
+      .filter('status === "SUCCESS" && 'moduleID === module.moduleID)
       .select('Overwatch_RunID, 'Pipeline_SnapTS)
       .orderBy('Pipeline_SnapTS.desc)
       .limit(previousRuns)
       .select('Overwatch_RunID).as[String].collect
 
-    BronzeTargets.sparkEventLogsTarget.asDF
-      .filter('Downstream_Processed)
-      .filter('Event === event)
-      .filter('Overwatch_RunID.isin(previousThree: _*))
+    Schema.verifyDF(
+      BronzeTargets.sparkEventLogsTarget.asDF
+        .filter('Downstream_Processed)
+        .filter('Event === event)
+        .filter('Overwatch_RunID.isin(previousThree: _*)),
+      module
+    )
 
   }
   lazy private val newSparkEvents = BronzeTargets.sparkEventLogsTarget.asDF.filter(!'Downstream_Processed)
@@ -153,7 +156,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendExecutorsProcess = EtlDefinition(
     newSparkEvents,
     Some(Seq(executor(
-      getLaggingStartEvents(executorsModule.moduleID, "SparkListenerExecutorAdded")
+      getLaggingStartEvents(executorsModule, "SparkListenerExecutorAdded")
     ))),
     append(SilverTargets.executorsTarget),
     executorsModule
@@ -171,7 +174,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendExecutionsProcess = EtlDefinition(
     newSparkEvents,
     Some(Seq(sqlExecutions(
-      getLaggingStartEvents(executionsModule.moduleID, "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
+      getLaggingStartEvents(executionsModule, "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
     ))),
     append(SilverTargets.executionsTarget),
     executionsModule
@@ -181,7 +184,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobsProcess = EtlDefinition(
     newSparkEvents,
     Some(Seq(sparkJobs(
-      getLaggingStartEvents(jobsModule.moduleID, "SparkListenerJobStart")
+      getLaggingStartEvents(jobsModule, "SparkListenerJobStart")
     ))),
     append(SilverTargets.jobsTarget),
     jobsModule
@@ -191,7 +194,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendStagesProcess = EtlDefinition(
     newSparkEvents,
     Some(Seq(sparkStages(
-      getLaggingStartEvents(stagesModule.moduleID, "SparkListenerStageSubmitted")
+      getLaggingStartEvents(stagesModule, "SparkListenerStageSubmitted")
     ))),
     append(SilverTargets.stagesTarget),
     stagesModule
@@ -201,7 +204,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendTasksProcess = EtlDefinition(
     newSparkEvents,
     Some(Seq(sparkTasks(
-      getLaggingStartEvents(tasksModule.moduleID, "SparkListenerTaskStart")
+      getLaggingStartEvents(tasksModule, "SparkListenerTaskStart")
     ))),
     append(SilverTargets.tasksTarget),
     tasksModule
