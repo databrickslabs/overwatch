@@ -704,7 +704,9 @@ trait SilverTransforms extends SparkSessionWrapper {
    * "runId", or in the "response.result.run_id" fields.
    *
    * The lineage of a run is as follows:
-   * runNow or submitRun: RPC service, happens at RPC request received
+   * runNow or submitRun: RPC service, happens at RPC request received, this RPC request does not happen when a
+   * job is started via databricks cron, in these cases only a runStart is emitted. A manual runstart via the UI
+   * emits a runNow
    * runStart: JobRunner service, happens when a run starts on a cluster
    * runSucceeded or runFailed, JobRunner service, happens when job ends
    *
@@ -742,11 +744,13 @@ trait SilverTransforms extends SparkSessionWrapper {
     val allCompletes = jobsAuditIncremental
       .filter('actionName.isin("runSucceeded", "runFailed"))
       .select(
+        'serviceName, 'actionName,
+        coalesce('orgId, lit(orgId)).alias("organization_id"),
         'runId.cast("int"),
         'jobId.cast("int"),
         'idInJob, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
         'jobTriggerType, 'orgId,
-        'requestId.alias("completionRequest"),
+        'requestId.alias("completionRequestID"),
         'response.alias("completionResponse"),
         'timestamp.alias("completionTime")
       )
@@ -755,22 +759,22 @@ trait SilverTransforms extends SparkSessionWrapper {
     val allCancellations = jobsAuditIncremental
       .filter('actionName.isin("cancel"))
       .select(
+        coalesce('orgId, lit(orgId)).alias("organization_id"),
         'run_id.cast("int").alias("runId"),
-        struct(
-          'requestId.alias("cancellationRequestId"),
-          'response.alias("cancellationResponse"),
-          'sessionId.alias("cancellationSessionId"),
-          'sourceIPAddress.alias("cancellationSourceIP"),
-          'timestamp.alias("cancellationTime"),
-          'userAgent.alias("cancelledUserAgent"),
-          'userIdentity.alias("cancelledBy")
-        ).alias("cancellationDetails")
+        'requestId.alias("cancellationRequestId"),
+        'response.alias("cancellationResponse"),
+        'sessionId.alias("cancellationSessionId"),
+        'sourceIPAddress.alias("cancellationSourceIP"),
+        'timestamp.alias("cancellationTime"),
+        'userAgent.alias("cancelledUserAgent"),
+        'userIdentity.alias("cancelledBy")
       )
 
     // DF for jobs launched with actionName == "runNow"
-    val runNowStart = jobsAuditComplete
+    val runNowStart = jobsAuditIncremental
       .filter('actionName.isin("runNow"))
       .select(
+        coalesce('orgId, lit(orgId)).alias("organization_id"),
         get_json_object($"response.result", "$.run_id").cast("int").alias("runId"),
         lit(null).cast("string").alias("run_name"),
         'timestamp.alias("submissionTime"),
@@ -785,18 +789,19 @@ trait SilverTransforms extends SparkSessionWrapper {
         ).alias("taskDetail"),
         lit(null).cast("string").alias("libraries"),
         lit(null).cast("string").alias("timeout_seconds"),
-        'sourceIPAddress.alias("startSourceIP"),
-        'sessionId.alias("startSessionId"),
-        'requestId.alias("startRequestID"),
-        'response.alias("startResponse"),
-        'userAgent.alias("startUserAgent"),
-        'userIdentity.alias("startedBy")
+        'sourceIPAddress.alias("submitSourceIP"),
+        'sessionId.alias("submitSessionId"),
+        'requestId.alias("submitRequestID"),
+        'response.alias("submitResponse"),
+        'userAgent.alias("submitUserAgent"),
+        'userIdentity.alias("submittedBy")
       )
 
     // DF for jobs launched with actionName == "submitRun"
-    val runSubmitStart = jobsAuditComplete
+    val runSubmitStart = jobsAuditIncremental
       .filter('actionName.isin("submitRun"))
       .select(
+        coalesce('orgId, lit(orgId)).alias("organization_id"),
         get_json_object($"response.result", "$.run_id").cast("int").alias("runId"),
         'run_name,
         'timestamp.alias("submissionTime"),
@@ -810,22 +815,27 @@ trait SilverTransforms extends SparkSessionWrapper {
         ).alias("taskDetail"),
         'libraries,
         'timeout_seconds,
-        'sourceIPAddress.alias("startSourceIP"),
-        'sessionId.alias("startSessionId"),
-        'requestId.alias("startRequestID"),
-        'response.alias("startResponse"),
-        'userAgent.alias("startUserAgent"),
-        'userIdentity.alias("startedBy")
+        'sourceIPAddress.alias("submitSourceIP"),
+        'sessionId.alias("submitSessionId"),
+        'requestId.alias("submitRequestID"),
+        'response.alias("submitResponse"),
+        'userAgent.alias("submitUserAgent"),
+        'userIdentity.alias("submittedBy")
       )
 
     // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
-    val allStarts = runNowStart
+    val allSubmissions = runNowStart
       .unionByName(runSubmitStart)
 
     // Find the corresponding runStart action for the completed jobs
-    val jobRunBegin = jobsAuditComplete
+    val runStarts = jobsAuditIncremental
       .filter('actionName.isin("runStart"))
-      .select('runId, 'timestamp.alias("runBeginTime"))
+      .select(
+        coalesce('orgId, lit(orgId)).alias("organization_id"),
+        'runId,
+        'timestamp.alias("startTime"),
+        'requestId.alias("startRequestID")
+      )
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
     lazy val clusterSpecLookup = spark.table(s"${etl_db}.audit_log_bronze") // change to cluster_spec eventually?
@@ -861,34 +871,51 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // Unify each run onto a single record and structure the df
     val jobRunsBase = allCompletes
-      .join(allStarts, Seq("runId"), "left")
-      .join(allCancellations, Seq("runId"), "left")
-      .join(jobRunBegin, Seq("runId"), "left")
-      .withColumn("jobTerminalState", when('cancellationDetails.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
-      .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('runBeginTime, 'submissionTime)), array_max(array('completionTime, $"cancellationDetails.cancellationTime"))))
+      .join(allSubmissions, Seq("runId", "organization_id"), "left")
+      .join(allCancellations, Seq("runId", "organization_id"), "left")
+      .join(runStarts, Seq("runId", "organization_id"), "left")
+      .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
+      .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
       .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
       .select(
         'runId, 'jobId, 'idInJob, 'jobRunTime, 'run_name, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
         'jobTriggerType, 'new_cluster,
         'existing_cluster_id, //.alias("clusterId"),
         'cluster_name,
-        coalesce('orgId, lit(orgId)).alias("organization_id"),
+        'organization_id,
         'notebook_params, 'libraries,
-        'workflow_context, 'taskDetail, 'cancellationDetails, 'startedBy,
+        'workflow_context, 'taskDetail,
         struct(
-          'runBeginTime,
+          'startTime,
           'submissionTime,
+          'cancellationTime,
           'completionTime,
           'timeout_seconds
         ).alias("timeDetails"),
         struct(
-          'completionRequest,
-          'completionResponse,
-          'startRequestID,
-          'startResponse,
-          'startSessionId,
-          'startSourceIP,
-          'startUserAgent
+          struct(
+            'submitRequestId,
+            'submitResponse,
+            'submitSessionId,
+            'submitSourceIP,
+            'submitUserAgent,
+            'submittedBy
+          ).alias("submissionRequest"),
+          struct(
+            'cancellationRequestId,
+            'cancellationResponse,
+            'cancellationSessionId,
+            'cancellationSourceIP,
+            'cancelledUserAgent,
+            'cancelledBy
+          ).alias("cancellationRequest"),
+          struct(
+            'completionRequestId,
+            'completionResponse
+          ).alias("completionRequest"),
+          struct(
+            'startRequestId
+          ).alias("startRequest")
         ).alias("requestDetails")
       )
       .withColumn("timestamp", $"jobRunTime.endEpochMS")
