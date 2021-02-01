@@ -77,11 +77,34 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   private val jobRunsModule = Module(3003, "Gold_JobRun")
   lazy private val appendJobRunsProcess = EtlDefinition(
     SilverTargets.dbJobRunsTarget.asIncrementalDF(
-      buildIncrementalFilter("timestamp", jobRunsModule.moduleID)
+      buildIncrementalFilter("endEpochMS", jobRunsModule.moduleID)
     ),
     Some(Seq(buildJobRuns())),
     append(GoldTargets.jobRunTarget),
     jobRunsModule
+  )
+
+  private val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact")
+  lazy private val appendJobRunCostPotentialFactProcess = EtlDefinition(
+    // new jobRuns to be considered are job runs completed since the last overwatch import for this module
+    GoldTargets.jobRunTarget.asIncrementalDF(
+      buildIncrementalFilter("endEpochMS", jobRunCostPotentialFactModule.moduleID)
+    ),
+    Some(Seq(
+      // 3 most recent clusterStateFact imports to obtain previous cluster events for job cost mapping
+      buildJobRunCostPotentialFact(
+        TransformFunctions.previousNOverwatchRuns(
+          GoldTargets.clusterStateFactTarget,
+          config.databaseName,
+          3,
+          jobRunCostPotentialFactModule
+      ),
+        // Lookups
+        GoldTargets.clusterTarget.asDF,
+        BronzeTargets.cloudMachineDetail.asDF
+    ))),
+    append(GoldTargets.jobRunCostPotentialFactTarget),
+    jobRunCostPotentialFactModule
   )
 
   private val notebookModule = Module(3004, "Gold_Notebook")
@@ -187,8 +210,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     if (scope.contains(OverwatchScope.jobs)) {
       appendJobsProcess.process()
       appendJobRunsProcess.process()
+      appendJobRunCostPotentialFactProcess.process()
       GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
       GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
+      GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
     }
 
     if (scope.contains(OverwatchScope.notebooks)) {

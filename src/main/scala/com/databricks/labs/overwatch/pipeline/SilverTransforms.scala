@@ -1013,7 +1013,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       Array("jobName"), lastJobStatusW, jobNameLookups: _*
     )
       .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
-      .withColumn("timestamp", $"jobRunTime.startEpochMS") // for incremental downstream
+      .withColumn("endEpochMS", $"jobRunTime.endEpochMS") // for incremental downstream after job termination
       .withColumn("runId", 'runId.cast("long"))
       .withColumn("jobId", 'jobId.cast("long"))
       .withColumn("idInJob", 'idInJob.cast("long"))

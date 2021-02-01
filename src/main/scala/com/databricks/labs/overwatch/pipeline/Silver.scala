@@ -40,29 +40,29 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
    * Start and End events can be separated across rolled log files. For example, if a job runs for 22 hours, there
    * will be n Overwatch runs that are processed and the start/end events will not be able to be pieced together
    * since Overwatch only processes the new data for Spark Events especially for spark modules due to performance
-   * @param moduleId ETL ModuleID
-   * @param event The spark event by which to filter
+   *
+   * @param moduleId     ETL ModuleID
+   * @param event        The spark event by which to filter
    * @param previousRuns Number of previous Overwatch Runs to include in the search for joins (inclusive). Defaulted
    *                     to 3
    * @return
    */
   private def getLaggingStartEvents(module: Module, event: String, previousRuns: Int = 3): DataFrame = {
-    val previousThree = spark.table(s"${config.databaseName}.pipeline_report")
-      .filter('status === "SUCCESS" && 'moduleID === module.moduleID)
-      .select('Overwatch_RunID, 'Pipeline_SnapTS)
-      .orderBy('Pipeline_SnapTS.desc)
-      .limit(previousRuns)
-      .select('Overwatch_RunID).as[String].collect
 
     Schema.verifyDF(
-      BronzeTargets.sparkEventLogsTarget.asDF
+      TransformFunctions.previousNOverwatchRuns(
+        BronzeTargets.sparkEventLogsTarget,
+        config.databaseName,
+        previousRuns,
+        module
+      )
         .filter('Downstream_Processed)
-        .filter('Event === event)
-        .filter('Overwatch_RunID.isin(previousThree: _*)),
+        .filter('Event === event),
       module
     )
 
   }
+
   lazy private val newSparkEvents = BronzeTargets.sparkEventLogsTarget.asDF.filter(!'Downstream_Processed)
 
   /**

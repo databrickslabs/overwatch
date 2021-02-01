@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import com.databricks.labs.overwatch.utils.{Module, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.WindowSpec
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
@@ -186,6 +186,31 @@ object TransformFunctions extends SparkSessionWrapper {
       when('type === "TERMINATING", lit(0))
         .otherwise(round(baseMetric, 2).alias(s"${nodeType}_${baseMetric}"))
     }
+  }
+
+  /**
+   * Returns data for pipeline target acquired during the previous n successful overwatch RunIDs
+   * for a given module. Often used for lagging slow changing dimensions.
+   * @param pipelineTarget The pipelineTarget for which the data is to be gathered
+   * @param etlDB ETL database in which the pipeline_report is contained
+   * @param previousRuns Number of previous runs to load
+   * @param module module for which to lookup last n successful runs
+   * @return Dataframe containing data for the previous n runs
+   */
+  def previousNOverwatchRuns(pipelineTarget: PipelineTable,
+                             etlDB: String,
+                             previousRuns: Int,
+                             module: Module
+                              ): DataFrame = {
+    val overwatchRunIDs = spark.table(s"${etlDB}.pipeline_report")
+      .filter('status === "SUCCESS" && 'moduleID === module.moduleID)
+      .select('Overwatch_RunID, 'Pipeline_SnapTS)
+      .orderBy('Pipeline_SnapTS.desc)
+      .limit(previousRuns)
+      .select('Overwatch_RunID).as[String].collect
+
+    pipelineTarget.asDF.filter('Overwatch_RunID.isin(overwatchRunIDs: _*))
+
   }
 
 
