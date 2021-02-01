@@ -101,6 +101,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   protected def getJDBCSession(sessionStartDF: DataFrame, sessionEndDF: DataFrame): DataFrame = {
     sessionStartDF
       .join(sessionEndDF, Seq("SparkContextID", "sessionId"))
+      .withColumn("organization_id", lit(orgId))
       .withColumn("ServerSessionRunTime",
         TransformFunctions.subtractTime('startTime, 'finishTime))
       .drop("startTime", "finishTime")
@@ -109,6 +110,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   protected def getJDBCOperation(operationStartDF: DataFrame, operationEndDF: DataFrame): DataFrame = {
     operationStartDF
       .join(operationEndDF, Seq("SparkContextID", "id"))
+      .withColumn("organization_id", lit(orgId))
       .withColumn("ServerOperationRunTime",
         TransformFunctions.subtractTime('startTime, 'closeTime))
       .drop("startTime", "finishTime")
@@ -136,6 +138,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("TaskRunTime",
         TransformFunctions.subtractTime('executorAddedTS, 'executorRemovedTS))
       .drop("executorAddedTS", "executorRemovedTS")
+      .withColumn("organization_id", lit(orgId))
       .withColumn("ExecutorAliveTime", struct(
         $"TaskRunTime.startEpochMS".alias("AddedEpochMS"),
         $"TaskRunTime.startTS".alias("AddedTS"),
@@ -153,6 +156,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     df.select('SparkContextID, 'AppID, 'AppName,
       TransformFunctions.toTS('Timestamp).alias("AppStartTime"),
       'Pipeline_SnapTS, 'filenameGroup)
+      .withColumn("organization_id", lit(orgId))
   }
 
   private val uniqueTimeWindow = Window.partitionBy("SparkContextID", "executionId")
@@ -190,6 +194,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("SqlExecutionRunTime",
         TransformFunctions.subtractTime('SqlExecStartTime, 'SqlExecEndTime))
       .drop("SqlExecStartTime", "SqlExecEndTime")
+      .withColumn("organization_id", lit(orgId))
       .withColumn("startTimestamp", $"SqlExecutionRunTime.startEpochMS")
   }
 
@@ -219,6 +224,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     jobStart.join(jobEnd, Seq("clusterId", "SparkContextID", "JobId"))
       .withColumn("JobRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
+      .withColumn("organization_id", lit(orgId))
       .withColumn("startTimestamp", $"JobRunTime.startEpochMS")
       .withColumn("startDate", $"JobRunTime.startTS".cast("date"))
   }
@@ -251,6 +257,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"StageStartInfo.FailureReason", $"StageEndInfo.NumberofTasks",
         $"StageStartInfo.ParentIDs", $"StageStartInfo.SubmissionTime"
       )).drop("StageEndInfo", "StageStartInfo")
+      .withColumn("organization_id", lit(orgId))
       .withColumn("StageRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime")
       .withColumn("startTimestamp", $"StageRunTime.startEpochMS")
@@ -295,6 +302,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"TaskEndInfo.Host", $"TaskEndInfo.Index", $"TaskEndInfo.Killed", $"TaskStartInfo.LaunchTime",
         $"TaskEndInfo.Locality", $"TaskEndInfo.Speculative"
       )).drop("TaskStartInfo", "TaskEndInfo")
+      .withColumn("organization_id", lit(orgId))
       .withColumn("TaskRunTime", TransformFunctions.subtractTime('LaunchTime, 'FinishTime)).drop("LaunchTime", "FinishTime")
       .withColumn("startTimestamp", $"TaskRunTime.startEpochMS")
       .withColumn("startDate", $"TaskRunTime.startTS".cast("date"))
@@ -313,6 +321,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"requestParams.user_name".alias("groups_user_name"),
         $"requestParams.userID".alias("account_admin_userID"),
         $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
+        .withColumn("organization_id", lit(orgId))
     } else
       Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
@@ -324,6 +333,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       newAccountsDF
         .select('date, 'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"),
           $"requestParams.targetUserName", 'sourceIPAddress, 'userAgent)
+        .withColumn("organization_id", lit(orgId))
     } else
       Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
@@ -351,7 +361,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'cluster_source, 'spark_env_vars, 'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
       'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
-      'organization_id, 'user_id, 'sourceIPAddress)
+      coalesce('organization_id, lit(orgId)).alias("organization_id"), 'user_id, 'sourceIPAddress)
 
 
     auditRawDF
@@ -457,6 +467,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .drop("userEmail", "cluster_creator_lookup")
   }
 
+  @deprecated
   protected def buildClusterStatus(clusterSpec: PipelineTable,
                                    clusterSnapshot: PipelineTable,
                                    cloudMachineDetail: PipelineTable
@@ -998,6 +1009,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("pathLength", when('notebookName.isNull, size(split('path, "/"))))
       .withColumn("notebookName", when('notebookName.isNull, split('path, "/")('pathLength - 1)).otherwise('notebookName))
       .select(notebookCols: _*)
+      .withColumn("organization_id", lit(orgId))
   }
 
 }
