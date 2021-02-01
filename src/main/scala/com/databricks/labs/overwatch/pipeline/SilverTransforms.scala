@@ -434,7 +434,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       'instance_pool_name,
       'spark_version,
       'idempotency_token,
-      coalesce('organization_id, lit(orgId).alias("organization_id")),
       'timestamp,
       'userEmail)
 
@@ -460,6 +459,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("createdBy",
         when(isAutomatedCluster && 'actionName === "create", lit("JobsService"))
           .when(!isAutomatedCluster && 'actionName === "create", 'userEmail))
+      .withColumn("organization_id", lit(orgId))
       .withColumn("createdBy", when(!isAutomatedCluster && 'createdBy.isNull, last('createdBy, true).over(clusterBefore)).otherwise('createdBy))
       .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomatedCluster && 'actionName === "edit", 'userEmail))
