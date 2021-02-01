@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Column, DataFrame}
@@ -8,6 +9,7 @@ import org.apache.spark.sql.functions._
 trait GoldTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
+  final private val orgId = dbutils.notebook.getContext.tags("orgId")
 
   protected def buildCluster()(df: DataFrame): DataFrame = {
     val clusterCols: Array[Column] = Array(
@@ -208,6 +210,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
           round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
       )
+      .withColumn("organization_id", lit(orgId))
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
@@ -323,7 +326,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected def buildSparkStage()(df: DataFrame): DataFrame = {
     val sparkStageCols: Array[Column] = Array(
-      'organization_id,
+      lit(orgId).alias("organization_id"),
       'SparkContextID.alias("spark_context_id"),
       'StageID.alias("stage_id"),
       'StageAttemptID.alias("stage_attempt_id"),
@@ -340,7 +343,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
   protected def buildSparkTask()(df: DataFrame): DataFrame = {
     val sparkTaskCols: Array[Column] = Array(
-      'organization_id,
+      lit(orgId).alias("organization_id"),
       'SparkContextID.alias("spark_context_id"),
       'TaskID.alias("task_id"),
       'TaskAttempt.alias("task_attempt_id"),
@@ -365,7 +368,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected def buildSparkExecution()(df: DataFrame): DataFrame = {
     val sparkExecutionCols: Array[Column] = Array(
-      'organization_id,
+      lit(orgId).alias("organization_id"),
       'SparkContextID.alias("spark_context_id"),
       'ExecutionID.alias("execution_id"),
       'clusterId.alias("cluster_id"),
@@ -382,7 +385,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
   protected def buildSparkExecutor()(df: DataFrame): DataFrame = {
     val sparkExecutorCols: Array[Column] = Array(
-      'organization_id,
+      lit(orgId).alias("organization_id"),
       'SparkContextID.alias("spark_context_id"),
       'ExecutorID.alias("executor_id"),
       'clusterId.alias("cluster_id"),
