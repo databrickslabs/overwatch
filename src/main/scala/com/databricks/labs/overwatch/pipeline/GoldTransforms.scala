@@ -241,6 +241,16 @@ trait GoldTransforms extends SparkSessionWrapper {
       .select(clusterStateFactCols: _*)
   }
 
+  //TEMP TEST FUNC
+//  private def displayDFAndRange(name: String, rangeCol: String, df: DataFrame): Unit = {
+//    case class MinMax(low: String, high: String)
+//    val minMax = df.select(min(col(rangeCol)).cast("string"), max(col(rangeCol)).cast("string"))
+//      .as[MinMax].collect().headOption.getOrElse(MinMax("0", "0"))
+//    val cnt = df.count()
+//    println(s"DF SAMPLE: Name: $name\nRange: ${minMax.low} --> ${minMax.high}\nCount: ${cnt}")
+//    df.orderBy(col(rangeCol)).show(10)
+//  }
+
   protected def buildJobRunCostPotentialFact(
                                               clusterStateFact: DataFrame,
                                               cluster: DataFrame,
@@ -249,17 +259,20 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               incrementalSparkTask: DataFrame
                                             )(newTerminatedJobRuns: DataFrame): DataFrame = {
 
+
     val clusterNameLookup = cluster.select('cluster_id, 'cluster_name).distinct
     val isAutomated = 'cluster_name.like("job-%-run-%")
 
     val driverCosts = instanceDetails
       .select(
+        'organization_id,
         'API_name.alias("driver_node_type_id"),
         'On_Demand_Cost_Hourly.alias("driver_compute_hourly"),
         'Hourly_DBUs.alias("driver_dbu_hourly")
       )
     val workerCosts = instanceDetails
       .select(
+        'organization_id,
         'API_name.alias("node_type_id"),
         'On_Demand_Cost_Hourly.alias("worker_compute_hourly"),
         'Hourly_DBUs.alias("worker_dbu_hourly"),
@@ -273,12 +286,12 @@ trait GoldTransforms extends SparkSessionWrapper {
           .otherwise(lit(0.55))
       ) // adding this to instanceDetails table -- placeholder for now
       .withColumn("uptime_in_state_H", 'uptime_in_state_S / 60 / 60)
-      .join(driverCosts, Seq("driver_node_type_id"))
-      .join(workerCosts, Seq("node_type_id"))
+      .join(driverCosts, Seq("organization_id", "driver_node_type_id"))
+      .join(workerCosts, Seq("organization_id", "node_type_id"))
 
     val clusterByIdAsOfW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
     val clusterByIdWhenW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc).rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val keys = Array("cluster_id", "cluster_name", "timestamp")
+    val keys = Array("organization_id", "cluster_id", "cluster_name", "timestamp")
     val lookupCols = Array("unixTimeMS_state_start", "unixTimeMS_state_end", "timestamp_state_start",
       "timestamp_state_end", "state", "cloud_billable", "databricks_billable", "current_num_workers",
       "dbu_rate", "driver_compute_hourly", "worker_compute_hourly", "driver_dbu_hourly",

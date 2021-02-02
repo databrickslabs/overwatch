@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Module, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.WindowSpec
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
@@ -203,14 +203,23 @@ object TransformFunctions extends SparkSessionWrapper {
                              module: Module
                               ): DataFrame = {
     val overwatchRunIDs = spark.table(s"${etlDB}.pipeline_report")
-      .filter('status === "SUCCESS" && 'moduleID === module.moduleID)
+      .filter('status.isin("SUCCESS", "EMPTY") && 'moduleID === module.moduleID)
       .select('Overwatch_RunID, 'Pipeline_SnapTS)
       .orderBy('Pipeline_SnapTS.desc)
       .limit(previousRuns)
-      .select('Overwatch_RunID).as[String].collect
+      .select('Overwatch_RunID).as[String].collect()
 
-    pipelineTarget.asDF.filter('Overwatch_RunID.isin(overwatchRunIDs: _*))
+    if (overwatchRunIDs.length <= previousRuns) pipelineTarget.asDF.filter('Overwatch_RunID.isin(overwatchRunIDs: _*))
+    else pipelineTarget.asDF
 
+  }
+
+  def buildIncrementalDateFilters(moduleID: Int, dateCol: String, config: Config, additionalLagDays: Int = 0): IncrementalFilter = {
+    IncrementalFilter(
+      dateCol,
+      date_sub(config.fromTime(moduleID).asColumnTS.cast("date"), additionalLagDays),
+      config.untilTime(moduleID).asColumnTS.cast("date")
+    )
   }
 
 

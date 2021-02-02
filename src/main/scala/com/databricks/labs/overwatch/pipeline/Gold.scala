@@ -86,30 +86,30 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact")
   //Incremental current spark job and tasks DFs plus 2 days for lag coverage
-  private val incrementalSparkFilter = Seq(IncrementalFilter(
-    "date",
-    date_sub(config.fromTime(jobRunCostPotentialFactModule.moduleID).asColumnTS.cast("date"), 2),
-    config.untilTime(jobRunCostPotentialFactModule.moduleID).asColumnTS.cast("date")
-  ))
   lazy private val appendJobRunCostPotentialFactProcess = EtlDefinition(
     // new jobRuns to be considered are job runs completed since the last overwatch import for this module
     GoldTargets.jobRunTarget.asIncrementalDF(
       buildIncrementalFilter("endEpochMS", jobRunCostPotentialFactModule.moduleID)
     ),
     Some(Seq(
-      // 3 most recent clusterStateFact imports to obtain previous cluster events for job cost mapping
+      // Retrieve cluster states for current time period plus 2 days for lagging states
       buildJobRunCostPotentialFact(
-        TransformFunctions.previousNOverwatchRuns(
-          GoldTargets.clusterStateFactTarget,
-          config.databaseName,
-          3,
-          jobRunCostPotentialFactModule
-      ),
+        GoldTargets.clusterStateFactTarget.asIncrementalDF(Seq(TransformFunctions.buildIncrementalDateFilters(
+          jobRunCostPotentialFactModule.moduleID, "date_state_start", config, 2
+        ))),
         // Lookups
         GoldTargets.clusterTarget.asDF,
         BronzeTargets.cloudMachineDetail.asDF,
-        GoldTargets.sparkJobTarget.asIncrementalDF(incrementalSparkFilter),
-        GoldTargets.sparkTaskTarget.asIncrementalDF(incrementalSparkFilter)
+        GoldTargets.sparkJobTarget.asIncrementalDF(
+          Seq(TransformFunctions.buildIncrementalDateFilters(
+            jobRunCostPotentialFactModule.moduleID, "date", config, 2)
+          )
+        ),
+        GoldTargets.sparkTaskTarget.asIncrementalDF(
+          Seq(TransformFunctions.buildIncrementalDateFilters(
+            jobRunCostPotentialFactModule.moduleID, "date", config, 2)
+          )
+        )
     ))),
     append(GoldTargets.jobRunCostPotentialFactTarget),
     jobRunCostPotentialFactModule

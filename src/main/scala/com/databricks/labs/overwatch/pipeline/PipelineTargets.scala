@@ -266,7 +266,7 @@ abstract class PipelineTargets(config: Config) {
       name = "clusterStateFact_gold",
       keys = Array("cluster_id", "unixTimeMS"),
       config,
-      incrementalColumns = Array("unixTimeMS")
+      incrementalColumns = Array("unixTimeMS_state_start")
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(

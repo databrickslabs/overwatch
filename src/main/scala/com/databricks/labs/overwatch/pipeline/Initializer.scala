@@ -11,7 +11,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{rank, row_number}
+import org.apache.spark.sql.functions.{lit, rank, row_number}
 
 /**
  * Take the config and validate the setup
@@ -131,6 +131,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       }
 
       instanceDetailsDF
+        .withColumn("organization_id", lit(dbutils.notebook.getContext.tags("orgId")))
         .write.format("delta")
         .saveAsTable(s"${config.consumerDatabaseName}.instanceDetails")
     }
