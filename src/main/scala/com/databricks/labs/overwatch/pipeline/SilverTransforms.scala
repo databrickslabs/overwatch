@@ -411,9 +411,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       .otherwise('node_type_id)
 
     val numWorkers = when(isSingleNode, lit(0).cast("int")).otherwise('num_workers.cast("int"))
-    val startCluster = when('start_cluster === "false" || 'start_cluster.isNull, lit(false))
+    val startCluster = when('start_cluster === "false", lit(false))
       .otherwise(lit(true))
-    val enableElasticDisk = when('enable_elastic_disk === "false" || 'enable_elastic_disk.isNull, lit(false))
+    val enableElasticDisk = when('enable_elastic_disk === "false", lit(false))
       .otherwise(lit(true))
 
     val clusterSpecBaseCols = Array[Column](
