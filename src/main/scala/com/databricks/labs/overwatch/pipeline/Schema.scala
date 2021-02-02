@@ -282,8 +282,7 @@ object Schema extends SparkSessionWrapper {
           StructField("idempotency_token", StringType, nullable = true),
           StructField("organization_id", StringType, nullable = true),
           StructField("user_id", StringType, nullable = true),
-          StructField("ssh_public_keys", StringType, nullable = true),
-          StructField("single_user_name", StringType, nullable = true)
+          StructField("ssh_public_keys", StringType, nullable = true)
         )), nullable = true),
       StructField("userIdentity",
         StructType(Seq(
