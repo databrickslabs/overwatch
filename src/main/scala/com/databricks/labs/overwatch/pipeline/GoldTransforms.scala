@@ -25,6 +25,9 @@ trait GoldTransforms extends SparkSessionWrapper {
       'autoscale,
       'autoTermination_minutes.alias("auto_termination_minutes"),
       'enable_elastic_disk,
+      'is_automated,
+      'cluster_type,
+      'security_profile,
       'cluster_log_conf,
       'init_scripts,
       'custom_tags,
@@ -404,9 +407,9 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val clusterViewColumnMapping: String =
     """
       |organization_id, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
-      |autoscale, auto_termination_minutes, enable_elastic_disk, cluster_log_conf, init_scripts, custom_tags,
-      |cluster_source, spark_env_vars, spark_conf, acl_path_prefix, instance_pool_id, spark_version,
-      |idempotency_token, deleted_by, created_by, last_edited_by
+      |autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type, security_profile, cluster_log_conf,
+      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, instance_pool_id,
+      |spark_version, idempotency_token, deleted_by, created_by, last_edited_by
       |""".stripMargin
 
   protected val jobViewColumnMapping: String =

@@ -361,7 +361,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'cluster_source, 'spark_env_vars, 'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
       'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
-      coalesce('organization_id, lit(orgId)).alias("organization_id"), 'user_id, 'sourceIPAddress)
+      coalesce('organization_id, lit(orgId)).alias("organization_id"), 'user_id, 'sourceIPAddress, 'single_user_name)
 
 
     auditRawDF
@@ -385,6 +385,12 @@ trait SilverTransforms extends SparkSessionWrapper {
     val isServerless = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
       "$.spark_databricks_cluster_profile") === lit("serverless")
     val isSQLAnalytics = get_json_object('custom_tags, "$.SqlEndpointId").isNotNull
+    val tableAcls = coalesce(get_json_object(regexp_replace('spark_conf, "\\.", "_"), "$.spark_databricks_acl_dfAclsEnabled").cast("boolean"), lit(false)).alias("table_acls_enabled")
+    val passthrough = coalesce(get_json_object(regexp_replace('spark_conf, "\\.", "_"), "$.spark_databricks_passthrough_enabled").cast("boolean"), lit(false)).alias("credential_passthrough_enabled")
+    val isolation = coalesce(get_json_object(regexp_replace('spark_conf, "\\.", "_"), "$.spark_databricks_pyspark_enableProcessIsolation").cast("boolean"), lit(false)).alias("isolation_enabled")
+    val languagesAllowed = coalesce(split(get_json_object(regexp_replace('spark_conf, "\\.", "_"), "$.spark_databricks_repl_allowedLanguages"), ","), array(lit("All"))).alias("repl_languages_permitted")
+    val isSingleUser = 'single_user_name.isNotNull
+
 
     val clusterBaseDF = clusterBase(df)
 
@@ -422,6 +428,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       'autoscale,
       'autotermination_minutes.cast("int").alias("autotermination_minutes"),
       enableElasticDisk.alias("enable_elastic_disk"),
+      isAutomatedCluster.alias("is_automated"),
+      when(isSingleNode, lit("Single Node"))
+        .when(isServerless, lit("Serverless"))
+        .when(isSQLAnalytics, lit("SQL Analytics"))
+        .otherwise("Standard").alias("cluster_type"),
+      'single_user_name,
       startCluster.alias("start_cluster"),
       'cluster_log_conf,
       'init_scripts,
@@ -456,6 +468,18 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("cluster_id"), "left")
       .join(clustersRemoved, Seq("cluster_id"), "left")
+      .withColumn("security_profile",
+        struct(
+          tableAcls,
+          passthrough,
+          isolation,
+          languagesAllowed,
+          struct(
+            isSingleUser.alias("is_single_user"),
+            'single_user_name
+          ).alias("single_user_profile")
+        )
+      )
       .withColumn("createdBy",
         when(isAutomatedCluster && 'actionName === "create", lit("JobsService"))
           .when(!isAutomatedCluster && 'actionName === "create", 'userEmail))
@@ -464,7 +488,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomatedCluster && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
-      .drop("userEmail", "cluster_creator_lookup")
+      .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
 
   @deprecated
