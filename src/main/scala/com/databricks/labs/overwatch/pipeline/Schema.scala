@@ -208,12 +208,12 @@ object Schema extends SparkSessionWrapper {
           StructField("clusterState", StringType, nullable = true),
           StructField("driver_node_type_id", StringType, nullable = true),
           StructField("node_type_id", StringType, nullable = true),
-          StructField("num_workers", StringType, nullable = true),
+          StructField("num_workers", IntegerType, nullable = true),
           StructField("autoscale", StringType, nullable = true),
           StructField("clusterWorkers", StringType, nullable = true),
-          StructField("autotermination_minutes", StringType, nullable = true),
-          StructField("enable_elastic_disk", StringType, nullable = true),
-          StructField("start_cluster", StringType, nullable = true),
+          StructField("autotermination_minutes", IntegerType, nullable = true),
+          StructField("enable_elastic_disk", BooleanType, nullable = true),
+          StructField("start_cluster", BooleanType, nullable = true),
           StructField("clusterOwnerUserId", StringType, nullable = true),
           StructField("cluster_log_conf", StringType, nullable = true),
           StructField("init_scripts", StringType, nullable = true),
@@ -229,7 +229,8 @@ object Schema extends SparkSessionWrapper {
           StructField("idempotency_token", StringType, nullable = true),
           StructField("organization_id", StringType, nullable = true),
           StructField("user_id", StringType, nullable = true),
-          StructField("ssh_public_keys", StringType, nullable = true)
+          StructField("ssh_public_keys", StringType, nullable = true),
+          StructField("single_user_name", StringType, nullable = true)
         )), nullable = true),
       StructField("userIdentity",
         StructType(Seq(
@@ -281,7 +282,8 @@ object Schema extends SparkSessionWrapper {
           StructField("idempotency_token", StringType, nullable = true),
           StructField("organization_id", StringType, nullable = true),
           StructField("user_id", StringType, nullable = true),
-          StructField("ssh_public_keys", StringType, nullable = true)
+          StructField("ssh_public_keys", StringType, nullable = true),
+          StructField("single_user_name", StringType, nullable = true)
         )), nullable = true),
       StructField("userIdentity",
         StructType(Seq(

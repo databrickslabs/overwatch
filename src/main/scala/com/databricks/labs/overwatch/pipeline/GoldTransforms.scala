@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Column, DataFrame}
@@ -8,6 +9,7 @@ import org.apache.spark.sql.functions._
 trait GoldTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
+  final private val orgId = dbutils.notebook.getContext.tags("orgId")
 
   protected def buildCluster()(df: DataFrame): DataFrame = {
     val clusterCols: Array[Column] = Array(
@@ -23,6 +25,9 @@ trait GoldTransforms extends SparkSessionWrapper {
       'autoscale,
       'autoTermination_minutes.alias("auto_termination_minutes"),
       'enable_elastic_disk,
+      'is_automated,
+      'cluster_type,
+      'security_profile,
       'cluster_log_conf,
       'init_scripts,
       'custom_tags,
@@ -43,6 +48,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected def buildJobs()(df: DataFrame): DataFrame = {
     val jobCols: Array[Column] = Array(
+      'organization_id,
       'jobId.alias("job_id"),
       'actionName.alias("action"),
       'timestamp.alias("unixTimeMS"),
@@ -89,21 +95,20 @@ trait GoldTransforms extends SparkSessionWrapper {
       'jobTerminalState.alias("job_terminal_state"),
       'jobTriggerType.alias("job_trigger_type"),
       'clusterId.alias("cluster_id"),
-      'orgId.alias("organization_id"),
+      'organization_id,
       'notebook_params,
       'libraries,
       'workflow_context,
       'taskDetail.alias("task_detail"),
-      'cancellationDetails.alias("cancellation_detail"),
-      'timeDetails.alias("time_detail"),
-      'startedBy.alias("started_by"),
-      'requestDetails.alias("request_detail")
+      'requestDetails.alias("request_detail"),
+      'timeDetails.alias("time_detail")
     )
     df.select(jobRunCols: _*)
   }
 
   protected def buildNotebook()(df: DataFrame): DataFrame = {
     val notebookCols: Array[Column] = Array(
+      'organization_id,
       'notebookId.alias("notebook_id"),
       'notebookName.alias("notebook_name"),
       'path.alias("notebook_path"),
@@ -208,12 +213,17 @@ trait GoldTransforms extends SparkSessionWrapper {
         round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
           round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
       )
+      .withColumn("organization_id", lit(orgId))
 
     val clusterStateFactCols: Array[Column] = Array(
+      'organization_id,
       'cluster_id,
-      'timestamp.alias("unixTimeMS"),
-      from_unixtime('timestamp.cast("double") / 1000).cast("timestamp").alias("timestamp"),
-      from_unixtime('timestamp.cast("double") / 1000).cast("timestamp").cast("date").alias("date"),
+      ('timestamp * lit(1000)).alias("unixTimeMS_state_start"),
+      from_unixtime(('timestamp * lit(1000)).cast("double") / 1000).cast("timestamp").alias("timestamp_state_start"),
+      from_unixtime(('timestamp * lit(1000)).cast("double") / 1000).cast("timestamp").cast("date").alias("date_state_start"),
+      ((lead('timestamp, 1).over(stateUnboundW) * lit(1000) - 1)).alias("unixTimeMS_state_end"),
+      from_unixtime(((lead('timestamp, 1).over(stateUnboundW) * lit(1000)).cast("double") - 1.0) / 1000).cast("timestamp").alias("timestamp_state_end"),
+      from_unixtime(((lead('timestamp, 1).over(stateUnboundW) * lit(1000)).cast("double") - 1.0) / 1000).cast("timestamp").cast("date").alias("date_state_end"),
       'type.alias("state"),
       'current_num_workers,
       'target_num_workers,
@@ -229,8 +239,6 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     clusterPotential
       .select(clusterStateFactCols: _*)
-      .withColumn("unixTimeMS", ('unixTimeMS * lit(1000)).cast("long"))
-
   }
 
   protected def buildSparkJob(
@@ -277,6 +285,7 @@ trait GoldTransforms extends SparkSessionWrapper {
           first('user_email, ignoreNulls = true).over(notebookW)).otherwise('user_email))
 
     val sparkJobCols: Array[Column] = Array(
+      'organization_id,
       'SparkContextID.alias("spark_context_id"),
       'JobID.alias("job_id"),
       'JobGroupID.alias("job_group_id"),
@@ -300,14 +309,27 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val sparkContextW = Window.partitionBy('spark_context_id)
 
+    val isDatabricksJob = 'job_group_id.like("%job-%-run-%")
+
     sparkJobsWImputedUser
       .select(sparkJobCols: _*)
       .withColumn("cluster_id", first('cluster_id, ignoreNulls = true).over(sparkContextW))
-
+      .withColumn("jobGroupAr", split('job_group_id, "_")(2))
+      .withColumn("db_job_id",
+        when(isDatabricksJob && 'db_job_id.isNull,
+          split(regexp_extract('jobGroupAr, "(job-\\d+)", 1), "-")(1))
+          .otherwise('db_job_id)
+      )
+      .withColumn("db_run_id",
+        when(isDatabricksJob && 'db_run_id.isNull,
+          split(regexp_extract('jobGroupAr, "(-run-\\d+)", 1), "-")(2))
+          .otherwise('db_run_id)
+      )
   }
 
   protected def buildSparkStage()(df: DataFrame): DataFrame = {
     val sparkStageCols: Array[Column] = Array(
+      lit(orgId).alias("organization_id"),
       'SparkContextID.alias("spark_context_id"),
       'StageID.alias("stage_id"),
       'StageAttemptID.alias("stage_attempt_id"),
@@ -324,6 +346,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
   protected def buildSparkTask()(df: DataFrame): DataFrame = {
     val sparkTaskCols: Array[Column] = Array(
+      lit(orgId).alias("organization_id"),
       'SparkContextID.alias("spark_context_id"),
       'TaskID.alias("task_id"),
       'TaskAttempt.alias("task_attempt_id"),
@@ -348,6 +371,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected def buildSparkExecution()(df: DataFrame): DataFrame = {
     val sparkExecutionCols: Array[Column] = Array(
+      lit(orgId).alias("organization_id"),
       'SparkContextID.alias("spark_context_id"),
       'ExecutionID.alias("execution_id"),
       'clusterId.alias("cluster_id"),
@@ -364,6 +388,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
   protected def buildSparkExecutor()(df: DataFrame): DataFrame = {
     val sparkExecutorCols: Array[Column] = Array(
+      lit(orgId).alias("organization_id"),
       'SparkContextID.alias("spark_context_id"),
       'ExecutorID.alias("executor_id"),
       'clusterId.alias("cluster_id"),
@@ -381,68 +406,69 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val clusterViewColumnMapping: String =
     """
-      |cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
-      |autoscale, auto_termination_minutes, enable_elastic_disk, cluster_log_conf, init_scripts, custom_tags,
-      |cluster_source, spark_env_vars, spark_conf, acl_path_prefix, instance_pool_id, spark_version,
-      |idempotency_token, organization_id, deleted_by, created_by, last_edited_by
+      |organization_id, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
+      |autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type, security_profile, cluster_log_conf,
+      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, instance_pool_id,
+      |spark_version, idempotency_token, deleted_by, created_by, last_edited_by
       |""".stripMargin
 
   protected val jobViewColumnMapping: String =
     """
-      |job_id, action, unixTimeMS, timestamp, date, job_name, job_type, timeout_seconds, schedule, notebook_path,
-      |new_settings, cluster, aclPermissionSet, grants, targetUserId, session_id, request_id, user_agent, response,
-      |source_ip_address, created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
+      |organization_id, job_id, action, unixTimeMS, timestamp, date, job_name, job_type, timeout_seconds, schedule,
+      |notebook_path, new_settings, cluster, aclPermissionSet, grants, targetUserId, session_id, request_id, user_agent,
+      |response, source_ip_address, created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
       |""".stripMargin
 
   protected val jobRunViewColumnMapping: String =
     """
-      |run_id, run_name, job_runtime, job_id, id_in_job, job_cluster_type, job_task_type, job_terminal_state,
-      |job_trigger_type, cluster_id, organization_id, notebook_params, libraries, workflow_context, task_detail,
-      |cancellation_detail, time_detail, started_by, request_detail
+      |organization_id, run_id, run_name, job_runtime, job_id, id_in_job, job_cluster_type, job_task_type,
+      |job_terminal_state, job_trigger_type, cluster_id, notebook_params, libraries, workflow_context, task_detail,
+      |request_detail, time_detail
       |""".stripMargin
 
   protected val notebookViewColumnMappings: String =
     """
-      |notebook_id, notebook_name, notebook_path, cluster_id, action, unixTimeMS, timestamp, date, old_name, old_path,
+      |organization_id, notebook_id, notebook_name, notebook_path, cluster_id, action, unixTimeMS, timestamp, date, old_name, old_path,
       |new_name, new_path, parent_path, user_email, request_id, response
       |""".stripMargin
 
   protected val clusterStateFactViewColumnMappings: String =
     """
-      |cluster_id, unixTimeMS, timestamp, date, state, current_num_workers, target_num_workers, counter_reset,
+      |organization_id, cluster_id, unixTimeMS_state_start, timestamp_state_start, date_state_start, unixTimeMS_state_end,
+      |timestamp_state_end, date_state_end, state, current_num_workers, target_num_workers, counter_reset,
       |uptime_since_restart_S, uptime_in_state_S, driver_node_type_id, node_type_id, cloud_billable,
       |databricks_billable, core_hours
       |""".stripMargin
 
   protected val sparkJobViewColumnMapping: String =
     """
-      |spark_context_id, job_id, job_group_id, execution_id, stage_ids, cluster_id, notebook_id, notebook_path,
-      |db_job_id, db_run_id, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
+      |organization_id, spark_context_id, job_id, job_group_id, execution_id, stage_ids, cluster_id, notebook_id, notebook_path,
+      |db_job_id, db_run_id as db_id_in_job, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
       |event_log_end, user_email
       |""".stripMargin
 
   protected val sparkStageViewColumnMapping: String =
     """
-      |spark_context_id, stage_id, stage_attempt_id, cluster_id, unixTimeMS, timestamp, date, stage_runtime,
+      |organization_id, spark_context_id, stage_id, stage_attempt_id, cluster_id, unixTimeMS, timestamp, date, stage_runtime,
       |stage_info, event_log_start, event_log_end
       |""".stripMargin
 
   protected val sparkTaskViewColumnMapping: String =
     """
-      |spark_context_id, task_id, task_attempt_id, stage_id, stage_attempt_id, cluster_id, executor_id, host,
+      |organization_id, spark_context_id, task_id, task_attempt_id, stage_id, stage_attempt_id, cluster_id, executor_id, host,
       |unixTimeMS, timestamp, date, task_runtime, task_metrics, task_info, task_type, task_end_reason,
       |event_log_start, event_log_end
       |""".stripMargin
 
   protected val sparkExecutionViewColumnMapping: String =
     """
-      |spark_context_id, execution_id, cluster_id, description, details, unixTimeMS, timestamp, date,
+      |organization_id, spark_context_id, execution_id, cluster_id, description, details, unixTimeMS, timestamp, date,
       |sql_execution_runtime, event_log_start, event_log_end
       |""".stripMargin
 
   protected val sparkExecutorViewColumnMapping: String =
     """
-      |spark_context_id, executor_id, cluster_id, executor_info, removed_reason, executor_alivetime,
+      |organization_id, spark_context_id, executor_id, cluster_id, executor_info, removed_reason, executor_alivetime,
       |unixTimeMS, timestamp, date, event_log_start, event_log_end
       |""".stripMargin
 

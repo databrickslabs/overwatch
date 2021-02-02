@@ -267,7 +267,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("spark_context_id", "job_id"),
       config,
       partitionBy = Array("date"),
-      zOrderBy = Array("spark_context_id"),
+      zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("unixTimeMS")
     )
 
@@ -282,7 +282,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("spark_context_id", "stage_id", "stage_attempt_id"),
       config,
       partitionBy = Array("date"),
-      zOrderBy = Array("spark_context_id"),
+      zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("unixTimeMS")
     )
 
@@ -297,7 +297,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("spark_context_id", "task_id", "task_attempt_id"),
       config,
       partitionBy = Array("date"),
-      zOrderBy = Array("spark_context_id"),
+      zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("unixTimeMS")
     )
 
