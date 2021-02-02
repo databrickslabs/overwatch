@@ -244,7 +244,9 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected def buildJobRunCostPotentialFact(
                                               clusterStateFact: DataFrame,
                                               cluster: DataFrame,
-                                              instanceDetails: DataFrame
+                                              instanceDetails: DataFrame,
+                                              incrementalSparkJob: DataFrame,
+                                              incrementalSparkTask: DataFrame
                                             )(newTerminatedJobRuns: DataFrame): DataFrame = {
 
     val clusterNameLookup = cluster.select('cluster_id, 'cluster_name).distinct
@@ -326,11 +328,16 @@ trait GoldTransforms extends SparkSessionWrapper {
       .unionByName(jobRunTerminalState)
 
     // GET UTILIZATION BY KEY
-    val sparkJobMini = spark.table("overwatch_dev.sparkjob")
-      .select('organization_id, 'spark_context_id, 'job_group_id, 'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
-      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
-    val sparkTaskMini = spark.table("overwatch_dev.sparktask")
-      .select('organization_id, 'spark_context_id, 'stage_id, 'stage_attempt_id, 'task_id, 'task_attempt_id, $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
+    val sparkJobMini = incrementalSparkJob
+      .select('organization_id, 'spark_context_id, 'job_group_id,
+        'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
+//      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
+      .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
+
+    val sparkTaskMini = incrementalSparkTask
+      .select('organization_id, 'spark_context_id, 'stage_id,
+        'stage_attempt_id, 'task_id, 'task_attempt_id,
+        $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
 
     val jobRunUtilRaw = sparkJobMini
       .join(sparkTaskMini, Seq("organization_id", "spark_context_id", "stage_id"))
@@ -462,7 +469,7 @@ trait GoldTransforms extends SparkSessionWrapper {
           split(regexp_extract('jobGroupAr, "(job-\\d+)", 1), "-")(1))
           .otherwise('db_job_id)
       )
-      .withColumn("db_run_id",
+      .withColumn("db_id_in_job",
         when(isDatabricksJob && 'db_run_id.isNull,
           split(regexp_extract('jobGroupAr, "(-run-\\d+)", 1), "-")(2))
           .otherwise('db_run_id)
@@ -593,7 +600,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val sparkJobViewColumnMapping: String =
     """
       |organization_id, spark_context_id, job_id, job_group_id, execution_id, stage_ids, cluster_id, notebook_id, notebook_path,
-      |db_job_id, db_run_id as db_id_in_job, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
+      |db_job_id, db_id_in_job, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
       |event_log_end, user_email
       |""".stripMargin
 

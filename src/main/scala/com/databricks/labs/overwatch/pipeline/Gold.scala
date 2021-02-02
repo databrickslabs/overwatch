@@ -85,6 +85,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   private val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact")
+  //Incremental current spark job and tasks DFs plus 2 days for lag coverage
+  private val incrementalSparkFilter = Seq(IncrementalFilter(
+    "date",
+    date_sub(config.fromTime(jobRunCostPotentialFactModule.moduleID).asColumnTS.cast("date"), 2),
+    config.untilTime(jobRunCostPotentialFactModule.moduleID).asColumnTS.cast("date")
+  ))
   lazy private val appendJobRunCostPotentialFactProcess = EtlDefinition(
     // new jobRuns to be considered are job runs completed since the last overwatch import for this module
     GoldTargets.jobRunTarget.asIncrementalDF(
@@ -101,7 +107,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       ),
         // Lookups
         GoldTargets.clusterTarget.asDF,
-        BronzeTargets.cloudMachineDetail.asDF
+        BronzeTargets.cloudMachineDetail.asDF,
+        GoldTargets.sparkJobTarget.asIncrementalDF(incrementalSparkFilter),
+        GoldTargets.sparkTaskTarget.asIncrementalDF(incrementalSparkFilter)
     ))),
     append(GoldTargets.jobRunCostPotentialFactTarget),
     jobRunCostPotentialFactModule
@@ -198,9 +206,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
     if (scope.contains(OverwatchScope.clusters)) {
       appendClusterProccess.process()
-      appendClusterStateFactProccess.process()
       GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping)
-      GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings)
     }
 
 //    if (scope.contains(OverwatchScope.pools)) {
@@ -210,10 +216,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     if (scope.contains(OverwatchScope.jobs)) {
       appendJobsProcess.process()
       appendJobRunsProcess.process()
-      appendJobRunCostPotentialFactProcess.process()
       GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
       GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
-      GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
     }
 
     if (scope.contains(OverwatchScope.notebooks)) {
@@ -228,6 +232,17 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         case e: FailedModuleException =>
           logger.log(Level.ERROR, "FAILED: SparkEvents Gold Module", e)
       }
+    }
+
+    //Build facts in scope -- this is done last as facts can consume from the gold model itself
+    if (scope.contains(OverwatchScope.clusterEvents)) {
+      appendClusterStateFactProccess.process()
+      GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings)
+    }
+
+    if (scope.contains(OverwatchScope.jobs)) {
+      appendJobRunCostPotentialFactProcess.process()
+      GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
     }
 
     initiatePostProcessing()
