@@ -13,6 +13,7 @@ Modules are the method by which Overwatch is segmented; currently, the modules a
 * [pools](#pools)
 * [jobs](#jobs)
 * [accounts](#accounts)
+* [notebooks](#notebooks)
 * [sparkEvents](#sparkevents)
 
 The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently,
@@ -65,6 +66,8 @@ to reduce/eliminate data gaps.
 ### Clusters
 *Dependencies:* Audit
 
+*Gold Entities:* Cluster
+
 The clusters module is pretty low-level. The cluster_id field throughout the layers is the primary method through 
 which users can tie spark-side data to databricks-side data. Additionally, cluster_ids are required to calculated 
 costs for clusters and for jobs since they are the basis for the compute. Without this metadata, the value of Overwatch
@@ -76,6 +79,8 @@ the clusters module, the sparkEvents cannot function.
 
 ### ClusterEvents
 *Dependencies:* Clusters
+
+*Gold Entities:* ClusterStateFact
 
 Cluster Events are just what they sound like, events that occur on a cluster which usually result in a cluster state
 change. All of these events can be seen in the UI if you navigate to a spcific cluster and click on *eEvent Log*.
@@ -101,7 +106,9 @@ other resources are heavily utilizing api calls.
 The Pools Module records the metadata related to Databricks Instance Pools.
 
 ### Jobs
-*Dependencies:* Audit
+*Dependencies:* Audit|Clusters|ClusterEvents
+
+*Gold Entities:* Job|JobRun|JobRunCostPotentialFact
 
 Overwatch curates all the job definitions through time, capturing as much metadata about these job definitions as 
 possible. In addition to the job definition metadata, Overwatch also captures each run and ties the run to a cluster_id
@@ -115,6 +122,8 @@ point-in-time cluster definition and run-times can be very powerful, and very ha
 
 ### Accounts
 *Dependencies:* Audit
+
+*Gold Entities:* User|UserLoginFact
 
 The accounts module is very simple and is meant to assist the IT Admin team in keeping track of users. The Accounts
 module includes some very useful auditing information as well as enables authorized users to tie user_ids back to 
@@ -131,8 +140,17 @@ If desired, views, can be created manually in the consumer database to publish t
 Overwatch should not be used as single source of truth for any audit requirements.
 {{% /notice %}}
 
+### Notebooks
+*Dependencies:* Audit
+
+*Gold Entities:* Notebook
+
+Currently a very simple module that just enables the materialization of notebooks as slow changing dimensions. 
+
 ### SparkEvents
 *Dependencies:* Clusters
+
+*Gold Entities:* SparkExecution|SparkJob|SparkStage|SparkTask|SparkExecutor|SparkJDBC
 
 Databricks captures all "SparkEvents" captured by Open Source Spark (OSS) AND some additional events that are 
 proprietary to Databricks. These events are captured and persisted in event log files when cluster logging is enabled.

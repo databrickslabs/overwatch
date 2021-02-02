@@ -17,7 +17,13 @@ and strong typing for additional validation options. All configs attempt to be d
 where possible. If a default is set, passing in a value will simply overwrite the default.
 
 ## Config Examples
-Below are some configurations examples.
+Below are some configurations examples of building the configuration parameters called *params* which is a variable
+set to contain an instance of the class *OverwatchParams*.
+
+Once the config has been created according to your needs, refer back to the 
+[Getting Started - Run Via Notebook]({{%relref "GettingStarted"%}}#run-via-notebook) or
+[Getting Started - Run Via Main Class]({{%relref "GettingStarted"%}}#run-via-main-class) section to see how it's can be used
+when executing the Overwatch Run.
 
 ### Simplified Example
 The simplest configuration possible. This is just for testing and likely is not a sufficient configuration for 

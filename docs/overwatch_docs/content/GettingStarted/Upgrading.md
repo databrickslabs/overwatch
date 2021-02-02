@@ -5,3 +5,5 @@ draft: true
 weight: 5
 ---
 
+## Place Holder
+This section will describe the process for schema upgrades for post 1.0 upgrades

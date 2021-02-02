@@ -15,3 +15,9 @@ weight: 4
 * Moving the Overwatch Database
 * Getting through the historical load (first run)
 
+## Optimizations Implemented
+
+## Best Practices
+
+## Enabling Debug
+Might move this to troubleshooting

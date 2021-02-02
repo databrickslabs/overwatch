@@ -49,6 +49,7 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [instanceDetails](#instancedetails)
 * [job](#job)
 * [jobrun](#jobrun)
+* [jobRunCostPotentialFact](#jobruncostpotentialfact)
 * [notebook](#notebook)
 * [user](#user)
 * [userLoginFact](#userloginfact)
@@ -73,7 +74,7 @@ To do this, just right click the SAMPLE link and click saveTargetAs or saveLinkA
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
-cluster_id                  |string           |Canonical Databricks cluster ID (more info in [Common Meta Fields]())
+cluster_id                  |string           |Canonical Databricks cluster ID (more info in [Common Meta Fields](#common-meta-fields))
 action                      |string           |Either **create** OR **edit** -- depicts the type of action for the cluster
 cluster_name                |string           |user-defined name of the cluster
 driver_node_type            |string           |Canonical name of the driver node type.
@@ -82,6 +83,9 @@ num_workers                 |int              |The number of workers defined WHE
 autoscale                   |struct           |The min/max workers defined WHEN autoscaling is enabled
 auto_termination_minutes    |int              |The number of minutes before the cluster auto-terminates due to inactivity
 enable_elastic_disk         |boolean          |Whether autoscaling disk was enabled or not
+is_automated                |booelan          |Whether the cluster is automated (true if automated false if interactive)
+cluster_type                |string           |Type of cluster (i.e. Serverless, SQL Analytics, Single Node, Standard)
+security_profile            |struct           |Complex type to describe secrity features enabled on the cluster. More information [Below]()
 cluster_log_conf            |string           |Logging directory if configured
 init_script                 |Array\[Struct\]  |Array of init scripts
 custom_tags                 |string           |User-Defined tags AND also includes Databricks JobID and Databricks RunName when the cluster is created by a Databricks Job as an automated cluster. Other Databricks services that create clusters also store unique information here such as SqlEndpointID when a cluster is created by "SqlAnalytics" 
@@ -200,10 +204,51 @@ time_detail                 |struct           |All time dimensions tied to the r
 started_by                  |struct           |Run request received from user -- email is recorded here -- usage == started_by.email
 request_detail              |struct           |Complete request detail received by the endpoint
 
+#### JobRunCostPotentialFact
+[SAMPLE]() **<-- TODO**
+
+**KEY** -- organization_id + job_id + id_in_job
+
+This fact table defines the cost, potential, and utilization of a cluster associated with a specific Databricks 
+Job Run.
+
+* Potential: Total core_milliseconds for which the cluster COULD execute spark tasks. This derivation only includes
+  the worker nodes in a state ready to receive spark tasks (i.e. Running). Nodes being added or running init scripts
+  are not ready for spark jobs thus those core milliseconds are omitted from the total potential.
+* Cost: Derived from the [instanceDetails](#instancedetails) table. This table can be completely customized to the 
+  need of the user. The costs in this table are derived from the "On_Demand_Cost_Hourly" values associated with the
+  instance type in instanceDetails. The DBU costs are associated to the interactive and automated dbu contract rates
+  defined in the configuration of the Overwatch Job. These values are generally static by organization_id (i.e. workspace)
+  but can be referenced in the instanceDetails table as well.
+* Utilization: Utilization is a function of core milliseconds used during spark task execution divided by the total
+  amount of core milliseconds available given the cluster size and state. (i.e. spark_task_runtime_H / worker_potential_core_H) 
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+organization_id             |string           |Canonical workspace id
+job_id                      |string           |Canonical ID of job
+id_in_job                   |string           |Run instance of the job_id. This can be seen in the UI in a job spec denoted as "Run N". Each Job ID has first id_in_job as "Run 1" and is incrented and canonical ONLY for the job_id. This field omits the "Run " prefix and results in an integer value of run instance within job.
+job_start_date              |string           |Date the job was submitted for run
+cluster_id                  |string           |Canonical workspace cluster id
+cluster_type                |string           |Either "automated" or "interactive"
+run_terminal_state          |string           |Final state of the job such as "Succeeded", "Failed" or "Cancelled"
+run_trigger_type            |string           |How the run was triggered (i.e. cron / manual) 
+worker_potential_core_H     |double           |cluster core hours capable of executing spark tasks, "potential"
+driver_compute_cost         |double           |USD cloud compute cost of Driver node
+driver_dbu_cost             |double           |USD Databricks cost for DBUs associated with Driver node
+worker_compute_cost         |double           |USD cloud compute cost of Worker nodes
+worker_dbu_cost             |double           |USD Databricks cost for DBUs associated with Worker nodes
+total_driver_cost           |double           |USD sum of compute and DBU costs for driver
+total_worker_cost           |double           |USD sum of compute and DBU costs for workers
+total_cost                  |double           |USD sum of compute and DBU costs associated with entire cluster
+spark_task_runtimeMS        |long             |Spark core execution time in milliseconds (i.e. task was operating/locking on core)
+spark_task_runtime_H        |double           |Spark core execution time in Hours (i.e. task was operating/locking on core)
+job_run_cluster_util        |double           |Cluster utilization: spark task execution time / cluster potential
+
 #### Notebook
 [SAMPLE]() **<-- TODO**
 
-**KEY** -- organization_id + notebook_id * action * unixTimeMS
+**KEY** -- organization_id + notebook_id + action + unixTimeMS
 
 Slow changing dimension of the notebook entities through time. This table does not capture the edits of the 
 notebook contents but rather the state of the notebook itself such as location, name, etc. Primary use case for 
@@ -230,7 +275,7 @@ response                    |struct           |HTTP response including errorMess
 #### User
 [SAMPLE]() **<-- TODO**
 
-**KEY** -- organization_id + user_id * action * unixTimeMS
+**KEY** -- organization_id + user_id + action + unixTimeMS
 
 {{% notice note%}}
 **Not exposed in the consumer database**. This table contains more sensitive information and by default is not
