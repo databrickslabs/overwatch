@@ -247,21 +247,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     clusterSpecModule
   )
 
-
-  private val clusterStatusModule = Module(2015, "Silver_ClusterStatus")
-  lazy private val appendClusterStatusProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(clusterStatusModule.moduleID),
-    Some(Seq(
-      buildClusterStatus(
-        SilverTargets.clustersSpecTarget,
-        BronzeTargets.clustersSnapshotTarget,
-        BronzeTargets.cloudMachineDetail
-      )
-    )),
-    append(SilverTargets.clustersStatusTarget),
-    clusterStatusModule
-  )
-
   private val userLoginsModule = Module(2016, "Silver_UserLogins")
   lazy private val appendUserLoginsProcess = EtlDefinition(
     getIncrementalAuditLogDFByTimestamp(userLoginsModule.moduleID),
@@ -331,7 +316,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     if (scope.contains(OverwatchScope.clusters)) {
       try {
         appendClusterSpecProcess.process()
-        appendClusterStatusProcess.process()
       } catch {
         case _: FailedModuleException =>
           logger.log(Level.ERROR, "FAILED: Clusters Module")

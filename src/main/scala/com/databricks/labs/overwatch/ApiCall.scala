@@ -68,6 +68,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         _decryptedToken = decryptedToken
         this
       }
+    } catch { // place holder until the encrypted token can be resolved
+      case e: Throwable => {
+        logger.log(Level.ERROR, e)
+        this
+      }
     }
   }
 
