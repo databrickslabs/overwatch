@@ -109,7 +109,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           Seq(TransformFunctions.buildIncrementalDateFilters(
             jobRunCostPotentialFactModule.moduleID, "date", config, 2)
           )
-        )
+        ),
+        config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
     ))),
     append(GoldTargets.jobRunCostPotentialFactTarget),
     jobRunCostPotentialFactModule

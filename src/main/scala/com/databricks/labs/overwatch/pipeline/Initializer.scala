@@ -119,7 +119,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    *
    * @return
    */
-  private def loadStaticDatasets: this.type = {
+  private def loadStaticDatasets(database: Database): this.type = {
     if (config.isFirstRun || !spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
@@ -132,6 +132,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
       instanceDetailsDF
         .withColumn("organization_id", lit(dbutils.notebook.getContext.tags("orgId")))
+        .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
+        .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
+        .withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS)
+        .withColumn("Overwatch_RunID", lit(config.runID))
         .write.format("delta")
         .saveAsTable(s"${config.consumerDatabaseName}.instanceDetails")
     }
@@ -494,7 +498,7 @@ object Initializer extends SparkSessionWrapper {
       .initPipelineRun()
       .initializeDatabase()
 
-    initializer.loadStaticDatasets
+    initializer.loadStaticDatasets(database)
 
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)

@@ -256,7 +256,9 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               cluster: DataFrame,
                                               instanceDetails: DataFrame,
                                               incrementalSparkJob: DataFrame,
-                                              incrementalSparkTask: DataFrame
+                                              incrementalSparkTask: DataFrame,
+                                              interactiveDBUPrice: Double,
+                                              automatedDBUPrice: Double
                                             )(newTerminatedJobRuns: DataFrame): DataFrame = {
 
 
@@ -282,8 +284,8 @@ trait GoldTransforms extends SparkSessionWrapper {
     val clusterPotentialWCosts = clusterStateFact
       .join(clusterNameLookup, Seq("cluster_id"), "left")
       .withColumn("dbu_rate",
-        when(isAutomated, lit(0.23))
-          .otherwise(lit(0.55))
+        when(isAutomated, lit(automatedDBUPrice))
+          .otherwise(lit(interactiveDBUPrice))
       ) // adding this to instanceDetails table -- placeholder for now
       .withColumn("uptime_in_state_H", 'uptime_in_state_S / 60 / 60)
       .join(driverCosts, Seq("organization_id", "driver_node_type_id"))
