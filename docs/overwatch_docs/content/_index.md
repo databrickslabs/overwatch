@@ -15,7 +15,10 @@ operational changes. Common examples of operational activities Overwatch assists
 
 ## How Much Does It Cost
 Overwatch is currently a Databricks Labs project and has **no direct cost** associated with it other than the costs
-incurred with running the daily jobs. As a reference, a cost analysis was performed at a large Databricks customer. 
+incurred with running the daily jobs. Audit logging is required and as such a 
+[**Azure Databricks Premium SKU**](https://databricks.com/product/azure-pricing) **OR**
+the equivalent [**AWS Premium Plan**](https://databricks.com/product/aws-pricing) or above.
+As a reference, a cost analysis was performed at a large Databricks customer.
 This customer had >1000 named users with >400 daily active users with a contract price with Databricks over $2MM/year. 
 Overwatch costs them approximately $8 USD / day to run which includes storage, compute, and DBUs. $8 / day == 
 approximately $3,000 / year or **0.15% of Databricks contract price**. This is just a single reference customer but 

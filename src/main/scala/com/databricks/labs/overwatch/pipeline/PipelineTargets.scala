@@ -167,16 +167,14 @@ abstract class PipelineTargets(config: Config) {
       name = "cluster_spec_silver",
       keys = Array("timestamp", "cluster_id"),
       config,
-      incrementalColumns = Array("timestamp"),
-      zOrderBy = Array("cluster_id")
+      incrementalColumns = Array("timestamp")
     )
 
     lazy private[overwatch] val clustersStatusTarget: PipelineTable = PipelineTable(
       name = "cluster_status_silver",
       keys = Array("timestamp", "cluster_id"),
       config,
-      incrementalColumns = Array("timestamp"),
-      zOrderBy = Array("cluster_id")
+      incrementalColumns = Array("timestamp")
     )
 
     lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable(
