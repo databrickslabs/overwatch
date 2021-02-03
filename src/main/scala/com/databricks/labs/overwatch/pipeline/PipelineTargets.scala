@@ -145,7 +145,7 @@ abstract class PipelineTargets(config: Config) {
       name = "jobrun_silver",
       keys = Array("timestamp", "runId"),
       config,
-      incrementalColumns = Array("timestamp"),
+      incrementalColumns = Array("endEpochMS"), // don't load into gold until run is terminated
       zOrderBy = Array("runId", "jobId")
     )
 
@@ -227,12 +227,25 @@ abstract class PipelineTargets(config: Config) {
       name = "jobRun_gold",
       keys = Array("run_id", "unixTimeMS"),
       config,
-      incrementalColumns = Array("unixTimeMS")
+      incrementalColumns = Array("endEpochMS")
     )
 
     lazy private[overwatch] val jobRunsViewTarget: PipelineView = PipelineView(
       name = "jobRun",
       jobRunTarget,
+      config
+    )
+
+    lazy private[overwatch] val jobRunCostPotentialFactTarget: PipelineTable = PipelineTable(
+      name = "jobRunCostPotentialFact_gold",
+      keys = Array("organization_id", "job_id", "id_in_job"),
+      config,
+      incrementalColumns = Array("job_start_date")
+    )
+
+    lazy private[overwatch] val jobRunCostPotentialFactViewTarget: PipelineView = PipelineView(
+      name = "jobRunCostPotentialFact",
+      jobRunCostPotentialFactTarget,
       config
     )
 
@@ -253,7 +266,7 @@ abstract class PipelineTargets(config: Config) {
       name = "clusterStateFact_gold",
       keys = Array("cluster_id", "unixTimeMS"),
       config,
-      incrementalColumns = Array("unixTimeMS")
+      incrementalColumns = Array("unixTimeMS_state_start")
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(

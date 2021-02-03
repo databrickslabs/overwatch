@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import com.databricks.labs.overwatch.utils.{Module, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
@@ -86,7 +86,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     val jobRunCols: Array[Column] = Array(
       'runId.alias("run_id"),
       'run_name,
-      $"JobRunTime.startEpochMS".alias("unixTimeMS"),
+      $"JobRunTime.endEpochMS".alias("endEpochMS"),
       'jobRunTime.alias("job_runtime"),
       'jobId.alias("job_id"),
       'idInJob.alias("id_in_job"),
@@ -241,6 +241,170 @@ trait GoldTransforms extends SparkSessionWrapper {
       .select(clusterStateFactCols: _*)
   }
 
+  //TEMP TEST FUNC
+//  private def displayDFAndRange(name: String, rangeCol: String, df: DataFrame): Unit = {
+//    case class MinMax(low: String, high: String)
+//    val minMax = df.select(min(col(rangeCol)).cast("string"), max(col(rangeCol)).cast("string"))
+//      .as[MinMax].collect().headOption.getOrElse(MinMax("0", "0"))
+//    val cnt = df.count()
+//    println(s"DF SAMPLE: Name: $name\nRange: ${minMax.low} --> ${minMax.high}\nCount: ${cnt}")
+//    df.orderBy(col(rangeCol)).show(10)
+//  }
+
+  protected def buildJobRunCostPotentialFact(
+                                              clusterStateFact: DataFrame,
+                                              cluster: DataFrame,
+                                              instanceDetails: DataFrame,
+                                              incrementalSparkJob: DataFrame,
+                                              incrementalSparkTask: DataFrame,
+                                              interactiveDBUPrice: Double,
+                                              automatedDBUPrice: Double
+                                            )(newTerminatedJobRuns: DataFrame): DataFrame = {
+
+
+    val clusterNameLookup = cluster.select('cluster_id, 'cluster_name).distinct
+    val isAutomated = 'cluster_name.like("job-%-run-%")
+
+    val driverCosts = instanceDetails
+      .select(
+        'organization_id,
+        'API_name.alias("driver_node_type_id"),
+        'On_Demand_Cost_Hourly.alias("driver_compute_hourly"),
+        'Hourly_DBUs.alias("driver_dbu_hourly")
+      )
+    val workerCosts = instanceDetails
+      .select(
+        'organization_id,
+        'API_name.alias("node_type_id"),
+        'On_Demand_Cost_Hourly.alias("worker_compute_hourly"),
+        'Hourly_DBUs.alias("worker_dbu_hourly"),
+        'vCPUs.alias("worker_cores")
+      )
+
+    val clusterPotentialWCosts = clusterStateFact
+      .join(clusterNameLookup, Seq("cluster_id"), "left")
+      .withColumn("dbu_rate",
+        when(isAutomated, lit(automatedDBUPrice))
+          .otherwise(lit(interactiveDBUPrice))
+      ) // adding this to instanceDetails table -- placeholder for now
+      .withColumn("uptime_in_state_H", 'uptime_in_state_S / 60 / 60)
+      .join(driverCosts, Seq("organization_id", "driver_node_type_id"))
+      .join(workerCosts, Seq("organization_id", "node_type_id"))
+
+    val clusterByIdAsOfW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val clusterByIdWhenW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val keys = Array("organization_id", "cluster_id", "cluster_name", "timestamp")
+    val lookupCols = Array("unixTimeMS_state_start", "unixTimeMS_state_end", "timestamp_state_start",
+      "timestamp_state_end", "state", "cloud_billable", "databricks_billable", "current_num_workers",
+      "dbu_rate", "driver_compute_hourly", "worker_compute_hourly", "driver_dbu_hourly",
+      "worker_dbu_hourly", "worker_cores")
+
+    // GET POTENTIAL WITH COSTS
+    val clusterPotentialInitialState = clusterPotentialWCosts
+      .withColumn("timestamp", 'unixTimeMS_state_start)
+      .select(keys ++ lookupCols map col: _*)
+
+    val jobRunInitialState = TransformFunctions.fillFromLookupsByTS(
+      newTerminatedJobRuns.withColumn("timestamp", $"job_runtime.startEpochMS"), "run_id",
+      lookupCols, clusterByIdAsOfW, clusterPotentialInitialState
+    )
+      .drop("timestamp")
+      .withColumn("uptime_in_state_H", (array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)
+      .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+
+    val clusterPotentialTerminalState = clusterPotentialWCosts
+      .withColumn("timestamp", 'unixTimeMS_state_end)
+      .select(keys ++ lookupCols map col: _*)
+
+    val jobRunTerminalState = TransformFunctions.fillFromLookupsByTS(
+      newTerminatedJobRuns.withColumn("timestamp", $"job_runtime.endEpochMS"), "run_id",
+      lookupCols, clusterByIdWhenW, clusterPotentialTerminalState
+    )
+      .filter('unixTimeMS_state_start > $"job_runtime.startEpochMS" && 'unixTimeMS_state_start < $"job_runtime.endEpochMS")
+      .drop("timestamp")
+      .withColumn("uptime_in_state_H", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
+      .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+
+    val clusterPotentialIntermediateStates = clusterPotentialWCosts
+      .select(Array("cluster_id", "cluster_name") ++ lookupCols map col: _*)
+
+    val jobRunIntermediateStates = newTerminatedJobRuns.alias("jr")
+      .join(clusterPotentialIntermediateStates.alias("cpot"),
+        $"jr.cluster_id" === $"cpot.cluster_id" &&
+          $"cpot.unixTimeMS_state_start" > $"jr.job_runtime.startEpochMS" && // only states beginning after job start and ending before
+          $"cpot.unixTimeMS_state_end" < $"jr.job_runtime.endEpochMS"
+      )
+      .drop($"cpot.cluster_id")
+      .withColumn("uptime_in_state_H", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000) / 3600)
+      .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+
+    val jobRunWPotential = jobRunInitialState
+      .unionByName(jobRunIntermediateStates)
+      .unionByName(jobRunTerminalState)
+
+    // GET UTILIZATION BY KEY
+    val sparkJobMini = incrementalSparkJob
+      .select('organization_id, 'spark_context_id, 'job_group_id,
+        'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
+//      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
+      .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
+
+    val sparkTaskMini = incrementalSparkTask
+      .select('organization_id, 'spark_context_id, 'stage_id,
+        'stage_attempt_id, 'task_id, 'task_attempt_id,
+        $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
+
+    val jobRunUtilRaw = sparkJobMini
+      .join(sparkTaskMini, Seq("organization_id", "spark_context_id", "stage_id"))
+      .withColumn("spark_task_runtime_H", 'runtimeMS / lit(1000) / lit(3600))
+      .withColumnRenamed("job_id", "spark_job_id")
+      .withColumnRenamed("stage_id", "spark_stage_id")
+      .withColumnRenamed("task_id", "spark_task_id")
+
+    val jobRunCostPotential = jobRunWPotential
+      .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
+      .withColumn("driver_compute_cost", when('cloud_billable, 'driver_compute_hourly * 'uptime_in_state_H).otherwise(lit(0)))
+      .withColumn("driver_dbu_cost", when('databricks_billable, 'driver_dbu_hourly * 'uptime_in_state_H * 'dbu_rate).otherwise(lit(0)))
+      .withColumn("worker_compute_cost", when('cloud_billable, 'worker_compute_hourly * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+      .withColumn("worker_dbu_cost", when('databricks_billable, 'worker_dbu_hourly * 'current_num_workers * 'uptime_in_state_H * 'dbu_rate).otherwise(lit(0)))
+      .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
+      .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
+      .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
+      .withColumn("job_start_date", $"job_runtime.startTS".cast("date"))
+      .groupBy('organization_id, 'job_id, 'id_in_job, 'job_start_date, 'cluster_id, 'cluster_type, 'job_terminal_state.alias("run_terminal_state"), 'job_trigger_type.alias("run_trigger_type"))
+      .agg(
+        round(sum('worker_potential_core_H), 4).alias("worker_potential_core_H"),
+        round(sum('driver_compute_cost), 2).alias("driver_compute_cost"),
+        round(sum('driver_dbu_cost), 2).alias("driver_dbu_cost"),
+        round(sum('worker_compute_cost), 2).alias("worker_compute_cost"),
+        round(sum('worker_dbu_cost), 2).alias("worker_dbu_cost"),
+        round(sum('total_driver_cost), 2).alias("total_driver_cost"),
+        round(sum('total_worker_cost), 2).alias("total_worker_cost"),
+        round(sum('total_cost), 2).alias("total_cost")
+      )
+
+    val jobRunSparkUtil = jobRunUtilRaw
+      .groupBy('organization_id, 'db_job_id, 'db_id_in_job, 'spark_task_termination_date)
+      .agg(
+        sum('runTimeMS).alias("spark_task_runtimeMS"),
+        round(sum('spark_task_runtime_H), 4).alias("spark_task_runtime_H")
+      )
+      .drop("spark_task_termination_date")
+
+    jobRunCostPotential.alias("jrCostPot")
+      .join(
+        jobRunSparkUtil.withColumnRenamed("organization_id", "orgId").alias("jrSparkUtil"),
+        $"jrCostPot.organization_id" === $"jrSparkUtil.orgId" &&
+          $"jrCostPot.job_id" === $"jrSparkUtil.db_job_id" &&
+          $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job"
+
+      )
+      .drop("db_job_id", "db_id_in_job", "orgId")
+      .withColumn("job_run_cluster_util", round(('spark_task_runtime_H / 'worker_potential_core_H), 4))
+
+
+  }
+
   protected def buildSparkJob(
                                cloudProvider: String
                              )(df: DataFrame): DataFrame = {
@@ -320,7 +484,7 @@ trait GoldTransforms extends SparkSessionWrapper {
           split(regexp_extract('jobGroupAr, "(job-\\d+)", 1), "-")(1))
           .otherwise('db_job_id)
       )
-      .withColumn("db_run_id",
+      .withColumn("db_id_in_job",
         when(isDatabricksJob && 'db_run_id.isNull,
           split(regexp_extract('jobGroupAr, "(-run-\\d+)", 1), "-")(2))
           .otherwise('db_run_id)
@@ -426,6 +590,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       |request_detail, time_detail
       |""".stripMargin
 
+  protected val jobRunCostPotentialFactViewColumnMapping: String =
+    """
+      |organization_id, job_id, id_in_job, job_start_date, cluster_id, cluster_type, run_terminal_state,
+      |run_trigger_type, worker_potential_core_H, driver_compute_cost, driver_dbu_cost, worker_compute_cost,
+      |worker_dbu_cost, total_driver_cost, total_worker_cost, total_cost, spark_task_runtimeMS, spark_task_runtime_H,
+      |job_run_cluster_util
+      |""".stripMargin
+
   protected val notebookViewColumnMappings: String =
     """
       |organization_id, notebook_id, notebook_name, notebook_path, cluster_id, action, unixTimeMS, timestamp, date, old_name, old_path,
@@ -443,7 +615,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val sparkJobViewColumnMapping: String =
     """
       |organization_id, spark_context_id, job_id, job_group_id, execution_id, stage_ids, cluster_id, notebook_id, notebook_path,
-      |db_job_id, db_run_id as db_id_in_job, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
+      |db_job_id, db_id_in_job, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
       |event_log_end, user_email
       |""".stripMargin
 
