@@ -309,31 +309,74 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   // TODO -- Azure Review
-  protected def userLogins()(df: DataFrame): DataFrame = {
-    val userLoginsDF = df.filter(
+  protected def accountLogins()(df: DataFrame): DataFrame = {
+    val endpointLogins = df.filter(
       'serviceName === "accounts" &&
-        'actionName.isin("login", "tokenLogin", "samlLogin", "jwtLogin") &&
+        lower('actionName).like("%login%") &&
         $"userIdentity.email" =!= "dbadmin")
 
-    if (userLoginsDF.rdd.take(1).nonEmpty) {
-      userLoginsDF.select('timestamp, 'date, 'serviceName, 'actionName,
-        $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
-        $"requestParams.user_name".alias("groups_user_name"),
-        $"requestParams.userID".alias("account_admin_userID"),
-        $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
+    val sshLoginRaw = df.filter('serviceName === "ssh" && 'actionName === "login")
+      .withColumn("actionName", lit("ssh"))
+
+    val accountLogins = endpointLogins.unionByName(sshLoginRaw)
+
+    val sshDetails = sshLoginRaw.select(
+      'timestamp,
+      'requestId,
+      lit("ssh").alias("login_type"),
+      struct(
+        $"requestParams.instanceId".alias("instance_id"),
+        $"requestParams.port".alias("login_port"),
+        'sessionId.alias("session_id"),
+        $"requestParams.publicKey".alias("login_public_key"),
+        $"requestParams.containerId".alias("container_id"),
+        $"requestParams.userName".alias("container_user_name")
+      ).alias("ssh_login_details")
+    )
+      .withColumn("organization_id", lit(orgId))
+
+    if (accountLogins.rdd.take(1).nonEmpty) {
+      accountLogins
+        .select(
+          'timestamp,
+          'date.alias("login_date"),
+          'serviceName,
+          'actionName.alias("login_type"),
+          $"requestParams.user".alias("login_user"),
+          //        $"requestParams.userName".alias("ssh_user_name"), TODO -- these are null in Azure - verify on AWS
+          //        $"requestParams.user_name".alias("groups_user_name"),
+          //        $"requestParams.userID".alias("account_admin_userID"),
+          $"userIdentity.email".alias("user_email"),
+          'sourceIPAddress, 'userAgent, 'requestId, 'response
+        )
         .withColumn("organization_id", lit(orgId))
+        .join(sshDetails, Seq("organization_id", "timestamp", "login_type", "requestId"), "left")
     } else
       Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   // TODO -- Azure Review
-  protected def newAccounts()(df: DataFrame): DataFrame = {
-    val newAccountsDF = df.filter('serviceName === "accounts" && 'actionName.isin("add"))
-    if (newAccountsDF.rdd.take(1).nonEmpty) {
-      newAccountsDF
-        .select('date, 'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"),
-          $"requestParams.targetUserName", 'sourceIPAddress, 'userAgent)
+  protected def accountMods()(df: DataFrame): DataFrame = {
+    val uidLookup = Window.partitionBy('organization_id, 'user_name).orderBy('timestamp)
+      .rowsBetween(Window.currentRow, Window.unboundedFollowing)
+    val modifiedAccountsDF = df.filter('serviceName === "accounts" &&
+      'actionName.isin("add", "addPrincipalToGroup", "removePrincipalFromGroup", "setAdmin", "updateUser", "delete"))
+    if (modifiedAccountsDF.rdd.take(1).nonEmpty) {
+      modifiedAccountsDF
+        .select(
+          'date, 'timestamp, 'serviceName, 'actionName,
+          $"requestParams.endpoint",
+          'requestId,
+          $"userIdentity.email".alias("modified_by"),
+          $"requestParams.targetUserName".alias("user_name"),
+          $"requestParams.targetUserId".alias("user_id"),
+          $"requestParams.targetGroupName".alias("group_name"),
+          $"requestParams.targetGroupId".alias("group_id"),
+          'sourceIPAddress, 'userAgent, 'response
+        )
         .withColumn("organization_id", lit(orgId))
+        .withColumn("user_id", when('user_id.isNull, first('user_id, true).over(uidLookup))
+          .otherwise('user_id))
     } else
       Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }

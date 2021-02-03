@@ -247,20 +247,20 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     clusterSpecModule
   )
 
-  private val userLoginsModule = Module(2016, "Silver_UserLogins")
-  lazy private val appendUserLoginsProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(userLoginsModule.moduleID),
-    Some(Seq(userLogins())),
-    append(SilverTargets.userLoginsTarget),
-    userLoginsModule
+  private val accountLoginsModule = Module(2016, "Silver_AccountLogins")
+  lazy private val appendAccountLoginsProcess = EtlDefinition(
+    getIncrementalAuditLogDFByTimestamp(accountLoginsModule.moduleID),
+    Some(Seq(accountLogins())),
+    append(SilverTargets.accountLoginTarget),
+    accountLoginsModule
   )
 
-  private val newAccountsModule = Module(2017, "Silver_NewAccounts")
-  lazy private val appendNewAccountsProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(newAccountsModule.moduleID),
-    Some(Seq(newAccounts())),
-    append(SilverTargets.newAccountsTarget),
-    newAccountsModule
+  private val modifiedAccountsModule = Module(2017, "Silver_ModifiedAccounts")
+  lazy private val appendModifiedAccountsProcess = EtlDefinition(
+    getIncrementalAuditLogDFByTimestamp(modifiedAccountsModule.moduleID),
+    Some(Seq(accountMods())),
+    append(SilverTargets.accountModTarget),
+    modifiedAccountsModule
   )
 
   private val notebookSummaryModule = Module(2018, "Silver_Notebooks")
@@ -305,8 +305,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
     if (scope.contains(OverwatchScope.accounts)) {
       try {
-        appendUserLoginsProcess.process()
-        appendNewAccountsProcess.process()
+        appendAccountLoginsProcess.process()
+        appendModifiedAccountsProcess.process()
       } catch {
         case _: FailedModuleException =>
           logger.log(Level.ERROR, "FAILED: Accounts Module")

@@ -251,8 +251,20 @@ object Schema extends SparkSessionWrapper {
       StructField("date", DateType, nullable = true),
       StructField("sourceIPAddress", StringType, nullable = true),
       StructField("userAgent", StringType, nullable = true),
+      StructField("requestId", StringType, nullable = true),
+      StructField("sessionId", StringType, nullable = true),
+      StructField("response",
+        StructType(Seq(
+          StructField("errorMessage", StringType, nullable = true),
+          StructField("result", StringType, nullable = true),
+          StructField("statusCode", LongType, nullable = true)
+        )), nullable = true),
       StructField("requestParams",
         StructType(Seq(
+          StructField("instanceId", StringType, nullable = true),
+          StructField("port", StringType, nullable = true),
+          StructField("publicKey", StringType, nullable = true),
+          StructField("containerId", StringType, nullable = true),
           StructField("user", StringType, nullable = true),
           StructField("userName", StringType, nullable = true),
           StructField("user_name", StringType, nullable = true),
