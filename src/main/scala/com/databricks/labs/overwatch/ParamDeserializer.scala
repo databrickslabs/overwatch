@@ -141,6 +141,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       getOption(masterNode, "databricksContractPrices.automatedDBUCostUSD",0.26 ).getOrElse(0.26)
     )
 
+    val primordialDateString = getOption[String](masterNode, "primordialDateString", "")
+
     //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
     //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
 
@@ -151,7 +153,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       Some(badRecordsPath),
       Some(overwatchScopes.toArray.toSeq),
       maxDaysToLoad,
-      dbContractPrices
+      dbContractPrices,
+      primordialDateString
     )
   }
 }

@@ -30,13 +30,14 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       (
         lr.moduleID,
         lr.moduleName,
+        config.primordialDateString,
         config.fromTime(lr.moduleID).asTSString,
         config.untilTime(lr.moduleID).asTSString,
         config.pipelineSnapTime.asTSString
       )
     )
 
-    rangeReport.toSeq.toDF("moduleID", "moduleName", "fromTS", "untilTS", "snapTS")
+    rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
       .orderBy('snapTS.desc, 'moduleId)
       .show(false)
   }
@@ -287,6 +288,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     // Defaulted to 0.56 interactive and 0.26 automated
     config.setContractInteractiveDBUPrice(rawParams.databricksContractPrices.interactiveDBUCostUSD)
     config.setContractAutomatedDBUPrice(rawParams.databricksContractPrices.automatedDBUCostUSD)
+
+    // Set Primordial Date
+    config.setPrimordialDateString(rawParams.primordialDateString)
 
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     validateAuditLogConfigs(auditLogConfig)

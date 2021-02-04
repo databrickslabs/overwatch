@@ -1,9 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
-import java.time.temporal.ChronoUnit
-import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
+import java.time.{Duration, Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset}
 import java.util.{Calendar, Date, TimeZone, UUID}
-
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{from_unixtime, lit}
@@ -30,6 +28,7 @@ class Config() {
   private var _apiEnv: ApiEnv = _
   private var _auditLogConfig: AuditLogConfig = _
   private var _badRecordsPath: String = _
+  private var _primordialDateString: Option[String] = None
   private var _maxDays: Int = 60
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
@@ -44,6 +43,39 @@ class Config() {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   /**
+   *
+   * Pipeline Snap Date minus primordial date or 60
+   * @return
+   */
+  @throws(classOf[IllegalArgumentException])
+  private def derivePrimordialDaysDiff: Int = {
+
+    if (primordialDateString.nonEmpty) {
+      try {
+        val primordialLocalDate = TimeTypesConstants.dtFormat.parse(primordialDateString.get)
+          .toInstant.atZone(Config.systemZoneId)
+          .toLocalDate
+
+        Duration.between(
+          primordialLocalDate.atStartOfDay(),
+          pipelineSnapTime.asLocalDateTime.toLocalDate.atStartOfDay())
+          .toDays.toInt
+      } catch {
+        case e: IllegalArgumentException => {
+          val errorMessage = s"ERROR: Primordial Date String has Incorrect Date Format: Must be ${TimeTypesConstants.dtStringFormat}"
+          println(errorMessage, e)
+          logger.log(Level.ERROR, errorMessage, e)
+          // Throw new error to avoid hidden, unexpected/incorrect primordial date -- Force Fail and bubble up
+          throw new IllegalArgumentException(e)
+        }
+      }
+    } else {
+      60
+    }
+
+  }
+
+  /**
    * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
    * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
    * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
@@ -51,9 +83,10 @@ class Config() {
    * age == 60 days.
    * @return
    */
-  private def primordealEpoch: Long = {
-    LocalDateTime.now(Config.utcZone).minusDays(60).toInstant(ZoneOffset.UTC)
-      .truncatedTo(ChronoUnit.DAYS)
+  private def primordialEpoch: Long = {
+    LocalDateTime.now(Config.systemZoneId).minusDays(derivePrimordialDaysDiff)
+      .toLocalDate.atStartOfDay
+      .toInstant(Config.systemZoneOffset)
       .toEpochMilli
   }
 
@@ -74,14 +107,17 @@ class Config() {
       lastRunDetail
     require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
     val fromTime = if (lastRunStatus.length != 1)
-      primordealEpoch
+      primordialEpoch
     else
       lastRunStatus.head.untilTS
     Config.createTimeDetail(fromTime)
   }
 
   private[overwatch] def daysToProcess(moduleId: Int): Long = {
-    ChronoUnit.DAYS.between(fromTime(moduleId).asLocalDateTime, untilTime(moduleId).asLocalDateTime)
+    Duration.between(
+      fromTime(moduleId).asLocalDateTime.toLocalDate.atStartOfDay,
+      untilTime(moduleId).asLocalDateTime.toLocalDate.atStartOfDay)
+      .toDays
   }
 
   /**
@@ -106,7 +142,7 @@ class Config() {
    */
   def untilTime(moduleID: Int): TimeTypes = {
     val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(maxDays)
-      .atZone(ZoneId.systemDefault()).toInstant.toEpochMilli
+      .atZone(Config.systemZoneId).toInstant.toEpochMilli
     val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
     if (startSecondPlusMaxDays < defaultUntilSecond) {
       Config.createTimeDetail(startSecondPlusMaxDays)
@@ -163,6 +199,8 @@ class Config() {
 
   private[overwatch] def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
 
+  private[overwatch] def primordialDateString: Option[String] = _primordialDateString
+
   /**
    * OverwatchScope defines the modules active for the current run
    * Some have been disabled for the moment in a sprint to v1.0 release but this acts as the
@@ -176,8 +214,6 @@ class Config() {
   }
 
   private[overwatch] def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
-
-  private[overwatch] def cal: Calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
     val manualOverrides = Map(
@@ -221,7 +257,7 @@ class Config() {
    * @return
    */
   private[overwatch] def setPipelineSnapTime(): this.type = {
-    _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
+    _pipelineSnapTime = LocalDateTime.now(Config.systemZoneId).toInstant(Config.systemZoneOffset).toEpochMilli
     this
   }
 
@@ -233,7 +269,6 @@ class Config() {
    * @return
    */
   def setPipelineSnapTime(tsMilli: Long): this.type = {
-    //    _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
     _pipelineSnapTime = tsMilli
     this
   }
@@ -252,6 +287,16 @@ class Config() {
 
   private[overwatch] def setMaxDays(value: Int): this.type = {
     _maxDays = value
+    this
+  }
+
+  private[overwatch] def setPrimordialDateString(value: Option[String]): this.type = {
+    if (value.nonEmpty) {
+      logger.log(Level.INFO, s"CONFIG SET: Primordial Date String = ${value.get}")
+    } else {
+      logger.log(Level.INFO, "CONFIG NOT SET: Primordial Date String")
+    }
+    _primordialDateString = value
     this
   }
 
@@ -452,7 +497,9 @@ class Config() {
 }
 
 object Config {
-  val utcZone: ZoneId = ZoneId.of("Etc/UTC")
+//  val utcZone: ZoneId = ZoneId.of("Etc/UTC")
+  val systemZoneId: ZoneId = ZoneId.systemDefault()
+  val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
 
   /**
    * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
@@ -463,16 +510,15 @@ object Config {
    */
   def createTimeDetail(tsMilli: Long): TimeTypes = {
     // TODO: systemDefault is the ticking mine
-    val localDT = new Date(tsMilli).toInstant.atZone(ZoneId.systemDefault()).toLocalDateTime
-    //    val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
+    val localDT = new Date(tsMilli).toInstant.atZone(systemZoneId).toLocalDateTime
     val instant = Instant.ofEpochMilli(tsMilli)
     TimeTypes(
       tsMilli, // asUnixTimeMilli
       lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
-      Date.from(instant), // asLocalDateTime at UTC
-      instant.atZone(utcZone), // asUTCZonedDateTime
+      Date.from(instant), // asLocalDateTime
+      instant.atZone(systemZoneId), // asSystemZonedDateTime
       localDT, // asLocalDateTime
-      localDT.toLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant.toEpochMilli // asMidnightEpochMilli
+      localDT.toLocalDate.atStartOfDay(systemZoneId).toInstant.toEpochMilli // asMidnightEpochMilli
     )
   }
 }

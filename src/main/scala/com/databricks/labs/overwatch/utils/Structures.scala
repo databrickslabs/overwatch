@@ -29,8 +29,10 @@ case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encr
 case class Module(moduleID: Int, moduleName: String)
 
 object TimeTypesConstants {
-  val tsFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-  val dtFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
+  val dtStringFormat: String = "yyyy-MM-dd"
+  val tsStringFormat: String = "yyyy-MM-dd HH:mm:ss"
+  val tsFormat: SimpleDateFormat = new SimpleDateFormat(tsStringFormat)
+  val dtFormat: SimpleDateFormat = new SimpleDateFormat(dtStringFormat)
 }
 
 // TODO: we need to try to get rid of the local date/time everywhere...
@@ -59,7 +61,8 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            badRecordsPath: Option[String] = None,
                            overwatchScope: Option[Seq[String]] = None,
                            maxDaysToLoad: Int = 60,
-                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(0.56, 0.26)
+                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(0.56, 0.26),
+                           primordialDateString: Option[String] = None
                           )
 
 case class ParsedConfig(
@@ -74,6 +77,7 @@ case class ParsedConfig(
 case class ModuleStatusReport(
                                moduleID: Int,
                                moduleName: String,
+                               primordialDateString: Option[String],
                                runStartTS: Long,
                                runEndTS: Long,
                                fromTS: Long,
@@ -90,6 +94,7 @@ case class ModuleStatusReport(
 case class SimplifiedModuleStatusReport(
                                moduleID: Int,
                                moduleName: String,
+                               primordialDateString: Option[String],
                                runStartTS: Long,
                                runEndTS: Long,
                                fromTS: Long,
