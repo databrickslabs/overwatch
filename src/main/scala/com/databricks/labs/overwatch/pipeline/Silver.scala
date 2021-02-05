@@ -19,51 +19,10 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private val sw = new StringWriter
 
-  private def getIncrementalAuditLogDFByTimestamp(moduleID: Int): DataFrame = {
-    val filters = Seq(
-      IncrementalFilter(
-        "timestamp", lit(config.fromTime(moduleID).asUnixTimeMilli),
-        lit(config.untilTime(moduleID).asUnixTimeMilli)
-      ),
-      IncrementalFilter(
-        "date",
-        date_sub(config.fromTime(moduleID).asColumnTS.cast("date"), 2),
-        config.untilTime(moduleID).asColumnTS.cast("date")
-      )
-    )
-    BronzeTargets.auditLogsTarget.asIncrementalDF(filters)
-  }
-
-  /**
-   * Start and End events can be separated across rolled log files. For example, if a job runs for 22 hours, there
-   * will be n Overwatch runs that are processed and the start/end events will not be able to be pieced together
-   * since Overwatch only processes the new data for Spark Events especially for spark modules due to performance
-   *
-   * @param moduleId     ETL ModuleID
-   * @param event        The spark event by which to filter
-   * @param previousRuns Number of previous Overwatch Runs to include in the search for joins (inclusive). Defaulted
-   *                     to 3
-   * @return
-   */
-  private def getLaggingStartEvents(module: Module, event: String, previousRuns: Int = 3): DataFrame = {
-
-    Schema.verifyDF(
-      TransformFunctions.previousNOverwatchRuns(
-        BronzeTargets.sparkEventLogsTarget,
-        config.databaseName,
-        previousRuns,
-        module
-      )
-        .filter('Downstream_Processed)
-        .filter('Event === event),
-      module
-    )
-
-  }
-
-  lazy private val newSparkEvents = BronzeTargets.sparkEventLogsTarget.asDF.filter(!'Downstream_Processed)
+  // Get spark events that are not downstream processed AND any spark events that are "lagLookupEligible"
+  lazy private val newSparkEvents = BronzeTargets.sparkEventLogsTarget.asDF
+    .filter(!'Downstream_Processed || 'lagLookupEligible)
 
   /**
    * Module sparkEvents
@@ -155,9 +114,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val executorsModule = Module(2003, "SPARK_Executors_Raw")
   lazy private val appendExecutorsProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(executor(
-      getLaggingStartEvents(executorsModule, "SparkListenerExecutorAdded")
-    ))),
+    Some(Seq(executor())),
     append(SilverTargets.executorsTarget),
     executorsModule
   )
@@ -173,9 +130,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val executionsModule = Module(2005, "SPARK_Executions_Raw")
   lazy private val appendExecutionsProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(sqlExecutions(
-      getLaggingStartEvents(executionsModule, "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
-    ))),
+    Some(Seq(sqlExecutions())),
     append(SilverTargets.executionsTarget),
     executionsModule
   )
@@ -183,9 +138,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val jobsModule = Module(2006, "SPARK_Jobs_Raw")
   lazy private val appendJobsProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(sparkJobs(
-      getLaggingStartEvents(jobsModule, "SparkListenerJobStart")
-    ))),
+    Some(Seq(sparkJobs())),
     append(SilverTargets.jobsTarget),
     jobsModule
   )
@@ -193,9 +146,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val stagesModule = Module(2007, "SPARK_Stages_Raw")
   lazy private val appendStagesProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(sparkStages(
-      getLaggingStartEvents(stagesModule, "SparkListenerStageSubmitted")
-    ))),
+    Some(Seq(sparkStages())),
     append(SilverTargets.stagesTarget),
     stagesModule
   )
@@ -203,16 +154,14 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val tasksModule = Module(2008, "SPARK_Tasks_Raw")
   lazy private val appendTasksProcess = EtlDefinition(
     newSparkEvents,
-    Some(Seq(sparkTasks(
-      getLaggingStartEvents(tasksModule, "SparkListenerTaskStart")
-    ))),
+    Some(Seq(sparkTasks())),
     append(SilverTargets.tasksTarget),
     tasksModule
   )
 
   private val jobStatusModule = Module(2010, "Silver_JobsStatus")
   lazy private val appendJobStatusProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(jobStatusModule.moduleID),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, 2, "timestamp", "date"),
     Some(Seq(dbJobsStatusSummary())),
     append(SilverTargets.dbJobsStatusTarget),
     jobStatusModule
@@ -220,7 +169,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobRunsModule = Module(2011, "Silver_JobsRuns")
   lazy private val appendJobRunsProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(jobRunsModule.moduleID),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, 2, "timestamp", "date"),
     Some(Seq(
       dbJobRunsSummary(
         Schema.verifyDF(BronzeTargets.auditLogsTarget.asDF, jobRunsModule),
@@ -237,7 +186,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val clusterSpecModule = Module(2014, "Silver_ClusterSpec")
   lazy private val appendClusterSpecProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(clusterSpecModule.moduleID),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, 2, "timestamp", "date"),
     Some(Seq(
       buildClusterSpec(
         BronzeTargets.clustersSnapshotTarget,
@@ -249,7 +198,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val accountLoginsModule = Module(2016, "Silver_AccountLogins")
   lazy private val appendAccountLoginsProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(accountLoginsModule.moduleID),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(accountLoginsModule, 2, "timestamp", "date"),
     Some(Seq(accountLogins())),
     append(SilverTargets.accountLoginTarget),
     accountLoginsModule
@@ -257,7 +206,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val modifiedAccountsModule = Module(2017, "Silver_ModifiedAccounts")
   lazy private val appendModifiedAccountsProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(modifiedAccountsModule.moduleID),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(modifiedAccountsModule, 2, "timestamp", "date"),
     Some(Seq(accountMods())),
     append(SilverTargets.accountModTarget),
     modifiedAccountsModule
@@ -265,7 +214,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val notebookSummaryModule = Module(2018, "Silver_Notebooks")
   lazy private val appendNotebookSummaryProcess = EtlDefinition(
-    getIncrementalAuditLogDFByTimestamp(notebookSummaryModule.moduleID),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(notebookSummaryModule, 2, "timestamp", "date"),
     Some(Seq(notebookSummary())),
     append(SilverTargets.notebookStatusTarget),
     notebookSummaryModule
@@ -273,13 +222,42 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- temp until refactor
   private def updateSparkEventsPipelineState(eventLogsBronze: PipelineTable): Unit = {
-    val updateSql =
+
+    /**
+     * EXPIRE laggard lookup events -- using update here due to size of source table, the laggard lookup column,
+     * "lagLookupEligible" is a partition to greatly improve performance when retrieving laggard start events
+     * The default is to retrieve current new data plus two previous etl runs to capture laggard events
+     */
+    val lagW = Window.partitionBy('Event, 'Overwatch_RunID).orderBy('Pipeline_SnapTS.desc)
+    newSparkEvents
+      .select('Event, 'Overwatch_RunID, 'Pipeline_SnapTS)
+      .distinct
+      .filter('lagLookupEligible)
+      .withColumn("rnk", rank().over(lagW))
+      .filter('rnk >= 4) // Pipelines Expired after 3 newer runs acquired
+      .select('Event, 'Overwatch_RunID, 'rnk)
+      .createOrReplaceTempView("OVERWATCH_expiredLags")
+
+    val expireLagLookupsSql =
+      s"""
+         |update ${eventLogsBronze.tableFullName} as src
+         |set lagLookupEligible = false
+         |where exists (
+         |  select * from
+         |    OVERWATCH_expiredLags lookup
+         |    where src.Event = lookup.Event
+         |    and src.Overwatch_RunID = lookup.Overwatch_RunID
+         |  )
+         |""".stripMargin
+    spark.sql(expireLagLookupsSql)
+
+    val setDownstreamProcessedSql =
       s"""
          |update ${eventLogsBronze.tableFullName}
          |set Downstream_Processed = true
          |where Downstream_Processed = false
          |""".stripMargin
-    spark.sql(updateSql)
+    spark.sql(setDownstreamProcessedSql)
   }
 
   private def processSparkEvents(): Unit = {

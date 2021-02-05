@@ -542,6 +542,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .drop("pathSize", "Stage ID")
             .withColumn("filenameGroup", groupFilename('filename))
             .withColumn("Downstream_Processed", lit(false))
+            .withColumn("lagLookupEligible", lit(true))
           )
           rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
         } else {
@@ -554,6 +555,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .drop("pathSize")
             .withColumn("filenameGroup", groupFilename('filename))
             .withColumn("Downstream_Processed", lit(false))
+            .withColumn("lagLookupEligible", lit(true))
           )
           rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
         }

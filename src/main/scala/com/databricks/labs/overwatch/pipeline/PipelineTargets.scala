@@ -62,7 +62,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("Event"),
       config,
       incrementalColumns = Array("Downstream_Processed"),
-      partitionBy = Array("Event", "Downstream_Processed"),
+      partitionBy = Array("Event", "lagLookupEligible", "Downstream_Processed"),
       statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
       sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000"),
       autoOptimize = true // TODO -- perftest

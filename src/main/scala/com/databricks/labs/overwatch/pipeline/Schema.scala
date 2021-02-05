@@ -58,7 +58,9 @@ object Schema extends SparkSessionWrapper {
           StructField("byCluster", StringType, nullable = true),
           StructField("byDriverHost", StringType, nullable = true),
           StructField("bySparkContext", StringType, nullable = true)
-        )), nullable = true)
+        )), nullable = true),
+      StructField("Downstream_Processed", BooleanType, nullable = true),
+      StructField("lagLookupEligible", BooleanType, nullable = true)
     )),
     // SparkExecutions
     2005 -> StructType(Seq(
@@ -69,6 +71,8 @@ object Schema extends SparkSessionWrapper {
       StructField("details", StringType, nullable = true),
       StructField("executionId", LongType, nullable = true),
       StructField("time", LongType, nullable = true),
+      StructField("Downstream_Processed", BooleanType, nullable = true),
+      StructField("lagLookupEligible", BooleanType, nullable = true),
       StructField("filenameGroup",
         StructType(Seq(
           StructField("filename", StringType, nullable = true),
@@ -87,9 +91,16 @@ object Schema extends SparkSessionWrapper {
       StructField("CompletionTime", StringType, nullable = true),
       StructField("StageIDs", StringType, nullable = true),
       StructField("SubmissionTime", StringType, nullable = true),
-      StructField("Pipeline_SnapTS", StringType, nullable = true),
-      StructField("Downstream_Processed", StringType, nullable = true),
-      StructField("filenameGroup", StringType, nullable = true),
+      StructField("Pipeline_SnapTS", TimestampType, nullable = true),
+      StructField("Downstream_Processed", BooleanType, nullable = true),
+      StructField("lagLookupEligible", BooleanType, nullable = true),
+      StructField("filenameGroup",
+        StructType(Seq(
+          StructField("filename", StringType, nullable = true),
+          StructField("byCluster", StringType, nullable = true),
+          StructField("byDriverHost", StringType, nullable = true),
+          StructField("bySparkContext", StringType, nullable = true)
+        )), nullable = true),
       StructField("actionName", StringType, nullable = true),
       StructField("Properties", MapType(
         StringType, StringType, valueContainsNull = true

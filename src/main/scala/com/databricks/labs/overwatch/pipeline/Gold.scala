@@ -17,27 +17,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  private def buildIncrementalFilter(incrementalColumn: String, moduleId: Int): Seq[IncrementalFilter] = {
-    val logStatement =
-      s"""
-         |ModuleID: ${moduleId}
-         |IncrementalColumn: ${incrementalColumn}
-         |FromTime: ${config.fromTime(moduleId).asTSString} --> ${config.fromTime(moduleId).asUnixTimeMilli}
-         |UntilTime: ${config.untilTime(moduleId).asTSString} --> ${config.untilTime(moduleId).asUnixTimeMilli}
-         |""".stripMargin
-    logger.log(Level.INFO, logStatement)
-
-    Seq(IncrementalFilter(incrementalColumn,
-      lit(config.fromTime(moduleId).asUnixTimeMilli),
-      lit(config.untilTime(moduleId).asUnixTimeMilli)
-    ))
-  }
-
   private val clusterModule = Module(3001, "Gold_Cluster")
   lazy private val appendClusterProccess = EtlDefinition(
-    SilverTargets.clustersSpecTarget.asIncrementalDF(
-      buildIncrementalFilter("timestamp", clusterModule.moduleID)
-    ),
+    SilverTargets.clustersSpecTarget.asIncrementalDF(clusterModule, "timestamp"),
     Some(Seq(buildCluster())),
     append(GoldTargets.clusterTarget),
     clusterModule
@@ -45,9 +27,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact")
   lazy private val appendClusterStateFactProccess = EtlDefinition(
-    BronzeTargets.clusterEventsTarget.asIncrementalDF(
-      buildIncrementalFilter("timestamp", clusterStateFactModule.moduleID)
-    ),
+    BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateFactModule, "timestamp"),
     Some(Seq(buildClusterStateFact(
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.clustersSnapshotTarget,
@@ -66,9 +46,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobsModule = Module(3002, "Gold_Job")
   lazy private val appendJobsProcess = EtlDefinition(
-    SilverTargets.dbJobsStatusTarget.asIncrementalDF(
-      buildIncrementalFilter("timestamp", jobsModule.moduleID)
-    ),
+    SilverTargets.dbJobsStatusTarget.asIncrementalDF(jobsModule, "timestamp"),
     Some(Seq(buildJobs())),
     append(GoldTargets.jobTarget),
     jobsModule
@@ -76,9 +54,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobRunsModule = Module(3003, "Gold_JobRun")
   lazy private val appendJobRunsProcess = EtlDefinition(
-    SilverTargets.dbJobRunsTarget.asIncrementalDF(
-      buildIncrementalFilter("endEpochMS", jobRunsModule.moduleID)
-    ),
+    SilverTargets.dbJobRunsTarget.asIncrementalDF(jobRunsModule, "endEpochMS"),
     Some(Seq(buildJobRuns())),
     append(GoldTargets.jobRunTarget),
     jobRunsModule
@@ -88,28 +64,16 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   //Incremental current spark job and tasks DFs plus 2 days for lag coverage
   lazy private val appendJobRunCostPotentialFactProcess = EtlDefinition(
     // new jobRuns to be considered are job runs completed since the last overwatch import for this module
-    GoldTargets.jobRunTarget.asIncrementalDF(
-      buildIncrementalFilter("endEpochMS", jobRunCostPotentialFactModule.moduleID)
-    ),
+    GoldTargets.jobRunTarget.asIncrementalDF(jobRunCostPotentialFactModule, "endEpochMS"),
     Some(Seq(
       // Retrieve cluster states for current time period plus 2 days for lagging states
       buildJobRunCostPotentialFact(
-        GoldTargets.clusterStateFactTarget.asIncrementalDF(Seq(TransformFunctions.buildIncrementalDateFilters(
-          jobRunCostPotentialFactModule.moduleID, "date_state_start", config, 2
-        ))),
+        GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date_state_start"),
         // Lookups
         GoldTargets.clusterTarget.asDF,
         BronzeTargets.cloudMachineDetail.asDF,
-        GoldTargets.sparkJobTarget.asIncrementalDF(
-          Seq(TransformFunctions.buildIncrementalDateFilters(
-            jobRunCostPotentialFactModule.moduleID, "date", config, 2)
-          )
-        ),
-        GoldTargets.sparkTaskTarget.asIncrementalDF(
-          Seq(TransformFunctions.buildIncrementalDateFilters(
-            jobRunCostPotentialFactModule.moduleID, "date", config, 2)
-          )
-        ),
+        GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
+        GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
         config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
     ))),
     append(GoldTargets.jobRunCostPotentialFactTarget),
@@ -118,9 +82,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val notebookModule = Module(3004, "Gold_Notebook")
   lazy private val appendNotebookProcess = EtlDefinition(
-    SilverTargets.notebookStatusTarget.asIncrementalDF(
-      buildIncrementalFilter("timestamp", notebookModule.moduleID)
-    ),
+    SilverTargets.notebookStatusTarget.asIncrementalDF(notebookModule, "timestamp"),
     Some(Seq(buildNotebook())),
     append(GoldTargets.notebookTarget),
     notebookModule
@@ -128,9 +90,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val accountModModule = Module(3007, "Gold_AccountMod")
   lazy private val appendAccountModProcess = EtlDefinition(
-    SilverTargets.accountModTarget.asIncrementalDF(
-      buildIncrementalFilter("timestamp", accountModModule.moduleID)
-    ),
+    SilverTargets.accountModTarget.asIncrementalDF(accountModModule, "timestamp"),
     Some(Seq(buildAccountMod())),
     append(GoldTargets.accountModsTarget),
     accountModModule
@@ -138,9 +98,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val accountLoginModule = Module(3008, "Gold_AccountLogin")
   lazy private val appendAccountLoginProcess = EtlDefinition(
-    SilverTargets.accountLoginTarget.asIncrementalDF(
-      buildIncrementalFilter("timestamp", accountLoginModule.moduleID)
-    ),
+    SilverTargets.accountLoginTarget.asIncrementalDF(accountLoginModule, "timestamp"),
     Some(Seq(buildLogin(SilverTargets.accountModTarget.asDF))),
     append(GoldTargets.accountLoginTarget),
     accountLoginModule
@@ -148,9 +106,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkJobModule = Module(3010, "Gold_SparkJob")
   lazy private val appendSparkJobProcess = EtlDefinition(
-    SilverTargets.jobsTarget.asIncrementalDF(
-      buildIncrementalFilter("startTimestamp", sparkJobModule.moduleID)
-    ),
+    SilverTargets.jobsTarget.asIncrementalDF(sparkJobModule, "startTimestamp"),
     Some(Seq(buildSparkJob(config.cloudProvider))),
     append(GoldTargets.sparkJobTarget),
     sparkJobModule
@@ -158,9 +114,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkStageModule = Module(3011, "Gold_SparkStage")
   lazy private val appendSparkStageProcess = EtlDefinition(
-    SilverTargets.stagesTarget.asIncrementalDF(
-      buildIncrementalFilter("startTimestamp", sparkStageModule.moduleID)
-    ),
+    SilverTargets.stagesTarget.asIncrementalDF(sparkStageModule, "startTimestamp"),
     Some(Seq(buildSparkStage())),
     append(GoldTargets.sparkStageTarget),
     sparkStageModule
@@ -168,9 +122,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkTaskModule = Module(3012, "Gold_SparkTask")
   lazy private val appendSparkTaskProcess = EtlDefinition(
-    SilverTargets.tasksTarget.asIncrementalDF(
-      buildIncrementalFilter("startTimestamp", sparkTaskModule.moduleID)
-    ),
+    SilverTargets.tasksTarget.asIncrementalDF(sparkTaskModule, "startTimestamp"),
     Some(Seq(buildSparkTask())),
     append(GoldTargets.sparkTaskTarget),
     sparkTaskModule
@@ -178,9 +130,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkExecutionModule = Module(3013, "Gold_SparkExecution")
   lazy private val appendSparkExecutionProcess = EtlDefinition(
-    SilverTargets.executionsTarget.asIncrementalDF(
-      buildIncrementalFilter("startTimestamp", sparkExecutionModule.moduleID)
-    ),
+    SilverTargets.executionsTarget.asIncrementalDF(sparkExecutionModule, "startTimestamp"),
     Some(Seq(buildSparkExecution())),
     append(GoldTargets.sparkExecutionTarget),
     sparkExecutionModule
@@ -188,9 +138,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkExecutorModule = Module(3014, "Gold_SparkExecutor")
   lazy private val appendSparkExecutorProcess = EtlDefinition(
-    SilverTargets.executorsTarget.asIncrementalDF(
-      buildIncrementalFilter("addedTimestamp", sparkExecutorModule.moduleID)
-    ),
+    SilverTargets.executorsTarget.asIncrementalDF(sparkExecutorModule, "addedTimestamp"),
     Some(Seq(buildSparkExecutor())),
     append(GoldTargets.sparkExecutorTarget),
     sparkExecutorModule
