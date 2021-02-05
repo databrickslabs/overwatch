@@ -15,6 +15,7 @@ class Config() {
   private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
   private var _isFirstRun: Boolean = false
   private var _debugFlag: Boolean = false
+  private var _organizationId: String = _
   private var _lastRunDetail: Array[SimplifiedModuleStatusReport] = Array[SimplifiedModuleStatusReport]()
   private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
@@ -162,6 +163,8 @@ class Config() {
   private[overwatch] def isFirstRun: Boolean = _isFirstRun
 
   private[overwatch] def debugFlag: Boolean = _debugFlag
+
+  private[overwatch] def organizationId: String = _organizationId
 
   private[overwatch] def cloudProvider: String = _cloudProvider
 
@@ -322,6 +325,11 @@ class Config() {
 
   private[overwatch] def setContractAutomatedDBUPrice(value: Double): this.type = {
     _contractAutomatedDBUPrice = value
+    this
+  }
+
+  private[overwatch] def setOrganizationId(value: String): this.type = {
+    _organizationId = value
     this
   }
 

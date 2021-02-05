@@ -54,6 +54,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
       val lastRunDetail = spark.table(s"${config.databaseName}.pipeline_report")
         .filter('Status.isin("SUCCESS", "EMPTY"))
+        .filter('organization_id === config.organizationId)
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter('rnk === 1 && 'rn === 1)
@@ -132,7 +133,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       }
 
       instanceDetailsDF
-        .withColumn("organization_id", lit(dbutils.notebook.getContext.tags("orgId")))
+        .withColumn("organization_id", lit(config.organizationId))
         .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
         .withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS)
@@ -488,6 +489,7 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
+    dbutils.notebook.getContext.tags("orgId")
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
     if (debugFlag) {
