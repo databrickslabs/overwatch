@@ -126,6 +126,26 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     notebookModule
   )
 
+  private val accountModModule = Module(3007, "Gold_AccountMod")
+  lazy private val appendAccountModProcess = EtlDefinition(
+    SilverTargets.accountModTarget.asIncrementalDF(
+      buildIncrementalFilter("timestamp", accountModModule.moduleID)
+    ),
+    Some(Seq(buildAccountMod())),
+    append(GoldTargets.accountModsTarget),
+    accountModModule
+  )
+
+  private val accountLoginModule = Module(3008, "Gold_AccountLogin")
+  lazy private val appendAccountLoginProcess = EtlDefinition(
+    SilverTargets.accountLoginTarget.asIncrementalDF(
+      buildIncrementalFilter("timestamp", accountLoginModule.moduleID)
+    ),
+    Some(Seq(buildLogin(SilverTargets.accountModTarget.asDF))),
+    append(GoldTargets.accountLoginTarget),
+    accountLoginModule
+  )
+
   private val sparkJobModule = Module(3010, "Gold_SparkJob")
   lazy private val appendSparkJobProcess = EtlDefinition(
     SilverTargets.jobsTarget.asIncrementalDF(
@@ -202,7 +222,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     val scope = config.overwatchScope
 
     if (scope.contains(OverwatchScope.accounts)) {
+      appendAccountLoginProcess.process()
+      appendAccountModProcess.process()
 
+      GoldTargets.accountLoginViewTarget.publish(accountLoginViewColumnMappings)
+      GoldTargets.accountModsViewTarget.publish(accountModViewColumnMappings)
     }
 
     if (scope.contains(OverwatchScope.clusters)) {

@@ -129,7 +129,6 @@ abstract class PipelineTargets(config: Config) {
       shuffleFactor = 0.07
     )
 
-    // TODO -- Optimization -- first write, minibatch by clusters and par write partitions
     lazy private[overwatch] val tasksTarget: PipelineTable = PipelineTable(
       name = "spark_tasks_silver",
       keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID"),
@@ -149,29 +148,22 @@ abstract class PipelineTargets(config: Config) {
       zOrderBy = Array("runId", "jobId")
     )
 
-    lazy private[overwatch] val userLoginsTarget: PipelineTable = PipelineTable(
-      name = "user_login_silver",
+    lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
+      name = "account_login_silver",
       keys = Array("timestamp", "userEmail"),
       config,
       incrementalColumns = Array("timestamp")
     )
 
-    lazy private[overwatch] val newAccountsTarget: PipelineTable = PipelineTable(
-      name = "user_account_silver",
-      keys = Array("timestamp", "targetUserName"),
+    lazy private[overwatch] val accountModTarget: PipelineTable = PipelineTable(
+      name = "account_mods_silver",
+      keys = Array("requestId"),
       config,
       incrementalColumns = Array("timestamp")
     )
 
     lazy private[overwatch] val clustersSpecTarget: PipelineTable = PipelineTable(
       name = "cluster_spec_silver",
-      keys = Array("timestamp", "cluster_id"),
-      config,
-      incrementalColumns = Array("timestamp")
-    )
-
-    lazy private[overwatch] val clustersStatusTarget: PipelineTable = PipelineTable(
-      name = "cluster_status_silver",
       keys = Array("timestamp", "cluster_id"),
       config,
       incrementalColumns = Array("timestamp")
@@ -260,6 +252,34 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
+    lazy private[overwatch] val accountModsTarget: PipelineTable = PipelineTable(
+      name = "account_mods_gold",
+      keys = Array("requestId"),
+      config,
+      incrementalColumns = Array("timestamp")
+    )
+
+    lazy private[overwatch] val accountModsViewTarget: PipelineView = PipelineView(
+      name = "accountMod",
+      accountModsTarget,
+      config,
+      dbTargetOverride = Some(config.databaseName) // Held in ETL DB due to data sensitivity
+    )
+
+    lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
+      name = "account_login_gold",
+      keys = Array("requestId"),
+      config,
+      incrementalColumns = Array("timestamp")
+    )
+
+    lazy private[overwatch] val accountLoginViewTarget: PipelineView = PipelineView(
+      name = "accountLogin",
+      accountLoginTarget,
+      config,
+      dbTargetOverride = Some(config.databaseName) // Held in ETL DB due to data sensitivity
+    )
+
     lazy private[overwatch] val clusterStateFactTarget: PipelineTable = PipelineTable(
       name = "clusterStateFact_gold",
       keys = Array("cluster_id", "unixTimeMS"),
@@ -309,7 +329,10 @@ abstract class PipelineTargets(config: Config) {
       config,
       partitionBy = Array("date"),
       zOrderBy = Array("cluster_id"),
-      incrementalColumns = Array("unixTimeMS")
+      incrementalColumns = Array("unixTimeMS"),
+      shuffleFactor = 5,
+      autoOptimize = true,
+      sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "100000")
     )
 
     lazy private[overwatch] val sparkTaskViewTarget: PipelineView = PipelineView(

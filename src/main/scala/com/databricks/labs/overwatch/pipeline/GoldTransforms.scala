@@ -129,6 +129,44 @@ trait GoldTransforms extends SparkSessionWrapper {
     df.select(notebookCols: _*)
   }
 
+  protected def buildAccountMod()(df: DataFrame): DataFrame = {
+    df.select(
+      'organization_id,
+      'timestamp.alias("mod_unixTimeMS"),
+      'date.alias("mod_date"),
+      'actionName.alias("action"),
+      'endpoint,
+      'modified_by,
+      'user_name,
+      'user_id,
+      'group_name,
+      'group_id,
+      'sourceIPAddress.alias("from_ip_address"),
+      'userAgent.alias("user_agent"),
+      'requestId.alias("request_id"),
+      'response
+    )
+  }
+
+  protected def buildLogin(accountModSilver: DataFrame)(df: DataFrame): DataFrame = {
+    val userIdLookup = accountModSilver.select('user_name.alias("login_user"), 'user_id)
+    df.join(userIdLookup, Seq("login_user"), "left")
+      .select(
+        'organization_id,
+        'timestamp.alias("login_unixTimeMS"),
+        'login_date,
+        'login_type,
+        'login_user,
+        'user_id,
+        'user_email,
+        'ssh_login_details,
+        'sourceIPAddress.alias("from_ip_address"),
+        'userAgent.alias("user_agent"),
+        'requestId.alias("request_id"),
+        'response
+      )
+  }
+
   protected def buildClusterStateFact(
                                        instanceDetails: PipelineTable,
                                        clusterSnapshot: PipelineTable,
@@ -240,16 +278,6 @@ trait GoldTransforms extends SparkSessionWrapper {
     clusterPotential
       .select(clusterStateFactCols: _*)
   }
-
-  //TEMP TEST FUNC
-//  private def displayDFAndRange(name: String, rangeCol: String, df: DataFrame): Unit = {
-//    case class MinMax(low: String, high: String)
-//    val minMax = df.select(min(col(rangeCol)).cast("string"), max(col(rangeCol)).cast("string"))
-//      .as[MinMax].collect().headOption.getOrElse(MinMax("0", "0"))
-//    val cnt = df.count()
-//    println(s"DF SAMPLE: Name: $name\nRange: ${minMax.low} --> ${minMax.high}\nCount: ${cnt}")
-//    df.orderBy(col(rangeCol)).show(10)
-//  }
 
   protected def buildJobRunCostPotentialFact(
                                               clusterStateFact: DataFrame,
@@ -604,6 +632,18 @@ trait GoldTransforms extends SparkSessionWrapper {
       |new_name, new_path, parent_path, user_email, request_id, response
       |""".stripMargin
 
+  protected val accountModViewColumnMappings: String =
+    """
+      |organization_id, mod_unixTimeMS, mod_date, action, endpoint, modified_by, user_name, user_id,
+      |group_name, group_id, from_ip_address, user_agent, request_id, response
+      |""".stripMargin
+
+  protected val accountLoginViewColumnMappings: String =
+    """
+      |organization_id, login_unixTimeMS, login_date, login_type, login_user, user_id, user_email, ssh_login_details
+      |from_ip_address, user_agent, request_id, response
+      |""".stripMargin
+
   protected val clusterStateFactViewColumnMappings: String =
     """
       |organization_id, cluster_id, unixTimeMS_state_start, timestamp_state_start, date_state_start, unixTimeMS_state_end,
@@ -643,6 +683,5 @@ trait GoldTransforms extends SparkSessionWrapper {
       |organization_id, spark_context_id, executor_id, cluster_id, executor_info, removed_reason, executor_alivetime,
       |unixTimeMS, timestamp, date, event_log_start, event_log_end
       |""".stripMargin
-
 
 }

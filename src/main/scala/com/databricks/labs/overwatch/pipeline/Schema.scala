@@ -243,59 +243,6 @@ object Schema extends SparkSessionWrapper {
           StructField("statusCode", LongType, nullable = true)
         )), nullable = true)
     )),
-    // Cluster Status
-    2015 -> StructType(Seq(
-      StructField("serviceName", StringType, nullable = true),
-      StructField("actionName", StringType, nullable = true),
-      StructField("timestamp", LongType, nullable = true),
-      StructField("date", DateType, nullable = true),
-      StructField("sourceIPAddress", StringType, nullable = true),
-      StructField("userAgent", StringType, nullable = true),
-      StructField("requestId", StringType, nullable = true),
-      StructField("requestParams",
-        StructType(Seq(
-          StructField("clusterId", StringType, nullable = true),
-          StructField("cluster_id", StringType, nullable = true),
-          StructField("cluster_name", StringType, nullable = true),
-          StructField("clusterName", StringType, nullable = true),
-          StructField("clusterState", StringType, nullable = true),
-          StructField("driver_node_type_id", StringType, nullable = true),
-          StructField("node_type_id", StringType, nullable = true),
-          StructField("num_workers", StringType, nullable = true),
-          StructField("autoscale", StringType, nullable = true),
-          StructField("clusterWorkers", StringType, nullable = true),
-          StructField("autotermination_minutes", StringType, nullable = true),
-          StructField("enable_elastic_disk", StringType, nullable = true),
-          StructField("start_cluster", StringType, nullable = true),
-          StructField("clusterOwnerUserId", StringType, nullable = true),
-          StructField("cluster_log_conf", StringType, nullable = true),
-          StructField("init_scripts", StringType, nullable = true),
-          StructField("custom_tags", StringType, nullable = true),
-          StructField("cluster_source", StringType, nullable = true),
-          StructField("spark_env_vars", StringType, nullable = true),
-          StructField("spark_conf", StringType, nullable = true),
-          StructField("acl_path_prefix", StringType, nullable = true),
-          StructField("instance_pool_id", StringType, nullable = true),
-          StructField("instance_pool_name", StringType, nullable = true),
-          StructField("spark_version", StringType, nullable = true),
-          StructField("cluster_creator", StringType, nullable = true),
-          StructField("idempotency_token", StringType, nullable = true),
-          StructField("organization_id", StringType, nullable = true),
-          StructField("user_id", StringType, nullable = true),
-          StructField("ssh_public_keys", StringType, nullable = true),
-          StructField("single_user_name", StringType, nullable = true)
-        )), nullable = true),
-      StructField("userIdentity",
-        StructType(Seq(
-          StructField("email", StringType, nullable = true)
-        )), nullable = true),
-      StructField("response",
-        StructType(Seq(
-          StructField("errorMessage", StringType, nullable = true),
-          StructField("result", StringType, nullable = true),
-          StructField("statusCode", LongType, nullable = true)
-        )), nullable = true)
-    )),
     // User Logins
     2016 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
@@ -304,8 +251,20 @@ object Schema extends SparkSessionWrapper {
       StructField("date", DateType, nullable = true),
       StructField("sourceIPAddress", StringType, nullable = true),
       StructField("userAgent", StringType, nullable = true),
+      StructField("requestId", StringType, nullable = true),
+      StructField("sessionId", StringType, nullable = true),
+      StructField("response",
+        StructType(Seq(
+          StructField("errorMessage", StringType, nullable = true),
+          StructField("result", StringType, nullable = true),
+          StructField("statusCode", LongType, nullable = true)
+        )), nullable = true),
       StructField("requestParams",
         StructType(Seq(
+          StructField("instanceId", StringType, nullable = true),
+          StructField("port", StringType, nullable = true),
+          StructField("publicKey", StringType, nullable = true),
+          StructField("containerId", StringType, nullable = true),
           StructField("user", StringType, nullable = true),
           StructField("userName", StringType, nullable = true),
           StructField("user_name", StringType, nullable = true),

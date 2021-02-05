@@ -309,31 +309,74 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   // TODO -- Azure Review
-  protected def userLogins()(df: DataFrame): DataFrame = {
-    val userLoginsDF = df.filter(
+  protected def accountLogins()(df: DataFrame): DataFrame = {
+    val endpointLogins = df.filter(
       'serviceName === "accounts" &&
-        'actionName.isin("login", "tokenLogin", "samlLogin", "jwtLogin") &&
+        lower('actionName).like("%login%") &&
         $"userIdentity.email" =!= "dbadmin")
 
-    if (userLoginsDF.rdd.take(1).nonEmpty) {
-      userLoginsDF.select('timestamp, 'date, 'serviceName, 'actionName,
-        $"requestParams.user".alias("login_user"), $"requestParams.userName".alias("ssh_user_name"),
-        $"requestParams.user_name".alias("groups_user_name"),
-        $"requestParams.userID".alias("account_admin_userID"),
-        $"userIdentity.email".alias("userEmail"), 'sourceIPAddress, 'userAgent)
+    val sshLoginRaw = df.filter('serviceName === "ssh" && 'actionName === "login")
+      .withColumn("actionName", lit("ssh"))
+
+    val accountLogins = endpointLogins.unionByName(sshLoginRaw)
+
+    val sshDetails = sshLoginRaw.select(
+      'timestamp,
+      'requestId,
+      lit("ssh").alias("login_type"),
+      struct(
+        $"requestParams.instanceId".alias("instance_id"),
+        $"requestParams.port".alias("login_port"),
+        'sessionId.alias("session_id"),
+        $"requestParams.publicKey".alias("login_public_key"),
+        $"requestParams.containerId".alias("container_id"),
+        $"requestParams.userName".alias("container_user_name")
+      ).alias("ssh_login_details")
+    )
+      .withColumn("organization_id", lit(orgId))
+
+    if (accountLogins.rdd.take(1).nonEmpty) {
+      accountLogins
+        .select(
+          'timestamp,
+          'date.alias("login_date"),
+          'serviceName,
+          'actionName.alias("login_type"),
+          $"requestParams.user".alias("login_user"),
+          //        $"requestParams.userName".alias("ssh_user_name"), TODO -- these are null in Azure - verify on AWS
+          //        $"requestParams.user_name".alias("groups_user_name"),
+          //        $"requestParams.userID".alias("account_admin_userID"),
+          $"userIdentity.email".alias("user_email"),
+          'sourceIPAddress, 'userAgent, 'requestId, 'response
+        )
         .withColumn("organization_id", lit(orgId))
+        .join(sshDetails, Seq("organization_id", "timestamp", "login_type", "requestId"), "left")
     } else
       Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   // TODO -- Azure Review
-  protected def newAccounts()(df: DataFrame): DataFrame = {
-    val newAccountsDF = df.filter('serviceName === "accounts" && 'actionName.isin("add"))
-    if (newAccountsDF.rdd.take(1).nonEmpty) {
-      newAccountsDF
-        .select('date, 'timestamp, 'serviceName, 'actionName, $"userIdentity.email".alias("userEmail"),
-          $"requestParams.targetUserName", 'sourceIPAddress, 'userAgent)
+  protected def accountMods()(df: DataFrame): DataFrame = {
+    val uidLookup = Window.partitionBy('organization_id, 'user_name).orderBy('timestamp)
+      .rowsBetween(Window.currentRow, Window.unboundedFollowing)
+    val modifiedAccountsDF = df.filter('serviceName === "accounts" &&
+      'actionName.isin("add", "addPrincipalToGroup", "removePrincipalFromGroup", "setAdmin", "updateUser", "delete"))
+    if (modifiedAccountsDF.rdd.take(1).nonEmpty) {
+      modifiedAccountsDF
+        .select(
+          'date, 'timestamp, 'serviceName, 'actionName,
+          $"requestParams.endpoint",
+          'requestId,
+          $"userIdentity.email".alias("modified_by"),
+          $"requestParams.targetUserName".alias("user_name"),
+          $"requestParams.targetUserId".alias("user_id"),
+          $"requestParams.targetGroupName".alias("group_name"),
+          $"requestParams.targetGroupId".alias("group_id"),
+          'sourceIPAddress, 'userAgent, 'response
+        )
         .withColumn("organization_id", lit(orgId))
+        .withColumn("user_id", when('user_id.isNull, first('user_id, true).over(uidLookup))
+          .otherwise('user_id))
     } else
       Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
@@ -489,161 +532,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("lastEditedBy", when(!isAutomatedCluster && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
-  }
-
-  @deprecated
-  protected def buildClusterStatus(clusterSpec: PipelineTable,
-                                   clusterSnapshot: PipelineTable,
-                                   cloudMachineDetail: PipelineTable
-                                  )(df: DataFrame): DataFrame = {
-    val lastClusterSnap = Window.partitionBy('cluster_id).orderBy('Pipeline_SnapTS.desc)
-    val clusterBefore = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val reset = Window.partitionBy('cluster_id).orderBy('timestamp)
-    val cumsum = Window.partitionBy('cluster_id, 'reset).orderBy('timestamp)
-
-    val clusterBaseDF = clusterBase(df)
-
-    // TODO -- Lookup missing cluster driver/worker by JobID/RunID cluster spec
-    //  May not help if all cluster specs from jobs properly get recorded in cluster_silver in the first place
-    val nodeTypeLookup = clusterSpec.asDF
-      .withColumn("driver_node_type_id",
-        when('driver_node_type_id.isNull, last('driver_node_type_id, true).over(clusterBefore))
-          .otherwise('driver_node_type_id))
-      .withColumn("node_type_id",
-        when('node_type_id.isNull, last('node_type_id, true).over(clusterBefore))
-          .otherwise('node_type_id))
-      .select('cluster_id, 'timestamp, 'driver_node_type_id, 'node_type_id)
-
-    val nodeTypeLookup2 = clusterSnapshot.asDF
-      .select('cluster_id, 'terminated_time, 'driver_node_type_id, 'node_type_id)
-
-    val creatorLookup = clusterSnapshot.asDF
-      .withColumn("rnk", rank().over(lastClusterSnap))
-      .withColumn("rn", row_number().over(lastClusterSnap))
-      .filter('rnk === 1 && 'rn === 1)
-      .select('cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
-
-    val clusterSize = clusterBaseDF
-      .filter($"response.statusCode" === 200) //? TODO -- validate that we should only be returning successful action requests
-      .filter('actionName.like("%esult"))
-      .join(creatorLookup, Seq("cluster_id"), "left")
-      .withColumn("date",
-        TransformFunctions.toTS('timestamp, outputResultType = DateType))
-      .withColumn("tsS", ('timestamp / 1000).cast("long"))
-      .withColumn("reset",
-        // TODO -- confirm that deleteResult and/or resizeResult are NOT REQUIRED HERE
-        sum(when('actionName.isin("startResult", "restartResult", "createResult"), lit(1))
-          .otherwise(lit(0))).over(reset))
-      .withColumn("runtime_curr_stateS",
-        coalesce(
-          when(!'actionName.isin("startResult", "createResult"), ('tsS - lag('tsS, 1).over(reset)))
-            .otherwise(lit(0)), lit(0)
-        ))
-      .withColumn("cumulative_uptimeS", sum('runtime_curr_stateS).over(cumsum))
-      .withColumn("created_by",
-        when('actionName === "createResult", 'userEmail).otherwise(lit(null)))
-      .withColumn("created_by",
-        coalesce(
-          when('created_by.isNull, last('created_by, true).over(clusterBefore))
-            .otherwise('created_by)
-        ))
-      .withColumn("created_by",
-        when('created_by.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup)
-          .otherwise(lit("Unknown")))
-      .withColumn("last_started_by",
-        when('actionName === "startResult", 'userEmail)
-          .otherwise(lit(null)))
-      .withColumn("last_started_by",
-        coalesce(
-          when('last_started_by.isNull, last('last_started_by, true).over(clusterBefore))
-            .otherwise('last_started_by), lit("Unknown")
-        ))
-      .withColumn("last_restarted_by",
-        when('actionName === "restartResult", 'userEmail)
-          .otherwise(lit(null)))
-      .withColumn("last_restarted_by",
-        coalesce(
-          when('last_restarted_by.isNull, last('last_restarted_by, true).over(clusterBefore))
-            .otherwise('last_restarted_by), lit("Unknown")
-        ))
-      .withColumn("last_resized_by",
-        when('actionName === "resizeResult", 'userEmail)
-          .otherwise(lit(null)))
-      .withColumn("last_resized_by",
-        coalesce(
-          when('last_resized_by.isNull, last('last_resized_by, true).over(clusterBefore))
-            .otherwise('last_resized_by), lit("Unknown")
-        ))
-      .withColumn("last_terminated_by",
-        when('actionName === "deleteResult", 'userEmail)
-          .otherwise(lit(null)))
-      .withColumn("last_terminated_by",
-        coalesce(
-          when('last_terminated_by.isNull, last('last_terminated_by, true).over(clusterBefore))
-            .otherwise('last_terminated_by), lit("Unknown")
-        ))
-
-    // TODO -- Azure -- fix this for azure instance types
-    val clusterStatusCols = Array[Column]('date, 'timestamp, 'serviceName, 'actionName, 'cluster_id,
-      'cluster_name, 'cluster_state, 'actual_workers, 'DriverNodeType, 'driverVCPUs, 'driverMemoryGB,
-      'WorkerNodeType, 'workerVCPUs, 'workerMemoryGB, 'cluster_worker_memory, 'cpu_time_curr_state,
-      'cpu_time_cumulative, 'runtime_curr_stateS, 'cumulative_uptimeS, 'driverHourlyCostOnDemand,
-      'driverHourlyCostReserved, 'driver_onDemand_cost_curr_state, 'driver_onDemand_cost_cumulative,
-      'driver_reserve_cost_curr_state, 'driver_reserve_cost_cumulative, 'workerHourlyCostOnDemand,
-      'workerHourlyCostReserved, 'worker_onDemand_cost_curr_state, 'worker_onDemand_cost_cumulative,
-      'worker_reserve_cost_curr_state, 'worker_reserve_cost_cumulative, 'created_by, 'last_started_by,
-      'last_resized_by, 'last_restarted_by, 'last_terminated_by)
-
-    val nodeTypeLookups = Array(nodeTypeLookup, nodeTypeLookup2)
-
-    // TODO -- NEED TO ADD AZURE SUPPORT
-    //  When azure is ready -- add if cloud type...
-    val instanceDetailLookup = cloudMachineDetail.asDF
-      .withColumn("DriverNodeType", 'API_Name)
-      .withColumn("WorkerNodeType", 'API_Name)
-
-    val driverLookup = instanceDetailLookup
-      .withColumnRenamed("On_Demand_Cost_Hourly", "driverHourlyCostOnDemand")
-      .withColumnRenamed("Linux_Reserved_Cost_Hourly", "driverHourlyCostReserved")
-      .withColumnRenamed("vCPUs", "driverVCPUs")
-      .withColumnRenamed("Memory_GB", "driverMemoryGB")
-      .drop("WorkerNodeType")
-
-    val workerLookup = instanceDetailLookup
-      .withColumnRenamed("On_Demand_Cost_Hourly", "workerHourlyCostOnDemand")
-      .withColumnRenamed("Linux_Reserved_Cost_Hourly", "workerHourlyCostReserved")
-      .withColumnRenamed("vCPUs", "workerVCPUs")
-      .withColumnRenamed("Memory_GB", "workerMemoryGB")
-      .drop("DriverNodeType")
-
-    TransformFunctions.fillFromLookupsByTS(
-      clusterSize, "serviceName",
-      Array("driver_node_type_id", "node_type_id"), clusterBefore, nodeTypeLookups: _*)
-      .withColumnRenamed("driver_node_type_id", "DriverNodeType")
-      .withColumnRenamed("node_type_id", "WorkerNodeType")
-      .join(workerLookup, Seq("WorkerNodeType"), "left")
-      .join(driverLookup, Seq("DriverNodeType"), "left")
-      .withColumn("cpu_time_curr_state", (('runtime_curr_stateS * 'actual_workers * 'workerVCPUs) + ('runtime_curr_stateS * 'driverVCPUs)))
-      .withColumn("cpu_time_cumulative", (('cumulative_uptimeS * 'actual_workers * 'workerVCPUs) + ('cumulative_uptimeS * 'driverVCPUs)))
-      .withColumn("driver_onDemand_cost_curr_state",
-        round('driverHourlyCostOnDemand * ('runtime_curr_stateS / 60 / 60), 2))
-      .withColumn("driver_onDemand_cost_cumulative",
-        round('driverHourlyCostOnDemand * ('cumulative_uptimeS / 60 / 60), 2))
-      .withColumn("driver_reserve_cost_curr_state",
-        round('driverHourlyCostReserved * ('runtime_curr_stateS / 60 / 60), 2))
-      .withColumn("driver_reserve_cost_cumulative",
-        round('driverHourlyCostReserved * ('cumulative_uptimeS / 60 / 60), 2))
-      .withColumn("worker_onDemand_cost_curr_state",
-        round('workerHourlyCostOnDemand * 'actual_workers * ('runtime_curr_stateS / 60 / 60), 2))
-      .withColumn("worker_onDemand_cost_cumulative",
-        round('workerHourlyCostOnDemand * 'actual_workers * ('cumulative_uptimeS / 60 / 60), 2))
-      .withColumn("worker_reserve_cost_curr_state",
-        round('workerHourlyCostReserved * 'actual_workers * ('runtime_curr_stateS / 60 / 60), 2))
-      .withColumn("worker_reserve_cost_cumulative",
-        round('workerHourlyCostReserved * 'actual_workers * ('cumulative_uptimeS / 60 / 60), 2))
-      .withColumn("cluster_worker_memory", 'actual_workers * 'workerMemoryGB)
-      .select(clusterStatusCols: _*)
-
   }
 
   /**

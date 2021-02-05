@@ -6,12 +6,15 @@ import org.apache.log4j.{Level, Logger}
 case class PipelineView(name: String,
                         dataSource: PipelineTable,
                         config: Config,
-                        partitionMapOverrides: Map[String, String] = Map()) extends SparkSessionWrapper {
+                        partitionMapOverrides: Map[String, String] = Map(),
+                        dbTargetOverride: Option[String] = None
+                       ) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
+  private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
 
   def publish(colDefinition: String): Unit = {
     val pubStatementSB = new StringBuilder("create or replace view ")
-    pubStatementSB.append(s"${config.consumerDatabaseName}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
+    pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
 
     // link partition columns
     if (dataSource.partitionBy.nonEmpty) {
