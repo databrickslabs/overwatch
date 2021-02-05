@@ -9,7 +9,7 @@ import org.apache.spark.sql.functions.{from_unixtime, lit}
 class Config() {
 
   private final val _overwatchSchemaVersion = "0.1"
-  private final val _runID = UUID.randomUUID().toString.replace("-","")
+  private final val _runID = UUID.randomUUID().toString.replace("-", "")
   private final val cipherKey = UUID.randomUUID().toString
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
@@ -46,6 +46,7 @@ class Config() {
   /**
    *
    * Pipeline Snap Date minus primordial date or 60
+   *
    * @return
    */
   @throws(classOf[IllegalArgumentException])
@@ -82,6 +83,7 @@ class Config() {
    * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
    * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
    * age == 60 days.
+   *
    * @return
    */
   private def primordialEpoch: Long = {
@@ -114,12 +116,12 @@ class Config() {
     Config.createTimeDetail(fromTime)
   }
 
-  private[overwatch] def daysToProcess(moduleId: Int): Long = {
-    Duration.between(
-      fromTime(moduleId).asLocalDateTime.toLocalDate.atStartOfDay,
-      untilTime(moduleId).asLocalDateTime.toLocalDate.atStartOfDay)
-      .toDays
-  }
+//  private[overwatch] def daysToProcess(moduleId: Int): Long = {
+//    Duration.between(
+//      fromTime(moduleId).asLocalDateTime.toLocalDate.atStartOfDay,
+//      untilTime(moduleId).asLocalDateTime.toLocalDate.atStartOfDay)
+//      .toDays
+//  }
 
   /**
    * BEGIN GETTERS
@@ -130,6 +132,7 @@ class Config() {
   /**
    * Getter for Pipeline Snap Time
    * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
+   *
    * @return
    */
   def pipelineSnapTime: TimeTypes = {
@@ -138,6 +141,7 @@ class Config() {
 
   /**
    * Defines the latest timestamp to be used for a give module as a TimeType
+   *
    * @param moduleID moduleID for which to get the until Time
    * @return
    */
@@ -208,6 +212,7 @@ class Config() {
    * OverwatchScope defines the modules active for the current run
    * Some have been disabled for the moment in a sprint to v1.0 release but this acts as the
    * cononical module inventory
+   *
    * @return
    */
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
@@ -257,6 +262,7 @@ class Config() {
    * Snapshot time of the time the snapshot was started. This is used throughout the process as the until timestamp
    * such that every data point to be loaded during the current run must be < this pipeline SnapTime.
    * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
+   *
    * @return
    */
   private[overwatch] def setPipelineSnapTime(): this.type = {
@@ -268,6 +274,7 @@ class Config() {
   /**
    * Test setter to simulate snapshot times. During a simulation where this is set, all data retrieved must be before
    * this time. This should not be a public-facing function in the final delivery
+   *
    * @param tsMilli long in milliseconds as per unix epoch
    * @return
    */
@@ -280,6 +287,7 @@ class Config() {
    * Identify the initial value before overwatch for shuffle partitions. This value gets modified a lot through
    * this process but should be set back to the same as the value before Overwatch process when Overwatch finishes
    * its work
+   *
    * @param value number of shuffle partitions to be set
    * @return
    */
@@ -348,6 +356,7 @@ class Config() {
 
   /**
    * After the input parameters have been serialized into the OverwatchParams object, set it
+   *
    * @param value
    * @return
    */
@@ -370,6 +379,7 @@ class Config() {
    * writing is not being used (the encrypted version). Notice the use of a "rawToken" which is fine but extra care
    * must be used to ensure the raw token doesn't get stored in clear text in any logs or passed in any
    * fashion that presents risk.
+   *
    * @param tokenSecret Optional input of the Token Secret. If left null, the token secret will be initialized
    *                    as the job owner or notebook user (if called from notebook)
    * @return
@@ -415,6 +425,7 @@ class Config() {
 
   /**
    * Set Overwatch DB and location
+   *
    * @param dbName
    * @param dbLocation
    * @return
@@ -435,6 +446,7 @@ class Config() {
 
   /**
    * Sets audit log config
+   *
    * @param value
    * @return
    */
@@ -446,6 +458,7 @@ class Config() {
   /**
    * Sets Passthrough log path
    * Passthrough logs will be enabled post v1.0.
+   *
    * @param value
    * @return
    */
@@ -456,6 +469,7 @@ class Config() {
 
   /**
    * Some input files have corrupted records, this sets the quarantine path for all such scenarios
+   *
    * @param value
    * @return
    */
@@ -467,6 +481,7 @@ class Config() {
   /**
    * Manual setters for DB Remote and Local Testing. This is not used if "isLocalTesting" == false
    * This function allows for hard coded parameters for rapid integration testing and prototyping
+   *
    * @return
    */
   def buildLocalOverwatchParams(): String = {
@@ -505,7 +520,7 @@ class Config() {
 }
 
 object Config {
-//  val utcZone: ZoneId = ZoneId.of("Etc/UTC")
+  //  val utcZone: ZoneId = ZoneId.of("Etc/UTC")
   val systemZoneId: ZoneId = ZoneId.systemDefault()
   val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
 
@@ -513,6 +528,7 @@ object Config {
    * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
    * of time. The sheer number of sources and heterogeneous time rules makes time management very challenging,
    * the idea here is to get it right once and just get the time type necessary.
+   *
    * @param tsMilli Unix epoch as a Long in milliseconds
    * @return
    */

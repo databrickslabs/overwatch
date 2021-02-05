@@ -409,7 +409,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     database.write(fileTrackerDF, trackerTarget)
   }
 
-  // Todo -- Put back to private
   private def getUniqueSparkEventsFiles(badRecordsPath: String,
                                         eventLogsDF: DataFrame,
                                         processedLogFiles: PipelineTable): Array[String] = {
@@ -422,9 +421,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val badFiles = spark.read.format("json").load(s"${badRecordsPath}/*/*/")
           .select('path.alias("filename"))
           .distinct
-        eventLogsDF.except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
+        eventLogsDF.select('filename).except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
       } else {
-        eventLogsDF.except(alreadyProcessed).as[String].collect()
+        eventLogsDF.select('filename).except(alreadyProcessed).as[String].collect()
       }
     } else {
       eventLogsDF.select('filename)
@@ -451,7 +450,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
-                          daysToProcess: Long,
                           processedLogFiles: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
 
     // Dropping 'Spark Infos' because Overwatch ETLs utilize joins to go from jobs -> stages -> tasks and thus
@@ -541,10 +539,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("StageID", stageIDColumnOverride)
             .drop("pathSize", "Stage ID")
             .withColumn("filenameGroup", groupFilename('filename))
-            .withColumn("Downstream_Processed", lit(false))
-            .withColumn("lagLookupEligible", lit(true))
           )
           rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+            .join(eventLogsDF, Seq("filename"))
         } else {
           val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
             .withColumn("progress", progressCol)
@@ -554,10 +551,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
             .drop("pathSize")
             .withColumn("filenameGroup", groupFilename('filename))
-            .withColumn("Downstream_Processed", lit(false))
-            .withColumn("lagLookupEligible", lit(true))
           )
           rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+            .join(eventLogsDF, Seq("filename"))
         }
       } else {
         val msg = "Path Globs Empty, exiting"
@@ -684,7 +680,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // org.apache.spark.util.ClosureCleaner$.ensureSerializable(ClosureCleaner.scala:403)
     // that parses the entire spark plan to determine whether a DF is serializable. These DF plans are not but the result
     // is which requires that the DF be materialized first.
-    // TODO -- Create global tmp prefix param and use that as the path prefix here
+    // TODO -- Use Temp path from config or create one if not exist
     val tmpEventLogPathsDir = "/tmp/overwatch/bronze/sparkEventLogPaths"
     newEventLogGlobs.write
       .mode("overwrite")
@@ -699,7 +695,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .as[String]
       .map(p => Helpers.globPath(p, Some(fromTimeEpochMillis), Some(untilTimeEpochMillis)))
       .filter(size('value) > 0)
-      .select(explode('value).alias("filename"))
+      .select(explode('value))
+      .select($"col._1".alias("filename"), $"col._2".alias("fileCreateEpochMS"))
+      .withColumn("fileCreateTS", from_unixtime('fileCreateEpochMS / lit(1000)).cast("timestamp"))
+      .withColumn("fileCreateDate", 'fileCreateTS.cast("date"))
 
     // DEBUG
     //    println(s"COUNT: EventLogPaths --> ${eventLogPaths.count}")

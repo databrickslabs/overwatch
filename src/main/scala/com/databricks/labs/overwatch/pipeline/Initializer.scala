@@ -489,7 +489,7 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-    dbutils.notebook.getContext.tags("orgId")
+    config.setOrganizationId(dbutils.notebook.getContext.tags("orgId"))
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
     if (debugFlag) {

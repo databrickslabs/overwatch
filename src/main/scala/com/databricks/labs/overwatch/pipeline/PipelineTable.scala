@@ -138,10 +138,10 @@ case class PipelineTable(
   //    }
   //  }
 
-//  Deprecated
-//  def asIncrementalDF(filters: Seq[IncrementalFilter]): DataFrame = {
-//    PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), filters)
-//  }
+  //  Deprecated
+  //  def asIncrementalDF(filters: Seq[IncrementalFilter]): DataFrame = {
+  //    PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), filters)
+  //  }
 
   @throws(classOf[UnhandledException])
   def asIncrementalDF(module: Module, cronColumns: String*): DataFrame = {
@@ -151,69 +151,73 @@ case class PipelineTable(
   /**
    * Build 1 or more incremental filters for a dataframe from standard start or aditionalStart less
    * "additionalLagDays" when loading an incremental DF with some front-padding to capture lagging start events
-   * @param module module used for logging and capturing status timestamps by module
+   *
+   * @param module            module used for logging and capturing status timestamps by module
    * @param additionalLagDays Front-padded days prior to start
-   * @param cronColumnsNames 1 or many incremental columns
+   * @param cronColumnsNames  1 or many incremental columns
    * @return Filtered Dataframe
    */
   @throws(classOf[UnhandledException])
   def asIncrementalDF(module: Module, additionalLagDays: Int, cronColumnsNames: String*): DataFrame = {
-    val dfFields = spark.table(tableFullName).schema.fields
-    val cronCols = dfFields.filter(f => cronColumnsNames.contains(f.name))
-    val moduleID = module.moduleID
-    val moduleName = module.moduleName
+    if (exists) {
+      val dfFields = spark.table(tableFullName).schema.fields
+      val cronCols = dfFields.filter(f => cronColumnsNames.contains(f.name))
+      val moduleID = module.moduleID
+      val moduleName = module.moduleName
 
-    if (additionalLagDays > 0) require(
-      dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
-      "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
-    val incrementalFilters = cronColumnsNames.map(filterCol => {
+      if (additionalLagDays > 0) require(
+        dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
+        "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
+      val incrementalFilters = cronColumnsNames.map(filterCol => {
 
-      val field = cronCols.filter(_.name == filterCol).head
+        val field = cronCols.filter(_.name == filterCol).head
 
-      val logStatement =
-        s"""
-           |ModuleID: ${moduleID}
-           |ModuleName: ${moduleName}
-           |IncrementalColumn: ${field.name}
-           |FromTime: ${config.fromTime(moduleID).asTSString} --> ${config.fromTime(moduleID).asUnixTimeMilli}
-           |UntilTime: ${config.untilTime(moduleID).asTSString} --> ${config.untilTime(moduleID).asUnixTimeMilli}
-           |""".stripMargin
-      logger.log(Level.INFO, logStatement)
+        val logStatement =
+          s"""
+             |ModuleID: ${moduleID}
+             |ModuleName: ${moduleName}
+             |IncrementalColumn: ${field.name}
+             |FromTime: ${config.fromTime(moduleID).asTSString} --> ${config.fromTime(moduleID).asUnixTimeMilli}
+             |UntilTime: ${config.untilTime(moduleID).asTSString} --> ${config.untilTime(moduleID).asUnixTimeMilli}
+             |""".stripMargin
+        logger.log(Level.INFO, logStatement)
 
-      field.dataType match {
-        case _: DateType => {
-          IncrementalFilter(
-            field.name,
-            date_sub(config.fromTime(moduleID).asColumnTS.cast(field.dataType), additionalLagDays),
-            config.untilTime(moduleID).asColumnTS.cast(field.dataType)
-          )
-        }
-        case _: TimestampType => {
-          val start = if (additionalLagDays > 0) {
-            val epochMillis = config.fromTime(moduleID).asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
-            from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(TimestampType)
-          } else {
-            config.fromTime(moduleID).asColumnTS
+        field.dataType match {
+          case _: DateType => {
+            IncrementalFilter(
+              field.name,
+              date_sub(config.fromTime(moduleID).asColumnTS.cast(field.dataType), additionalLagDays),
+              config.untilTime(moduleID).asColumnTS.cast(field.dataType)
+            )
           }
-          IncrementalFilter(
-            field.name,
-            start,
-            config.untilTime(moduleID).asColumnTS
-          )
+          case _: TimestampType => {
+            val start = if (additionalLagDays > 0) {
+              val epochMillis = config.fromTime(moduleID).asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
+              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(TimestampType)
+            } else {
+              config.fromTime(moduleID).asColumnTS
+            }
+            IncrementalFilter(
+              field.name,
+              start,
+              config.untilTime(moduleID).asColumnTS
+            )
+          }
+          case _: LongType => {
+            IncrementalFilter(field.name,
+              lit(config.fromTime(moduleID).asUnixTimeMilli),
+              lit(config.untilTime(moduleID).asUnixTimeMilli)
+            )
+          }
+          case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
+            s"a filter containing a ${field.dataType.typeName} type. ONLY Timestamp, Date, and Long types are supported.")
         }
-        case _: LongType => {
-          IncrementalFilter(field.name,
-            lit(config.fromTime(moduleID).asUnixTimeMilli),
-            lit(config.untilTime(moduleID).asUnixTimeMilli)
-          )
-        }
-        case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
-          s"a filter containing a ${field.dataType.typeName} type. ONLY Timestamp, Date, and Long types are supported.")
-      }
-    })
+      })
 
-    PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), incrementalFilters)
-
+      PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), incrementalFilters)
+    } else {
+      spark.emptyDataFrame
+    }
   }
 
   def writer(df: DataFrame): Any = {

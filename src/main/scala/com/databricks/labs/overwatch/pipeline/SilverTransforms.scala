@@ -132,7 +132,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
 
     val executorAdded = simplifyExecutorAdded(df)
-    val executorRemoved = simplifyExecutorRemoved(df.filter(!'Downstream_Processed))
+    val executorRemoved = simplifyExecutorRemoved(df)
 
     executorAdded.join(executorRemoved, Seq("clusterId", "SparkContextID", "ExecutorID"))
       .withColumn("TaskRunTime",
@@ -185,7 +185,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def sqlExecutions()(df: DataFrame): DataFrame = {
     val executionsStart = simplifyExecutionsStart(df)
-    val executionsEnd = simplifyExecutionsEnd(df.filter(!'Downstream_Processed))
+    val executionsEnd = simplifyExecutionsEnd(df)
 
     //TODO -- review if skew is necessary -- on all DFs
     executionsStart
@@ -217,7 +217,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def sparkJobs()(df: DataFrame): DataFrame = {
     val jobStart = simplifyJobStart(df)
-    val jobEnd = simplifyJobEnd(df.filter(!'Downstream_Processed))
+    val jobEnd = simplifyJobEnd(df)
 
     jobStart.join(jobEnd, Seq("clusterId", "SparkContextID", "JobId"))
       .withColumn("JobRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
@@ -245,7 +245,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def sparkStages()(df: DataFrame): DataFrame = {
     val stageStart = simplifyStageStart(df)
-    val stageEnd = simplifyStageEnd(df.filter(!'Downstream_Processed))
+    val stageEnd = simplifyStageEnd(df)
 
     stageStart
       .join(stageEnd, Seq("clusterId", "SparkContextID", "StageID", "StageAttemptID"))
@@ -286,7 +286,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   // Failed tasks lose association with their chain
   protected def sparkTasks()(df: DataFrame): DataFrame = {
     val taskStart = simplifyTaskStart(df)
-    val taskEnd = simplifyTaskEnd(df.filter(!'Downstream_Processed))
+    val taskEnd = simplifyTaskEnd(df)
 
     taskStart.join(
       taskEnd, Seq(

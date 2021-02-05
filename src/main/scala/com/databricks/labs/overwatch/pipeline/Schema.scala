@@ -59,8 +59,9 @@ object Schema extends SparkSessionWrapper {
           StructField("byDriverHost", StringType, nullable = true),
           StructField("bySparkContext", StringType, nullable = true)
         )), nullable = true),
-      StructField("Downstream_Processed", BooleanType, nullable = true),
-      StructField("lagLookupEligible", BooleanType, nullable = true)
+      StructField("fileCreateEpochMS", LongType, nullable = true),
+      StructField("fileCreateTS", TimestampType, nullable = true),
+      StructField("fileCreateDate", DateType, nullable = true)
     )),
     // SparkExecutions
     2005 -> StructType(Seq(
@@ -71,8 +72,9 @@ object Schema extends SparkSessionWrapper {
       StructField("details", StringType, nullable = true),
       StructField("executionId", LongType, nullable = true),
       StructField("time", LongType, nullable = true),
-      StructField("Downstream_Processed", BooleanType, nullable = true),
-      StructField("lagLookupEligible", BooleanType, nullable = true),
+      StructField("fileCreateEpochMS", LongType, nullable = true),
+      StructField("fileCreateTS", TimestampType, nullable = true),
+      StructField("fileCreateDate", DateType, nullable = true),
       StructField("filenameGroup",
         StructType(Seq(
           StructField("filename", StringType, nullable = true),
@@ -92,8 +94,9 @@ object Schema extends SparkSessionWrapper {
       StructField("StageIDs", StringType, nullable = true),
       StructField("SubmissionTime", StringType, nullable = true),
       StructField("Pipeline_SnapTS", TimestampType, nullable = true),
-      StructField("Downstream_Processed", BooleanType, nullable = true),
-      StructField("lagLookupEligible", BooleanType, nullable = true),
+      StructField("fileCreateEpochMS", LongType, nullable = true),
+      StructField("fileCreateTS", TimestampType, nullable = true),
+      StructField("fileCreateDate", DateType, nullable = true),
       StructField("filenameGroup",
         StructType(Seq(
           StructField("filename", StringType, nullable = true),

@@ -95,7 +95,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       generateEventLogsDF(
         database,
         config.badRecordsPath,
-        config.daysToProcess(sparkEventLogsModule.moduleID),
+//        config.daysToProcess(sparkEventLogsModule.moduleID),
         BronzeTargets.processedEventLogs) //,
       //      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget) // TODO -- Perf testing without
     )),
@@ -168,11 +168,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
       try {
         appendSparkEventLogsProcess.process()
-        //        // TODO -- Temporary until refactor
-        //        Helpers.fastDrop(
-        //          BronzeTargets.sparkEventLogsTempTarget.tableFullName,
-        //          config.cloudProvider
-        //        )
       }
       catch {
         case _: FailedModuleException =>

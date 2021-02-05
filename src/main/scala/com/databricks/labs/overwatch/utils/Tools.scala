@@ -388,7 +388,7 @@ object Helpers extends SparkSessionWrapper {
    * @param path wildcard path as string
    * @return list of all paths contained within the wildcard path
    */
-  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[String] = {
+  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[(String, Option[Long])] = {
     val conf = new Configuration()
     val fs = new Path(path).getFileSystem(conf)
     val paths = fs.globStatus(new Path(path))
@@ -404,12 +404,12 @@ object Helpers extends SparkSessionWrapper {
       // Ensure that the last modified time of the file was between from --> until
       if (p._2.nonEmpty) {
         val lastModifiedTS = p._2.get
-        // TODO -- Switch to Debug
-        println(s"PROOF: ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
+        // TODO -- Switch to Debug -- is on exec logs with println
+        println(s"PROOF: ${p._1} --> ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
         (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
           untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
       } else false
-    }).map(_._1)
+    }).map(x => (x._1, x._2))
   }
 
   /**
@@ -648,8 +648,8 @@ object Helpers extends SparkSessionWrapper {
   private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
     topPaths.map(p => {
       if (p.reverse.head.toString == "/") s"${p}*" else s"${p}/*"
-    }).flatMap(p => globPath(p)).toSeq.toDF("filesToDelete")
-      .as[String]
+    }).flatMap(p => globPath(p)).toSeq.toDF("filesToDelete", "fileCreateDate")
+      .select('filesToDelete).as[String]
       .foreach(f => rmSer(f))
 
     topPaths.foreach(dir => dbutils.fs.rm(dir, true))
