@@ -324,7 +324,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val existingDBLocation = dbMeta.locationUri.toString
       if (existingDBLocation != dbLocation) {
         switch = false
-        throw new BadConfigException(s"The DB: $dbName exists" +
+        throw new BadConfigException(s"The DB: $dbName exists " +
           s"at location $existingDBLocation which is different than the location entered in the config. Ensure" +
           s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
           s"dbfs:/...")
@@ -372,7 +372,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         val existingConsumerDBLocation = consumerDBMeta.locationUri.toString
         if (existingConsumerDBLocation != consumerDBLocation) {
           switch = false
-          throw new BadConfigException(s"The DB: $dbName exists" +
+          throw new BadConfigException(s"The Consumer DB: $consumerDBName exists" +
             s"at location $existingConsumerDBLocation which is different than the location entered in the config. Ensure" +
             s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
             s"dbfs:/...")

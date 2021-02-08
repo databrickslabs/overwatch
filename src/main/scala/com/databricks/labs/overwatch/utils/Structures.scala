@@ -75,6 +75,7 @@ case class ParsedConfig(
                        )
 
 case class ModuleStatusReport(
+                               organization_id: String,
                                moduleID: Int,
                                moduleName: String,
                                primordialDateString: Option[String],
@@ -92,25 +93,26 @@ case class ModuleStatusReport(
                              )
 
 case class SimplifiedModuleStatusReport(
-                               moduleID: Int,
-                               moduleName: String,
-                               primordialDateString: Option[String],
-                               runStartTS: Long,
-                               runEndTS: Long,
-                               fromTS: Long,
-                               untilTS: Long,
-                               dataFrequency: String,
-                               status: String,
-                               recordsAppended: Long,
-                               lastOptimizedTS: Long,
-                               vacuumRetentionHours: Int
-                             )
+                                         organization_id: String,
+                                         moduleID: Int,
+                                         moduleName: String,
+                                         primordialDateString: Option[String],
+                                         runStartTS: Long,
+                                         runEndTS: Long,
+                                         fromTS: Long,
+                                         untilTS: Long,
+                                         dataFrequency: String,
+                                         status: String,
+                                         recordsAppended: Long,
+                                         lastOptimizedTS: Long,
+                                         vacuumRetentionHours: Int
+                                       )
 
 case class IncrementalFilter(cronColName: String, low: Column, high: Column)
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools  = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value
   // TODO - iamPassthrough, profiles, pools
 }
 
@@ -125,11 +127,17 @@ object Frequency extends Enumeration {
 }
 
 private[overwatch] class NoNewDataException(s: String) extends Exception(s) {}
+
 private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
+
 private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
+
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
+
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
+
 private[overwatch] class FailedModuleException(s: String) extends Exception(s) {}
+
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
 
 object OverwatchEncoders {

@@ -49,7 +49,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       config.fromTime(appendAuditLogsModule.moduleID).asLocalDateTime,
       config.untilTime(appendAuditLogsModule.moduleID).asLocalDateTime,
       BronzeTargets.auditLogAzureLandRaw,
-      config.runID
+      config.runID,
+      config.organizationId
     ),
     None,
     append(BronzeTargets.auditLogsTarget),
@@ -96,7 +97,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         database,
         config.badRecordsPath,
 //        config.daysToProcess(sparkEventLogsModule.moduleID),
-        BronzeTargets.processedEventLogs) //,
+        BronzeTargets.processedEventLogs,
+        config.organizationId) //,
       //      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget) // TODO -- Perf testing without
     )),
     append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic
@@ -113,7 +115,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     if (config.cloudProvider == "azure") {
       val rawAzureAuditEvents = landAzureAuditLogDF(
         config.auditLogConfig.azureAuditLogEventhubConfig.get,
-        config.isFirstRun
+        config.isFirstRun,
+        config.organizationId
       )
       database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
 

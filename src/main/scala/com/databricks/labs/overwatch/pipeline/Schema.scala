@@ -29,6 +29,7 @@ object Schema extends SparkSessionWrapper {
     // SparkExecutors
     2003 -> StructType(Seq(
       StructField("Event", StringType, nullable = true),
+      StructField("organization_id", StringType, nullable = false),
       StructField("clusterId", StringType, nullable = true),
       StructField("SparkContextID", StringType, nullable = true),
       StructField("ExecutorID", StringType, nullable = true),
@@ -65,6 +66,7 @@ object Schema extends SparkSessionWrapper {
     )),
     // SparkExecutions
     2005 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
       StructField("Event", StringType, nullable = true),
       StructField("clusterId", StringType, nullable = true),
       StructField("SparkContextID", StringType, nullable = true),
@@ -85,6 +87,7 @@ object Schema extends SparkSessionWrapper {
     )),
     // SparkJobs
     2006 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
       StructField("Event", StringType, nullable = true),
       StructField("clusterId", StringType, nullable = true),
       StructField("SparkContextID", StringType, nullable = true),
@@ -113,6 +116,7 @@ object Schema extends SparkSessionWrapper {
     )),
     // JobStatus
     2010 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
       StructField("date", DateType, nullable = true),
@@ -158,6 +162,7 @@ object Schema extends SparkSessionWrapper {
     2011 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
+      StructField("organization_id", StringType, nullable = false),
       StructField("date", DateType, nullable = true),
       StructField("timestamp", LongType, nullable = true),
       StructField("sessionId", StringType, nullable = true),
@@ -175,7 +180,7 @@ object Schema extends SparkSessionWrapper {
           StructField("run_name", StringType, nullable = true),
           StructField("idInJob", StringType, nullable = true),
           StructField("job_type", StringType, nullable = true),
-          StructField("orgId", StringType, nullable = true),
+//          StructField("orgId", StringType, nullable = true),
           StructField("jobTerminalState", StringType, nullable = true),
           StructField("jobTriggerType", StringType, nullable = true),
           StructField("jobTaskType", StringType, nullable = true),
@@ -208,6 +213,7 @@ object Schema extends SparkSessionWrapper {
     2014 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
+      StructField("organization_id", StringType, nullable = false),
       StructField("timestamp", LongType, nullable = true),
       StructField("date", DateType, nullable = true),
       StructField("sourceIPAddress", StringType, nullable = true),
@@ -241,7 +247,7 @@ object Schema extends SparkSessionWrapper {
           StructField("spark_version", StringType, nullable = true),
           StructField("cluster_creator", StringType, nullable = true),
           StructField("idempotency_token", StringType, nullable = true),
-          StructField("organization_id", StringType, nullable = true),
+//          StructField("organization_id", StringType, nullable = true),
           StructField("user_id", StringType, nullable = true),
           StructField("ssh_public_keys", StringType, nullable = true),
           StructField("single_user_name", StringType, nullable = true)
@@ -257,10 +263,11 @@ object Schema extends SparkSessionWrapper {
           StructField("statusCode", LongType, nullable = true)
         )), nullable = true)
     )),
-    // User Logins
+    // User Account Login
     2016 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
+      StructField("organization_id", StringType, nullable = false),
       StructField("timestamp", LongType, nullable = true),
       StructField("date", DateType, nullable = true),
       StructField("sourceIPAddress", StringType, nullable = true),
@@ -290,10 +297,41 @@ object Schema extends SparkSessionWrapper {
           StructField("email", StringType, nullable = true)
         )), nullable = true)
     )),
+    // User Account Mods
+    2017 -> StructType(Seq(
+      StructField("serviceName", StringType, nullable = true),
+      StructField("actionName", StringType, nullable = true),
+      StructField("organization_id", StringType, nullable = false),
+      StructField("timestamp", LongType, nullable = true),
+      StructField("date", DateType, nullable = true),
+      StructField("sourceIPAddress", StringType, nullable = true),
+      StructField("userAgent", StringType, nullable = true),
+      StructField("requestId", StringType, nullable = true),
+      StructField("sessionId", StringType, nullable = true),
+      StructField("response",
+        StructType(Seq(
+          StructField("errorMessage", StringType, nullable = true),
+          StructField("result", StringType, nullable = true),
+          StructField("statusCode", LongType, nullable = true)
+        )), nullable = true),
+      StructField("requestParams",
+        StructType(Seq(
+          StructField("endpoint", StringType, nullable = true),
+          StructField("targetUserName", StringType, nullable = true),
+          StructField("targetUserId", StringType, nullable = true),
+          StructField("targetGroupName", StringType, nullable = true),
+          StructField("targetGroupId", StringType, nullable = true)
+        )), nullable = true),
+      StructField("userIdentity",
+        StructType(Seq(
+          StructField("email", StringType, nullable = true)
+        )), nullable = true)
+    )),
     // Notebook Summary
     2018 -> StructType(Seq(
       StructField("serviceName", StringType, nullable = true),
       StructField("actionName", StringType, nullable = true),
+      StructField("organization_id", StringType, nullable = false),
       StructField("timestamp", LongType, nullable = true),
       StructField("date", DateType, nullable = true),
       StructField("sourceIPAddress", StringType, nullable = true),
@@ -323,6 +361,7 @@ object Schema extends SparkSessionWrapper {
         )), nullable = true)
     )),
     3005 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
       StructField("cluster_id",StringType,nullable = true),
       StructField("details",StructType(Seq(
         StructField("cause",StringType,nullable = true),
@@ -392,6 +431,7 @@ object Schema extends SparkSessionWrapper {
     )),
     // sparkStage
     3011 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
       StructField("clusterId",StringType,nullable = true),
       StructField("SparkContextID",StringType,nullable = true),
       StructField("StageID",LongType,nullable = true),
@@ -448,6 +488,7 @@ object Schema extends SparkSessionWrapper {
     )),
     // sparkTasks
     3012 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
       StructField("clusterId",StringType,nullable = true),
       StructField("SparkContextID",StringType,nullable = true),
       StructField("StageID",LongType,nullable = true),

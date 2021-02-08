@@ -26,8 +26,17 @@ object PipelineFunctions {
     }
   }
 
+  def applyFilters(df: DataFrame, filters: Seq[Column]): DataFrame = {
+    val filterExpressions: Unit = filters.map(_.expr).foreach(println)
+    logger.log(Level.INFO, filterExpressions)
+    filters.foldLeft(df) {
+      case (rawDF, filter) =>
+        rawDF.filter(filter)
+    }
+  }
+
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
-  def withIncrementalFilters(df: DataFrame, filters: Seq[IncrementalFilter]): DataFrame = {
+  def withIncrementalFilters(df: DataFrame, filters: Seq[IncrementalFilter], globalFilters: Option[Seq[Column]] = None): DataFrame = {
     val parsedFilters = filters.map(filter => {
       val c = filter.cronColName
       val low = filter.low
@@ -50,12 +59,10 @@ object PipelineFunctions {
       }
     })
 
-    val filterExpressions = parsedFilters.map(_.expr).foreach(println)
-    logger.log(Level.INFO, filterExpressions)
-    parsedFilters.foldLeft(df) {
-      case (rawDF, filter) =>
-        rawDF.filter(filter)
-    }
+    val allFilters = parsedFilters ++ globalFilters.getOrElse(Seq())
+
+    applyFilters(df, allFilters)
+
   }
 
   def isIgnorableException(e: Exception): Boolean = {

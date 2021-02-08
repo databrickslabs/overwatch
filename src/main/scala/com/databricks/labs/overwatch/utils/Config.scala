@@ -4,7 +4,8 @@ import java.time.{Duration, Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffse
 import java.util.{Calendar, Date, TimeZone, UUID}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.{from_unixtime, lit}
+import org.apache.spark.sql.Column
+import org.apache.spark.sql.functions.{col, from_unixtime, lit}
 
 class Config() {
 
@@ -207,6 +208,12 @@ class Config() {
   private[overwatch] def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
 
   private[overwatch] def primordialDateString: Option[String] = _primordialDateString
+
+  private[overwatch] def globalFilters: Option[Seq[Column]] = {
+    Some(Seq(
+      col("organization_id") === organizationId
+    ))
+  }
 
   /**
    * OverwatchScope defines the modules active for the current run

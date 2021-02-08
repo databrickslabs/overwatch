@@ -118,11 +118,19 @@ case class PipelineTable(
   }
 
   def asDF: DataFrame = {
+    asDF()
+  }
+
+  def asDF(withGlobalFilters: Boolean = true): DataFrame = {
     try {
-      spark.table(tableFullName)
+      val fullDF = spark.table(tableFullName)
+      if (withGlobalFilters && config.globalFilters.nonEmpty)
+        PipelineFunctions.applyFilters(fullDF, config.globalFilters.get)
+      else fullDF
     } catch {
       case e: AnalysisException =>
-        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
+        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist or cannot apply global filters. " +
+          s"Will attempt to continue", e)
         Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
     }
   }
@@ -214,7 +222,7 @@ case class PipelineTable(
         }
       })
 
-      PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), incrementalFilters)
+      PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), incrementalFilters, config.globalFilters)
     } else {
       spark.emptyDataFrame
     }
