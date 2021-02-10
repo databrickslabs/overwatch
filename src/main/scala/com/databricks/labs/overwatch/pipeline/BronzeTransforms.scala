@@ -13,7 +13,6 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
-import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DateType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
@@ -600,10 +599,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
 
-    val cluster_id_gen_w = Window.partitionBy('cluster_name)
-      .orderBy('timestamp)
-      .rowsBetween(Window.currentRow, Window.unboundedFollowing)
-
     //    DEBUG
     //    println("DEBUG TIME COLS")
     //    Seq("").toDF("fromTSCol")
@@ -615,9 +610,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     //      .withColumn("untilMillisManualTS", from_unixtime('untilMillis / 1000))
     //      .show(false)
 
-    // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create" AND "changeClusterAcl" actions
-    val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
-
+    // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create", AND "changeClusterAcl" actions
     val latestSnapDate = clusterSnapshot.asDF.select(max('Pipeline_SnapTS).cast("date").cast("string"))
       .as[String].first
     val existingClustersWithLogs = clusterSnapshot.asDF
@@ -632,17 +625,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // Populating cluster Ids
     val dfClusterService = df
-      .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
-      .selectExpr("*", "requestParams.*")
+      .selectExpr("*", "requestParams.*").drop("requestParams")
       .filter('serviceName === "clusters")
       .withColumn("cluster_id",
         when('cluster_id.isNull, 'clusterId).otherwise('cluster_id)
       )
       .withColumn("cluster_id",
         when('cluster_id.isNull, get_json_object(to_json('response), "$.result.cluster_id")).otherwise('cluster_id)
-      )
-      .withColumn("cluster_id",
-        when('cluster_id.isNull, cluster_id_gen).otherwise('cluster_id)
       )
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)

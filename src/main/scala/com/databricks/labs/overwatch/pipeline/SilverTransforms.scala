@@ -375,9 +375,9 @@ trait SilverTransforms extends SparkSessionWrapper {
 
 
   private def clusterBase(auditRawDF: DataFrame): DataFrame = {
-    val cluster_id_gen_w = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
-    val cluster_name_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, Window.unboundedFollowing)
-    val cluster_state_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val cluster_id_gen_w = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
+    val cluster_name_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
+    val cluster_state_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
     val cluster_id_gen = first('cluster_id, true).over(cluster_id_gen_w)
     val cluster_name_gen = first('cluster_name, true).over(cluster_name_gen_w)
     val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
@@ -411,7 +411,7 @@ trait SilverTransforms extends SparkSessionWrapper {
                                 )(df: DataFrame): DataFrame = {
     val lastClusterSnap = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
     val clusterBefore = Window.partitionBy('organization_id, 'cluster_id)
-      .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+      .orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
     val isSingleNode = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
       "$.spark_databricks_cluster_profile") === lit("singleNode")
     val isServerless = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
@@ -835,9 +835,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
       .withColumn("timestamp", $"jobRunTime.endEpochMS")
 
-    val clusterByIdAsOfW = Window.partitionBy('organization_id, 'clusterId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val clusterByNameAsOfW = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val lastJobStatusW = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val clusterByIdAsOfW = Window.partitionBy('organization_id, 'clusterId).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
+    val clusterByNameAsOfW = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
+    val lastJobStatusW = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
 
     // JobRuns with interactive clusters
     // If the lookups are present (likely will be unless is first run or modules are turned off somehow)

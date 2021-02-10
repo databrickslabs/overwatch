@@ -191,9 +191,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
 
     val clusterBeforeW = Window.partitionBy('cluster_id).orderBy('timestamp)
-      .rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val stateAsOfW = Window.partitionBy('cluster_id).orderBy('timestamp)
-      .rangeBetween(Window.unboundedPreceding, Window.currentRow)
+      .rowsBetween(-1000, Window.currentRow)
     val stateUnboundW = Window.partitionBy('cluster_id).orderBy('timestamp)
     val uptimeW = Window.partitionBy('cluster_id, 'counter_reset).orderBy('timestamp)
 
@@ -218,7 +216,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val clusterPotential = TransformFunctions.fillFromLookupsByTS(
       clusterEventsBaseline, "type",
-      Array("driver_node_type_id", "node_type_id", "cluster_name"), stateAsOfW, nodeTypeLookups: _*)
+      Array("driver_node_type_id", "node_type_id", "cluster_name"), clusterBeforeW, nodeTypeLookups: _*)
       .select(
         'organization_id, 'cluster_id, 'cluster_name,
         'timestamp, 'type, 'current_num_workers, 'target_num_workers,
@@ -231,8 +229,8 @@ trait GoldTransforms extends SparkSessionWrapper {
         when(lag('type, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING"), lit(true))
           .otherwise(lit(false)
           ))
-      .withColumn("target_num_workers", last('target_num_workers, true).over(stateAsOfW))
-      .withColumn("current_num_workers", last('current_num_workers, true).over(stateAsOfW))
+      .withColumn("target_num_workers", last('target_num_workers, true).over(clusterBeforeW))
+      .withColumn("current_num_workers", last('current_num_workers, true).over(clusterBeforeW))
       .withColumn("uptime_since_restart_S",
         coalesce(
           when('counter_reset, lit(0))
@@ -318,8 +316,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       .join(driverCosts, Seq("organization_id", "driver_node_type_id"))
       .join(workerCosts, Seq("organization_id", "node_type_id"))
 
-    val clusterByIdAsOfW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val clusterByIdWhenW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val clusterByIdAsOfW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(-100, Window.currentRow)
+    val clusterByIdWhenW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc).rowsBetween(-100, Window.currentRow)
     val keys = Array("organization_id", "cluster_id", "cluster_name", "timestamp")
     val lookupCols = Array("unixTimeMS_state_start", "unixTimeMS_state_end", "timestamp_state_start",
       "timestamp_state_end", "state", "cloud_billable", "databricks_billable", "current_num_workers",
@@ -473,7 +471,7 @@ trait GoldTransforms extends SparkSessionWrapper {
           first('user_email, ignoreNulls = true).over(executionW)).otherwise('user_email))
       .withColumn("user_email",
         when('user_email.isNull && $"PowerProperties.NotebookID".isNotNull,
-          first('user_email, ignoreNulls = true).over(notebookW)).otherwise('user_email))
+          last('user_email, ignoreNulls = true).over(notebookW)).otherwise('user_email))
 
     val sparkJobCols: Array[Column] = Array(
       'organization_id,
