@@ -64,7 +64,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       incrementalColumns = Array("fileCreateEpochMS"),
       partitionBy = Array("organization_id", "Event", "fileCreateDate"),
-      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
+      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID, fileCreateTS, fileCreateDate, fileCreateEpochMS".split(", "),
       sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000"),
       autoOptimize = true // TODO -- perftest
     )

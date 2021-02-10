@@ -777,7 +777,9 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // Ensure the lookups have data -- this will be improved when the module unification occurs during the next
     // scheduled refactor
-    val clusterLookups = Array(clusterSpecLookup, clusterSnapLookup)
+    val clusterLookups = ArrayBuffer[DataFrame]()
+    if (clusterSpec.exists) clusterLookups.append(clusterSpecLookup)
+    if (clusterSnapshot.exists) clusterLookups.append(clusterSnapLookup)
     val jobStatusClusterLookups = ArrayBuffer[DataFrame]()
     if (jobsStatus.exists) jobStatusClusterLookups.append(existingClusterLookup)
     if (jobsSnapshot.exists) jobStatusClusterLookups.append(existingClusterLookup2)

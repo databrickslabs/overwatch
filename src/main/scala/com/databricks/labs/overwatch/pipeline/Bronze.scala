@@ -63,7 +63,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.auditLogsTarget,
       config.fromTime(appendClusterEventLogsModule.moduleID),
       config.untilTime(appendClusterEventLogsModule.moduleID),
-      config.apiEnv
+      config.apiEnv,
+      config.organizationId
     ),
     None,
     append(BronzeTargets.clusterEventsTarget),

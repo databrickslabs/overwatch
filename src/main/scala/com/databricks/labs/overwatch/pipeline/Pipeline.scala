@@ -177,7 +177,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
 
       finalDF = if (target.zOrderBy.nonEmpty) {
-        TransformFunctions.moveColumnsToFront(finalDF, target.zOrderBy)
+        TransformFunctions.moveColumnsToFront(finalDF, target.zOrderBy ++ target.statsColumns)
       } else finalDF
 
       // TODO -- handle streaming until Module refactor with source -> target mappings

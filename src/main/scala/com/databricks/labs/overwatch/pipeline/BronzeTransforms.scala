@@ -309,7 +309,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
 //  protected
   def prepClusterEventLogs(auditLogsTable: PipelineTable,
                            start_time: TimeTypes, end_time: TimeTypes,
-                           apiEnv: ApiEnv): DataFrame = {
+                           apiEnv: ApiEnv,
+                           organizationId: String): DataFrame = {
     val extraQuery = Map(
       "start_time" -> start_time.asUnixTimeMilli, // 1588935326000L, //
       "end_time" -> end_time.asUnixTimeMilli, //1589021726000L //
@@ -381,6 +382,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         )
 
         SchemaTools.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+          .withColumn("organization_id", lit(organizationId))
           .write.mode("append").format("delta")
           .option("mergeSchema", "true")
           .save(tmpClusterEventsPath)
@@ -457,17 +459,18 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
-                          processedLogFiles: PipelineTable,
+                          processedLogFilesTracker: PipelineTable,
                           organizationId: String)(eventLogsDF: DataFrame): DataFrame = {
 
-    // Dropping 'Spark Infos' because Overwatch ETLs utilize joins to go from jobs -> stages -> tasks and thus
-    // No value is lost in dropping Spark Infos. Furthermore, Spark Infos is often null for some of the nested structs
-    // which causes a schema failure when appending to existing spark_events_bronze.
-    if (eventLogsDF.take(1).nonEmpty) {
-      val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
+    // Caching is done to ensure a single scan of the event log file paths
+    val cachedEventLogs = eventLogsDF.cache()
+    cachedEventLogs.count() // eager force cache
+
+    if (cachedEventLogs.take(1).nonEmpty) {
+      val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, cachedEventLogs, processedLogFilesTracker)
       if (pathsGlob.take(1).nonEmpty) {
         try {
-          appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
+          appendNewFilesToTracker(database, pathsGlob, processedLogFilesTracker)
         } catch {
           case e: Throwable => {
             val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +
@@ -477,9 +480,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
             throw e
           }
         }
-        // TODO don't drop stage infos but rather convert it (along with the other columns with nested structs) to a json
-        //  and use strctFromJson to reconstruct it later. Waiting on ES-44663
-        //  may continue to drop Stage Infos as it's such a large column and it is redundant for overwatch
+
+        // Dropping 'Spark Infos' because Overwatch ETLs utilize joins to go from jobs -> stages -> tasks and thus
+        // No value is lost in dropping Spark Infos. Furthermore, Spark Infos is often null for some of the nested structs
+        // which causes a schema failure when appending to existing spark_events_bronze.
         val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
           "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Stage Infos")
 
@@ -561,8 +565,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
         }
 
         rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
-          .join(eventLogsDF, Seq("filename"))
+          .join(cachedEventLogs, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
+
+        cachedEventLogs.unpersist()
       } else {
         val msg = "Path Globs Empty, exiting"
         println(msg)
