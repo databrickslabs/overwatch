@@ -411,17 +411,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   private def appendNewFilesToTracker(database: Database,
-                                      newFiles: Array[String],
-                                      trackerTarget: PipelineTable): Unit = {
-    val fileTrackerDF = newFiles.toSeq.toDF("filename")
+                                      newFiles: DataFrame,
+                                      trackerTarget: PipelineTable,
+                                      orgId: String): Unit = {
+    val fileTrackerDF = newFiles
       .withColumn("failed", lit(false))
+      .withColumn("organization_id", lit(orgId))
     database.write(fileTrackerDF, trackerTarget)
   }
 
-  private def getUniqueSparkEventsFiles(badRecordsPath: String,
+  private def retrieveNewValidSparkEventsWMeta(badRecordsPath: String,
                                         eventLogsDF: DataFrame,
-                                        processedLogFiles: PipelineTable): Array[String] = {
-    if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
+                                        processedLogFiles: PipelineTable): DataFrame = {
+    val validNewFiles = if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
       val alreadyProcessed = processedLogFiles.asDF.select('filename)
         .filter(!'failed)
         .distinct
@@ -430,14 +432,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val badFiles = spark.read.format("json").load(s"${badRecordsPath}/*/*/")
           .select('path.alias("filename"))
           .distinct
-        eventLogsDF.select('filename).except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
+        eventLogsDF.select('filename).except(alreadyProcessed.unionByName(badFiles))
       } else {
-        eventLogsDF.select('filename).except(alreadyProcessed).as[String].collect()
+        eventLogsDF.select('filename).except(alreadyProcessed)
       }
     } else {
       eventLogsDF.select('filename)
-        .distinct.as[String].collect()
+        .distinct
     }
+
+    validNewFiles.join(eventLogsDF, Seq("filename"))
+
   }
 
   private def groupFilename(filename: Column): Column = {
@@ -466,11 +471,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val cachedEventLogs = eventLogsDF.cache()
     cachedEventLogs.count() // eager force cache
 
-    if (cachedEventLogs.take(1).nonEmpty) {
-      val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, cachedEventLogs, processedLogFilesTracker)
-      if (pathsGlob.take(1).nonEmpty) {
+    if (cachedEventLogs.take(1).nonEmpty) { // newly found file names
+      val validNewFilesWMetaDF = retrieveNewValidSparkEventsWMeta(badRecordsPath, cachedEventLogs, processedLogFilesTracker)
+      val pathsGlob = validNewFilesWMetaDF.select('fileName).as[String].collect
+      if (pathsGlob.nonEmpty) { // new files less bad files and already-processed files
         try {
-          appendNewFilesToTracker(database, pathsGlob, processedLogFilesTracker)
+          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId)
         } catch {
           case e: Throwable => {
             val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +
