@@ -30,13 +30,14 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       (
         lr.moduleID,
         lr.moduleName,
+        config.primordialDateString,
         config.fromTime(lr.moduleID).asTSString,
         config.untilTime(lr.moduleID).asTSString,
         config.pipelineSnapTime.asTSString
       )
     )
 
-    rangeReport.toSeq.toDF("moduleID", "moduleName", "fromTS", "untilTS", "snapTS")
+    rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
       .orderBy('snapTS.desc, 'moduleId)
       .show(false)
   }
@@ -53,6 +54,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
       val lastRunDetail = spark.table(s"${config.databaseName}.pipeline_report")
         .filter('Status.isin("SUCCESS", "EMPTY"))
+        .filter('organization_id === config.organizationId)
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter('rnk === 1 && 'rn === 1)
@@ -131,7 +133,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       }
 
       instanceDetailsDF
-        .withColumn("organization_id", lit(dbutils.notebook.getContext.tags("orgId")))
+        .withColumn("organization_id", lit(config.organizationId))
         .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
         .withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS)
@@ -288,6 +290,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setContractInteractiveDBUPrice(rawParams.databricksContractPrices.interactiveDBUCostUSD)
     config.setContractAutomatedDBUPrice(rawParams.databricksContractPrices.automatedDBUCostUSD)
 
+    // Set Primordial Date
+    config.setPrimordialDateString(rawParams.primordialDateString)
+
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     validateAuditLogConfigs(auditLogConfig)
 
@@ -319,7 +324,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val existingDBLocation = dbMeta.locationUri.toString
       if (existingDBLocation != dbLocation) {
         switch = false
-        throw new BadConfigException(s"The DB: $dbName exists" +
+        throw new BadConfigException(s"The DB: $dbName exists " +
           s"at location $existingDBLocation which is different than the location entered in the config. Ensure" +
           s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
           s"dbfs:/...")
@@ -367,7 +372,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         val existingConsumerDBLocation = consumerDBMeta.locationUri.toString
         if (existingConsumerDBLocation != consumerDBLocation) {
           switch = false
-          throw new BadConfigException(s"The DB: $dbName exists" +
+          throw new BadConfigException(s"The Consumer DB: $consumerDBName exists" +
             s"at location $existingConsumerDBLocation which is different than the location entered in the config. Ensure" +
             s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
             s"dbfs:/...")
@@ -484,6 +489,7 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
+    config.setOrganizationId(dbutils.notebook.getContext.tags("orgId"))
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
     if (debugFlag) {

@@ -11,30 +11,30 @@ abstract class PipelineTargets(config: Config) {
     object BronzeTargets {
     lazy private[overwatch] val jobsSnapshotTarget: PipelineTable = PipelineTable(
       name = "jobs_snapshot_bronze",
-      keys = Array("job_id"),
+      keys = Array("organization_id", "job_id"),
       config,
       statsColumns = "created_time, creator_user_name, job_id, Pipeline_SnapTS, Overwatch_RunID".split(", "))
 
     lazy private[overwatch] val clustersSnapshotTarget: PipelineTable = PipelineTable(
       name = "clusters_snapshot_bronze",
-      keys = Array("cluster_id"),
+      keys = Array("organization_id", "cluster_id"),
       config,
-      statsColumns = ("cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
+      statsColumns = ("organization_id, cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
         "start_time, terminated_time, Overwatch_RunID").split(", "))
 
     lazy private[overwatch] val poolsTarget: PipelineTable = PipelineTable(
       name = "pools_snapshot_bronze",
-      keys = Array("instance_pool_id"),
+      keys = Array("organization_id", "instance_pool_id"),
       config,
       statsColumns = ("instance_pool_id, node_type_id, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "))
 
     lazy private[overwatch] val auditLogsTarget: PipelineTable = PipelineTable(
       name = "audit_log_bronze",
-      keys = Array("requestId"),
+      keys = Array("organization_id", "requestId"),
       config,
       incrementalColumns = Array("date", "timestamp"),
-      partitionBy = Array("date"),
+      partitionBy = Array("organization_id", "date"),
       statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "),
       dataFrequency = Frequency.daily
@@ -44,7 +44,7 @@ abstract class PipelineTargets(config: Config) {
       name = "audit_log_raw_events",
       keys = Array("sequenceNumber"),
       config,
-      partitionBy = Array("Overwatch_RunID"),
+      partitionBy = Array("organization_id", "Overwatch_RunID"),
       checkpointPath = if (config.cloudProvider == "azure")
         config.auditLogConfig.azureAuditLogEventhubConfig.get.auditRawEventsChk
       else None
@@ -52,17 +52,18 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterEventsTarget: PipelineTable = PipelineTable(
       name = "cluster_events_bronze",
-      keys = Array("cluster_id", "timestamp"),
+      keys = Array("organization_id", "cluster_id", "timestamp"),
       config,
+      partitionBy = Array("organization_id"),
       incrementalColumns = Array("timestamp"),
       statsColumns = ("cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID").split(", "))
 
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
-      keys = Array("Event"),
+      keys = Array("organization_id", "Event"),
       config,
-      incrementalColumns = Array("Downstream_Processed"),
-      partitionBy = Array("Event", "Downstream_Processed"),
+      incrementalColumns = Array("fileCreateEpochMS"),
+      partitionBy = Array("organization_id", "Event", "fileCreateDate"),
       statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID".split(", "),
       sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000"),
       autoOptimize = true // TODO -- perftest

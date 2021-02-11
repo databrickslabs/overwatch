@@ -43,14 +43,18 @@ class Pipeline(_workspace: Workspace, _database: Database,
           println(s"Delaying source shuffle Partition Set since input is stream")
       }
 
-      if (transforms.nonEmpty) {
-        val transformedDF = transforms.get.foldLeft(verifiedSourceDF) {
-          case (df, transform) =>
-            df.transform(transform)
+      if (sourceDF.rdd.take(1).nonEmpty) { // if source DF is nonEmpty, continue with transforms
+        if (transforms.nonEmpty) {
+          val transformedDF = transforms.get.foldLeft(verifiedSourceDF) {
+            case (df, transform) =>
+              df.transform(transform)
+          }
+          write(transformedDF, module)
+        } else {
+          write(verifiedSourceDF, module)
         }
-        write(transformedDF, module)
-      } else {
-        write(verifiedSourceDF, module)
+      } else { // if Source DF is empty don't attempt transforms and send EMPTY to writer
+        write(spark.emptyDataFrame, module)
       }
     }
   }
@@ -58,12 +62,17 @@ class Pipeline(_workspace: Workspace, _database: Database,
   import spark.implicits._
 
   protected def finalizeModule(report: ModuleStatusReport): Unit = {
-    val pipelineReportTarget = PipelineTable("pipeline_report", Array("Overwatch_RunID"), config, Array("Pipeline_SnapTS"))
+    val pipelineReportTarget = PipelineTable(
+      name =  "pipeline_report",
+      keys = Array("organization_id", "Overwatch_RunID"),
+      config = config,
+      incrementalColumns = Array("Pipeline_SnapTS")
+    )
     database.write(Seq(report).toDF, pipelineReportTarget)
   }
 
   protected def initiatePostProcessing(): Unit = {
-//    postProcessor.analyze()
+    //    postProcessor.analyze()
     postProcessor.optimize()
     Helpers.fastrm(Array(
       "/tmp/overwatch/bronze/clusterEventsBatches",
@@ -72,11 +81,11 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   }
 
-  protected def restoreSparkConf() : Unit = {
+  protected def restoreSparkConf(): Unit = {
     restoreSparkConf(config.initialSparkConf)
   }
 
-  protected def restoreSparkConf(value: Map[String, String]) : Unit = {
+  protected def restoreSparkConf(value: Map[String, String]): Unit = {
     PipelineFunctions.setSparkOverrides(spark, value, config.debugFlag)
   }
 
@@ -116,8 +125,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
   private def failModule(module: Module, target: PipelineTable, outcome: String, msg: String): ModuleStatusReport = {
 
     ModuleStatusReport(
+      organization_id = config.organizationId,
       moduleID = module.moduleID,
       moduleName = module.moduleName,
+      primordialDateString = config.primordialDateString,
       runStartTS = 0L,
       runEndTS = 0L,
       fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
@@ -138,10 +149,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
     val startTime = System.currentTimeMillis()
 
     try {
-      if (df.schema.fieldNames.contains("__OVERWATCHEMPTY")) {
+      if (df.schema.fieldNames.contains("__OVERWATCHEMPTY") || df.rdd.take(1).isEmpty) {
         val emptyStatusReport = ModuleStatusReport(
+          organization_id = config.organizationId,
           moduleID = module.moduleID,
           moduleName = module.moduleName,
+          primordialDateString = config.primordialDateString,
           runStartTS = startTime,
           runEndTS = startTime,
           fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
@@ -157,7 +170,9 @@ class Pipeline(_workspace: Workspace, _database: Database,
         finalizeModule(emptyStatusReport)
         throw new NoNewDataException(s"FAILED to append: ${target.tableFullName}")
       }
-      if (df.schema.fieldNames.contains("__OVERWATCHFAILURE")) throw new UnhandledException(s"FAILED to append: ${target.tableFullName}")
+      if (df.schema.fieldNames.contains("__OVERWATCHFAILURE")) throw new UnhandledException(s"FAILED to append: ${
+        target.tableFullName
+      }")
       var finalDF = df
       var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
 
@@ -168,7 +183,9 @@ class Pipeline(_workspace: Workspace, _database: Database,
       // TODO -- handle streaming until Module refactor with source -> target mappings
       val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
         target.name match {
-          case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
+          case "audit_log_bronze" => spark.table(s"${
+            config.databaseName
+          }.audit_log_raw_events")
             .rdd.partitions.length * target.shuffleFactor
         }
       } else {
@@ -178,23 +195,39 @@ class Pipeline(_workspace: Workspace, _database: Database,
       val targetShuffleSize = math.max(100, finalDFPartCount).toInt
 
       if (config.debugFlag) {
-        println(s"DEBUG: Target Shuffle Partitions: ${targetShuffleSize}")
-        println(s"DEBUG: Max PartitionBytes (MB): ${spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024}")
+        println(s"DEBUG: Target Shuffle Partitions: ${
+          targetShuffleSize
+        }")
+        println(s"DEBUG: Max PartitionBytes (MB): ${
+          spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
+        }")
       }
 
-      logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
-        s"\nShufflePartitions: ${targetShuffleSize}")
+      logger.log(Level.INFO, s"${
+        module.moduleName
+      }: Final DF estimated at ${
+        estimatedFinalDFSizeMB
+      } MBs." +
+        s"\nShufflePartitions: ${
+          targetShuffleSize
+        }")
 
       spark.conf.set("spark.sql.shuffle.partitions", targetShuffleSize)
 
-      val startLogMsg = s"Beginning append to ${target.tableFullName}"
+      val startLogMsg = s"Beginning append to ${
+        target.tableFullName
+      }"
       logger.log(Level.INFO, startLogMsg)
 
 
-      if(!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
+      if (!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
       val debugCount = if (!config.isFirstRun || config.debugFlag) {
         val dfCount = finalDF.count()
-        val msg = s"${module.moduleName} SUCCESS! ${dfCount} records appended."
+        val msg = s"${
+          module.moduleName
+        } SUCCESS! ${
+          dfCount
+        } records appended."
         println(msg)
         logger.log(Level.INFO, msg)
         dfCount
@@ -213,8 +246,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
       val endTime = System.currentTimeMillis()
 
       val moduleStatusReport = ModuleStatusReport(
+        organization_id = config.organizationId,
         moduleID = module.moduleID,
         moduleName = module.moduleName,
+        primordialDateString = config.primordialDateString,
         runStartTS = startTime,
         runEndTS = endTime,
         fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
@@ -230,15 +265,25 @@ class Pipeline(_workspace: Workspace, _database: Database,
       finalizeModule(moduleStatusReport)
     } catch {
       case e: NoNewDataException =>
-        val msg = s"ALERT: No New Data Retrieved for Module ${module.moduleID}! Skipping"
+        val msg = s"ALERT: No New Data Retrieved for Module ${
+          module.moduleID
+        }! Skipping"
         println(msg)
         logger.log(Level.WARN, msg, e)
       case e: Throwable =>
-        val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
+        val msg = s"${
+          module.moduleName
+        } FAILED -->\nMessage: ${
+          e.getMessage
+        }\nCause:${
+          e.getCause
+        }"
         logger.log(Level.ERROR, msg, e)
         // TODO -- handle rollback
         // TODO -- Capture e message in failReport
-        val rollbackMsg = s"ROLLBACK: Attempting Roll back ${module.moduleName}."
+        val rollbackMsg = s"ROLLBACK: Attempting Roll back ${
+          module.moduleName
+        }."
         println(rollbackMsg)
         println(msg, e)
         logger.log(Level.WARN, rollbackMsg)
@@ -246,15 +291,27 @@ class Pipeline(_workspace: Workspace, _database: Database,
           database.rollbackTarget(target)
         } catch {
           case eSub: Throwable => {
-            val rollbackFailedMsg = s"ROLLBACK FAILED: ${module.moduleName} -->\nMessage: ${eSub.getMessage}\nCause:" +
-              s" ${eSub.getCause}"
+            val rollbackFailedMsg = s"ROLLBACK FAILED: ${
+              module.moduleName
+            } -->\nMessage: ${
+              eSub.getMessage
+            }\nCause:" +
+              s" ${
+                eSub.getCause
+              }"
             println(rollbackFailedMsg, eSub)
             logger.log(Level.ERROR, rollbackFailedMsg, eSub)
           }
         }
         val failedModuleReport = failModule(module, target, "FAILED", msg)
         finalizeModule(failedModuleReport)
-        throw new FailedModuleException(s"MODULE FAILED: ${module.moduleID} --> ${module.moduleName}\n ${e.getMessage}")
+        throw new FailedModuleException(s"MODULE FAILED: ${
+          module.moduleID
+        } --> ${
+          module.moduleName
+        }\n ${
+          e.getMessage
+        }")
     }
 
   }

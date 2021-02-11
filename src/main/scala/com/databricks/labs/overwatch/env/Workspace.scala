@@ -43,6 +43,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       ApiCall(jobsEndpoint, config.apiEnv)
         .executeGet()
         .asDF
+        .withColumn("organization_id", lit(config.organizationId))
     } catch {
       case e: Throwable => {
         logger.log(Level.ERROR, "ERROR: Failed to execute jobs/list API call.", e)
@@ -65,6 +66,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(clustersEndpoint, config.apiEnv)
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
@@ -80,6 +82,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap))
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
@@ -91,6 +94,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(poolsEndpoint, config.apiEnv)
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
@@ -102,6 +106,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(profilesEndpoint, config.apiEnv)
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
@@ -113,6 +118,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")))
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
 }

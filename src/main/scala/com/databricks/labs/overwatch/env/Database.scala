@@ -49,18 +49,6 @@ class Database(config: Config) extends SparkSessionWrapper {
         logger.log(Level.INFO, s"Rollback Statement to Execute: ${rollbackSql}")
         spark.sql(rollbackSql)
       })
-
-      val bronzeEventsRollbackMsg = s"Unsetting Downstream_Processed in spark_events_bronze"
-      if (config.debugFlag) println(bronzeEventsRollbackMsg)
-      logger.log(Level.WARN, bronzeEventsRollbackMsg)
-      val rollbackSparkEventsBronzeSql =
-        s"""
-           |update ${config.databaseName}.spark_events_bronze
-           |set Downstream_Processed = false
-           |where Overwatch_RunID = '${config.runID}'
-           |""".stripMargin
-      logger.log(Level.INFO, s"Rollback Statement to Execute: ${bronzeEventsRollbackMsg}")
-      spark.sql(rollbackSparkEventsBronzeSql)
     } else {
       val rollbackSql =
         s"""

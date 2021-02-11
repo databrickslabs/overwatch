@@ -120,7 +120,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   @throws(classOf[BadConfigException])
   protected def landAzureAuditLogDF(ehConfig: AzureAuditLogEventhubConfig,
-                                    isFirstRun: Boolean
+                                    isFirstRun: Boolean,
+                                    organizationId: String
                                    ): DataFrame = {
 
     if (!validateCleanPaths(isFirstRun, ehConfig))
@@ -144,6 +145,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .options(eventHubsConf.toMap)
       .load()
       .withColumn("deserializedBody", 'body.cast("string"))
+      .withColumn("organization_id", lit(organizationId))
 
   }
 
@@ -171,34 +173,37 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                fromTime: LocalDateTime,
                                untilTime: LocalDateTime,
                                auditRawLand: PipelineTable,
-                               overwatchRunID: String
+                               overwatchRunID: String,
+                               organizationId: String
                               ): DataFrame = {
     if (cloudProvider == "azure") {
       val rawBodyLookup = spark.table(auditRawLand.tableFullName)
         .filter('Overwatch_RunID === lit(overwatchRunID))
+        .filter('organization_id === organizationId)
       val schemaBuilders = spark.table(auditRawLand.tableFullName)
         .filter('Overwatch_RunID === lit(overwatchRunID))
+        .filter('organization_id === organizationId)
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
-        .select(explode($"parsedBody.records").alias("streamRecord"))
-        .selectExpr("streamRecord.*")
+        .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
+        .selectExpr("streamRecord.*", "organization_id")
         .withColumn("version", 'operationVersion)
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"))
+        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"), 'organization_id)
         .selectExpr("*", "properties.*").drop("properties")
 
 
       spark.table(auditRawLand.tableFullName)
         .filter('Overwatch_RunID === lit(overwatchRunID))
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
-        .select(explode($"parsedBody.records").alias("streamRecord"))
-        .selectExpr("streamRecord.*")
+        .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
+        .selectExpr("streamRecord.*", "organization_id")
         .withColumn("version", 'operationVersion)
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"))
+        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"), 'organization_id)
         .withColumn("userIdentity", structFromJson(schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
         .withColumn("requestParams", structFromJson(schemaBuilders, "requestParams"))
@@ -221,6 +226,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         if (datesGlob.nonEmpty) {
           spark.read.json(datesGlob: _*)
             // When globbing the paths, the date must be reconstructed and re-added manually
+            .withColumn("organization_id", lit(organizationId))
             .withColumn("filename", split(input_file_name, "/"))
             .withColumn("date",
               split(expr("filter(filename, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
@@ -235,6 +241,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         // Todo -- add parameter to limit max audit history pull
         //  may not be necessary when lifecycle is implemented for auto-delete logs, TBD
         spark.read.json(auditLogConfig.rawAuditPath.get)
+          .withColumn("organization_id", lit(organizationId))
       }
     }
   }
@@ -409,7 +416,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     database.write(fileTrackerDF, trackerTarget)
   }
 
-  // Todo -- Put back to private
   private def getUniqueSparkEventsFiles(badRecordsPath: String,
                                         eventLogsDF: DataFrame,
                                         processedLogFiles: PipelineTable): Array[String] = {
@@ -422,9 +428,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val badFiles = spark.read.format("json").load(s"${badRecordsPath}/*/*/")
           .select('path.alias("filename"))
           .distinct
-        eventLogsDF.except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
+        eventLogsDF.select('filename).except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
       } else {
-        eventLogsDF.except(alreadyProcessed).as[String].collect()
+        eventLogsDF.select('filename).except(alreadyProcessed).as[String].collect()
       }
     } else {
       eventLogsDF.select('filename)
@@ -451,8 +457,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
-                          daysToProcess: Long,
-                          processedLogFiles: PipelineTable)(eventLogsDF: DataFrame): DataFrame = {
+                          processedLogFiles: PipelineTable,
+                          organizationId: String)(eventLogsDF: DataFrame): DataFrame = {
 
     // Dropping 'Spark Infos' because Overwatch ETLs utilize joins to go from jobs -> stages -> tasks and thus
     // No value is lost in dropping Spark Infos. Furthermore, Spark Infos is often null for some of the nested structs
@@ -531,8 +537,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
           when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
         } else 'StageID
 
-        if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
-          val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
+        val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
+          SchemaTools.scrubSchema(baseEventsDF
             .withColumn("progress", progressCol)
             .withColumn("filename", input_file_name)
             .withColumn("pathSize", size(split('filename, "/")))
@@ -541,11 +547,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("StageID", stageIDColumnOverride)
             .drop("pathSize", "Stage ID")
             .withColumn("filenameGroup", groupFilename('filename))
-            .withColumn("Downstream_Processed", lit(false))
           )
-          rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
         } else {
-          val rawScrubbed = SchemaTools.scrubSchema(baseEventsDF
+          SchemaTools.scrubSchema(baseEventsDF
             .withColumn("progress", progressCol)
             .withColumn("filename", input_file_name)
             .withColumn("pathSize", size(split('filename, "/")))
@@ -553,10 +557,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
             .drop("pathSize")
             .withColumn("filenameGroup", groupFilename('filename))
-            .withColumn("Downstream_Processed", lit(false))
           )
-          rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
         }
+
+        rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+          .join(eventLogsDF, Seq("filename"))
+          .withColumn("organization_id", lit(organizationId))
       } else {
         val msg = "Path Globs Empty, exiting"
         println(msg)
@@ -682,7 +688,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // org.apache.spark.util.ClosureCleaner$.ensureSerializable(ClosureCleaner.scala:403)
     // that parses the entire spark plan to determine whether a DF is serializable. These DF plans are not but the result
     // is which requires that the DF be materialized first.
-    // TODO -- Create global tmp prefix param and use that as the path prefix here
+    // TODO -- Use Temp path from config or create one if not exist
     val tmpEventLogPathsDir = "/tmp/overwatch/bronze/sparkEventLogPaths"
     newEventLogGlobs.write
       .mode("overwrite")
@@ -697,7 +703,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .as[String]
       .map(p => Helpers.globPath(p, Some(fromTimeEpochMillis), Some(untilTimeEpochMillis)))
       .filter(size('value) > 0)
-      .select(explode('value).alias("filename"))
+      .select(explode('value))
+      .select($"col._1".alias("filename"), $"col._2".alias("fileCreateEpochMS"))
+      .withColumn("fileCreateTS", from_unixtime('fileCreateEpochMS / lit(1000)).cast("timestamp"))
+      .withColumn("fileCreateDate", 'fileCreateTS.cast("date"))
 
     // DEBUG
     //    println(s"COUNT: EventLogPaths --> ${eventLogPaths.count}")
