@@ -466,15 +466,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
                           processedLogFilesTracker: PipelineTable,
                           organizationId: String)(eventLogsDF: DataFrame): DataFrame = {
 
+    logger.log(Level.INFO, "Searching for Event logs")
     // Caching is done to ensure a single scan of the event log file paths
     val cachedEventLogs = eventLogsDF.cache()
-    cachedEventLogs.count() // eager force cache
+    val eventLogsCount = cachedEventLogs.count() // eager force cache
+
+    logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
 
     if (cachedEventLogs.take(1).nonEmpty) { // newly found file names
       val validNewFilesWMetaDF = retrieveNewValidSparkEventsWMeta(badRecordsPath, cachedEventLogs, processedLogFilesTracker)
       val pathsGlob = validNewFilesWMetaDF.select('fileName).as[String].collect
       if (pathsGlob.nonEmpty) { // new files less bad files and already-processed files
+        logger.log(Level.INFO, s"VALID NEW EVENT LOGS FOUND: COUNT --> ${pathsGlob.length}")
         try {
+          logger.log(Level.INFO, "Updating Tracker with new files")
           appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId)
         } catch {
           case e: Throwable => {
@@ -498,6 +503,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
 //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
+        logger.log(Level.INFO, "Attempting to load event log data")
         val baseEventsDF = try {
           spark.read.option("badRecordsPath", badRecordsPath)
             .json(pathsGlob: _*)
@@ -569,11 +575,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
           )
         }
 
-        rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+        val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .join(cachedEventLogs, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
 
         cachedEventLogs.unpersist()
+
+        bronzeEventsFinal
       } else {
         val msg = "Path Globs Empty, exiting"
         println(msg)

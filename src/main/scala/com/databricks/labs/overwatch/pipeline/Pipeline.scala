@@ -5,6 +5,8 @@ import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpe
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
 import Schema.verifyDF
+import org.apache.spark.sql.functions.col
+
 import java.io.{PrintWriter, StringWriter}
 
 class Pipeline(_workspace: Workspace, _database: Database,
@@ -214,12 +216,19 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
       spark.conf.set("spark.sql.shuffle.partitions", targetShuffleSize)
 
+      // repartition partitioned tables that are not auto-optimized into the range partitions for writing
+      // without this the file counts of partitioned tables will be extremely high
+      finalDF = if (target.partitionBy.nonEmpty && !target.autoOptimize) {
+        finalDF.repartition(targetShuffleSize, target.partitionBy map col: _*)
+      } else finalDF
+
       val startLogMsg = s"Beginning append to ${
         target.tableFullName
       }"
       logger.log(Level.INFO, startLogMsg)
 
 
+      // Append the output
       if (!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
       val debugCount = if (!config.isFirstRun || config.debugFlag) {
         val dfCount = finalDF.count()

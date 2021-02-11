@@ -188,6 +188,7 @@ case class PipelineTable(
              |FromTime: ${config.fromTime(moduleID).asTSString} --> ${config.fromTime(moduleID).asUnixTimeMilli}
              |UntilTime: ${config.untilTime(moduleID).asTSString} --> ${config.untilTime(moduleID).asUnixTimeMilli}
              |""".stripMargin
+        if (config.debugFlag) println(logStatement)
         logger.log(Level.INFO, logStatement)
 
         field.dataType match {
@@ -222,7 +223,7 @@ case class PipelineTable(
         }
       })
 
-      PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), incrementalFilters, config.globalFilters)
+      PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), module, incrementalFilters, config.globalFilters)
     } else {
       spark.emptyDataFrame
     }

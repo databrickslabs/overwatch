@@ -5,11 +5,12 @@ import com.databricks.labs.overwatch.utils.{Module, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
+import TransformFunctions._
 
 trait GoldTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
-//  final private val orgId = dbutils.notebook.getContext.tags("orgId")
+  //  final private val orgId = dbutils.notebook.getContext.tags("orgId")
 
   protected def buildCluster()(df: DataFrame): DataFrame = {
     val clusterCols: Array[Column] = Array(
@@ -367,25 +368,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       .unionByName(jobRunIntermediateStates)
       .unionByName(jobRunTerminalState)
 
-    // GET UTILIZATION BY KEY
-    val sparkJobMini = incrementalSparkJob
-      .select('organization_id, 'spark_context_id, 'job_group_id,
-        'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
-//      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
-      .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
-
-    val sparkTaskMini = incrementalSparkTask
-      .select('organization_id, 'spark_context_id, 'stage_id,
-        'stage_attempt_id, 'task_id, 'task_attempt_id,
-        $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
-
-    val jobRunUtilRaw = sparkJobMini
-      .join(sparkTaskMini, Seq("organization_id", "spark_context_id", "stage_id"))
-      .withColumn("spark_task_runtime_H", 'runtimeMS / lit(1000) / lit(3600))
-      .withColumnRenamed("job_id", "spark_job_id")
-      .withColumnRenamed("stage_id", "spark_stage_id")
-      .withColumnRenamed("task_id", "spark_task_id")
-
     val jobRunCostPotential = jobRunWPotential
       .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
       .withColumn("driver_compute_cost", when('cloud_billable, 'driver_compute_hourly * 'uptime_in_state_H).otherwise(lit(0)))
@@ -408,24 +390,55 @@ trait GoldTransforms extends SparkSessionWrapper {
         round(sum('total_cost), 2).alias("total_cost")
       )
 
-    val jobRunSparkUtil = jobRunUtilRaw
-      .groupBy('organization_id, 'db_job_id, 'db_id_in_job, 'spark_task_termination_date)
-      .agg(
-        sum('runTimeMS).alias("spark_task_runtimeMS"),
-        round(sum('spark_task_runtime_H), 4).alias("spark_task_runtime_H")
-      )
-      .drop("spark_task_termination_date")
+    // GET UTILIZATION BY KEY
+    // IF incremental spark events are present calculate utilization, otherwise just return with NULLS
+    // Spark events are commonly missing if no clusters are logging and/or in test environments
+    if (incrementalSparkJob.take(1).nonEmpty) {
+      val sparkJobMini = incrementalSparkJob
+        .select('organization_id, 'startDate, 'spark_context_id, 'job_group_id,
+          'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
+        //      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
+        .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
 
-    jobRunCostPotential.alias("jrCostPot")
-      .join(
-        jobRunSparkUtil.withColumnRenamed("organization_id", "orgId").alias("jrSparkUtil"),
-        $"jrCostPot.organization_id" === $"jrSparkUtil.orgId" &&
-          $"jrCostPot.job_id" === $"jrSparkUtil.db_job_id" &&
-          $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job"
+      val sparkTaskMini = incrementalSparkTask
+        .select('organization_id, 'startDate, 'spark_context_id, 'stage_id,
+          'stage_attempt_id, 'task_id, 'task_attempt_id,
+          $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
 
-      )
-      .drop("db_job_id", "db_id_in_job", "orgId")
-      .withColumn("job_run_cluster_util", round(('spark_task_runtime_H / 'worker_potential_core_H), 4))
+      val jobRunUtilRaw = sparkJobMini.alias("sparkJobMini")
+        .joinWithLag(
+          sparkTaskMini,
+          Seq("organization_id", "startDate", "spark_context_id", "stage_id"),
+          "startDate"
+        )
+        .withColumn("spark_task_runtime_H", 'runtimeMS / lit(1000) / lit(3600))
+        .withColumnRenamed("job_id", "spark_job_id")
+        .withColumnRenamed("stage_id", "spark_stage_id")
+        .withColumnRenamed("task_id", "spark_task_id")
+
+      val jobRunSparkUtil = jobRunUtilRaw
+        .groupBy('organization_id, 'db_job_id, 'db_id_in_job)
+        .agg(
+          sum('runTimeMS).alias("spark_task_runtimeMS"),
+          round(sum('spark_task_runtime_H), 4).alias("spark_task_runtime_H")
+        )
+
+      jobRunCostPotential.alias("jrCostPot")
+        .join(
+          jobRunSparkUtil.withColumnRenamed("organization_id", "orgId").alias("jrSparkUtil"),
+          $"jrCostPot.organization_id" === $"jrSparkUtil.orgId" &&
+            $"jrCostPot.job_id" === $"jrSparkUtil.db_job_id" &&
+            $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job"
+
+        )
+        .drop("db_job_id", "db_id_in_job", "orgId")
+        .withColumn("job_run_cluster_util", round(('spark_task_runtime_H / 'worker_potential_core_H), 4))
+    } else {
+      jobRunCostPotential
+        .withColumn("spark_task_runtimeMS", lit(null).cast("long"))
+        .withColumn("spark_task_runtime_H", lit(null).cast("double"))
+        .withColumn("job_run_cluster_util", lit(null).cast("double"))
+    }
 
 
   }
@@ -533,6 +546,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     )
     df.select(sparkStageCols: _*)
   }
+
   protected def buildSparkTask()(df: DataFrame): DataFrame = {
     val sparkTaskCols: Array[Column] = Array(
       'organization_id,
@@ -575,6 +589,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     )
     df.select(sparkExecutionCols: _*)
   }
+
   protected def buildSparkExecutor()(df: DataFrame): DataFrame = {
     val sparkExecutorCols: Array[Column] = Array(
       'organization_id,

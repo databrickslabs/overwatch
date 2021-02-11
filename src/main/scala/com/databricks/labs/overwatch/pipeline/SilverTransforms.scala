@@ -7,6 +7,7 @@ import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import TransformFunctions._
 
 import scala.collection.mutable.ArrayBuffer
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
@@ -16,7 +17,8 @@ trait SilverTransforms extends SparkSessionWrapper {
   import spark.implicits._
 
   private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
-//  final private val orgId = dbutils.notebook.getContext.tags("orgId")
+
+  //  final private val orgId = dbutils.notebook.getContext.tags("orgId")
 
   object UDF {
 
@@ -98,44 +100,46 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
 
-  protected def getJDBCSession(sessionStartDF: DataFrame, sessionEndDF: DataFrame): DataFrame = {
-    sessionStartDF
-      .join(sessionEndDF, Seq("SparkContextID", "sessionId"))
-      .withColumn("ServerSessionRunTime",
-        TransformFunctions.subtractTime('startTime, 'finishTime))
-      .drop("startTime", "finishTime")
-  }
-
-  protected def getJDBCOperation(operationStartDF: DataFrame, operationEndDF: DataFrame): DataFrame = {
-    operationStartDF
-      .join(operationEndDF, Seq("SparkContextID", "id"))
-      .withColumn("ServerOperationRunTime",
-        TransformFunctions.subtractTime('startTime, 'closeTime))
-      .drop("startTime", "finishTime")
-  }
+  //  protected def getJDBCSession(sessionStartDF: DataFrame, sessionEndDF: DataFrame): DataFrame = {
+  //    sessionStartDF
+  //      .join(sessionEndDF, Seq("SparkContextID", "sessionId"))
+  //      .withColumn("ServerSessionRunTime",
+  //        TransformFunctions.subtractTime('startTime, 'finishTime))
+  //      .drop("startTime", "finishTime")
+  //  }
+  //
+  //  protected def getJDBCOperation(operationStartDF: DataFrame, operationEndDF: DataFrame): DataFrame = {
+  //    operationStartDF
+  //      .join(operationEndDF, Seq("SparkContextID", "id"))
+  //      .withColumn("ServerOperationRunTime",
+  //        TransformFunctions.subtractTime('startTime, 'closeTime))
+  //      .drop("startTime", "finishTime")
+  //  }
 
   private def simplifyExecutorAdded(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerExecutorAdded")
-      .select('organization_id, 'clusterId, 'SparkContextID, 'ExecutorID, 'executorInfo, 'Timestamp.alias("executorAddedTS"),
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID, 'ExecutorID, 'executorInfo, 'Timestamp.alias("executorAddedTS"),
         'filenameGroup.alias("startFilenameGroup"))
   }
 
   private def simplifyExecutorRemoved(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerExecutorRemoved")
-      .select('organization_id, 'clusterId, 'SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
         'filenameGroup.alias("endFilenameGroup"))
   }
 
   protected def executor()(df: DataFrame): DataFrame = {
 
 
-    val executorAdded = simplifyExecutorAdded(df)
-    val executorRemoved = simplifyExecutorRemoved(df)
+    val executorAdded = simplifyExecutorAdded(df).alias("executorAdded")
+    val executorRemoved = simplifyExecutorRemoved(df).alias("executorRemoved")
+    val joinKeys = Seq("organization_id", "fileCreateDate", "clusterId", "SparkContextID", "ExecutorID")
 
-    executorAdded.join(executorRemoved, Seq("organization_id", "clusterId", "SparkContextID", "ExecutorID"))
+    executorAdded
+      .joinWithLag(executorRemoved, joinKeys, "fileCreateDate")
       .withColumn("TaskRunTime",
         TransformFunctions.subtractTime('executorAddedTS, 'executorRemovedTS))
-      .drop("executorAddedTS", "executorRemovedTS")
+      .drop("executorAddedTS", "executorRemovedTS", "fileCreateDate")
       .withColumn("ExecutorAliveTime", struct(
         $"TaskRunTime.startEpochMS".alias("AddedEpochMS"),
         $"TaskRunTime.startTS".alias("AddedTS"),
@@ -159,7 +163,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   private def simplifyExecutionsStart(df: DataFrame): DataFrame = {
     df.filter('Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
-      .select('organization_id, 'clusterId, 'SparkContextID, 'description, 'details, 'executionId.alias("ExecutionID"),
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID, 'description, 'details, 'executionId.alias("ExecutionID"),
         'time.alias("SqlExecStartTime"),
         'filenameGroup.alias("startFilenameGroup"))
       .withColumn("timeRnk", rank().over(uniqueTimeWindow.orderBy('SqlExecStartTime)))
@@ -170,7 +174,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   private def simplifyExecutionsEnd(df: DataFrame): DataFrame = {
     df.filter('Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionEnd")
-      .select('organization_id, 'clusterId, 'SparkContextID, 'executionId.alias("ExecutionID"),
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID, 'executionId.alias("ExecutionID"),
         'time.alias("SqlExecEndTime"),
         'filenameGroup.alias("endFilenameGroup"))
       .withColumn("timeRnk", rank().over(uniqueTimeWindow.orderBy('SqlExecEndTime)))
@@ -180,15 +184,16 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   protected def sqlExecutions()(df: DataFrame): DataFrame = {
-    val executionsStart = simplifyExecutionsStart(df)
-    val executionsEnd = simplifyExecutionsEnd(df)
+    val executionsStart = simplifyExecutionsStart(df).alias("executionsStart")
+    val executionsEnd = simplifyExecutionsEnd(df).alias("executionsEnd")
+    val joinKeys = Seq("organization_id", "fileCreateDate", "clusterId", "SparkContextID", "ExecutionID")
 
     //TODO -- review if skew is necessary -- on all DFs
     executionsStart
-      .join(executionsEnd, Seq("organization_id", "clusterId", "SparkContextID", "ExecutionID"))
+      .joinWithLag(executionsEnd, joinKeys, "fileCreateDate")
       .withColumn("SqlExecutionRunTime",
         TransformFunctions.subtractTime('SqlExecStartTime, 'SqlExecEndTime))
-      .drop("SqlExecStartTime", "SqlExecEndTime")
+      .drop("SqlExecStartTime", "SqlExecEndTime", "fileCreateDate")
       .withColumn("startTimestamp", $"SqlExecutionRunTime.startEpochMS")
   }
 
@@ -197,7 +202,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     sparkEventsBronze.filter('Event.isin("SparkListenerJobStart"))
       .withColumn("PowerProperties", UDF.appendPowerProperties)
       .select(
-        'organization_id, 'clusterId, 'SparkContextID,
+        'organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
         $"PowerProperties.JobGroupID", $"PowerProperties.ExecutionID",
         'JobID, 'StageIDs, 'SubmissionTime, 'PowerProperties,
         'filenameGroup.alias("startFilenameGroup")
@@ -206,24 +211,26 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def simplifyJobEnd(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerJobEnd")
-      .select('organization_id, 'clusterId, 'SparkContextID, 'JobID, 'JobResult, 'CompletionTime,
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID, 'JobID, 'JobResult, 'CompletionTime,
         'filenameGroup.alias("endFilenameGroup"))
   }
 
   protected def sparkJobs()(df: DataFrame): DataFrame = {
-    val jobStart = simplifyJobStart(df)
-    val jobEnd = simplifyJobEnd(df)
+    val jobStart = simplifyJobStart(df).alias("jobStart")
+    val jobEnd = simplifyJobEnd(df).alias("jobEnd")
+    val joinKeys = Seq("organization_id", "fileCreateDate", "clusterId", "SparkContextID", "JobID")
 
-    jobStart.join(jobEnd, Seq("organization_id", "clusterId", "SparkContextID", "JobId"))
+    jobStart
+      .joinWithLag(jobEnd, joinKeys, "fileCreateDate")
       .withColumn("JobRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
-      .drop("SubmissionTime", "CompletionTime")
+      .drop("SubmissionTime", "CompletionTime", "fileCreateDate")
       .withColumn("startTimestamp", $"JobRunTime.startEpochMS")
       .withColumn("startDate", $"JobRunTime.startTS".cast("date"))
   }
 
   protected def simplifyStageStart(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerStageSubmitted")
-      .select('organization_id, 'clusterId, 'SparkContextID,
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
         $"StageInfo.StageID", $"StageInfo.SubmissionTime", $"StageInfo.StageAttemptID",
         'StageInfo.alias("StageStartInfo"),
         'filenameGroup.alias("startFilenameGroup"))
@@ -231,25 +238,26 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def simplifyStageEnd(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerStageCompleted")
-      .select('organization_id, 'clusterId, 'SparkContextID,
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
         $"StageInfo.StageID", $"StageInfo.StageAttemptID", $"StageInfo.CompletionTime",
         'StageInfo.alias("StageEndInfo"), 'filenameGroup.alias("endFilenameGroup")
       )
   }
 
   protected def sparkStages()(df: DataFrame): DataFrame = {
-    val stageStart = simplifyStageStart(df)
-    val stageEnd = simplifyStageEnd(df)
+    val stageStart = simplifyStageStart(df).alias("stageStart")
+    val stageEnd = simplifyStageEnd(df).alias("stageEnd")
+    val joinKeys = Seq("organization_id", "fileCreateDate", "clusterId", "SparkContextID", "StageID", "StageAttemptID")
 
     stageStart
-      .join(stageEnd, Seq("organization_id", "clusterId", "SparkContextID", "StageID", "StageAttemptID"))
+      .joinWithLag(stageEnd, joinKeys, "fileCreateDate")
       .withColumn("StageInfo", struct(
         $"StageEndInfo.Accumulables", $"StageEndInfo.CompletionTime", $"StageStartInfo.Details",
         $"StageStartInfo.FailureReason", $"StageEndInfo.NumberofTasks",
         $"StageStartInfo.ParentIDs", $"StageStartInfo.SubmissionTime"
       )).drop("StageEndInfo", "StageStartInfo")
       .withColumn("StageRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
-      .drop("SubmissionTime", "CompletionTime")
+      .drop("SubmissionTime", "CompletionTime", "fileCreateDate")
       .withColumn("startTimestamp", $"StageRunTime.startEpochMS")
       .withColumn("startDate", $"StageRunTime.startTS".cast("date"))
   }
@@ -257,7 +265,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   // TODO -- Add in Specualtive Tasks Event == org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted
   protected def simplifyTaskStart(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerTaskStart")
-      .select('organization_id, 'clusterId, 'SparkContextID,
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
         'StageID, 'StageAttemptID, $"TaskInfo.TaskID", $"TaskInfo.ExecutorID",
         $"TaskInfo.Attempt".alias("TaskAttempt"),
         $"TaskInfo.Host", $"TaskInfo.LaunchTime", 'TaskInfo.alias("TaskStartInfo"),
@@ -267,7 +275,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def simplifyTaskEnd(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerTaskEnd")
-      .select('organization_id, 'clusterId, 'SparkContextID,
+      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
         'StageID, 'StageAttemptID, 'TaskEndReason, $"TaskInfo.TaskID", $"TaskInfo.ExecutorID",
         $"TaskInfo.Attempt".alias("TaskAttempt"),
         $"TaskInfo.Host", $"TaskInfo.FinishTime", 'TaskInfo.alias("TaskEndInfo"),
@@ -278,19 +286,20 @@ trait SilverTransforms extends SparkSessionWrapper {
   // Orphan tasks are a result of "TaskEndReason.Reason" != "Success"
   // Failed tasks lose association with their chain
   protected def sparkTasks()(df: DataFrame): DataFrame = {
-    val taskStart = simplifyTaskStart(df)
-    val taskEnd = simplifyTaskEnd(df)
+    val taskStart = simplifyTaskStart(df).alias("taskStart")
+    val taskEnd = simplifyTaskEnd(df).alias("taskEnd")
+    val joinKeys = Seq(
+      "organization_id", "fileCreateDate", "clusterId", "SparkContextID",
+      "StageID", "StageAttemptID", "TaskID", "TaskAttempt", "ExecutorID", "Host"
+    )
 
-    taskStart.join(
-      taskEnd, Seq(
-        "organization_id", "clusterId", "SparkContextID", "StageID", "StageAttemptID", "TaskID", "TaskAttempt", "ExecutorID", "Host"
-      ))
+    taskStart.joinWithLag(taskEnd, joinKeys, "fileCreateDate")
       .withColumn("TaskInfo", struct(
         $"TaskEndInfo.Accumulables", $"TaskEndInfo.Failed", $"TaskEndInfo.FinishTime",
         $"TaskEndInfo.GettingResultTime",
         $"TaskEndInfo.Host", $"TaskEndInfo.Index", $"TaskEndInfo.Killed", $"TaskStartInfo.LaunchTime",
         $"TaskEndInfo.Locality", $"TaskEndInfo.Speculative"
-      )).drop("TaskStartInfo", "TaskEndInfo")
+      )).drop("TaskStartInfo", "TaskEndInfo", "fileCreateDate")
       .withColumn("TaskRunTime", TransformFunctions.subtractTime('LaunchTime, 'FinishTime)).drop("LaunchTime", "FinishTime")
       .withColumn("startTimestamp", $"TaskRunTime.startEpochMS")
       .withColumn("startDate", $"TaskRunTime.startTS".cast("date"))
@@ -311,6 +320,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val sshDetails = sshLoginRaw.select(
       'timestamp,
       'organization_id,
+      'date,
       'requestId,
       lit("ssh").alias("login_type"),
       struct(
@@ -328,6 +338,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .select(
           'timestamp,
           'organization_id,
+          'date,
           'date.alias("login_date"),
           'serviceName,
           'actionName.alias("login_type"),
@@ -338,7 +349,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           $"userIdentity.email".alias("user_email"),
           'sourceIPAddress, 'userAgent, 'requestId, 'response
         )
-        .join(sshDetails, Seq("organization_id", "timestamp", "login_type", "requestId"), "left")
+        .join(sshDetails, Seq("organization_id", "date", "timestamp", "login_type", "requestId"), "left")
+        .drop("date")
     } else
       Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
@@ -662,6 +674,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select(
         'serviceName, 'actionName,
         'organization_id,
+        'date,
         'runId.cast("int"),
         'jobId.cast("int"),
         'idInJob, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
@@ -675,7 +688,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val allCancellations = jobsAuditIncremental
       .filter('actionName.isin("cancel"))
       .select(
-        'organization_id,
+        'organization_id, 'date,
         'run_id.cast("int").alias("runId"),
         'requestId.alias("cancellationRequestId"),
         'response.alias("cancellationResponse"),
@@ -690,7 +703,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val runNowStart = jobsAuditIncremental
       .filter('actionName.isin("runNow"))
       .select(
-        'organization_id,
+        'organization_id, 'date,
         get_json_object($"response.result", "$.run_id").cast("int").alias("runId"),
         lit(null).cast("string").alias("run_name"),
         'timestamp.alias("submissionTime"),
@@ -717,7 +730,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val runSubmitStart = jobsAuditIncremental
       .filter('actionName.isin("submitRun"))
       .select(
-        'organization_id,
+        'organization_id, 'date,
         get_json_object($"response.result", "$.run_id").cast("int").alias("runId"),
         'run_name,
         'timestamp.alias("submissionTime"),
@@ -747,7 +760,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val runStarts = jobsAuditIncremental
       .filter('actionName.isin("runStart"))
       .select(
-        'organization_id,
+        'organization_id, 'date,
         'runId,
         'timestamp.alias("startTime"),
         'requestId.alias("startRequestID")
@@ -785,10 +798,10 @@ trait SilverTransforms extends SparkSessionWrapper {
     if (jobsSnapshot.exists) jobStatusClusterLookups.append(existingClusterLookup2)
 
     // Unify each run onto a single record and structure the df
-    val jobRunsBase = allCompletes
-      .join(allSubmissions, Seq("runId", "organization_id"), "left")
-      .join(allCancellations, Seq("runId", "organization_id"), "left")
-      .join(runStarts, Seq("runId", "organization_id"), "left")
+    val jobRunsBase = allCompletes.alias("completes")
+      .joinWithLag(allSubmissions, Seq("runId", "organization_id", "date"), "date", joinType = "left")
+      .joinWithLag(allCancellations, Seq("runId", "organization_id", "date"), "date", joinType = "left")
+      .joinWithLag(runStarts, Seq("runId", "organization_id", "date"), "date", joinType = "left")
       .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
       .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
       .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
@@ -892,7 +905,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("runId", 'runId.cast("long"))
       .withColumn("jobId", 'jobId.cast("long"))
       .withColumn("idInJob", 'idInJob.cast("long"))
-      .repartition(256)
+      .repartition(repartitionCount) // very large skew in some cases
 
     jobsAuditComplete.unpersist()
 

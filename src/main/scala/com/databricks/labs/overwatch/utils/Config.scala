@@ -344,6 +344,7 @@ class Config() {
   }
 
   private[overwatch] def setOrganizationId(value: String): this.type = {
+    if (debugFlag) println(s"organization ID set to ${value}")
     _organizationId = value
     this
   }

@@ -2,13 +2,81 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.WindowSpec
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 
 object TransformFunctions extends SparkSessionWrapper {
 
   import spark.implicits._
+
+  implicit class DataFrameTransforms(df: DataFrame) {
+
+    def dropDupColumnByAlias(dropAlias: String, columnNames: String*): DataFrame = {
+      columnNames.foldLeft(df) {
+        case (mutDF, k) => {
+          mutDF.drop(col(s"${dropAlias}.${k}"))
+        }
+      }
+    }
+
+    def joinWithLag(
+                     df2: DataFrame,
+                     usingColumns: Seq[String],
+                     lagDateColumnName: String,
+                     laggingSide: String = "left",
+                     joinType: String = "inner"
+                   ): DataFrame = {
+      require(laggingSide == "left" || laggingSide == "right", s"laggingSide must be either 'left' or 'right'; received ${laggingSide}")
+      val (left, right) = if(laggingSide == "left") {
+        (df.alias("laggard"), df2.alias("driver"))
+      } else {
+        (df.alias("driver"), df2.alias("laggard"))
+      }
+
+      val joinExpr = usingColumns.map(c => {
+        val matchCol = col(s"driver.${c}") === col(s"laggard.${c}")
+        if (c == lagDateColumnName) {
+          matchCol || col(s"driver.${c}") === date_sub(col(s"laggard.${c}"), 1)
+        } else matchCol
+      }).reduce((x, y) => x && y)
+
+      left.join(right, joinExpr, joinType)
+        .dropDupColumnByAlias("laggard", usingColumns: _*)
+    }
+
+  }
+
+  /**
+   * Retrieve DF alias
+   * @param ds
+   * @return
+   */
+  def getAlias(ds: Dataset[_]): Option[String] = ds.queryExecution.analyzed match {
+    case SubqueryAlias(alias, _) => Some(alias.identifier)
+    case _ => None
+  }
+
+  /**
+   * Simplify code for join conditions where begin events may be on the previous date BUT the date column is a
+   * partition column so the explicit date condition[s] must be in the join clause to ensure
+   * dynamic partition pruning (DPP)
+   * join column names must match on both sides of the join
+   * @param dateColumnName date column of DateType -- this column should also either be a partition or indexed col
+   * @param alias DF alias of latest event
+   * @param lagAlias DF alias potentially containing lagging events
+   * @param usingColumns Seq[String] for matching column names
+   * @return
+   */
+  def joinExprMinusOneDay(dateColumnName: String, alias: String, lagAlias: String, usingColumns: Seq[String]): Column = {
+    usingColumns.map(c => {
+      val matchCol = col(s"${alias}.${c}") === col(s"${lagAlias}.${c}")
+      if (c == dateColumnName) {
+        matchCol || col(s"${alias}.${c}") === date_sub(col(s"${lagAlias}.${c}"), 1)
+      } else matchCol
+    }).reduce((x, y) => x && y)
+  }
 
   /**
    * Converts column of seconds/milliseconds/nanoseconds to timestamp
