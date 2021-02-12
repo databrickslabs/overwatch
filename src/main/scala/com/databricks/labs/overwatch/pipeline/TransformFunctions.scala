@@ -1,11 +1,13 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SparkSessionWrapper}
-import org.apache.spark.sql.expressions.WindowSpec
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
+
+import java.util.UUID
 
 object TransformFunctions extends SparkSessionWrapper {
 
@@ -46,6 +48,56 @@ object TransformFunctions extends SparkSessionWrapper {
         .dropDupColumnByAlias("laggard", usingColumns: _*)
     }
 
+    def joinAsOf(
+                  lookupDF: DataFrame,
+                  usingColumns: Seq[String],
+                  orderByColumns: Seq[String],
+                  lookupColumns: Seq[String],
+                  permitFillBackward: Boolean = false,
+                  rowsBefore: Long = Window.unboundedPreceding,
+                  rowsAfter: Long = Window.unboundedFollowing
+                ): DataFrame = {
+
+      val controlColName = "__ctrlCol__"
+      val drivingDF = df
+        .withColumn(controlColName, lit(0).cast("int"))
+      val baseWSpec = Window.partitionBy(usingColumns map col: _*)
+        .orderBy(orderByColumns map col: _*)
+      val beforeWSpec = baseWSpec.rowsBetween(rowsBefore, Window.currentRow)
+      val afterWSpec = baseWSpec.rowsBetween(Window.currentRow, rowsAfter)
+
+
+      val drivingCols = drivingDF.columns
+      val lookupDFCols = lookupDF.columns
+      val missingBaseCols = lookupDFCols.diff(drivingCols)
+      val missingLookupCols = drivingCols.diff(lookupDFCols)
+
+      val df1Complete = missingBaseCols.foldLeft(drivingDF) {
+        case (dfBuilder, c) =>
+          dfBuilder.withColumn(c, lit(null))
+      }
+      val df2Complete = missingLookupCols.foldLeft(lookupDF) {
+        case (dfBuilder, c) =>
+          dfBuilder.withColumn(c, lit(null))
+      }
+
+      val masterDF = df1Complete.unionByName(df2Complete)
+
+      lookupColumns.foldLeft(masterDF) {
+        case (dfBuilder, c) => {
+          val dt = dfBuilder.schema.fields.filter(_.name == c).head.dataType
+          val asOfDF = dfBuilder.withColumn(c,
+            coalesce(last(col(c), ignoreNulls = true).over(beforeWSpec), lit(null).cast(dt))
+          )
+          if (permitFillBackward) {
+            asOfDF.withColumn(c,
+              coalesce(first(col(c), ignoreNulls = true).over(afterWSpec), lit(null).cast(dt))
+            )
+          } else asOfDF
+        }
+      }.filter(col(controlColName).isNotNull)
+        .drop(controlColName)
+    }
   }
 
   /**

@@ -190,8 +190,14 @@ trait GoldTransforms extends SparkSessionWrapper {
         when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
           .otherwise('target_num_workers)
       )
+      .select(
+        'organization_id, 'cluster_id,
+        'timestamp, 'type, 'current_num_workers, 'target_num_workers
+      )
 
     val clusterBeforeW = Window.partitionBy('cluster_id).orderBy('timestamp)
+      .rowsBetween(-1000, Window.currentRow)
+    val clusterAfterW = Window.partitionBy('cluster_id).orderBy('timestamp.desc)
       .rowsBetween(-1000, Window.currentRow)
     val stateUnboundW = Window.partitionBy('cluster_id).orderBy('timestamp)
     val uptimeW = Window.partitionBy('cluster_id, 'counter_reset).orderBy('timestamp)
@@ -207,21 +213,31 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("node_type_id",
         when('node_type_id.isNull, last('node_type_id, true).over(clusterBeforeW))
           .otherwise('node_type_id))
+      .withColumn("driver_node_type_id",
+        when('driver_node_type_id.isNull, first('driver_node_type_id, true).over(clusterAfterW))
+          .otherwise('driver_node_type_id))
+      .withColumn("node_type_id",
+        when('node_type_id.isNull, first('node_type_id, true).over(clusterAfterW))
+          .otherwise('node_type_id))
       .select('cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
 
     val nodeTypeLookup2 = clusterSnapshot.asDF
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
       .select('cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
 
-    val nodeTypeLookups = Array(nodeTypeLookup, nodeTypeLookup2)
-
-    val clusterPotential = TransformFunctions.fillFromLookupsByTS(
-      clusterEventsBaseline, "type",
-      Array("driver_node_type_id", "node_type_id", "cluster_name"), clusterBeforeW, nodeTypeLookups: _*)
-      .select(
-        'organization_id, 'cluster_id, 'cluster_name,
-        'timestamp, 'type, 'current_num_workers, 'target_num_workers,
-        'driver_node_type_id, 'node_type_id
+    val clusterPotential = clusterEventsBaseline
+      .joinAsOf(
+        nodeTypeLookup,
+        Seq("cluster_id"),
+        Seq("timestamp"),
+        Seq("driver_node_type_id", "node_type_id", "cluster_name"),
+        permitFillBackward = true, rowsBefore = -1000, rowsAfter = 1000
+      ).joinAsOf(
+      nodeTypeLookup2,
+        Seq("cluster_id"),
+        Seq("timestamp"),
+        Seq("driver_node_type_id", "node_type_id", "cluster_name"),
+        permitFillBackward = true, rowsBefore = -1000, rowsAfter = 1000
       )
       .withColumn("timestamp", 'timestamp.cast("double") / 1000.0)
       .withColumn("ts", from_unixtime('timestamp).cast("timestamp"))
@@ -395,21 +411,21 @@ trait GoldTransforms extends SparkSessionWrapper {
     // Spark events are commonly missing if no clusters are logging and/or in test environments
     if (incrementalSparkJob.take(1).nonEmpty) {
       val sparkJobMini = incrementalSparkJob
-        .select('organization_id, 'startDate, 'spark_context_id, 'job_group_id,
+        .select('organization_id, 'date, 'spark_context_id, 'job_group_id,
           'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
         //      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
         .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
 
       val sparkTaskMini = incrementalSparkTask
-        .select('organization_id, 'startDate, 'spark_context_id, 'stage_id,
+        .select('organization_id, 'date, 'spark_context_id, 'stage_id,
           'stage_attempt_id, 'task_id, 'task_attempt_id,
           $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
 
       val jobRunUtilRaw = sparkJobMini.alias("sparkJobMini")
         .joinWithLag(
           sparkTaskMini,
-          Seq("organization_id", "startDate", "spark_context_id", "stage_id"),
-          "startDate"
+          Seq("organization_id", "date", "spark_context_id", "stage_id"),
+          "date"
         )
         .withColumn("spark_task_runtime_H", 'runtimeMS / lit(1000) / lit(3600))
         .withColumnRenamed("job_id", "spark_job_id")
@@ -428,8 +444,8 @@ trait GoldTransforms extends SparkSessionWrapper {
           jobRunSparkUtil.withColumnRenamed("organization_id", "orgId").alias("jrSparkUtil"),
           $"jrCostPot.organization_id" === $"jrSparkUtil.orgId" &&
             $"jrCostPot.job_id" === $"jrSparkUtil.db_job_id" &&
-            $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job"
-
+            $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job",
+          "left"
         )
         .drop("db_job_id", "db_id_in_job", "orgId")
         .withColumn("job_run_cluster_util", round(('spark_task_runtime_H / 'worker_potential_core_H), 4))
