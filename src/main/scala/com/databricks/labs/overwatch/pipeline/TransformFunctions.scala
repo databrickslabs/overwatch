@@ -51,18 +51,17 @@ object TransformFunctions extends SparkSessionWrapper {
     def joinAsOf(
                   lookupDF: DataFrame,
                   usingColumns: Seq[String],
-                  orderByColumns: Seq[String],
+                  orderByColumns: Seq[Column],
                   lookupColumns: Seq[String],
-                  permitFillBackward: Boolean = false,
                   rowsBefore: Long = Window.unboundedPreceding,
-                  rowsAfter: Long = Window.unboundedFollowing
+                  rowsAfter: Long = Window.currentRow
                 ): DataFrame = {
 
       val controlColName = "__ctrlCol__"
       val drivingDF = df
         .withColumn(controlColName, lit(0).cast("int"))
       val baseWSpec = Window.partitionBy(usingColumns map col: _*)
-        .orderBy(orderByColumns map col: _*)
+        .orderBy(orderByColumns: _*)
       val beforeWSpec = baseWSpec.rowsBetween(rowsBefore, Window.currentRow)
       val afterWSpec = baseWSpec.rowsBetween(Window.currentRow, rowsAfter)
 
@@ -89,7 +88,7 @@ object TransformFunctions extends SparkSessionWrapper {
           val asOfDF = dfBuilder.withColumn(c,
             coalesce(last(col(c), ignoreNulls = true).over(beforeWSpec), lit(null).cast(dt))
           )
-          if (permitFillBackward) {
+          if (rowsAfter != 0L) {
             asOfDF.withColumn(c,
               coalesce(first(col(c), ignoreNulls = true).over(afterWSpec), lit(null).cast(dt))
             )

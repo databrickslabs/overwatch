@@ -229,15 +229,15 @@ trait GoldTransforms extends SparkSessionWrapper {
       .joinAsOf(
         nodeTypeLookup,
         Seq("cluster_id"),
-        Seq("timestamp"),
+        Seq('timestamp),
         Seq("driver_node_type_id", "node_type_id", "cluster_name"),
-        permitFillBackward = true, rowsBefore = -1000, rowsAfter = 1000
+        rowsBefore = -1000, rowsAfter = 1000
       ).joinAsOf(
       nodeTypeLookup2,
         Seq("cluster_id"),
-        Seq("timestamp"),
+        Seq('timestamp),
         Seq("driver_node_type_id", "node_type_id", "cluster_name"),
-        permitFillBackward = true, rowsBefore = -1000, rowsAfter = 1000
+        rowsBefore = -1000, rowsAfter = 1000
       )
       .withColumn("timestamp", 'timestamp.cast("double") / 1000.0)
       .withColumn("ts", from_unixtime('timestamp).cast("timestamp"))
@@ -333,8 +333,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       .join(driverCosts, Seq("organization_id", "driver_node_type_id"))
       .join(workerCosts, Seq("organization_id", "node_type_id"))
 
-    val clusterByIdAsOfW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(-100, Window.currentRow)
-    val clusterByIdWhenW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc).rowsBetween(-100, Window.currentRow)
     val keys = Array("organization_id", "cluster_id", "cluster_name", "timestamp")
     val lookupCols = Array("unixTimeMS_state_start", "unixTimeMS_state_end", "timestamp_state_start",
       "timestamp_state_end", "state", "cloud_billable", "databricks_billable", "current_num_workers",
@@ -346,24 +344,30 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("timestamp", 'unixTimeMS_state_start)
       .select(keys ++ lookupCols map col: _*)
 
-    val jobRunInitialState = TransformFunctions.fillFromLookupsByTS(
-      newTerminatedJobRuns.withColumn("timestamp", $"job_runtime.startEpochMS"), "run_id",
-      lookupCols, clusterByIdAsOfW, clusterPotentialInitialState
-    )
-      .drop("timestamp")
-      .withColumn("uptime_in_state_H", (array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)
-      .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
-
     val clusterPotentialTerminalState = clusterPotentialWCosts
       .withColumn("timestamp", 'unixTimeMS_state_end)
       .select(keys ++ lookupCols map col: _*)
 
-    val jobRunTerminalState = TransformFunctions.fillFromLookupsByTS(
-      newTerminatedJobRuns.withColumn("timestamp", $"job_runtime.endEpochMS"), "run_id",
-      lookupCols, clusterByIdWhenW, clusterPotentialTerminalState
-    )
+    val jobRunInitialState = newTerminatedJobRuns
+      .joinAsOf(
+        clusterPotentialInitialState,
+        Seq("organization_id", "cluster_id"),
+        Seq($"job_runtime.startEpochMS"),
+        lookupCols.toSeq,
+        rowsBefore = -100
+      )
+      .withColumn("uptime_in_state_H", (array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)
+      .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+
+    val jobRunTerminalState = newTerminatedJobRuns
+      .joinAsOf(
+        clusterPotentialTerminalState,
+        Seq("organization_id", "cluster_id"),
+        Seq($"job_runtime.endEpochMS".desc),
+        lookupCols.toSeq,
+        rowsBefore = -100
+      )
       .filter('unixTimeMS_state_start > $"job_runtime.startEpochMS" && 'unixTimeMS_state_start < $"job_runtime.endEpochMS")
-      .drop("timestamp")
       .withColumn("uptime_in_state_H", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
       .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
 
