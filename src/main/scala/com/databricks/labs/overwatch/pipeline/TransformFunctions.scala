@@ -23,6 +23,7 @@ object TransformFunctions extends SparkSessionWrapper {
       }
     }
 
+    // WARNING -- ERROR when using multiple columns
     def joinWithLag(
                      df2: DataFrame,
                      usingColumns: Seq[String],
@@ -30,7 +31,7 @@ object TransformFunctions extends SparkSessionWrapper {
                      laggingSide: String = "left",
                      joinType: String = "inner"
                    ): DataFrame = {
-      require(laggingSide == "left" || laggingSide == "right", s"laggingSide must be either 'left' or 'right'; received ${laggingSide}")
+      require(laggingSide == "left" || laggingSide == "right", s"laggingSide must be either 'left' or 'right'; received $laggingSide")
       val (left, right) = if(laggingSide == "left") {
         (df.alias("laggard"), df2.alias("driver"))
       } else {

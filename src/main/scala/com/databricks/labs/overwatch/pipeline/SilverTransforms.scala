@@ -536,11 +536,11 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   /**
-   * First shot At Silver Job Runs
-   *
-   * @param df
-   * @return
-   */
+    * First shot At Silver Job Runs
+    *
+    * @param df
+    * @return
+    */
 
   //TODO -- jobs snapshot api seems to be returning more data than audit logs, review
   //  example = maxRetries, max_concurrent_runs, jar_task, python_task
@@ -628,27 +628,27 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   /**
-   * Depending on the actionName, the runID will be found in one of the following columns, "run_id",
-   * "runId", or in the "response.result.run_id" fields.
-   *
-   * The lineage of a run is as follows:
-   * runNow or submitRun: RPC service, happens at RPC request received, this RPC request does not happen when a
-   * job is started via databricks cron, in these cases only a runStart is emitted. A manual runstart via the UI
-   * emits a runNow
-   * runStart: JobRunner service, happens when a run starts on a cluster
-   * runSucceeded or runFailed, JobRunner service, happens when job ends
-   *
-   * To build the logs, the incremental audit logs are reviewed for jobs COMPLETED and CANCELLED in the time scope
-   * of this overwatch run. If completed during this run then the entire audit log jobs service is searched for
-   * the start of that run
-   *
-   * @param completeAuditTable
-   * @param clusterSpec
-   * @param jobsStatus
-   * @param jobsSnapshot
-   * @param df
-   * @return
-   */
+    * Depending on the actionName, the runID will be found in one of the following columns, "run_id",
+    * "runId", or in the "response.result.run_id" fields.
+    *
+    * The lineage of a run is as follows:
+    * runNow or submitRun: RPC service, happens at RPC request received, this RPC request does not happen when a
+    * job is started via databricks cron, in these cases only a runStart is emitted. A manual runstart via the UI
+    * emits a runNow
+    * runStart: JobRunner service, happens when a run starts on a cluster
+    * runSucceeded or runFailed, JobRunner service, happens when job ends
+    *
+    * To build the logs, the incremental audit logs are reviewed for jobs COMPLETED and CANCELLED in the time scope
+    * of this overwatch run. If completed during this run then the entire audit log jobs service is searched for
+    * the start of that run
+    *
+    * @param completeAuditTable
+    * @param clusterSpec
+    * @param jobsStatus
+    * @param jobsSnapshot
+    * @param df
+    * @return
+    */
   protected def dbJobRunsSummary(completeAuditTable: DataFrame,
                                  clusterSpec: PipelineTable,
                                  clusterSnapshot: PipelineTable,
@@ -697,7 +697,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'timestamp.alias("cancellationTime"),
         'userAgent.alias("cancelledUserAgent"),
         'userIdentity.alias("cancelledBy")
-      )
+      ).filter('runId.isNotNull)
 
     // DF for jobs launched with actionName == "runNow"
     val runNowStart = jobsAuditIncremental
@@ -724,7 +724,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'response.alias("submitResponse"),
         'userAgent.alias("submitUserAgent"),
         'userIdentity.alias("submittedBy")
-      )
+      ).filter('runId.isNotNull)
 
     // DF for jobs launched with actionName == "submitRun"
     val runSubmitStart = jobsAuditIncremental
@@ -750,7 +750,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'response.alias("submitResponse"),
         'userAgent.alias("submitUserAgent"),
         'userIdentity.alias("submittedBy")
-      )
+      ).filter('runId.isNotNull)
 
     // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
     val allSubmissions = runNowStart
@@ -797,11 +797,17 @@ trait SilverTransforms extends SparkSessionWrapper {
     if (jobsStatus.exists) jobStatusClusterLookups.append(existingClusterLookup)
     if (jobsSnapshot.exists) jobStatusClusterLookups.append(existingClusterLookup2)
 
+    // TODO -- add the lag back but there's an error in the joinWithLag func atm
     // Unify each run onto a single record and structure the df
-    val jobRunsBase = allCompletes.alias("completes")
-      .joinWithLag(allSubmissions, Seq("runId", "organization_id", "date"), "date", joinType = "left")
-      .joinWithLag(allCancellations, Seq("runId", "organization_id", "date"), "date", joinType = "left")
-      .joinWithLag(runStarts, Seq("runId", "organization_id", "date"), "date", joinType = "left")
+    //    val jobRunsBase = allCompletes.alias("completes")
+    //      .joinWithLag(allSubmissions, Seq("runId", "organization_id", "date"), "date", joinType = "left")
+    //      .joinWithLag(allCancellations, Seq("runId", "organization_id", "date"), "date", joinType = "left")
+    //      .joinWithLag(runStarts, Seq("runId", "organization_id", "date"), "date", joinType = "left")
+
+    val jobRunsBase = allCompletes
+      .join(allSubmissions, Seq("runId", "organization_id", "date"), "left")
+      .join(allCancellations, Seq("runId", "organization_id", "date"), "left")
+      .join(runStarts, Seq("runId", "organization_id", "date"), "left")
       .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
       .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
       .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
@@ -852,33 +858,63 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterByNameAsOfW = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
     val lastJobStatusW = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
 
+    val automatedJobRunsBase = jobRunsBase
+      .filter('jobClusterType === "new")
+      .withColumnRenamed("existing_cluster_id", "clusterId")
+
     // JobRuns with interactive clusters
     // If the lookups are present (likely will be unless is first run or modules are turned off somehow)
     // use the lookups to populate the null clusterIds and cluster_names
-    val interactiveRunsWIDAndName = if (jobStatusClusterLookups.nonEmpty) {
-      val interactiveJobRunsWIDs = TransformFunctions.fillFromLookupsByTS(
-        jobRunsBase.filter('jobClusterType === "existing"), "runId",
-        Array("existing_cluster_id"), lastJobStatusW, jobStatusClusterLookups: _*
-      )
-        .withColumnRenamed("existing_cluster_id", "clusterId")
-
-      TransformFunctions.fillFromLookupsByTS(
-        interactiveJobRunsWIDs, "runId",
-        Array("cluster_name"), clusterByIdAsOfW, clusterLookups: _*
-      )
-    } else jobRunsBase
+    val interactiveRunsWID = if (jobStatusClusterLookups.nonEmpty) {
+      jobStatusClusterLookups.foldLeft(jobRunsBase.filter('jobClusterType === "existing")) {
+        case (dfBuilder, lookupDF) => {
+          dfBuilder
+            .joinAsOf(
+              lookupDF,
+              Seq("organization_id", "jobId"),
+              Seq('timestamp),
+              Seq("existing_cluster_id"),
+              rowsBefore = -1000
+            )
+        }
+      }.withColumnRenamed("existing_cluster_id", "clusterId")
+    } else jobRunsBase.withColumnRenamed("existing_cluster_id", "clusterId")
 
     // JobRuns using Automated clusters -- get clusterID by derived name
-    val automatedRunsWIDAndName = TransformFunctions.fillFromLookupsByTS(
-      jobRunsBase.filter('jobClusterType === "new").withColumnRenamed("existing_cluster_id", "clusterId"),
-      "runId", Array("clusterId"), clusterByNameAsOfW, clusterLookups: _*
-    )
+    val (interactiveRunsWIDAndName, automatedRunsWIDAndName) = if (clusterLookups.nonEmpty) {
+      val interactiveWMeta = clusterLookups.foldLeft(interactiveRunsWID) {
+        case (dfBuilder, lookupDF) => {
+          dfBuilder
+            .joinAsOf(
+              lookupDF,
+              Seq("organization_id", "clusterId"),
+              Seq('timestamp),
+              Seq("cluster_name"),
+              rowsBefore = -1000
+            )
+        }
+      }
+
+      val automatedWMeta = clusterLookups.foldLeft(automatedJobRunsBase) {
+        case (dfBuilder, lookupDF) => {
+          dfBuilder
+            .joinAsOf(
+              lookupDF,
+              Seq("organization_id", "cluster_name"),
+              Seq('timestamp),
+              Seq("clusterId"),
+              rowsBefore = -1000
+            )
+        }
+      }
+      (interactiveWMeta, automatedWMeta)
+    } else (interactiveRunsWID, automatedJobRunsBase)
 
     // Union the interactive and automated back together with the cluster ids and names
     val jobRunsWClusterIDAndName = interactiveRunsWIDAndName.unionByName(automatedRunsWIDAndName)
 
 
-    val jobNameLookup = completeAuditTable
+    val newJobsNameLookup = completeAuditTable
       .filter('serviceName === "jobs" && 'actionName === "create")
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .select(
@@ -887,7 +923,14 @@ trait SilverTransforms extends SparkSessionWrapper {
         'name.alias("jobName")
       )
 
-    val jobNameLookup2 = spark.table(s"${etl_db}.jobs_snapshot_bronze")
+    val editJobsNameLookup = completeAuditTable
+      .filter('serviceName === "jobs" && 'actionName.isin("reset", "update"))
+      .selectExpr("*", "requestParams.*").drop("requestParams")
+      .select('timestamp, 'job_id.alias("jobId"), get_json_object('new_settings, "$.name").alias("jobName"))
+
+    val jobNameLookup = newJobsNameLookup.unionByName(editJobsNameLookup)
+
+    val jobNameLookup2 = jobsSnapshot.asDF
       .select(unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
         'job_id.alias("jobId"),
         $"settings.name".alias("jobName")
@@ -896,11 +939,18 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobNameLookups = Array(jobNameLookup, jobNameLookup2)
 
     // Backfill the jobNames
-    val jobRunsFinal = TransformFunctions.fillFromLookupsByTS(
-      jobRunsWClusterIDAndName, "runId",
-      Array("jobName"), lastJobStatusW, jobNameLookups: _*
-    )
-      .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
+    val jobRunsFinal = jobNameLookups.foldLeft(jobRunsWClusterIDAndName) {
+      case (dfBuilder, lookupDF) => {
+        dfBuilder
+          .joinAsOf(
+            lookupDF,
+            Seq("organization_id", "jobId"),
+            Seq('timestamp),
+            Seq("jobName"),
+            rowsBefore = -1000
+          )
+      }
+    }.drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
       .withColumn("endEpochMS", $"jobRunTime.endEpochMS") // for incremental downstream after job termination
       .withColumn("runId", 'runId.cast("long"))
       .withColumn("jobId", 'jobId.cast("long"))

@@ -356,6 +356,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         lookupCols.toSeq,
         rowsBefore = -100
       )
+      .drop("timestamp")
       .withColumn("uptime_in_state_H", (array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)
       .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
 
@@ -367,6 +368,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         lookupCols.toSeq,
         rowsBefore = -100
       )
+      .drop("timestamp")
       .filter('unixTimeMS_state_start > $"job_runtime.startEpochMS" && 'unixTimeMS_state_start < $"job_runtime.endEpochMS")
       .withColumn("uptime_in_state_H", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
       .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
