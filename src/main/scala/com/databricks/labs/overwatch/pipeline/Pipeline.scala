@@ -197,7 +197,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       }
 
       val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
-      val targetShufflePartitionCount = math.max(100, finalDFPartCount).toInt
+      val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
 
       if (config.debugFlag) {
         println(s"DEBUG: Source DF Partitions: ${sourceDFparts}")

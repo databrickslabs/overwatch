@@ -136,12 +136,12 @@ abstract class PipelineTargets(config: Config) {
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Array("startDate"),
-      shuffleFactor = 8,
+      shuffleFactor = 5,
       autoOptimize = true,
       enableSchemaMerge = false,
       sparkOverrides = Map(
-        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "50000",
-        "spark.databricks.delta.optimizeWrite.binSize"-> "512" // output is very dense, shrink output file size
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize"-> "2048" // output is very dense, shrink output file size
       )
     )
 
@@ -335,11 +335,11 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Array("date"),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("unixTimeMS"),
-      shuffleFactor = 8,
+      shuffleFactor = 5,
       autoOptimize = true,
       sparkOverrides = Map(
-        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "50000", // output is very skewed by partition
-        "spark.databricks.delta.optimizeWrite.binSize"-> "512" // output is very dense, shrink output file size
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000", // output is very skewed by partition
+        "spark.databricks.delta.optimizeWrite.binSize"-> "2048" // output is very dense, shrink output file size
       )
     )
 
