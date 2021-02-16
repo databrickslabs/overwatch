@@ -805,9 +805,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     //      .joinWithLag(runStarts, Seq("runId", "organization_id", "date"), "date", joinType = "left")
 
     val jobRunsBase = allCompletes
-      .join(allSubmissions, Seq("runId", "organization_id", "date"), "left")
-      .join(allCancellations, Seq("runId", "organization_id", "date"), "left")
-      .join(runStarts, Seq("runId", "organization_id", "date"), "left")
+      .joinWithLag(allSubmissions, Seq("runId", "organization_id", "date"), "date", laggingSide = "right", joinType = "left")
+      .joinWithLag(allCancellations, Seq("runId", "organization_id", "date"), "date", laggingSide = "right", joinType = "left")
+      .joinWithLag(runStarts, Seq("runId", "organization_id", "date"), "date", laggingSide = "right", joinType = "left")
       .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
       .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
       .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))

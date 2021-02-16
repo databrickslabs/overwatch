@@ -240,6 +240,10 @@ class Config() {
         value.getOrElse("spark.databricks.delta.optimize.maxFileSize", (1024 * 1024 * 128).toString),
       "spark.databricks.delta.retentionDurationCheck.enabled" ->
         value.getOrElse("spark.databricks.delta.retentionDurationCheck.enabled", "true"),
+      "spark.databricks.delta.optimizeWrite.numShuffleBlocks" ->
+        value.getOrElse("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "50000"),
+      "spark.databricks.delta.optimizeWrite.binSize" ->
+        value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
       "spark.sql.caseSensitive" -> "false"
     )
     _initialSparkConf = value ++ manualOverrides

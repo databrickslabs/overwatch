@@ -41,7 +41,9 @@ object TransformFunctions extends SparkSessionWrapper {
       val joinExpr = usingColumns.map(c => {
         val matchCol = col(s"driver.${c}") === col(s"laggard.${c}")
         if (c == lagDateColumnName) {
-          matchCol || col(s"driver.${c}") === date_sub(col(s"laggard.${c}"), 1)
+          col(s"driver.${c}") >= date_sub(col(s"laggard.${c}"), 1) &&
+            col(s"driver.${c}") <= col(s"laggard.${c}")
+//          matchCol || col(s"driver.${c}") === date_sub(col(s"laggard.${c}"), 1)
         } else matchCol
       }).reduce((x, y) => x && y)
 

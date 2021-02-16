@@ -182,44 +182,39 @@ class Pipeline(_workspace: Workspace, _database: Database,
         TransformFunctions.moveColumnsToFront(finalDF, target.zOrderBy ++ target.statsColumns)
       } else finalDF
 
+      val targetShufflePartitionSizeMB = 128.0
+      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").toDouble / 1024 / 1024
+      val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
+
       // TODO -- handle streaming until Module refactor with source -> target mappings
       val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
         target.name match {
-          case "audit_log_bronze" => spark.table(s"${
-            config.databaseName
-          }.audit_log_raw_events")
+          case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
             .rdd.partitions.length * target.shuffleFactor
         }
       } else {
-        sourceDFparts * target.shuffleFactor
+        sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
       }
-      val estimatedFinalDFSizeMB = finalDFPartCount * spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
-      val targetShuffleSize = math.max(100, finalDFPartCount).toInt
+
+      val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
+      val targetShufflePartitionCount = math.max(100, finalDFPartCount).toInt
 
       if (config.debugFlag) {
-        println(s"DEBUG: Target Shuffle Partitions: ${
-          targetShuffleSize
-        }")
+        println(s"DEBUG: Source DF Partitions: ${sourceDFparts}")
+        println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
         println(s"DEBUG: Max PartitionBytes (MB): ${
-          spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
-        }")
+          spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024}")
       }
 
-      logger.log(Level.INFO, s"${
-        module.moduleName
-      }: Final DF estimated at ${
-        estimatedFinalDFSizeMB
-      } MBs." +
-        s"\nShufflePartitions: ${
-          targetShuffleSize
-        }")
+      logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
+        s"\nShufflePartitions: ${targetShufflePartitionCount}")
 
-      spark.conf.set("spark.sql.shuffle.partitions", targetShuffleSize)
+      spark.conf.set("spark.sql.shuffle.partitions", targetShufflePartitionCount)
 
       // repartition partitioned tables that are not auto-optimized into the range partitions for writing
       // without this the file counts of partitioned tables will be extremely high
       finalDF = if (target.partitionBy.nonEmpty && !target.autoOptimize) {
-        finalDF.repartition(targetShuffleSize, target.partitionBy map col: _*)
+        finalDF.repartition(targetShufflePartitionCount, target.partitionBy map col: _*)
       } else finalDF
 
       val startLogMsg = s"Beginning append to ${
