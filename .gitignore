@@ -20,3 +20,4 @@ project/target/
 /Logo/
 \.terraform
 terraform.tfstate*
+\.terraform.lock.hcl
