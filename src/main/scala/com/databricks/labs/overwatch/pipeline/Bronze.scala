@@ -83,7 +83,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 //  }
 
   lazy private val appendSparkEventLogsProcess = EtlDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, "date"),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols: _*),
     Some(Seq(
       collectEventLogPaths(
         config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,

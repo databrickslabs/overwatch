@@ -438,6 +438,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val clusterBaseDF = clusterBase(df)
 
+    // TODO instance pool lookup pass in from bronze
     val instancePoolLookup = auditRawTable.asDF
       .filter('serviceName === "instancePools" && 'actionName === "create")
       .select(
@@ -560,8 +561,8 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobs_statusCols: Array[Column] = Array(
       'organization_id, 'serviceName, 'actionName, 'timestamp,
-      when('actionName === "create", get_json_object($"response.result", "$.job_id"))
-        .otherwise('job_id).alias("jobId"),
+      when('actionName === "create", get_json_object($"response.result", "$.job_id").cast("long"))
+        .otherwise('job_id).cast("long").alias("jobId"),
       'job_type,
       'name.alias("jobName"),
       'timeout_seconds.cast("long").alias("timeout_seconds"),

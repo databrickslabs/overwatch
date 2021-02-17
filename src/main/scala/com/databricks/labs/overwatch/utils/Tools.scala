@@ -221,7 +221,7 @@ object SchemaTools extends SparkSessionWrapper {
         false
       }
     }
-//    jobsSnapshot.asDF().schema.fields.filter(_.name == "settings").head.dataType.asInstanceOf[StructType].fields.filter(_.name == "existing_cluster_id").map(_.name).headOption
+    //    jobsSnapshot.asDF().schema.fields.filter(_.name == "settings").head.dataType.asInstanceOf[StructType].fields.filter(_.name == "existing_cluster_id").map(_.name).headOption
   }
 
   //  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
@@ -417,31 +417,28 @@ object Helpers extends SparkSessionWrapper {
   def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[(String, Option[Long], Boolean)] = {
     val conf = new Configuration()
     try {
-      if (pathExists(path)) {
-        val fs = new Path(path).getFileSystem(conf)
-        val paths = fs.globStatus(new Path(path))
-        logger.log(Level.DEBUG, s"${path} expanded in ${paths.length} files")
-        paths.map(wildString => {
-          val path = wildString.getPath
-          val pathString = path.toString
-          val fileModEpochMillis = if (fromEpochMillis.nonEmpty) {
-            Some(fs.listStatus(path).filter(_.isFile).head.getModificationTime)
-          } else None
-          (pathString, fileModEpochMillis)
-        }).filter(p => {
-          // Ensure that the last modified time of the file was between from --> until
-          if (p._2.nonEmpty) {
-            val lastModifiedTS = p._2.get
-            // TODO -- Switch to Debug -- is on exec logs with println
-            println(s"PROOF: ${p._1} --> ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
-            (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
-              untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
-          } else false
-        }).map(x => (x._1, x._2, true))
-      } else {
-        logger.log(Level.ERROR, s"PATH NOT FOUND: ${path}. Returning default create date")
-        Array((path, Some(0L), false))
-      }
+      val fs = new Path(path).getFileSystem(conf)
+      val paths = fs.globStatus(new Path(path))
+      logger.log(Level.DEBUG, s"${path} expanded in ${paths.length} files")
+      paths.map(wildString => {
+        val path = wildString.getPath
+        val pathString = path.toString
+        val fileModEpochMillis = if (fromEpochMillis.nonEmpty) {
+          Some(fs.listStatus(path).filter(_.isFile).head.getModificationTime)
+        } else None
+        (pathString, fileModEpochMillis)
+      }).filter(p => {
+        // p._1 == path
+        // p._2 == fileModEpochMillis
+        // Ensure that the last modified time of the file was between from --> until
+        if (p._2.nonEmpty) {
+          val lastModifiedTS = p._2.get
+          // TODO -- Switch to Debug -- is on exec logs with println
+          println(s"PROOF: ${p._1} --> ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
+          (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
+            untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
+        } else false
+      }).map(x => (x._1, x._2, true))
     } catch {
       case e: AmazonS3Exception => logger.log(Level.ERROR, s"ACCESS DENIED: " +
         s"Cluster Event Logs at path ${path} are inaccessible with given the Databricks account used to run Overwatch. " +

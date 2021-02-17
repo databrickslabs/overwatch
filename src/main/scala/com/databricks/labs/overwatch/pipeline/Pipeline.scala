@@ -63,6 +63,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   import spark.implicits._
 
+  /**
+   * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
+   * Accepting data with higher precision than delivery causes bad data
+   */
+  protected val auditLogsIncrementalCols = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
+
   protected def finalizeModule(report: ModuleStatusReport): Unit = {
     val pipelineReportTarget = PipelineTable(
       name =  "pipeline_report",

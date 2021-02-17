@@ -307,6 +307,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "limit" -> 500
     )
 
+    // TODO -- upgrade to incrementalDF
     val auditDFBase = auditLogsTable.asDF
       .filter(
         'date.between(start_time.asColumnTS.cast("date"), end_time.asColumnTS.cast("date")) &&
@@ -611,9 +612,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
     //      .show(false)
 
     // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create", AND "changeClusterAcl" actions
+    // TODO -- upgrade to incrementalDF
     val latestSnapDate = clusterSnapshot.asDF.select(max('Pipeline_SnapTS).cast("date").cast("string"))
       .as[String].first
-    val existingClustersWithLogs = clusterSnapshot.asDF
+    val currentClustersWithLogs = clusterSnapshot.asDF
       .filter('Pipeline_SnapTS.cast("date") === latestSnapDate)
       .select(
         unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
@@ -635,7 +637,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       )
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
-      .unionByName(existingClustersWithLogs)
+      .unionByName(currentClustersWithLogs)
     //      .cache() //Not caching because delta cache is likely more efficient
 
     val clusterIDsWithNewData = dfClusterService
@@ -698,6 +700,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .save(tmpEventLogPathsDir)
 
     // TODO -- use intelligent partitions count
+    // TOOD -- Throw error on failure and bubble up to report
     val strategicPartitions = if (isFirstRun) 2000 else 1000
     val eventLogPaths = spark.read.format("delta").load(tmpEventLogPathsDir)
       .repartition(strategicPartitions)
