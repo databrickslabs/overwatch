@@ -57,3 +57,11 @@ variable "overwatch_job_temppath" {
   description = "Path on DBFS to store broken records, checkpoints, etc."
   default = "/tmp/overwatch"
 }
+
+variable "overwatch_primodial_date" {
+  description = "Primodal data"
+}
+
+variable "overwatch_max_days_to_load" {
+  description = "Max days to load"
+}

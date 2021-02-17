@@ -11,17 +11,26 @@ resource "databricks_job" "overwatch" {
     }
     spark_version = "6.4.x-scala2.11"
     node_type_id  = var.node_type
+
+    cluster_log_conf {
+      dbfs {
+        destination = "dbfs:/cluster-logs"
+      }
+    }
   }
 
   notebook_task {
     notebook_path = databricks_notebook.overwatch.path
     base_parameters = {
-      dbName = var.overwatch_job_dbname
+      etlDBName = var.overwatch_job_dbname
+      presentationDBName = var.overwatch_job_dbname
       evhName = var.overwatch_job_evh_name
       secretsScope = var.overwatch_job_secrets_scope
       secretsEvHubKey = var.overwatch_job_secrets_evhub_key_name
       overwatchDBKey = var.overwatch_job_secrets_dbpat_key_name
       tempPath = var.overwatch_job_temppath
+      maxDaysToLoad = var.overwatch_max_days_to_load
+      primordialDateString = var.overwatch_primodial_date
     }
   }
 
@@ -32,7 +41,7 @@ resource "databricks_job" "overwatch" {
 
   library {
     maven {
-      coordinates = "com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.17"
+      coordinates = "com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.18"
     }
   }
 
