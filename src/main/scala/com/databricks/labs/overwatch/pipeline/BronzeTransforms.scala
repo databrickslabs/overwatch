@@ -210,37 +210,28 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .drop("logId")
 
     } else {
-      if (!isFirstRun) {
 
-        // TODO -- fix this -- SO UGLY
-        //  might be good to build from time in initializer better on a source case basis
-        //  don't attempt this until after tests are in place
-        val fromDT = fromTime.toLocalDate
-        val untilDT = untilTime.toLocalDate
-        // inclusive from exclusive to
-        val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
-          .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
-          .filter(Helpers.pathExists)
+      // TODO -- fix this -- SO UGLY
+      //  might be good to build from time in initializer better on a source case basis
+      //  don't attempt this until after tests are in place
+      val fromDT = fromTime.toLocalDate
+      val untilDT = untilTime.toLocalDate
+      // inclusive from exclusive to
+      val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
+        .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
+        .filter(Helpers.pathExists)
 
-        if (datesGlob.nonEmpty) {
-          spark.read.json(datesGlob: _*)
-            // When globbing the paths, the date must be reconstructed and re-added manually
-            .withColumn("organization_id", lit(organizationId))
-            .withColumn("filename", split(input_file_name, "/"))
-            .withColumn("date",
-              split(expr("filter(filename, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
-            .drop("filename")
-        } else {
-          Seq("No New Records").toDF("__OVERWATCHEMPTY")
-        }
-      } else {
-        // Intentionally not filtering dates here
-        // There are events that occur before a point in time that imrpove completeness of the data
-        // Grab all data present
-        // Todo -- add parameter to limit max audit history pull
-        //  may not be necessary when lifecycle is implemented for auto-delete logs, TBD
-        spark.read.json(auditLogConfig.rawAuditPath.get)
+      if (datesGlob.nonEmpty) {
+        spark.read.json(datesGlob: _*)
+          // When globbing the paths, the date must be reconstructed and re-added manually
           .withColumn("organization_id", lit(organizationId))
+          .withColumn("filename", input_file_name)
+          .withColumn("filenameAR", split(input_file_name, "/"))
+          .withColumn("date",
+            split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
+          .drop("filenameAR")
+      } else {
+        Seq("No New Records").toDF("__OVERWATCHEMPTY")
       }
     }
   }
@@ -305,7 +296,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-//  protected
+  //  protected
   def prepClusterEventLogs(auditLogsTable: PipelineTable,
                            start_time: TimeTypes, end_time: TimeTypes,
                            apiEnv: ApiEnv,
@@ -348,7 +339,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
      * spark.driver.maxResultSize 32g
      */
     val batchSize = 500000D
-//    val batchSize = 50000D // DEBUG
+    //    val batchSize = 50000D // DEBUG
     val tmpClusterEventsPath = "/tmp/overwatch/bronze/clusterEventsBatches"
     val clusterEventsBuffer = buildClusterEventBatches(apiEnv, batchSize, start_time.asUnixTimeMilli, end_time.asUnixTimeMilli, clusterIDs)
 
@@ -365,11 +356,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       try {
         val tdf = SchemaTools.scrubSchema(
           spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
-          .select(col("events.*"))
+            .select(col("events.*"))
         )
 
         // DEBUG
-//        tdf.printSchema()
+        //        tdf.printSchema()
 
         val changeInventory = Map[String, Column](
           "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
@@ -420,8 +411,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   private def retrieveNewValidSparkEventsWMeta(badRecordsPath: String,
-                                        eventLogsDF: DataFrame,
-                                        processedLogFiles: PipelineTable): DataFrame = {
+                                               eventLogsDF: DataFrame,
+                                               processedLogFiles: PipelineTable): DataFrame = {
     val validNewFiles = if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
       val alreadyProcessed = processedLogFiles.asDF.select('filename)
         .filter(!'failed)
@@ -499,9 +490,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         // GZ files -- very compressed, need to get sufficienct parallelism but too much and there can be too
         // many tasks to serialize the returned schema from each task
-//        val tempMaxPartBytes = if (daysToProcess >= 3) 1024 * 1024 * 32 else 1024 * 1024 * 16
-//        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
-//        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
+        //        val tempMaxPartBytes = if (daysToProcess >= 3) 1024 * 1024 * 32 else 1024 * 1024 * 16
+        //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
+        //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
         logger.log(Level.INFO, "Attempting to load event log data")
         val baseEventsDF = try {
@@ -534,7 +525,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                   TransformFunctions.stringTsToUnixMillis('timestamp)
                 ).otherwise('Timestamp))
               .drop("timestamp")
-          } case e: Throwable => {
+          }
+          case e: Throwable => {
             logger.log(Level.ERROR, "FAILED spark events bronze", e)
             Seq("").toDF("__OVERWATCHFAILURE")
           }
@@ -713,7 +705,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .map(p => Helpers.globPath(p, Some(fromTimeEpochMillis), Some(untilTimeEpochMillis)))
       .filter(size('value) > 0)
       .select(explode('value))
-      .select($"col._1".alias("filename"), $"col._2".alias("fileCreateEpochMS"))
+      .select($"col._1".alias("filename"), $"col._2".alias("fileCreateEpochMS"), $"col._3".alias("succeeded"))
+      .filter('succeeded)
       .withColumn("fileCreateTS", from_unixtime('fileCreateEpochMS / lit(1000)).cast("timestamp"))
       .withColumn("fileCreateDate", 'fileCreateTS.cast("date"))
 

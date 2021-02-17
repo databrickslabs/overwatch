@@ -23,12 +23,12 @@ object TransformFunctions extends SparkSessionWrapper {
       }
     }
 
-    // WARNING -- ERROR when using multiple columns
     def joinWithLag(
                      df2: DataFrame,
                      usingColumns: Seq[String],
                      lagDateColumnName: String,
                      laggingSide: String = "left",
+                     lagDays: Int = 1,
                      joinType: String = "inner"
                    ): DataFrame = {
       require(laggingSide == "left" || laggingSide == "right", s"laggingSide must be either 'left' or 'right'; received $laggingSide")
@@ -39,12 +39,9 @@ object TransformFunctions extends SparkSessionWrapper {
       }
 
       val joinExpr = usingColumns.map(c => {
-        val matchCol = col(s"driver.${c}") === col(s"laggard.${c}")
         if (c == lagDateColumnName) {
-          col(s"driver.${c}") >= date_sub(col(s"laggard.${c}"), 1) &&
-            col(s"driver.${c}") <= col(s"laggard.${c}")
-//          matchCol || col(s"driver.${c}") === date_sub(col(s"laggard.${c}"), 1)
-        } else matchCol
+          datediff(col(s"driver.${c}"), col(s"laggard.${c}")) <= lagDays
+        } else col(s"driver.${c}") === col(s"laggard.${c}")
       }).reduce((x, y) => x && y)
 
       left.join(right, joinExpr, joinType)
@@ -68,9 +65,12 @@ object TransformFunctions extends SparkSessionWrapper {
       val beforeWSpec = baseWSpec.rowsBetween(rowsBefore, Window.currentRow)
       val afterWSpec = baseWSpec.rowsBetween(Window.currentRow, rowsAfter)
 
+      val slimLookupCols = ((usingColumns ++ lookupColumns) map col) ++ orderByColumns
+      val slimLookupDF = lookupDF.select(slimLookupCols: _*)
+
 
       val drivingCols = drivingDF.columns
-      val lookupDFCols = lookupDF.columns
+      val lookupDFCols = slimLookupDF.columns
       val missingBaseCols = lookupDFCols.diff(drivingCols)
       val missingLookupCols = drivingCols.diff(lookupDFCols)
 
@@ -78,7 +78,7 @@ object TransformFunctions extends SparkSessionWrapper {
         case (dfBuilder, c) =>
           dfBuilder.withColumn(c, lit(null))
       }
-      val df2Complete = missingLookupCols.foldLeft(lookupDF) {
+      val df2Complete = missingLookupCols.foldLeft(slimLookupDF) {
         case (dfBuilder, c) =>
           dfBuilder.withColumn(c, lit(null))
       }

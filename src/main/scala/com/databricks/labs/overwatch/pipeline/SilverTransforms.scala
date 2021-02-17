@@ -646,6 +646,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     * @param clusterSpec
     * @param jobsStatus
     * @param jobsSnapshot
+    * @param etlStartTime Actual start timestamp of the Overwatch run
     * @param df
     * @return
     */
@@ -654,7 +655,8 @@ trait SilverTransforms extends SparkSessionWrapper {
                                  clusterSnapshot: PipelineTable,
                                  jobsStatus: PipelineTable,
                                  jobsSnapshot: PipelineTable,
-                                 etl_db: String)(df: DataFrame): DataFrame = {
+                                 etlStartTime: Column,
+                                 etlStartEpochMS: Long)(df: DataFrame): DataFrame = {
 
     // TODO -- limit the lookback period to about 7 days -- no job should run for more than 7 days except
     //  streaming jobs. This is only needed to improve performance if needed.
@@ -668,8 +670,11 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobsAuditIncremental = getJobsBase(df)
 
+    // Completes must be >= etlStartTime as it is the driver endpoint
+    // All joiners to Completes may be from the past up to N days as defined in the incremental df
     // Identify all completed jobs in scope for this overwatch run
     val allCompletes = jobsAuditIncremental
+      .filter('date >= etlStartTime.cast("date") && 'timestamp >= lit(etlStartEpochMS))
       .filter('actionName.isin("runSucceeded", "runFailed"))
       .select(
         'serviceName, 'actionName,
@@ -684,6 +689,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         'timestamp.alias("completionTime")
       )
 
+    // CancelRequests are still lookups from the driver "complete" as a cancel request is a request and still
+    // results in a runFailed after the cancellation
     // Identify all cancelled jobs in scope for this overwatch run
     val allCancellations = jobsAuditIncremental
       .filter('actionName.isin("cancel"))
@@ -805,9 +812,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     //      .joinWithLag(runStarts, Seq("runId", "organization_id", "date"), "date", joinType = "left")
 
     val jobRunsBase = allCompletes
-      .joinWithLag(allSubmissions, Seq("runId", "organization_id", "date"), "date", laggingSide = "right", joinType = "left")
-      .joinWithLag(allCancellations, Seq("runId", "organization_id", "date"), "date", laggingSide = "right", joinType = "left")
-      .joinWithLag(runStarts, Seq("runId", "organization_id", "date"), "date", laggingSide = "right", joinType = "left")
+      .join(allSubmissions, Seq("runId", "organization_id"), "left")
+      .join(allCancellations, Seq("runId", "organization_id"), "left")
+      .join(runStarts, Seq("runId", "organization_id"), "left")
       .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
       .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
       .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
@@ -853,10 +860,6 @@ trait SilverTransforms extends SparkSessionWrapper {
         ).alias("requestDetails")
       )
       .withColumn("timestamp", $"jobRunTime.endEpochMS")
-
-    val clusterByIdAsOfW = Window.partitionBy('organization_id, 'clusterId).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
-    val clusterByNameAsOfW = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
-    val lastJobStatusW = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
 
     val automatedJobRunsBase = jobRunsBase
       .filter('jobClusterType === "new")
@@ -914,24 +917,21 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobRunsWClusterIDAndName = interactiveRunsWIDAndName.unionByName(automatedRunsWIDAndName)
 
 
-    val newJobsNameLookup = completeAuditTable
-      .filter('serviceName === "jobs" && 'actionName === "create")
-      .selectExpr("*", "requestParams.*").drop("requestParams")
+    val newJobsNameLookup = jobsAuditComplete
       .select(
-        'timestamp,
+        'organization_id, 'timestamp,
         get_json_object($"response.result", "$.job_id").alias("jobId"),
         'name.alias("jobName")
       )
 
-    val editJobsNameLookup = completeAuditTable
-      .filter('serviceName === "jobs" && 'actionName.isin("reset", "update"))
-      .selectExpr("*", "requestParams.*").drop("requestParams")
-      .select('timestamp, 'job_id.alias("jobId"), get_json_object('new_settings, "$.name").alias("jobName"))
+    val editJobsNameLookup = jobsAuditComplete
+      .filter('actionName.isin("reset", "update"))
+      .select('organization_id, 'timestamp, 'job_id.alias("jobId"), get_json_object('new_settings, "$.name").alias("jobName"))
 
     val jobNameLookup = newJobsNameLookup.unionByName(editJobsNameLookup)
 
     val jobNameLookup2 = jobsSnapshot.asDF
-      .select(unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
+      .select('organization_id, unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
         'job_id.alias("jobId"),
         $"settings.name".alias("jobName")
       )

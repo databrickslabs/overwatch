@@ -64,7 +64,9 @@ abstract class PipelineTargets(config: Config) {
       config,
       incrementalColumns = Array("fileCreateEpochMS"),
       partitionBy = Array("organization_id", "Event", "fileCreateDate"),
-      statsColumns = "SparkContextID, clusterID, JobGroupID, ExecutionID, fileCreateTS, fileCreateDate, fileCreateEpochMS".split(", "),
+      statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID," +
+        "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename," +
+        "Pipeline_SnapTS, Overwatch_RunID").split(", "),
       sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000"),
       autoOptimize = true // TODO -- perftest
     )
@@ -138,7 +140,6 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Array("startDate"),
       shuffleFactor = 5,
       autoOptimize = true,
-      enableSchemaMerge = false,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
         "spark.databricks.delta.optimizeWrite.binSize"-> "2048" // output is very dense, shrink output file size

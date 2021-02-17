@@ -1,11 +1,13 @@
 package com.databricks.labs.overwatch.utils
 
+import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.IvParameterSpec
@@ -198,20 +200,20 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
-//  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
-//    //    val columnInventory = df.select(s"${structColToModify}.*").columns
-//    //    val newStructInventory = columnInventory.map(cName => )
-//    val columnInventory = getAllColumnNames(df.select(s"${structColToModify}.*").schema).map(cn => {
-//      if (cn.contains(".")) {
-//        cn.split("\\.").dropRight(1).mkString(".")
-//      } else { cn }
-//    }).distinct
-//    // returning flat columns, need to return the struct column and stop
-//    val newStructInventory = columnInventory.map(cName => {
-//      changeInventory.getOrElse(cName, col(s"${structColToModify}.${cName}")).alias(cName)
-//    })
-//    struct(newStructInventory: _*)
-//  }
+  //  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
+  //    //    val columnInventory = df.select(s"${structColToModify}.*").columns
+  //    //    val newStructInventory = columnInventory.map(cName => )
+  //    val columnInventory = getAllColumnNames(df.select(s"${structColToModify}.*").schema).map(cn => {
+  //      if (cn.contains(".")) {
+  //        cn.split("\\.").dropRight(1).mkString(".")
+  //      } else { cn }
+  //    }).distinct
+  //    // returning flat columns, need to return the struct column and stop
+  //    val newStructInventory = columnInventory.map(cName => {
+  //      changeInventory.getOrElse(cName, col(s"${structColToModify}.${cName}")).alias(cName)
+  //    })
+  //    struct(newStructInventory: _*)
+  //  }
 
   // TODO -- How to remove keys with nulls from maps?
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
@@ -383,33 +385,45 @@ object Helpers extends SparkSessionWrapper {
    * is ensuring spark is used to serialize it meaning make sure that it's called from the lambda of a Dataset
    *
    * TODO - This function can be easily enhanced to take in String* so that multiple, unrelated wildcards can be
-   *  globbed simultaneously
+   * globbed simultaneously
    *
    * @param path wildcard path as string
    * @return list of all paths contained within the wildcard path
    */
-  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[(String, Option[Long])] = {
+  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[(String, Option[Long], Boolean)] = {
     val conf = new Configuration()
-    val fs = new Path(path).getFileSystem(conf)
-    val paths = fs.globStatus(new Path(path))
-    logger.log(Level.DEBUG, s"${path} expanded in ${paths.length} files")
-    paths.map(wildString => {
-      val path = wildString.getPath
-      val pathString = path.toString
-      val fileModEpochMillis = if (fromEpochMillis.nonEmpty) {
-        Some(fs.listStatus(path).filter(_.isFile).head.getModificationTime)
-      } else None
-      (pathString, fileModEpochMillis)
-    }).filter(p => {
-      // Ensure that the last modified time of the file was between from --> until
-      if (p._2.nonEmpty) {
-        val lastModifiedTS = p._2.get
-        // TODO -- Switch to Debug -- is on exec logs with println
-        println(s"PROOF: ${p._1} --> ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
-        (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
-          untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
-      } else false
-    }).map(x => (x._1, x._2))
+    try {
+      if (pathExists(path)) {
+        val fs = new Path(path).getFileSystem(conf)
+        val paths = fs.globStatus(new Path(path))
+        logger.log(Level.DEBUG, s"${path} expanded in ${paths.length} files")
+        paths.map(wildString => {
+          val path = wildString.getPath
+          val pathString = path.toString
+          val fileModEpochMillis = if (fromEpochMillis.nonEmpty) {
+            Some(fs.listStatus(path).filter(_.isFile).head.getModificationTime)
+          } else None
+          (pathString, fileModEpochMillis)
+        }).filter(p => {
+          // Ensure that the last modified time of the file was between from --> until
+          if (p._2.nonEmpty) {
+            val lastModifiedTS = p._2.get
+            // TODO -- Switch to Debug -- is on exec logs with println
+            println(s"PROOF: ${p._1} --> ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
+            (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
+              untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
+          } else false
+        }).map(x => (x._1, x._2, true))
+      } else {
+        logger.log(Level.ERROR, s"PATH NOT FOUND: ${path}. Returning default create date")
+        Array((path, Some(0L), false))
+      }
+    } catch {
+      case e: AmazonS3Exception => logger.log(Level.ERROR, s"ACCESS DENIED: " +
+        s"Cluster Event Logs at path ${path} are inaccessible with given the Databricks account used to run Overwatch. " +
+        s"Validate access & try again.\n${e.getMessage}")
+        Array((path, Some(0L), false))
+    }
   }
 
   /**
@@ -648,7 +662,7 @@ object Helpers extends SparkSessionWrapper {
   private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
     topPaths.map(p => {
       if (p.reverse.head.toString == "/") s"${p}*" else s"${p}/*"
-    }).flatMap(p => globPath(p)).toSeq.toDF("filesToDelete", "fileCreateDate")
+    }).flatMap(p => globPath(p)).toSeq.toDF("filesToDelete", "fileCreateDate", "succeeded")
       .select('filesToDelete).as[String]
       .foreach(f => rmSer(f))
 
