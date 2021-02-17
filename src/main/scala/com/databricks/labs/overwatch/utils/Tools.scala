@@ -200,6 +200,30 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+  def nestedColExists(df: DataFrame, dotPathOfField: String): Boolean = {
+    val dotPathAr = dotPathOfField.split("\\.")
+    val elder = dotPathAr.head
+    val children = dotPathAr.tail
+    val startField = df.schema.fields.find(_.name == elder)
+    try {
+      children.foldLeft(startField) {
+        case (f, childName) => {
+          if (f.nonEmpty) {
+            f.get.dataType match {
+              case child: StructType => child.find(_.name == childName)
+            }
+          } else None
+        }
+      }.nonEmpty
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.WARN, s"${children.takeRight(1).head} column not found in source DF, attempting to continue without it", e)
+        false
+      }
+    }
+//    jobsSnapshot.asDF().schema.fields.filter(_.name == "settings").head.dataType.asInstanceOf[StructType].fields.filter(_.name == "existing_cluster_id").map(_.name).headOption
+  }
+
   //  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
   //    //    val columnInventory = df.select(s"${structColToModify}.*").columns
   //    //    val newStructInventory = columnInventory.map(cName => )

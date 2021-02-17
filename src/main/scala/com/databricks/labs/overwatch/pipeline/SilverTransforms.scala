@@ -789,11 +789,17 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select('organization_id, 'timestamp, 'jobId, 'existing_cluster_id)
       .filter('existing_cluster_id.isNotNull)
 
+    // tmpFix -- TODO -- build dfFunc df.selectWNulls
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    lazy val existingClusterLookup2 = jobsSnapshot.asDF
+    lazy val existingClusterLookup2 = if (SchemaTools.nestedColExists(jobsSnapshot.asDF, "settings.existing_cluster_id")) {
+      jobsSnapshot.asDF
       .select('organization_id, 'job_id.alias("jobId"), $"settings.existing_cluster_id",
         'created_time.alias("timestamp"))
-      .filter('existing_cluster_id.isNotNull)
+    } else {
+      jobsSnapshot.asDF
+        .select('organization_id, 'job_id.alias("jobId"),
+          'created_time.alias("timestamp"))
+    }.filter('existing_cluster_id.isNotNull)
 
     // Ensure the lookups have data -- this will be improved when the module unification occurs during the next
     // scheduled refactor

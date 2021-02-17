@@ -333,7 +333,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .join(driverCosts, Seq("organization_id", "driver_node_type_id"))
       .join(workerCosts, Seq("organization_id", "node_type_id"))
 
-    val keys = Array("organization_id", "cluster_id", "cluster_name", "timestamp")
+    val keys = Array("organization_id", "cluster_id", "timestamp")
     val lookupCols = Array("unixTimeMS_state_start", "unixTimeMS_state_end", "timestamp_state_start",
       "timestamp_state_end", "state", "cloud_billable", "databricks_billable", "current_num_workers",
       "dbu_rate", "driver_compute_hourly", "worker_compute_hourly", "driver_dbu_hourly",
@@ -343,6 +343,9 @@ trait GoldTransforms extends SparkSessionWrapper {
     val clusterPotentialInitialState = clusterPotentialWCosts
       .withColumn("timestamp", 'unixTimeMS_state_start)
       .select(keys ++ lookupCols map col: _*)
+
+    val clusterPotentialIntermediateStates = clusterPotentialWCosts
+      .select(keys.filterNot(_ == "timestamp") ++ lookupCols map col: _*)
 
     val clusterPotentialTerminalState = clusterPotentialWCosts
       .withColumn("timestamp", 'unixTimeMS_state_end)
@@ -366,7 +369,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .joinAsOf(
         clusterPotentialTerminalState,
         Seq("organization_id", "cluster_id"),
-        Seq('endEpochMS.desc),
+        Seq('timestamp),
         lookupCols.toSeq,
         rowsBefore = -100
       )
@@ -375,16 +378,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("uptime_in_state_H", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
       .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
 
-    val clusterPotentialIntermediateStates = clusterPotentialWCosts
-      .select(Array("cluster_id", "cluster_name") ++ lookupCols map col: _*)
-
     val jobRunIntermediateStates = newTerminatedJobRuns.alias("jr")
       .join(clusterPotentialIntermediateStates.alias("cpot"),
+        $"jr.organization_id" === $"cpot.organization_id" &&
         $"jr.cluster_id" === $"cpot.cluster_id" &&
           $"cpot.unixTimeMS_state_start" > $"jr.job_runtime.startEpochMS" && // only states beginning after job start and ending before
           $"cpot.unixTimeMS_state_end" < $"jr.job_runtime.endEpochMS"
       )
-      .drop($"cpot.cluster_id")
+      .drop($"cpot.cluster_id").drop($"cpot.organization_id")
       .withColumn("uptime_in_state_H", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000) / 3600)
       .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
 
