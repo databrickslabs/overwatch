@@ -348,11 +348,12 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("timestamp", 'unixTimeMS_state_end)
       .select(keys ++ lookupCols map col: _*)
 
-    val jobRunInitialState = newTerminatedJobRuns
+    val jobRunInitialState = newTerminatedJobRuns //jobRun_gold
+        .withColumn("timestamp", $"job_runtime.startEpochMS")
       .joinAsOf(
         clusterPotentialInitialState,
         Seq("organization_id", "cluster_id"),
-        Seq($"job_runtime.startEpochMS"),
+        Seq('timestamp),
         lookupCols.toSeq,
         rowsBefore = -100
       )
@@ -361,10 +362,11 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
 
     val jobRunTerminalState = newTerminatedJobRuns
+      .withColumn("timestamp", $"job_runtime.endEpochMS")
       .joinAsOf(
         clusterPotentialTerminalState,
         Seq("organization_id", "cluster_id"),
-        Seq($"job_runtime.endEpochMS".desc),
+        Seq('endEpochMS.desc),
         lookupCols.toSeq,
         rowsBefore = -100
       )
