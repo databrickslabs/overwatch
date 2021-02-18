@@ -107,69 +107,42 @@ object Schema extends SparkSessionWrapper {
           StructField("byDriverHost", StringType, nullable = true),
           StructField("bySparkContext", StringType, nullable = true)
         )), nullable = true),
-      StructField("actionName", StringType, nullable = true),
-      StructField("Properties", MapType(
-        StringType, StringType, valueContainsNull = true
-      )),
-      StructField("sourceIPAddress", StringType, nullable = true),
-      StructField("version", StringType, nullable = true)
+      StructField("actionName", StringType, nullable = true)
     )),
     // SparkStages
     2007 -> StructType(Seq(
-      StructField("startFilenameGroup",
-        StructType(Seq(
-          StructField("filename", StringType, nullable = true),
-          StructField("byCluster", StringType, nullable = true),
-          StructField("byDriverHost", StringType, nullable = true),
-          StructField("bySparkContext", StringType, nullable = true)
-        )), nullable = true),
-      StructField("organization_id", StringType, nullable = true),
+      StructField("organization_id", StringType, nullable = false),
+      StructField("Event", StringType, nullable = true),
       StructField("clusterId", StringType, nullable = true),
       StructField("SparkContextID", StringType, nullable = true),
-      StructField("StageID", LongType, nullable = true),
-      StructField("StageAttemptID", LongType, nullable = true),
-      StructField("endFilenameGroup",
+      StructField("JobID", StringType, nullable = true),
+      StructField("JobResult", StringType, nullable = true),
+      StructField("CompletionTime", StringType, nullable = true),
+      StructField("StageIDs", StringType, nullable = true),
+      StructField("SubmissionTime", StringType, nullable = true),
+      StructField("Pipeline_SnapTS", TimestampType, nullable = true),
+      StructField("fileCreateEpochMS", LongType, nullable = true),
+      StructField("fileCreateTS", TimestampType, nullable = true),
+      StructField("fileCreateDate", DateType, nullable = true),
+      StructField("StageInfo",
+        StructType(Seq(
+          StructField("StageID", StringType, nullable = true),
+          StructField("SubmissionTime", StringType, nullable = true),
+          StructField("StageAttemptID", StringType, nullable = true),
+          StructField("CompletionTime", StringType, nullable = true),
+          StructField("Details", StringType, nullable = true),
+          StructField("FailureReason", StringType, nullable = true),
+          StructField("NumberofTasks", StringType, nullable = true),
+          StructField("ParentIDs", StringType, nullable = true)
+        )), nullable = true),
+      StructField("filenameGroup",
         StructType(Seq(
           StructField("filename", StringType, nullable = true),
           StructField("byCluster", StringType, nullable = true),
           StructField("byDriverHost", StringType, nullable = true),
           StructField("bySparkContext", StringType, nullable = true)
         )), nullable = true),
-      StructField("StageInfo",
-        StructType(Seq(
-          StructField("Accumulables",
-            ArrayType(
-              StructType(Seq(
-                StructField("CountFailedValues", BooleanType, nullable = true),
-                StructField("ID", LongType, nullable = true),
-                StructField("Internal", BooleanType, nullable = true),
-                StructField("Metadata", StringType, nullable = true),
-                StructField("Name", StringType, nullable = true),
-                StructField("Value", StringType, nullable = true)
-              )), containsNull = true),
-            true),
-          StructField("CompletionTime", LongType, nullable = true),
-          StructField("Details", StringType, nullable = true),
-          StructField("FailureReason", StringType, nullable = true),
-          StructField("NumberofTasks", LongType, nullable = true),
-          StructField("ParentIDs", ArrayType(LongType, containsNull = true), nullable = true),
-          StructField("SubmissionTime", LongType, nullable = true)
-        )), nullable = true),
-      StructField("StageRunTime",
-        StructType(Seq(
-          StructField("startEpochMS", LongType, nullable = true),
-          StructField("startTS", TimestampType, nullable = true),
-          StructField("endEpochMS", LongType, nullable = true),
-          StructField("endTS", TimestampType, nullable = true),
-          StructField("runTimeMS", LongType, nullable = true),
-          StructField("runTimeS", DoubleType, nullable = true),
-          StructField("runTimeM", DoubleType, nullable = true),
-          StructField("runTimeH", DoubleType, nullable = true)
-        )), nullable = true),
-      StructField("startTimestamp", LongType, nullable = true),
-      StructField("startDate", DateType, nullable = true),
-      StructField("Pipeline_SnapTS", TimestampType, nullable = true),
-      StructField("Overwatch_RunID", StringType, nullable = true)
+      StructField("actionName", StringType, nullable = true)
     )),
     // JobStatus
     2010 -> StructType(Seq(
@@ -677,10 +650,15 @@ object Schema extends SparkSessionWrapper {
     ))
   )
 
+  def get(module: Module): Option[StructType] = requiredSchemas.get(module.moduleID)
+
+  def get(moduleId: Int): Option[StructType] = requiredSchemas.get(moduleId)
+
   // TODO -- move this to schemaTools -- probably
   /**
    * In a nested struct this returns the entire dot delimited path to the current struct field.
-   * @param prefix All higher-level structs that supercede the current field
+   *
+   * @param prefix    All higher-level structs that supercede the current field
    * @param fieldName Name of current field
    * @return
    */
@@ -693,11 +671,13 @@ object Schema extends SparkSessionWrapper {
    * Validates the required columns are present in the source DF and when NOT, and IF STRUCTTYPE, creates the structure
    * with all nulls to allow downstream ETL to continue processing with the missing/nulled strings created from
    * inferred schema df readers
-   * @param dfSchema schema from source df to compare with the minimum required schema
+   *
+   * @param dfSchema      schema from source df to compare with the minimum required schema
    * @param minimumSchema Required minimum schema
-   * @param prefix if drilling into/through structs this will be set to track the depth map
+   * @param prefix        if drilling into/through structs this will be set to track the depth map
    * @return
    */
+  @deprecated("Deprecated: Use df.verifyMinimumSchema()")
   private def correctAndValidate(dfSchema: StructType, minimumSchema: StructType, prefix: String = null): Array[Column] = {
 
     logger.log(Level.DEBUG, s"Top Level DFSchema Fields: ${dfSchema.fieldNames.mkString(",")}")
@@ -750,10 +730,12 @@ object Schema extends SparkSessionWrapper {
 
   /**
    * Public facing function used to validate and correct a DF before the ETL stage.
-   * @param df DF to validate
+   *
+   * @param df     DF to validate
    * @param module Module for which the DF is the source
    * @return
    */
+  @deprecated("Deprecated: Use df.verifyMinimumSchema()")
   def verifyDF(df: DataFrame, module: Module): DataFrame = {
     val requiredSchema = requiredSchemas.get(module.moduleID)
     if (requiredSchema.nonEmpty) {

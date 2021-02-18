@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SchemaTools, SparkSessionWrapper}
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
@@ -14,6 +15,7 @@ object TransformFunctions extends SparkSessionWrapper {
   import spark.implicits._
 
   implicit class DataFrameTransforms(df: DataFrame) {
+    private val logger: Logger = Logger.getLogger(this.getClass)
 
     def dropDupColumnByAlias(dropAlias: String, columnNames: String*): DataFrame = {
       columnNames.foldLeft(df) {
@@ -100,6 +102,20 @@ object TransformFunctions extends SparkSessionWrapper {
       }.filter(col(controlColName).isNotNull)
         .drop(controlColName)
     }
+
+    def verifyMinimumSchema(minimumRequiredSchema: Option[StructType]): DataFrame = {
+
+      if (minimumRequiredSchema.nonEmpty) {
+        // validate field requirements for fields present in the dataframe
+        val validatedCols = SchemaTools.buildValidationRunner(df.schema, minimumRequiredSchema.get)
+          .map(SchemaTools.validateSchema(_))
+        df.select(validatedCols.map(_.column): _*)
+      } else {
+        logger.log(Level.WARN, s"No Schema Found for verification.")
+        df
+      }
+    }
+
   }
 
   /**

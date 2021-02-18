@@ -3,12 +3,11 @@ package com.databricks.labs.overwatch.utils
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
-
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.ScalaReflection
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StructField, StructType}
 
 case class DBDetail()
 
@@ -24,6 +23,12 @@ case class DataTarget(databaseName: Option[String], databaseLocation: Option[Str
 case class DatabricksContractPrices(interactiveDBUCostUSD: Double, automatedDBUCostUSD: Double)
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encryptedToken: Array[Byte], cipher: Cipher)
+
+case class ValidatedColumn(
+                            column: Column,
+                            fieldToValidate: Option[StructField] = None,
+                            requiredStructure: Option[StructField] = None
+                          )
 
 // Todo Add Description
 case class Module(moduleID: Int, moduleName: String)

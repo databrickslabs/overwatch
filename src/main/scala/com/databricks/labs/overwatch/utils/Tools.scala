@@ -356,6 +356,136 @@ object SchemaTools extends SparkSessionWrapper {
   def scrubSchema(df: DataFrame): DataFrame = {
     spark.createDataFrame(df.rdd, SchemaTools.sanitizeSchema(df.schema).asInstanceOf[StructType])
   }
+
+  private def getPrefixedString(prefix: Option[String], fieldName: String): String = {
+    if (prefix.isEmpty) fieldName else s"${prefix.get}.${fieldName}"
+  }
+
+  private def malformedTypeErrorMessage(f: StructField, req: StructField): String = {
+    val complexUnmatchedTypeErrorMsg = s"Required Schema Failure: Required Schema types do not match " +
+      s"and cannot be inferred for " +
+      s"column ${req.name}.\nRequired Type: ${req.dataType.typeName} but received: ${f.dataType.typeName}"
+    req.dataType match {
+      case _: StructType =>
+        complexUnmatchedTypeErrorMsg
+      case arType: ArrayType =>
+        if (f.dataType != req.dataType) complexUnmatchedTypeErrorMsg else {
+          s"Required Schema Failure: Required Type for ARRAY element ${f.name} is ${arType.elementType.typeName} " +
+            s"but received ${f.dataType.typeName}."
+        }
+      case _ => s"Required Schema Failure: Required Type for column: ${f.name} is ${req.dataType.typeName} " +
+        s"but received ${f.dataType.typeName}. Attempting to cast to required type"
+    }
+  }
+
+  private def malformedStructureHandler(f: StructField, req: StructField): Exception = {
+    val msg = malformedTypeErrorMessage(f, req)
+    println(msg)
+    logger.log(Level.ERROR, msg)
+    new Exception(msg)
+  }
+
+  def buildValidationRunner(
+                                     dfSchema: StructType,
+                                     minRequiredSchema: StructType,
+                                     cPrefix: Option[String] = None
+                                   ): Seq[ValidatedColumn] = {
+
+    val dfFieldsNames = dfSchema.fieldNames.map(_.toLowerCase)
+    val reqFieldsNames = minRequiredSchema.fieldNames.map(_.toLowerCase)
+    val missingRequiredFieldNames = reqFieldsNames.diff(dfFieldsNames)
+    val unconstrainedFieldNames = dfFieldsNames.diff(reqFieldsNames)
+    val fieldsNamesRequiringValidation = dfFieldsNames.intersect(reqFieldsNames)
+
+    // find missing required fields, add, type, and alias them
+    val missingFields = minRequiredSchema.filter(f => missingRequiredFieldNames.contains(f.name.toLowerCase))
+      .map(f => {
+        ValidatedColumn(lit(null).cast(f.dataType).alias(f.name))
+      })
+
+    // fields without requirements
+    val unconstrainedFields = dfSchema.filter(f => unconstrainedFieldNames.contains(f.name.toLowerCase))
+      .map(f => {
+        ValidatedColumn(col(getPrefixedString(cPrefix, f.name)))
+      })
+
+    // fields to validate
+    val fieldsToValidate = dfSchema.filter(f => fieldsNamesRequiringValidation.contains(f.name.toLowerCase))
+      .map(f => {
+        ValidatedColumn(
+          col(getPrefixedString(cPrefix, f.name)),
+          dfSchema.fields.find(_.name.toLowerCase == f.name.toLowerCase),
+          minRequiredSchema.fields.find(_.name.toLowerCase == f.name.toLowerCase)
+        )
+      })
+
+    missingFields ++ unconstrainedFields ++ fieldsToValidate
+
+  }
+
+  def validateSchema(validator: ValidatedColumn, cPrefix: Option[String] = None): ValidatedColumn = {
+
+    if (validator.requiredStructure.nonEmpty) { // is requirement on the field
+      val fieldStructure = validator.fieldToValidate.get
+      val requiredFieldStructure = validator.requiredStructure.get
+      val newPrefix = Some(getPrefixedString(cPrefix, fieldStructure.name))
+
+      fieldStructure.dataType match {
+        case dt: StructType => { // field is struct type
+          val dtStruct = dt.asInstanceOf[StructType]
+          if (!requiredFieldStructure.dataType.isInstanceOf[StructType]) // requirement is struct field
+            throw malformedStructureHandler(fieldStructure, requiredFieldStructure)
+
+          // When struct type matches identify requirements and recurse
+          val validatedChildren = buildValidationRunner(
+            dtStruct,
+            requiredFieldStructure.dataType.asInstanceOf[StructType],
+            newPrefix
+          )
+            .map(validateSchema(_, newPrefix)) // TODO -- check if recursive prefix is right
+
+          // build and return struct
+          validator.copy(column = struct(validatedChildren.map(_.column): _*))
+
+        }
+        case dt: ArrayType => { // field is ArrayType
+          val dtArray = dt.asInstanceOf[ArrayType]
+          // field is array BUT requirement is NOT array --> throw error
+          if (!requiredFieldStructure.dataType.isInstanceOf[ArrayType])
+            throw malformedStructureHandler(fieldStructure, requiredFieldStructure)
+
+          // array[complexType]
+          // if elementType is nested complex, recurse to validate and return array of validated children
+          dtArray.elementType match {
+            case eType: StructType =>
+              val validatedChildren = buildValidationRunner(
+                eType,requiredFieldStructure.dataType.asInstanceOf[StructType],newPrefix
+              ).map(validateSchema(_, newPrefix))
+              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)))
+
+            case eType =>
+              if (eType != requiredFieldStructure.dataType.asInstanceOf[ArrayType].elementType) { //element types don't match FAIL
+                throw malformedStructureHandler(fieldStructure, requiredFieldStructure)
+              } else { // element types match
+                validator.copy(column = col(getPrefixedString(cPrefix, fieldStructure.name)))
+              }
+          }
+        }
+        case c => { // field is base scalar
+          if (c != requiredFieldStructure.dataType) { // if not same type, try to cast column to the required type; fail if exception
+            logger.log(Level.WARN, malformedTypeErrorMessage(fieldStructure, requiredFieldStructure))
+            val mutatedColumnt = col(getPrefixedString(cPrefix, fieldStructure.name))
+              .cast(requiredFieldStructure.dataType).alias(fieldStructure.name)
+            validator.copy(column = mutatedColumnt)
+          } else { // colType is simple and passes requirements
+            validator.copy(column = col(getPrefixedString(cPrefix, fieldStructure.name)))
+          }
+        }
+      }
+    } else { // no validation required
+      validator
+    }
+  }
 }
 
 /**

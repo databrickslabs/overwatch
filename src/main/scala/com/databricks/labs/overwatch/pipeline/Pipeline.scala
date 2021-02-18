@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpers, Module, ModuleStatusReport, NoNewDataException, SchemaTools, SparkSessionWrapper, UnhandledException}
+import TransformFunctions._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
 import Schema.verifyDF
@@ -36,7 +37,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
       println(s"Beginning: ${module.moduleName}")
 
       println("Validating Input Schemas")
-      val verifiedSourceDF = verifyDF(sourceDF, module)
+      val verifiedSourceDF = sourceDF.verifyMinimumSchema(Schema.get(module))
+//        verifyDF(sourceDF, module)
 
       try {
         sourceDFparts = verifiedSourceDF.rdd.partitions.length
