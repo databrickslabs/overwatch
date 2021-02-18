@@ -18,6 +18,36 @@ object Schema extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  private val commonSchemas: Map[String, StructField] = Map(
+    "filenamegroup" -> StructField("filenameGroup",
+      StructType(Seq(
+        StructField("filename", StringType, nullable = true),
+        StructField("byCluster", StringType, nullable = true),
+        StructField("byDriverHost", StringType, nullable = true),
+        StructField("bySparkContext", StringType, nullable = true)
+      )), nullable = true),
+    "response" -> StructField("response",
+      StructType(Seq(
+        StructField("errorMessage", StringType, nullable = true),
+        StructField("result", StringType, nullable = true),
+        StructField("statusCode", LongType, nullable = true)
+      )), nullable = true),
+    "useridentity" -> StructField("userIdentity",
+      StructType(Seq(
+        StructField("email", StringType, nullable = true)
+      )), nullable = true)
+  )
+
+  private def common(name: String): StructField ={
+    commonSchemas(name.toLowerCase)
+  }
+
+//  Array(DiskBytesSpilled, ExecutorCPUTime, ExecutorDeserializeCPUTime,
+  //  ExecutorDeserializeTime, ExecutorRunTime, InputMetrics, JVMGCTime,
+  //  MemoryBytesSpilled, OutputMetrics, PeakExecutionMemory,
+  //  ResultSerializationTime, ResultSize, ShuffleReadMetrics,
+  //  ShuffleWriteMetrics, UpdatedBlocks)
+
   /**
    * Minimum required schema by module. "Minimum Requierd Schema" means that at least these columns of these types
    * must exist for the downstream ETLs to function.
@@ -25,7 +55,7 @@ object Schema extends SparkSessionWrapper {
    * Silver Layer modules 2xxx
    * Gold Layer 3xxx
    */
-  private val requiredSchemas: Map[Int, StructType] = Map(
+  private[overwatch] val minimumSchemasByModule: Map[Int, StructType] = Map(
     // SparkExecutors
     2003 -> StructType(Seq(
       StructField("Event", StringType, nullable = true),
@@ -38,30 +68,9 @@ object Schema extends SparkSessionWrapper {
       StructField("executorInfo",
         StructType(Seq(
           StructField("Host", StringType, nullable = true),
-          StructField("LogUrls",
-            StructType(Seq(
-              StructField("stderr", StringType, nullable = true),
-              StructField("stdout", StringType, nullable = true)
-            )), nullable = true),
-          StructField("Resources",
-            StructType(Seq(
-              StructField("gpu",
-                StructType(Seq(
-                  StructField("addresses", ArrayType(StringType), nullable = true),
-                  StructField("name", StringType, nullable = true)
-                )), nullable = true)
-            )), nullable = true),
           StructField("TotalCores", LongType, nullable = true)
         )), nullable = true),
-      StructField("filenameGroup",
-        StructType(Seq(
-          StructField("filename", StringType, nullable = true),
-          StructField("byCluster", StringType, nullable = true),
-          StructField("byDriverHost", StringType, nullable = true),
-          StructField("bySparkContext", StringType, nullable = true)
-        )), nullable = true),
-      StructField("fileCreateEpochMS", LongType, nullable = true),
-      StructField("fileCreateTS", TimestampType, nullable = true),
+      common("filenameGroup"),
       StructField("fileCreateDate", DateType, nullable = true)
     )),
     // SparkExecutions
@@ -77,13 +86,7 @@ object Schema extends SparkSessionWrapper {
       StructField("fileCreateEpochMS", LongType, nullable = true),
       StructField("fileCreateTS", TimestampType, nullable = true),
       StructField("fileCreateDate", DateType, nullable = true),
-      StructField("filenameGroup",
-        StructType(Seq(
-          StructField("filename", StringType, nullable = true),
-          StructField("byCluster", StringType, nullable = true),
-          StructField("byDriverHost", StringType, nullable = true),
-          StructField("bySparkContext", StringType, nullable = true)
-        )), nullable = true)
+      common("filenameGroup")
     )),
     // SparkJobs
     2006 -> StructType(Seq(
@@ -100,14 +103,7 @@ object Schema extends SparkSessionWrapper {
       StructField("fileCreateEpochMS", LongType, nullable = true),
       StructField("fileCreateTS", TimestampType, nullable = true),
       StructField("fileCreateDate", DateType, nullable = true),
-      StructField("filenameGroup",
-        StructType(Seq(
-          StructField("filename", StringType, nullable = true),
-          StructField("byCluster", StringType, nullable = true),
-          StructField("byDriverHost", StringType, nullable = true),
-          StructField("bySparkContext", StringType, nullable = true)
-        )), nullable = true),
-      StructField("actionName", StringType, nullable = true)
+      common("filenameGroup")
     )),
     // SparkStages
     2007 -> StructType(Seq(
@@ -115,14 +111,8 @@ object Schema extends SparkSessionWrapper {
       StructField("Event", StringType, nullable = true),
       StructField("clusterId", StringType, nullable = true),
       StructField("SparkContextID", StringType, nullable = true),
-      StructField("JobID", StringType, nullable = true),
-      StructField("JobResult", StringType, nullable = true),
-      StructField("CompletionTime", StringType, nullable = true),
       StructField("StageIDs", StringType, nullable = true),
       StructField("SubmissionTime", StringType, nullable = true),
-      StructField("Pipeline_SnapTS", TimestampType, nullable = true),
-      StructField("fileCreateEpochMS", LongType, nullable = true),
-      StructField("fileCreateTS", TimestampType, nullable = true),
       StructField("fileCreateDate", DateType, nullable = true),
       StructField("StageInfo",
         StructType(Seq(
@@ -135,14 +125,40 @@ object Schema extends SparkSessionWrapper {
           StructField("NumberofTasks", StringType, nullable = true),
           StructField("ParentIDs", StringType, nullable = true)
         )), nullable = true),
-      StructField("filenameGroup",
+      common("filenameGroup")
+    )),
+    // SparkTasks
+    2008 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
+      StructField("Event", StringType, nullable = true),
+      StructField("clusterId", StringType, nullable = true),
+      StructField("SparkContextID", StringType, nullable = true),
+      StructField("fileCreateDate", DateType, nullable = true),
+      StructField("StageID", LongType, nullable = true),
+      StructField("StageAttemptID", LongType, nullable = true),
+      StructField("TaskMetrics",
         StructType(Seq(
-          StructField("filename", StringType, nullable = true),
-          StructField("byCluster", StringType, nullable = true),
-          StructField("byDriverHost", StringType, nullable = true),
-          StructField("bySparkContext", StringType, nullable = true)
+          StructField("ExecutorCPUTime", LongType, nullable = true),
+          StructField("ExecutorRunTime", LongType, nullable = true),
+          StructField("MemoryBytesSpilled", LongType, nullable = true),
+          StructField("DiskBytesSpilled", LongType, nullable = true),
+          StructField("ResultSize", LongType, nullable = true)
         )), nullable = true),
-      StructField("actionName", StringType, nullable = true)
+      StructField("TaskType", StringType, nullable = true),
+      StructField("TaskEndReason", StructType(Seq(
+        StructField("__overwatchReserved", IntegerType, nullable = true)
+      )), nullable = true),
+      StructField("TaskInfo",
+        StructType(Seq(
+          StructField("TaskID", LongType, nullable = true),
+          StructField("Attempt", LongType, nullable = true),
+          StructField("Host", StringType, nullable = true),
+          StructField("LaunchTime", LongType, nullable = true),
+          StructField("ExecutorID", LongType, nullable = true),
+          StructField("FinishTime", LongType, nullable = true),
+          StructField("ParentIDs", StringType, nullable = true)
+        )), nullable = true),
+      common("filenameGroup")
     )),
     // JobStatus
     2010 -> StructType(Seq(
@@ -177,16 +193,8 @@ object Schema extends SparkSessionWrapper {
           StructField("grants", StringType, nullable = true),
           StructField("targetUserId", StringType, nullable = true)
         )), nullable = true),
-      StructField("response",
-        StructType(Seq(
-          StructField("errorMessage", StringType, nullable = true),
-          StructField("result", StringType, nullable = true),
-          StructField("statusCode", LongType, nullable = true)
-        )), nullable = true),
-      StructField("userIdentity",
-        StructType(Seq(
-          StructField("email", StringType, nullable = true)
-        )), nullable = true)
+      common("response"),
+      common("useridentity")
     )),
     // JobRuns
     2011 -> StructType(Seq(
@@ -228,16 +236,8 @@ object Schema extends SparkSessionWrapper {
           StructField("spark_jar_task", StringType, nullable = true),
           StructField("shell_command_task", StringType, nullable = true)
         )), nullable = true),
-      StructField("response",
-        StructType(Seq(
-          StructField("errorMessage", StringType, nullable = true),
-          StructField("result", StringType, nullable = true),
-          StructField("statusCode", LongType, nullable = true)
-        )), nullable = true),
-      StructField("userIdentity",
-        StructType(Seq(
-          StructField("email", StringType, nullable = true)
-        )), nullable = true)
+      common("response"),
+      common("useridentity")
     )),
     // ClusterSpec
     2014 -> StructType(Seq(
@@ -282,16 +282,8 @@ object Schema extends SparkSessionWrapper {
           StructField("ssh_public_keys", StringType, nullable = true),
           StructField("single_user_name", StringType, nullable = true)
         )), nullable = true),
-      StructField("userIdentity",
-        StructType(Seq(
-          StructField("email", StringType, nullable = true)
-        )), nullable = true),
-      StructField("response",
-        StructType(Seq(
-          StructField("errorMessage", StringType, nullable = true),
-          StructField("result", StringType, nullable = true),
-          StructField("statusCode", LongType, nullable = true)
-        )), nullable = true)
+      common("response"),
+      common("useridentity")
     )),
     // User Account Login
     2016 -> StructType(Seq(
@@ -304,12 +296,6 @@ object Schema extends SparkSessionWrapper {
       StructField("userAgent", StringType, nullable = true),
       StructField("requestId", StringType, nullable = true),
       StructField("sessionId", StringType, nullable = true),
-      StructField("response",
-        StructType(Seq(
-          StructField("errorMessage", StringType, nullable = true),
-          StructField("result", StringType, nullable = true),
-          StructField("statusCode", LongType, nullable = true)
-        )), nullable = true),
       StructField("requestParams",
         StructType(Seq(
           StructField("instanceId", StringType, nullable = true),
@@ -322,10 +308,8 @@ object Schema extends SparkSessionWrapper {
           StructField("userID", StringType, nullable = true),
           StructField("email", StringType, nullable = true)
         )), nullable = true),
-      StructField("userIdentity",
-        StructType(Seq(
-          StructField("email", StringType, nullable = true)
-        )), nullable = true)
+      common("response"),
+      common("useridentity")
     )),
     // User Account Mods
     2017 -> StructType(Seq(
@@ -338,12 +322,6 @@ object Schema extends SparkSessionWrapper {
       StructField("userAgent", StringType, nullable = true),
       StructField("requestId", StringType, nullable = true),
       StructField("sessionId", StringType, nullable = true),
-      StructField("response",
-        StructType(Seq(
-          StructField("errorMessage", StringType, nullable = true),
-          StructField("result", StringType, nullable = true),
-          StructField("statusCode", LongType, nullable = true)
-        )), nullable = true),
       StructField("requestParams",
         StructType(Seq(
           StructField("endpoint", StringType, nullable = true),
@@ -352,10 +330,8 @@ object Schema extends SparkSessionWrapper {
           StructField("targetGroupName", StringType, nullable = true),
           StructField("targetGroupId", StringType, nullable = true)
         )), nullable = true),
-      StructField("userIdentity",
-        StructType(Seq(
-          StructField("email", StringType, nullable = true)
-        )), nullable = true)
+      common("response"),
+      common("useridentity")
     )),
     // Notebook Summary
     2018 -> StructType(Seq(
@@ -379,17 +355,10 @@ object Schema extends SparkSessionWrapper {
           StructField("parentPath", StringType, nullable = true),
           StructField("clusterId", StringType, nullable = true)
         )), nullable = true),
-      StructField("response",
-        StructType(Seq(
-          StructField("errorMessage", StringType, nullable = true),
-          StructField("result", StringType, nullable = true),
-          StructField("statusCode", LongType, nullable = true)
-        )), nullable = true),
-      StructField("userIdentity",
-        StructType(Seq(
-          StructField("email", StringType, nullable = true)
-        )), nullable = true)
+        common("response"),
+      common("useridentity")
     )),
+    // clusterStateFact
     3005 -> StructType(Seq(
       StructField("organization_id", StringType, nullable = false),
       StructField("cluster_id", StringType, nullable = true),
@@ -650,9 +619,9 @@ object Schema extends SparkSessionWrapper {
     ))
   )
 
-  def get(module: Module): Option[StructType] = requiredSchemas.get(module.moduleID)
+  def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleID)
 
-  def get(moduleId: Int): Option[StructType] = requiredSchemas.get(moduleId)
+  def get(moduleId: Int): Option[StructType] = minimumSchemasByModule.get(moduleId)
 
   // TODO -- move this to schemaTools -- probably
   /**
@@ -737,7 +706,7 @@ object Schema extends SparkSessionWrapper {
    */
   @deprecated("Deprecated: Use df.verifyMinimumSchema()")
   def verifyDF(df: DataFrame, module: Module): DataFrame = {
-    val requiredSchema = requiredSchemas.get(module.moduleID)
+    val requiredSchema = minimumSchemasByModule.get(module.moduleID)
     if (requiredSchema.nonEmpty) {
       df.select(
         correctAndValidate(df.schema, requiredSchema.get): _*

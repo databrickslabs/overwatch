@@ -37,7 +37,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       println(s"Beginning: ${module.moduleName}")
 
       println("Validating Input Schemas")
-      val verifiedSourceDF = sourceDF.verifyMinimumSchema(Schema.get(module))
+      val verifiedSourceDF = sourceDF.verifyMinimumSchema(Schema.get(module), config.debugFlag)
 //        verifyDF(sourceDF, module)
 
       try {

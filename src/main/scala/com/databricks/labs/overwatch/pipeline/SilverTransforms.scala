@@ -99,6 +99,13 @@ trait SilverTransforms extends SparkSessionWrapper {
     }
   }
 
+  // Additional events for future research
+  // 'Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLAdaptiveSQLMetricUpdates"
+  //    --> select sqlPlanMetrics, ExecutionID
+  // 'Event === "SparkListenerEnvironmentUpdate"
+  //    --> select JVMInformation
+  // 'Event.isin("SparkListenerBlockManagerAdded", "SparkListenerBlockManagerRemoved")
+  //    --> select BlockManagerID, MaximumMemory, MaximumOnheapMemory, Timestamp
 
   //  protected def getJDBCSession(sessionStartDF: DataFrame, sessionEndDF: DataFrame): DataFrame = {
   //    sessionStartDF
@@ -265,21 +272,34 @@ trait SilverTransforms extends SparkSessionWrapper {
   // TODO -- Add in Specualtive Tasks Event == org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted
   protected def simplifyTaskStart(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerTaskStart")
-      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
+      .select(
+        // keys
+        'organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
         'StageID, 'StageAttemptID, $"TaskInfo.TaskID", $"TaskInfo.ExecutorID",
         $"TaskInfo.Attempt".alias("TaskAttempt"),
-        $"TaskInfo.Host", $"TaskInfo.LaunchTime", 'TaskInfo.alias("TaskStartInfo"),
+        $"TaskInfo.Host", $"TaskInfo.LaunchTime",
+        // mesasures
+        'TaskInfo.alias("TaskStartInfo"),
         'filenameGroup.alias("startFilenameGroup")
       )
   }
 
   protected def simplifyTaskEnd(df: DataFrame): DataFrame = {
     df.filter('Event === "SparkListenerTaskEnd")
-      .select('organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
+      .select(
+        // keys
+        'organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
         'StageID, 'StageAttemptID, 'TaskEndReason, $"TaskInfo.TaskID", $"TaskInfo.ExecutorID",
         $"TaskInfo.Attempt".alias("TaskAttempt"),
-        $"TaskInfo.Host", $"TaskInfo.FinishTime", 'TaskInfo.alias("TaskEndInfo"),
-        'TaskMetrics, 'TaskType, 'filenameGroup.alias("endFilenameGroup")
+        $"TaskInfo.Host",
+        // measures
+        $"TaskInfo.FinishTime",
+        'TaskInfo.alias("TaskEndInfo"),
+        'TaskMetrics,
+        'TaskType,
+        'TaskEndReason,
+        'TaskExecutorMetrics,
+        'filenameGroup.alias("endFilenameGroup")
       )
   }
 

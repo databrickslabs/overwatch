@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SchemaTools, SparkSessionWrapper, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
@@ -103,16 +103,32 @@ object TransformFunctions extends SparkSessionWrapper {
         .drop(controlColName)
     }
 
-    def verifyMinimumSchema(minimumRequiredSchema: Option[StructType]): DataFrame = {
+    def verifyMinimumSchema(minimumRequiredSchema: StructType, isDebug: Boolean = false): DataFrame = {
+      verifyMinimumSchema(Some(minimumRequiredSchema), isDebug)
+    }
+    def verifyMinimumSchema(minimumRequiredSchema: Option[StructType], isDebug: Boolean): DataFrame = {
 
       if (minimumRequiredSchema.nonEmpty) {
         // validate field requirements for fields present in the dataframe
-        val validatedCols = SchemaTools.buildValidationRunner(df.schema, minimumRequiredSchema.get)
+        val validatedCols = SchemaTools.buildValidationRunner(df.schema, minimumRequiredSchema.get, isDebug)
           .map(SchemaTools.validateSchema(_))
         df.select(validatedCols.map(_.column): _*)
       } else {
         logger.log(Level.WARN, s"No Schema Found for verification.")
         df
+      }
+    }
+
+    // Function used to view schema validation and returned columns
+    def reviewSchemaValidations(minimumRequiredSchema: Option[StructType]): Seq[ValidatedColumn] = {
+
+      if (minimumRequiredSchema.nonEmpty) {
+        // validate field requirements for fields present in the dataframe
+        SchemaTools.buildValidationRunner(df.schema, minimumRequiredSchema.get, isDebug = true)
+          .map(SchemaTools.validateSchema(_, isDebug = true))
+      } else {
+        logger.log(Level.ERROR, s"No Schema Found for verification.")
+        df.schema.fields.map(f => ValidatedColumn(col(f.name), Some(f)))
       }
     }
 
