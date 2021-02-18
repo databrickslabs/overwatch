@@ -277,7 +277,8 @@ object Schema extends SparkSessionWrapper {
           StructField("spark_version", StringType, nullable = true),
           StructField("cluster_creator", StringType, nullable = true),
           StructField("idempotency_token", StringType, nullable = true),
-          //          StructField("organization_id", StringType, nullable = true),
+          StructField("organization_id", NullType, nullable = true),
+          StructField("orgId", NullType, nullable = true),
           StructField("user_id", StringType, nullable = true),
           StructField("ssh_public_keys", StringType, nullable = true),
           StructField("single_user_name", StringType, nullable = true)

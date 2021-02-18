@@ -357,48 +357,93 @@ object SchemaTools extends SparkSessionWrapper {
     spark.createDataFrame(df.rdd, SchemaTools.sanitizeSchema(df.schema).asInstanceOf[StructType])
   }
 
+  /**
+   * The next several set of functions are used to clean a schema with a minimum required set of fields as the guide.
+   * Rules will be documented later but this section will likely benefit from a refactor to a more complex object
+   */
+    // TODO -- Review viability of similifying all schema functions within the SchemaHelpers object
+    //  during next refactor
+
+
   private def getPrefixedString(prefix: Option[String], fieldName: String): String = {
     if (prefix.isEmpty) fieldName else s"${prefix.get}.${fieldName}"
   }
 
-  private def malformedTypeErrorMessage(f: StructField, req: StructField, prefix: Option[String]): String = {
+  private def isComplexDataType(dataType: DataType): Boolean = {
+    dataType.isInstanceOf[ArrayType] || dataType.isInstanceOf[StructType] || dataType.isInstanceOf[MapType]
+  }
+
+  private def emitExclusionWarning(f: StructField, isDebug: Boolean, prefix: Option[String]): Unit = {
     val fullColName = getPrefixedString(prefix, f.name)
-    val fullReqName = getPrefixedString(prefix, req.name)
-    val complexUnmatchedTypeErrorMsg = s"SCHEMA ERROR: Required Schema Failure: Required Schema types do not match " +
-      s"and cannot be inferred for " +
-      s"column ${fullReqName}.\nRequired Type: ${req.dataType.typeName} but received: ${f.dataType.typeName}"
-    req.dataType match {
-      case _: StructType =>
-        complexUnmatchedTypeErrorMsg
-      case arType: ArrayType =>
-        // Don't cast to array --> FAIL
-        if (!req.dataType.isInstanceOf[ArrayType]) complexUnmatchedTypeErrorMsg else { // Element Type not matched --> Fail
-          s"SCHEMA ERROR: Required Schema Failure: Required Type for ARRAY element ${fullColName} is ${arType.elementType.typeName} " +
-            s"but received ${f.dataType.typeName}."
-        }
-      case _ =>
-        val scalarCastMessage = s"SCHEMA WARNING: Required Schema Failure: Required Type for column: " +
-          s"${fullColName} is ${req.dataType.typeName} but received ${f.dataType.typeName}. " +
-          s"Attempting to cast to required type but may result in unexpected nulls"
-        println(scalarCastMessage)
-        scalarCastMessage
+
+    val msg = s"SCHEMA WARNING: COLUMN STRIPPED from source --> Column $fullColName is required to be absent from " +
+      s"source as it's type has been identified as a NullType"
+    if (isDebug) println(msg)
+    logger.log(Level.WARN, msg)
+  }
+
+  private def malformedSchemaErrorMessage(f: StructField, req: StructField, prefix: Option[String]): String = {
+    val fullColName = getPrefixedString(prefix, f.name)
+    val requiredTypeName = req.dataType.typeName
+    val fieldTypeName = f.dataType.typeName
+
+    val oneComplexOneNot = (isComplexDataType(req.dataType) && !isComplexDataType(f.dataType)) ||
+        (!isComplexDataType(req.dataType) && isComplexDataType(f.dataType))
+
+    val bothComplex = isComplexDataType(req.dataType) || isComplexDataType(f.dataType)
+
+    val neitherComplex = !isComplexDataType(req.dataType) && !isComplexDataType(f.dataType)
+
+    val genericSchemaErrorMsg = s"SCHEMA ERROR: Received type $fieldTypeName for $fullColName BUT required type " +
+      s"is $requiredTypeName"
+    val unsupportedComplexCastingMsg = s"SCHEMA ERROR: Required Schema for column $fullColName is $requiredTypeName " +
+      s"but input type was $fieldTypeName. Implicit casting between / to / from complex types not supported."
+
+    // if one field is complex and the other is not, fail
+    //noinspection TypeCheckCanBeMatch
+    if (oneComplexOneNot) unsupportedComplexCastingMsg
+    else if (req.dataType.isInstanceOf[ArrayType] && requiredTypeName == fieldTypeName) {
+      // Both Array but Element Type not Equal
+      val reqElementTypeName = req.dataType.asInstanceOf[ArrayType].elementType.typeName
+      val fieldElementTypeName = f.dataType.asInstanceOf[ArrayType].elementType.typeName
+      if (reqElementTypeName != fieldElementTypeName) {
+        s"SCHEMA ERROR: Array element types incompatible: Received array<$fieldElementTypeName> when " +
+          s"array<$reqElementTypeName> is required for column $fullColName. Implicit casting of Array " +
+          s"element types is not supported."
+      } else unsupportedComplexCastingMsg // cannot cast array types
+    }
+    else if (bothComplex && req.dataType != f.dataType) unsupportedComplexCastingMsg // complex type casting not supported
+    else if (neitherComplex) { // both simple types -- will attempt to cast
+      val scalarCastMessage = s"SCHEMA WARNING: IMPLICIT CAST: Required Type for column: " +
+        s"$fullColName is $requiredTypeName but received $fieldTypeName. " +
+        s"Attempting to cast to required type but may result in unexpected nulls or loss of precision"
+      println(scalarCastMessage)
+      scalarCastMessage
+    } else genericSchemaErrorMsg
+  }
+
+  private def checkNullable(missingField: StructField, prefix: Option[String], isDebug: Boolean): Unit = {
+    val fullColName = getPrefixedString(prefix, missingField.name)
+
+    if (missingField.nullable) { // if nulls allowed
+      val msg = s"SCHEMA WARNING: Input DF missing required field $fullColName of type " +
+        s"${missingField.dataType.typeName}. There's either an error or relevant data doesn't exist in " +
+        s"your environment and/or was not acquired during the current run."
+      if (isDebug) println(msg)
+      logger.log(Level.WARN, msg)
+    } else { // FAIL --> trying to null non-nullable field
+      val msg = s"SCHEMA ERROR: Required Field $fullColName is NON-NULLABLE but nulls were received. Failing module"
+      if (isDebug) println(msg)
+      logger.log(Level.ERROR, msg)
+      throw new BadSchemaException(msg)
     }
   }
 
-  private def emitNullWarning(missingField: StructField, prefix: Option[String], isDebug: Boolean): Unit = {
-    val msg = s"SCHEMA WARNING: Input DF missing required field ${missingField.name} of type " +
-      s"${missingField.dataType.typeName}. If relevant data doesn't exist in your environment and/or was not " +
-      s"acquired during the current run."
-    if (isDebug) println(msg)
-    logger.log(Level.WARN, msg)
-
-  }
-
   private def malformedStructureHandler(f: StructField, req: StructField, prefix: Option[String]): Exception = {
-    val msg = malformedTypeErrorMessage(f, req, prefix)
+    val msg = malformedSchemaErrorMessage(f, req, prefix)
     println(msg)
     logger.log(Level.ERROR, msg)
-    new Exception(msg)
+    new BadSchemaException(msg)
   }
 
   def buildValidationRunner(
@@ -408,20 +453,27 @@ object SchemaTools extends SparkSessionWrapper {
                                      cPrefix: Option[String] = None
                                    ): Seq[ValidatedColumn] = {
 
+    // Some fields are force excluded from the complex types due to duplicates or issues in underlying
+    // data sources
+    val exclusionsFields = minRequiredSchema.fields.filter(f => f.dataType.isInstanceOf[NullType])
+    val exclusions = exclusionsFields.map(_.name.toLowerCase)
+    exclusionsFields.foreach(emitExclusionWarning(_, isDebug, cPrefix))
+
     val dfFieldsNames = dfSchema.fieldNames.map(_.toLowerCase)
     val reqFieldsNames = minRequiredSchema.fieldNames.map(_.toLowerCase)
-    val missingRequiredFieldNames = reqFieldsNames.diff(dfFieldsNames)
-    val unconstrainedFieldNames = dfFieldsNames.diff(reqFieldsNames)
-    val fieldsNamesRequiringValidation = dfFieldsNames.intersect(reqFieldsNames)
+    val missingRequiredFieldNames = reqFieldsNames.diff(dfFieldsNames).diff(exclusions)
+    val unconstrainedFieldNames = dfFieldsNames.diff(reqFieldsNames).diff(exclusions)
+    val fieldsNamesRequiringValidation = dfFieldsNames.intersect(reqFieldsNames).diff(exclusions)
 
     // find missing required fields, add, type, and alias them
-    val missingFields = minRequiredSchema.filter(f => missingRequiredFieldNames.contains(f.name.toLowerCase))
-      .map(missingReqField => {
-        emitNullWarning(missingReqField, cPrefix, isDebug)
-        ValidatedColumn(lit(null).cast(missingReqField.dataType).alias(missingReqField.name))
+    val missingFields = minRequiredSchema.filter(child => missingRequiredFieldNames.contains(child.name.toLowerCase))
+      .map(missingChild => {
+        checkNullable(missingChild, cPrefix, isDebug)
+        ValidatedColumn(lit(null).cast(missingChild.dataType).alias(missingChild.name))
       })
 
     // fields without requirements
+    // test field and recurse at lower layer
     val unconstrainedFields = dfSchema.filter(f => unconstrainedFieldNames.contains(f.name.toLowerCase))
       .map(f => {
         ValidatedColumn(col(getPrefixedString(cPrefix, f.name)))
@@ -455,7 +507,7 @@ object SchemaTools extends SparkSessionWrapper {
       fieldStructure.dataType match {
         case dt: StructType => { // field is struct type
           val dtStruct = dt.asInstanceOf[StructType]
-          if (!requiredFieldStructure.dataType.isInstanceOf[StructType]) // requirement is struct field
+          if (!requiredFieldStructure.dataType.isInstanceOf[StructType]) // requirement is not struct field
             throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
 
           // When struct type matches identify requirements and recurse
@@ -499,9 +551,15 @@ object SchemaTools extends SparkSessionWrapper {
               }
           }
         }
-        case c => { // field is base scalar
-          if (c != requiredFieldStructure.dataType) { // if not same type, try to cast column to the required type; fail if exception
-            logger.log(Level.WARN, malformedTypeErrorMessage(fieldStructure, requiredFieldStructure, cPrefix))
+        // TODO -- add support for MapType
+        case scalarField => { // field is base scalar
+          if (isComplexDataType(requiredFieldStructure.dataType)) { // FAIL -- Scalar to Complex not supported
+            throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
+          }
+          if (scalarField != requiredFieldStructure.dataType) { // if not same type, try to cast column to the required type;
+            val warnMsg = malformedSchemaErrorMessage(fieldStructure, requiredFieldStructure, cPrefix)
+            logger.log(Level.WARN, warnMsg)
+            if (isDebug) println(warnMsg)
             val mutatedColumnt = col(getPrefixedString(cPrefix, fieldStructure.name))
               .cast(requiredFieldStructure.dataType).alias(fieldStructure.name)
             validator.copy(column = mutatedColumnt)

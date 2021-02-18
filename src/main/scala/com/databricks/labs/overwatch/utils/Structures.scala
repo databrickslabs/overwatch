@@ -145,6 +145,8 @@ private[overwatch] class FailedModuleException(s: String) extends Exception(s) {
 
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
 
+private[overwatch] class BadSchemaException(s: String) extends Exception(s) {}
+
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =
     org.apache.spark.sql.Encoders.kryo[Array[OverwatchScope.Value]]
