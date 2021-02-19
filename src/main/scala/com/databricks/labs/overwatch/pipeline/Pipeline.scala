@@ -5,7 +5,6 @@ import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpe
 import TransformFunctions._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
-import Schema.verifyDF
 import org.apache.spark.sql.functions.col
 
 import java.io.{PrintWriter, StringWriter}
@@ -35,10 +34,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     def process(): Unit = {
       println(s"Beginning: ${module.moduleName}")
-
       println("Validating Input Schemas")
-      val verifiedSourceDF = sourceDF.verifyMinimumSchema(Schema.get(module), config.debugFlag)
-//        verifyDF(sourceDF, module)
+
+        val verifiedSourceDF = sourceDF
+          .verifyMinimumSchema(Schema.get(module), enforceNonNullCols = true, config.debugFlag)
 
       try {
         sourceDFparts = verifiedSourceDF.rdd.partitions.length
@@ -154,11 +153,11 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   }
 
-  // TODO -- refactor the module status report process
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): Unit = {
     val startTime = System.currentTimeMillis()
 
     try {
+      // TODO -- move this to the exception handler for EmptyModule
       if (df.schema.fieldNames.contains("__OVERWATCHEMPTY") || df.rdd.take(1).isEmpty) {
         val emptyStatusReport = ModuleStatusReport(
           organization_id = config.organizationId,
@@ -277,25 +276,15 @@ class Pipeline(_workspace: Workspace, _database: Database,
       finalizeModule(moduleStatusReport)
     } catch {
       case e: NoNewDataException =>
-        val msg = s"ALERT: No New Data Retrieved for Module ${
-          module.moduleID
-        }! Skipping"
+        val msg = s"ALERT: No New Data Retrieved for Module ${module.moduleID}! Skipping"
         println(msg)
         logger.log(Level.WARN, msg, e)
       case e: Throwable =>
-        val msg = s"${
-          module.moduleName
-        } FAILED -->\nMessage: ${
-          e.getMessage
-        }\nCause:${
-          e.getCause
-        }"
+        val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
         logger.log(Level.ERROR, msg, e)
         // TODO -- handle rollback
         // TODO -- Capture e message in failReport
-        val rollbackMsg = s"ROLLBACK: Attempting Roll back ${
-          module.moduleName
-        }."
+        val rollbackMsg = s"ROLLBACK: Attempting Roll back ${module.moduleName}."
         println(rollbackMsg)
         println(msg, e)
         logger.log(Level.WARN, rollbackMsg)
@@ -303,18 +292,13 @@ class Pipeline(_workspace: Workspace, _database: Database,
           database.rollbackTarget(target)
         } catch {
           case eSub: Throwable => {
-            val rollbackFailedMsg = s"ROLLBACK FAILED: ${
-              module.moduleName
-            } -->\nMessage: ${
-              eSub.getMessage
-            }\nCause:" +
-              s" ${
-                eSub.getCause
-              }"
+            val rollbackFailedMsg = s"ROLLBACK FAILED: ${module.moduleName} -->\nMessage: ${eSub.getMessage}\nCause:" +
+              s"${eSub.getCause}"
             println(rollbackFailedMsg, eSub)
             logger.log(Level.ERROR, rollbackFailedMsg, eSub)
           }
         }
+        // TODO -- move this to FailedModule exception handler
         val failedModuleReport = failModule(module, target, "FAILED", msg)
         finalizeModule(failedModuleReport)
         throw new FailedModuleException(s"MODULE FAILED: ${

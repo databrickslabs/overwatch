@@ -2,11 +2,10 @@ package com.databricks.labs.overwatch.pipeline
 
 import java.io.StringWriter
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, IncrementalFilter, Module, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, IncrementalFilter, Module, ModuleStatusReport, NoNewDataException, OverwatchScope, SparkSessionWrapper}
 import org.apache.spark.sql.functions._
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.expressions.Window
+import TransformFunctions._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -157,7 +156,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobStatusModule = Module(2010, "Silver_JobsStatus")
   lazy private val appendJobStatusProcess = EtlDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, auditLogsIncrementalCols: _*),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, auditLogsIncrementalCols),
     Some(Seq(dbJobsStatusSummary())),
     append(SilverTargets.dbJobsStatusTarget),
     jobStatusModule
@@ -165,10 +164,10 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobRunsModule = Module(2011, "Silver_JobsRuns")
   lazy private val appendJobRunsProcess = EtlDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, 2, auditLogsIncrementalCols: _*),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, auditLogsIncrementalCols, 2),
     Some(Seq(
       dbJobRunsSummary(
-        Schema.verifyDF(BronzeTargets.auditLogsTarget.asDF, jobRunsModule),
+        BronzeTargets.auditLogsTarget.withMinimumSchemaEnforcement.asDF,
         SilverTargets.clustersSpecTarget,
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
@@ -183,7 +182,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val clusterSpecModule = Module(2014, "Silver_ClusterSpec")
   lazy private val appendClusterSpecProcess = EtlDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, auditLogsIncrementalCols: _*),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, auditLogsIncrementalCols),
     Some(Seq(
       buildClusterSpec(
         BronzeTargets.clustersSnapshotTarget,
@@ -195,7 +194,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val accountLoginsModule = Module(2016, "Silver_AccountLogins")
   lazy private val appendAccountLoginsProcess = EtlDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(accountLoginsModule, auditLogsIncrementalCols: _*),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(accountLoginsModule, auditLogsIncrementalCols),
     Some(Seq(accountLogins())),
     append(SilverTargets.accountLoginTarget),
     accountLoginsModule
@@ -203,7 +202,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val modifiedAccountsModule = Module(2017, "Silver_ModifiedAccounts")
   lazy private val appendModifiedAccountsProcess = EtlDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(modifiedAccountsModule, auditLogsIncrementalCols: _*),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(modifiedAccountsModule, auditLogsIncrementalCols),
     Some(Seq(accountMods())),
     append(SilverTargets.accountModTarget),
     modifiedAccountsModule
@@ -211,7 +210,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val notebookSummaryModule = Module(2018, "Silver_Notebooks")
   lazy private val appendNotebookSummaryProcess = EtlDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(notebookSummaryModule, auditLogsIncrementalCols: _*),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(notebookSummaryModule, auditLogsIncrementalCols),
     Some(Seq(notebookSummary())),
     append(SilverTargets.notebookStatusTarget),
     notebookSummaryModule
@@ -276,10 +275,20 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
     if (scope.contains(OverwatchScope.sparkEvents))
       try {
-        processSparkEvents()
+        if (BronzeTargets.sparkEventLogsTarget.exists) processSparkEvents()
+        else {
+          val msg = s"The source data for sparkEvents module does not exist or is inaccessible. " +
+            s"Please ensure cluster logging is enabled " +
+            s"on at least a few clusters and you have appropriate access to the log path prefixes. Otherwise " +
+            s"please disable the sparkEvents module."
+          throw new NoNewDataException(msg)
+        }
       } catch {
         case e: FailedModuleException =>
           logger.log(Level.ERROR, "FAILED: SparkEvents Silver Module", e)
+        case e: NoNewDataException =>
+          logger.log(Level.ERROR, e)
+          if (config.debugFlag) println(e.getMessage)
       }
 
     initiatePostProcessing()

@@ -349,6 +349,7 @@ object SchemaTools extends SparkSessionWrapper {
    * Main function for cleaning a schema. The point is to remove special characters and duplicates all the way down
    * into the Arrays / Structs.
    * TODO -- Add support for map type recursion cleansing
+   * TODO -- convert to same pattern as schema validation function
    *
    * @param df Input dataframe to be cleansed
    * @return
@@ -449,6 +450,7 @@ object SchemaTools extends SparkSessionWrapper {
   def buildValidationRunner(
                                      dfSchema: StructType,
                                      minRequiredSchema: StructType,
+                                     enforceNonNullCols: Boolean = true,
                                      isDebug: Boolean = false,
                                      cPrefix: Option[String] = None
                                    ): Seq[ValidatedColumn] = {
@@ -468,7 +470,7 @@ object SchemaTools extends SparkSessionWrapper {
     // find missing required fields, add, type, and alias them
     val missingFields = minRequiredSchema.filter(child => missingRequiredFieldNames.contains(child.name.toLowerCase))
       .map(missingChild => {
-        checkNullable(missingChild, cPrefix, isDebug)
+        if (enforceNonNullCols) checkNullable(missingChild, cPrefix, isDebug)
         ValidatedColumn(lit(null).cast(missingChild.dataType).alias(missingChild.name))
       })
 
@@ -496,6 +498,7 @@ object SchemaTools extends SparkSessionWrapper {
   def validateSchema(
                       validator: ValidatedColumn,
                       cPrefix: Option[String] = None,
+                      enforceNonNullCols: Boolean = true,
                       isDebug: Boolean = false
                     ): ValidatedColumn = {
 
@@ -514,6 +517,7 @@ object SchemaTools extends SparkSessionWrapper {
           val validatedChildren = buildValidationRunner(
             dtStruct,
             requiredFieldStructure.dataType.asInstanceOf[StructType],
+            enforceNonNullCols,
             isDebug,
             newPrefix
           )
@@ -536,6 +540,7 @@ object SchemaTools extends SparkSessionWrapper {
               val validatedChildren = buildValidationRunner(
                 eType,
                 requiredFieldStructure.dataType.asInstanceOf[StructType],
+                enforceNonNullCols,
                 isDebug,
                 newPrefix
               ).map(validateSchema(_, newPrefix))

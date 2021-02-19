@@ -682,7 +682,16 @@ trait SilverTransforms extends SparkSessionWrapper {
     // TODO -- limit the lookback period to about 7 days -- no job should run for more than 7 days except
     //  streaming jobs. This is only needed to improve performance if needed.
     val repartitionCount = spark.conf.get("spark.sql.shuffle.partitions").toInt * 2
+
+    val rawAuditExclusions = StructType(Seq(
+      StructField("requestParams", StructType(Seq(
+        StructField("organization_id", NullType, nullable = true),
+        StructField("orgId", NullType, nullable = true)
+      )), nullable = true)
+    ))
+
     val jobsAuditComplete = completeAuditTable
+      .verifyMinimumSchema(rawAuditExclusions) // remove interference from source
       .filter('serviceName === "jobs")
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .repartition(repartitionCount)

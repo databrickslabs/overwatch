@@ -481,7 +481,6 @@ trait GoldTransforms extends SparkSessionWrapper {
     val notebookW = Window.partitionBy('SparkContextID, $"PowerProperties.NotebookID")
       .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
-
     val cloudSpecificUserImputations = if (cloudProvider == "azure") {
       df.withColumn("user_email", $"PowerProperties.UserEmail")
         .withColumn("user_email",

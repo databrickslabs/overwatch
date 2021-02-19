@@ -37,7 +37,8 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Array("organization_id", "date"),
       statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "),
-      dataFrequency = Frequency.daily
+      dataFrequency = Frequency.daily,
+      masterSchema = Some(Schema.auditMasterSchema)
     )
 
     lazy private[overwatch] val auditLogAzureLandRaw: PipelineTable = PipelineTable(
@@ -60,7 +61,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
-      keys = Array("organization_id", "Event"),
+      keys = Array("organization_id", "Event"), // really aren't any global valid keys for this table
       config,
       incrementalColumns = Array("fileCreateEpochMS"),
       partitionBy = Array("organization_id", "Event", "fileCreateDate"),
@@ -68,7 +69,8 @@ abstract class PipelineTargets(config: Config) {
         "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename," +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "),
       sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000"),
-      autoOptimize = true // TODO -- perftest
+      autoOptimize = true, // TODO -- perftest
+      masterSchema = Some(Schema.sparkEventsRawMasterSchema)
     )
 
     lazy private[overwatch] val processedEventLogs: PipelineTable = PipelineTable(

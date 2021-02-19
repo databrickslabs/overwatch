@@ -103,15 +103,24 @@ object TransformFunctions extends SparkSessionWrapper {
         .drop(controlColName)
     }
 
-    def verifyMinimumSchema(minimumRequiredSchema: StructType, isDebug: Boolean = false): DataFrame = {
-      verifyMinimumSchema(Some(minimumRequiredSchema), isDebug)
+    def verifyMinimumSchema(
+                             minimumRequiredSchema: StructType,
+                             enforceNonNullCols: Boolean = true,
+                             isDebug: Boolean = false
+                           ): DataFrame = {
+      verifyMinimumSchema(Some(minimumRequiredSchema), enforceNonNullCols, isDebug)
     }
-    def verifyMinimumSchema(minimumRequiredSchema: Option[StructType], isDebug: Boolean): DataFrame = {
+    def verifyMinimumSchema(
+                             minimumRequiredSchema: Option[StructType],
+                             enforceNonNullCols: Boolean,
+                             isDebug: Boolean
+                           ): DataFrame = {
 
       if (minimumRequiredSchema.nonEmpty) {
         // validate field requirements for fields present in the dataframe
-        val validatedCols = SchemaTools.buildValidationRunner(df.schema, minimumRequiredSchema.get, isDebug)
-          .map(SchemaTools.validateSchema(_))
+        val validatedCols = SchemaTools
+          .buildValidationRunner(df.schema, minimumRequiredSchema.get, enforceNonNullCols, isDebug)
+          .map(SchemaTools.validateSchema(_, isDebug = isDebug))
         df.select(validatedCols.map(_.column): _*)
       } else {
         logger.log(Level.WARN, s"No Schema Found for verification.")
@@ -120,11 +129,14 @@ object TransformFunctions extends SparkSessionWrapper {
     }
 
     // Function used to view schema validation and returned columns
-    def reviewSchemaValidations(minimumRequiredSchema: Option[StructType]): Seq[ValidatedColumn] = {
+    def reviewSchemaValidations(
+                                 minimumRequiredSchema: Option[StructType],
+                                 enforceNonNullCols: Boolean = true
+                               ): Seq[ValidatedColumn] = {
 
       if (minimumRequiredSchema.nonEmpty) {
         // validate field requirements for fields present in the dataframe
-        SchemaTools.buildValidationRunner(df.schema, minimumRequiredSchema.get, isDebug = true)
+        SchemaTools.buildValidationRunner(df.schema, minimumRequiredSchema.get, enforceNonNullCols, isDebug = true)
           .map(SchemaTools.validateSchema(_, isDebug = true))
       } else {
         logger.log(Level.ERROR, s"No Schema Found for verification.")
