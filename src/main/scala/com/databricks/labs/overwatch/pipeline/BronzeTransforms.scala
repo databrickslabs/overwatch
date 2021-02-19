@@ -710,6 +710,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .select(explode('value))
       .select($"col._1".alias("filename"), $"col._2".alias("fileCreateEpochMS"), $"col._3".alias("succeeded"))
       .filter('succeeded)
+      .drop("succeeded") // using failed as the status tracker col downstream
       .withColumn("fileCreateTS", from_unixtime('fileCreateEpochMS / lit(1000)).cast("timestamp"))
       .withColumn("fileCreateDate", 'fileCreateTS.cast("date"))
 

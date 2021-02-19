@@ -68,7 +68,12 @@ abstract class PipelineTargets(config: Config) {
       statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID," +
         "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename," +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "),
-      sparkOverrides = Map("spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000"),
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize"-> "2048",
+        "spark.sql.files.maxPartitionBytes" -> "33554432"
+        // 32m --> input is extremely wide/deep in places which can cause major input task skew
+      ),
       autoOptimize = true, // TODO -- perftest
       masterSchema = Some(Schema.sparkEventsRawMasterSchema)
     )

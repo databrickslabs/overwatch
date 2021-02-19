@@ -108,7 +108,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val executorsModule = Module(2003, "SPARK_Executors_Raw")
   lazy private val appendExecutorsProcess = EtlDefinition(
-    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(executorsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
+    BronzeTargets.sparkEventLogsTarget
+      .asIncrementalDF(executorsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
     Some(Seq(executor())),
     append(SilverTargets.executorsTarget),
     executorsModule
@@ -124,7 +125,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val executionsModule = Module(2005, "SPARK_Executions_Raw")
   lazy private val appendExecutionsProcess = EtlDefinition(
-    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(executionsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
+    BronzeTargets.sparkEventLogsTarget
+      .asIncrementalDF(executionsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
     Some(Seq(sqlExecutions())),
     append(SilverTargets.executionsTarget),
     executionsModule
@@ -132,7 +134,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobsModule = Module(2006, "SPARK_Jobs_Raw")
   lazy private val appendJobsProcess = EtlDefinition(
-    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(jobsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
+    BronzeTargets.sparkEventLogsTarget
+      .asIncrementalDF(jobsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
     Some(Seq(sparkJobs())),
     append(SilverTargets.jobsTarget),
     jobsModule
@@ -140,7 +143,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val stagesModule = Module(2007, "SPARK_Stages_Raw")
   lazy private val appendStagesProcess = EtlDefinition(
-    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(stagesModule, 2, "fileCreateDate", "fileCreateEpochMS"),
+    BronzeTargets.sparkEventLogsTarget
+      .asIncrementalDF(stagesModule, 2, "fileCreateDate", "fileCreateEpochMS"),
     Some(Seq(sparkStages())),
     append(SilverTargets.stagesTarget),
     stagesModule
@@ -148,7 +152,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val tasksModule = Module(2008, "SPARK_Tasks_Raw")
   lazy private val appendTasksProcess = EtlDefinition(
-    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(tasksModule, 2, "fileCreateDate", "fileCreateEpochMS"),
+    BronzeTargets.sparkEventLogsTarget
+      .asIncrementalDF(tasksModule, 2, "fileCreateDate", "fileCreateEpochMS"),
     Some(Seq(sparkTasks())),
     append(SilverTargets.tasksTarget),
     tasksModule

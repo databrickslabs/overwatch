@@ -297,7 +297,6 @@ trait SilverTransforms extends SparkSessionWrapper {
         'TaskInfo.alias("TaskEndInfo"),
         'TaskMetrics,
         'TaskType,
-        'TaskEndReason,
         'TaskExecutorMetrics,
         'filenameGroup.alias("endFilenameGroup")
       )
