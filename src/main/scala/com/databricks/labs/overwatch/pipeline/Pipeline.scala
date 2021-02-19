@@ -2,9 +2,11 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpers, Module, ModuleStatusReport, NoNewDataException, SchemaTools, SparkSessionWrapper, UnhandledException}
+import TransformFunctions._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
-import Schema.verifyDF
+import org.apache.spark.sql.functions.col
+
 import java.io.{PrintWriter, StringWriter}
 
 class Pipeline(_workspace: Workspace, _database: Database,
@@ -32,9 +34,11 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     def process(): Unit = {
       println(s"Beginning: ${module.moduleName}")
-
       println("Validating Input Schemas")
-      val verifiedSourceDF = verifyDF(sourceDF, module)
+
+      @transient
+      lazy val verifiedSourceDF = sourceDF
+        .verifyMinimumSchema(Schema.get(module), enforceNonNullCols = true, config.debugFlag)
 
       try {
         sourceDFparts = verifiedSourceDF.rdd.partitions.length
@@ -61,9 +65,15 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   import spark.implicits._
 
+  /**
+    * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
+    * Accepting data with higher precision than delivery causes bad data
+    */
+  protected val auditLogsIncrementalCols = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
+
   protected def finalizeModule(report: ModuleStatusReport): Unit = {
     val pipelineReportTarget = PipelineTable(
-      name =  "pipeline_report",
+      name = "pipeline_report",
       keys = Array("organization_id", "Overwatch_RunID"),
       config = config,
       incrementalColumns = Array("Pipeline_SnapTS")
@@ -106,13 +116,13 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
 
   /**
-   * Some modules should never progress through time while being empty
-   * For example, cluster events may get ahead of audit logs and be empty but that doesn't mean there are
-   * no cluster events for that time period
-   *
-   * @param moduleID
-   * @return
-   */
+    * Some modules should never progress through time while being empty
+    * For example, cluster events may get ahead of audit logs and be empty but that doesn't mean there are
+    * no cluster events for that time period
+    *
+    * @param moduleID
+    * @return
+    */
   private def getVerifiedUntilTS(moduleID: Int): Long = {
     val nonEmptyModules = Array(1005)
     if (nonEmptyModules.contains(moduleID)) {
@@ -144,11 +154,11 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   }
 
-  // TODO -- refactor the module status report process
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): Unit = {
     val startTime = System.currentTimeMillis()
 
     try {
+      // TODO -- move this to the exception handler for EmptyModule
       if (df.schema.fieldNames.contains("__OVERWATCHEMPTY") || df.rdd.take(1).isEmpty) {
         val emptyStatusReport = ModuleStatusReport(
           organization_id = config.organizationId,
@@ -177,42 +187,44 @@ class Pipeline(_workspace: Workspace, _database: Database,
       var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
 
       finalDF = if (target.zOrderBy.nonEmpty) {
-        TransformFunctions.moveColumnsToFront(finalDF, target.zOrderBy)
+        TransformFunctions.moveColumnsToFront(finalDF, target.zOrderBy ++ target.statsColumns)
       } else finalDF
+
+      val targetShufflePartitionSizeMB = 128.0
+      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").toDouble / 1024 / 1024
+      val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
 
       // TODO -- handle streaming until Module refactor with source -> target mappings
       val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
         target.name match {
-          case "audit_log_bronze" => spark.table(s"${
-            config.databaseName
-          }.audit_log_raw_events")
+          case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
             .rdd.partitions.length * target.shuffleFactor
         }
       } else {
-        sourceDFparts * target.shuffleFactor
+        sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
       }
-      val estimatedFinalDFSizeMB = finalDFPartCount * spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
-      val targetShuffleSize = math.max(100, finalDFPartCount).toInt
+
+      val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
+      val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
 
       if (config.debugFlag) {
-        println(s"DEBUG: Target Shuffle Partitions: ${
-          targetShuffleSize
-        }")
+        println(s"DEBUG: Source DF Partitions: ${sourceDFparts}")
+        println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
         println(s"DEBUG: Max PartitionBytes (MB): ${
           spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
         }")
       }
 
-      logger.log(Level.INFO, s"${
-        module.moduleName
-      }: Final DF estimated at ${
-        estimatedFinalDFSizeMB
-      } MBs." +
-        s"\nShufflePartitions: ${
-          targetShuffleSize
-        }")
+      logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
+        s"\nShufflePartitions: ${targetShufflePartitionCount}")
 
-      spark.conf.set("spark.sql.shuffle.partitions", targetShuffleSize)
+      spark.conf.set("spark.sql.shuffle.partitions", targetShufflePartitionCount)
+
+      // repartition partitioned tables that are not auto-optimized into the range partitions for writing
+      // without this the file counts of partitioned tables will be extremely high
+      finalDF = if (target.partitionBy.nonEmpty && !target.autoOptimize) {
+        finalDF.repartition(targetShufflePartitionCount, target.partitionBy map col: _*)
+      } else finalDF
 
       val startLogMsg = s"Beginning append to ${
         target.tableFullName
@@ -220,6 +232,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       logger.log(Level.INFO, startLogMsg)
 
 
+      // Append the output
       if (!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
       val debugCount = if (!config.isFirstRun || config.debugFlag) {
         val dfCount = finalDF.count()
@@ -265,25 +278,15 @@ class Pipeline(_workspace: Workspace, _database: Database,
       finalizeModule(moduleStatusReport)
     } catch {
       case e: NoNewDataException =>
-        val msg = s"ALERT: No New Data Retrieved for Module ${
-          module.moduleID
-        }! Skipping"
+        val msg = s"ALERT: No New Data Retrieved for Module ${module.moduleID}! Skipping"
         println(msg)
         logger.log(Level.WARN, msg, e)
       case e: Throwable =>
-        val msg = s"${
-          module.moduleName
-        } FAILED -->\nMessage: ${
-          e.getMessage
-        }\nCause:${
-          e.getCause
-        }"
+        val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
         logger.log(Level.ERROR, msg, e)
         // TODO -- handle rollback
         // TODO -- Capture e message in failReport
-        val rollbackMsg = s"ROLLBACK: Attempting Roll back ${
-          module.moduleName
-        }."
+        val rollbackMsg = s"ROLLBACK: Attempting Roll back ${module.moduleName}."
         println(rollbackMsg)
         println(msg, e)
         logger.log(Level.WARN, rollbackMsg)
@@ -291,18 +294,13 @@ class Pipeline(_workspace: Workspace, _database: Database,
           database.rollbackTarget(target)
         } catch {
           case eSub: Throwable => {
-            val rollbackFailedMsg = s"ROLLBACK FAILED: ${
-              module.moduleName
-            } -->\nMessage: ${
-              eSub.getMessage
-            }\nCause:" +
-              s" ${
-                eSub.getCause
-              }"
+            val rollbackFailedMsg = s"ROLLBACK FAILED: ${module.moduleName} -->\nMessage: ${eSub.getMessage}\nCause:" +
+              s"${eSub.getCause}"
             println(rollbackFailedMsg, eSub)
             logger.log(Level.ERROR, rollbackFailedMsg, eSub)
           }
         }
+        // TODO -- move this to FailedModule exception handler
         val failedModuleReport = failModule(module, target, "FAILED", msg)
         finalizeModule(failedModuleReport)
         throw new FailedModuleException(s"MODULE FAILED: ${

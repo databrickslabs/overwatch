@@ -1,11 +1,9 @@
-[Project Name]
+OVERWATCH
 
-Copyright (2018) Databricks, Inc.
+Copyright (2021) Databricks, Inc.
 
 
 This Software includes software developed at Databricks (https://www.databricks.com/) and its use is subject to the included LICENSE file.
 
-
-Additionally, this Software contains code from the following open source projects:
-
-[Project Name - License]
+All code is original all dependencies have been reviewed and are and Databricks is compliant with their
+licenses

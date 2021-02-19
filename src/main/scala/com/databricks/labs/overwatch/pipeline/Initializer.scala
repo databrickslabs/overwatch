@@ -39,7 +39,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
     rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
       .orderBy('snapTS.desc, 'moduleId)
-      .show(false)
+      .show(50, false)
   }
 
   /**

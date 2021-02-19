@@ -13,7 +13,6 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
-import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DateType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
@@ -211,37 +210,28 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .drop("logId")
 
     } else {
-      if (!isFirstRun) {
 
-        // TODO -- fix this -- SO UGLY
-        //  might be good to build from time in initializer better on a source case basis
-        //  don't attempt this until after tests are in place
-        val fromDT = fromTime.toLocalDate
-        val untilDT = untilTime.toLocalDate
-        // inclusive from exclusive to
-        val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
-          .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
-          .filter(Helpers.pathExists)
+      // TODO -- fix this -- SO UGLY
+      //  might be good to build from time in initializer better on a source case basis
+      //  don't attempt this until after tests are in place
+      val fromDT = fromTime.toLocalDate
+      val untilDT = untilTime.toLocalDate
+      // inclusive from exclusive to
+      val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
+        .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
+        .filter(Helpers.pathExists)
 
-        if (datesGlob.nonEmpty) {
-          spark.read.json(datesGlob: _*)
-            // When globbing the paths, the date must be reconstructed and re-added manually
-            .withColumn("organization_id", lit(organizationId))
-            .withColumn("filename", split(input_file_name, "/"))
-            .withColumn("date",
-              split(expr("filter(filename, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
-            .drop("filename")
-        } else {
-          Seq("No New Records").toDF("__OVERWATCHEMPTY")
-        }
-      } else {
-        // Intentionally not filtering dates here
-        // There are events that occur before a point in time that imrpove completeness of the data
-        // Grab all data present
-        // Todo -- add parameter to limit max audit history pull
-        //  may not be necessary when lifecycle is implemented for auto-delete logs, TBD
-        spark.read.json(auditLogConfig.rawAuditPath.get)
+      if (datesGlob.nonEmpty) {
+        spark.read.json(datesGlob: _*)
+          // When globbing the paths, the date must be reconstructed and re-added manually
           .withColumn("organization_id", lit(organizationId))
+          .withColumn("filename", input_file_name)
+          .withColumn("filenameAR", split(input_file_name, "/"))
+          .withColumn("date",
+            split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
+          .drop("filenameAR")
+      } else {
+        Seq("No New Records").toDF("__OVERWATCHEMPTY")
       }
     }
   }
@@ -306,16 +296,18 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-//  protected
+  //  protected
   def prepClusterEventLogs(auditLogsTable: PipelineTable,
                            start_time: TimeTypes, end_time: TimeTypes,
-                           apiEnv: ApiEnv): DataFrame = {
+                           apiEnv: ApiEnv,
+                           organizationId: String): DataFrame = {
     val extraQuery = Map(
       "start_time" -> start_time.asUnixTimeMilli, // 1588935326000L, //
       "end_time" -> end_time.asUnixTimeMilli, //1589021726000L //
       "limit" -> 500
     )
 
+    // TODO -- upgrade to incrementalDF
     val auditDFBase = auditLogsTable.asDF
       .filter(
         'date.between(start_time.asColumnTS.cast("date"), end_time.asColumnTS.cast("date")) &&
@@ -348,7 +340,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
      * spark.driver.maxResultSize 32g
      */
     val batchSize = 500000D
-//    val batchSize = 50000D // DEBUG
+    //    val batchSize = 50000D // DEBUG
     val tmpClusterEventsPath = "/tmp/overwatch/bronze/clusterEventsBatches"
     val clusterEventsBuffer = buildClusterEventBatches(apiEnv, batchSize, start_time.asUnixTimeMilli, end_time.asUnixTimeMilli, clusterIDs)
 
@@ -365,11 +357,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       try {
         val tdf = SchemaTools.scrubSchema(
           spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
-          .select(col("events.*"))
+            .select(col("events.*"))
         )
 
         // DEBUG
-//        tdf.printSchema()
+        //        tdf.printSchema()
 
         val changeInventory = Map[String, Column](
           "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
@@ -381,6 +373,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         )
 
         SchemaTools.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+          .withColumn("organization_id", lit(organizationId))
           .write.mode("append").format("delta")
           .option("mergeSchema", "true")
           .save(tmpClusterEventsPath)
@@ -409,17 +402,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   private def appendNewFilesToTracker(database: Database,
-                                      newFiles: Array[String],
-                                      trackerTarget: PipelineTable): Unit = {
-    val fileTrackerDF = newFiles.toSeq.toDF("filename")
+                                      newFiles: DataFrame,
+                                      trackerTarget: PipelineTable,
+                                      orgId: String): Unit = {
+    val fileTrackerDF = newFiles
       .withColumn("failed", lit(false))
+      .withColumn("organization_id", lit(orgId))
     database.write(fileTrackerDF, trackerTarget)
   }
 
-  private def getUniqueSparkEventsFiles(badRecordsPath: String,
-                                        eventLogsDF: DataFrame,
-                                        processedLogFiles: PipelineTable): Array[String] = {
-    if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
+  private def retrieveNewValidSparkEventsWMeta(badRecordsPath: String,
+                                               eventLogsDF: DataFrame,
+                                               processedLogFiles: PipelineTable): DataFrame = {
+    val validNewFiles = if (spark.catalog.tableExists(processedLogFiles.tableFullName)) {
       val alreadyProcessed = processedLogFiles.asDF.select('filename)
         .filter(!'failed)
         .distinct
@@ -428,14 +423,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val badFiles = spark.read.format("json").load(s"${badRecordsPath}/*/*/")
           .select('path.alias("filename"))
           .distinct
-        eventLogsDF.select('filename).except(alreadyProcessed.unionByName(badFiles)).as[String].collect()
+        eventLogsDF.select('filename).except(alreadyProcessed.unionByName(badFiles))
       } else {
-        eventLogsDF.select('filename).except(alreadyProcessed).as[String].collect()
+        eventLogsDF.select('filename).except(alreadyProcessed)
       }
     } else {
       eventLogsDF.select('filename)
-        .distinct.as[String].collect()
+        .distinct
     }
+
+    validNewFiles.join(eventLogsDF, Seq("filename"))
+
   }
 
   private def groupFilename(filename: Column): Column = {
@@ -457,17 +455,24 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
-                          processedLogFiles: PipelineTable,
+                          processedLogFilesTracker: PipelineTable,
                           organizationId: String)(eventLogsDF: DataFrame): DataFrame = {
 
-    // Dropping 'Spark Infos' because Overwatch ETLs utilize joins to go from jobs -> stages -> tasks and thus
-    // No value is lost in dropping Spark Infos. Furthermore, Spark Infos is often null for some of the nested structs
-    // which causes a schema failure when appending to existing spark_events_bronze.
-    if (eventLogsDF.take(1).nonEmpty) {
-      val pathsGlob = getUniqueSparkEventsFiles(badRecordsPath, eventLogsDF, processedLogFiles)
-      if (pathsGlob.take(1).nonEmpty) {
+    logger.log(Level.INFO, "Searching for Event logs")
+    // Caching is done to ensure a single scan of the event log file paths
+    val cachedEventLogs = eventLogsDF.cache()
+    val eventLogsCount = cachedEventLogs.count() // eager force cache
+
+    logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
+
+    if (cachedEventLogs.take(1).nonEmpty) { // newly found file names
+      val validNewFilesWMetaDF = retrieveNewValidSparkEventsWMeta(badRecordsPath, cachedEventLogs, processedLogFilesTracker)
+      val pathsGlob = validNewFilesWMetaDF.select('fileName).as[String].collect
+      if (pathsGlob.nonEmpty) { // new files less bad files and already-processed files
+        logger.log(Level.INFO, s"VALID NEW EVENT LOGS FOUND: COUNT --> ${pathsGlob.length}")
         try {
-          appendNewFilesToTracker(database, pathsGlob, processedLogFiles)
+          logger.log(Level.INFO, "Updating Tracker with new files")
+          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId)
         } catch {
           case e: Throwable => {
             val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +
@@ -477,18 +482,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
             throw e
           }
         }
-        // TODO don't drop stage infos but rather convert it (along with the other columns with nested structs) to a json
-        //  and use strctFromJson to reconstruct it later. Waiting on ES-44663
-        //  may continue to drop Stage Infos as it's such a large column and it is redundant for overwatch
+
+        // Dropping 'Spark Infos' because Overwatch ETLs utilize joins to go from jobs -> stages -> tasks and thus
+        // No value is lost in dropping Spark Infos. Furthermore, Spark Infos is often null for some of the nested structs
+        // which causes a schema failure when appending to existing spark_events_bronze.
         val dropCols = Array("Classpath Entries", "System Properties", "sparkPlanInfo", "Spark Properties",
           "System Properties", "HadoopProperties", "Hadoop Properties", "SparkContext Id", "Stage Infos")
 
         // GZ files -- very compressed, need to get sufficienct parallelism but too much and there can be too
         // many tasks to serialize the returned schema from each task
-//        val tempMaxPartBytes = if (daysToProcess >= 3) 1024 * 1024 * 32 else 1024 * 1024 * 16
-//        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
-//        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
+        //        val tempMaxPartBytes = if (daysToProcess >= 3) 1024 * 1024 * 32 else 1024 * 1024 * 16
+        //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
+        //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
+        logger.log(Level.INFO, "Attempting to load event log data")
         val baseEventsDF = try {
           spark.read.option("badRecordsPath", badRecordsPath)
             .json(pathsGlob: _*)
@@ -519,7 +526,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                   TransformFunctions.stringTsToUnixMillis('timestamp)
                 ).otherwise('Timestamp))
               .drop("timestamp")
-          } case e: Throwable => {
+          }
+          case e: Throwable => {
             logger.log(Level.ERROR, "FAILED spark events bronze", e)
             Seq("").toDF("__OVERWATCHFAILURE")
           }
@@ -560,9 +568,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
           )
         }
 
-        rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
-          .join(eventLogsDF, Seq("filename"))
+        val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+          .join(cachedEventLogs, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
+
+        cachedEventLogs.unpersist()
+
+        bronzeEventsFinal
       } else {
         val msg = "Path Globs Empty, exiting"
         println(msg)
@@ -588,10 +600,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
 
-    val cluster_id_gen_w = Window.partitionBy('cluster_name)
-      .orderBy('timestamp)
-      .rowsBetween(Window.currentRow, Window.unboundedFollowing)
-
     //    DEBUG
     //    println("DEBUG TIME COLS")
     //    Seq("").toDF("fromTSCol")
@@ -603,12 +611,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
     //      .withColumn("untilMillisManualTS", from_unixtime('untilMillis / 1000))
     //      .show(false)
 
-    // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create" AND "changeClusterAcl" actions
-    val cluster_id_gen = first('cluster_id, ignoreNulls = true).over(cluster_id_gen_w)
-
+    // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create", AND "changeClusterAcl" actions
+    // TODO -- upgrade to incrementalDF
     val latestSnapDate = clusterSnapshot.asDF.select(max('Pipeline_SnapTS).cast("date").cast("string"))
       .as[String].first
-    val existingClustersWithLogs = clusterSnapshot.asDF
+    val currentClustersWithLogs = clusterSnapshot.asDF
       .filter('Pipeline_SnapTS.cast("date") === latestSnapDate)
       .select(
         unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
@@ -620,8 +627,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // Populating cluster Ids
     val dfClusterService = df
-      .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
-      .selectExpr("*", "requestParams.*")
+      .selectExpr("*", "requestParams.*").drop("requestParams")
       .filter('serviceName === "clusters")
       .withColumn("cluster_id",
         when('cluster_id.isNull, 'clusterId).otherwise('cluster_id)
@@ -629,12 +635,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("cluster_id",
         when('cluster_id.isNull, get_json_object(to_json('response), "$.result.cluster_id")).otherwise('cluster_id)
       )
-      .withColumn("cluster_id",
-        when('cluster_id.isNull, cluster_id_gen).otherwise('cluster_id)
-      )
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
-      .unionByName(existingClustersWithLogs)
+      .unionByName(currentClustersWithLogs)
     //      .cache() //Not caching because delta cache is likely more efficient
 
     val clusterIDsWithNewData = dfClusterService
@@ -697,6 +700,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .save(tmpEventLogPathsDir)
 
     // TODO -- use intelligent partitions count
+    // TOOD -- Throw error on failure and bubble up to report
     val strategicPartitions = if (isFirstRun) 2000 else 1000
     val eventLogPaths = spark.read.format("delta").load(tmpEventLogPathsDir)
       .repartition(strategicPartitions)
@@ -704,7 +708,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .map(p => Helpers.globPath(p, Some(fromTimeEpochMillis), Some(untilTimeEpochMillis)))
       .filter(size('value) > 0)
       .select(explode('value))
-      .select($"col._1".alias("filename"), $"col._2".alias("fileCreateEpochMS"))
+      .select($"col._1".alias("filename"), $"col._2".alias("fileCreateEpochMS"), $"col._3".alias("succeeded"))
+      .filter('succeeded)
+      .drop("succeeded") // using failed as the status tracker col downstream
       .withColumn("fileCreateTS", from_unixtime('fileCreateEpochMS / lit(1000)).cast("timestamp"))
       .withColumn("fileCreateDate", 'fileCreateTS.cast("date"))
 

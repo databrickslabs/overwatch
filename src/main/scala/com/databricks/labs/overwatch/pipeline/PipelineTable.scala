@@ -1,10 +1,11 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter, Module, SparkSessionWrapper, UnhandledException, UnsupportedTypeException}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Frequency, IncrementalFilter, Module, NoNewDataException, SparkSessionWrapper, UnhandledException, UnsupportedTypeException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.functions._
+import TransformFunctions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
@@ -33,7 +34,8 @@ case class PipelineTable(
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true,
                           isTemp: Boolean = false,
-                          checkpointPath: Option[String] = None
+                          checkpointPath: Option[String] = None,
+                          masterSchema: Option[StructType] = None
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -72,6 +74,29 @@ case class PipelineTable(
   }
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
 
+  // Minimum Schema Enforcement Management
+  private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
+  private var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
+  private def emitMissingMasterSchemaMessage: Unit = {
+    val msg = s"No Master Schema defined for Table $tableFullName"
+    logger.log(Level.ERROR, msg)
+    if (config.debugFlag) println(msg)
+  }
+
+  private[overwatch] def withMinimumSchemaEnforcement: this.type = withMinimumSchemaEnforcement(true)
+  private[overwatch] def withMinimumSchemaEnforcement(value: Boolean): this.type = {
+    if (masterSchema.nonEmpty) withMasterMinimumSchema = value
+    else emitMissingMasterSchemaMessage // cannot enforce master schema if not defined
+    this
+  }
+
+  private[overwatch] def enforceNullableRequirements: this.type = enforceNullableRequirements(true)
+  private[overwatch] def enforceNullableRequirements(value: Boolean): this.type = {
+    if (masterSchema.nonEmpty && exists) enforceNonNullable = value
+    else emitMissingMasterSchemaMessage // cannot enforce master schema if not defined
+    this
+  }
+
   /**
    * This EITHER appends/changes the spark overrides OR sets them. This can only set spark params if updates
    * are not passed --> setting the spark conf is really mean to be private action
@@ -87,32 +112,6 @@ case class PipelineTable(
     }
   }
 
-  // TODO -- Add partition filter
-  //  private def buildIncrementalDF(df: DataFrame, filter: IncrementalFilter): DataFrame = {
-  //    val low = filter.low
-  //    val high = filter.high
-  //    val incrementalFilters = incrementalColumns.map(c => {
-  //      df.schema.fields.filter(_.name == c).head.dataType match {
-  //        case _: TimestampType => col(c).between(addOneTick(low.asColumnTS), high.asColumnTS)
-  //        case _: DateType => {
-  //          val maxVal = df.select(max(c)).as[String].collect().head
-  //          col(c).between(addOneTick(lit(maxVal).cast("date"), DateType), high.asColumnTS.cast("date"))
-  //        }
-  //        case _: LongType => col(c).between(low.asUnixTimeMilli + 1, high.asUnixTimeMilli)
-  //        case _: DoubleType => col(c).between(low.asUnixTimeMilli + 0.001, high.asUnixTimeMilli)
-  //        case _: BooleanType => col(c) === lit(false)
-  //        case dt: DataType =>
-  //          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
-  //      }
-  //    })
-  //
-  //    incrementalFilters.foldLeft(df) {
-  //      case (rawDF, incrementalFilter) =>
-  //        rawDF.filter(incrementalFilter)
-  //    }
-  //
-  //  }
-
   def exists: Boolean = {
     spark.catalog.tableExists(tableFullName)
   }
@@ -123,7 +122,10 @@ case class PipelineTable(
 
   def asDF(withGlobalFilters: Boolean = true): DataFrame = {
     try {
-      val fullDF = spark.table(tableFullName)
+      val fullDF = if (withMasterMinimumSchema) { // infer master schema if true and available
+        logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for $tableFullName")
+        spark.table(tableFullName).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
+      } else spark.table(tableFullName)
       if (withGlobalFilters && config.globalFilters.nonEmpty)
         PipelineFunctions.applyFilters(fullDF, config.globalFilters.get)
       else fullDF
@@ -135,25 +137,14 @@ case class PipelineTable(
     }
   }
 
-  // TODO - REMOVE try/catch???
-  //  def asIncrementalDF(moduleID: Int): DataFrame = {
-  //    try {
-  //      buildIncrementalDF(spark.table(tableFullName), moduleID)
-  //    } catch {
-  //      case e: AnalysisException =>
-  //        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
-  //        Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
-  //    }
-  //  }
-
-  //  Deprecated
-  //  def asIncrementalDF(filters: Seq[IncrementalFilter]): DataFrame = {
-  //    PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), filters)
-  //  }
-
   @throws(classOf[UnhandledException])
   def asIncrementalDF(module: Module, cronColumns: String*): DataFrame = {
-    asIncrementalDF(module, 0, cronColumns: _*)
+    asIncrementalDF(module, cronColumns, 0)
+  }
+
+  @throws(classOf[UnhandledException])
+  def asIncrementalDF(module: Module, additionalLagDays: Int, cronColumns: String*): DataFrame = {
+    asIncrementalDF(module, cronColumns, additionalLagDays)
   }
 
   /**
@@ -166,12 +157,22 @@ case class PipelineTable(
    * @return Filtered Dataframe
    */
   @throws(classOf[UnhandledException])
-  def asIncrementalDF(module: Module, additionalLagDays: Int, cronColumnsNames: String*): DataFrame = {
+  def asIncrementalDF(
+                       module: Module,
+                       cronColumnsNames: Seq[String],
+                       additionalLagDays: Int = 0
+                     ): DataFrame = {
+    val moduleID = module.moduleID
+    val moduleName = module.moduleName
+
     if (exists) {
-      val dfFields = spark.table(tableFullName).schema.fields
+      val instanceDF = if (withMasterMinimumSchema) { // infer master schema if true and available
+        logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for Module: " +
+          s"$moduleID --> $moduleName for Table: $tableFullName")
+        spark.table(tableFullName).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
+      } else spark.table(tableFullName)
+      val dfFields = instanceDF.schema.fields
       val cronCols = dfFields.filter(f => cronColumnsNames.contains(f.name))
-      val moduleID = module.moduleID
-      val moduleName = module.moduleName
 
       if (additionalLagDays > 0) require(
         dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
@@ -188,6 +189,7 @@ case class PipelineTable(
              |FromTime: ${config.fromTime(moduleID).asTSString} --> ${config.fromTime(moduleID).asUnixTimeMilli}
              |UntilTime: ${config.untilTime(moduleID).asTSString} --> ${config.untilTime(moduleID).asUnixTimeMilli}
              |""".stripMargin
+        if (config.debugFlag) println(logStatement)
         logger.log(Level.INFO, logStatement)
 
         field.dataType match {
@@ -222,9 +224,12 @@ case class PipelineTable(
         }
       })
 
-      PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), incrementalFilters, config.globalFilters)
-    } else {
-      spark.emptyDataFrame
+      PipelineFunctions.withIncrementalFilters(instanceDF, module, incrementalFilters, config.globalFilters)
+    } else { // Source doesn't exist
+//      Seq("No New Records").toDF("__OVERWATCHEMPTY")
+      // TODO -- again need to find the best way to fail if missing sources
+      throw new FailedModuleException(s"Source $tableFullName does not exist for Module $moduleID EMPTY: skipping.")
+
     }
   }
 

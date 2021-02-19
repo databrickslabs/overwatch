@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.IncrementalFilter
+import com.databricks.labs.overwatch.utils.{IncrementalFilter, Module}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 import org.apache.spark.sql.types._
@@ -26,9 +26,15 @@ object PipelineFunctions {
     }
   }
 
-  def applyFilters(df: DataFrame, filters: Seq[Column]): DataFrame = {
-    val filterExpressions: Unit = filters.map(_.expr).foreach(println)
-    logger.log(Level.INFO, filterExpressions)
+  def applyFilters(df: DataFrame, filters: Seq[Column], module: Option[Module] = None): DataFrame = {
+    if (module.nonEmpty) {
+      val filterLogMessageSB: StringBuilder = new StringBuilder
+      filterLogMessageSB.append(s"APPLIED FILTERS:\nMODULE_ID: ${module.get.moduleID}\nMODULE_NAME: ${module.get.moduleName}\nFILTERS:\n")
+      filters.map(_.expr).foreach(filterLogMessageSB.append)
+      val filterLogMessage = filterLogMessageSB.toString()
+      println(filterLogMessage)
+      logger.log(Level.INFO, filterLogMessage)
+    }
     filters.foldLeft(df) {
       case (rawDF, filter) =>
         rawDF.filter(filter)
@@ -36,7 +42,7 @@ object PipelineFunctions {
   }
 
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
-  def withIncrementalFilters(df: DataFrame, filters: Seq[IncrementalFilter], globalFilters: Option[Seq[Column]] = None): DataFrame = {
+  def withIncrementalFilters(df: DataFrame, module: Module, filters: Seq[IncrementalFilter], globalFilters: Option[Seq[Column]] = None): DataFrame = {
     val parsedFilters = filters.map(filter => {
       val c = filter.cronColName
       val low = filter.low
@@ -61,7 +67,7 @@ object PipelineFunctions {
 
     val allFilters = parsedFilters ++ globalFilters.getOrElse(Seq())
 
-    applyFilters(df, allFilters)
+    applyFilters(df, allFilters, Some(module))
 
   }
 

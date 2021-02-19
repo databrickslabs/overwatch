@@ -1,14 +1,183 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SparkSessionWrapper}
-import org.apache.spark.sql.expressions.WindowSpec
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SchemaTools, SparkSessionWrapper, ValidatedColumn}
+import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
+import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
+
+import java.util.UUID
 
 object TransformFunctions extends SparkSessionWrapper {
 
   import spark.implicits._
+
+  implicit class DataFrameTransforms(df: DataFrame) {
+    private val logger: Logger = Logger.getLogger(this.getClass)
+
+    def dropDupColumnByAlias(dropAlias: String, columnNames: String*): DataFrame = {
+      columnNames.foldLeft(df) {
+        case (mutDF, k) => {
+          mutDF.drop(col(s"${dropAlias}.${k}"))
+        }
+      }
+    }
+
+    def joinWithLag(
+                     df2: DataFrame,
+                     usingColumns: Seq[String],
+                     lagDateColumnName: String,
+                     laggingSide: String = "left",
+                     lagDays: Int = 1,
+                     joinType: String = "inner"
+                   ): DataFrame = {
+      require(laggingSide == "left" || laggingSide == "right", s"laggingSide must be either 'left' or 'right'; received $laggingSide")
+      val (left, right) = if(laggingSide == "left") {
+        (df.alias("laggard"), df2.alias("driver"))
+      } else {
+        (df.alias("driver"), df2.alias("laggard"))
+      }
+
+      val joinExpr = usingColumns.map(c => {
+        if (c == lagDateColumnName) {
+          datediff(col(s"driver.${c}"), col(s"laggard.${c}")) <= lagDays
+        } else col(s"driver.${c}") === col(s"laggard.${c}")
+      }).reduce((x, y) => x && y)
+
+      left.join(right, joinExpr, joinType)
+        .dropDupColumnByAlias("laggard", usingColumns: _*)
+    }
+
+    def joinAsOf(
+                  lookupDF: DataFrame,
+                  usingColumns: Seq[String],
+                  orderByColumns: Seq[Column],
+                  lookupColumns: Seq[String],
+                  rowsBefore: Long = Window.unboundedPreceding,
+                  rowsAfter: Long = Window.currentRow
+                ): DataFrame = {
+
+      val controlColName = "__ctrlCol__"
+      val drivingDF = df
+        .withColumn(controlColName, lit(0).cast("int"))
+      val baseWSpec = Window.partitionBy(usingColumns map col: _*)
+        .orderBy(orderByColumns: _*)
+      val beforeWSpec = baseWSpec.rowsBetween(rowsBefore, Window.currentRow)
+      val afterWSpec = baseWSpec.rowsBetween(Window.currentRow, rowsAfter)
+
+      val slimLookupCols = ((usingColumns ++ lookupColumns) map col) ++ orderByColumns
+      val slimLookupDF = lookupDF.select(slimLookupCols: _*)
+
+
+      val drivingCols = drivingDF.columns
+      val lookupDFCols = slimLookupDF.columns
+      val missingBaseCols = lookupDFCols.diff(drivingCols)
+      val missingLookupCols = drivingCols.diff(lookupDFCols)
+
+      val df1Complete = missingBaseCols.foldLeft(drivingDF) {
+        case (dfBuilder, c) =>
+          dfBuilder.withColumn(c, lit(null))
+      }
+      val df2Complete = missingLookupCols.foldLeft(slimLookupDF) {
+        case (dfBuilder, c) =>
+          dfBuilder.withColumn(c, lit(null))
+      }
+
+      val masterDF = df1Complete.unionByName(df2Complete)
+
+      lookupColumns.foldLeft(masterDF) {
+        case (dfBuilder, c) => {
+          val dt = dfBuilder.schema.fields.filter(_.name == c).head.dataType
+          val asOfDF = dfBuilder.withColumn(c,
+            coalesce(last(col(c), ignoreNulls = true).over(beforeWSpec), lit(null).cast(dt))
+          )
+          if (rowsAfter != 0L) {
+            asOfDF.withColumn(c,
+              coalesce(first(col(c), ignoreNulls = true).over(afterWSpec), lit(null).cast(dt))
+            )
+          } else asOfDF
+        }
+      }.filter(col(controlColName).isNotNull)
+        .drop(controlColName)
+    }
+
+    @transient
+    def verifyMinimumSchema(
+                             minimumRequiredSchema: StructType,
+                             enforceNonNullCols: Boolean = true,
+                             isDebug: Boolean = false
+                           ): DataFrame = {
+      verifyMinimumSchema(Some(minimumRequiredSchema), enforceNonNullCols, isDebug)
+    }
+
+    @transient
+    def verifyMinimumSchema(
+                             minimumRequiredSchema: Option[StructType],
+                             enforceNonNullCols: Boolean,
+                             isDebug: Boolean
+                           ): DataFrame = {
+
+      if (minimumRequiredSchema.nonEmpty) {
+        // validate field requirements for fields present in the dataframe
+        val validatedCols = SchemaTools
+          .buildValidationRunner(df.schema, minimumRequiredSchema.get, enforceNonNullCols, isDebug)
+          .map(SchemaTools.validateSchema(_, isDebug = isDebug))
+        df.select(validatedCols.map(_.column): _*)
+      } else {
+        logger.log(Level.WARN, s"No Schema Found for verification.")
+        df
+      }
+    }
+
+    // Function used to view schema validation and returned columns
+    def reviewSchemaValidations(
+                                 minimumRequiredSchema: Option[StructType],
+                                 enforceNonNullCols: Boolean = true
+                               ): Seq[ValidatedColumn] = {
+
+      if (minimumRequiredSchema.nonEmpty) {
+        // validate field requirements for fields present in the dataframe
+        SchemaTools.buildValidationRunner(df.schema, minimumRequiredSchema.get, enforceNonNullCols, isDebug = true)
+          .map(SchemaTools.validateSchema(_, isDebug = true))
+      } else {
+        logger.log(Level.ERROR, s"No Schema Found for verification.")
+        df.schema.fields.map(f => ValidatedColumn(col(f.name), Some(f)))
+      }
+    }
+
+  }
+
+  /**
+   * Retrieve DF alias
+   * @param ds
+   * @return
+   */
+  def getAlias(ds: Dataset[_]): Option[String] = ds.queryExecution.analyzed match {
+    case SubqueryAlias(alias, _) => Some(alias.identifier)
+    case _ => None
+  }
+
+  /**
+   * Simplify code for join conditions where begin events may be on the previous date BUT the date column is a
+   * partition column so the explicit date condition[s] must be in the join clause to ensure
+   * dynamic partition pruning (DPP)
+   * join column names must match on both sides of the join
+   * @param dateColumnName date column of DateType -- this column should also either be a partition or indexed col
+   * @param alias DF alias of latest event
+   * @param lagAlias DF alias potentially containing lagging events
+   * @param usingColumns Seq[String] for matching column names
+   * @return
+   */
+  def joinExprMinusOneDay(dateColumnName: String, alias: String, lagAlias: String, usingColumns: Seq[String]): Column = {
+    usingColumns.map(c => {
+      val matchCol = col(s"${alias}.${c}") === col(s"${lagAlias}.${c}")
+      if (c == dateColumnName) {
+        matchCol || col(s"${alias}.${c}") === date_sub(col(s"${lagAlias}.${c}"), 1)
+      } else matchCol
+    }).reduce((x, y) => x && y)
+  }
 
   /**
    * Converts column of seconds/milliseconds/nanoseconds to timestamp
