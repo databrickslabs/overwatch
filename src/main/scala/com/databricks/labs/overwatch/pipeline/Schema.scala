@@ -178,7 +178,11 @@ object Schema extends SparkSessionWrapper {
     StructField("description", StringType, nullable = true),
     StructField("details", StringType, nullable = true),
     StructField("executionId", LongType, nullable = true),
-    StructField("JobResult", StringType, nullable = true),
+    StructField("JobResult", StructType(Seq(
+      StructField("Exception", StructType(Seq(
+        StructField("Message", StringType, nullable = true)
+      )), nullable = true)
+    )), nullable = true),
     StructField("StageID", LongType, nullable = true),
     StructField("StageAttemptID", LongType, nullable = true),
     StructField("ExecutorID", LongType, nullable = true),
@@ -197,9 +201,14 @@ object Schema extends SparkSessionWrapper {
         StructField("ResultSize", LongType, nullable = true)
       )), nullable = true),
     StructField("TaskType", StringType, nullable = true),
-    StructField("TaskEndReason", StructType(Seq(
-      StructField("__overwatchReserved", IntegerType, nullable = true)
-    )), nullable = true),
+    StructField("TaskEndReason",
+      StructType(Seq(
+        StructField("ClassName", StringType, nullable = true),
+        StructField("Description", StringType, nullable = true),
+        StructField("FullStackTrace", StringType, nullable = true),
+        StructField("KillReason", StringType, nullable = true),
+        StructField("Reason", StringType, nullable = true)
+      )), nullable = true),
     StructField("TaskInfo",
       StructType(Seq(
         StructField("TaskID", LongType, nullable = true),
@@ -219,7 +228,7 @@ object Schema extends SparkSessionWrapper {
         StructField("Details", StringType, nullable = true),
         StructField("FailureReason", StringType, nullable = true),
         StructField("NumberofTasks", StringType, nullable = true),
-        StructField("ParentIDs", StringType, nullable = true)
+        StructField("ParentIDs", ArrayType(LongType, containsNull = true), nullable = true)
       )), nullable = true),
     StructField("fileCreateDate", DateType, nullable = false),
     StructField("SubmissionTime", StringType, nullable = true),

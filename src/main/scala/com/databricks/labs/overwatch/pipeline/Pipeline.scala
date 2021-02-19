@@ -36,8 +36,9 @@ class Pipeline(_workspace: Workspace, _database: Database,
       println(s"Beginning: ${module.moduleName}")
       println("Validating Input Schemas")
 
-        val verifiedSourceDF = sourceDF
-          .verifyMinimumSchema(Schema.get(module), enforceNonNullCols = true, config.debugFlag)
+      @transient
+      lazy val verifiedSourceDF = sourceDF
+        .verifyMinimumSchema(Schema.get(module), enforceNonNullCols = true, config.debugFlag)
 
       try {
         sourceDFparts = verifiedSourceDF.rdd.partitions.length
@@ -65,14 +66,14 @@ class Pipeline(_workspace: Workspace, _database: Database,
   import spark.implicits._
 
   /**
-   * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
-   * Accepting data with higher precision than delivery causes bad data
-   */
+    * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
+    * Accepting data with higher precision than delivery causes bad data
+    */
   protected val auditLogsIncrementalCols = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
 
   protected def finalizeModule(report: ModuleStatusReport): Unit = {
     val pipelineReportTarget = PipelineTable(
-      name =  "pipeline_report",
+      name = "pipeline_report",
       keys = Array("organization_id", "Overwatch_RunID"),
       config = config,
       incrementalColumns = Array("Pipeline_SnapTS")
@@ -115,13 +116,13 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
 
   /**
-   * Some modules should never progress through time while being empty
-   * For example, cluster events may get ahead of audit logs and be empty but that doesn't mean there are
-   * no cluster events for that time period
-   *
-   * @param moduleID
-   * @return
-   */
+    * Some modules should never progress through time while being empty
+    * For example, cluster events may get ahead of audit logs and be empty but that doesn't mean there are
+    * no cluster events for that time period
+    *
+    * @param moduleID
+    * @return
+    */
   private def getVerifiedUntilTS(moduleID: Int): Long = {
     val nonEmptyModules = Array(1005)
     if (nonEmptyModules.contains(moduleID)) {
@@ -210,7 +211,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
         println(s"DEBUG: Source DF Partitions: ${sourceDFparts}")
         println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
         println(s"DEBUG: Max PartitionBytes (MB): ${
-          spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024}")
+          spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
+        }")
       }
 
       logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +

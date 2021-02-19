@@ -103,6 +103,7 @@ object TransformFunctions extends SparkSessionWrapper {
         .drop(controlColName)
     }
 
+    @transient
     def verifyMinimumSchema(
                              minimumRequiredSchema: StructType,
                              enforceNonNullCols: Boolean = true,
@@ -110,6 +111,8 @@ object TransformFunctions extends SparkSessionWrapper {
                            ): DataFrame = {
       verifyMinimumSchema(Some(minimumRequiredSchema), enforceNonNullCols, isDebug)
     }
+
+    @transient
     def verifyMinimumSchema(
                              minimumRequiredSchema: Option[StructType],
                              enforceNonNullCols: Boolean,
