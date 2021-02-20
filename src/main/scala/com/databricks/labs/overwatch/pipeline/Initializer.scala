@@ -51,7 +51,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   private def initPipelineRun(): this.type = {
     val rangeDetail = if (spark.catalog.databaseExists(config.databaseName) &&
       spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
-      val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
+      val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
       val lastRunDetail = spark.table(s"${config.databaseName}.pipeline_report")
         .filter('Status.isin("SUCCESS", "EMPTY"))
         .filter('organization_id === config.organizationId)
@@ -122,7 +122,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * @return
    */
   private def loadStaticDatasets(database: Database): this.type = {
-    if (config.isFirstRun || !spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
+    if (!spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
           InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
@@ -138,7 +138,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
         .withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS)
         .withColumn("Overwatch_RunID", lit(config.runID))
+        .coalesce(1)
         .write.format("delta")
+        .partitionBy("organization_id")
         .saveAsTable(s"${config.consumerDatabaseName}.instanceDetails")
     }
     this

@@ -23,7 +23,7 @@ case class PipelineTable(
                           _databaseName: String = "default",
                           autoOptimize: Boolean = false,
                           autoCompact: Boolean = false,
-                          partitionBy: Array[String] = Array(),
+                          partitionBy: Seq[String] = Seq(),
                           statsColumns: Array[String] = Array(),
                           shuffleFactor: Double = 1.0,
                           optimizeFrequency: Int = 24 * 7,

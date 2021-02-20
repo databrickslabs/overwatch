@@ -2,7 +2,6 @@ package com.databricks.labs.overwatch.pipeline
 
 import java.io.FileNotFoundException
 import java.time.{LocalDate, LocalDateTime}
-
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
@@ -13,6 +12,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DateType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
@@ -24,6 +24,7 @@ import scala.concurrent.forkjoin.ForkJoinPool
 trait BronzeTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
+  import TransformFunctions._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _newDataRetrieved: Boolean = true
@@ -408,6 +409,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val fileTrackerDF = newFiles
       .withColumn("failed", lit(false))
       .withColumn("organization_id", lit(orgId))
+      .coalesce(4) // narrow, short table -- each append will == spark event log files processed
     database.write(fileTrackerDF, trackerTarget)
   }
 
@@ -460,12 +462,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Searching for Event logs")
     // Caching is done to ensure a single scan of the event log file paths
-    val cachedEventLogs = eventLogsDF.cache()
-    val eventLogsCount = cachedEventLogs.count() // eager force cache
+    // eager force cache
+    val cachedEventLogs = if(!eventLogsDF.isEmpty) {
+      eventLogsDF.cache()
+      val eventLogsCount = eventLogsDF.count()
+      logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
+      eventLogsDF
+    } else eventLogsDF
 
-    logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
-
-    if (cachedEventLogs.take(1).nonEmpty) { // newly found file names
+    if (!cachedEventLogs.isEmpty) { // newly found file names
       val validNewFilesWMetaDF = retrieveNewValidSparkEventsWMeta(badRecordsPath, cachedEventLogs, processedLogFilesTracker)
       val pathsGlob = validNewFilesWMetaDF.select('fileName).as[String].collect
       if (pathsGlob.nonEmpty) { // new files less bad files and already-processed files
@@ -571,6 +576,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .join(cachedEventLogs, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
+          //TODO -- use map_filter to remove massive redundant useless column to save space
+          // asOf Spark 3.0.0
+          //.withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
 
         cachedEventLogs.unpersist()
 
@@ -613,11 +621,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // Lookup null cluster_ids -- cluster_id and clusterId are both null during "create", AND "changeClusterAcl" actions
     // TODO -- upgrade to incrementalDF
-    val latestSnapDate = clusterSnapshot.asDF.select(max('Pipeline_SnapTS).cast("date").cast("string"))
+    val latestSnapDate = clusterSnapshot.asDF
+      .select(max('Pipeline_SnapTS).cast("date").cast("string"))
       .as[String].first
     val currentClustersWithLogs = clusterSnapshot.asDF
       .filter('Pipeline_SnapTS.cast("date") === latestSnapDate)
       .select(
+        'organization_id,
         unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
         'cluster_id,
         'cluster_name,
@@ -636,27 +646,27 @@ trait BronzeTransforms extends SparkSessionWrapper {
         when('cluster_id.isNull, get_json_object(to_json('response), "$.result.cluster_id")).otherwise('cluster_id)
       )
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
-      .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+      .select('organization_id, 'timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
       .unionByName(currentClustersWithLogs)
     //      .cache() //Not caching because delta cache is likely more efficient
 
     val clusterIDsWithNewData = dfClusterService
-      .select('cluster_id)
+      .select('organization_id, 'cluster_id)
       .distinct
 
-    val newEventLogPrefixes = if (isFirstRun || !clusterSpec.exists) {
+    val newEventLogPrefixes = if (!clusterSpec.exists) {
       dfClusterService
     } else {
 
       val historicalClustersWithNewData = clusterSpec.asDF
         //        .withColumn("date", toTS('timestamp, outputResultType = DateType))
         //        .filter('date.between(fromTimeCol.cast("date"), untilTimeCol.cast("date")))
-        .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
-        .join(clusterIDsWithNewData, Seq("cluster_id"))
+        .select('organization_id, 'timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+        .join(clusterIDsWithNewData, Seq("cluster_id", "organization_id"))
 
       val logPrefixesWithNewData = dfClusterService
-        .join(clusterIDsWithNewData, Seq("cluster_id"))
-        .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+        .join(clusterIDsWithNewData, Seq("organization_id", "cluster_id"))
+        .select('organization_id, 'timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
         .filter('cluster_log_conf.isNotNull)
         .unionByName(historicalClustersWithNewData)
 
@@ -664,7 +674,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter('cluster_id.isNotNull)
         .withColumn("date", TransformFunctions.toTS('timestamp, outputResultType = DateType))
         .filter('cluster_log_conf.isNotNull && 'actionName.isin("create", "edit"))
-        .select('timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+        .select('organization_id, 'timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
 
       existingLogPrefixes
         .unionByName(logPrefixesWithNewData)

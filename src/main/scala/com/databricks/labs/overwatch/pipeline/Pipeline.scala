@@ -5,7 +5,6 @@ import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpe
 import TransformFunctions._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
-import org.apache.spark.sql.functions.col
 
 import java.io.{PrintWriter, StringWriter}
 
@@ -47,7 +46,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
           println(s"Delaying source shuffle Partition Set since input is stream")
       }
 
-      if (sourceDF.rdd.take(1).nonEmpty) { // if source DF is nonEmpty, continue with transforms
+      if (!sourceDF.isEmpty) { // if source DF is nonEmpty, continue with transforms
         if (transforms.nonEmpty) {
           val transformedDF = transforms.get.foldLeft(verifiedSourceDF) {
             case (df, transform) =>
@@ -69,7 +68,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
     * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
     * Accepting data with higher precision than delivery causes bad data
     */
-  protected val auditLogsIncrementalCols = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
+  protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
 
   protected def finalizeModule(report: ModuleStatusReport): Unit = {
     val pipelineReportTarget = PipelineTable(
@@ -159,7 +158,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     try {
       // TODO -- move this to the exception handler for EmptyModule
-      if (df.schema.fieldNames.contains("__OVERWATCHEMPTY") || df.rdd.take(1).isEmpty) {
+      if (df.schema.fieldNames.contains("__OVERWATCHEMPTY") || df.isEmpty) {
         val emptyStatusReport = ModuleStatusReport(
           organization_id = config.organizationId,
           moduleID = module.moduleID,
@@ -183,72 +182,22 @@ class Pipeline(_workspace: Workspace, _database: Database,
       if (df.schema.fieldNames.contains("__OVERWATCHFAILURE")) throw new UnhandledException(s"FAILED to append: ${
         target.tableFullName
       }")
-      var finalDF = df
-      var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
 
-      finalDF = if (target.zOrderBy.nonEmpty) {
-        TransformFunctions.moveColumnsToFront(finalDF, target.zOrderBy ++ target.statsColumns)
-      } else finalDF
+      val finalDF = PipelineFunctions.optimizeWritePartitions(df, sourceDFparts, target, spark, config, module)
 
-      val targetShufflePartitionSizeMB = 128.0
-      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").toDouble / 1024 / 1024
-      val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
 
-      // TODO -- handle streaming until Module refactor with source -> target mappings
-      val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
-        target.name match {
-          case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
-            .rdd.partitions.length * target.shuffleFactor
-        }
-      } else {
-        sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
-      }
-
-      val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
-      val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
-
-      if (config.debugFlag) {
-        println(s"DEBUG: Source DF Partitions: ${sourceDFparts}")
-        println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
-        println(s"DEBUG: Max PartitionBytes (MB): ${
-          spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
-        }")
-      }
-
-      logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
-        s"\nShufflePartitions: ${targetShufflePartitionCount}")
-
-      spark.conf.set("spark.sql.shuffle.partitions", targetShufflePartitionCount)
-
-      // repartition partitioned tables that are not auto-optimized into the range partitions for writing
-      // without this the file counts of partitioned tables will be extremely high
-      finalDF = if (target.partitionBy.nonEmpty && !target.autoOptimize) {
-        finalDF.repartition(targetShufflePartitionCount, target.partitionBy map col: _*)
-      } else finalDF
-
-      val startLogMsg = s"Beginning append to ${
-        target.tableFullName
-      }"
+      val startLogMsg = s"Beginning append to ${target.tableFullName}"
       logger.log(Level.INFO, startLogMsg)
 
 
       // Append the output
       if (!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
-      val debugCount = if (!config.isFirstRun || config.debugFlag) {
-        val dfCount = finalDF.count()
-        val msg = s"${
-          module.moduleName
-        } SUCCESS! ${
-          dfCount
-        } records appended."
-        println(msg)
-        logger.log(Level.INFO, msg)
-        dfCount
-      } else {
-        logger.log(Level.INFO, "Counts not calculated on first run.")
-        0
-      }
+      val dfCount = finalDF.count()
+      val msg = s"SUCCESS! ${module.moduleName}: $dfCount records appended."
+      println(msg)
+      logger.log(Level.INFO, msg)
 
+      var lastOptimizedTS: Long = getLastOptimized(module.moduleID)
       if (needsOptimize(module.moduleID)) {
         postProcessor.markOptimize(target)
         lastOptimizedTS = config.untilTime(module.moduleID).asUnixTimeMilli
@@ -258,6 +207,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
       val endTime = System.currentTimeMillis()
 
+      // Generate Success Report
       val moduleStatusReport = ModuleStatusReport(
         organization_id = config.organizationId,
         moduleID = module.moduleID,
@@ -269,7 +219,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         untilTS = config.untilTime(module.moduleID).asUnixTimeMilli,
         dataFrequency = target.dataFrequency.toString,
         status = "SUCCESS",
-        recordsAppended = debugCount,
+        recordsAppended = dfCount,
         lastOptimizedTS = lastOptimizedTS,
         vacuumRetentionHours = 24 * 7,
         inputConfig = config.inputConfig,
@@ -303,13 +253,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         // TODO -- move this to FailedModule exception handler
         val failedModuleReport = failModule(module, target, "FAILED", msg)
         finalizeModule(failedModuleReport)
-        throw new FailedModuleException(s"MODULE FAILED: ${
-          module.moduleID
-        } --> ${
-          module.moduleName
-        }\n ${
-          e.getMessage
-        }")
+        throw new FailedModuleException(s"MODULE FAILED: ${module.moduleID} --> ${module.moduleName}\n ${e.getMessage}")
     }
 
   }
