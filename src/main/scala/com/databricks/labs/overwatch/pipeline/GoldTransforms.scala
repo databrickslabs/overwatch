@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.{Module, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Module, NoNewDataException, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
@@ -150,7 +150,9 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
 
   protected def buildLogin(accountModSilver: DataFrame)(df: DataFrame): DataFrame = {
-    val userIdLookup = accountModSilver.select('organization_id, 'user_name.alias("login_user"), 'user_id)
+    val userIdLookup = if (!accountModSilver.isEmpty) {
+      accountModSilver.select('organization_id, 'user_name.alias("login_user"), 'user_id)
+    } else Seq(("-99", "-99")).toDF("organization_id", "login_user")
     df.join(userIdLookup, Seq("organization_id", "login_user"), "left")
       .select(
         'organization_id,
@@ -303,6 +305,7 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               automatedDBUPrice: Double
                                             )(newTerminatedJobRuns: DataFrame): DataFrame = {
 
+    if (clusterStateFact.isEmpty) throw new NoNewDataException(s"ClusterStateFact Source does not exist or is empty")
 
     val clusterNameLookup = cluster.select('organization_id, 'cluster_id, 'cluster_name).distinct
     val isAutomated = 'cluster_name.like("job-%-run-%")

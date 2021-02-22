@@ -35,29 +35,43 @@ class Pipeline(_workspace: Workspace, _database: Database,
       println(s"Beginning: ${module.moduleName}")
       println("Validating Input Schemas")
 
-      @transient
-      lazy val verifiedSourceDF = sourceDF
-        .verifyMinimumSchema(Schema.get(module), enforceNonNullCols = true, config.debugFlag)
-
       try {
-        sourceDFparts = verifiedSourceDF.rdd.partitions.length
-      } catch {
-        case _: AnalysisException =>
-          println(s"Delaying source shuffle Partition Set since input is stream")
-      }
 
-      if (!sourceDF.isEmpty) { // if source DF is nonEmpty, continue with transforms
-        if (transforms.nonEmpty) {
-          val transformedDF = transforms.get.foldLeft(verifiedSourceDF) {
-            case (df, transform) =>
-              df.transform(transform)
+        if (!sourceDF.isEmpty) { // if source DF is nonEmpty, continue with transforms
+          @transient
+          lazy val verifiedSourceDF = sourceDF
+            .verifyMinimumSchema(Schema.get(module), enforceNonNullCols = true, config.debugFlag)
+
+          try {
+            sourceDFparts = verifiedSourceDF.rdd.partitions.length
+          } catch {
+            case _: AnalysisException =>
+              println(s"Delaying source shuffle Partition Set since input is stream")
           }
-          write(transformedDF, module)
-        } else {
-          write(verifiedSourceDF, module)
+
+          if (transforms.nonEmpty) {
+            val transformedDF = transforms.get.foldLeft(verifiedSourceDF) {
+              case (df, transform) =>
+                df.transform(transform)
+            }
+            write(transformedDF, module)
+          } else {
+            write(verifiedSourceDF, module)
+          }
+        } else { // if Source DF is empty don't attempt transforms and send EMPTY to writer
+//          write(spark.emptyDataFrame, module)
+          val msg = s"ALERT: No New Data Retrieved for Module ${module.moduleID}-${module.moduleName}! Skipping"
+          println(msg)
+          throw new NoNewDataException(msg)
         }
-      } else { // if Source DF is empty don't attempt transforms and send EMPTY to writer
-        write(spark.emptyDataFrame, module)
+      } catch {
+        case e: FailedModuleException =>
+          val errMessage = s"FAILED: ${module.moduleID}-${module.moduleName} Module"
+          logger.log(Level.ERROR, errMessage, e)
+        case e: NoNewDataException =>
+          val errMessage = s"EMPTY: ${module.moduleID}-${module.moduleName} Module: SKIPPING"
+          logger.log(Level.ERROR, errMessage, e)
+          noNewDataHandler(module)
       }
     }
   }
@@ -131,9 +145,26 @@ class Pipeline(_workspace: Workspace, _database: Database,
     }
   }
 
-  private def failModule(module: Module, target: PipelineTable, outcome: String, msg: String): ModuleStatusReport = {
+  private def failModule(module: Module, target: PipelineTable, msg: String): Unit = {
 
-    ModuleStatusReport(
+    val rollbackMsg = s"ROLLBACK: Attempting Roll back ${module.moduleName}."
+    println(rollbackMsg)
+    logger.log(Level.WARN, rollbackMsg)
+
+    val rollbackStatus = try {
+      database.rollbackTarget(target)
+      "ROLLBACK SUCCESSFUL"
+    } catch {
+      case e: Throwable => {
+        val rollbackFailedMsg = s"ROLLBACK FAILED: ${module.moduleName} -->\nMessage: ${e.getMessage}\nCause:" +
+          s"${e.getCause}"
+        println(rollbackFailedMsg, e)
+        logger.log(Level.ERROR, rollbackFailedMsg, e)
+        "ROLLBACK FAILED"
+      }
+    }
+
+    val failedStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
       moduleID = module.moduleID,
       moduleName = module.moduleName,
@@ -143,45 +174,44 @@ class Pipeline(_workspace: Workspace, _database: Database,
       fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
       untilTS = getVerifiedUntilTS(module.moduleID),
       dataFrequency = target.dataFrequency.toString,
-      status = s"${outcome}: $msg",
+      status = s"FAILED --> $rollbackStatus: ERROR:\n$msg",
       recordsAppended = 0L,
       lastOptimizedTS = getLastOptimized(module.moduleID),
       vacuumRetentionHours = 0,
       inputConfig = config.inputConfig,
       parsedConfig = config.parsedConfig
     )
+    finalizeModule(failedStatusReport)
+    throw new FailedModuleException(msg)
 
+  }
+
+  private def noNewDataHandler(module: Module): Unit = {
+    val startTime = System.currentTimeMillis()
+    val emptyStatusReport = ModuleStatusReport(
+      organization_id = config.organizationId,
+      moduleID = module.moduleID,
+      moduleName = module.moduleName,
+      primordialDateString = config.primordialDateString,
+      runStartTS = startTime,
+      runEndTS = startTime,
+      fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
+      untilTS = getVerifiedUntilTS(module.moduleID),
+      dataFrequency = "",
+      status = "EMPTY",
+      recordsAppended = 0L,
+      lastOptimizedTS = getLastOptimized(module.moduleID),
+      vacuumRetentionHours = 24 * 7,
+      inputConfig = config.inputConfig,
+      parsedConfig = config.parsedConfig
+    )
+    finalizeModule(emptyStatusReport)
   }
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): Unit = {
     val startTime = System.currentTimeMillis()
 
     try {
-      // TODO -- move this to the exception handler for EmptyModule
-      if (df.schema.fieldNames.contains("__OVERWATCHEMPTY") || df.isEmpty) {
-        val emptyStatusReport = ModuleStatusReport(
-          organization_id = config.organizationId,
-          moduleID = module.moduleID,
-          moduleName = module.moduleName,
-          primordialDateString = config.primordialDateString,
-          runStartTS = startTime,
-          runEndTS = startTime,
-          fromTS = config.fromTime(module.moduleID).asUnixTimeMilli,
-          untilTS = getVerifiedUntilTS(module.moduleID),
-          dataFrequency = target.dataFrequency.toString,
-          status = "EMPTY",
-          recordsAppended = 0L,
-          lastOptimizedTS = getLastOptimized(module.moduleID),
-          vacuumRetentionHours = 24 * 7,
-          inputConfig = config.inputConfig,
-          parsedConfig = config.parsedConfig
-        )
-        finalizeModule(emptyStatusReport)
-        throw new NoNewDataException(s"FAILED to append: ${target.tableFullName}")
-      }
-      if (df.schema.fieldNames.contains("__OVERWATCHFAILURE")) throw new UnhandledException(s"FAILED to append: ${
-        target.tableFullName
-      }")
 
       val finalDF = PipelineFunctions.optimizeWritePartitions(df, sourceDFparts, target, spark, config, module)
 
@@ -233,33 +263,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
       )
       finalizeModule(moduleStatusReport)
     } catch {
-      case e: NoNewDataException =>
-        val msg = s"ALERT: No New Data Retrieved for Module ${module.moduleID}! Skipping"
-        println(msg)
-        logger.log(Level.WARN, msg, e)
       case e: Throwable =>
         val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
         logger.log(Level.ERROR, msg, e)
-        // TODO -- handle rollback
-        // TODO -- Capture e message in failReport
-        val rollbackMsg = s"ROLLBACK: Attempting Roll back ${module.moduleName}."
-        println(rollbackMsg)
-        println(msg, e)
-        logger.log(Level.WARN, rollbackMsg)
-        try {
-          database.rollbackTarget(target)
-        } catch {
-          case eSub: Throwable => {
-            val rollbackFailedMsg = s"ROLLBACK FAILED: ${module.moduleName} -->\nMessage: ${eSub.getMessage}\nCause:" +
-              s"${eSub.getCause}"
-            println(rollbackFailedMsg, eSub)
-            logger.log(Level.ERROR, rollbackFailedMsg, eSub)
-          }
-        }
-        // TODO -- move this to FailedModule exception handler
-        val failedModuleReport = failModule(module, target, "FAILED", msg)
-        finalizeModule(failedModuleReport)
-        throw new FailedModuleException(s"MODULE FAILED: ${module.moduleID} --> ${module.moduleName}\n ${e.getMessage}")
+        failModule(module, target, msg)
     }
 
   }

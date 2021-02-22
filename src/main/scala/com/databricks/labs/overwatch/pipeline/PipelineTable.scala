@@ -122,13 +122,15 @@ case class PipelineTable(
 
   def asDF(withGlobalFilters: Boolean = true): DataFrame = {
     try {
-      val fullDF = if (withMasterMinimumSchema) { // infer master schema if true and available
-        logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for $tableFullName")
-        spark.table(tableFullName).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
-      } else spark.table(tableFullName)
-      if (withGlobalFilters && config.globalFilters.nonEmpty)
-        PipelineFunctions.applyFilters(fullDF, config.globalFilters.get)
-      else fullDF
+      if (exists) {
+        val fullDF = if (withMasterMinimumSchema) { // infer master schema if true and available
+          logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for $tableFullName")
+          spark.table(tableFullName).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
+        } else spark.table(tableFullName)
+        if (withGlobalFilters && config.globalFilters.nonEmpty)
+          PipelineFunctions.applyFilters(fullDF, config.globalFilters.get)
+        else fullDF
+      } else spark.emptyDataFrame
     } catch {
       case e: AnalysisException =>
         logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist or cannot apply global filters. " +
@@ -156,7 +158,6 @@ case class PipelineTable(
    * @param cronColumnsNames  1 or many incremental columns
    * @return Filtered Dataframe
    */
-  @throws(classOf[UnhandledException])
   def asIncrementalDF(
                        module: Module,
                        cronColumnsNames: Seq[String],
@@ -226,10 +227,7 @@ case class PipelineTable(
 
       PipelineFunctions.withIncrementalFilters(instanceDF, module, incrementalFilters, config.globalFilters)
     } else { // Source doesn't exist
-//      Seq("No New Records").toDF("__OVERWATCHEMPTY")
-      // TODO -- again need to find the best way to fail if missing sources
-      throw new FailedModuleException(s"Source $tableFullName does not exist for Module $moduleID EMPTY: skipping.")
-
+      spark.emptyDataFrame
     }
   }
 

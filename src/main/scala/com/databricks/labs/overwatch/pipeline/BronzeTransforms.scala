@@ -232,7 +232,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
             split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
           .drop("filenameAR")
       } else {
-        Seq("No New Records").toDF("__OVERWATCHEMPTY")
+        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data found between ${fromDT.toString}-${untilDT.toString}")
+//        Seq("No New Records").toDF("__OVERWATCHEMPTY")
       }
     }
   }
@@ -397,7 +398,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       clusterEventsDF
     } else {
       println("EMPTY MODULE: Cluster Events")
-      Seq("").toDF("__OVERWATCHEMPTY")
+//      Seq("").toDF("__OVERWATCHEMPTY")
+      throw new NoNewDataException("EMPTY: No New Cluster Events")
     }
 
   }
@@ -533,8 +535,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
               .drop("timestamp")
           }
           case e: Throwable => {
-            logger.log(Level.ERROR, "FAILED spark events bronze", e)
-            Seq("").toDF("__OVERWATCHFAILURE")
+//            logger.log(Level.ERROR, "FAILED spark events bronze", e)
+//            Seq("").toDF("__OVERWATCHFAILURE")
+            throw new FailedModuleException(e.getMessage)
           }
         }
 
@@ -587,13 +590,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val msg = "Path Globs Empty, exiting"
         println(msg)
         logger.log(Level.WARN, msg)
-        Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
+        throw new NoNewDataException("EMPTY: No new Spark Events Files")
+//        Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
       }
     } else {
       val msg = "Event Logs DF is empty, Exiting"
       println(msg)
       logger.log(Level.WARN, msg)
-      Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
+      throw new NoNewDataException("EMPTY: No new Spark Events Files")
+//      Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
     }
   }
 

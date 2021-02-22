@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, ModuleStatusReport}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 import org.apache.spark.sql.types._

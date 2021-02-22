@@ -1,8 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import java.util.UUID
-
-import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, NoNewDataException, SchemaTools, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
@@ -371,7 +370,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         .join(sshDetails, Seq("organization_id", "date", "timestamp", "login_type", "requestId"), "left")
         .drop("date")
     } else
-      Seq("No New Records").toDF("__OVERWATCHEMPTY")
+      throw new NoNewDataException("EMPTY: No new Account Logins")
+//      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   // TODO -- Azure Review
@@ -397,7 +397,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           .otherwise('user_id))
 
     } else
-      Seq("No New Records").toDF("__OVERWATCHEMPTY")
+      throw new NoNewDataException(s"EMPTY: Now new account modifications")
+//      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   private val auditBaseCols: Array[Column] = Array(

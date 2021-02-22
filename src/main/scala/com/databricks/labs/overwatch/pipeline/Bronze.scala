@@ -135,48 +135,23 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
      * enabled will be missing all info. This is especially important for overwatch early stages
      */
     if (config.overwatchScope.contains(OverwatchScope.clusters)) {
-      try {
-        appendClustersAPIProcess.process()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: Clusters Module")
-      }
+      appendClustersAPIProcess.process()
     }
+
     if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-      try {
-        appendClusterEventLogsProcess.process()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: ClusterEvents Module")
-      }
+      appendClusterEventLogsProcess.process()
     }
 
     if (config.overwatchScope.contains(OverwatchScope.jobs)) {
-      try {
-        appendJobsProcess.process()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: Jobs Module")
-      }
+      appendJobsProcess.process()
     }
 
     if (config.overwatchScope.contains(OverwatchScope.pools)) {
-      try {
-        appendPoolsProcess.process()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: Pools Module")
-      }
+      appendPoolsProcess.process()
     }
 
     if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-      try {
-        appendSparkEventLogsProcess.process()
-      }
-      catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: Spark Events Module")
-      }
+      appendSparkEventLogsProcess.process()
     }
 
     initiatePostProcessing()
