@@ -640,11 +640,12 @@ object Helpers extends SparkSessionWrapper {
     try {
       val fs = new Path(path).getFileSystem(conf)
       val paths = fs.globStatus(new Path(path))
-      logger.log(Level.DEBUG, s"${path} expanded in ${paths.length} files")
+      logger.log(Level.DEBUG, s"$path expanded in ${paths.length} files")
       paths.map(wildString => {
         val path = wildString.getPath
         val pathString = path.toString
         val fileModEpochMillis = if (fromEpochMillis.nonEmpty) {
+          // TODO -- use the listStatus to return other metadata as well such as file size
           Some(fs.listStatus(path).filter(_.isFile).head.getModificationTime)
         } else None
         (pathString, fileModEpochMillis)

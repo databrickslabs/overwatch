@@ -192,7 +192,13 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
       // Append the output
       if (!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
-      val dfCount = finalDF.count()
+
+      // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
+      // of attempting to re-read the very inefficient json.gz files.
+      val dfCount = if (target.name == "spark_events_bronze") {
+        target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
+      } else finalDF.count()
+
       val msg = s"SUCCESS! ${module.moduleName}: $dfCount records appended."
       println(msg)
       logger.log(Level.INFO, msg)

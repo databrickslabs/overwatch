@@ -39,7 +39,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("organization_id", "requestId"),
       config,
       incrementalColumns = Array("date", "timestamp"),
-      partitionBy = Seq("organization_id", "date", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id", "date"),
       statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "),
       dataFrequency = Frequency.daily,
@@ -62,22 +62,23 @@ abstract class PipelineTargets(config: Config) {
       config,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("timestamp"),
-      statsColumns = ("cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID").split(", "))
+      statsColumns = "cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID".split(", "))
 
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
       keys = Array("organization_id", "Event"), // really aren't any global valid keys for this table
       config,
       incrementalColumns = Array("fileCreateEpochMS"),
-      partitionBy = Seq("organization_id", "Event", "fileCreateDate", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id", "Event", "fileCreateDate"),
       statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID," +
         "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename," +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "),
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
         "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
-        "spark.sql.files.maxPartitionBytes" -> "33554432"
-        // 32m --> input is extremely wide/deep in places which can cause major input task skew
+        "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString
+        // very large schema to imply, too much parallelism and schema result size is too large to
+        // serialize, 64m seems to be a good middle ground.
       ),
       autoOptimize = true, // TODO -- perftest
       masterSchema = Some(Schema.sparkEventsRawMasterSchema)
@@ -129,7 +130,12 @@ abstract class PipelineTargets(config: Config) {
       name = "spark_executors_silver",
       keys = Array("SparkContextID", "ExecutorID"),
       config,
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id"),
+      autoOptimize = true,
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
+      ),
       shuffleFactor = 0.25
     )
 
@@ -137,7 +143,12 @@ abstract class PipelineTargets(config: Config) {
       name = "spark_Executions_silver",
       keys = Array("SparkContextID", "ExecutionID"),
       config,
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id"),
+      autoOptimize = true,
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
+      ),
       shuffleFactor = 0.25
     )
 
@@ -146,7 +157,12 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "JobID"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
-      partitionBy = Seq("organization_id", "startDate", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id", "startDate"),
+      autoOptimize = true,
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
+      ),
       shuffleFactor = 0.25
     )
 
@@ -155,7 +171,12 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "StageID", "StageAttemptID"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
-      partitionBy = Seq("organization_id", "startDate", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id", "startDate"),
+      autoOptimize = true,
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
+      ),
       shuffleFactor = 0.25
     )
 
@@ -164,7 +185,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
-      partitionBy = Seq("organization_id", "startDate", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id", "startDate"),
       shuffleFactor = 5,
       autoOptimize = true,
       sparkOverrides = Map(
@@ -187,7 +208,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("timestamp", "userEmail"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
     lazy private[overwatch] val accountModTarget: PipelineTable = PipelineTable(
@@ -195,7 +216,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("requestId"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
     lazy private[overwatch] val clustersSpecTarget: PipelineTable = PipelineTable(
@@ -219,7 +240,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("timestamp", "notebook_id"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
   }
@@ -301,7 +322,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("requestId"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
     lazy private[overwatch] val accountModsViewTarget: PipelineView = PipelineView(
@@ -316,7 +337,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("requestId"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
     lazy private[overwatch] val accountLoginViewTarget: PipelineView = PipelineView(
@@ -344,7 +365,12 @@ abstract class PipelineTargets(config: Config) {
       name = "sparkJob_gold",
       keys = Array("spark_context_id", "job_id"),
       config,
-      partitionBy = Seq("organization_id", "date", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id", "date"),
+      autoOptimize = true,
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
+      ),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("unixTimeMS")
     )
@@ -359,7 +385,12 @@ abstract class PipelineTargets(config: Config) {
       name = "sparkStage_gold",
       keys = Array("spark_context_id", "stage_id", "stage_attempt_id"),
       config,
-      partitionBy = Seq("organization_id", "date", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id", "date"),
+      autoOptimize = true,
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
+      ),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("unixTimeMS")
     )
@@ -374,7 +405,7 @@ abstract class PipelineTargets(config: Config) {
       name = "sparkTask_gold",
       keys = Array("spark_context_id", "task_id", "task_attempt_id"),
       config,
-      partitionBy = Seq("organization_id", "date", "__overwatch_ctrl_noise"),
+      partitionBy = Seq("organization_id", "date"),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("unixTimeMS"),
       shuffleFactor = 5,
@@ -396,7 +427,12 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("spark_context_id", "execution_id"),
       config,
       incrementalColumns = Array("unixTimeMS"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id"),
+      autoOptimize = true,
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
+      )
     )
 
     lazy private[overwatch] val sparkExecutionViewTarget: PipelineView = PipelineView(
@@ -410,7 +446,12 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("spark_context_id", "executor_id"),
       config,
       incrementalColumns = Array("unixTimeMS"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id"),
+      autoOptimize = true,
+      sparkOverrides = Map(
+        "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
+      )
     )
 
     lazy private[overwatch] val sparkExecutorViewTarget: PipelineView = PipelineView(

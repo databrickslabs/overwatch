@@ -77,7 +77,7 @@ object PipelineFunctions {
     // noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
 
     if (target.partitionBy.nonEmpty) {
-      if (target.partitionBy.contains("__overwatch_ctrl_noise")) {
+      if (target.partitionBy.contains("__overwatch_ctrl_noise") && !target.autoOptimize) {
         logger.log(Level.INFO, s"${target.tableFullName}: generating partition noise")
         mutationDF = mutationDF.withColumn("__overwatch_ctrl_noise", (rand() * lit(32)).cast("int"))
       }
