@@ -710,8 +710,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         'serviceName, 'actionName,
         'organization_id,
         'date,
-        'runId.cast("int"),
-        'jobId.cast("int"),
+        'runId,
+        'jobId,
         'idInJob, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
         'jobTriggerType,
         'requestId.alias("completionRequestID"),
@@ -726,7 +726,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('actionName.isin("cancel"))
       .select(
         'organization_id, 'date,
-        'run_id.cast("int").alias("runId"),
+        'run_id.cast("long").alias("runId"),
         'requestId.alias("cancellationRequestId"),
         'response.alias("cancellationResponse"),
         'sessionId.alias("cancellationSessionId"),
@@ -741,7 +741,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('actionName.isin("runNow"))
       .select(
         'organization_id, 'date,
-        get_json_object($"response.result", "$.run_id").cast("int").alias("runId"),
+        get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
         lit(null).cast("string").alias("run_name"),
         'timestamp.alias("submissionTime"),
         lit(null).cast("string").alias("new_cluster"),
@@ -768,7 +768,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('actionName.isin("submitRun"))
       .select(
         'organization_id, 'date,
-        get_json_object($"response.result", "$.run_id").cast("int").alias("runId"),
+        get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
         'run_name,
         'timestamp.alias("submissionTime"),
         'new_cluster, 'existing_cluster_id,
@@ -856,7 +856,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
       .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
       .select(
-        'runId, 'jobId, 'idInJob, 'jobRunTime, 'run_name, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
+        'runId.cast("long"), 'jobId.cast("long"), 'idInJob, 'jobRunTime, 'run_name,
+        'jobClusterType, 'jobTaskType, 'jobTerminalState,
         'jobTriggerType, 'new_cluster,
         'existing_cluster_id, //.alias("clusterId"),
         'cluster_name,

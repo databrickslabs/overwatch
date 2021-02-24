@@ -8,9 +8,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 
-object TransformFunctions extends SparkSessionWrapper {
-
-  import spark.implicits._
+object TransformFunctions {
 
   implicit class DataFrameTransforms(df: DataFrame) {
     private val logger: Logger = Logger.getLogger(this.getClass)
@@ -289,7 +287,9 @@ object TransformFunctions extends SparkSessionWrapper {
     ((unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)).cast("long")
   }
 
-  private val applicableWorkers = when('type === "RESIZING" && 'target_num_workers < 'current_num_workers, 'target_num_workers).otherwise('current_num_workers)
+  private val applicableWorkers = when(col("type") === "RESIZING" &&
+    col("target_num_workers") < col("current_num_workers"), col("target_num_workers"))
+    .otherwise(col("current_num_workers"))
 
   def getNodeInfo(nodeType: String, metric: String, multiplyTime: Boolean): Column = {
     val baseMetric = if ("driver".compareToIgnoreCase(nodeType) == 0) {
@@ -301,10 +301,10 @@ object TransformFunctions extends SparkSessionWrapper {
     }
 
     if (multiplyTime) {
-      when('type === "TERMINATING", lit(0))
-        .otherwise(round(baseMetric * 'uptime_in_state_S, 2)).alias(s"${nodeType}_${baseMetric}S")
+      when(col("type") === "TERMINATING", lit(0))
+        .otherwise(round(baseMetric * col("uptime_in_state_S"), 2)).alias(s"${nodeType}_${baseMetric}S")
     } else {
-      when('type === "TERMINATING", lit(0))
+      when(col("type") === "TERMINATING", lit(0))
         .otherwise(round(baseMetric, 2).alias(s"${nodeType}_${baseMetric}"))
     }
   }

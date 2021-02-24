@@ -1,8 +1,10 @@
 package com.databricks.labs.overwatch.utils
 
+
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructField
+import org.apache.log4j.{Level, Logger}
 
 /**
  * Essentially a fork from dblabs tempo project
@@ -14,6 +16,7 @@ import org.apache.spark.sql.types.StructField
  * tempo as a dep when it's ready.
  */
 object asofJoin {
+  private val logger: Logger = Logger.getLogger(this.getClass)
 
   def checkEqualPartitionCols(leftTSDF: TSDF, rightTSDF: TSDF): Boolean = {
     leftTSDF.partitionCols.zip(rightTSDF.partitionCols).forall(p => p._1 == p._2)
@@ -169,7 +172,19 @@ object asofJoin {
                 ): TSDF = {
 
     if (!checkEqualPartitionCols(leftTSDF, rightTSDF)) {
-      throw new IllegalArgumentException("Partition columns of left and right TSDF should be equal.")
+
+      val msg = "SCHEMA WARNING: Partition columns of left and right TSDF should be equal.\n" +
+        s"LEFT PARTITIONS: ${leftTSDF.partitionCols.foreach(f => println(f.toString()))}\n" +
+        s"RIGHT PARTITIONS: ${rightTSDF.partitionCols.foreach(f => println(f.toString()))}\n" +
+        s"ATTEMPTING IMPLICIT CAST and continue."
+
+      logger.log(Level.WARN, msg)
+      println(msg)
+
+//      if (leftTSDF.partitionCols.forall(f => rightTSDF.partitionCols.map(_.name.toLowerCase).contains(f.name.toLowerCase))) {
+//        throw new IllegalArgumentException("Casting Aborted! Partition column names are different")
+//      }
+
     }
 
     // add Prefixes to TSDFs

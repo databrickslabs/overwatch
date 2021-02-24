@@ -257,10 +257,10 @@ trait GoldTransforms extends SparkSessionWrapper {
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
       'cluster_id,
-      ('timestamp * lit(1000)).alias("unixTimeMS_state_start"),
+      ('timestamp * lit(1000)).cast("long").alias("unixTimeMS_state_start"),
       from_unixtime(('timestamp * lit(1000)).cast("double") / 1000).cast("timestamp").alias("timestamp_state_start"),
       from_unixtime(('timestamp * lit(1000)).cast("double") / 1000).cast("timestamp").cast("date").alias("date_state_start"),
-      ((lead('timestamp, 1).over(stateUnboundW) * lit(1000) - 1)).alias("unixTimeMS_state_end"),
+      ((lead('timestamp, 1).over(stateUnboundW) * lit(1000) - 1)).cast("long").alias("unixTimeMS_state_end"),
       from_unixtime(((lead('timestamp, 1).over(stateUnboundW) * lit(1000)).cast("double") - 1.0) / 1000).cast("timestamp").alias("timestamp_state_end"),
       from_unixtime(((lead('timestamp, 1).over(stateUnboundW) * lit(1000)).cast("double") - 1.0) / 1000).cast("timestamp").cast("date").alias("date_state_end"),
       'type.alias("state"),
