@@ -142,7 +142,7 @@ private[overwatch] class TokenError(s: String) extends Exception(s) {}
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
 // TODO - enable these event handlers to right the Failed/Empty Module status reports
-private[overwatch] class EmptyModuleException(s: String) extends Exception(s) {}
+//private[overwatch] class EmptyModuleException(s: String) extends Exception(s) {}
 private[overwatch] class FailedModuleException(s: String) extends Exception(s) {}
 
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}

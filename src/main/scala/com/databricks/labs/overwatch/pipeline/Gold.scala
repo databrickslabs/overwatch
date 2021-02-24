@@ -170,8 +170,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     val scope = config.overwatchScope
 
     if (scope.contains(OverwatchScope.accounts)) {
-      appendAccountLoginProcess.process()
       appendAccountModProcess.process()
+      appendAccountLoginProcess.process()
 
       GoldTargets.accountLoginViewTarget.publish(accountLoginViewColumnMappings)
       GoldTargets.accountModsViewTarget.publish(accountModViewColumnMappings)
@@ -199,12 +199,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
 
     if (scope.contains(OverwatchScope.sparkEvents)) {
-      try {
-        processSparkEvents()
-      } catch {
-        case e: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: SparkEvents Gold Module", e)
-      }
+      processSparkEvents()
     }
 
     //Build facts in scope -- this is done last as facts can consume from the gold model itself

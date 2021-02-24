@@ -1,8 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import java.util.UUID
-
-import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, NoNewDataException, SchemaTools, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
@@ -166,7 +165,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'Pipeline_SnapTS, 'filenameGroup)
   }
 
-  private val uniqueTimeWindow = Window.partitionBy("SparkContextID", "executionId")
+  private val uniqueTimeWindow = Window.partitionBy('organization_id, 'SparkContextID, 'executionId)
 
   private def simplifyExecutionsStart(df: DataFrame): DataFrame = {
     df.filter('Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart")
@@ -352,7 +351,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       ).alias("ssh_login_details")
     )
 
-    if (accountLogins.rdd.take(1).nonEmpty) {
+    if (!accountLogins.isEmpty) {
       accountLogins
         .select(
           'timestamp,
@@ -371,7 +370,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         .join(sshDetails, Seq("organization_id", "date", "timestamp", "login_type", "requestId"), "left")
         .drop("date")
     } else
-      Seq("No New Records").toDF("__OVERWATCHEMPTY")
+      throw new NoNewDataException("EMPTY: No new Account Logins")
+//      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   // TODO -- Azure Review
@@ -380,7 +380,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .rowsBetween(Window.currentRow, Window.unboundedFollowing)
     val modifiedAccountsDF = df.filter('serviceName === "accounts" &&
       'actionName.isin("add", "addPrincipalToGroup", "removePrincipalFromGroup", "setAdmin", "updateUser", "delete"))
-    if (modifiedAccountsDF.rdd.take(1).nonEmpty) {
+    if (!modifiedAccountsDF.isEmpty) {
       modifiedAccountsDF
         .select(
           'date, 'timestamp, 'organization_id, 'serviceName, 'actionName,
@@ -397,7 +397,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           .otherwise('user_id))
 
     } else
-      Seq("No New Records").toDF("__OVERWATCHEMPTY")
+      throw new NoNewDataException(s"EMPTY: Now new account modifications")
+//      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   private val auditBaseCols: Array[Column] = Array(
@@ -406,9 +407,9 @@ trait SilverTransforms extends SparkSessionWrapper {
 
 
   private def clusterBase(auditRawDF: DataFrame): DataFrame = {
-    val cluster_id_gen_w = Window.partitionBy('cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
-    val cluster_name_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
-    val cluster_state_gen_w = Window.partitionBy('cluster_id).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
+    val cluster_id_gen_w = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
+    val cluster_name_gen_w = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
+    val cluster_state_gen_w = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
     val cluster_id_gen = first('cluster_id, true).over(cluster_id_gen_w)
     val cluster_name_gen = first('cluster_name, true).over(cluster_name_gen_w)
     val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
@@ -591,8 +592,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'sessionId, 'requestId, 'userAgent, 'userIdentity, 'response, 'sourceIPAddress, 'version
     )
 
-    val lastJobStatus = Window.partitionBy('jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val lastJobStatusUnbound = Window.partitionBy('jobId).orderBy('timestamp)
+    val lastJobStatus = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val lastJobStatusUnbound = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp)
     val jobCluster = struct(
       'existing_cluster_id.alias("existing_cluster_id"),
       'new_cluster.alias("new_cluster")

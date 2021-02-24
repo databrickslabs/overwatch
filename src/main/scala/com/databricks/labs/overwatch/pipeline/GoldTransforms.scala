@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.{Module, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Module, NoNewDataException, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
@@ -150,8 +150,10 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
 
   protected def buildLogin(accountModSilver: DataFrame)(df: DataFrame): DataFrame = {
-    val userIdLookup = accountModSilver.select('user_name.alias("login_user"), 'user_id)
-    df.join(userIdLookup, Seq("login_user"), "left")
+    val userIdLookup = if (!accountModSilver.isEmpty) {
+      accountModSilver.select('organization_id, 'user_name.alias("login_user"), 'user_id)
+    } else Seq(("-99", "-99")).toDF("organization_id", "login_user")
+    df.join(userIdLookup, Seq("organization_id", "login_user"), "left")
       .select(
         'organization_id,
         'timestamp.alias("login_unixTimeMS"),
@@ -195,12 +197,12 @@ trait GoldTransforms extends SparkSessionWrapper {
         'timestamp, 'type, 'current_num_workers, 'target_num_workers
       )
 
-    val clusterBeforeW = Window.partitionBy('cluster_id).orderBy('timestamp)
+    val clusterBeforeW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
       .rowsBetween(-1000, Window.currentRow)
-    val clusterAfterW = Window.partitionBy('cluster_id).orderBy('timestamp.desc)
+    val clusterAfterW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
       .rowsBetween(-1000, Window.currentRow)
-    val stateUnboundW = Window.partitionBy('cluster_id).orderBy('timestamp)
-    val uptimeW = Window.partitionBy('cluster_id, 'counter_reset).orderBy('timestamp)
+    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'counter_reset).orderBy('timestamp)
 
     val billableTypes = Array(
       "INIT_SCRIPTS_FINISHED", "INIT_SCRIPTS_STARTED", "STARTING", "TERMINATING", "CREATING", "RESTARTING"
@@ -219,22 +221,22 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("node_type_id",
         when('node_type_id.isNull, first('node_type_id, true).over(clusterAfterW))
           .otherwise('node_type_id))
-      .select('cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
+      .select('organization_id, 'cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
 
     val nodeTypeLookup2 = clusterSnapshot.asDF
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
-      .select('cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
+      .select('organization_id, 'cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
 
     val clusterPotential = clusterEventsBaseline
       .joinAsOf(
         nodeTypeLookup,
-        Seq("cluster_id"),
+        Seq("organization_id", "cluster_id"),
         Seq('timestamp),
         Seq("driver_node_type_id", "node_type_id", "cluster_name"),
         rowsBefore = -1000, rowsAfter = 1000
       ).joinAsOf(
       nodeTypeLookup2,
-        Seq("cluster_id"),
+        Seq("organization_id", "cluster_id"),
         Seq('timestamp),
         Seq("driver_node_type_id", "node_type_id", "cluster_name"),
         rowsBefore = -1000, rowsAfter = 1000
@@ -303,6 +305,7 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               automatedDBUPrice: Double
                                             )(newTerminatedJobRuns: DataFrame): DataFrame = {
 
+    if (clusterStateFact.isEmpty) throw new NoNewDataException(s"ClusterStateFact Source does not exist or is empty")
 
     val clusterNameLookup = cluster.select('organization_id, 'cluster_id, 'cluster_name).distinct
     val isAutomated = 'cluster_name.like("job-%-run-%")
@@ -311,14 +314,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       .select(
         'organization_id,
         'API_name.alias("driver_node_type_id"),
-        'On_Demand_Cost_Hourly.alias("driver_compute_hourly"),
+        'Compute_Contract_Price.alias("driver_compute_hourly"),
         'Hourly_DBUs.alias("driver_dbu_hourly")
       )
     val workerCosts = instanceDetails
       .select(
         'organization_id,
         'API_name.alias("node_type_id"),
-        'On_Demand_Cost_Hourly.alias("worker_compute_hourly"),
+        'Compute_Contract_Price.alias("worker_compute_hourly"),
         'Hourly_DBUs.alias("worker_dbu_hourly"),
         'vCPUs.alias("worker_cores")
       )
@@ -418,7 +421,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     // GET UTILIZATION BY KEY
     // IF incremental spark events are present calculate utilization, otherwise just return with NULLS
     // Spark events are commonly missing if no clusters are logging and/or in test environments
-    if (incrementalSparkJob.take(1).nonEmpty) {
+    if (!incrementalSparkJob.isEmpty) {
       val sparkJobMini = incrementalSparkJob
         .select('organization_id, 'date, 'spark_context_id, 'job_group_id,
           'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
@@ -472,13 +475,13 @@ trait GoldTransforms extends SparkSessionWrapper {
                                cloudProvider: String
                              )(df: DataFrame): DataFrame = {
 
-    val jobGroupW = Window.partitionBy('SparkContextID, $"PowerProperties.JobGroupID")
-    val executionW = Window.partitionBy('SparkContextID, $"PowerProperties.ExecutionID")
-    val isolationIDW = Window.partitionBy('SparkContextID, $"PowerProperties.SparkDBIsolationID")
-    val oAuthIDW = Window.partitionBy('SparkContextID, $"PowerProperties.AzureOAuth2ClientID")
-    val rddScopeW = Window.partitionBy('SparkContextID, $"PowerProperties.RDDScope")
-    val replIDW = Window.partitionBy('SparkContextID, $"PowerProperties.SparkDBREPLID")
-    val notebookW = Window.partitionBy('SparkContextID, $"PowerProperties.NotebookID")
+    val jobGroupW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.JobGroupID")
+    val executionW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.ExecutionID")
+    val isolationIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBIsolationID")
+    val oAuthIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.AzureOAuth2ClientID")
+    val rddScopeW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.RDDScope")
+    val replIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBREPLID")
+    val notebookW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.NotebookID")
       .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     val cloudSpecificUserImputations = if (cloudProvider == "azure") {
@@ -533,7 +536,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'user_email
     )
 
-    val sparkContextW = Window.partitionBy('spark_context_id)
+    val sparkContextW = Window.partitionBy('organization_id, 'spark_context_id)
 
     val isDatabricksJob = 'job_group_id.like("%job-%-run-%")
 

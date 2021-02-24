@@ -242,59 +242,26 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     val scope = config.overwatchScope
 
     if (scope.contains(OverwatchScope.accounts)) {
-      try {
-        appendAccountLoginsProcess.process()
-        appendModifiedAccountsProcess.process()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: Accounts Module")
-      }
+      appendAccountLoginsProcess.process()
+      appendModifiedAccountsProcess.process()
     }
 
     if (scope.contains(OverwatchScope.clusters)) {
-      try {
-        appendClusterSpecProcess.process()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: Clusters Module")
-      }
+      appendClusterSpecProcess.process()
     }
 
     if (scope.contains(OverwatchScope.jobs)) {
-      try {
-        appendJobStatusProcess.process()
-        appendJobRunsProcess.process()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: Jobs Module")
-      }
+      appendJobStatusProcess.process()
+      appendJobRunsProcess.process()
     }
 
-    if (scope.contains(OverwatchScope.notebooks))
-      try {
-        appendNotebookSummaryProcess.process()
-      } catch {
-        case _: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: Notebooks Module")
-      }
+    if (scope.contains(OverwatchScope.notebooks)) {
+      appendNotebookSummaryProcess.process()
+    }
 
-    if (scope.contains(OverwatchScope.sparkEvents))
-      try {
-        if (BronzeTargets.sparkEventLogsTarget.exists) processSparkEvents()
-        else {
-          val msg = s"The source data for sparkEvents module does not exist or is inaccessible. " +
-            s"Please ensure cluster logging is enabled " +
-            s"on at least a few clusters and you have appropriate access to the log path prefixes. Otherwise " +
-            s"please disable the sparkEvents module."
-          throw new NoNewDataException(msg)
-        }
-      } catch {
-        case e: FailedModuleException =>
-          logger.log(Level.ERROR, "FAILED: SparkEvents Silver Module", e)
-        case e: NoNewDataException =>
-          logger.log(Level.ERROR, e)
-          if (config.debugFlag) println(e.getMessage)
-      }
+    if (scope.contains(OverwatchScope.sparkEvents)) {
+      processSparkEvents()
+    }
 
     initiatePostProcessing()
     true // to be used as fail switch later if necessary

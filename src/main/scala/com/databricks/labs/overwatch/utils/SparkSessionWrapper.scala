@@ -47,49 +47,25 @@ trait SparkSessionWrapper extends Serializable {
   lazy val sc: SparkContext = spark.sparkContext
 //  sc.setLogLevel("DEBUG")
 
-  private var _coresPerWorker: Int = _
-  private var _numberOfWorkerNodes: Int = _
-  private var _totalCores: Int = _
-  private var _coresPerTask: Int = _
-  private var _parTasks: Int = _
-  private val driverCores: Int = java.lang.Runtime.getRuntime.availableProcessors
+  def getCoresPerWorker: Int = sc.parallelize("1", 1)
+    .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0)
 
-  def setCoresPerWorker(value: Int): this.type = {
-    _coresPerWorker = value
-    this
+  def getNumberOfWorkerNodes: Int = sc.statusTracker.getExecutorInfos.length - 1
+
+  def getTotalCores: Int = getCoresPerWorker * getNumberOfWorkerNodes
+
+  def getCoresPerTask: Int = {
+    try {
+      spark.conf.get("spark.task.cpus").toInt
+    }
+    catch {
+      case _: java.util.NoSuchElementException => 1
+    }
   }
 
-  def setNumberOfWorkerNodes(value: Int): this.type = {
-    _numberOfWorkerNodes = value
-    this
-  }
+  def getParTasks: Int = scala.math.floor(getTotalCores / getCoresPerTask).toInt
 
-  def setTotalCores(value: Int): this.type = {
-    _totalCores = value
-    this
-  }
-
-  def setCoresPerTask(value: Int): this.type = {
-    _coresPerTask = value
-    this
-  }
-
-  def setParTasks(value: Int): this.type = {
-    _parTasks = value
-    this
-  }
-
-  def getCoresPerWorker: Int = _coresPerWorker
-
-  def getNumberOfWorkerNodes: Int = _numberOfWorkerNodes
-
-  def getTotalCores: Int = _totalCores
-
-  def getCoresPerTask: Int = _coresPerTask
-
-  def getParTasks: Int = _parTasks
-
-  def getDriverCores: Int = driverCores
+  def getDriverCores: Int = java.lang.Runtime.getRuntime.availableProcessors
 
   /**
    * Set global, cluster details such as cluster cores, driver cores, logLevel, etc.
@@ -99,30 +75,6 @@ trait SparkSessionWrapper extends Serializable {
    */
   def envInit(logLevel: String = "INFO"): Boolean = {
     sc.setLogLevel(logLevel)
-    if (System.getenv("OVERWATCH") != "LOCAL") {
-      setCoresPerWorker(sc.parallelize("1", 1)
-        .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0))
-      
-      setNumberOfWorkerNodes(sc.statusTracker.getExecutorInfos.length - 1)
-      setCoresPerTask(
-        try {
-          spark.conf.get("spark.task.cpus").toInt
-        }
-        catch {
-          case e: java.util.NoSuchElementException => 1
-        }
-      )
-    } else {
-      val env = System.getenv().asScala
-      setCoresPerWorker(env("coresPerWorker").toInt)
-      setNumberOfWorkerNodes(env("numberOfWorkerNodes").toInt)
-      setCoresPerTask(1)
-    }
-    setTotalCores(getCoresPerWorker * getNumberOfWorkerNodes)
-    setParTasks(scala.math.floor(getTotalCores / getCoresPerTask).toInt)
-//    if (spark.conf.get("spark.sql.shuffle.partitions") == "200")
-//      spark.conf.set("spark.sql.shuffle.partitions", getTotalCores * 4)
-
     true
   }
 }
