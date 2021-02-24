@@ -6,6 +6,10 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import asofJoin._
 
+/**
+ * Added support for reverse sorting and lookup when
+ */
+
 sealed trait TSDF {
   val df: DataFrame
 
@@ -23,7 +27,10 @@ sealed trait TSDF {
 
   val observationColumns: Seq[StructField]
 
-  protected def baseWindow(): WindowSpec
+  /**
+   * Altered to enable reverse sorting
+   */
+  protected def baseWindow(reversed: Boolean): WindowSpec
 
   def asofJoin(rightTSDF: TSDF,
                leftPrefix: String,
@@ -31,23 +38,32 @@ sealed trait TSDF {
                maxLookback: Long,
                maxLookAhead: Long,
                tsPartitionVal: Int = 0,
-               fraction: Double = 0.1) : TSDF
+               fraction: Double = 0.1): TSDF
+
+  def lookupWhen(rightTSDF: TSDF,
+                 leftPrefix: String,
+                 rightPrefix: String = "right_",
+                 maxLookback: Long,
+                 maxLookAhead: Long,
+                 tsPartitionVal: Int = 0,
+                 fraction: Double = 0.1): TSDF
 
   def windowBetweenRows(start: Long, end: Long): WindowSpec
 
-//  def windowOverRows(length: Long, offset: Long = Window.currentRow): WindowSpec
+  //  def windowOverRows(length: Long, offset: Long = Window.currentRow): WindowSpec
 
   def windowBetweenRange(start: Long, end: Long): WindowSpec
-//
-//  def windowOverRange(length: Long, offset: Long = Window.currentRow): WindowSpec
+
+  //
+  //  def windowOverRange(length: Long, offset: Long = Window.currentRow): WindowSpec
 
 }
 
 private[overwatch] sealed class BaseTSDF(
-                                      val df: DataFrame,
-                                      val tsColumn: StructField,
-                                      val partitionCols: StructField*
-                             )
+                                          val df: DataFrame,
+                                          val tsColumn: StructField,
+                                          val partitionCols: StructField*
+                                        )
   extends TSDF {
 
   override val schema: StructType = df.schema
@@ -66,7 +82,6 @@ private[overwatch] sealed class BaseTSDF(
 
   override val isPartitioned: Boolean = partitionCols.nonEmpty
 
-
   override val structuralColumns: Seq[StructField] = Seq(tsColumn) ++ partitionCols
 
   override val observationColumns: Seq[StructField] =
@@ -76,8 +91,19 @@ private[overwatch] sealed class BaseTSDF(
     TSDF(df, tsColumn.name, _partitionCols: _*)
   }
 
-  protected def baseWindow(): WindowSpec = {
-    val w = Window.orderBy(tsColumn.name)
+  /**
+   * Added support for reverse sorting. TEMPO should probably implement reversed sorting for seq ordering as well
+   * but that was beyond the scope of the needs for this
+   * @param reversed
+   * @return
+   */
+  protected def baseWindow(reversed: Boolean = false): WindowSpec = {
+
+    val w = if (reversed) {
+      Window.orderBy(col(tsColumn.name).desc)
+    } else {
+      Window.orderBy(tsColumn.name)
+    }
 
     if (this.isPartitioned) {
       w.partitionBy(partitionCols.map(_.name) map col: _*)
@@ -93,6 +119,29 @@ private[overwatch] sealed class BaseTSDF(
   }
 
 
+  def lookupWhen(
+                  rightTSDF: TSDF,
+                  leftPrefix: String = "",
+                  rightPrefix: String = "right_",
+                  maxLookback: Long = Window.unboundedPreceding,
+                  maxLookAhead: Long = Window.currentRow,
+                  tsPartitionVal: Int = 0,
+                  fraction: Double = 0.1
+                ): TSDF = {
+
+    if (leftPrefix == "" && tsPartitionVal == 0) {
+      asofJoinExec(this, rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None, fraction)
+    }
+    else if (leftPrefix == "") {
+      asofJoinExec(this, rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, Some(tsPartitionVal), fraction)
+    }
+    else if (tsPartitionVal == 0) {
+      asofJoinExec(this, rightTSDF, Some(leftPrefix), rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None)
+    }
+    else {
+      asofJoinExec(this, rightTSDF, Some(leftPrefix), rightPrefix, maxLookback, maxLookAhead, Some(tsPartitionVal), fraction)
+    }
+  }
 
   def asofJoin(
                 rightTSDF: TSDF,
@@ -104,13 +153,13 @@ private[overwatch] sealed class BaseTSDF(
                 fraction: Double = 0.1
               ): TSDF = {
 
-    if(leftPrefix == "" && tsPartitionVal == 0) {
-      asofJoinExec(this,rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None, fraction)
+    if (leftPrefix == "" && tsPartitionVal == 0) {
+      asofJoinExec(this, rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None, fraction)
     }
-    else if(leftPrefix == "") {
+    else if (leftPrefix == "") {
       asofJoinExec(this, rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, Some(tsPartitionVal), fraction)
     }
-    else if(tsPartitionVal == 0) {
+    else if (tsPartitionVal == 0) {
       asofJoinExec(this, rightTSDF, Some(leftPrefix), rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None)
     }
     else {

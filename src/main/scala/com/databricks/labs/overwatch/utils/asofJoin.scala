@@ -1,10 +1,18 @@
 package com.databricks.labs.overwatch.utils
 
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{IntegerType, StructField}
+import org.apache.spark.sql.types.StructField
 
+/**
+ * Essentially a fork from dblabs tempo project
+ * Added a few features and made one or two minor changes noted below
+ * Plan to use tempo as a dependency when tempo is ready and has these new, needed features
+ *
+ * Some significant refactoring can be done to simplify and reduce the code here but left it broken out to
+ * simplify the merge into tempo. Also, didn't want to spend too much time on it since the ultimate goal is to use
+ * tempo as a dep when it's ready.
+ */
 object asofJoin {
 
   def checkEqualPartitionCols(leftTSDF: TSDF, rightTSDF: TSDF): Boolean = {
@@ -39,6 +47,13 @@ object asofJoin {
     TSDF(newDF, tsdf.tsColumn.name, tsdf.partitionCols.map(_.name): _*)
   }
 
+  /**
+   * CHANGE: removed the "combined_ts" column and am using the left timestamp column as the time-series
+   * for continuity throughout multiple joins
+   * @param leftTSDF
+   * @param rightTSDF
+   * @return
+   */
   def combineTSDF(leftTSDF: TSDF, rightTSDF: TSDF): TSDF = {
 
     //    val combinedTsCol = "combined_ts"
@@ -52,36 +67,20 @@ object asofJoin {
     TSDF(combinedDF, leftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name): _*)
   }
 
-  //    def combineTSDF(leftTSDF: TSDF, lookupTSDF: TSDF, lookupColums: Seq[String]): TSDF = {
-  //
-  //      val controlCol = StructField("__control__", IntegerType, nullable = true)
-  //      val combinedTsCol = "combined_ts"
-  //
-  //      val missingLeftColumns = lookupTSDF.schema.filterNot(leftTSDF.fields.contains(_))
-  //      val missingLookupColumns = leftTSDF.schema.filterNot(lookupTSDF.fields.contains(_)) :+ controlCol
-  //
-  //
-  //      val leftComplete = missingLeftColumns.foldLeft(leftTSDF.df)((dfBuilder, missingLeftField) => dfBuilder
-  //        .withColumn(missingLeftField.name, lit(null).cast(missingLeftField.dataType)))
-  //
-  //      val lookupComplete = missingLookupColumns.foldLeft(lookupTSDF.df)((dfBuilder, missingLookupField) => dfBuilder
-  //        .withColumn(missingLookupField.name, lit(null).cast(missingLookupField.dataType)))
-  //
-  //      val combinedDF = leftComplete
-  //        .withColumn(controlCol.name, lit(1))
-  //        .unionByName(lookupComplete)
-  //        .withColumn(combinedTsCol,
-  //          coalesce(col(leftTSDF.tsColumn.name), col(lookupTSDF.tsColumn.name)))
-  //
-  //      TSDF(combinedDF, combinedTsCol, leftTSDF.partitionCols.map(_.name): _*)
-  //
-  //
-  //      assert(lookupColums.map(_.toLowerCase).diff(lookupColNames.map(_.toLowerCase)).isEmpty,
-  //        s"Lookup column[s] missing from target DF: ${lookupColums.diff(lookupTSDF.schema.fieldNames)}"
-  //      )
-  //
-  //    }
-
+  /**
+   * MAJOR CHANGE: This implementation was considerably altered from tempo's original to enable time-boxed
+   * reverse and forward lookups. Additionally, there was a BUG?? in that the window was custom built inside this
+   * function rather than being built from the TSDF definition
+   *
+   * Also added column typecasting to ensure left type == right type. Error handling and checks should be
+   * implemented, currently if cannot cast, null is written silently.
+   * @param tsdf
+   * @param maxLookback
+   * @param maxLookAhead
+   * @param left_ts_col
+   * @param rightCols
+   * @return
+   */
   def getLastRightRow(
                        tsdf: TSDF,
                        maxLookback: Long,
@@ -89,18 +88,9 @@ object asofJoin {
                        left_ts_col: StructField,
                        rightCols: Seq[StructField]
                      ): TSDF = {
-    // TODO: Add functionality for sort_keys (@ricardo)
-
-
-    //    val window_spec: WindowSpec =  Window
-    //      .partitionBy(tsdf.partitionCols.map(x => col(x.name)):_*)
-    //      .rowsBetween(maxLookback, maxLookAhead)
-    //      .orderBy(tsdf.tsColumn.name)
 
     val beforeW: WindowSpec = tsdf.windowBetweenRows(maxLookback, Window.currentRow)
     val afterW: WindowSpec = tsdf.windowBetweenRows(Window.currentRow, maxLookAhead)
-
-    //    val rightWindowSpec = windowSpec.orderBy()
 
     val df = rightCols.foldLeft(tsdf.df) {
       case (dfBuilder, rightCol) => {
@@ -115,14 +105,17 @@ object asofJoin {
       }
     }
 
-    //    val df = rightCols
-    //      .foldLeft(tsdf.df)((df, rightCol) =>
-    //        df.withColumn(rightCol.name, last(df(rightCol.name), true).over(window_spec)))
-    //      .filter(col(left_ts_col.name).isNotNull).drop(col(tsdf.tsColumn.name))
-
     TSDF(df, left_ts_col.name, tsdf.partitionCols.map(_.name): _*)
   }
 
+  /**
+   * Critical performance for skewed windows -- time sliced (partitioned) windows to greatly improve parallelism
+   * on skewed windows
+   * @param combinedTSDF
+   * @param tsPartitionVal
+   * @param fraction
+   * @return
+   */
   def getTimePartitions(combinedTSDF: TSDF, tsPartitionVal: Int, fraction: Double): TSDF = {
 
     val tsColDouble = "ts_col_double"
@@ -148,16 +141,30 @@ object asofJoin {
     TSDF(df, combinedTSDF.tsColumn.name, newPartitionColNames: _*)
   }
 
-  def asofJoinExec(
-                    leftTSDF: TSDF,
-                    rightTSDF: TSDF,
-                    leftPrefix: Option[String],
-                    rightPrefix: String,
-                    maxLookback: Long,
-                    maxLookAhead: Long,
-                    tsPartitionVal: Option[Int],
-                    fraction: Double = 0.1
-                  ): TSDF = {
+  /**
+   * NEW: The tempo tsdf join joins left and right and maintains all columns. When performing lookups, the columns
+   * handling after several chained joins is a nightmare. This function merges all the columns from left to right
+   * taking the first non-null value and keeping it through all future joins.
+   * @param leftTSDF
+   * @param rightTSDF
+   * @param leftPrefix
+   * @param rightPrefix
+   * @param maxLookback
+   * @param maxLookAhead
+   * @param tsPartitionVal
+   * @param fraction
+   * @return
+   */
+  def lookupWhenExec(
+                  leftTSDF: TSDF,
+                  rightTSDF: TSDF,
+                  leftPrefix: Option[String],
+                  rightPrefix: String,
+                  maxLookback: Long,
+                  maxLookAhead: Long,
+                  tsPartitionVal: Option[Int],
+                  fraction: Double = 0.1
+                ): TSDF = {
 
     if (!checkEqualPartitionCols(leftTSDF, rightTSDF)) {
       throw new IllegalArgumentException("Partition columns of left and right TSDF should be equal.")
@@ -186,6 +193,7 @@ object asofJoin {
       addColumnsFromOtherDF(prefixedLeftTSDF, rightCols),
       addColumnsFromOtherDF(prefixedRightTSDF, leftCols))
 
+    // build left-driving unified output columns
     // structural cols
     val structuralCols = combinedTSDF.structuralColumns.map(f => col(f.name).alias(f.name))
 
@@ -231,70 +239,86 @@ object asofJoin {
 
     TSDF(lookupDF, leftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name): _*)
   }
+
+  /**
+   * Original asOfJoin implementation with ADDITION of enabling time-boxed reverse lookups as well as forward
+   * lookups. The defaults remain as they were (unbound) but can be overridden. The first non-null value will be
+   * taken from -Inf to Inf order
+   * @param leftTSDF
+   * @param rightTSDF
+   * @param leftPrefix
+   * @param rightPrefix
+   * @param maxLookback
+   * @param maxLookAhead
+   * @param tsPartitionVal
+   * @param fraction
+   * @return
+   */
+    def asofJoinExec(
+                      leftTSDF: TSDF,
+                      rightTSDF: TSDF,
+                      leftPrefix: Option[String],
+                      rightPrefix: String,
+                      maxLookback: Long,
+                      maxLookAhead: Long,
+                      tsPartitionVal: Option[Int],
+                      fraction: Double = 0.1
+                    ): TSDF= {
+
+      if(!checkEqualPartitionCols(leftTSDF,rightTSDF)) {
+        throw new IllegalArgumentException("Partition columns of left and right TSDF should be equal.")
+      }
+
+      // add Prefixes to TSDFs
+      val prefixedLeftTSDF = leftPrefix match {
+        case Some(prefix_value) => addPrefixToColumns(
+          leftTSDF,
+          leftTSDF.observationColumns :+ leftTSDF.tsColumn,
+          prefix_value)
+        case None => leftTSDF
+      }
+
+      val prefixedRightTSDF = addPrefixToColumns(
+        rightTSDF,
+        rightTSDF.observationColumns :+ rightTSDF.tsColumn,
+        rightPrefix)
+
+      // get all non-partition columns (including ts col)
+      val leftCols = prefixedLeftTSDF.observationColumns :+ prefixedLeftTSDF.tsColumn
+      val rightCols = prefixedRightTSDF.observationColumns :+ prefixedRightTSDF.tsColumn
+
+      // perform asof join
+      val combinedTSDF = combineTSDF(
+        addColumnsFromOtherDF(prefixedLeftTSDF, rightCols),
+        addColumnsFromOtherDF(prefixedRightTSDF, leftCols))
+
+      val asofTSDF: TSDF = tsPartitionVal match {
+        case Some(partitionValue) => {
+          val timePartitionedTSDF = getTimePartitions(combinedTSDF,partitionValue,fraction)
+
+          val asofDF = getLastRightRow(
+            timePartitionedTSDF,
+            maxLookback,
+            maxLookAhead,
+            prefixedLeftTSDF.tsColumn,
+            rightCols
+          ).df
+            .filter(col("is_original") === lit(1))
+            .drop("ts_partition","is_original")
+
+          TSDF(asofDF, prefixedLeftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name):_*)
+        }
+        case None => getLastRightRow(
+          combinedTSDF,
+          maxLookback,
+          maxLookAhead,
+          prefixedLeftTSDF.tsColumn,
+          rightCols
+        )
+      }
+      asofTSDF
+    }
+
 }
 
-//  def asofJoinExec(
-//                    leftTSDF: TSDF,
-//                    rightTSDF: TSDF,
-//                    leftPrefix: Option[String],
-//                    rightPrefix: String,
-//                    maxLookback: Long,
-//                    maxLookAhead: Long,
-//                    tsPartitionVal: Option[Int],
-//                    fraction: Double = 0.1
-//                  ): TSDF= {
-//
-//    if(!checkEqualPartitionCols(leftTSDF,rightTSDF)) {
-//      throw new IllegalArgumentException("Partition columns of left and right TSDF should be equal.")
-//    }
-//
-//    // add Prefixes to TSDFs
-//    val prefixedLeftTSDF = leftPrefix match {
-//      case Some(prefix_value) => addPrefixToColumns(
-//        leftTSDF,
-//        leftTSDF.observationColumns :+ leftTSDF.tsColumn,
-//        prefix_value)
-//      case None => leftTSDF
-//    }
-//
-//    val prefixedRightTSDF = addPrefixToColumns(
-//      rightTSDF,
-//      rightTSDF.observationColumns :+ rightTSDF.tsColumn,
-//      rightPrefix)
-//
-//    // get all non-partition columns (including ts col)
-//    val leftCols = prefixedLeftTSDF.observationColumns :+ prefixedLeftTSDF.tsColumn
-//    val rightCols = prefixedRightTSDF.observationColumns :+ prefixedRightTSDF.tsColumn
-//
-//    // perform asof join
-//    val combinedTSDF = combineTSDF(
-//      addColumnsFromOtherDF(prefixedLeftTSDF, rightCols),
-//      addColumnsFromOtherDF(prefixedRightTSDF, leftCols))
-//
-//    val asofTSDF: TSDF = tsPartitionVal match {
-//      case Some(partitionValue) => {
-//        val timePartitionedTSDF = getTimePartitions(combinedTSDF,partitionValue,fraction)
-//
-//        val asofDF = getLastRightRow(
-//          timePartitionedTSDF,
-//          maxLookback,
-//          maxLookAhead,
-//          prefixedLeftTSDF.tsColumn,
-//          rightCols
-//        ).df
-//          .filter(col("is_original") === lit(1))
-//          .drop("ts_partition","is_original")
-//
-//        TSDF(asofDF, prefixedLeftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name):_*)
-//      }
-//      case None => getLastRightRow(
-//        combinedTSDF,
-//        maxLookback,
-//        maxLookAhead,
-//        prefixedLeftTSDF.tsColumn,
-//        rightCols
-//      )
-//    }
-//    asofTSDF
-//  }
 
