@@ -209,18 +209,6 @@ trait GoldTransforms extends SparkSessionWrapper {
     )
 
     val nodeTypeLookup = clusterSpec.asDF
-      .withColumn("driver_node_type_id",
-        when('driver_node_type_id.isNull, last('driver_node_type_id, true).over(clusterBeforeW))
-          .otherwise('driver_node_type_id))
-      .withColumn("node_type_id",
-        when('node_type_id.isNull, last('node_type_id, true).over(clusterBeforeW))
-          .otherwise('node_type_id))
-      .withColumn("driver_node_type_id",
-        when('driver_node_type_id.isNull, first('driver_node_type_id, true).over(clusterAfterW))
-          .otherwise('driver_node_type_id))
-      .withColumn("node_type_id",
-        when('node_type_id.isNull, first('node_type_id, true).over(clusterAfterW))
-          .otherwise('node_type_id))
       .select('organization_id, 'cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
 
     val nodeTypeLookup2 = clusterSnapshot.asDF
@@ -228,19 +216,16 @@ trait GoldTransforms extends SparkSessionWrapper {
       .select('organization_id, 'cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
 
     val clusterPotential = clusterEventsBaseline
-      .joinAsOf(
-        nodeTypeLookup,
-        Seq("organization_id", "cluster_id"),
-        Seq('timestamp),
-        Seq("driver_node_type_id", "node_type_id", "cluster_name"),
-        rowsBefore = -1000, rowsAfter = 1000
-      ).joinAsOf(
-      nodeTypeLookup2,
-        Seq("organization_id", "cluster_id"),
-        Seq('timestamp),
-        Seq("driver_node_type_id", "node_type_id", "cluster_name"),
-        rowsBefore = -1000, rowsAfter = 1000
-      )
+      .toTSDF("timestamp", "organization_id", "cluster_id")
+      .lookupWhen(
+        nodeTypeLookup.toTSDF("timestamp", "organization_id", "cluster_id"),
+        maxLookback = -1000,
+        maxLookAhead = 100,
+        tsPartitionVal = 1200
+      ).lookupWhen(
+      nodeTypeLookup2.toTSDF("timestamp", "organization_id", "cluster_id"),
+      tsPartitionVal = 1200
+    ).df
       .withColumn("timestamp", 'timestamp.cast("double") / 1000.0)
       .withColumn("ts", from_unixtime('timestamp).cast("timestamp"))
       .withColumn("date", 'ts.cast("date"))
@@ -356,26 +341,26 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val jobRunInitialState = newTerminatedJobRuns //jobRun_gold
         .withColumn("timestamp", $"job_runtime.startEpochMS")
-      .joinAsOf(
-        clusterPotentialInitialState,
-        Seq("organization_id", "cluster_id"),
-        Seq('timestamp),
-        lookupCols.toSeq,
-        rowsBefore = -100
-      )
+      .toTSDF("timestamp", "organization_id", "cluster_id")
+      .lookupWhen(
+        clusterPotentialInitialState
+          .toTSDF("timestamp", "organization_id", "cluster_id"),
+        maxLookback = -100,
+        tsPartitionVal = 1200
+      ).df
       .drop("timestamp")
       .withColumn("uptime_in_state_H", (array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)
       .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
 
     val jobRunTerminalState = newTerminatedJobRuns
       .withColumn("timestamp", $"job_runtime.endEpochMS")
-      .joinAsOf(
-        clusterPotentialTerminalState,
-        Seq("organization_id", "cluster_id"),
-        Seq('timestamp),
-        lookupCols.toSeq,
-        rowsBefore = -100
-      )
+      .toTSDF("timestamp", "organization_id", "cluster_id")
+      .lookupWhen(
+        clusterPotentialTerminalState
+          .toTSDF("timestamp", "organization_id", "cluster_id"),
+        maxLookback = -100,
+        tsPartitionVal = 1200
+      ).df
       .drop("timestamp")
       .filter('unixTimeMS_state_start > $"job_runtime.startEpochMS" && 'unixTimeMS_state_start < $"job_runtime.endEpochMS")
       .withColumn("uptime_in_state_H", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)

@@ -33,18 +33,18 @@ sealed trait TSDF {
   protected def baseWindow(reversed: Boolean): WindowSpec
 
   def asofJoin(rightTSDF: TSDF,
-               leftPrefix: String,
+               leftPrefix: String = "",
                rightPrefix: String = "right_",
-               maxLookback: Long,
-               maxLookAhead: Long,
+               maxLookback: Long = Window.unboundedPreceding,
+               maxLookAhead: Long = Window.unboundedFollowing,
                tsPartitionVal: Int = 0,
                fraction: Double = 0.1): TSDF
 
   def lookupWhen(rightTSDF: TSDF,
-                 leftPrefix: String,
+                 leftPrefix: String = "",
                  rightPrefix: String = "right_",
-                 maxLookback: Long,
-                 maxLookAhead: Long,
+                 maxLookback: Long = Window.unboundedPreceding,
+                 maxLookAhead: Long = Window.unboundedFollowing,
                  tsPartitionVal: Int = 0,
                  fraction: Double = 0.1): TSDF
 
@@ -130,16 +130,16 @@ private[overwatch] sealed class BaseTSDF(
                 ): TSDF = {
 
     if (leftPrefix == "" && tsPartitionVal == 0) {
-      asofJoinExec(this, rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None, fraction)
+      lookupWhenExec(this, rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None, fraction)
     }
     else if (leftPrefix == "") {
-      asofJoinExec(this, rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, Some(tsPartitionVal), fraction)
+      lookupWhenExec(this, rightTSDF, leftPrefix = None, rightPrefix, maxLookback, maxLookAhead, Some(tsPartitionVal), fraction)
     }
     else if (tsPartitionVal == 0) {
-      asofJoinExec(this, rightTSDF, Some(leftPrefix), rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None)
+      lookupWhenExec(this, rightTSDF, Some(leftPrefix), rightPrefix, maxLookback, maxLookAhead, tsPartitionVal = None)
     }
     else {
-      asofJoinExec(this, rightTSDF, Some(leftPrefix), rightPrefix, maxLookback, maxLookAhead, Some(tsPartitionVal), fraction)
+      lookupWhenExec(this, rightTSDF, Some(leftPrefix), rightPrefix, maxLookback, maxLookAhead, Some(tsPartitionVal), fraction)
     }
   }
 

@@ -1,14 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SchemaTools, SparkSessionWrapper, ValidatedColumn}
+import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, ValidatedColumn, TSDF}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
-
-import java.util.UUID
 
 object TransformFunctions extends SparkSessionWrapper {
 
@@ -50,77 +48,11 @@ object TransformFunctions extends SparkSessionWrapper {
         .dropDupColumnByAlias("laggard", usingColumns: _*)
     }
 
-    def joinAsOf(
-                  lookupDF: DataFrame,
-                  usingColumns: Seq[String],
-                  orderByColumns: Seq[Column],
-                  lookupColumns: Seq[String],
-                  rowsBefore: Long = Window.unboundedPreceding,
-                  rowsAfter: Long = Window.currentRow
-                ): DataFrame = {
-
-      val controlColName = "__ctrlCol__"
-      val drivingDF = df
-        .withColumn(controlColName, lit(0).cast("int"))
-      val baseWSpec = Window.partitionBy(usingColumns map col: _*)
-        .orderBy(orderByColumns: _*)
-      val beforeWSpec = baseWSpec.rowsBetween(rowsBefore, Window.currentRow)
-      val afterWSpec = baseWSpec.rowsBetween(Window.currentRow, rowsAfter)
-
-      val slimLookupCols = ((usingColumns ++ lookupColumns) map col) ++ orderByColumns
-      val slimLookupDF = lookupDF.select(slimLookupCols: _*)
-
-
-
-      val drivingCols = drivingDF.columns
-      val lookupDFCols = slimLookupDF.columns
-      val missingBaseCols = lookupDFCols.diff(drivingCols)
-      val missingLookupCols = drivingCols.diff(lookupDFCols)
-
-      val df1Complete = missingBaseCols.foldLeft(drivingDF) {
-        case (dfBuilder, c) =>
-          dfBuilder.withColumn(c, lit(null))
-      }
-      val df2Complete = missingLookupCols.foldLeft(slimLookupDF) {
-        case (dfBuilder, c) =>
-          dfBuilder.withColumn(c, lit(null))
-      }
-
-      val masterDF = df1Complete.unionByName(df2Complete)
-
-      val asOfCols = lookupColumns.flatMap(c => {
-        val dt = masterDF.schema.fields.filter(_.name.toLowerCase == c.toLowerCase).head.dataType
-        val cAsOf = if (rowsBefore != 0L) {
-          Array((c, coalesce(last(col(c), ignoreNulls = true).over(beforeWSpec), lit(null).cast(dt))))
-        } else Array()
-//        val cWhen = if (rowsAfter != 0L) {
-//          Array((c, coalesce(first(col(c), ignoreNulls = true).over(afterWSpec), lit(null).cast(dt))))
-//        } else Array()
-        cAsOf //++ cWhen
-      })
-//
-//
-//      val fullColInventory = (masterDF.columns map col) ++ asOfCols
-//      masterDF.select(fullColInventory: _*)
-//        .filter(col(controlColName).isNotNull)
-//        .drop(controlColName)
-
-      asOfCols.foldLeft(masterDF) {
-        case (dfBuilder, c) => {
-//          dfBuilder.withColumn(c._1, c._2)
-          val dt = dfBuilder.schema.fields.filter(_.name == c._1).head.dataType
-          val asOfDF = dfBuilder.withColumn(c._1,
-            coalesce(last(c._2, ignoreNulls = true).over(beforeWSpec), lit(null).cast(dt))
-          )
-//          if (rowsAfter != 0L) {
-//            asOfDF.withColumn(c,
-//              coalesce(first(col(c), ignoreNulls = true).over(afterWSpec), lit(null).cast(dt))
-//            )
-//          } else asOfDF
-          asOfDF
-        }
-      }.filter(col(controlColName).isNotNull)
-        .drop(controlColName)
+    def toTSDF(
+              timeSeriesColumnName: String,
+              partitionByColumnNames: String*
+              ): TSDF = {
+      TSDF(df, timeSeriesColumnName, partitionByColumnNames: _*)
     }
 
     @transient
