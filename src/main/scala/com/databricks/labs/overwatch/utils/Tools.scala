@@ -299,8 +299,11 @@ object SchemaTools extends SparkSessionWrapper {
    * @return
    */
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
+    val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
     val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
-    val fieldNames = fields.map(_.name.trim.toLowerCase())
+    val fieldNames = if(caseSensitive) {
+      fields.map(_.name.trim)
+    } else fields.map(_.name.trim.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
     val dupCount = dups.length
     if (dupCount == 0) {
@@ -314,7 +317,8 @@ object SchemaTools extends SparkSessionWrapper {
       logger.log(Level.WARN, warnMsg)
       val uniqueSuffixes = (0 to fields.length + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
       fields.zipWithIndex.map(f => {
-        if (dups.contains(f._1.name.toLowerCase())) {
+        val fieldName = if (caseSensitive) f._1.name else f._1.name.toLowerCase
+        if (dups.contains(fieldName)) {
           val generatedUniqueName = f._1.name + "_" + uniqueSuffixes(f._2)
           val uniqueColumnMapping = s"\n${f._1.name} --> ${generatedUniqueName}"
           println(uniqueColumnMapping)

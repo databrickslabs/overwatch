@@ -370,7 +370,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         .join(sshDetails, Seq("organization_id", "date", "timestamp", "login_type", "requestId"), "left")
         .drop("date")
     } else
-      throw new NoNewDataException("EMPTY: No new Account Logins")
+      spark.emptyDataFrame
+//      throw new NoNewDataException("EMPTY: No new Account Logins")
     //      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
@@ -397,7 +398,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           .otherwise('user_id))
 
     } else
-      throw new NoNewDataException(s"EMPTY: Now new account modifications")
+      spark.emptyDataFrame
+//      throw new NoNewDataException(s"EMPTY: Now new account modifications")
     //      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
