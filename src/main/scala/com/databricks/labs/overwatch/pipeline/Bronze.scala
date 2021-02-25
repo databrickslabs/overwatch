@@ -117,7 +117,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       val rawAzureAuditEvents = landAzureAuditLogDF(
         config.auditLogConfig.azureAuditLogEventhubConfig.get,
         config.isFirstRun,
-        config.organizationId
+        config.organizationId,
+        config.runID
       )
 
       val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
