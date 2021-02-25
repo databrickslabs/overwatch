@@ -122,7 +122,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
       val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
         rawAzureAuditEvents,
-        rawAzureAuditEvents.rdd.partitions.length,
+        400,
         BronzeTargets.auditLogAzureLandRaw,
         spark, config, None
       )
