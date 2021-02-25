@@ -160,6 +160,7 @@ object Schema extends SparkSessionWrapper {
         StructField("user_id", StringType, nullable = true),
         StructField("ssh_public_keys", StringType, nullable = true),
         StructField("single_user_name", StringType, nullable = true),
+        StructField("resourceId", LongType, nullable = true),
         // EXPLICIT EXCLUSIONS -- fields will not be in targetDF
         StructField("organization_id", NullType, nullable = true),
         StructField("orgId", NullType, nullable = true),

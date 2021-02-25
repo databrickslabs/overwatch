@@ -49,6 +49,7 @@ object PipelineFunctions {
       target.name match {
         case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
           .rdd.partitions.length * target.shuffleFactor
+        case _ => sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
       }
     } else {
       sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
