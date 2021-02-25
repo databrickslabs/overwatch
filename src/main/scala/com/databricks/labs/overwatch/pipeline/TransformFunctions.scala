@@ -2,11 +2,12 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, ValidatedColumn, TSDF}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
+import org.apache.spark.sql.{Column, DataFrame, Dataset}
 
 object TransformFunctions {
 
@@ -105,7 +106,7 @@ object TransformFunctions {
    * @return
    */
   def getAlias(ds: Dataset[_]): Option[String] = ds.queryExecution.analyzed match {
-    case SubqueryAlias(alias, _) => Some(alias.identifier)
+    case SubqueryAlias(alias, _) => Some(alias.name)
     case _ => None
   }
 

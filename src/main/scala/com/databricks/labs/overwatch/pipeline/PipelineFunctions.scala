@@ -43,7 +43,7 @@ object PipelineFunctions {
     } else mutationDF
 
     val targetShufflePartitionSizeMB = 128.0
-    val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").toDouble / 1024 / 1024
+    val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").replace("b", "").toDouble / 1024 / 1024
     val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
 
     // TODO -- handle streaming until Module refactor with source -> target mappings
@@ -63,9 +63,7 @@ object PipelineFunctions {
     if (config.debugFlag) {
       println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
       println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
-      println(s"DEBUG: Max PartitionBytes (MB): ${
-        spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
-      }")
+      println(s"DEBUG: Max PartitionBytes (MB): $readMaxPartitionBytesMB")
     }
 
     logger.log(Level.INFO, s"$moduleName: " +

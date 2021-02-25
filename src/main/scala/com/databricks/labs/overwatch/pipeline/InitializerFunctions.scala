@@ -2,6 +2,9 @@ package com.databricks.labs.overwatch.pipeline
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import java.util.stream.Collectors
+import collection.JavaConverters._
+
 object InitializerFunctions {
   /**
    * Load text file
@@ -12,8 +15,8 @@ object InitializerFunctions {
     val fileLocation = getClass.getResourceAsStream(path)
     if (fileLocation == null)
       throw new RuntimeException(s"There is no resource at path: $path")
-    val source = scala.io.Source.fromInputStream(fileLocation).mkString
-    source.stripMargin.lines.toSeq.filter(!_.trim.isEmpty)
+    val source = scala.io.Source.fromInputStream(fileLocation).mkString.stripMargin
+    source.split("\\r?\\n").filter(_.trim.nonEmpty).toSeq
   }
 
   /**
