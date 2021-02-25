@@ -32,7 +32,7 @@ object PipelineFunctions {
                                target: PipelineTable,
                                spark: SparkSession,
                                config: Config,
-                               module: Module
+                               module: Option[Module]
                              ): DataFrame = {
 
     var mutationDF = df
@@ -65,7 +65,8 @@ object PipelineFunctions {
       }")
     }
 
-    logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
+    if (module.nonEmpty) logger.log(Level.INFO, s"${module.get.moduleName}: " +
+      s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
       s"\nShufflePartitions: ${targetShufflePartitionCount}")
 
     spark.conf.set("spark.sql.shuffle.partitions", targetShufflePartitionCount)
