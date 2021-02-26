@@ -181,9 +181,19 @@ trait GoldTransforms extends SparkSessionWrapper {
     val workerNodeDetails = instanceDetails.asDF
       .select('organization_id, 'API_Name.alias("node_type_id"), struct(instanceDetails.asDF.columns map col: _*).alias("workerSpecs"))
 
+    val clusterBeforeW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+      .rowsBetween(-1000, Window.currentRow)
+    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'counter_reset).orderBy('timestamp)
+
     val clusterEventsBaseline = clusterEventsDF
       .selectExpr("*", "details.*")
       .drop("details")
+      .withColumn("isRunning", when('type === "TERMINATING", lit(false)).otherwise(lit(true)))
+      .withColumn("isRunning",
+        when('type === "TERMINATING" || ('type =!= "STARTING" && lag(!'isRunning, 1).over(stateUnboundW)), lit(false))
+          .otherwise(lit(true))
+      )
       .withColumn("current_num_workers",
         when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
           .otherwise('current_num_workers)
@@ -197,14 +207,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         'timestamp, 'type, 'current_num_workers, 'target_num_workers
       )
 
-    val clusterBeforeW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-      .rowsBetween(-1000, Window.currentRow)
-    val clusterAfterW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
-      .rowsBetween(-1000, Window.currentRow)
-    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'counter_reset).orderBy('timestamp)
-
-    val billableTypes = Array(
+    val nonBillableTypes = Array(
       "INIT_SCRIPTS_FINISHED", "INIT_SCRIPTS_STARTED", "STARTING", "TERMINATING", "CREATING", "RESTARTING"
     )
 
@@ -219,12 +222,12 @@ trait GoldTransforms extends SparkSessionWrapper {
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         nodeTypeLookup.toTSDF("timestamp", "organization_id", "cluster_id"),
-        maxLookback = -1000,
-        maxLookAhead = 100,
-        tsPartitionVal = 1200
+        maxLookAhead = 1,
+        tsPartitionVal = 64
       ).lookupWhen(
       nodeTypeLookup2.toTSDF("timestamp", "organization_id", "cluster_id"),
-      tsPartitionVal = 1200
+      maxLookAhead = 1,
+      tsPartitionVal = 64
     ).df
       .withColumn("timestamp", 'timestamp.cast("double") / 1000.0)
       .withColumn("ts", from_unixtime('timestamp).cast("timestamp"))
@@ -243,16 +246,17 @@ trait GoldTransforms extends SparkSessionWrapper {
         )
       )
       .withColumn("uptime_in_state_S", lead('timestamp, 1).over(stateUnboundW) - 'timestamp)
-      .withColumn("cloud_billable", lit(true))
-      .withColumn("databricks_billable", when('type.isin(billableTypes: _*), lit(false))
+      .withColumn("cloud_billable", when('isRunning, lit(true)).otherwise(lit(false)))
+      .withColumn("databricks_billable",
+        when('isRunning && !'type.isin(nonBillableTypes: _*), lit(false))
         .otherwise(lit(true)
         ))
       .join(driverNodeDetails, Seq("organization_id", "driver_node_type_id"), "left")
       .join(workerNodeDetails, Seq("organization_id", "node_type_id"), "left")
-      .withColumn("core_hours",
+      .withColumn("core_hours", when('isRunning,
         round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
           round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
-      )
+      ))
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
@@ -347,8 +351,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .lookupWhen(
           clusterPotentialInitialState
             .toTSDF("timestamp", "organization_id", "cluster_id"),
-          maxLookback = -100,
-          tsPartitionVal = 1200
+          tsPartitionVal = 64
         ).df
         .drop("timestamp")
         .withColumn("uptime_in_state_H", (array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)
@@ -360,8 +363,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .lookupWhen(
           clusterPotentialTerminalState
             .toTSDF("timestamp", "organization_id", "cluster_id"),
-          maxLookback = -100,
-          tsPartitionVal = 1200
+          tsPartitionVal = 64
         ).df
         .drop("timestamp")
         .filter('unixTimeMS_state_start > $"job_runtime.startEpochMS" && 'unixTimeMS_state_start < $"job_runtime.endEpochMS")

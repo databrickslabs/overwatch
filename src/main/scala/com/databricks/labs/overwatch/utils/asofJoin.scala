@@ -60,9 +60,11 @@ object asofJoin {
   def combineTSDF(leftTSDF: TSDF, rightTSDF: TSDF): TSDF = {
 
     //    val combinedTsCol = "combined_ts"
+    val drivingDFColName = "__driving_df__" //used to remove left nulls at the end given a lookupWhen not joinAsOf
 
     val combinedDF = leftTSDF.df
-      .unionByName(rightTSDF.df)
+      .withColumn(drivingDFColName, lit(1).cast("int"))
+      .unionByName(rightTSDF.df.withColumn(drivingDFColName, lit(0).cast("int")))
       .withColumn(leftTSDF.tsColumn.name,
         coalesce(col(leftTSDF.tsColumn.name), col(rightTSDF.tsColumn.name)))
 
@@ -252,6 +254,7 @@ object asofJoin {
 
     val lookupDF = dupColNames.foldLeft(asofTSDF.df)((df, c) => df
       .withColumn(c, coalesce(col(leftPrefix.getOrElse("") + c), col(rightPrefix + c))))
+      .filter(col("__driving_df__") === 1) // for lookup, get only the original rows with the lookup value
       .select(slimSelects: _*)
 
     TSDF(lookupDF, leftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name): _*)
@@ -321,17 +324,22 @@ object asofJoin {
             rightCols
           ).df
             .filter(col("is_original") === lit(1))
-            .drop("ts_partition","is_original")
+            .drop("ts_partition","is_original","__driving_df__")
 
           TSDF(asofDF, prefixedLeftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name):_*)
         }
-        case None => getLastRightRow(
-          combinedTSDF,
-          maxLookback,
-          maxLookAhead,
-          prefixedLeftTSDF.tsColumn,
-          rightCols
-        )
+        case None => {
+          val asofDF = getLastRightRow(
+            combinedTSDF,
+            maxLookback,
+            maxLookAhead,
+            prefixedLeftTSDF.tsColumn,
+            rightCols
+          ).df
+            .drop("__driving_df__")
+
+          TSDF(asofDF, prefixedLeftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name):_*)
+        }
       }
       asofTSDF
     }

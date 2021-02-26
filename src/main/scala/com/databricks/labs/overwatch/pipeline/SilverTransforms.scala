@@ -921,8 +921,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             jobStatusClusterLookups("jobStatusLookup")
               .toTSDF("timestamp", "organization_id", "jobId"),
-            maxLookback = -1000,
-            tsPartitionVal = 1200
+            tsPartitionVal = 64
           ).df
       }
 
@@ -931,7 +930,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             jobStatusClusterLookups("jobSnapshotLookup")
               .toTSDF("timestamp", "organization_id", "jobId"),
-            tsPartitionVal = 1200
+            tsPartitionVal = 64
           ).df
       }
       jrBaseExisting
@@ -953,8 +952,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSpecLookup")
               .toTSDF("timestamp", "organization_id", "clusterId"),
-            maxLookback = -100,
-            tsPartitionVal = 1200
+            tsPartitionVal = 64
           ).df
 
         // get cluster_id by cluster_name (derived)
@@ -962,8 +960,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSpecLookup")
               .toTSDF("timestamp", "organization_id", "cluster_name"),
-            maxLookback = -100,
-            tsPartitionVal = 1200
+            tsPartitionVal = 64
           ).df
       }
 
@@ -973,14 +970,14 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSnapLookup")
               .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 1200
+            tsPartitionVal = 64
           ).df
 
         automatedWMeta = automatedWMetaTSDF
           .lookupWhen(
             clusterLookups("clusterSnapLookup")
               .toTSDF("timestamp", "organization_id", "cluster_name"),
-            tsPartitionVal = 1200
+            tsPartitionVal = 64
           ).df
       }
 
@@ -1014,11 +1011,10 @@ trait SilverTransforms extends SparkSessionWrapper {
       .toTSDF("timestamp", "organization_id", "jobId")
       .lookupWhen(
         jobNameLookupFromAudit.toTSDF("timestamp", "organization_id", "jobId"),
-        maxLookback = -1000,
-        tsPartitionVal = 1200
+        tsPartitionVal = 64
       ).lookupWhen(
-      jobNameLookupFromAudit.toTSDF("timestamp", "organization_id", "jobId"),
-      tsPartitionVal = 1200
+      jobNameLookupFromSnap.toTSDF("timestamp", "organization_id", "jobId"),
+      tsPartitionVal = 64
     ).df
       .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
       .withColumn("endEpochMS", $"jobRunTime.endEpochMS") // for incremental downstream after job termination
