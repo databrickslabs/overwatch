@@ -101,7 +101,6 @@ object PipelineFunctions {
       filterLogMessageSB.append(s"APPLIED FILTERS:\nMODULE_ID: ${module.get.moduleID}\nMODULE_NAME: ${module.get.moduleName}\nFILTERS:\n")
       filters.map(_.expr).foreach(filterLogMessageSB.append)
       val filterLogMessage = filterLogMessageSB.toString()
-      println(filterLogMessage)
       logger.log(Level.INFO, filterLogMessage)
     }
     filters.foldLeft(df) {

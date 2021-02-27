@@ -383,8 +383,7 @@ object SchemaTools extends SparkSessionWrapper {
 
     val msg = s"SCHEMA WARNING: COLUMN STRIPPED from source --> Column $fullColName is required to be absent from " +
       s"source as it's type has been identified as a NullType"
-    if (isDebug) println(msg)
-    logger.log(Level.WARN, msg)
+    logger.log(Level.DEBUG, msg)
   }
 
   private def malformedSchemaErrorMessage(f: StructField, req: StructField, prefix: Option[String]): String = {
@@ -422,7 +421,7 @@ object SchemaTools extends SparkSessionWrapper {
       val scalarCastMessage = s"SCHEMA WARNING: IMPLICIT CAST: Required Type for column: " +
         s"$fullColName is $requiredTypeName but received $fieldTypeName. " +
         s"Attempting to cast to required type but may result in unexpected nulls or loss of precision"
-      println(scalarCastMessage)
+      logger.log(Level.DEBUG, scalarCastMessage)
       scalarCastMessage
     } else genericSchemaErrorMsg
   }
@@ -435,7 +434,7 @@ object SchemaTools extends SparkSessionWrapper {
         s"${missingField.dataType.typeName}. There's either an error or relevant data doesn't exist in " +
         s"your environment and/or was not acquired during the current run."
       if (isDebug) println(msg)
-      logger.log(Level.WARN, msg)
+      logger.log(Level.DEBUG, msg)
     } else { // FAIL --> trying to null non-nullable field
       val msg = s"SCHEMA ERROR: Required Field $fullColName is NON-NULLABLE but nulls were received. Failing module"
       if (isDebug) println(msg)

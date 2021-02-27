@@ -180,8 +180,7 @@ object asofJoin {
         s"RIGHT PARTITIONS: ${rightTSDF.partitionCols.foreach(f => println(f.toString()))}\n" +
         s"ATTEMPTING IMPLICIT CAST and continue."
 
-      logger.log(Level.WARN, msg)
-      println(msg)
+      logger.log(Level.DEBUG, msg)
 
 //      if (leftTSDF.partitionCols.forall(f => rightTSDF.partitionCols.map(_.name.toLowerCase).contains(f.name.toLowerCase))) {
 //        throw new IllegalArgumentException("Casting Aborted! Partition column names are different")
