@@ -371,7 +371,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .drop("date")
     } else
       spark.emptyDataFrame
-//      throw new NoNewDataException("EMPTY: No new Account Logins")
+    //      throw new NoNewDataException("EMPTY: No new Account Logins")
     //      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
@@ -399,7 +399,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     } else
       spark.emptyDataFrame
-//      throw new NoNewDataException(s"EMPTY: Now new account modifications")
+    //      throw new NoNewDataException(s"EMPTY: Now new account modifications")
     //      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
@@ -812,26 +812,26 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
     lazy val clusterSnapLookup = clusterSnapshot.asDF
-      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS))
+      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
       .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
       .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
     lazy val existingClusterLookup = jobsStatus.asDF
-      .select('organization_id, 'timestamp, 'jobId, 'existing_cluster_id)
-      .filter('existing_cluster_id.isNotNull)
+      .select('organization_id, 'timestamp, 'jobId, 'existing_cluster_id.alias("clusterId"))
+      .filter('clusterId.isNotNull)
 
     // tmpFix -- TODO -- build dfFunc df.selectWNulls
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
     lazy val existingClusterLookup2 = if (SchemaTools.nestedColExists(jobsSnapshot.asDF, "settings.existing_cluster_id")) {
       jobsSnapshot.asDF
-        .select('organization_id, 'job_id.alias("jobId"), $"settings.existing_cluster_id",
+        .select('organization_id, 'job_id.alias("jobId"), $"settings.existing_cluster_id".alias("clusterId"),
           'created_time.alias("timestamp"))
     } else {
       jobsSnapshot.asDF
         .select('organization_id, 'job_id.alias("jobId"),
           'created_time.alias("timestamp"))
-    }.filter('existing_cluster_id.isNotNull)
+    }.filter('clusterId.isNotNull)
 
     // Ensure the lookups have data -- this will be improved when the module unification occurs during the next
     // scheduled refactor
@@ -861,7 +861,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'runId.cast("long"), 'jobId.cast("long"), 'idInJob, 'jobRunTime, 'run_name,
         'jobClusterType, 'jobTaskType, 'jobTerminalState,
         'jobTriggerType, 'new_cluster,
-        'existing_cluster_id, //.alias("clusterId"),
+        'existing_cluster_id.alias("clusterId"),
         'cluster_name,
         'organization_id,
         'notebook_params, 'libraries,
@@ -901,92 +901,45 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
       .withColumn("timestamp", $"jobRunTime.endEpochMS")
 
+    val jrBaseExisting = jobRunsBase
+      .filter('jobClusterType === "existing")
+
     val automatedJobRunsBase = jobRunsBase
       .filter('jobClusterType === "new")
-      .withColumnRenamed("existing_cluster_id", "clusterId")
 
-    // TODO -- build func to simplify this etl
-    //  func should take in map of objects where k = name or type and v = structure of df and lookback period,
-    //  and structurally required columns for lookupWhen func
+    // LOOKUP - ClusterID By JobID -- EXISTING CLUSTER JOB RUNS
     // JobRuns with interactive clusters
     // If the lookups are present (likely will be unless is first run or modules are turned off somehow)
     // use the lookups to populate the null clusterIds and cluster_names
     val interactiveRunsWID = if (jobStatusClusterLookups.nonEmpty) {
-      var jrBaseExisting = jobRunsBase.filter('jobClusterType === "existing")
-      val jrBaseExistingTSDF = jrBaseExisting
-        .toTSDF("timestamp", "organization_id", "jobId")
+      var jrBaseExistingBuilder = jrBaseExisting
 
       if (jobStatusClusterLookups.contains("jobStatusLookup")) {
-        jrBaseExisting = jrBaseExistingTSDF
+        jrBaseExistingBuilder = jrBaseExistingBuilder
+          .toTSDF("timestamp", "organization_id", "jobId")
           .lookupWhen(
             jobStatusClusterLookups("jobStatusLookup")
-              .toTSDF("timestamp", "organization_id", "jobId"),
-            tsPartitionVal = 64
+              .toTSDF("timestamp", "organization_id", "jobId")
           ).df
       }
 
       if (jobStatusClusterLookups.contains("jobSnapshotLookup")) {
-        jrBaseExisting = jrBaseExistingTSDF
+        jrBaseExistingBuilder = jrBaseExistingBuilder
+          .toTSDF("timestamp", "organization_id", "jobId")
           .lookupWhen(
             jobStatusClusterLookups("jobSnapshotLookup")
-              .toTSDF("timestamp", "organization_id", "jobId"),
-            tsPartitionVal = 64
+              .toTSDF("timestamp", "organization_id", "jobId")
           ).df
       }
-      jrBaseExisting
-        .withColumnRenamed("existing_cluster_id", "clusterId")
-    } else jobRunsBase.withColumnRenamed("existing_cluster_id", "clusterId")
+      jrBaseExistingBuilder
 
-    // clusters -- get clusterID by derived name AND/OR clusterName by clusterID
-    val (interactiveRunsWIDAndName, automatedRunsWIDAndName) = if (clusterLookups.nonEmpty) {
+    } else jrBaseExisting
 
-      val interactiveWMetaTSDF = interactiveRunsWID.toTSDF("timestamp", "organization_id", "clusterId")
-      val automatedWMetaTSDF = automatedJobRunsBase.toTSDF("timestamp", "organization_id", "cluster_name")
-      var interactiveWMeta = interactiveRunsWID
-      var automatedWMeta = automatedJobRunsBase
+    // Re-Combine Interactive and Automated Job Run Clusters
+    val jobRunsBaseWIDs = interactiveRunsWID.unionByName(automatedJobRunsBase)
 
-      // Cluster Spec should lookback -100, 0
-      if (clusterLookups.contains("clusterSpecLookup")) {
-        // GET cluster_name by clusterID for interactive clusters
-        interactiveWMeta = interactiveWMetaTSDF
-          .lookupWhen(
-            clusterLookups("clusterSpecLookup")
-              .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 64
-          ).df
-
-        // get cluster_id by cluster_name (derived)
-        automatedWMeta = automatedWMetaTSDF
-          .lookupWhen(
-            clusterLookups("clusterSpecLookup")
-              .toTSDF("timestamp", "organization_id", "cluster_name"),
-            tsPartitionVal = 64
-          ).df
-      }
-
-      // look in run snapshots when values still null attempt to fill them from the snapshots
-      if (clusterLookups.contains("clusterSnapLookup")) {
-        interactiveWMeta = interactiveWMetaTSDF
-          .lookupWhen(
-            clusterLookups("clusterSnapLookup")
-              .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 64
-          ).df
-
-        automatedWMeta = automatedWMetaTSDF
-          .lookupWhen(
-            clusterLookups("clusterSnapLookup")
-              .toTSDF("timestamp", "organization_id", "cluster_name"),
-            tsPartitionVal = 64
-          ).df
-      }
-
-      (interactiveWMeta, automatedWMeta)
-    } else (interactiveRunsWID, automatedJobRunsBase)
-
-    // Union the interactive and automated back together with the cluster ids and names
-    val jobRunsWClusterIDAndName = interactiveRunsWIDAndName.unionByName(automatedRunsWIDAndName)
-
+    // Get JobName for All Jobs
+    val previousJobNameW = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     val newJobsNameLookup = jobsAuditComplete
       .select(
@@ -998,30 +951,105 @@ trait SilverTransforms extends SparkSessionWrapper {
     val editJobsNameLookup = jobsAuditComplete
       .filter('actionName.isin("reset", "update"))
       .select('organization_id, 'timestamp, 'job_id.alias("jobId"), get_json_object('new_settings, "$.name").alias("jobName"))
+      .withColumn("jobName", when('jobName.isNull, last('jobName, true).over(previousJobNameW)).otherwise('jobName))
 
     val jobNameLookupFromAudit = newJobsNameLookup.unionByName(editJobsNameLookup)
 
     val jobNameLookupFromSnap = jobsSnapshot.asDF
-      .select('organization_id, unix_timestamp('Pipeline_SnapTS).alias("timestamp"),
+      .select('organization_id, (unix_timestamp('Pipeline_SnapTS) * lit(1000)).alias("timestamp"),
         'job_id.alias("jobId"),
         $"settings.name".alias("jobName")
       )
 
-    val jobRunsFinal = jobRunsWClusterIDAndName
+    // jobNames from MLFlow Runs
+    val experimentName = get_json_object($"taskDetail.notebook_task", "$.base_parameters.EXPERIMENT_NAME")
+
+    val jobRunsWIdsAndNames = jobRunsBaseWIDs
       .toTSDF("timestamp", "organization_id", "jobId")
       .lookupWhen(
-        jobNameLookupFromAudit.toTSDF("timestamp", "organization_id", "jobId"),
-        tsPartitionVal = 64
+        jobNameLookupFromAudit.toTSDF("timestamp", "organization_id", "jobId")
       ).lookupWhen(
-      jobNameLookupFromSnap.toTSDF("timestamp", "organization_id", "jobId"),
-      tsPartitionVal = 64
+      jobNameLookupFromSnap.toTSDF("timestamp", "organization_id", "jobId")
     ).df
+      .withColumn("jobName", when('jobName.isNull && experimentName.isNotNull, experimentName).otherwise('jobName))
+      .withColumn("jobName", when('jobName.isNull && 'run_name.isNotNull, 'run_name).otherwise('jobName))
+
+    /**
+     * Child job run times are double counted when kept at the top level with their parents, thus this step is to
+     * nest the children under the parent. Currently, only nesting one layer.
+     */
+    val jobRunsWJobMetaWithoutChildren = jobRunsWIdsAndNames
+      .filter(get_json_object('workflow_context, "$.root_run_id").isNull)
+
+    val jobRunsWJobMetaWithoutChildrenInteractive = jobRunsWJobMetaWithoutChildren.filter('jobClusterType === "existing")
+    val jobRunsWJobMetaWithoutChildrenAutomated = jobRunsWJobMetaWithoutChildren.filter('jobClusterType === "new")
+
+    // clusters -- get clusterID by derived name AND/OR clusterName by clusterID
+    val (interactiveRunsWJobClusterMeta, automatedRunsWJobClusterMeta) = if (clusterLookups.nonEmpty) {
+
+      var interactiveClusterMetaLookupBuilder = jobRunsWJobMetaWithoutChildrenInteractive
+      var automatedClusterMetaLookupBuilder = jobRunsWJobMetaWithoutChildrenAutomated
+
+      if (clusterLookups.contains("clusterSpecLookup")) {
+        // GET cluster_name by clusterID for interactive clusters
+        interactiveClusterMetaLookupBuilder = interactiveClusterMetaLookupBuilder
+          .toTSDF("timestamp", "organization_id", "clusterId")
+          .lookupWhen(
+            clusterLookups("clusterSpecLookup")
+              .toTSDF("timestamp", "organization_id", "clusterId"),
+            tsPartitionVal = 64
+          ).df
+
+        // get cluster_id by cluster_name (derived)
+        automatedClusterMetaLookupBuilder = automatedClusterMetaLookupBuilder
+          .toTSDF("timestamp", "organization_id", "cluster_name")
+          .lookupWhen(
+            clusterLookups("clusterSpecLookup")
+              .toTSDF("timestamp", "organization_id", "cluster_name")
+          ).df
+      }
+
+      // look in run snapshots when values still null attempt to fill them from the snapshots
+      if (clusterLookups.contains("clusterSnapLookup")) {
+        interactiveClusterMetaLookupBuilder = interactiveClusterMetaLookupBuilder
+          .toTSDF("timestamp", "organization_id", "clusterId")
+          .lookupWhen(
+            clusterLookups("clusterSnapLookup")
+              .toTSDF("timestamp", "organization_id", "clusterId"),
+            tsPartitionVal = 64
+          ).df
+
+        automatedClusterMetaLookupBuilder = automatedClusterMetaLookupBuilder
+          .toTSDF("timestamp", "organization_id", "cluster_name")
+          .lookupWhen(
+            clusterLookups("clusterSnapLookup")
+              .toTSDF("timestamp", "organization_id", "cluster_name")
+          ).df
+      }
+
+      (interactiveClusterMetaLookupBuilder, automatedClusterMetaLookupBuilder)
+    } else (jobRunsWJobMetaWithoutChildrenInteractive, jobRunsWJobMetaWithoutChildrenAutomated)
+
+    // Union the interactive and automated back together with the cluster ids and names
+    val jobRunsWMeta = interactiveRunsWJobClusterMeta.unionByName(automatedRunsWJobClusterMeta)
+
+    // Get Ephemeral Notebook Job Run Details to be nested into the parent job runs
+    val childJobRuns = jobRunsWIdsAndNames
+      .filter(get_json_object('workflow_context, "$.root_run_id").isNotNull)
+
+    val childRunsForNesting = childJobRuns
+      .withColumn("children", struct(childJobRuns.schema.fieldNames map col: _*))
+      .select(
+        get_json_object('workflow_context, "$.root_run_id").alias("runId"), 'children
+      )
+
+    val jobRunsFinal = jobRunsWMeta
+      .join(childRunsForNesting, Seq("runId"), "left")
       .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
       .withColumn("endEpochMS", $"jobRunTime.endEpochMS") // for incremental downstream after job termination
       .withColumn("runId", 'runId.cast("long"))
       .withColumn("jobId", 'jobId.cast("long"))
       .withColumn("idInJob", 'idInJob.cast("long"))
-      .repartition(repartitionCount)
 
     jobsAuditComplete.unpersist()
 

@@ -203,7 +203,7 @@ trait GoldTransforms extends SparkSessionWrapper {
           .otherwise('target_num_workers)
       )
       .select(
-        'organization_id, 'cluster_id,
+        'organization_id, 'cluster_id, 'isRunning,
         'timestamp, 'type, 'current_num_workers, 'target_num_workers
       )
 
