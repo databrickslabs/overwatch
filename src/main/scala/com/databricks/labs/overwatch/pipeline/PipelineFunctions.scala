@@ -32,7 +32,7 @@ object PipelineFunctions {
                                target: PipelineTable,
                                spark: SparkSession,
                                config: Config,
-                               module: Module
+                               module: Option[Module]
                              ): DataFrame = {
 
     var mutationDF = df
@@ -49,6 +49,7 @@ object PipelineFunctions {
       target.name match {
         case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
           .rdd.partitions.length * target.shuffleFactor
+        case _ => sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
       }
     } else {
       sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
@@ -65,7 +66,8 @@ object PipelineFunctions {
       }")
     }
 
-    logger.log(Level.INFO, s"${module.moduleName}: Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
+    if (module.nonEmpty) logger.log(Level.INFO, s"${module.get.moduleName}: " +
+      s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
       s"\nShufflePartitions: ${targetShufflePartitionCount}")
 
     spark.conf.set("spark.sql.shuffle.partitions", targetShufflePartitionCount)

@@ -51,6 +51,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("sequenceNumber"),
       config,
       partitionBy = Seq("organization_id", "Overwatch_RunID", "__overwatch_ctrl_noise"),
+      withOverwatchRunID = if (config.cloudProvider == "azure") false else true,
       checkpointPath = if (config.cloudProvider == "azure")
         config.auditLogConfig.azureAuditLogEventhubConfig.get.auditRawEventsChk
       else None

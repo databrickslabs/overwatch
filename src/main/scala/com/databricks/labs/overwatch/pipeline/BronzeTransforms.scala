@@ -120,7 +120,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
   @throws(classOf[BadConfigException])
   protected def landAzureAuditLogDF(ehConfig: AzureAuditLogEventhubConfig,
                                     isFirstRun: Boolean,
-                                    organizationId: String
+                                    organizationId: String,
+                                    runID: String
                                    ): DataFrame = {
 
     if (!validateCleanPaths(isFirstRun, ehConfig))
@@ -145,6 +146,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .load()
       .withColumn("deserializedBody", 'body.cast("string"))
       .withColumn("organization_id", lit(organizationId))
+      .withColumn("Overwatch_RunID", lit(runID))
 
   }
 

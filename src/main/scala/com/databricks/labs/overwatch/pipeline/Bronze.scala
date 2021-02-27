@@ -117,9 +117,18 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       val rawAzureAuditEvents = landAzureAuditLogDF(
         config.auditLogConfig.azureAuditLogEventhubConfig.get,
         config.isFirstRun,
-        config.organizationId
+        config.organizationId,
+        config.runID
       )
-      database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
+
+      val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
+        rawAzureAuditEvents,
+        400,
+        BronzeTargets.auditLogAzureLandRaw,
+        spark, config, None
+      )
+
+      database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
 
       //      Helpers.fastDrop(BronzeTargets.auditLogAzureLandRaw.tableFullName, "azure")
 

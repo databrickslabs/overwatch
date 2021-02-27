@@ -160,6 +160,7 @@ object Schema extends SparkSessionWrapper {
         StructField("user_id", StringType, nullable = true),
         StructField("ssh_public_keys", StringType, nullable = true),
         StructField("single_user_name", StringType, nullable = true),
+        StructField("resourceId", LongType, nullable = true),
         // EXPLICIT EXCLUSIONS -- fields will not be in targetDF
         StructField("organization_id", NullType, nullable = true),
         StructField("orgId", NullType, nullable = true),
@@ -292,6 +293,40 @@ object Schema extends SparkSessionWrapper {
       )), nullable = true),
       StructField("timestamp", LongType, nullable = true),
       StructField("type", StringType, nullable = true)
+    )),
+    // Account Mod Gold
+    3007 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
+      StructField("timestamp", LongType, nullable = true),
+      StructField("date", DateType, nullable = true),
+      StructField("actionName", StringType, nullable = true),
+      StructField("endpoint", StringType, nullable = true),
+      StructField("modified_by", StringType, nullable = true),
+      StructField("user_name", StringType, nullable = true),
+      StructField("user_id", StringType, nullable = true),
+      StructField("group_name", StringType, nullable = true),
+      StructField("group_id", StringType, nullable = true),
+      StructField("sourceIPAddress", StringType, nullable = true),
+      StructField("userAgent", StringType, nullable = true),
+      StructField("requestId", StringType, nullable = true),
+      common("response")
+    )),
+    // Account Login Gold
+    3008 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
+      StructField("timestamp", LongType, nullable = true),
+      StructField("login_date", DateType, nullable = true),
+      StructField("login_type", StringType, nullable = true),
+      StructField("login_user", StringType, nullable = true),
+      StructField("user_id", StringType, nullable = true),
+      StructField("user_email", StringType, nullable = true),
+      StructField("ssh_login_details", StructType(Seq(
+        StructField("instance_id", StringType, nullable = true)
+      )), nullable = true),
+      StructField("sourceIPAddress", StringType, nullable = true),
+      StructField("userAgent", StringType, nullable = true),
+      StructField("requestId", StringType, nullable = true),
+      common("response")
     )),
     // sparkJob
     3010 -> StructType(Seq(
