@@ -49,7 +49,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   protected def newDataRetrieved: Boolean = _newDataRetrieved
 
-  @throws(classOf[NoNewDataException])
   private def apiByID[T](endpoint: String, apiEnv: ApiEnv,
                          apiType: String,
                          ids: Array[T], idsKey: String,
@@ -232,7 +231,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
             split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
           .drop("filenameAR")
       } else {
-        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data found between ${fromDT.toString}-${untilDT.toString}")
+//        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data found between ${fromDT.toString}-${untilDT.toString}")
+        spark.emptyDataFrame
 //        Seq("No New Records").toDF("__OVERWATCHEMPTY")
       }
     }
@@ -398,8 +398,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       clusterEventsDF
     } else {
       println("EMPTY MODULE: Cluster Events")
+      spark.emptyDataFrame
 //      Seq("").toDF("__OVERWATCHEMPTY")
-      throw new NoNewDataException("EMPTY: No New Cluster Events")
+//      throw new NoNewDataException("EMPTY: No New Cluster Events")
     }
 
   }
@@ -464,15 +465,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Searching for Event logs")
     // Caching is done to ensure a single scan of the event log file paths
+    // From here forward there should be no more direct scans for new records, just loading data direct from paths
     // eager force cache
-    val cachedEventLogs = if(!eventLogsDF.isEmpty) {
-      eventLogsDF.cache()
-      val eventLogsCount = eventLogsDF.count()
-      logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
-      eventLogsDF
-    } else eventLogsDF
+    // TODO -- Delta auto-optimize seems to be scanning the source files again anyway during
+    //  execute at DeltaInvariantCheckerExec.scala:95 -- review again after upgrade to DBR 7.x+
+    val cachedEventLogs = eventLogsDF.cache()
+    val eventLogsCount = cachedEventLogs.count()
+    logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
 
-    if (!cachedEventLogs.isEmpty) { // newly found file names
+    if (eventLogsCount > 0) { // newly found file names
       val validNewFilesWMetaDF = retrieveNewValidSparkEventsWMeta(badRecordsPath, cachedEventLogs, processedLogFilesTracker)
       val pathsGlob = validNewFilesWMetaDF.select('fileName).as[String].collect
       if (pathsGlob.nonEmpty) { // new files less bad files and already-processed files
@@ -502,22 +503,26 @@ trait BronzeTransforms extends SparkSessionWrapper {
         //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
         //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
-        logger.log(Level.INFO, "Attempting to load event log data")
+        /** Removing this top try as it seems many customers have this situation and by first trying and then catching
+         * it requires that the longest bronze workload run twice.
+        */
+//        logger.log(Level.INFO, "Attempting to load event log data")
+//        val baseEventsDF = try {
+//          spark.read.option("badRecordsPath", badRecordsPath)
+//            .json(pathsGlob: _*)
+//            .drop(dropCols: _*)
+//        } catch {
         val baseEventsDF = try {
-          spark.read.option("badRecordsPath", badRecordsPath)
-            .json(pathsGlob: _*)
-            .drop(dropCols: _*)
-        } catch {
           /**
            * Event org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent has a duplicate column
            * "timestamp" where the type is a string and the column name is "timestamp". This conflicts with the rest
            * of the event log where the column name is "Timestamp" and its type is "Long"; thus, the catch for
            * the aforementioned event is specifically there to resolve the timestamp issue when this event is present.
            */
-          case e: AnalysisException if (e.getMessage().trim
-            .equalsIgnoreCase("""Found duplicate column(s) in the data schema: `timestamp`;""")) => {
-
-            logger.log(Level.WARN, "Found duplicate column(s) in the data schema: `timestamp`; attempting to handle")
+//          case e: AnalysisException if (e.getMessage().trim
+//            .equalsIgnoreCase("""Found duplicate column(s) in the data schema: `timestamp`;""")) => {
+//
+//            logger.log(Level.WARN, "Found duplicate column(s) in the data schema: `timestamp`; attempting to handle")
 
             val streamingQueryListenerTS = 'Timestamp.isNull && 'timestamp.isNotNull && 'Event === "org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent"
 
@@ -525,18 +530,27 @@ trait BronzeTransforms extends SparkSessionWrapper {
             spark.conf.set("spark.sql.caseSensitive", "true")
 
             // read the df and convert the timestamp column
-            spark.read.option("badRecordsPath", badRecordsPath)
+            val basedDF = spark.read.option("badRecordsPath", badRecordsPath)
               .json(pathsGlob: _*)
               .drop(dropCols: _*)
-              .withColumn("Timestamp",
-                when(streamingQueryListenerTS,
-                  TransformFunctions.stringTsToUnixMillis('timestamp)
-                ).otherwise('Timestamp))
+
+            val hasUpperTimestamp = basedDF.schema.fields.map(_.name).contains("Timestamp")
+            val hasLower_timestamp = basedDF.schema.fields.map(_.name).contains("timestamp")
+
+            val fixDupTimestamps = if (hasUpperTimestamp && hasLower_timestamp) when(streamingQueryListenerTS, TransformFunctions.stringTsToUnixMillis('timestamp)).otherwise('Timestamp)
+            else if (hasLower_timestamp) TransformFunctions.stringTsToUnixMillis('timestamp)
+            else col("Timestamp")
+
+            basedDF
+              .withColumn("Timestamp", fixDupTimestamps)
               .drop("timestamp")
-          }
+
+          } catch {
           case e: Throwable => {
+            // TODO -- set processedFiles to failed
 //            logger.log(Level.ERROR, "FAILED spark events bronze", e)
 //            Seq("").toDF("__OVERWATCHFAILURE")
+            spark.conf.set("spark.sql.caseSensitive", "false")
             throw new FailedModuleException(e.getMessage)
           }
         }
@@ -583,6 +597,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           // asOf Spark 3.0.0
           //.withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
 
+        spark.conf.set("spark.sql.caseSensitive", "false")
         cachedEventLogs.unpersist()
 
         bronzeEventsFinal
@@ -590,14 +605,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val msg = "Path Globs Empty, exiting"
         println(msg)
         logger.log(Level.WARN, msg)
-        throw new NoNewDataException("EMPTY: No new Spark Events Files")
+        spark.emptyDataFrame
+//        throw new NoNewDataException("EMPTY: No new Spark Events Files")
 //        Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
       }
     } else {
       val msg = "Event Logs DF is empty, Exiting"
       println(msg)
       logger.log(Level.WARN, msg)
-      throw new NoNewDataException("EMPTY: No new Spark Events Files")
+      spark.emptyDataFrame
+//      throw new NoNewDataException("EMPTY: No new Spark Events Files")
 //      Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
     }
   }
@@ -714,8 +731,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .format("delta")
       .save(tmpEventLogPathsDir)
 
-    // TODO -- use intelligent partitions count
-    // TOOD -- Throw error on failure and bubble up to report
+    /**
+     * TODO --
+     *  use intelligent partitions count
+     *  Throw error on failure and bubble up to report
+     *  OPTIMIZATION - each path prefix is assigned to a single task meaning that large shared cluster source paths
+     *    take 99% of time to load paths instead of sharing the load across other cores. Break this scan apart if possible
+     *  Store additioanl meta metrics on source files such as size
+     */
     val strategicPartitions = if (isFirstRun) 2000 else 1000
     val eventLogPaths = spark.read.format("delta").load(tmpEventLogPathsDir)
       .repartition(strategicPartitions)

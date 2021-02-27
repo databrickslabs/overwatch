@@ -181,9 +181,19 @@ trait GoldTransforms extends SparkSessionWrapper {
     val workerNodeDetails = instanceDetails.asDF
       .select('organization_id, 'API_Name.alias("node_type_id"), struct(instanceDetails.asDF.columns map col: _*).alias("workerSpecs"))
 
+    val clusterBeforeW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+      .rowsBetween(-1000, Window.currentRow)
+    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'counter_reset).orderBy('timestamp)
+
     val clusterEventsBaseline = clusterEventsDF
       .selectExpr("*", "details.*")
       .drop("details")
+      .withColumn("isRunning", when('type === "TERMINATING", lit(false)).otherwise(lit(true)))
+      .withColumn("isRunning",
+        when('type === "TERMINATING" || ('type =!= "STARTING" && lag(!'isRunning, 1).over(stateUnboundW)), lit(false))
+          .otherwise(lit(true))
+      )
       .withColumn("current_num_workers",
         when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
           .otherwise('current_num_workers)
@@ -193,34 +203,15 @@ trait GoldTransforms extends SparkSessionWrapper {
           .otherwise('target_num_workers)
       )
       .select(
-        'organization_id, 'cluster_id,
+        'organization_id, 'cluster_id, 'isRunning,
         'timestamp, 'type, 'current_num_workers, 'target_num_workers
       )
 
-    val clusterBeforeW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-      .rowsBetween(-1000, Window.currentRow)
-    val clusterAfterW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
-      .rowsBetween(-1000, Window.currentRow)
-    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'counter_reset).orderBy('timestamp)
-
-    val billableTypes = Array(
+    val nonBillableTypes = Array(
       "INIT_SCRIPTS_FINISHED", "INIT_SCRIPTS_STARTED", "STARTING", "TERMINATING", "CREATING", "RESTARTING"
     )
 
     val nodeTypeLookup = clusterSpec.asDF
-      .withColumn("driver_node_type_id",
-        when('driver_node_type_id.isNull, last('driver_node_type_id, true).over(clusterBeforeW))
-          .otherwise('driver_node_type_id))
-      .withColumn("node_type_id",
-        when('node_type_id.isNull, last('node_type_id, true).over(clusterBeforeW))
-          .otherwise('node_type_id))
-      .withColumn("driver_node_type_id",
-        when('driver_node_type_id.isNull, first('driver_node_type_id, true).over(clusterAfterW))
-          .otherwise('driver_node_type_id))
-      .withColumn("node_type_id",
-        when('node_type_id.isNull, first('node_type_id, true).over(clusterAfterW))
-          .otherwise('node_type_id))
       .select('organization_id, 'cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
 
     val nodeTypeLookup2 = clusterSnapshot.asDF
@@ -228,19 +219,16 @@ trait GoldTransforms extends SparkSessionWrapper {
       .select('organization_id, 'cluster_id, 'cluster_name, 'timestamp, 'driver_node_type_id, 'node_type_id)
 
     val clusterPotential = clusterEventsBaseline
-      .joinAsOf(
-        nodeTypeLookup,
-        Seq("organization_id", "cluster_id"),
-        Seq('timestamp),
-        Seq("driver_node_type_id", "node_type_id", "cluster_name"),
-        rowsBefore = -1000, rowsAfter = 1000
-      ).joinAsOf(
-      nodeTypeLookup2,
-        Seq("organization_id", "cluster_id"),
-        Seq('timestamp),
-        Seq("driver_node_type_id", "node_type_id", "cluster_name"),
-        rowsBefore = -1000, rowsAfter = 1000
-      )
+      .toTSDF("timestamp", "organization_id", "cluster_id")
+      .lookupWhen(
+        nodeTypeLookup.toTSDF("timestamp", "organization_id", "cluster_id"),
+        maxLookAhead = 1,
+        tsPartitionVal = 64
+      ).lookupWhen(
+      nodeTypeLookup2.toTSDF("timestamp", "organization_id", "cluster_id"),
+      maxLookAhead = 1,
+      tsPartitionVal = 64
+    ).df
       .withColumn("timestamp", 'timestamp.cast("double") / 1000.0)
       .withColumn("ts", from_unixtime('timestamp).cast("timestamp"))
       .withColumn("date", 'ts.cast("date"))
@@ -258,24 +246,25 @@ trait GoldTransforms extends SparkSessionWrapper {
         )
       )
       .withColumn("uptime_in_state_S", lead('timestamp, 1).over(stateUnboundW) - 'timestamp)
-      .withColumn("cloud_billable", lit(true))
-      .withColumn("databricks_billable", when('type.isin(billableTypes: _*), lit(false))
+      .withColumn("cloud_billable", when('isRunning, lit(true)).otherwise(lit(false)))
+      .withColumn("databricks_billable",
+        when('isRunning && !'type.isin(nonBillableTypes: _*), lit(false))
         .otherwise(lit(true)
         ))
       .join(driverNodeDetails, Seq("organization_id", "driver_node_type_id"), "left")
       .join(workerNodeDetails, Seq("organization_id", "node_type_id"), "left")
-      .withColumn("core_hours",
+      .withColumn("core_hours", when('isRunning,
         round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
           round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
-      )
+      ))
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
       'cluster_id,
-      ('timestamp * lit(1000)).alias("unixTimeMS_state_start"),
+      ('timestamp * lit(1000)).cast("long").alias("unixTimeMS_state_start"),
       from_unixtime(('timestamp * lit(1000)).cast("double") / 1000).cast("timestamp").alias("timestamp_state_start"),
       from_unixtime(('timestamp * lit(1000)).cast("double") / 1000).cast("timestamp").cast("date").alias("date_state_start"),
-      ((lead('timestamp, 1).over(stateUnboundW) * lit(1000) - 1)).alias("unixTimeMS_state_end"),
+      ((lead('timestamp, 1).over(stateUnboundW) * lit(1000) - 1)).cast("long").alias("unixTimeMS_state_end"),
       from_unixtime(((lead('timestamp, 1).over(stateUnboundW) * lit(1000)).cast("double") - 1.0) / 1000).cast("timestamp").alias("timestamp_state_end"),
       from_unixtime(((lead('timestamp, 1).over(stateUnboundW) * lit(1000)).cast("double") - 1.0) / 1000).cast("timestamp").cast("date").alias("date_state_end"),
       'type.alias("state"),
@@ -305,167 +294,169 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               automatedDBUPrice: Double
                                             )(newTerminatedJobRuns: DataFrame): DataFrame = {
 
-    if (clusterStateFact.isEmpty) throw new NoNewDataException(s"ClusterStateFact Source does not exist or is empty")
-
-    val clusterNameLookup = cluster.select('organization_id, 'cluster_id, 'cluster_name).distinct
-    val isAutomated = 'cluster_name.like("job-%-run-%")
-
-    val driverCosts = instanceDetails
-      .select(
-        'organization_id,
-        'API_name.alias("driver_node_type_id"),
-        'Compute_Contract_Price.alias("driver_compute_hourly"),
-        'Hourly_DBUs.alias("driver_dbu_hourly")
-      )
-    val workerCosts = instanceDetails
-      .select(
-        'organization_id,
-        'API_name.alias("node_type_id"),
-        'Compute_Contract_Price.alias("worker_compute_hourly"),
-        'Hourly_DBUs.alias("worker_dbu_hourly"),
-        'vCPUs.alias("worker_cores")
-      )
-
-    val clusterPotentialWCosts = clusterStateFact
-      .join(clusterNameLookup, Seq("organization_id", "cluster_id"), "left")
-      .withColumn("dbu_rate",
-        when(isAutomated, lit(automatedDBUPrice))
-          .otherwise(lit(interactiveDBUPrice))
-      ) // adding this to instanceDetails table -- placeholder for now
-      .withColumn("uptime_in_state_H", 'uptime_in_state_S / 60 / 60)
-      .join(driverCosts, Seq("organization_id", "driver_node_type_id"))
-      .join(workerCosts, Seq("organization_id", "node_type_id"))
-
-    val keys = Array("organization_id", "cluster_id", "timestamp")
-    val lookupCols = Array("unixTimeMS_state_start", "unixTimeMS_state_end", "timestamp_state_start",
-      "timestamp_state_end", "state", "cloud_billable", "databricks_billable", "current_num_workers",
-      "dbu_rate", "driver_compute_hourly", "worker_compute_hourly", "driver_dbu_hourly",
-      "worker_dbu_hourly", "worker_cores")
-
-    // GET POTENTIAL WITH COSTS
-    val clusterPotentialInitialState = clusterPotentialWCosts
-      .withColumn("timestamp", 'unixTimeMS_state_start)
-      .select(keys ++ lookupCols map col: _*)
-
-    val clusterPotentialIntermediateStates = clusterPotentialWCosts
-      .select(keys.filterNot(_ == "timestamp") ++ lookupCols map col: _*)
-
-    val clusterPotentialTerminalState = clusterPotentialWCosts
-      .withColumn("timestamp", 'unixTimeMS_state_end)
-      .select(keys ++ lookupCols map col: _*)
-
-    val jobRunInitialState = newTerminatedJobRuns //jobRun_gold
-        .withColumn("timestamp", $"job_runtime.startEpochMS")
-      .joinAsOf(
-        clusterPotentialInitialState,
-        Seq("organization_id", "cluster_id"),
-        Seq('timestamp),
-        lookupCols.toSeq,
-        rowsBefore = -100
-      )
-      .drop("timestamp")
-      .withColumn("uptime_in_state_H", (array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)
-      .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
-
-    val jobRunTerminalState = newTerminatedJobRuns
-      .withColumn("timestamp", $"job_runtime.endEpochMS")
-      .joinAsOf(
-        clusterPotentialTerminalState,
-        Seq("organization_id", "cluster_id"),
-        Seq('timestamp),
-        lookupCols.toSeq,
-        rowsBefore = -100
-      )
-      .drop("timestamp")
-      .filter('unixTimeMS_state_start > $"job_runtime.startEpochMS" && 'unixTimeMS_state_start < $"job_runtime.endEpochMS")
-      .withColumn("uptime_in_state_H", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
-      .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
-
-    val jobRunIntermediateStates = newTerminatedJobRuns.alias("jr")
-      .join(clusterPotentialIntermediateStates.alias("cpot"),
-        $"jr.organization_id" === $"cpot.organization_id" &&
-        $"jr.cluster_id" === $"cpot.cluster_id" &&
-          $"cpot.unixTimeMS_state_start" > $"jr.job_runtime.startEpochMS" && // only states beginning after job start and ending before
-          $"cpot.unixTimeMS_state_end" < $"jr.job_runtime.endEpochMS"
-      )
-      .drop($"cpot.cluster_id").drop($"cpot.organization_id")
-      .withColumn("uptime_in_state_H", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000) / 3600)
-      .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
-
-    val jobRunWPotential = jobRunInitialState
-      .unionByName(jobRunIntermediateStates)
-      .unionByName(jobRunTerminalState)
-
-    val jobRunCostPotential = jobRunWPotential
-      .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
-      .withColumn("driver_compute_cost", when('cloud_billable, 'driver_compute_hourly * 'uptime_in_state_H).otherwise(lit(0)))
-      .withColumn("driver_dbu_cost", when('databricks_billable, 'driver_dbu_hourly * 'uptime_in_state_H * 'dbu_rate).otherwise(lit(0)))
-      .withColumn("worker_compute_cost", when('cloud_billable, 'worker_compute_hourly * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
-      .withColumn("worker_dbu_cost", when('databricks_billable, 'worker_dbu_hourly * 'current_num_workers * 'uptime_in_state_H * 'dbu_rate).otherwise(lit(0)))
-      .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
-      .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
-      .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
-      .withColumn("job_start_date", $"job_runtime.startTS".cast("date"))
-      .groupBy('organization_id, 'job_id, 'id_in_job, 'job_start_date, 'cluster_id, 'cluster_type, 'job_terminal_state.alias("run_terminal_state"), 'job_trigger_type.alias("run_trigger_type"))
-      .agg(
-        round(sum('worker_potential_core_H), 4).alias("worker_potential_core_H"),
-        round(sum('driver_compute_cost), 2).alias("driver_compute_cost"),
-        round(sum('driver_dbu_cost), 2).alias("driver_dbu_cost"),
-        round(sum('worker_compute_cost), 2).alias("worker_compute_cost"),
-        round(sum('worker_dbu_cost), 2).alias("worker_dbu_cost"),
-        round(sum('total_driver_cost), 2).alias("total_driver_cost"),
-        round(sum('total_worker_cost), 2).alias("total_worker_cost"),
-        round(sum('total_cost), 2).alias("total_cost")
-      )
-
-    // GET UTILIZATION BY KEY
-    // IF incremental spark events are present calculate utilization, otherwise just return with NULLS
-    // Spark events are commonly missing if no clusters are logging and/or in test environments
-    if (!incrementalSparkJob.isEmpty) {
-      val sparkJobMini = incrementalSparkJob
-        .select('organization_id, 'date, 'spark_context_id, 'job_group_id,
-          'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
-        //      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
-        .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
-
-      val sparkTaskMini = incrementalSparkTask
-        .select('organization_id, 'date, 'spark_context_id, 'stage_id,
-          'stage_attempt_id, 'task_id, 'task_attempt_id,
-          $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
-
-      val jobRunUtilRaw = sparkJobMini.alias("sparkJobMini")
-        .joinWithLag(
-          sparkTaskMini,
-          Seq("organization_id", "date", "spark_context_id", "stage_id"),
-          "date"
-        )
-        .withColumn("spark_task_runtime_H", 'runtimeMS / lit(1000) / lit(3600))
-        .withColumnRenamed("job_id", "spark_job_id")
-        .withColumnRenamed("stage_id", "spark_stage_id")
-        .withColumnRenamed("task_id", "spark_task_id")
-
-      val jobRunSparkUtil = jobRunUtilRaw
-        .groupBy('organization_id, 'db_job_id, 'db_id_in_job)
-        .agg(
-          sum('runTimeMS).alias("spark_task_runtimeMS"),
-          round(sum('spark_task_runtime_H), 4).alias("spark_task_runtime_H")
-        )
-
-      jobRunCostPotential.alias("jrCostPot")
-        .join(
-          jobRunSparkUtil.withColumnRenamed("organization_id", "orgId").alias("jrSparkUtil"),
-          $"jrCostPot.organization_id" === $"jrSparkUtil.orgId" &&
-            $"jrCostPot.job_id" === $"jrSparkUtil.db_job_id" &&
-            $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job",
-          "left"
-        )
-        .drop("db_job_id", "db_id_in_job", "orgId")
-        .withColumn("job_run_cluster_util", round(('spark_task_runtime_H / 'worker_potential_core_H), 4))
+    if (clusterStateFact.isEmpty) {
+      spark.emptyDataFrame
     } else {
-      jobRunCostPotential
-        .withColumn("spark_task_runtimeMS", lit(null).cast("long"))
-        .withColumn("spark_task_runtime_H", lit(null).cast("double"))
-        .withColumn("job_run_cluster_util", lit(null).cast("double"))
+
+      val clusterNameLookup = cluster.select('organization_id, 'cluster_id, 'cluster_name).distinct
+      val isAutomated = 'cluster_name.like("job-%-run-%")
+
+      val driverCosts = instanceDetails
+        .select(
+          'organization_id,
+          'API_name.alias("driver_node_type_id"),
+          'Compute_Contract_Price.alias("driver_compute_hourly"),
+          'Hourly_DBUs.alias("driver_dbu_hourly")
+        )
+      val workerCosts = instanceDetails
+        .select(
+          'organization_id,
+          'API_name.alias("node_type_id"),
+          'Compute_Contract_Price.alias("worker_compute_hourly"),
+          'Hourly_DBUs.alias("worker_dbu_hourly"),
+          'vCPUs.alias("worker_cores")
+        )
+
+      val clusterPotentialWCosts = clusterStateFact
+        .join(clusterNameLookup, Seq("organization_id", "cluster_id"), "left")
+        .withColumn("dbu_rate",
+          when(isAutomated, lit(automatedDBUPrice))
+            .otherwise(lit(interactiveDBUPrice))
+        ) // adding this to instanceDetails table -- placeholder for now
+        .withColumn("uptime_in_state_H", 'uptime_in_state_S / 60 / 60)
+        .join(driverCosts, Seq("organization_id", "driver_node_type_id"))
+        .join(workerCosts, Seq("organization_id", "node_type_id"))
+
+      val keys = Array("organization_id", "cluster_id", "timestamp")
+      val lookupCols = Array("unixTimeMS_state_start", "unixTimeMS_state_end", "timestamp_state_start",
+        "timestamp_state_end", "state", "cloud_billable", "databricks_billable", "current_num_workers",
+        "dbu_rate", "driver_compute_hourly", "worker_compute_hourly", "driver_dbu_hourly",
+        "worker_dbu_hourly", "worker_cores")
+
+      // GET POTENTIAL WITH COSTS
+      val clusterPotentialInitialState = clusterPotentialWCosts
+        .withColumn("timestamp", 'unixTimeMS_state_start)
+        .select(keys ++ lookupCols map col: _*)
+
+      val clusterPotentialIntermediateStates = clusterPotentialWCosts
+        .select(keys.filterNot(_ == "timestamp") ++ lookupCols map col: _*)
+
+      val clusterPotentialTerminalState = clusterPotentialWCosts
+        .withColumn("timestamp", 'unixTimeMS_state_end)
+        .select(keys ++ lookupCols map col: _*)
+
+      val jobRunInitialState = newTerminatedJobRuns //jobRun_gold
+        .withColumn("timestamp", $"job_runtime.startEpochMS")
+        .toTSDF("timestamp", "organization_id", "cluster_id")
+        .lookupWhen(
+          clusterPotentialInitialState
+            .toTSDF("timestamp", "organization_id", "cluster_id"),
+          tsPartitionVal = 64
+        ).df
+        .drop("timestamp")
+        .withColumn("uptime_in_state_H", (array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)
+        .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+
+      val jobRunTerminalState = newTerminatedJobRuns
+        .withColumn("timestamp", $"job_runtime.endEpochMS")
+        .toTSDF("timestamp", "organization_id", "cluster_id")
+        .lookupWhen(
+          clusterPotentialTerminalState
+            .toTSDF("timestamp", "organization_id", "cluster_id"),
+          tsPartitionVal = 64
+        ).df
+        .drop("timestamp")
+        .filter('unixTimeMS_state_start > $"job_runtime.startEpochMS" && 'unixTimeMS_state_start < $"job_runtime.endEpochMS")
+        .withColumn("uptime_in_state_H", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
+        .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+
+      val jobRunIntermediateStates = newTerminatedJobRuns.alias("jr")
+        .join(clusterPotentialIntermediateStates.alias("cpot"),
+          $"jr.organization_id" === $"cpot.organization_id" &&
+            $"jr.cluster_id" === $"cpot.cluster_id" &&
+            $"cpot.unixTimeMS_state_start" > $"jr.job_runtime.startEpochMS" && // only states beginning after job start and ending before
+            $"cpot.unixTimeMS_state_end" < $"jr.job_runtime.endEpochMS"
+        )
+        .drop($"cpot.cluster_id").drop($"cpot.organization_id")
+        .withColumn("uptime_in_state_H", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000) / 3600)
+        .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+
+      val jobRunWPotential = jobRunInitialState
+        .unionByName(jobRunIntermediateStates)
+        .unionByName(jobRunTerminalState)
+
+      val jobRunCostPotential = jobRunWPotential
+        .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
+        .withColumn("driver_compute_cost", when('cloud_billable, 'driver_compute_hourly * 'uptime_in_state_H).otherwise(lit(0)))
+        .withColumn("driver_dbu_cost", when('databricks_billable, 'driver_dbu_hourly * 'uptime_in_state_H * 'dbu_rate).otherwise(lit(0)))
+        .withColumn("worker_compute_cost", when('cloud_billable, 'worker_compute_hourly * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
+        .withColumn("worker_dbu_cost", when('databricks_billable, 'worker_dbu_hourly * 'current_num_workers * 'uptime_in_state_H * 'dbu_rate).otherwise(lit(0)))
+        .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
+        .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
+        .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
+        .withColumn("job_start_date", $"job_runtime.startTS".cast("date"))
+        .groupBy('organization_id, 'job_id, 'id_in_job, 'job_start_date, 'cluster_id, 'cluster_type, 'job_terminal_state.alias("run_terminal_state"), 'job_trigger_type.alias("run_trigger_type"))
+        .agg(
+          round(sum('worker_potential_core_H), 4).alias("worker_potential_core_H"),
+          round(sum('driver_compute_cost), 2).alias("driver_compute_cost"),
+          round(sum('driver_dbu_cost), 2).alias("driver_dbu_cost"),
+          round(sum('worker_compute_cost), 2).alias("worker_compute_cost"),
+          round(sum('worker_dbu_cost), 2).alias("worker_dbu_cost"),
+          round(sum('total_driver_cost), 2).alias("total_driver_cost"),
+          round(sum('total_worker_cost), 2).alias("total_worker_cost"),
+          round(sum('total_cost), 2).alias("total_cost")
+        )
+
+      // GET UTILIZATION BY KEY
+      // IF incremental spark events are present calculate utilization, otherwise just return with NULLS
+      // Spark events are commonly missing if no clusters are logging and/or in test environments
+      if (!incrementalSparkJob.isEmpty) {
+        val sparkJobMini = incrementalSparkJob
+          .select('organization_id, 'date, 'spark_context_id, 'job_group_id,
+            'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
+          //      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
+          .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
+
+        val sparkTaskMini = incrementalSparkTask
+          .select('organization_id, 'date, 'spark_context_id, 'stage_id,
+            'stage_attempt_id, 'task_id, 'task_attempt_id,
+            $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
+
+        val jobRunUtilRaw = sparkJobMini.alias("sparkJobMini")
+          .joinWithLag(
+            sparkTaskMini,
+            Seq("organization_id", "date", "spark_context_id", "stage_id"),
+            "date"
+          )
+          .withColumn("spark_task_runtime_H", 'runtimeMS / lit(1000) / lit(3600))
+          .withColumnRenamed("job_id", "spark_job_id")
+          .withColumnRenamed("stage_id", "spark_stage_id")
+          .withColumnRenamed("task_id", "spark_task_id")
+
+        val jobRunSparkUtil = jobRunUtilRaw
+          .groupBy('organization_id, 'db_job_id, 'db_id_in_job)
+          .agg(
+            sum('runTimeMS).alias("spark_task_runtimeMS"),
+            round(sum('spark_task_runtime_H), 4).alias("spark_task_runtime_H")
+          )
+
+        jobRunCostPotential.alias("jrCostPot")
+          .join(
+            jobRunSparkUtil.withColumnRenamed("organization_id", "orgId").alias("jrSparkUtil"),
+            $"jrCostPot.organization_id" === $"jrSparkUtil.orgId" &&
+              $"jrCostPot.job_id" === $"jrSparkUtil.db_job_id" &&
+              $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job",
+            "left"
+          )
+          .drop("db_job_id", "db_id_in_job", "orgId")
+          .withColumn("job_run_cluster_util", round(('spark_task_runtime_H / 'worker_potential_core_H), 4))
+      } else {
+        jobRunCostPotential
+          .withColumn("spark_task_runtimeMS", lit(null).cast("long"))
+          .withColumn("spark_task_runtime_H", lit(null).cast("double"))
+          .withColumn("job_run_cluster_util", lit(null).cast("double"))
+      }
+
     }
 
 

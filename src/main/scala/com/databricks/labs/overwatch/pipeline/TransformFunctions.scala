@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, SchemaTools, SparkSessionWrapper, ValidatedColumn}
+import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, ValidatedColumn, TSDF}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
@@ -8,11 +8,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 
-import java.util.UUID
-
-object TransformFunctions extends SparkSessionWrapper {
-
-  import spark.implicits._
+object TransformFunctions {
 
   implicit class DataFrameTransforms(df: DataFrame) {
     private val logger: Logger = Logger.getLogger(this.getClass)
@@ -50,57 +46,11 @@ object TransformFunctions extends SparkSessionWrapper {
         .dropDupColumnByAlias("laggard", usingColumns: _*)
     }
 
-    def joinAsOf(
-                  lookupDF: DataFrame,
-                  usingColumns: Seq[String],
-                  orderByColumns: Seq[Column],
-                  lookupColumns: Seq[String],
-                  rowsBefore: Long = Window.unboundedPreceding,
-                  rowsAfter: Long = Window.currentRow
-                ): DataFrame = {
-
-      val controlColName = "__ctrlCol__"
-      val drivingDF = df
-        .withColumn(controlColName, lit(0).cast("int"))
-      val baseWSpec = Window.partitionBy(usingColumns map col: _*)
-        .orderBy(orderByColumns: _*)
-      val beforeWSpec = baseWSpec.rowsBetween(rowsBefore, Window.currentRow)
-      val afterWSpec = baseWSpec.rowsBetween(Window.currentRow, rowsAfter)
-
-      val slimLookupCols = ((usingColumns ++ lookupColumns) map col) ++ orderByColumns
-      val slimLookupDF = lookupDF.select(slimLookupCols: _*)
-
-
-      val drivingCols = drivingDF.columns
-      val lookupDFCols = slimLookupDF.columns
-      val missingBaseCols = lookupDFCols.diff(drivingCols)
-      val missingLookupCols = drivingCols.diff(lookupDFCols)
-
-      val df1Complete = missingBaseCols.foldLeft(drivingDF) {
-        case (dfBuilder, c) =>
-          dfBuilder.withColumn(c, lit(null))
-      }
-      val df2Complete = missingLookupCols.foldLeft(slimLookupDF) {
-        case (dfBuilder, c) =>
-          dfBuilder.withColumn(c, lit(null))
-      }
-
-      val masterDF = df1Complete.unionByName(df2Complete)
-
-      lookupColumns.foldLeft(masterDF) {
-        case (dfBuilder, c) => {
-          val dt = dfBuilder.schema.fields.filter(_.name == c).head.dataType
-          val asOfDF = dfBuilder.withColumn(c,
-            coalesce(last(col(c), ignoreNulls = true).over(beforeWSpec), lit(null).cast(dt))
-          )
-          if (rowsAfter != 0L) {
-            asOfDF.withColumn(c,
-              coalesce(first(col(c), ignoreNulls = true).over(afterWSpec), lit(null).cast(dt))
-            )
-          } else asOfDF
-        }
-      }.filter(col(controlColName).isNotNull)
-        .drop(controlColName)
+    def toTSDF(
+              timeSeriesColumnName: String,
+              partitionByColumnNames: String*
+              ): TSDF = {
+      TSDF(df, timeSeriesColumnName, partitionByColumnNames: _*)
     }
 
     @transient
@@ -337,7 +287,9 @@ object TransformFunctions extends SparkSessionWrapper {
     ((unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)).cast("long")
   }
 
-  private val applicableWorkers = when('type === "RESIZING" && 'target_num_workers < 'current_num_workers, 'target_num_workers).otherwise('current_num_workers)
+  private val applicableWorkers = when(col("type") === "RESIZING" &&
+    col("target_num_workers") < col("current_num_workers"), col("target_num_workers"))
+    .otherwise(col("current_num_workers"))
 
   def getNodeInfo(nodeType: String, metric: String, multiplyTime: Boolean): Column = {
     val baseMetric = if ("driver".compareToIgnoreCase(nodeType) == 0) {
@@ -349,10 +301,10 @@ object TransformFunctions extends SparkSessionWrapper {
     }
 
     if (multiplyTime) {
-      when('type === "TERMINATING", lit(0))
-        .otherwise(round(baseMetric * 'uptime_in_state_S, 2)).alias(s"${nodeType}_${baseMetric}S")
+      when(col("type") === "TERMINATING", lit(0))
+        .otherwise(round(baseMetric * col("uptime_in_state_S"), 2)).alias(s"${nodeType}_${baseMetric}S")
     } else {
-      when('type === "TERMINATING", lit(0))
+      when(col("type") === "TERMINATING", lit(0))
         .otherwise(round(baseMetric, 2).alias(s"${nodeType}_${baseMetric}"))
     }
   }
