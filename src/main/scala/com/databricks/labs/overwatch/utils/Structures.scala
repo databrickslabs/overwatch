@@ -31,7 +31,7 @@ case class ValidatedColumn(
                           )
 
 // Todo Add Description
-case class Module(moduleID: Int, moduleName: String)
+//case class Module(moduleID: Int, moduleName: String)
 
 object TimeTypesConstants {
   val dtStringFormat: String = "yyyy-MM-dd"
@@ -95,7 +95,25 @@ case class ModuleStatusReport(
                                vacuumRetentionHours: Int,
                                inputConfig: OverwatchParams,
                                parsedConfig: ParsedConfig
-                             )
+                             ) {
+  def simple: SimplifiedModuleStatusReport = {
+    SimplifiedModuleStatusReport(
+      organization_id,
+      moduleID,
+      moduleName,
+      primordialDateString,
+      runStartTS,
+      runEndTS,
+      fromTS,
+      untilTS,
+      dataFrequency,
+      status,
+      recordsAppended,
+      lastOptimizedTS,
+      vacuumRetentionHours
+    )
+  }
+}
 
 case class SimplifiedModuleStatusReport(
                                          organization_id: String,

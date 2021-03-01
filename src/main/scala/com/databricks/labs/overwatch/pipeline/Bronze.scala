@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import java.io.{File, PrintWriter, StringWriter}
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpers, Module, ModuleStatusReport, OverwatchScope, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
@@ -18,51 +18,50 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  lazy private val appendJobsProcess = EtlDefinition(
+  lazy private val appendJobsProcess = ETLDefinition(
+    Module(1001, "Bronze_Jobs_Snapshot", this),
     workspace.getJobsDF,
     None,
-    append(BronzeTargets.jobsSnapshotTarget),
-    Module(1001, "Bronze_Jobs_Snapshot")
+    append(BronzeTargets.jobsSnapshotTarget)
   )
 
-  private val appendClustersModule = Module(1002, "Bronze_Clusters_Snapshot")
-  lazy private val appendClustersAPIProcess = EtlDefinition(
+  lazy private val appendClustersAPIProcess = ETLDefinition(
+    Module(1002, "Bronze_Clusters_Snapshot", this),
     workspace.getClustersDF,
     Some(Seq(cleanseRawClusterSnapDF(config.cloudProvider))),
-    append(BronzeTargets.clustersSnapshotTarget),
-    appendClustersModule
+    append(BronzeTargets.clustersSnapshotTarget)
   )
 
-  lazy private val appendPoolsProcess = EtlDefinition(
+  lazy private val appendPoolsProcess = ETLDefinition(
+    Module(1003, "Bronze_Pools", this),
     workspace.getPoolsDF,
     Some(Seq(cleanseRawPoolsDF())),
-    append(BronzeTargets.poolsTarget),
-    Module(1003, "Bronze_Pools")
+    append(BronzeTargets.poolsTarget)
   )
 
-  private val appendAuditLogsModule = Module(1004, "Bronze_AuditLogs")
-  lazy private val appendAuditLogsProcess = EtlDefinition(
+  private val auditLogModule = Module(1004, "Bronze_AuditLogs", this)
+  lazy private val appendAuditLogsProcess = ETLDefinition(
+    auditLogModule,
     getAuditLogsDF(
       config.auditLogConfig,
       config.isFirstRun,
       config.cloudProvider,
-      config.fromTime(appendAuditLogsModule.moduleID).asLocalDateTime,
-      config.untilTime(appendAuditLogsModule.moduleID).asLocalDateTime,
+      config.fromTime(appendAuditLogsModule.moduleId).asLocalDateTime,
+      config.untilTime(appendAuditLogsModule.moduleId).asLocalDateTime,
       BronzeTargets.auditLogAzureLandRaw,
       config.runID,
       config.organizationId
     ),
     None,
-    append(BronzeTargets.auditLogsTarget),
-    appendAuditLogsModule
+    append(BronzeTargets.auditLogsTarget)
   )
 
   private val appendClusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs")
-  lazy private val appendClusterEventLogsProcess = EtlDefinition(
+  lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget,
-      config.fromTime(appendClusterEventLogsModule.moduleID),
-      config.untilTime(appendClusterEventLogsModule.moduleID),
+      config.fromTime(appendClusterEventLogsModule.moduleId),
+      config.untilTime(appendClusterEventLogsModule.moduleId),
       config.apiEnv,
       config.organizationId
     ),
@@ -82,14 +81,14 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 //      .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
 //  }
 
-  lazy private val appendSparkEventLogsProcess = EtlDefinition(
+  lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols: _*),
     Some(Seq(
       collectEventLogPaths(
-        config.fromTime(sparkEventLogsModule.moduleID).asColumnTS,
-        config.untilTime(sparkEventLogsModule.moduleID).asColumnTS,
-        config.fromTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
-        config.untilTime(sparkEventLogsModule.moduleID).asUnixTimeMilli,
+        config.fromTime(sparkEventLogsModule.moduleId).asColumnTS,
+        config.untilTime(sparkEventLogsModule.moduleId).asColumnTS,
+        config.fromTime(sparkEventLogsModule.moduleId).asUnixTimeMilli,
+        config.untilTime(sparkEventLogsModule.moduleId).asUnixTimeMilli,
         SilverTargets.clustersSpecTarget,
         BronzeTargets.clustersSnapshotTarget,
         config.isFirstRun
@@ -106,8 +105,19 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     sparkEventLogsModule
   )
 
+  private def declareModules = {
+    config.overwatchScope.map {
+      case OverwatchScope.audit => registerModule(1004, "Bronze_AuditLogs", appendAuditLogsProcess)
+      case OverwatchScope.clusters => registerModule(1002, "Bronze_Clusters_Snapshot", appendClustersAPIProcess)
+      case OverwatchScope.clusterEvents => registerModule(1005, "Bronze_ClusterEventLogs", appendClusterEventLogsProcess)
+      case OverwatchScope.jobs => registerModule(1001, "Bronze_Jobs_Snapshot", appendJobsProcess)
+      case OverwatchScope.pools => registerModule(1003, "Bronze_Pools", appendPoolsProcess)
+      case OverwatchScope.sparkEvents => registerModule(1006, "Bronze_SparkEventLogs", appendSparkEventLogsProcess)
+    }
+  }
+
   // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
-  def run(): Unit = {
+  def run(): Pipeline = {
 
     restoreSparkConf()
 
@@ -163,15 +173,19 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       appendSparkEventLogsProcess.process()
     }
 
-    initiatePostProcessing()
+//    initiatePostProcessing()
+    this
 
   }
 
 }
 
 object Bronze {
-  def apply(workspace: Workspace): Bronze = new Bronze(workspace, workspace.database, workspace.getConfig)
+  def apply(workspace: Workspace): Bronze = {
+    new Bronze(workspace, workspace.database, workspace.getConfig)
+      .initializePipelineState // Initialize all existing module states
 
+  }
   //    .setWorkspace(workspace).setDatabase(workspace.database)
 
 }

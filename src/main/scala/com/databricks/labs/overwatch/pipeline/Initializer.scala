@@ -68,7 +68,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       Array[SimplifiedModuleStatusReport]()
     }
     config.setPipelineSnapTime()
-    if (config.debugFlag) showRangeReport(rangeDetail)
+    showRangeReport(rangeDetail)
     this
   }
 

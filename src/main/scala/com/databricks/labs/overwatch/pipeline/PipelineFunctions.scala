@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, ModuleStatusReport}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 import org.apache.spark.sql.types._
@@ -32,7 +32,7 @@ object PipelineFunctions {
                                target: PipelineTable,
                                spark: SparkSession,
                                config: Config,
-                               module: Option[Module]
+                               moduleName: String
                              ): DataFrame = {
 
     var mutationDF = df
@@ -66,7 +66,7 @@ object PipelineFunctions {
       }")
     }
 
-    if (module.nonEmpty) logger.log(Level.INFO, s"${module.get.moduleName}: " +
+    logger.log(Level.INFO, s"$moduleName: " +
       s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
       s"\nShufflePartitions: ${targetShufflePartitionCount}")
 
@@ -98,7 +98,7 @@ object PipelineFunctions {
   def applyFilters(df: DataFrame, filters: Seq[Column], module: Option[Module] = None): DataFrame = {
     if (module.nonEmpty) {
       val filterLogMessageSB: StringBuilder = new StringBuilder
-      filterLogMessageSB.append(s"APPLIED FILTERS:\nMODULE_ID: ${module.get.moduleID}\nMODULE_NAME: ${module.get.moduleName}\nFILTERS:\n")
+      filterLogMessageSB.append(s"APPLIED FILTERS:\nMODULE_ID: ${module.get.moduleId}\nMODULE_NAME: ${module.get.moduleName}\nFILTERS:\n")
       filters.map(_.expr).foreach(filterLogMessageSB.append)
       val filterLogMessage = filterLogMessageSB.toString()
       logger.log(Level.INFO, filterLogMessage)

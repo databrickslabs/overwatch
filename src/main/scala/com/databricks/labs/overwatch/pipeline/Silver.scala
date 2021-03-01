@@ -15,8 +15,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   envInit()
 
-  import spark.implicits._
-
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   /**
@@ -177,8 +175,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
-        config.fromTime(jobRunsModule.moduleID).asColumnTS,
-        config.fromTime(jobRunsModule.moduleID).asUnixTimeMilli
+        config.fromTime(jobRunsModule.moduleId).asColumnTS,
+        config.fromTime(jobRunsModule.moduleId).asUnixTimeMilli
       )
     )),
     append(SilverTargets.dbJobRunsTarget),
@@ -234,7 +232,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   }
 
-  def run(): Boolean = {
+  def run(): Pipeline = {
 
     restoreSparkConf()
     // TODO -- see which transforms are possible without audit and rebuild for no-audit
@@ -264,7 +262,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     }
 
     initiatePostProcessing()
-    true // to be used as fail switch later if necessary
+    this // to be used as fail switch later if necessary
   }
 
 
@@ -272,6 +270,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
 object Silver {
   def apply(workspace: Workspace): Silver = new Silver(workspace, workspace.database, workspace.getConfig)
+  def apply(pipeline: Pipeline): Silver = new Silver(pipeline.workspace, pipeline.database, pipeline.config)
 
   //    .setWorkspace(workspace).setDatabase(workspace.database)
 

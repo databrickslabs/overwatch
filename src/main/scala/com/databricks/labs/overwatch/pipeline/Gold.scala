@@ -163,7 +163,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
 
 
-  def run(): Boolean = {
+  def run(): Pipeline = {
 
     restoreSparkConf()
 
@@ -213,8 +213,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
     }
 
-    initiatePostProcessing()
-    true // to be used as fail switch later if necessary
+//    initiatePostProcessing()
+    this // to be used as fail switch later if necessary
   }
 
 
@@ -222,5 +222,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
 object Gold {
   def apply(workspace: Workspace): Gold = new Gold(workspace, workspace.database, workspace.getConfig)
+  def apply(pipeline: Pipeline): Silver = new Silver(pipeline.workspace, pipeline.database, pipeline.config)
 
 }

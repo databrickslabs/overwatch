@@ -163,13 +163,13 @@ case class PipelineTable(
                        cronColumnsNames: Seq[String],
                        additionalLagDays: Int = 0
                      ): DataFrame = {
-    val moduleID = module.moduleID
+    val moduleId = module.moduleId
     val moduleName = module.moduleName
 
     if (exists) {
       val instanceDF = if (withMasterMinimumSchema) { // infer master schema if true and available
         logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for Module: " +
-          s"$moduleID --> $moduleName for Table: $tableFullName")
+          s"$moduleId --> $moduleName for Table: $tableFullName")
         spark.table(tableFullName).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
       } else spark.table(tableFullName)
       val dfFields = instanceDF.schema.fields
@@ -184,11 +184,11 @@ case class PipelineTable(
 
         val logStatement =
           s"""
-             |ModuleID: ${moduleID}
+             |ModuleID: ${moduleId}
              |ModuleName: ${moduleName}
              |IncrementalColumn: ${field.name}
-             |FromTime: ${config.fromTime(moduleID).asTSString} --> ${config.fromTime(moduleID).asUnixTimeMilli}
-             |UntilTime: ${config.untilTime(moduleID).asTSString} --> ${config.untilTime(moduleID).asUnixTimeMilli}
+             |FromTime: ${config.fromTime(moduleId).asTSString} --> ${config.fromTime(moduleId).asUnixTimeMilli}
+             |UntilTime: ${config.untilTime(moduleId).asTSString} --> ${config.untilTime(moduleId).asUnixTimeMilli}
              |""".stripMargin
         if (config.debugFlag) println(logStatement)
         logger.log(Level.INFO, logStatement)
@@ -197,27 +197,27 @@ case class PipelineTable(
           case _: DateType => {
             IncrementalFilter(
               field.name,
-              date_sub(config.fromTime(moduleID).asColumnTS.cast(field.dataType), additionalLagDays),
-              config.untilTime(moduleID).asColumnTS.cast(field.dataType)
+              date_sub(config.fromTime(moduleId).asColumnTS.cast(field.dataType), additionalLagDays),
+              config.untilTime(moduleId).asColumnTS.cast(field.dataType)
             )
           }
           case _: TimestampType => {
             val start = if (additionalLagDays > 0) {
-              val epochMillis = config.fromTime(moduleID).asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
+              val epochMillis = config.fromTime(moduleId).asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
               from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(TimestampType)
             } else {
-              config.fromTime(moduleID).asColumnTS
+              config.fromTime(moduleId).asColumnTS
             }
             IncrementalFilter(
               field.name,
               start,
-              config.untilTime(moduleID).asColumnTS
+              config.untilTime(moduleId).asColumnTS
             )
           }
           case _: LongType => {
             IncrementalFilter(field.name,
-              lit(config.fromTime(moduleID).asUnixTimeMilli),
-              lit(config.untilTime(moduleID).asUnixTimeMilli)
+              lit(config.fromTime(moduleId).asUnixTimeMilli),
+              lit(config.untilTime(moduleId).asUnixTimeMilli)
             )
           }
           case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +

@@ -424,7 +424,7 @@ object Schema extends SparkSessionWrapper {
     ))
   )
 
-  def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleID)
+  def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleId)
 
   def get(moduleId: Int): Option[StructType] = minimumSchemasByModule.get(moduleId)
 }

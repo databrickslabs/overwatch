@@ -9,6 +9,11 @@ import org.apache.spark.sql.functions.{col, from_unixtime, lit}
 
 class Config() {
 
+
+  // TODO -- Build Module Inventory Map that tracks state of each module
+  //  publish to it during finalizeModule / moduleErrors
+  //  check state during module Initialization and validate dependencies
+  //  Add config needs into function for validation DURING pipeline Process
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-", "")
   private final val cipherKey = UUID.randomUUID().toString
@@ -44,78 +49,78 @@ class Config() {
   final private val cipher = new Cipher(cipherKey)
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  /**
-   *
-   * Pipeline Snap Date minus primordial date or 60
-   *
-   * @return
-   */
-  @throws(classOf[IllegalArgumentException])
-  private def derivePrimordialDaysDiff: Int = {
+//  /**
+//   *
+//   * Pipeline Snap Date minus primordial date or 60
+//   *
+//   * @return
+//   */
+//  @throws(classOf[IllegalArgumentException])
+//  private def derivePrimordialDaysDiff: Int = {
+//
+//    if (primordialDateString.nonEmpty) {
+//      try {
+//        val primordialLocalDate = TimeTypesConstants.dtFormat.parse(primordialDateString.get)
+//          .toInstant.atZone(Config.systemZoneId)
+//          .toLocalDate
+//
+//        Duration.between(
+//          primordialLocalDate.atStartOfDay(),
+//          pipelineSnapTime.asLocalDateTime.toLocalDate.atStartOfDay())
+//          .toDays.toInt
+//      } catch {
+//        case e: IllegalArgumentException => {
+//          val errorMessage = s"ERROR: Primordial Date String has Incorrect Date Format: Must be ${TimeTypesConstants.dtStringFormat}"
+//          println(errorMessage, e)
+//          logger.log(Level.ERROR, errorMessage, e)
+//          // Throw new error to avoid hidden, unexpected/incorrect primordial date -- Force Fail and bubble up
+//          throw new IllegalArgumentException(e)
+//        }
+//      }
+//    } else {
+//      60
+//    }
+//
+//  }
+//
+//  /**
+//   * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
+//   * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
+//   * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
+//   * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
+//   * age == 60 days.
+//   *
+//   * @return
+//   */
+//  private def primordialEpoch: Long = {
+//    LocalDateTime.now(Config.systemZoneId).minusDays(derivePrimordialDaysDiff)
+//      .toLocalDate.atStartOfDay
+//      .toInstant(Config.systemZoneOffset)
+//      .toEpochMilli
+//  }
 
-    if (primordialDateString.nonEmpty) {
-      try {
-        val primordialLocalDate = TimeTypesConstants.dtFormat.parse(primordialDateString.get)
-          .toInstant.atZone(Config.systemZoneId)
-          .toLocalDate
-
-        Duration.between(
-          primordialLocalDate.atStartOfDay(),
-          pipelineSnapTime.asLocalDateTime.toLocalDate.atStartOfDay())
-          .toDays.toInt
-      } catch {
-        case e: IllegalArgumentException => {
-          val errorMessage = s"ERROR: Primordial Date String has Incorrect Date Format: Must be ${TimeTypesConstants.dtStringFormat}"
-          println(errorMessage, e)
-          logger.log(Level.ERROR, errorMessage, e)
-          // Throw new error to avoid hidden, unexpected/incorrect primordial date -- Force Fail and bubble up
-          throw new IllegalArgumentException(e)
-        }
-      }
-    } else {
-      60
-    }
-
-  }
-
-  /**
-   * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
-   * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
-   * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
-   * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
-   * age == 60 days.
-   *
-   * @return
-   */
-  private def primordialEpoch: Long = {
-    LocalDateTime.now(Config.systemZoneId).minusDays(derivePrimordialDaysDiff)
-      .toLocalDate.atStartOfDay
-      .toInstant(Config.systemZoneOffset)
-      .toEpochMilli
-  }
-
-  /**
-   * This is also used for simulation of start/end times during testing. This also should not be a public function
-   * when completed. Note that this controlled by module. Not every module is executed on every run or a module could
-   * fail and this allows for missed data since the last successful run to be acquired without having to pull all the
-   * data for all modules each time.
-   * @param moduleID moduleID for modules in scope for the run
-   * @throws java.util.NoSuchElementException
-   * @return
-   */
-  @throws(classOf[NoSuchElementException])
-  def fromTime(moduleID: Int): TimeTypes = {
-    val lastRunStatus = if (!isFirstRun)
-      lastRunDetail.filter(_.moduleID == moduleID)
-    else
-      lastRunDetail
-    require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
-    val fromTime = if (lastRunStatus.length != 1)
-      primordialEpoch
-    else
-      lastRunStatus.head.untilTS
-    Config.createTimeDetail(fromTime)
-  }
+//  /**
+//   * This is also used for simulation of start/end times during testing. This also should not be a public function
+//   * when completed. Note that this controlled by module. Not every module is executed on every run or a module could
+//   * fail and this allows for missed data since the last successful run to be acquired without having to pull all the
+//   * data for all modules each time.
+//   * @param moduleID moduleID for modules in scope for the run
+//   * @throws java.util.NoSuchElementException
+//   * @return
+//   */
+//  @throws(classOf[NoSuchElementException])
+//  def fromTime(moduleID: Int): TimeTypes = {
+//    val lastRunStatus = if (!isFirstRun)
+//      lastRunDetail.filter(_.moduleID == moduleID)
+//    else
+//      lastRunDetail
+//    require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
+//    val fromTime = if (lastRunStatus.length != 1)
+//      primordialEpoch
+//    else
+//      lastRunStatus.head.untilTS
+//    Config.createTimeDetail(fromTime)
+//  }
 
 //  private[overwatch] def daysToProcess(moduleId: Int): Long = {
 //    Duration.between(
@@ -130,32 +135,32 @@ class Config() {
    * the getter may be obscure or more complicated.
    */
 
-  /**
-   * Getter for Pipeline Snap Time
-   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
-   *
-   * @return
-   */
-  def pipelineSnapTime: TimeTypes = {
-    Config.createTimeDetail(_pipelineSnapTime)
-  }
+//  /**
+//   * Getter for Pipeline Snap Time
+//   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
+//   *
+//   * @return
+//   */
+//  def pipelineSnapTime: TimeTypes = {
+//    Config.createTimeDetail(_pipelineSnapTime)
+//  }
 
-  /**
-   * Defines the latest timestamp to be used for a give module as a TimeType
-   *
-   * @param moduleID moduleID for which to get the until Time
-   * @return
-   */
-  def untilTime(moduleID: Int): TimeTypes = {
-    val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(maxDays)
-      .atZone(Config.systemZoneId).toInstant.toEpochMilli
-    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
-    if (startSecondPlusMaxDays < defaultUntilSecond) {
-      Config.createTimeDetail(startSecondPlusMaxDays)
-    } else {
-      Config.createTimeDetail(defaultUntilSecond)
-    }
-  }
+//  /**
+//   * Defines the latest timestamp to be used for a give module as a TimeType
+//   *
+//   * @param moduleID moduleID for which to get the until Time
+//   * @return
+//   */
+//  def untilTime(moduleID: Int): TimeTypes = {
+//    val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(maxDays)
+//      .atZone(Config.systemZoneId).toInstant.toEpochMilli
+//    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
+//    if (startSecondPlusMaxDays < defaultUntilSecond) {
+//      Config.createTimeDetail(startSecondPlusMaxDays)
+//    } else {
+//      Config.createTimeDetail(defaultUntilSecond)
+//    }
+//  }
 
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -269,17 +274,17 @@ class Config() {
    * BEGIN SETTERS
    */
 
-  /**
-   * Snapshot time of the time the snapshot was started. This is used throughout the process as the until timestamp
-   * such that every data point to be loaded during the current run must be < this pipeline SnapTime.
-   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
-   *
-   * @return
-   */
-  private[overwatch] def setPipelineSnapTime(): this.type = {
-    _pipelineSnapTime = LocalDateTime.now(Config.systemZoneId).toInstant(Config.systemZoneOffset).toEpochMilli
-    this
-  }
+//  /**
+//   * Snapshot time of the time the snapshot was started. This is used throughout the process as the until timestamp
+//   * such that every data point to be loaded during the current run must be < this pipeline SnapTime.
+//   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
+//   *
+//   * @return
+//   */
+//  private[overwatch] def setPipelineSnapTime(): this.type = {
+//    _pipelineSnapTime = LocalDateTime.now(Config.systemZoneId).toInstant(Config.systemZoneOffset).toEpochMilli
+//    this
+//  }
 
   // TODO -- This is for local testing only
   /**
@@ -533,28 +538,28 @@ class Config() {
 
 object Config {
   //  val utcZone: ZoneId = ZoneId.of("Etc/UTC")
-  val systemZoneId: ZoneId = ZoneId.systemDefault()
-  val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
+//  val systemZoneId: ZoneId = ZoneId.systemDefault()
+//  val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
 
-  /**
-   * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
-   * of time. The sheer number of sources and heterogeneous time rules makes time management very challenging,
-   * the idea here is to get it right once and just get the time type necessary.
-   *
-   * @param tsMilli Unix epoch as a Long in milliseconds
-   * @return
-   */
-  def createTimeDetail(tsMilli: Long): TimeTypes = {
-    // TODO: systemDefault is the ticking mine
-    val localDT = new Date(tsMilli).toInstant.atZone(systemZoneId).toLocalDateTime
-    val instant = Instant.ofEpochMilli(tsMilli)
-    TimeTypes(
-      tsMilli, // asUnixTimeMilli
-      lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
-      Date.from(instant), // asLocalDateTime
-      instant.atZone(systemZoneId), // asSystemZonedDateTime
-      localDT, // asLocalDateTime
-      localDT.toLocalDate.atStartOfDay(systemZoneId).toInstant.toEpochMilli // asMidnightEpochMilli
-    )
-  }
+//  /**
+//   * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
+//   * of time. The sheer number of sources and heterogeneous time rules makes time management very challenging,
+//   * the idea here is to get it right once and just get the time type necessary.
+//   *
+//   * @param tsMilli Unix epoch as a Long in milliseconds
+//   * @return
+//   */
+//  def createTimeDetail(tsMilli: Long): TimeTypes = {
+//    // TODO: systemDefault is the ticking mine
+//    val localDT = new Date(tsMilli).toInstant.atZone(systemZoneId).toLocalDateTime
+//    val instant = Instant.ofEpochMilli(tsMilli)
+//    TimeTypes(
+//      tsMilli, // asUnixTimeMilli
+//      lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
+//      Date.from(instant), // asLocalDateTime
+//      instant.atZone(systemZoneId), // asSystemZonedDateTime
+//      localDT, // asLocalDateTime
+//      localDT.toLocalDate.atStartOfDay(systemZoneId).toInstant.toEpochMilli // asMidnightEpochMilli
+//    )
+//  }
 }

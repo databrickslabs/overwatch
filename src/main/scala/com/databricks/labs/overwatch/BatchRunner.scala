@@ -28,13 +28,16 @@ object BatchRunner extends SparkSessionWrapper{
     }
 
     logger.log(Level.INFO, "Starting Bronze")
-    Bronze(workspace).run()
+    workspace.executePipeline(Bronze)
+    val bronze = Bronze(workspace).run()
 
     logger.log(Level.INFO, "Starting Silver")
-    Silver(workspace).run()
+    val silver = Silver(bronze).run()
 
     logger.log(Level.INFO, "Starting Gold")
-    Gold(workspace).run()
+    Gold(silver).run()
+      .initiatePostProcessing()
+
 
   }
 
