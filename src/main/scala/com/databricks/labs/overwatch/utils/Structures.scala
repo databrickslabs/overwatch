@@ -152,8 +152,9 @@ object Frequency extends Enumeration {
   val milliSecond, daily = Value
 }
 
-private[overwatch] class NoNewDataException(s: String, _level: Level) extends Exception(s) {
+private[overwatch] class NoNewDataException(s: String, _level: Level, _allowModuleProgression: Boolean = false) extends Exception(s) {
   val level: Level = _level
+  val allowModuleProgression: Boolean = _allowModuleProgression
 }
 
 private[overwatch] class UnhandledException(s: String) extends Exception(s) {}

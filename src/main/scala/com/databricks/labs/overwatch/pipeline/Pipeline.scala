@@ -2,11 +2,12 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.pipeline.Pipeline.{systemZoneId, systemZoneOffset}
+import com.databricks.labs.overwatch.pipeline.Pipeline.{createTimeDetail, systemZoneId, systemZoneOffset}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{from_unixtime, lit, rank, row_number}
 import org.apache.spark.sql.DataFrame
+
 import java.time.{Duration, Instant, LocalDateTime, ZoneId, ZoneOffset}
 import java.util.Date
 
@@ -27,15 +28,15 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   protected def pipeline: Pipeline = this
 
-  protected def getModuleState(moduleID: Int): Option[SimplifiedModuleStatusReport] = {
+  def getModuleState(moduleID: Int): Option[SimplifiedModuleStatusReport] = {
     pipelineState.get(moduleID)
   }
 
-  protected def getPipelineState: scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport] = {
+  def getPipelineState: scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport] = {
     pipelineState
   }
 
-  protected def updateModuleState(moduleState: SimplifiedModuleStatusReport): Unit = {
+  def updateModuleState(moduleState: SimplifiedModuleStatusReport): Unit = {
     pipelineState.put(moduleState.moduleID, moduleState)
   }
 
@@ -49,6 +50,23 @@ class Pipeline(_workspace: Workspace, _database: Database,
     Pipeline.createTimeDetail(_pipelineSnapTime)
   }
 
+  def fromTime(moduleId: Int): TimeTypes = if (getModuleState(moduleId).isEmpty){
+    Pipeline.createTimeDetail(primordialEpoch)
+  } else Pipeline.createTimeDetail(getModuleState(moduleId).get.untilTS)
+
+  def untilTime(moduleID: Int): TimeTypes = {
+    val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(config.maxDays)
+      .atZone(Pipeline.systemZoneId).toInstant.toEpochMilli
+
+    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
+
+    if (startSecondPlusMaxDays < defaultUntilSecond) {
+      Pipeline.createTimeDetail(startSecondPlusMaxDays)
+    } else {
+      Pipeline.createTimeDetail(defaultUntilSecond)
+    }
+  }
+
   /**
    * Snapshot time of the time the snapshot was started. This is used throughout the process as the until timestamp
    * such that every data point to be loaded during the current run must be < this pipeline SnapTime.
@@ -58,17 +76,18 @@ class Pipeline(_workspace: Workspace, _database: Database,
    */
   private[overwatch] def setPipelineSnapTime(): this.type = {
     _pipelineSnapTime = LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli
+    logger.log(Level.INFO, s"INIT: Pipeline Snap TS: ${pipelineSnapTime.asUnixTimeMilli}-${pipelineSnapTime.asTSString}")
     this
   }
 
-  private def showRangeReport(): Unit = {
+  def showRangeReport(): Unit = {
     val rangeReport = pipelineState.values.map(lr => (
       lr.moduleID,
       lr.moduleName,
       lr.primordialDateString,
-      lr.fromTS,
-      lr.untilTS,
-      pipelineSnapTime
+      fromTime(lr.moduleID).asTSString,
+      untilTime(lr.moduleID).asTSString,
+      pipelineSnapTime.asTSString
     ))
 
     rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
@@ -82,7 +101,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
    *
    * @return
    */
-  private def loadStaticDatasets(): this.type = {
+  protected def loadStaticDatasets(): this.type = {
     if (!spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
@@ -113,7 +132,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
    *
    * @return
    */
-  private def initPipelineRun(): this.type = {
+  protected def initPipelineRun(): this.type = {
+    logger.log(Level.INFO, "INIT: Pipeline Run")
     if (spark.catalog.databaseExists(config.databaseName) &&
       spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
       val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
@@ -131,8 +151,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
       config.setIsFirstRun(true)
       Array[SimplifiedModuleStatusReport]()
     }
-    if (pipelineState.nonEmpty) showRangeReport()
     setPipelineSnapTime()
+    if (pipelineState.nonEmpty) showRangeReport()
     this
   }
 
@@ -145,7 +165,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
    *
    * @return
    */
-  protected def primordialEpoch: Long = {
+  def primordialEpoch: Long = {
     LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
       .toLocalDate.atStartOfDay
       .toInstant(systemZoneOffset)

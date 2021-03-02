@@ -1,41 +1,38 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, ModuleStatusReport, NoNewDataException, SimplifiedModuleStatusReport, TimeTypes, TimeTypesConstants, UnhandledException}
+import com.databricks.labs.overwatch.utils._
 import org.apache.spark.sql.DataFrame
 import TransformFunctions._
-import com.databricks.labs.overwatch.env.{Database, Workspace}
 import org.apache.log4j.{Level, Logger}
 
 class Module(
               _moduleID: Int,
               _moduleName: String,
-              _moduleDependencies: Array[Int],
-              _workspace: Workspace,
-              _database: Database,
-              _config: Config
-            ) extends Pipeline(_workspace, _database, _config) {
+              pipeline: Pipeline,
+              _moduleDependencies: Array[Int]
+            ) {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+  import pipeline.spark.implicits._
+  private val config = pipeline.config
 
-  import spark.implicits._
 
   val moduleId: Int = _moduleID
   val moduleName: String = _moduleName
   private var _isFirstRun: Boolean = false
-  protected val moduleDependencies: Array[Int] = _moduleDependencies
+  private val moduleDependencies: Array[Int] = _moduleDependencies
 
-  protected def moduleState: SimplifiedModuleStatusReport = {
-    if (getModuleState(moduleId).isEmpty) {
+  private def moduleState: SimplifiedModuleStatusReport = {
+    if (pipeline.getModuleState(moduleId).isEmpty) {
       _isFirstRun = true
       val initialModuleState = initModuleState
-      updateModuleState(initialModuleState)
+      pipeline.updateModuleState(initialModuleState)
       initialModuleState
     }
-    //      throw new UnhandledException(s"ERROR: Could not build or retrieve state for Module: $moduleId-$moduleName")
-    else getModuleState(moduleId).get
+    else pipeline.getModuleState(moduleId).get
   }
 
-  protected def pipelineState: Map[Int, SimplifiedModuleStatusReport] = getPipelineState.toMap
+  private def pipelineState: Map[Int, SimplifiedModuleStatusReport] = pipeline.getPipelineState.toMap
 
   /**
    * This is also used for simulation of start/end times during testing. This also should not be a public function
@@ -46,9 +43,9 @@ class Module(
    * @param moduleID moduleID for modules in scope for the run
    * @return
    */
-  def fromTime: TimeTypes = if (getModuleState(moduleId).isEmpty){
-    Pipeline.createTimeDetail(primordialEpoch)
-  } else Pipeline.createTimeDetail(moduleState.fromTS)
+  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty){
+    Pipeline.createTimeDetail(pipeline.primordialEpoch)
+  } else Pipeline.createTimeDetail(moduleState.untilTS)
 
   /**
    * Defines the latest timestamp to be used for a give module as a TimeType
@@ -57,16 +54,27 @@ class Module(
    * @return
    */
   def untilTime: TimeTypes = {
-    val startSecondPlusMaxDays = fromTime.asLocalDateTime.plusDays(config.maxDays)
+    val startSecondPlusMaxDays = fromTime.asLocalDateTime.plusDays(pipeline.config.maxDays)
       .atZone(Pipeline.systemZoneId).toInstant.toEpochMilli
 
-    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
+    val defaultUntilSecond = pipeline.pipelineSnapTime.asUnixTimeMilli
 
-    if (startSecondPlusMaxDays < defaultUntilSecond) {
+    // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
+    val maxIndependentUntilTime = if (startSecondPlusMaxDays < defaultUntilSecond) {
       Pipeline.createTimeDetail(startSecondPlusMaxDays)
     } else {
       Pipeline.createTimeDetail(defaultUntilSecond)
     }
+
+    if (moduleDependencies.nonEmpty && mostLaggingDependency.untilTS < maxIndependentUntilTime.asUnixTimeMilli) {
+      val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${maxIndependentUntilTime.asUnixTimeMilli} " +
+        s"exceeds that of an upstream requisite module: ${mostLaggingDependency.moduleID}-${mostLaggingDependency.moduleName} " +
+        s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module untilTS == min requisite module: " +
+        s"${mostLaggingDependency.untilTS}."
+      logger.log(Level.WARN, msg)
+      println(msg)
+      Pipeline.createTimeDetail(mostLaggingDependency.untilTS)
+    } else maxIndependentUntilTime
   }
 
   private def mostLaggingDependency: SimplifiedModuleStatusReport = {
@@ -84,17 +92,17 @@ class Module(
       // get earliest date of all required modules
       val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${untilTime.asUnixTimeMilli} " +
         s"exceeds that of an upstream requisite module: ${mostLaggingDependency.moduleID}-${mostLaggingDependency.moduleName} " +
-        s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module until TS to == min requisite module."
+        s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module untilTS == min requisite module: " +
+        s"${mostLaggingDependency.untilTS}."
       logger.log(Level.WARN, msg)
       println(msg)
-      overrideUntilTS(mostLaggingDependency.untilTS)
     }
     val newState = moduleState.copy(untilTS = newUntilTime)
-    updateModuleState(newState)
+    pipeline.updateModuleState(newState)
   }
 
   private def initModuleState: SimplifiedModuleStatusReport = {
-    SimplifiedModuleStatusReport(
+    val initState = SimplifiedModuleStatusReport(
       organization_id = config.organizationId,
       moduleID = moduleId,
       moduleName = moduleName,
@@ -109,17 +117,19 @@ class Module(
       lastOptimizedTS = 0L,
       vacuumRetentionHours = 24 * 7
     )
+    pipeline.updateModuleState(initState)
+    initState
   }
 
   private def finalizeModule(report: ModuleStatusReport): Unit = {
-    updateModuleState(report.simple)
+    pipeline.updateModuleState(report.simple)
     val pipelineReportTarget = PipelineTable(
       name = "pipeline_report",
       keys = Array("organization_id", "Overwatch_RunID"),
       config = config,
       incrementalColumns = Array("Pipeline_SnapTS")
     )
-    database.write(Seq(report).toDF, pipelineReportTarget, pipelineSnapTime.asColumnTS)
+    pipeline.database.write(Seq(report).toDF, pipelineReportTarget, pipeline.pipelineSnapTime.asColumnTS)
   }
 
   private def fail(msg: String, rollbackStatus: String = ""): Unit = {
@@ -149,7 +159,7 @@ class Module(
     logger.log(Level.WARN, rollbackMsg)
 
     val rollbackStatus = try {
-      database.rollbackTarget(target)
+      pipeline.database.rollbackTarget(target)
       "ROLLBACK SUCCESSFUL"
     } catch {
       case e: Throwable => {
@@ -163,7 +173,13 @@ class Module(
     fail(msg, rollbackStatus)
   }
 
-  private def noNewDataHandler(msg: String, errorLevel: Level): Unit = {
+  /**
+   *
+   * @param msg
+   * @param errorLevel
+   * @param allowModuleProgression
+   */
+  private def noNewDataHandler(msg: String, errorLevel: Level, allowModuleProgression: Boolean): Unit = {
     logger.log(errorLevel, msg)
     val startTime = System.currentTimeMillis()
     val emptyStatusReport = ModuleStatusReport(
@@ -174,7 +190,7 @@ class Module(
       runStartTS = startTime,
       runEndTS = startTime,
       fromTS = fromTime.asUnixTimeMilli,
-      untilTS = untilTime.asUnixTimeMilli,
+      untilTS = if (allowModuleProgression) untilTime.asUnixTimeMilli else fromTime.asUnixTimeMilli,
       dataFrequency = moduleState.dataFrequency,
       status = s"EMPTY: $msg",
       recordsAppended = 0L,
@@ -190,7 +206,7 @@ class Module(
     if (df.isEmpty) {
       val msg = s"ALERT: No New Data Retrieved for Module ${moduleId}-${moduleName}! Skipping"
       println(msg)
-      throw new NoNewDataException(msg, Level.WARN)
+      throw new NoNewDataException(msg, Level.WARN, _allowModuleProgression = true)
     } else {
       println(s"$moduleName: Validating Input Schemas")
       df.verifyMinimumSchema(Schema.get(moduleId), enforceNonNullCols = true, isDebug = config.debugFlag)
@@ -201,7 +217,7 @@ class Module(
 
     if (moduleDependencies.nonEmpty) { // if dependencies present
       // If earliest untilTS of dependencies < current untilTS edit current untilTS to match
-      if (mostLaggingDependency.untilTS < untilTime.asUnixTimeMilli) overrideUntilTS(mostLaggingDependency.untilTS)
+//      if (mostLaggingDependency.untilTS < untilTime.asUnixTimeMilli) overrideUntilTS(mostLaggingDependency.untilTS)
       moduleDependencies.foreach(dependentModuleId => {
         val depStateOp = pipelineState.get(dependentModuleId)
         if (depStateOp.isEmpty) { // No existing state for pre-requisite
@@ -210,9 +226,9 @@ class Module(
           throw new NoNewDataException(msg, Level.WARN)
         } else { // Dependency State Exists
           val depState = depStateOp.get
-          if (depState.status != "SUCCESS" || !depState.status.startsWith("EMPTY")) { // required pre-requisite failed
-            val msg = s"Requires $dependentModuleId is in a failed state. This Module will not progress until its " +
-              s"upstream load is successful"
+          if (depState.status != "SUCCESS" && !depState.status.startsWith("EMPTY")) { // required pre-requisite failed
+            val msg = s"Requires $dependentModuleId is in a failed state: ${depState.status}. This Module will not progress until its " +
+              s"upstream requirement[s] is loaded successfully"
             throw new NoNewDataException(msg, Level.WARN)
           }
         }
@@ -229,10 +245,11 @@ class Module(
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
       val etlDefinition = _etlDefinition.copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
-      val sourceDFParts = PipelineFunctions.getSourceDFParts(verifiedSourceDF)
-
+      val debugMsg = s"MODULE: $moduleId-$moduleName\nTIME RANGE: " +
+        s"    From -> To == ${fromTime.asTSString} -> ${untilTime.asTSString}"
+      println(debugMsg)
+      logger.log(Level.INFO, debugMsg)
       val newState = etlDefinition.executeETL(this, verifiedSourceDF)
-      updateModuleState(newState.simple)
       finalizeModule(newState)
 
     } catch {
@@ -246,9 +263,9 @@ class Module(
           s"module will not progress until new data is received by this module.\n " +
           s"Module Dependencies: ${moduleDependencies.mkString(", ")}\n" + e.getMessage
         logger.log(Level.ERROR, errMessage, e)
-        noNewDataHandler(errMessage, e.level)
+        noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
       case e: Throwable =>
-        val msg = s"$moduleName FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
+        val msg = s"$moduleName FAILED -->\nMessage: ${e.getMessage}"
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     }
@@ -269,10 +286,8 @@ object Module {
     new Module(
       moduleId,
       moduleName,
-      moduleDependencies,
-      pipeline.workspace,
-      pipeline.database,
-      pipeline.config
+      pipeline,
+      moduleDependencies
     )
   }
 

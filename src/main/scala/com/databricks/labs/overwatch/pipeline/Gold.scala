@@ -171,6 +171,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
         GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
       }
+      case _ =>
     }
   }
 
@@ -184,7 +185,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         jobRunCostPotentialFactModule.execute(appendJobRunCostPotentialFactProcess)
         GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
       }
-
+      case _ =>
     }
   }
 
@@ -249,5 +250,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
 object Gold {
   def apply(workspace: Workspace): Gold = new Gold(workspace, workspace.database, workspace.getConfig)
+    .initPipelineRun()
+    .loadStaticDatasets()
 
 }

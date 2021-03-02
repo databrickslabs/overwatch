@@ -433,7 +433,6 @@ object SchemaTools extends SparkSessionWrapper {
       val msg = s"SCHEMA WARNING: Input DF missing required field $fullColName of type " +
         s"${missingField.dataType.typeName}. There's either an error or relevant data doesn't exist in " +
         s"your environment and/or was not acquired during the current run."
-      if (isDebug) println(msg)
       logger.log(Level.DEBUG, msg)
     } else { // FAIL --> trying to null non-nullable field
       val msg = s"SCHEMA ERROR: Required Field $fullColName is NON-NULLABLE but nulls were received. Failing module"

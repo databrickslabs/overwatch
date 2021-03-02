@@ -228,6 +228,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         jobStatusModule.execute(appendJobStatusProcess)
         jobRunsModule.execute(appendJobRunsProcess)
       }
+      case _ =>
     }
   }
 
@@ -269,7 +270,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 }
 
 object Silver {
-  def apply(workspace: Workspace): Silver = new Silver(workspace, workspace.database, workspace.getConfig)
+  def apply(workspace: Workspace): Silver = {
+    new Silver(workspace, workspace.database, workspace.getConfig)
+      .initPipelineRun()
+      .loadStaticDatasets()
+  }
 
   //    .setWorkspace(workspace).setDatabase(workspace.database)
 

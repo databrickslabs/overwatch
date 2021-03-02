@@ -39,7 +39,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.poolsTarget)
   )
 
-  private val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
+  lazy private val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
+  lazy private val  timeTest = s"DEBUG: AUDIT LOG MODULE bronze.scala = From -> To | ${auditLogsModule.fromTime.asTSString} --> ${auditLogsModule.untilTime.asTSString}"
   lazy private val appendAuditLogsProcess = ETLDefinition(
     getAuditLogsDF(
       config.auditLogConfig,
@@ -55,7 +56,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.auditLogsTarget)
   )
 
-  private val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
+  lazy private val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget,
@@ -68,8 +69,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clusterEventsTarget)
   )
 
-  private val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
-
+  lazy private val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols: _*),
     Some(Seq(
@@ -117,12 +117,18 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private def executeModules(): Unit = {
     config.overwatchScope.foreach {
-      case OverwatchScope.audit => auditLogsModule.execute(appendAuditLogsProcess)
+      case OverwatchScope.audit => {
+//        val x = auditLogsModule
+//        println(timeTest)
+//        logger.log(Level.INFO, timeTest)
+        auditLogsModule.execute(appendAuditLogsProcess)
+      }
       case OverwatchScope.clusters => clustersSnapshotModule.execute(appendClustersAPIProcess)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
+      case _ =>
     }
   }
 
@@ -176,6 +182,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 object Bronze {
   def apply(workspace: Workspace): Bronze = {
     new Bronze(workspace, workspace.database, workspace.getConfig)
+      .initPipelineRun()
+      .loadStaticDatasets()
 
   }
   //    .setWorkspace(workspace).setDatabase(workspace.database)
