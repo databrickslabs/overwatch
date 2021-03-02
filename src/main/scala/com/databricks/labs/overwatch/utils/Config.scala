@@ -48,119 +48,11 @@ class Config() {
 
   final private val cipher = new Cipher(cipherKey)
   private val logger: Logger = Logger.getLogger(this.getClass)
-
-//  /**
-//   *
-//   * Pipeline Snap Date minus primordial date or 60
-//   *
-//   * @return
-//   */
-//  @throws(classOf[IllegalArgumentException])
-//  private def derivePrimordialDaysDiff: Int = {
-//
-//    if (primordialDateString.nonEmpty) {
-//      try {
-//        val primordialLocalDate = TimeTypesConstants.dtFormat.parse(primordialDateString.get)
-//          .toInstant.atZone(Config.systemZoneId)
-//          .toLocalDate
-//
-//        Duration.between(
-//          primordialLocalDate.atStartOfDay(),
-//          pipelineSnapTime.asLocalDateTime.toLocalDate.atStartOfDay())
-//          .toDays.toInt
-//      } catch {
-//        case e: IllegalArgumentException => {
-//          val errorMessage = s"ERROR: Primordial Date String has Incorrect Date Format: Must be ${TimeTypesConstants.dtStringFormat}"
-//          println(errorMessage, e)
-//          logger.log(Level.ERROR, errorMessage, e)
-//          // Throw new error to avoid hidden, unexpected/incorrect primordial date -- Force Fail and bubble up
-//          throw new IllegalArgumentException(e)
-//        }
-//      }
-//    } else {
-//      60
-//    }
-//
-//  }
-//
-//  /**
-//   * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
-//   * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
-//   * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
-//   * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
-//   * age == 60 days.
-//   *
-//   * @return
-//   */
-//  private def primordialEpoch: Long = {
-//    LocalDateTime.now(Config.systemZoneId).minusDays(derivePrimordialDaysDiff)
-//      .toLocalDate.atStartOfDay
-//      .toInstant(Config.systemZoneOffset)
-//      .toEpochMilli
-//  }
-
-//  /**
-//   * This is also used for simulation of start/end times during testing. This also should not be a public function
-//   * when completed. Note that this controlled by module. Not every module is executed on every run or a module could
-//   * fail and this allows for missed data since the last successful run to be acquired without having to pull all the
-//   * data for all modules each time.
-//   * @param moduleID moduleID for modules in scope for the run
-//   * @throws java.util.NoSuchElementException
-//   * @return
-//   */
-//  @throws(classOf[NoSuchElementException])
-//  def fromTime(moduleID: Int): TimeTypes = {
-//    val lastRunStatus = if (!isFirstRun)
-//      lastRunDetail.filter(_.moduleID == moduleID)
-//    else
-//      lastRunDetail
-//    require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
-//    val fromTime = if (lastRunStatus.length != 1)
-//      primordialEpoch
-//    else
-//      lastRunStatus.head.untilTS
-//    Config.createTimeDetail(fromTime)
-//  }
-
-//  private[overwatch] def daysToProcess(moduleId: Int): Long = {
-//    Duration.between(
-//      fromTime(moduleId).asLocalDateTime.toLocalDate.atStartOfDay,
-//      untilTime(moduleId).asLocalDateTime.toLocalDate.atStartOfDay)
-//      .toDays
-//  }
-
   /**
    * BEGIN GETTERS
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
-
-//  /**
-//   * Getter for Pipeline Snap Time
-//   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
-//   *
-//   * @return
-//   */
-//  def pipelineSnapTime: TimeTypes = {
-//    Config.createTimeDetail(_pipelineSnapTime)
-//  }
-
-//  /**
-//   * Defines the latest timestamp to be used for a give module as a TimeType
-//   *
-//   * @param moduleID moduleID for which to get the until Time
-//   * @return
-//   */
-//  def untilTime(moduleID: Int): TimeTypes = {
-//    val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(maxDays)
-//      .atZone(Config.systemZoneId).toInstant.toEpochMilli
-//    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
-//    if (startSecondPlusMaxDays < defaultUntilSecond) {
-//      Config.createTimeDetail(startSecondPlusMaxDays)
-//    } else {
-//      Config.createTimeDetail(defaultUntilSecond)
-//    }
-//  }
 
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -230,7 +122,7 @@ class Config() {
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
     import OverwatchScope._
     //    jobs, clusters, clusterEvents, sparkEvents, pools, audit, passthrough, profiles
-    Seq(audit, jobs, clusters, clusterEvents, sparkEvents, notebooks)
+    Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
   }
 
   private[overwatch] def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
@@ -274,31 +166,6 @@ class Config() {
    * BEGIN SETTERS
    */
 
-//  /**
-//   * Snapshot time of the time the snapshot was started. This is used throughout the process as the until timestamp
-//   * such that every data point to be loaded during the current run must be < this pipeline SnapTime.
-//   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
-//   *
-//   * @return
-//   */
-//  private[overwatch] def setPipelineSnapTime(): this.type = {
-//    _pipelineSnapTime = LocalDateTime.now(Config.systemZoneId).toInstant(Config.systemZoneOffset).toEpochMilli
-//    this
-//  }
-
-  // TODO -- This is for local testing only
-  /**
-   * Test setter to simulate snapshot times. During a simulation where this is set, all data retrieved must be before
-   * this time. This should not be a public-facing function in the final delivery
-   *
-   * @param tsMilli long in milliseconds as per unix epoch
-   * @return
-   */
-  def setPipelineSnapTime(tsMilli: Long): this.type = {
-    _pipelineSnapTime = tsMilli
-    this
-  }
-
   /**
    * Identify the initial value before overwatch for shuffle partitions. This value gets modified a lot through
    * this process but should be set back to the same as the value before Overwatch process when Overwatch finishes
@@ -327,8 +194,15 @@ class Config() {
     this
   }
 
+  /**
+   * Set the Overwatch Scope in the correct order as per the ordered Seq. This is important for processing the
+   * modules in the correct order inside the pipeline
+   * @param value
+   * @return
+   */
   private[overwatch] def setOverwatchScope(value: Seq[OverwatchScope.Value]): this.type = {
-    _overwatchScope = value
+    val orderedScope = orderedOverwatchScope.filter(scope => value.contains(scope))
+    _overwatchScope = orderedScope
     this
   }
 
@@ -357,15 +231,6 @@ class Config() {
     _organizationId = value
     this
   }
-
-  //TODO -- switch back to private -- public for testing only
-  //private[overwatch]
-  def setLastRunDetail(value: Array[SimplifiedModuleStatusReport]): this.type = {
-    // Todo -- Add assertion --> number of rows <= number of modules or something to that effect
-    _lastRunDetail = value
-    this
-  }
-
   private def setApiEnv(value: ApiEnv): this.type = {
     _apiEnv = value
     this

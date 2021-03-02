@@ -18,36 +18,35 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  lazy private val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess = ETLDefinition(
-    Module(1001, "Bronze_Jobs_Snapshot", this),
     workspace.getJobsDF,
     None,
     append(BronzeTargets.jobsSnapshotTarget)
   )
 
+  lazy private val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
   lazy private val appendClustersAPIProcess = ETLDefinition(
-    Module(1002, "Bronze_Clusters_Snapshot", this),
     workspace.getClustersDF,
     Some(Seq(cleanseRawClusterSnapDF(config.cloudProvider))),
     append(BronzeTargets.clustersSnapshotTarget)
   )
 
+  lazy private val poolsSnapshotModule = Module(1003, "Bronze_Pools", this)
   lazy private val appendPoolsProcess = ETLDefinition(
-    Module(1003, "Bronze_Pools", this),
     workspace.getPoolsDF,
     Some(Seq(cleanseRawPoolsDF())),
     append(BronzeTargets.poolsTarget)
   )
 
-  private val auditLogModule = Module(1004, "Bronze_AuditLogs", this)
+  private val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
   lazy private val appendAuditLogsProcess = ETLDefinition(
-    auditLogModule,
     getAuditLogsDF(
       config.auditLogConfig,
       config.isFirstRun,
       config.cloudProvider,
-      config.fromTime(appendAuditLogsModule.moduleId).asLocalDateTime,
-      config.untilTime(appendAuditLogsModule.moduleId).asLocalDateTime,
+      auditLogsModule.fromTime.asLocalDateTime,
+      auditLogsModule.untilTime.asLocalDateTime,
       BronzeTargets.auditLogAzureLandRaw,
       config.runID,
       config.organizationId
@@ -56,39 +55,27 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.auditLogsTarget)
   )
 
-  private val appendClusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs")
+  private val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget,
-      config.fromTime(appendClusterEventLogsModule.moduleId),
-      config.untilTime(appendClusterEventLogsModule.moduleId),
+      clusterEventLogsModule.fromTime,
+      clusterEventLogsModule.untilTime,
       config.apiEnv,
       config.organizationId
     ),
     None,
-    append(BronzeTargets.clusterEventsTarget),
-    appendClusterEventLogsModule
+    append(BronzeTargets.clusterEventsTarget)
   )
 
-  private val sparkEventLogsModule = Module(1006, "Bronze_EventLogs")
-
-  // TODO -- Error if auditLogsTarget does not exist -- determine how to handle
-  //  decided -- audit logs are required for sparkEvents anyway -- just remove the
-  //  if statement
-//  private def getEventLogPathsSourceDF: DataFrame = {
-//    if (BronzeTargets.auditLogsTarget.exists) BronzeTargets.auditLogsTarget.asDF
-//    else BronzeTargets.clustersSnapshotTarget.asDF
-//      .filter('Pipeline_SnapTS === config.pipelineSnapTime.asColumnTS)
-//  }
+  private val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
 
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols: _*),
     Some(Seq(
       collectEventLogPaths(
-        config.fromTime(sparkEventLogsModule.moduleId).asColumnTS,
-        config.untilTime(sparkEventLogsModule.moduleId).asColumnTS,
-        config.fromTime(sparkEventLogsModule.moduleId).asUnixTimeMilli,
-        config.untilTime(sparkEventLogsModule.moduleId).asUnixTimeMilli,
+        sparkEventLogsModule.fromTime.asUnixTimeMilli,
+        sparkEventLogsModule.untilTime.asUnixTimeMilli,
         SilverTargets.clustersSpecTarget,
         BronzeTargets.clustersSnapshotTarget,
         config.isFirstRun
@@ -96,23 +83,46 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       generateEventLogsDF(
         database,
         config.badRecordsPath,
-//        config.daysToProcess(sparkEventLogsModule.moduleID),
         BronzeTargets.processedEventLogs,
-        config.organizationId) //,
-      //      saveAndLoadTempEvents(database, BronzeTargets.sparkEventLogsTempTarget) // TODO -- Perf testing without
+        config.organizationId,
+        pipelineSnapTime.asColumnTS
+      ) //,
     )),
-    append(BronzeTargets.sparkEventLogsTarget), // Not new data only -- date filters handled in function logic
-    sparkEventLogsModule
+    append(BronzeTargets.sparkEventLogsTarget) // Not new data only -- date filters handled in function logic
   )
 
-  private def declareModules = {
-    config.overwatchScope.map {
-      case OverwatchScope.audit => registerModule(1004, "Bronze_AuditLogs", appendAuditLogsProcess)
-      case OverwatchScope.clusters => registerModule(1002, "Bronze_Clusters_Snapshot", appendClustersAPIProcess)
-      case OverwatchScope.clusterEvents => registerModule(1005, "Bronze_ClusterEventLogs", appendClusterEventLogsProcess)
-      case OverwatchScope.jobs => registerModule(1001, "Bronze_Jobs_Snapshot", appendJobsProcess)
-      case OverwatchScope.pools => registerModule(1003, "Bronze_Pools", appendPoolsProcess)
-      case OverwatchScope.sparkEvents => registerModule(1006, "Bronze_SparkEventLogs", appendSparkEventLogsProcess)
+  // TODO -- convert and merge this into audit's ETLDefinition
+  private def landAzureAuditEvents(): Unit = {
+    val rawAzureAuditEvents = landAzureAuditLogDF(
+      config.auditLogConfig.azureAuditLogEventhubConfig.get,
+      config.isFirstRun,
+      config.organizationId,
+      config.runID
+    )
+
+    val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
+      rawAzureAuditEvents,
+      BronzeTargets.auditLogAzureLandRaw,
+      spark, config, "azure_audit_log_preProcessing"
+    )
+
+    database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw,pipelineSnapTime.asColumnTS)
+
+    //      Helpers.fastDrop(BronzeTargets.auditLogAzureLandRaw.tableFullName, "azure")
+
+    val rawProcessCompleteMsg = "Azure audit ingest process complete"
+    if (config.debugFlag) println(rawProcessCompleteMsg)
+    logger.log(Level.INFO, rawProcessCompleteMsg)
+  }
+
+  private def executeModules(): Unit = {
+    config.overwatchScope.foreach {
+      case OverwatchScope.audit => auditLogsModule.execute(appendAuditLogsProcess)
+      case OverwatchScope.clusters => clustersSnapshotModule.execute(appendClustersAPIProcess)
+      case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
+      case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
+      case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
+      case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
     }
   }
 
@@ -124,54 +134,37 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     if (config.debugFlag) println(s"DEBUG: CLOUD PROVIDER = ${config.cloudProvider}")
 
     if (config.cloudProvider == "azure") {
-      val rawAzureAuditEvents = landAzureAuditLogDF(
-        config.auditLogConfig.azureAuditLogEventhubConfig.get,
-        config.isFirstRun,
-        config.organizationId,
-        config.runID
-      )
-
-      val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
-        rawAzureAuditEvents,
-        400,
-        BronzeTargets.auditLogAzureLandRaw,
-        spark, config, None
-      )
-
-      database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw)
-
-      //      Helpers.fastDrop(BronzeTargets.auditLogAzureLandRaw.tableFullName, "azure")
-
-      val rawProcessCompleteMsg = "Azure audit ingest process complete"
-      if (config.debugFlag) println(rawProcessCompleteMsg)
-      logger.log(Level.INFO, rawProcessCompleteMsg)
+      landAzureAuditEvents()
     }
 
-    appendAuditLogsProcess.process()
+    executeModules()
 
-    /** Current cluster snapshot is important because cluster spec details are only available from audit logs
-     * during create/edit events. Thus all existing clusters created/edited last before the audit logs were
-     * enabled will be missing all info. This is especially important for overwatch early stages
-     */
-    if (config.overwatchScope.contains(OverwatchScope.clusters)) {
-      appendClustersAPIProcess.process()
-    }
 
-    if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-      appendClusterEventLogsProcess.process()
-    }
-
-    if (config.overwatchScope.contains(OverwatchScope.jobs)) {
-      appendJobsProcess.process()
-    }
-
-    if (config.overwatchScope.contains(OverwatchScope.pools)) {
-      appendPoolsProcess.process()
-    }
-
-    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-      appendSparkEventLogsProcess.process()
-    }
+//    appendAuditLogsProcess.process()
+//
+//    /** Current cluster snapshot is important because cluster spec details are only available from audit logs
+//     * during create/edit events. Thus all existing clusters created/edited last before the audit logs were
+//     * enabled will be missing all info. This is especially important for overwatch early stages
+//     */
+//    if (config.overwatchScope.contains(OverwatchScope.clusters)) {
+//      appendClustersAPIProcess.process()
+//    }
+//
+//    if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
+//      appendClusterEventLogsProcess.process()
+//    }
+//
+//    if (config.overwatchScope.contains(OverwatchScope.jobs)) {
+//      appendJobsProcess.process()
+//    }
+//
+//    if (config.overwatchScope.contains(OverwatchScope.pools)) {
+//      appendPoolsProcess.process()
+//    }
+//
+//    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
+//      appendSparkEventLogsProcess.process()
+//    }
 
 //    initiatePostProcessing()
     this
@@ -183,7 +176,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 object Bronze {
   def apply(workspace: Workspace): Bronze = {
     new Bronze(workspace, workspace.database, workspace.getConfig)
-      .initializePipelineState // Initialize all existing module states
 
   }
   //    .setWorkspace(workspace).setDatabase(workspace.database)

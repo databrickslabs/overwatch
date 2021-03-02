@@ -1,20 +1,15 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, ModuleStatusReport, NoNewDataException, SimplifiedModuleStatusReport, TimeTypes, TimeTypesConstants}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, ModuleStatusReport, NoNewDataException, SimplifiedModuleStatusReport, TimeTypes, TimeTypesConstants, UnhandledException}
 import org.apache.spark.sql.DataFrame
 import TransformFunctions._
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.pipeline.Pipeline.{createTimeDetail, systemZoneId, systemZoneOffset}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.{from_unixtime, lit}
-
-import java.time.{Duration, Instant, LocalDateTime}
-import java.util.Date
 
 class Module(
               _moduleID: Int,
               _moduleName: String,
-              _moduleDependencies: Option[Array[Int]],
+              _moduleDependencies: Array[Int],
               _workspace: Workspace,
               _database: Database,
               _config: Config
@@ -24,64 +19,36 @@ class Module(
 
   import spark.implicits._
 
-  protected val moduleId: Int = _moduleID
-  protected val moduleName: String = _moduleName
-  protected val moduleDependencies: Option[Array[Int]] = _moduleDependencies
+  val moduleId: Int = _moduleID
+  val moduleName: String = _moduleName
+  private var _isFirstRun: Boolean = false
+  protected val moduleDependencies: Array[Int] = _moduleDependencies
 
-
-  protected def moduleState: Option[SimplifiedModuleStatusReport] = getModuleState(moduleId)
+  protected def moduleState: SimplifiedModuleStatusReport = {
+    if (getModuleState(moduleId).isEmpty) {
+      _isFirstRun = true
+      val initialModuleState = initModuleState
+      updateModuleState(initialModuleState)
+      initialModuleState
+    }
+    //      throw new UnhandledException(s"ERROR: Could not build or retrieve state for Module: $moduleId-$moduleName")
+    else getModuleState(moduleId).get
+  }
 
   protected def pipelineState: Map[Int, SimplifiedModuleStatusReport] = getPipelineState.toMap
 
   /**
-   * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
-   * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
-   * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
-   * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
-   * age == 60 days.
+   * This is also used for simulation of start/end times during testing. This also should not be a public function
+   * when completed. Note that this controlled by module. Not every module is executed on every run or a module could
+   * fail and this allows for missed data since the last successful run to be acquired without having to pull all the
+   * data for all modules each time.
    *
+   * @param moduleID moduleID for modules in scope for the run
    * @return
    */
-  private def primordialEpoch: Long = {
-    LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
-      .toLocalDate.atStartOfDay
-      .toInstant(systemZoneOffset)
-      .toEpochMilli
-  }
-
-  /**
-   *
-   * Pipeline Snap Date minus primordial date or 60
-   *
-   * @return
-   */
-  @throws(classOf[IllegalArgumentException])
-  private def derivePrimordialDaysDiff: Int = {
-
-    if (config.primordialDateString.nonEmpty) {
-      try {
-        val primordialLocalDate = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get)
-          .toInstant.atZone(systemZoneId)
-          .toLocalDate
-
-        Duration.between(
-          primordialLocalDate.atStartOfDay(),
-          pipelineSnapTime.asLocalDateTime.toLocalDate.atStartOfDay())
-          .toDays.toInt
-      } catch {
-        case e: IllegalArgumentException => {
-          val errorMessage = s"ERROR: Primordial Date String has Incorrect Date Format: Must be ${TimeTypesConstants.dtStringFormat}"
-          println(errorMessage, e)
-          logger.log(Level.ERROR, errorMessage, e)
-          // Throw new error to avoid hidden, unexpected/incorrect primordial date -- Force Fail and bubble up
-          throw new IllegalArgumentException(e)
-        }
-      }
-    } else {
-      60
-    }
-
-  }
+  def fromTime: TimeTypes = if (getModuleState(moduleId).isEmpty){
+    Pipeline.createTimeDetail(primordialEpoch)
+  } else Pipeline.createTimeDetail(moduleState.fromTS)
 
   /**
    * Defines the latest timestamp to be used for a give module as a TimeType
@@ -91,8 +58,10 @@ class Module(
    */
   def untilTime: TimeTypes = {
     val startSecondPlusMaxDays = fromTime.asLocalDateTime.plusDays(config.maxDays)
-      .atZone(systemZoneId).toInstant.toEpochMilli
+      .atZone(Pipeline.systemZoneId).toInstant.toEpochMilli
+
     val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
+
     if (startSecondPlusMaxDays < defaultUntilSecond) {
       Pipeline.createTimeDetail(startSecondPlusMaxDays)
     } else {
@@ -100,27 +69,49 @@ class Module(
     }
   }
 
+  private def mostLaggingDependency: SimplifiedModuleStatusReport = {
+    moduleDependencies.map(depState => pipelineState(depState))
+      .sortBy(_.untilTS).reverse.head
+  }
+
   /**
-   * This is also used for simulation of start/end times during testing. This also should not be a public function
-   * when completed. Note that this controlled by module. Not every module is executed on every run or a module could
-   * fail and this allows for missed data since the last successful run to be acquired without having to pull all the
-   * data for all modules each time.
+   * Override the initial untilTS with a new value equal to the specified value
    *
-   * @param moduleID moduleID for modules in scope for the run
-   * @throws java.util.NoSuchElementException
-   * @return
+   * @param newUntilTime
    */
-  def fromTime: TimeTypes = {
-    if (moduleState.isEmpty)
-      createTimeDetail(primordialEpoch)
-    else createTimeDetail(moduleState.get.untilTS)
+  private def overrideUntilTS(newUntilTime: Long): Unit = {
+    if (moduleDependencies.nonEmpty) {
+      // get earliest date of all required modules
+      val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${untilTime.asUnixTimeMilli} " +
+        s"exceeds that of an upstream requisite module: ${mostLaggingDependency.moduleID}-${mostLaggingDependency.moduleName} " +
+        s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module until TS to == min requisite module."
+      logger.log(Level.WARN, msg)
+      println(msg)
+      overrideUntilTS(mostLaggingDependency.untilTS)
+    }
+    val newState = moduleState.copy(untilTS = newUntilTime)
+    updateModuleState(newState)
   }
 
-  private def overrideMaxUntilTime: Unit = {
-
+  private def initModuleState: SimplifiedModuleStatusReport = {
+    SimplifiedModuleStatusReport(
+      organization_id = config.organizationId,
+      moduleID = moduleId,
+      moduleName = moduleName,
+      primordialDateString = config.primordialDateString,
+      runStartTS = 0L,
+      runEndTS = 0L,
+      fromTS = fromTime.asUnixTimeMilli,
+      untilTS = untilTime.asUnixTimeMilli,
+      dataFrequency = "",
+      status = s"Initialized",
+      recordsAppended = 0L,
+      lastOptimizedTS = 0L,
+      vacuumRetentionHours = 24 * 7
+    )
   }
 
-  protected def finalize(report: ModuleStatusReport): Unit = {
+  private def finalizeModule(report: ModuleStatusReport): Unit = {
     updateModuleState(report.simple)
     val pipelineReportTarget = PipelineTable(
       name = "pipeline_report",
@@ -128,10 +119,31 @@ class Module(
       config = config,
       incrementalColumns = Array("Pipeline_SnapTS")
     )
-    database.write(Seq(report).toDF, pipelineReportTarget)
+    database.write(Seq(report).toDF, pipelineReportTarget, pipelineSnapTime.asColumnTS)
   }
 
-  protected def fail(target: PipelineTable, msg: String): Unit = {
+  private def fail(msg: String, rollbackStatus: String = ""): Unit = {
+    val failedStatusReport = ModuleStatusReport(
+      organization_id = config.organizationId,
+      moduleID = moduleId,
+      moduleName = moduleName,
+      primordialDateString = config.primordialDateString,
+      runStartTS = 0L,
+      runEndTS = 0L,
+      fromTS = fromTime.asUnixTimeMilli,
+      untilTS = untilTime.asUnixTimeMilli,
+      dataFrequency = moduleState.dataFrequency,
+      status = s"FAILED --> $rollbackStatus: ERROR:\n$msg",
+      recordsAppended = 0L,
+      lastOptimizedTS = moduleState.lastOptimizedTS,
+      vacuumRetentionHours = moduleState.vacuumRetentionHours,
+      inputConfig = config.inputConfig,
+      parsedConfig = config.parsedConfig
+    )
+    finalizeModule(failedStatusReport)
+  }
+
+  private def failWithRollback(target: PipelineTable, msg: String): Unit = {
     val rollbackMsg = s"ROLLBACK: Attempting Roll back $moduleName."
     println(rollbackMsg)
     logger.log(Level.WARN, rollbackMsg)
@@ -148,29 +160,11 @@ class Module(
         "ROLLBACK FAILED"
       }
     }
-
-    val failedStatusReport = ModuleStatusReport(
-      organization_id = config.organizationId,
-      moduleID = moduleId,
-      moduleName = moduleName,
-      primordialDateString = config.primordialDateString,
-      runStartTS = 0L,
-      runEndTS = 0L,
-      fromTS = fromTime.asUnixTimeMilli,
-      untilTS = untilTime.asUnixTimeMilli,
-      dataFrequency = target.dataFrequency.toString,
-      status = s"FAILED --> $rollbackStatus: ERROR:\n$msg",
-      recordsAppended = 0L,
-      lastOptimizedTS = moduleState.orNull.lastOptimizedTS,
-      vacuumRetentionHours = moduleState.orNull.vacuumRetentionHours,
-      inputConfig = config.inputConfig,
-      parsedConfig = config.parsedConfig
-    )
-    finalize(failedStatusReport)
-    throw new FailedModuleException(msg)
+    fail(msg, rollbackStatus)
   }
 
-  protected def noNewDataHandler(msg: String): Unit = {
+  private def noNewDataHandler(msg: String, errorLevel: Level): Unit = {
+    logger.log(errorLevel, msg)
     val startTime = System.currentTimeMillis()
     val emptyStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
@@ -181,55 +175,86 @@ class Module(
       runEndTS = startTime,
       fromTS = fromTime.asUnixTimeMilli,
       untilTS = untilTime.asUnixTimeMilli,
-      dataFrequency = moduleState.orNull.dataFrequency,
-      status = "EMPTY",
+      dataFrequency = moduleState.dataFrequency,
+      status = s"EMPTY: $msg",
       recordsAppended = 0L,
-      lastOptimizedTS = moduleState.orNull.lastOptimizedTS,
-      vacuumRetentionHours = moduleState.orNull.vacuumRetentionHours,
+      lastOptimizedTS = moduleState.lastOptimizedTS,
+      vacuumRetentionHours = moduleState.vacuumRetentionHours,
       inputConfig = config.inputConfig,
       parsedConfig = config.parsedConfig
     )
-    finalize(emptyStatusReport)
-    throw new NoNewDataException(msg)
+    finalizeModule(emptyStatusReport)
   }
 
-  protected def validateSourceDF(df: DataFrame): DataFrame = {
+  private def validateSourceDF(df: DataFrame): DataFrame = {
     if (df.isEmpty) {
       val msg = s"ALERT: No New Data Retrieved for Module ${moduleId}-${moduleName}! Skipping"
       println(msg)
-      throw new NoNewDataException(msg)
+      throw new NoNewDataException(msg, Level.WARN)
     } else {
       println(s"$moduleName: Validating Input Schemas")
-      df.verifyMinimumSchema(Schema.get(moduleId), enforceNonNullCols = true, isDebug = _debugFlag)
+      df.verifyMinimumSchema(Schema.get(moduleId), enforceNonNullCols = true, isDebug = config.debugFlag)
     }
   }
 
-  protected def sourceDFParts(df: DataFrame): Int = if (!df.isStreaming) df.rdd.partitions.length else 200
-
-  def validatePipelineState(): Boolean = {
-    var requirementsPassed: Boolean = true
+  private def validatePipelineState(): Unit = {
 
     if (moduleDependencies.nonEmpty) { // if dependencies present
-      moduleDependencies.get.foreach(dep => {
-        val depStateOp = pipelineState.get(dep)
+      // If earliest untilTS of dependencies < current untilTS edit current untilTS to match
+      if (mostLaggingDependency.untilTS < untilTime.asUnixTimeMilli) overrideUntilTS(mostLaggingDependency.untilTS)
+      moduleDependencies.foreach(dependentModuleId => {
+        val depStateOp = pipelineState.get(dependentModuleId)
         if (depStateOp.isEmpty) { // No existing state for pre-requisite
-          noNewDataHandler()
+          val msg = s"A pipeline state cannot be deterined for Module ID $dependentModuleId. Setting module to EMPTY and " +
+            s"attempting to proceed. Note: Any other modules depending on Module ID $dependentModuleId will also be set to empty."
+          throw new NoNewDataException(msg, Level.WARN)
         } else { // Dependency State Exists
           val depState = depStateOp.get
-          if (depState.status != "SUCCESS" || depState.status != "EMPTY") { // required pre-requisite failed
-            noNewDataHandler()
-          }
-          if (depState.recordsAppended == 0L) { // required pre-requisite has no new data
-            noNewDataHandler()
+          if (depState.status != "SUCCESS" || !depState.status.startsWith("EMPTY")) { // required pre-requisite failed
+            val msg = s"Requires $dependentModuleId is in a failed state. This Module will not progress until its " +
+              s"upstream load is successful"
+            throw new NoNewDataException(msg, Level.WARN)
           }
         }
       })
-      true // no exception thrown -- continue
-    } else { // no dependencies -- continue
-      true
-    }
-    //    requirementsPassed
+    }// requirementsPassed
   }
+
+  @throws(classOf[IllegalArgumentException])
+  def execute(_etlDefinition: ETLDefinition): Unit = {
+    println(s"Beginning: $moduleName")
+
+    try {
+      validatePipelineState()
+      // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
+      val etlDefinition = _etlDefinition.copy()
+      val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
+      val sourceDFParts = PipelineFunctions.getSourceDFParts(verifiedSourceDF)
+
+      val newState = etlDefinition.executeETL(this, verifiedSourceDF)
+      updateModuleState(newState.simple)
+      finalizeModule(newState)
+
+    } catch {
+      case e: FailedModuleException =>
+        val errMessage = s"FAILED: $moduleId-$moduleName Module"
+        logger.log(Level.ERROR, errMessage, e)
+        failWithRollback(e.target, s"$errMessage\n${e.getMessage}")
+      case e: NoNewDataException =>
+        // EMPTY prefix gets prepended in the errorHandler
+        val errMessage = s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
+          s"module will not progress until new data is received by this module.\n " +
+          s"Module Dependencies: ${moduleDependencies.mkString(", ")}\n" + e.getMessage
+        logger.log(Level.ERROR, errMessage, e)
+        noNewDataHandler(errMessage, e.level)
+      case e: Throwable =>
+        val msg = s"$moduleName FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
+        logger.log(Level.ERROR, msg, e)
+        fail(msg)
+    }
+
+  }
+
 
 }
 
@@ -238,7 +263,7 @@ object Module {
   def apply(moduleId: Int,
             moduleName: String,
             pipeline: Pipeline,
-            moduleDependencies: Option[Array[Int]] = None
+            moduleDependencies: Array[Int] = Array()
            ): Module = {
 
     new Module(

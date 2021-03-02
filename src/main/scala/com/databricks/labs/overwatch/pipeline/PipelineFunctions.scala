@@ -26,15 +26,16 @@ object PipelineFunctions {
     }
   }
 
+  def getSourceDFParts(df: DataFrame): Int = if (!df.isStreaming) df.rdd.partitions.length else 200
   def optimizeWritePartitions(
                                df: DataFrame,
-                               sourceDFparts: Int,
                                target: PipelineTable,
                                spark: SparkSession,
                                config: Config,
                                moduleName: String
                              ): DataFrame = {
 
+    val sourceDFParts = getSourceDFParts(df)
     var mutationDF = df
     mutationDF = if (target.zOrderBy.nonEmpty) {
       TransformFunctions.moveColumnsToFront(mutationDF, target.zOrderBy ++ target.statsColumns)
@@ -49,17 +50,17 @@ object PipelineFunctions {
       target.name match {
         case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
           .rdd.partitions.length * target.shuffleFactor
-        case _ => sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
+        case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
       }
     } else {
-      sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
+      sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
     }
 
     val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
     val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
 
     if (config.debugFlag) {
-      println(s"DEBUG: Source DF Partitions: ${sourceDFparts}")
+      println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
       println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
       println(s"DEBUG: Max PartitionBytes (MB): ${
         spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024

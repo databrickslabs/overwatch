@@ -1,8 +1,11 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.pipeline.PipelineTable
+
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
+import org.apache.log4j.Level
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.spark.sql.Column
@@ -149,7 +152,9 @@ object Frequency extends Enumeration {
   val milliSecond, daily = Value
 }
 
-private[overwatch] class NoNewDataException(s: String) extends Exception(s) {}
+private[overwatch] class NoNewDataException(s: String, _level: Level) extends Exception(s) {
+  val level: Level = _level
+}
 
 private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 
@@ -161,7 +166,9 @@ private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
 // TODO - enable these event handlers to right the Failed/Empty Module status reports
 //private[overwatch] class EmptyModuleException(s: String) extends Exception(s) {}
-private[overwatch] class FailedModuleException(s: String) extends Exception(s) {}
+private[overwatch] class FailedModuleException(s: String, _target: PipelineTable, level: Level) extends Exception(s) {
+  val target: PipelineTable = _target
+}
 
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
 

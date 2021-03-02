@@ -233,9 +233,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
             split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
           .drop("filenameAR")
       } else {
-//        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data found between ${fromDT.toString}-${untilDT.toString}")
+        //        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data found between ${fromDT.toString}-${untilDT.toString}")
         spark.emptyDataFrame
-//        Seq("No New Records").toDF("__OVERWATCHEMPTY")
+        //        Seq("No New Records").toDF("__OVERWATCHEMPTY")
       }
     }
   }
@@ -401,8 +401,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     } else {
       println("EMPTY MODULE: Cluster Events")
       spark.emptyDataFrame
-//      Seq("").toDF("__OVERWATCHEMPTY")
-//      throw new NoNewDataException("EMPTY: No New Cluster Events")
+      //      Seq("").toDF("__OVERWATCHEMPTY")
+      //      throw new NoNewDataException("EMPTY: No New Cluster Events")
     }
 
   }
@@ -410,12 +410,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private def appendNewFilesToTracker(database: Database,
                                       newFiles: DataFrame,
                                       trackerTarget: PipelineTable,
-                                      orgId: String): Unit = {
+                                      orgId: String,
+                                      pipelineSnapTime: Column
+                                     ): Unit = {
     val fileTrackerDF = newFiles
       .withColumn("failed", lit(false))
       .withColumn("organization_id", lit(orgId))
       .coalesce(4) // narrow, short table -- each append will == spark event log files processed
-    database.write(fileTrackerDF, trackerTarget)
+    database.write(fileTrackerDF, trackerTarget, pipelineSnapTime)
   }
 
   private def retrieveNewValidSparkEventsWMeta(badRecordsPath: String,
@@ -463,7 +465,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
                           processedLogFilesTracker: PipelineTable,
-                          organizationId: String)(eventLogsDF: DataFrame): DataFrame = {
+                          organizationId: String,
+                          pipelineSnapTime: Column
+                         )(eventLogsDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Searching for Event logs")
     // Caching is done to ensure a single scan of the event log file paths
@@ -482,7 +486,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         logger.log(Level.INFO, s"VALID NEW EVENT LOGS FOUND: COUNT --> ${pathsGlob.length}")
         try {
           logger.log(Level.INFO, "Updating Tracker with new files")
-          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId)
+          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime)
         } catch {
           case e: Throwable => {
             val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +
@@ -507,13 +511,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         /** Removing this top try as it seems many customers have this situation and by first trying and then catching
          * it requires that the longest bronze workload run twice.
-        */
-//        logger.log(Level.INFO, "Attempting to load event log data")
-//        val baseEventsDF = try {
-//          spark.read.option("badRecordsPath", badRecordsPath)
-//            .json(pathsGlob: _*)
-//            .drop(dropCols: _*)
-//        } catch {
+         */
+        //        logger.log(Level.INFO, "Attempting to load event log data")
+        //        val baseEventsDF = try {
+        //          spark.read.option("badRecordsPath", badRecordsPath)
+        //            .json(pathsGlob: _*)
+        //            .drop(dropCols: _*)
+        //        } catch {
         val baseEventsDF = try {
           /**
            * Event org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent has a duplicate column
@@ -521,39 +525,39 @@ trait BronzeTransforms extends SparkSessionWrapper {
            * of the event log where the column name is "Timestamp" and its type is "Long"; thus, the catch for
            * the aforementioned event is specifically there to resolve the timestamp issue when this event is present.
            */
-//          case e: AnalysisException if (e.getMessage().trim
-//            .equalsIgnoreCase("""Found duplicate column(s) in the data schema: `timestamp`;""")) => {
-//
-//            logger.log(Level.WARN, "Found duplicate column(s) in the data schema: `timestamp`; attempting to handle")
+          //          case e: AnalysisException if (e.getMessage().trim
+          //            .equalsIgnoreCase("""Found duplicate column(s) in the data schema: `timestamp`;""")) => {
+          //
+          //            logger.log(Level.WARN, "Found duplicate column(s) in the data schema: `timestamp`; attempting to handle")
 
-            val streamingQueryListenerTS = 'Timestamp.isNull && 'timestamp.isNotNull && 'Event === "org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent"
+          val streamingQueryListenerTS = 'Timestamp.isNull && 'timestamp.isNotNull && 'Event === "org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent"
 
-            // Enable Spark to read case sensitive columns
-            spark.conf.set("spark.sql.caseSensitive", "true")
+          // Enable Spark to read case sensitive columns
+          spark.conf.set("spark.sql.caseSensitive", "true")
 
-            // read the df and convert the timestamp column
-            val basedDF = spark.read.option("badRecordsPath", badRecordsPath)
-              .json(pathsGlob: _*)
-              .drop(dropCols: _*)
+          // read the df and convert the timestamp column
+          val basedDF = spark.read.option("badRecordsPath", badRecordsPath)
+            .json(pathsGlob: _*)
+            .drop(dropCols: _*)
 
-            val hasUpperTimestamp = basedDF.schema.fields.map(_.name).contains("Timestamp")
-            val hasLower_timestamp = basedDF.schema.fields.map(_.name).contains("timestamp")
+          val hasUpperTimestamp = basedDF.schema.fields.map(_.name).contains("Timestamp")
+          val hasLower_timestamp = basedDF.schema.fields.map(_.name).contains("timestamp")
 
-            val fixDupTimestamps = if (hasUpperTimestamp && hasLower_timestamp) when(streamingQueryListenerTS, TransformFunctions.stringTsToUnixMillis('timestamp)).otherwise('Timestamp)
-            else if (hasLower_timestamp) TransformFunctions.stringTsToUnixMillis('timestamp)
-            else col("Timestamp")
+          val fixDupTimestamps = if (hasUpperTimestamp && hasLower_timestamp) when(streamingQueryListenerTS, TransformFunctions.stringTsToUnixMillis('timestamp)).otherwise('Timestamp)
+          else if (hasLower_timestamp) TransformFunctions.stringTsToUnixMillis('timestamp)
+          else col("Timestamp")
 
-            basedDF
-              .withColumn("Timestamp", fixDupTimestamps)
-              .drop("timestamp")
+          basedDF
+            .withColumn("Timestamp", fixDupTimestamps)
+            .drop("timestamp")
 
-          } catch {
+        } catch {
           case e: Throwable => {
             // TODO -- set processedFiles to failed
-//            logger.log(Level.ERROR, "FAILED spark events bronze", e)
-//            Seq("").toDF("__OVERWATCHFAILURE")
+            //            logger.log(Level.ERROR, "FAILED spark events bronze", e)
+            //            Seq("").toDF("__OVERWATCHFAILURE")
             spark.conf.set("spark.sql.caseSensitive", "false")
-            throw new FailedModuleException(e.getMessage)
+            throw e
           }
         }
 
@@ -595,9 +599,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .join(cachedEventLogs, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
-          //TODO -- use map_filter to remove massive redundant useless column to save space
-          // asOf Spark 3.0.0
-          //.withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
+        //TODO -- use map_filter to remove massive redundant useless column to save space
+        // asOf Spark 3.0.0
+        //.withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
 
         spark.conf.set("spark.sql.caseSensitive", "false")
         cachedEventLogs.unpersist()
@@ -608,26 +612,26 @@ trait BronzeTransforms extends SparkSessionWrapper {
         println(msg)
         logger.log(Level.WARN, msg)
         spark.emptyDataFrame
-//        throw new NoNewDataException("EMPTY: No new Spark Events Files")
-//        Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
+        //        throw new NoNewDataException("EMPTY: No new Spark Events Files")
+        //        Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
       }
     } else {
       val msg = "Event Logs DF is empty, Exiting"
       println(msg)
       logger.log(Level.WARN, msg)
       spark.emptyDataFrame
-//      throw new NoNewDataException("EMPTY: No new Spark Events Files")
-//      Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
+      //      throw new NoNewDataException("EMPTY: No new Spark Events Files")
+      //      Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
     }
   }
 
-  protected def collectEventLogPaths(fromTimeCol: Column,
-                                     untilTimeCol: Column,
-                                     fromTimeEpochMillis: Long,
-                                     untilTimeEpochMillis: Long,
-                                     clusterSpec: PipelineTable,
-                                     clusterSnapshot: PipelineTable,
-                                     isFirstRun: Boolean)(df: DataFrame): DataFrame = {
+  protected def collectEventLogPaths(
+                                      fromTimeEpochMillis: Long,
+                                      untilTimeEpochMillis: Long,
+                                      clusterSpec: PipelineTable,
+                                      clusterSnapshot: PipelineTable,
+                                      isFirstRun: Boolean
+                                    )(df: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
@@ -735,11 +739,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     /**
      * TODO --
-     *  use intelligent partitions count
-     *  Throw error on failure and bubble up to report
-     *  OPTIMIZATION - each path prefix is assigned to a single task meaning that large shared cluster source paths
-     *    take 99% of time to load paths instead of sharing the load across other cores. Break this scan apart if possible
-     *  Store additioanl meta metrics on source files such as size
+     * use intelligent partitions count
+     * Throw error on failure and bubble up to report
+     * OPTIMIZATION - each path prefix is assigned to a single task meaning that large shared cluster source paths
+     * take 99% of time to load paths instead of sharing the load across other cores. Break this scan apart if possible
+     * Store additioanl meta metrics on source files such as size
      */
     val strategicPartitions = if (isFirstRun) 2000 else 1000
     val eventLogPaths = spark.read.format("delta").load(tmpEventLogPathsDir)

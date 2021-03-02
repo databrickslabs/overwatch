@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Frequency, IncrementalFilter, Module, NoNewDataException, SparkSessionWrapper, UnhandledException, UnsupportedTypeException}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Frequency, IncrementalFilter, NoNewDataException, SparkSessionWrapper, UnhandledException, UnsupportedTypeException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.functions._
@@ -187,8 +187,8 @@ case class PipelineTable(
              |ModuleID: ${moduleId}
              |ModuleName: ${moduleName}
              |IncrementalColumn: ${field.name}
-             |FromTime: ${config.fromTime(moduleId).asTSString} --> ${config.fromTime(moduleId).asUnixTimeMilli}
-             |UntilTime: ${config.untilTime(moduleId).asTSString} --> ${config.untilTime(moduleId).asUnixTimeMilli}
+             |FromTime: ${module.fromTime.asTSString} --> ${module.fromTime.asUnixTimeMilli}
+             |UntilTime: ${module.untilTime.asTSString} --> ${module.untilTime.asUnixTimeMilli}
              |""".stripMargin
         if (config.debugFlag) println(logStatement)
         logger.log(Level.INFO, logStatement)
@@ -197,27 +197,27 @@ case class PipelineTable(
           case _: DateType => {
             IncrementalFilter(
               field.name,
-              date_sub(config.fromTime(moduleId).asColumnTS.cast(field.dataType), additionalLagDays),
-              config.untilTime(moduleId).asColumnTS.cast(field.dataType)
+              date_sub(module.fromTime.asColumnTS.cast(field.dataType), additionalLagDays),
+              module.untilTime.asColumnTS.cast(field.dataType)
             )
           }
           case _: TimestampType => {
             val start = if (additionalLagDays > 0) {
-              val epochMillis = config.fromTime(moduleId).asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
+              val epochMillis = module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
               from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(TimestampType)
             } else {
-              config.fromTime(moduleId).asColumnTS
+              module.fromTime.asColumnTS
             }
             IncrementalFilter(
               field.name,
               start,
-              config.untilTime(moduleId).asColumnTS
+              module.untilTime.asColumnTS
             )
           }
           case _: LongType => {
             IncrementalFilter(field.name,
-              lit(config.fromTime(moduleId).asUnixTimeMilli),
-              lit(config.untilTime(moduleId).asUnixTimeMilli)
+              lit(module.fromTime.asUnixTimeMilli),
+              lit(module.untilTime.asUnixTimeMilli)
             )
           }
           case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +

@@ -23,55 +23,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  import spark.implicits._
-
-  private def showRangeReport(lastRunDetail: Array[SimplifiedModuleStatusReport]): Unit = {
-    val rangeReport = lastRunDetail.map(lr =>
-      (
-        lr.moduleID,
-        lr.moduleName,
-        config.primordialDateString,
-        config.fromTime(lr.moduleID).asTSString,
-        config.untilTime(lr.moduleID).asTSString,
-        config.pipelineSnapTime.asTSString
-      )
-    )
-
-    rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
-      .orderBy('snapTS.desc, 'moduleId)
-      .show(50, false)
-  }
-
-  /**
-   * initialize the pipeline run
-   * Identify the timestamps to use by module and set them
-   *
-   * @return
-   */
-  private def initPipelineRun(): this.type = {
-    val rangeDetail = if (spark.catalog.databaseExists(config.databaseName) &&
-      spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
-      val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
-      val lastRunDetail = spark.table(s"${config.databaseName}.pipeline_report")
-        .filter('Status.isin("SUCCESS", "EMPTY"))
-        .filter('organization_id === config.organizationId)
-        .withColumn("rnk", rank().over(w))
-        .withColumn("rn", row_number().over(w))
-        .filter('rnk === 1 && 'rn === 1)
-        .drop("inputConfig", "parsedConfig")
-        .as[SimplifiedModuleStatusReport]
-        .collect()
-      config.setLastRunDetail(lastRunDetail)
-      lastRunDetail
-    } else {
-      config.setIsFirstRun(true)
-      Array[SimplifiedModuleStatusReport]()
-    }
-    config.setPipelineSnapTime()
-    showRangeReport(rangeDetail)
-    this
-  }
-
   /**
    * Initialize the "Database" object
    * If creating the database special properties will be created to allow overwatch to identify that the db was
@@ -113,37 +64,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     }
 
     Database(config)
-  }
-
-  /**
-   * Ensure all static datasets exist in the newly initialized Database. This function must be called after
-   * the database has been initialized.
-   *
-   * @return
-   */
-  private def loadStaticDatasets(database: Database): this.type = {
-    if (!spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
-      val instanceDetailsDF = config.cloudProvider match {
-        case "aws" =>
-          InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
-        case "azure" =>
-          InitializerFunctions.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
-        case _ =>
-          throw new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure.")
-      }
-
-      instanceDetailsDF
-        .withColumn("organization_id", lit(config.organizationId))
-        .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
-        .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
-        .withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS)
-        .withColumn("Overwatch_RunID", lit(config.runID))
-        .coalesce(1)
-        .write.format("delta")
-        .partitionBy("organization_id")
-        .saveAsTable(s"${config.consumerDatabaseName}.instanceDetails")
-    }
-    this
   }
 
   @throws(classOf[BadConfigException])
@@ -503,10 +423,7 @@ object Initializer extends SparkSessionWrapper {
     val initializer = new Initializer(config)
     val database = initializer
       .validateAndRegisterArgs(args)
-      .initPipelineRun()
       .initializeDatabase()
-
-    initializer.loadStaticDatasets(database)
 
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)

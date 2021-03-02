@@ -1,14 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Helpers, ModuleStatusReport, NoNewDataException, OverwatchScope, SchemaTools, SimplifiedModuleStatusReport, SparkSessionWrapper, TimeTypes, TimeTypesConstants, UnhandledException}
-import TransformFunctions._
-import com.databricks.labs.overwatch.pipeline.Pipeline.createTimeDetail
+import com.databricks.labs.overwatch.utils._
+import com.databricks.labs.overwatch.pipeline.Pipeline.{systemZoneId, systemZoneOffset}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.{from_unixtime, lit}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Row}
-
-import java.io.{PrintWriter, StringWriter}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{from_unixtime, lit, rank, row_number}
+import org.apache.spark.sql.DataFrame
 import java.time.{Duration, Instant, LocalDateTime, ZoneId, ZoneOffset}
 import java.util.Date
 
@@ -17,17 +15,16 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   // TODO -- Validate Targets (unique table names, ModuleIDs and names, etc)
   private val logger: Logger = Logger.getLogger(this.getClass)
-  protected final val workspace: Workspace = _workspace
-  protected final val database: Database = _database
-  protected final val config: Config = _config
+  final val workspace: Workspace = _workspace
+  final val database: Database = _database
+  final val config: Config = _config
   private var _pipelineSnapTime: Long = _
   lazy protected final val postProcessor = new PostProcessor()
   private val pipelineState = scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport]()
-  private var sourceDFparts: Int = 200
+  import spark.implicits._
 
   envInit()
 
-  def run(): Pipeline
   protected def pipeline: Pipeline = this
 
   protected def getModuleState(moduleID: Int): Option[SimplifiedModuleStatusReport] = {
@@ -38,14 +35,18 @@ class Pipeline(_workspace: Workspace, _database: Database,
     pipelineState
   }
 
-  protected def updateModuleState(moduleState: SimplifiedModuleStatusReport): this.type = {
+  protected def updateModuleState(moduleState: SimplifiedModuleStatusReport): Unit = {
     pipelineState.put(moduleState.moduleID, moduleState)
-    this
   }
 
-  protected def initializePipelineState: this.type = {
-    config.lastRunDetail.foreach(updateModuleState)
-    this
+  /**
+   * Getter for Pipeline Snap Time
+   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
+   *
+   * @return
+   */
+  def pipelineSnapTime: TimeTypes = {
+    Pipeline.createTimeDetail(_pipelineSnapTime)
   }
 
   /**
@@ -60,109 +61,136 @@ class Pipeline(_workspace: Workspace, _database: Database,
     this
   }
 
-  protected def pipelineSnapTime: TimeTypes = {
-    createTimeDetail(_pipelineSnapTime)
+  private def showRangeReport(): Unit = {
+    val rangeReport = pipelineState.values.map(lr => (
+      lr.moduleID,
+      lr.moduleName,
+      lr.primordialDateString,
+      lr.fromTS,
+      lr.untilTS,
+      pipelineSnapTime
+    ))
+
+    rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
+      .orderBy('snapTS.desc, 'moduleId)
+      .show(50, false)
   }
 
   /**
-   * Getter for Pipeline Snap Time
-   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
+   * Ensure all static datasets exist in the newly initialized Database. This function must be called after
+   * the database has been initialized.
    *
    * @return
    */
-  def pipelineSnapTime: TimeTypes = {
-    Pipeline.createTimeDetail(_pipelineSnapTime)
-  }
-
-  // TODO -- Add Rules engine
-  //  additional field under transforms rules: Option[Seq[Rule => Boolean]]
-  case class EtlDefinition(
-                            sourceDF: DataFrame,
-                            transforms: Option[Seq[DataFrame => DataFrame]],
-                            write: (DataFrame, Module) => Unit,
-                            module: Module
-                          ) {
-
-    def process(): Unit = {
-      println(s"Beginning: ${module.moduleName}")
-      module.validatePipelineState(getPipelineState)
-
-
-      println("Validating Input Schemas")
-
-      try {
-
-        if (!sourceDF.isEmpty) { // if source DF is nonEmpty, continue with transforms
-          @transient
-          lazy val verifiedSourceDF = sourceDF
-            .verifyMinimumSchema(Schema.get(module), enforceNonNullCols = true, config.debugFlag)
-
-          try {
-            sourceDFparts = verifiedSourceDF.rdd.partitions.length
-          } catch {
-            case _: AnalysisException =>
-              println(s"Delaying source shuffle Partition Set since input is stream")
-          }
-
-          if (transforms.nonEmpty) {
-            val transformedDF = transforms.get.foldLeft(verifiedSourceDF) {
-              case (df, transform) =>
-                df.transform(transform)
-            }
-            write(transformedDF, module)
-          } else {
-            write(verifiedSourceDF, module)
-          }
-        } else { // if Source DF is empty don't attempt transforms and send EMPTY to writer
-//          write(spark.emptyDataFrame, module)
-          val msg = s"ALERT: No New Data Retrieved for Module ${module.moduleId}-${module.moduleName}! Skipping"
-          println(msg)
-          throw new NoNewDataException(msg)
-        }
-      } catch {
-        case e: FailedModuleException =>
-          val errMessage = s"FAILED: ${module.moduleId}-${module.moduleName} Module"
-          logger.log(Level.ERROR, errMessage, e)
-        case e: NoNewDataException =>
-          val errMessage = s"EMPTY: ${module.moduleId}-${module.moduleName} Module: SKIPPING"
-          logger.log(Level.ERROR, errMessage, e)
-          noNewDataHandler(module)
+  private def loadStaticDatasets(): this.type = {
+    if (!spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
+      val instanceDetailsDF = config.cloudProvider match {
+        case "aws" =>
+          InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
+        case "azure" =>
+          InitializerFunctions.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
+        case _ =>
+          throw new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure.")
       }
+
+      instanceDetailsDF
+        .withColumn("organization_id", lit(config.organizationId))
+        .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
+        .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
+        .withColumn("Pipeline_SnapTS", pipelineSnapTime.asColumnTS)
+        .withColumn("Overwatch_RunID", lit(config.runID))
+        .coalesce(1)
+        .write.format("delta")
+        .partitionBy("organization_id")
+        .saveAsTable(s"${config.consumerDatabaseName}.instanceDetails")
     }
+    this
   }
 
-  protected def registerModule(
-                              moduleId: Int,
-                              moduleName: String,
-                              moduleDependencies: Option[Array[Int]] = None
-                              ): Unit = {
-    Module(
-      moduleId,
-      moduleName,
-      moduleDependencies,
-      this
-    )
-
+  /**
+   * initialize the pipeline run
+   * Identify the timestamps to use by module and set them
+   *
+   * @return
+   */
+  private def initPipelineRun(): this.type = {
+    if (spark.catalog.databaseExists(config.databaseName) &&
+      spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
+      val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
+      spark.table(s"${config.databaseName}.pipeline_report")
+        .filter('Status === "SUCCESS" || 'Status.startsWith("EMPTY"))
+        .filter('organization_id === config.organizationId)
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter('rnk === 1 && 'rn === 1)
+        .drop("inputConfig", "parsedConfig")
+        .as[SimplifiedModuleStatusReport]
+        .collect()
+        .foreach(updateModuleState)
+    } else {
+      config.setIsFirstRun(true)
+      Array[SimplifiedModuleStatusReport]()
+    }
+    if (pipelineState.nonEmpty) showRangeReport()
+    setPipelineSnapTime()
+    this
   }
 
-  import spark.implicits._
+  /**
+   * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
+   * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
+   * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
+   * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
+   * age == 60 days.
+   *
+   * @return
+   */
+  protected def primordialEpoch: Long = {
+    LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
+      .toLocalDate.atStartOfDay
+      .toInstant(systemZoneOffset)
+      .toEpochMilli
+  }
+
+  /**
+   *
+   * Pipeline Snap Date minus primordial date or 60
+   *
+   * @return
+   */
+  @throws(classOf[IllegalArgumentException])
+  private def derivePrimordialDaysDiff: Int = {
+
+    if (config.primordialDateString.nonEmpty) {
+      try {
+        val primordialLocalDate = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get)
+          .toInstant.atZone(systemZoneId)
+          .toLocalDate
+
+        Duration.between(
+          primordialLocalDate.atStartOfDay(),
+          pipelineSnapTime.asLocalDateTime.toLocalDate.atStartOfDay())
+          .toDays.toInt
+      } catch {
+        case e: IllegalArgumentException => {
+          val errorMessage = s"ERROR: Primordial Date String has Incorrect Date Format: Must be ${TimeTypesConstants.dtStringFormat}"
+          println(errorMessage, e)
+          logger.log(Level.ERROR, errorMessage, e)
+          // Throw new error to avoid hidden, unexpected/incorrect primordial date -- Force Fail and bubble up
+          throw new IllegalArgumentException(e)
+        }
+      }
+    } else {
+      60
+    }
+
+  }
 
   /**
     * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
     * Accepting data with higher precision than delivery causes bad data
     */
   protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
-
-//  protected def finalizeModule(report: ModuleStatusReport): Unit = {
-//    updateModuleState(report.moduleID, report.simple)
-//    val pipelineReportTarget = PipelineTable(
-//      name = "pipeline_report",
-//      keys = Array("organization_id", "Overwatch_RunID"),
-//      config = config,
-//      incrementalColumns = Array("Pipeline_SnapTS")
-//    )
-//    database.write(Seq(report).toDF, pipelineReportTarget)
-//  }
 
   private[overwatch] def initiatePostProcessing(): Unit = {
     //    postProcessor.analyze()
@@ -197,83 +225,18 @@ class Pipeline(_workspace: Workspace, _database: Database,
     else false
   }
 
-//  private def failModule(moduleId: Int, moduleName: String, target: PipelineTable, msg: String): Unit = {
-//
-//    val rollbackMsg = s"ROLLBACK: Attempting Roll back $moduleName."
-//    println(rollbackMsg)
-//    logger.log(Level.WARN, rollbackMsg)
-//
-//    val rollbackStatus = try {
-//      database.rollbackTarget(target)
-//      "ROLLBACK SUCCESSFUL"
-//    } catch {
-//      case e: Throwable => {
-//        val rollbackFailedMsg = s"ROLLBACK FAILED: $moduleName -->\nMessage: ${e.getMessage}\nCause:" +
-//          s"${e.getCause}"
-//        println(rollbackFailedMsg, e)
-//        logger.log(Level.ERROR, rollbackFailedMsg, e)
-//        "ROLLBACK FAILED"
-//      }
-//    }
-//
-//    val failedStatusReport = ModuleStatusReport(
-//      organization_id = config.organizationId,
-//      moduleID = moduleId,
-//      moduleName = moduleName,
-//      primordialDateString = config.primordialDateString,
-//      runStartTS = 0L,
-//      runEndTS = 0L,
-//      fromTS = config.fromTime(module.moduleId).asUnixTimeMilli,
-//      untilTS = getVerifiedUntilTS(module.moduleId),
-//      dataFrequency = target.dataFrequency.toString,
-//      status = s"FAILED --> $rollbackStatus: ERROR:\n$msg",
-//      recordsAppended = 0L,
-//      lastOptimizedTS = getLastOptimized(module.moduleId),
-//      vacuumRetentionHours = 0,
-//      inputConfig = config.inputConfig,
-//      parsedConfig = config.parsedConfig
-//    )
-//    finalizeModule(failedStatusReport)
-//    throw new FailedModuleException(msg)
-//
-//  }
-
-//  protected def noNewDataHandler(): Unit = {
-//    val startTime = System.currentTimeMillis()
-//    val emptyStatusReport = ModuleStatusReport(
-//      organization_id = config.organizationId,
-//      moduleID = module.moduleId,
-//      moduleName = module.moduleName,
-//      primordialDateString = config.primordialDateString,
-//      runStartTS = startTime,
-//      runEndTS = startTime,
-//      fromTS = config.fromTime(module.moduleId).asUnixTimeMilli,
-//      untilTS = getVerifiedUntilTS(module.moduleId),
-//      dataFrequency = "",
-//      status = "EMPTY",
-//      recordsAppended = 0L,
-//      lastOptimizedTS = getLastOptimized(module.moduleId),
-//      vacuumRetentionHours = 24 * 7,
-//      inputConfig = config.inputConfig,
-//      parsedConfig = config.parsedConfig
-//    )
-//    finalizeModule(emptyStatusReport)
-//  }
-
-  private[overwatch] def append(target: PipelineTable)(df: DataFrame, moduleId: Int, moduleName: String): Unit = {
+  private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
 
     try {
 
-      val finalDF = PipelineFunctions.optimizeWritePartitions(df, sourceDFparts, target, spark, config, moduleName: String)
-
+      val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName)
 
       val startLogMsg = s"Beginning append to ${target.tableFullName}"
       logger.log(Level.INFO, startLogMsg)
 
-
       // Append the output
-      if (!_database.write(finalDF, target)) throw new Exception("PIPELINE FAILURE")
+      if (!_database.write(finalDF, target, pipelineSnapTime.asColumnTS)) throw new Exception("PIPELINE FAILURE")
 
       // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
       // of attempting to re-read the very inefficient json.gz files.
@@ -288,7 +251,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       var lastOptimizedTS: Long = getLastOptimized(module.moduleId)
       if (needsOptimize(module.moduleId)) {
         postProcessor.markOptimize(target)
-        lastOptimizedTS = config.untilTime(module.moduleId).asUnixTimeMilli
+        lastOptimizedTS = module.untilTime.asUnixTimeMilli
       }
 
       restoreSparkConf()
@@ -296,15 +259,15 @@ class Pipeline(_workspace: Workspace, _database: Database,
       val endTime = System.currentTimeMillis()
 
       // Generate Success Report
-      val moduleStatusReport = ModuleStatusReport(
+      ModuleStatusReport(
         organization_id = config.organizationId,
         moduleID = module.moduleId,
         moduleName = module.moduleName,
         primordialDateString = config.primordialDateString,
         runStartTS = startTime,
         runEndTS = endTime,
-        fromTS = config.fromTime(module.moduleId).asUnixTimeMilli,
-        untilTS = config.untilTime(module.moduleId).asUnixTimeMilli,
+        fromTS = module.fromTime.asUnixTimeMilli,
+        untilTS = module.untilTime.asUnixTimeMilli,
         dataFrequency = target.dataFrequency.toString,
         status = "SUCCESS",
         recordsAppended = dfCount,
@@ -313,12 +276,11 @@ class Pipeline(_workspace: Workspace, _database: Database,
         inputConfig = config.inputConfig,
         parsedConfig = config.parsedConfig
       )
-      finalizeModule(moduleStatusReport)
     } catch {
       case e: Throwable =>
         val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
         logger.log(Level.ERROR, msg, e)
-        failModule(module, target, msg)
+        throw new FailedModuleException(msg, target, Level.ERROR)
     }
 
   }
@@ -354,6 +316,8 @@ object Pipeline {
   def apply(workspace: Workspace, database: Database, config: Config): Pipeline = {
 
     new Pipeline(workspace, database, config)
+      .initPipelineRun()
+      .loadStaticDatasets()
 
   }
 }
