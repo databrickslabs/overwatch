@@ -301,7 +301,7 @@ object SchemaTools extends SparkSessionWrapper {
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
     val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
     val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
-    val fieldNames = if(caseSensitive) {
+    val fieldNames = if (caseSensitive) {
       fields.map(_.name.trim)
     } else fields.map(_.name.trim.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
@@ -366,8 +366,8 @@ object SchemaTools extends SparkSessionWrapper {
    * The next several set of functions are used to clean a schema with a minimum required set of fields as the guide.
    * Rules will be documented later but this section will likely benefit from a refactor to a more complex object
    */
-    // TODO -- Review viability of similifying all schema functions within the SchemaHelpers object
-    //  during next refactor
+  // TODO -- Review viability of similifying all schema functions within the SchemaHelpers object
+  //  during next refactor
 
 
   private def getPrefixedString(prefix: Option[String], fieldName: String): String = {
@@ -392,7 +392,7 @@ object SchemaTools extends SparkSessionWrapper {
     val fieldTypeName = f.dataType.typeName
 
     val oneComplexOneNot = (isComplexDataType(req.dataType) && !isComplexDataType(f.dataType)) ||
-        (!isComplexDataType(req.dataType) && isComplexDataType(f.dataType))
+      (!isComplexDataType(req.dataType) && isComplexDataType(f.dataType))
 
     val bothComplex = isComplexDataType(req.dataType) || isComplexDataType(f.dataType)
 
@@ -450,12 +450,12 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   def buildValidationRunner(
-                                     dfSchema: StructType,
-                                     minRequiredSchema: StructType,
-                                     enforceNonNullCols: Boolean = true,
-                                     isDebug: Boolean = false,
-                                     cPrefix: Option[String] = None
-                                   ): Seq[ValidatedColumn] = {
+                             dfSchema: StructType,
+                             minRequiredSchema: StructType,
+                             enforceNonNullCols: Boolean = true,
+                             isDebug: Boolean = false,
+                             cPrefix: Option[String] = None
+                           ): Seq[ValidatedColumn] = {
 
     // Some fields are force excluded from the complex types due to duplicates or issues in underlying
     // data sources
@@ -627,6 +627,21 @@ object Helpers extends SparkSessionWrapper {
   }
 
   /**
+   * Serialized / parallelized method for rapidly listing paths under a sub directory
+   * @param path
+   * @return
+   */
+  def parListFiles(path: String): Array[String] = {
+    try {
+      val conf = new Configuration()
+      val fs = new Path(path).getFileSystem(conf)
+      fs.listStatus(new Path(path)).map(_.getPath.toString)
+    } catch {
+      case e: Throwable => Array(path)
+    }
+  }
+
+  /**
    * Serializable path expander from wildcard paths. Given an input like /path/to/<asterisk>/wildcards/<asterisk>
    * all paths in that wildcard path will be returned in the array. The key to the performance of this function
    * is ensuring spark is used to serialize it meaning make sure that it's called from the lambda of a Dataset
@@ -637,7 +652,17 @@ object Helpers extends SparkSessionWrapper {
    * @param path wildcard path as string
    * @return list of all paths contained within the wildcard path
    */
-  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[(String, Option[Long], Boolean)] = {
+
+  case class PathStringFileStatus(
+                                   pathString: String,
+                                   fileCreateEpochMS: Option[Long],
+                                   fileSize: Option[Long],
+                                   withinSpecifiedTimeRange: Boolean,
+                                   failed: Boolean,
+                                   failMsg: Option[String]
+                                 )
+
+  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[PathStringFileStatus] = {
     val conf = new Configuration()
     try {
       val fs = new Path(path).getFileSystem(conf)
@@ -646,28 +671,35 @@ object Helpers extends SparkSessionWrapper {
       paths.map(wildString => {
         val path = wildString.getPath
         val pathString = path.toString
-        val fileModEpochMillis = if (fromEpochMillis.nonEmpty) {
-          // TODO -- use the listStatus to return other metadata as well such as file size
-          Some(fs.listStatus(path).filter(_.isFile).head.getModificationTime)
-        } else None
-        (pathString, fileModEpochMillis)
-      }).filter(p => {
-        // p._1 == path
-        // p._2 == fileModEpochMillis
-        // Ensure that the last modified time of the file was between from --> until
-        if (p._2.nonEmpty) {
-          val lastModifiedTS = p._2.get
-          // TODO -- Switch to Debug -- is on exec logs with println
-          println(s"PROOF: ${p._1} --> ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
-          (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
-            untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
-        } else false
-      }).map(x => (x._1, x._2, true))
+        val fileStatusOp = fs.listStatus(path).find(_.isFile)
+        if (fileStatusOp.nonEmpty) {
+          val fileStatus = fileStatusOp.get
+          val lastModifiedTS = fileStatus.getModificationTime
+          val debugProofMsg = s"PROOF: $pathString --> ${fromEpochMillis.getOrElse(0L)} <= " +
+            s"${lastModifiedTS} < ${untilEpochMillis.getOrElse(Long.MaxValue)}"
+          logger.log(Level.DEBUG, debugProofMsg)
+          val isWithinSpecifiedRange = fromEpochMillis.getOrElse(0L) <= lastModifiedTS &&
+            untilEpochMillis.getOrElse(Long.MaxValue) > lastModifiedTS
+          PathStringFileStatus(pathString, Some(lastModifiedTS), Some(fileStatus.getLen), isWithinSpecifiedRange, failed = false, None)
+        } else {
+          val msg = s"Could not retrieve FileStatus for path: $pathString"
+          logger.log(Level.ERROR, msg)
+          // Return failed if timeframe specified but fileStatus is Empty
+          val isFailed = if (fromEpochMillis.nonEmpty || untilEpochMillis.nonEmpty) true else false
+          PathStringFileStatus(pathString, None, None, withinSpecifiedTimeRange = false, failed = isFailed, Some(msg))
+        }
+      })
     } catch {
-      case e: AmazonS3Exception => logger.log(Level.ERROR, s"ACCESS DENIED: " +
-        s"Cluster Event Logs at path ${path} are inaccessible with given the Databricks account used to run Overwatch. " +
-        s"Validate access & try again.\n${e.getMessage}")
-        Array((path, Some(0L), false))
+      case e: AmazonS3Exception =>
+        val errMsg = s"ACCESS DENIED: " +
+          s"Cluster Event Logs at path ${path} are inaccessible with given the Databricks account used to run Overwatch. " +
+          s"Validate access & try again.\n${e.getMessage}"
+        logger.log(Level.ERROR, errMsg)
+        Array(PathStringFileStatus(path, None, None, withinSpecifiedTimeRange = false, failed = true, Some(errMsg)))
+      case e: Throwable =>
+        val msg = s"Failed to retrieve FileStatus for Path: $path. ${e.getMessage}"
+        logger.log(Level.ERROR, msg)
+        Array(PathStringFileStatus(path, None, None, withinSpecifiedTimeRange = false, failed = true, Some(msg)))
     }
   }
 

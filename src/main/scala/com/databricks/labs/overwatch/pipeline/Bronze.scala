@@ -76,7 +76,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       collectEventLogPaths(
         sparkEventLogsModule.fromTime.asUnixTimeMilli,
         sparkEventLogsModule.untilTime.asUnixTimeMilli,
-        SilverTargets.clustersSpecTarget,
+        BronzeTargets.processedEventLogs,
         BronzeTargets.clustersSnapshotTarget,
         config.isFirstRun
       ),
@@ -85,6 +85,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.badRecordsPath,
         BronzeTargets.processedEventLogs,
         config.organizationId,
+        config.runID,
         pipelineSnapTime.asColumnTS
       ) //,
     )),
