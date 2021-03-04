@@ -73,6 +73,12 @@ object Schema extends SparkSessionWrapper {
     commonSchemas(name.toLowerCase)
   }
 
+  val badRecordsSchema: StructType = StructType(Seq(
+    StructField("path",StringType, nullable = true),
+    StructField("reason",StringType, nullable = true),
+    StructField("record",StringType, nullable = true)
+  ))
+
   lazy private[overwatch] val auditMasterSchema = StructType(Seq(
     StructField("serviceName", StringType, nullable = false),
     StructField("actionName", StringType, nullable = false),
@@ -253,6 +259,7 @@ object Schema extends SparkSessionWrapper {
    * Gold Layer 3xxx
    */
   private[overwatch] val minimumSchemasByModule: Map[Int, StructType] = Map(
+    1006 -> auditMasterSchema,
     // SparkExecutors
     2003 -> sparkEventsRawMasterSchema,
     // SparkExecutions

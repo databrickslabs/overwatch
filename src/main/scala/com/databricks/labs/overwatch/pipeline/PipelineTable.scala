@@ -194,17 +194,17 @@ case class PipelineTable(
         logger.log(Level.INFO, logStatement)
 
         field.dataType match {
-          case _: DateType => {
+          case dt: DateType => {
             IncrementalFilter(
               field.name,
-              date_sub(module.fromTime.asColumnTS.cast(field.dataType), additionalLagDays),
-              module.untilTime.asColumnTS.cast(field.dataType)
+              date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays),
+              module.untilTime.asColumnTS.cast(dt)
             )
           }
-          case _: TimestampType => {
+          case dt: TimestampType => {
             val start = if (additionalLagDays > 0) {
               val epochMillis = module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
-              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(TimestampType)
+              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(dt)
             } else {
               module.fromTime.asColumnTS
             }
@@ -225,7 +225,7 @@ case class PipelineTable(
         }
       })
 
-      PipelineFunctions.withIncrementalFilters(instanceDF, module, incrementalFilters, config.globalFilters)
+      PipelineFunctions.withIncrementalFilters(instanceDF, module, incrementalFilters, config.globalFilters, dataFrequency)
     } else { // Source doesn't exist
       spark.emptyDataFrame
     }

@@ -42,7 +42,7 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "date"),
       statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "),
-      dataFrequency = Frequency.daily,
+      dataFrequency = if (config.cloudProvider == "azure") Frequency.milliSecond else Frequency.daily,
       masterSchema = Some(Schema.auditMasterSchema)
     )
 

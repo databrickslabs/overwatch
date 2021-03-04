@@ -439,7 +439,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .distinct
 
       if (Helpers.pathExists(badRecordsPath)) {
-        val badFiles = spark.read.format("json").load(s"${badRecordsPath}/*/*/")
+        val badFiles = spark.read.format("json")
+          .schema(Schema.badRecordsSchema)
+          .load(s"${badRecordsPath}/*/*/")
           .select('path.alias("filename"))
           .distinct
         eventLogsDF.select('filename).except(alreadyProcessed.unionByName(badFiles))

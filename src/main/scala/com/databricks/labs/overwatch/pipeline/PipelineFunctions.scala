@@ -1,20 +1,21 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter}
+import com.databricks.labs.overwatch.utils.Frequency.Frequency
+import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.functions.{col, date_add, lit, rand}
+import org.apache.spark.sql.functions.{col, date_add, date_sub, lit, rand}
 
 object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def addOneTick(ts: Column, dt: DataType = TimestampType): Column = {
+  def addOneTick(ts: Column, dataFrequency: Frequency, dt: DataType = TimestampType): Column = {
     dt match {
       case _: TimestampType =>
         ((ts.cast("double") * 1000 + 1) / 1000).cast("timestamp")
       case _: DateType =>
-        date_add(ts, 1)
+        if (dataFrequency == Frequency.daily) ts else date_add(ts, 1)
       case _: DoubleType =>
         ts + 0.001d
       case _: LongType =>
@@ -111,7 +112,13 @@ object PipelineFunctions {
   }
 
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
-  def withIncrementalFilters(df: DataFrame, module: Module, filters: Seq[IncrementalFilter], globalFilters: Option[Seq[Column]] = None): DataFrame = {
+  def withIncrementalFilters(
+                              df: DataFrame,
+                              module: Module,
+                              filters: Seq[IncrementalFilter],
+                              globalFilters: Option[Seq[Column]] = None,
+                              dataFrequency: Frequency
+                            ): DataFrame = {
     val parsedFilters = filters.map(filter => {
       val c = filter.cronColName
       val low = filter.low
@@ -119,16 +126,19 @@ object PipelineFunctions {
       val dt = df.schema.fields.filter(_.name == c).head.dataType
       dt match {
         case _: TimestampType =>
-          col(c).between(PipelineFunctions.addOneTick(low), high)
+          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency), high)
         case _: DateType => {
-          col(c).between(PipelineFunctions.addOneTick(low.cast(DateType), DateType), high.cast(DateType))
+          col(c).between(
+            PipelineFunctions.addOneTick(low.cast(DateType), dataFrequency, DateType),
+            if (dataFrequency == Frequency.daily) date_sub(high.cast(DateType), 1) else high.cast(DateType)
+          )
         }
         case _: LongType =>
-          col(c).between(PipelineFunctions.addOneTick(low, LongType), high.cast(LongType))
+          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, LongType), high.cast(LongType))
         case _: IntegerType =>
-          col(c).between(PipelineFunctions.addOneTick(low, IntegerType), high.cast(IntegerType))
+          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, IntegerType), high.cast(IntegerType))
         case _: DoubleType =>
-          col(c).between(PipelineFunctions.addOneTick(low, DoubleType), high.cast(DoubleType))
+          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, DoubleType), high.cast(DoubleType))
         case _ =>
           throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
       }
