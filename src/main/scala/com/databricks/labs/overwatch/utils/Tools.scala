@@ -939,8 +939,12 @@ object Helpers extends SparkSessionWrapper {
   private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
     topPaths.map(p => {
       if (p.reverse.head.toString == "/") s"${p}*" else s"${p}/*"
-    }).flatMap(p => globPath(p)).toSeq.toDF("filesToDelete", "fileCreateDate", "succeeded")
-      .select('filesToDelete).as[String]
+    }).toSeq.toDF("pathsToDrop")
+      .as[String]
+      .map(p => Helpers.globPath(p))
+      .select(explode('value).alias("pathsToDrop"))
+      .select($"pathsToDrop.pathString")
+      .as[String]
       .foreach(f => rmSer(f))
 
     topPaths.foreach(dir => dbutils.fs.rm(dir, true))

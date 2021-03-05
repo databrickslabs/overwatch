@@ -182,17 +182,6 @@ case class PipelineTable(
 
         val field = cronCols.filter(_.name == filterCol).head
 
-        val logStatement =
-          s"""
-             |ModuleID: ${moduleId}
-             |ModuleName: ${moduleName}
-             |IncrementalColumn: ${field.name}
-             |FromTime: ${module.fromTime.asTSString} --> ${module.fromTime.asUnixTimeMilli}
-             |UntilTime: ${module.untilTime.asTSString} --> ${module.untilTime.asUnixTimeMilli}
-             |""".stripMargin
-        if (config.debugFlag) println(logStatement)
-        logger.log(Level.INFO, logStatement)
-
         field.dataType match {
           case dt: DateType => {
             IncrementalFilter(

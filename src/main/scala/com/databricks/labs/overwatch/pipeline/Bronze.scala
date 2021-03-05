@@ -173,7 +173,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 //      appendSparkEventLogsProcess.process()
 //    }
 
-//    initiatePostProcessing()
+    initiatePostProcessing()
     this
 
   }

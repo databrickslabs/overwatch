@@ -246,11 +246,8 @@ trait GoldTransforms extends SparkSessionWrapper {
         )
       )
       .withColumn("uptime_in_state_S", lead('timestamp, 1).over(stateUnboundW) - 'timestamp)
-      .withColumn("cloud_billable", when('isRunning, lit(true)).otherwise(lit(false)))
-      .withColumn("databricks_billable",
-        when('isRunning && !'type.isin(nonBillableTypes: _*), lit(false))
-        .otherwise(lit(true)
-        ))
+      .withColumn("cloud_billable", 'isRunning)
+      .withColumn("databricks_billable", 'isRunning && !'type.isin(nonBillableTypes: _*))
       .join(driverNodeDetails, Seq("organization_id", "driver_node_type_id"), "left")
       .join(workerNodeDetails, Seq("organization_id", "node_type_id"), "left")
       .withColumn("core_hours", when('isRunning,

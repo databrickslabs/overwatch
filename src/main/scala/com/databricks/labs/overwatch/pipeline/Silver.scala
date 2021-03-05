@@ -262,7 +262,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 //      processSparkEvents()
 //    }
 //
-//    initiatePostProcessing()
+    initiatePostProcessing()
     this // to be used as fail switch later if necessary
   }
 

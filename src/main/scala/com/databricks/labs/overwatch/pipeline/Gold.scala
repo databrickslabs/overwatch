@@ -242,7 +242,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     //      GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
     //    }
 
-    //    initiatePostProcessing()
+        initiatePostProcessing()
     this // to be used as fail switch later if necessary
   }
 

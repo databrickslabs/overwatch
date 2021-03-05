@@ -72,7 +72,7 @@ class Module(
         s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module untilTS == min requisite module: " +
         s"${mostLaggingDependency.untilTS}."
       logger.log(Level.WARN, msg)
-      println(msg)
+      if (pipeline.config.debugFlag) println(msg)
       Pipeline.createTimeDetail(mostLaggingDependency.untilTS)
     } else maxIndependentUntilTime
   }
