@@ -206,7 +206,7 @@ class Module(
     if (df.isEmpty) {
       val msg = s"ALERT: No New Data Retrieved for Module ${moduleId}-${moduleName}! Skipping"
       println(msg)
-      throw new NoNewDataException(msg, Level.WARN, _allowModuleProgression = true)
+      throw new NoNewDataException(msg, Level.WARN, allowModuleProgression = true)
     } else {
       println(s"$moduleName: Validating Input Schemas")
       df.verifyMinimumSchema(Schema.get(moduleId), enforceNonNullCols = true, isDebug = config.debugFlag)

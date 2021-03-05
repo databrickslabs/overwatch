@@ -116,7 +116,7 @@ object PipelineFunctions {
                               df: DataFrame,
                               module: Module,
                               filters: Seq[IncrementalFilter],
-                              globalFilters: Option[Seq[Column]] = None,
+                              globalFilters: Seq[Column] = Seq(),
                               dataFrequency: Frequency
                             ): DataFrame = {
     val parsedFilters = filters.map(filter => {
@@ -144,14 +144,14 @@ object PipelineFunctions {
       }
     })
 
-    val allFilters = parsedFilters ++ globalFilters.getOrElse(Seq())
+    val allFilters = parsedFilters ++ globalFilters
 
     applyFilters(df, allFilters, Some(module))
 
   }
 
   def isIgnorableException(e: Exception): Boolean = {
-    val message = e.getMessage()
+    val message = e.getMessage
     message.contains("Cannot modify the value of a static config")
   }
 

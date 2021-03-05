@@ -128,7 +128,7 @@ case class PipelineTable(
           spark.table(tableFullName).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
         } else spark.table(tableFullName)
         if (withGlobalFilters && config.globalFilters.nonEmpty)
-          PipelineFunctions.applyFilters(fullDF, config.globalFilters.get)
+          PipelineFunctions.applyFilters(fullDF, config.globalFilters)
         else fullDF
       } else spark.emptyDataFrame
     } catch {

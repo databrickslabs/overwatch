@@ -106,10 +106,10 @@ class Config() {
 
   private[overwatch] def primordialDateString: Option[String] = _primordialDateString
 
-  private[overwatch] def globalFilters: Option[Seq[Column]] = {
-    Some(Seq(
+  private[overwatch] def globalFilters: Seq[Column] = {
+    Seq(
       col("organization_id") === organizationId
-    ))
+    )
   }
 
   /**
