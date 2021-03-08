@@ -126,7 +126,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                    ): DataFrame = {
 
     if (!validateCleanPaths(isFirstRun, ehConfig))
-      throw new BadConfigException("Azure Event Hub Paths are nto empty on first run")
+      throw new BadConfigException("Azure Event Hub Paths are not empty on first run")
 
     val connectionString = ConnectionStringBuilder(ehConfig.connectionString)
       .setEventHubName(ehConfig.eventHubName)

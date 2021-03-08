@@ -325,7 +325,6 @@ object Schema extends SparkSessionWrapper {
       StructField("login_date", DateType, nullable = true),
       StructField("login_type", StringType, nullable = true),
       StructField("login_user", StringType, nullable = true),
-      StructField("user_id", StringType, nullable = true),
       StructField("user_email", StringType, nullable = true),
       StructField("ssh_login_details", StructType(Seq(
         StructField("instance_id", StringType, nullable = true)

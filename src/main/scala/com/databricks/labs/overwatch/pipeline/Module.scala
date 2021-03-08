@@ -240,15 +240,15 @@ class Module(
   def execute(_etlDefinition: ETLDefinition): Unit = {
     println(s"Beginning: $moduleName")
 
+    val debugMsg = s"MODULE: $moduleId-$moduleName\nTIME RANGE: " +
+      s"    From -> To == ${fromTime.asTSString} -> ${untilTime.asTSString}"
+    println(debugMsg)
+    logger.log(Level.INFO, debugMsg)
     try {
       validatePipelineState()
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
       val etlDefinition = _etlDefinition.copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
-      val debugMsg = s"MODULE: $moduleId-$moduleName\nTIME RANGE: " +
-        s"    From -> To == ${fromTime.asTSString} -> ${untilTime.asTSString}"
-      println(debugMsg)
-      logger.log(Level.INFO, debugMsg)
       val newState = etlDefinition.executeETL(this, verifiedSourceDF)
       finalizeModule(newState)
 

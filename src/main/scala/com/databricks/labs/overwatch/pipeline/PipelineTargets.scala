@@ -8,6 +8,7 @@ abstract class PipelineTargets(config: Config) {
    * Bronze Targets
    */
   object BronzeTargets {
+
     lazy private[overwatch] val jobsSnapshotTarget: PipelineTable = PipelineTable(
       name = "jobs_snapshot_bronze",
       keys = Array("organization_id", "job_id"),
