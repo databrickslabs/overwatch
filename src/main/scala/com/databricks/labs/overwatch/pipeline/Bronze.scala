@@ -16,6 +16,20 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   import spark.implicits._
 
+  def getAllTargets: Array[PipelineTable] = {
+    Array(
+      BronzeTargets.jobsSnapshotTarget,
+      BronzeTargets.clustersSnapshotTarget,
+      BronzeTargets.poolsTarget,
+      BronzeTargets.auditLogsTarget,
+      BronzeTargets.auditLogAzureLandRaw,
+      BronzeTargets.clusterEventsTarget,
+      BronzeTargets.sparkEventLogsTarget,
+      BronzeTargets.processedEventLogs,
+      BronzeTargets.cloudMachineDetail
+    )
+  }
+
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   lazy private val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)

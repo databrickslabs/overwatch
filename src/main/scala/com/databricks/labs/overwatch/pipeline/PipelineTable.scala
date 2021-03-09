@@ -43,7 +43,7 @@ case class PipelineTable(
 
   import spark.implicits._
 
-  private val databaseName = if (_databaseName == "default") config.databaseName else config.consumerDatabaseName
+  val databaseName: String = if (_databaseName == "default") config.databaseName else config.consumerDatabaseName
 
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try {

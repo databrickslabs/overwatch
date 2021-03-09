@@ -3,13 +3,11 @@ package com.databricks.labs.overwatch.pipeline
 import java.util.UUID
 import com.databricks.labs.overwatch.utils.{Config, NoNewDataException, SchemaTools, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import TransformFunctions._
-
-import scala.collection.mutable.ArrayBuffer
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 
 trait SilverTransforms extends SparkSessionWrapper {
 
@@ -370,7 +368,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .join(sshDetails, Seq("organization_id", "date", "timestamp", "login_type", "requestId"), "left")
         .drop("date")
     } else
-      spark.emptyDataFrame
+      throw new NoNewDataException("No New Data", Level.INFO, allowModuleProgression = true)
     //      throw new NoNewDataException("EMPTY: No new Account Logins")
     //      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
@@ -398,7 +396,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .otherwise('user_id))
 
     } else
-      spark.emptyDataFrame
+      throw new NoNewDataException("No New Data", Level.INFO, allowModuleProgression = true)
     //      throw new NoNewDataException(s"EMPTY: Now new account modifications")
     //      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
