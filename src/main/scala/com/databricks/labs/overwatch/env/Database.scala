@@ -111,10 +111,10 @@ class Database(config: Config) extends SparkSessionWrapper {
     streamManager
   }
 
-  def write(df: DataFrame, target: PipelineTable): Boolean = {
+  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column): Boolean = {
 
     var finalDF: DataFrame = df
-    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS) else finalDF
+    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
 
     // TODO -- Enhance schema scrubber. If target has an array of nested structs which is populated but the new

@@ -1,20 +1,21 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, Module, ModuleStatusReport}
+import com.databricks.labs.overwatch.utils.Frequency.Frequency
+import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.functions.{col, date_add, lit, rand}
+import org.apache.spark.sql.functions.{col, date_add, date_sub, lit, rand}
 
 object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def addOneTick(ts: Column, dt: DataType = TimestampType): Column = {
+  def addOneTick(ts: Column, dataFrequency: Frequency, dt: DataType = TimestampType): Column = {
     dt match {
       case _: TimestampType =>
         ((ts.cast("double") * 1000 + 1) / 1000).cast("timestamp")
       case _: DateType =>
-        date_add(ts, 1)
+        if (dataFrequency == Frequency.daily) ts else date_add(ts, 1)
       case _: DoubleType =>
         ts + 0.001d
       case _: LongType =>
@@ -26,15 +27,16 @@ object PipelineFunctions {
     }
   }
 
+  def getSourceDFParts(df: DataFrame): Int = if (!df.isStreaming) df.rdd.partitions.length else 200
   def optimizeWritePartitions(
                                df: DataFrame,
-                               sourceDFparts: Int,
                                target: PipelineTable,
                                spark: SparkSession,
                                config: Config,
-                               module: Option[Module]
+                               moduleName: String
                              ): DataFrame = {
 
+    val sourceDFParts = getSourceDFParts(df)
     var mutationDF = df
     mutationDF = if (target.zOrderBy.nonEmpty) {
       TransformFunctions.moveColumnsToFront(mutationDF, target.zOrderBy ++ target.statsColumns)
@@ -49,24 +51,24 @@ object PipelineFunctions {
       target.name match {
         case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
           .rdd.partitions.length * target.shuffleFactor
-        case _ => sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
+        case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
       }
     } else {
-      sourceDFparts / partSizeNoramlizationFactor * target.shuffleFactor
+      sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
     }
 
     val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
     val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
 
     if (config.debugFlag) {
-      println(s"DEBUG: Source DF Partitions: ${sourceDFparts}")
+      println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
       println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
       println(s"DEBUG: Max PartitionBytes (MB): ${
         spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
       }")
     }
 
-    if (module.nonEmpty) logger.log(Level.INFO, s"${module.get.moduleName}: " +
+    logger.log(Level.INFO, s"$moduleName: " +
       s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
       s"\nShufflePartitions: ${targetShufflePartitionCount}")
 
@@ -98,10 +100,9 @@ object PipelineFunctions {
   def applyFilters(df: DataFrame, filters: Seq[Column], module: Option[Module] = None): DataFrame = {
     if (module.nonEmpty) {
       val filterLogMessageSB: StringBuilder = new StringBuilder
-      filterLogMessageSB.append(s"APPLIED FILTERS:\nMODULE_ID: ${module.get.moduleID}\nMODULE_NAME: ${module.get.moduleName}\nFILTERS:\n")
+      filterLogMessageSB.append(s"APPLIED FILTERS:\nMODULE_ID: ${module.get.moduleId}\nMODULE_NAME: ${module.get.moduleName}\nFILTERS:\n")
       filters.map(_.expr).foreach(filterLogMessageSB.append)
       val filterLogMessage = filterLogMessageSB.toString()
-      println(filterLogMessage)
       logger.log(Level.INFO, filterLogMessage)
     }
     filters.foldLeft(df) {
@@ -111,7 +112,13 @@ object PipelineFunctions {
   }
 
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
-  def withIncrementalFilters(df: DataFrame, module: Module, filters: Seq[IncrementalFilter], globalFilters: Option[Seq[Column]] = None): DataFrame = {
+  def withIncrementalFilters(
+                              df: DataFrame,
+                              module: Module,
+                              filters: Seq[IncrementalFilter],
+                              globalFilters: Seq[Column] = Seq(),
+                              dataFrequency: Frequency
+                            ): DataFrame = {
     val parsedFilters = filters.map(filter => {
       val c = filter.cronColName
       val low = filter.low
@@ -119,29 +126,32 @@ object PipelineFunctions {
       val dt = df.schema.fields.filter(_.name == c).head.dataType
       dt match {
         case _: TimestampType =>
-          col(c).between(PipelineFunctions.addOneTick(low), high)
+          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency), high)
         case _: DateType => {
-          col(c).between(PipelineFunctions.addOneTick(low.cast(DateType), DateType), high.cast(DateType))
+          col(c).between(
+            PipelineFunctions.addOneTick(low.cast(DateType), dataFrequency, DateType),
+            if (dataFrequency == Frequency.daily) date_sub(high.cast(DateType), 1) else high.cast(DateType)
+          )
         }
         case _: LongType =>
-          col(c).between(PipelineFunctions.addOneTick(low, LongType), high.cast(LongType))
+          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, LongType), high.cast(LongType))
         case _: IntegerType =>
-          col(c).between(PipelineFunctions.addOneTick(low, IntegerType), high.cast(IntegerType))
+          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, IntegerType), high.cast(IntegerType))
         case _: DoubleType =>
-          col(c).between(PipelineFunctions.addOneTick(low, DoubleType), high.cast(DoubleType))
+          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, DoubleType), high.cast(DoubleType))
         case _ =>
           throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
       }
     })
 
-    val allFilters = parsedFilters ++ globalFilters.getOrElse(Seq())
+    val allFilters = parsedFilters ++ globalFilters
 
     applyFilters(df, allFilters, Some(module))
 
   }
 
   def isIgnorableException(e: Exception): Boolean = {
-    val message = e.getMessage()
+    val message = e.getMessage
     message.contains("Cannot modify the value of a static config")
   }
 

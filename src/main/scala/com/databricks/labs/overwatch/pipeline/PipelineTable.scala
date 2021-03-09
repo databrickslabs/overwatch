@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Frequency, IncrementalFilter, Module, NoNewDataException, SparkSessionWrapper, UnhandledException, UnsupportedTypeException}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Frequency, IncrementalFilter, NoNewDataException, SparkSessionWrapper, UnhandledException, UnsupportedTypeException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.functions._
@@ -43,7 +43,7 @@ case class PipelineTable(
 
   import spark.implicits._
 
-  private val databaseName = if (_databaseName == "default") config.databaseName else config.consumerDatabaseName
+  val databaseName: String = if (_databaseName == "default") config.databaseName else config.consumerDatabaseName
 
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try {
@@ -128,7 +128,7 @@ case class PipelineTable(
           spark.table(tableFullName).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
         } else spark.table(tableFullName)
         if (withGlobalFilters && config.globalFilters.nonEmpty)
-          PipelineFunctions.applyFilters(fullDF, config.globalFilters.get)
+          PipelineFunctions.applyFilters(fullDF, config.globalFilters)
         else fullDF
       } else spark.emptyDataFrame
     } catch {
@@ -163,13 +163,13 @@ case class PipelineTable(
                        cronColumnsNames: Seq[String],
                        additionalLagDays: Int = 0
                      ): DataFrame = {
-    val moduleID = module.moduleID
+    val moduleId = module.moduleId
     val moduleName = module.moduleName
 
     if (exists) {
       val instanceDF = if (withMasterMinimumSchema) { // infer master schema if true and available
         logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for Module: " +
-          s"$moduleID --> $moduleName for Table: $tableFullName")
+          s"$moduleId --> $moduleName for Table: $tableFullName")
         spark.table(tableFullName).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
       } else spark.table(tableFullName)
       val dfFields = instanceDF.schema.fields
@@ -182,42 +182,31 @@ case class PipelineTable(
 
         val field = cronCols.filter(_.name == filterCol).head
 
-        val logStatement =
-          s"""
-             |ModuleID: ${moduleID}
-             |ModuleName: ${moduleName}
-             |IncrementalColumn: ${field.name}
-             |FromTime: ${config.fromTime(moduleID).asTSString} --> ${config.fromTime(moduleID).asUnixTimeMilli}
-             |UntilTime: ${config.untilTime(moduleID).asTSString} --> ${config.untilTime(moduleID).asUnixTimeMilli}
-             |""".stripMargin
-        if (config.debugFlag) println(logStatement)
-        logger.log(Level.INFO, logStatement)
-
         field.dataType match {
-          case _: DateType => {
+          case dt: DateType => {
             IncrementalFilter(
               field.name,
-              date_sub(config.fromTime(moduleID).asColumnTS.cast(field.dataType), additionalLagDays),
-              config.untilTime(moduleID).asColumnTS.cast(field.dataType)
+              date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays),
+              module.untilTime.asColumnTS.cast(dt)
             )
           }
-          case _: TimestampType => {
+          case dt: TimestampType => {
             val start = if (additionalLagDays > 0) {
-              val epochMillis = config.fromTime(moduleID).asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
-              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(TimestampType)
+              val epochMillis = module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
+              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(dt)
             } else {
-              config.fromTime(moduleID).asColumnTS
+              module.fromTime.asColumnTS
             }
             IncrementalFilter(
               field.name,
               start,
-              config.untilTime(moduleID).asColumnTS
+              module.untilTime.asColumnTS
             )
           }
           case _: LongType => {
             IncrementalFilter(field.name,
-              lit(config.fromTime(moduleID).asUnixTimeMilli),
-              lit(config.untilTime(moduleID).asUnixTimeMilli)
+              lit(module.fromTime.asUnixTimeMilli),
+              lit(module.untilTime.asUnixTimeMilli)
             )
           }
           case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
@@ -225,7 +214,7 @@ case class PipelineTable(
         }
       })
 
-      PipelineFunctions.withIncrementalFilters(instanceDF, module, incrementalFilters, config.globalFilters)
+      PipelineFunctions.withIncrementalFilters(instanceDF, module, incrementalFilters, config.globalFilters, dataFrequency)
     } else { // Source doesn't exist
       spark.emptyDataFrame
     }

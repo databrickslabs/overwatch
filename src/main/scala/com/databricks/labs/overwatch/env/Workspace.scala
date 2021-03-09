@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.env
 import com.databricks.backend.common.rpc.CommandContext
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.pipeline.Pipeline
 import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, DataFrame}
@@ -122,6 +123,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   }
 
 }
+
 
 object Workspace {
   /**

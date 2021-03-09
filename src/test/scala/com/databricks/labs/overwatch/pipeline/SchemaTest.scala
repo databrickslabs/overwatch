@@ -1,12 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
-import com.databricks.labs.overwatch.utils.Module
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
-import com.holdenkarau.spark.testing.DataframeGenerator
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.types.{DateType, LongType, MapType, StringType, StructField, StructType, TimestampType}
-import org.scalatest.Inspectors.forAll
 import org.scalatest.funspec.AnyFunSpec
 
 

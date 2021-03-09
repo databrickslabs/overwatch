@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Module, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.sql.functions._
@@ -72,6 +72,12 @@ object Schema extends SparkSessionWrapper {
   private def common(name: String): StructField = {
     commonSchemas(name.toLowerCase)
   }
+
+  val badRecordsSchema: StructType = StructType(Seq(
+    StructField("path",StringType, nullable = true),
+    StructField("reason",StringType, nullable = true),
+    StructField("record",StringType, nullable = true)
+  ))
 
   lazy private[overwatch] val auditMasterSchema = StructType(Seq(
     StructField("serviceName", StringType, nullable = false),
@@ -253,6 +259,7 @@ object Schema extends SparkSessionWrapper {
    * Gold Layer 3xxx
    */
   private[overwatch] val minimumSchemasByModule: Map[Int, StructType] = Map(
+    1006 -> auditMasterSchema,
     // SparkExecutors
     2003 -> sparkEventsRawMasterSchema,
     // SparkExecutions
@@ -318,7 +325,6 @@ object Schema extends SparkSessionWrapper {
       StructField("login_date", DateType, nullable = true),
       StructField("login_type", StringType, nullable = true),
       StructField("login_user", StringType, nullable = true),
-      StructField("user_id", StringType, nullable = true),
       StructField("user_email", StringType, nullable = true),
       StructField("ssh_login_details", StructType(Seq(
         StructField("instance_id", StringType, nullable = true)
@@ -424,7 +430,7 @@ object Schema extends SparkSessionWrapper {
     ))
   )
 
-  def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleID)
+  def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleId)
 
   def get(moduleId: Int): Option[StructType] = minimumSchemasByModule.get(moduleId)
 }

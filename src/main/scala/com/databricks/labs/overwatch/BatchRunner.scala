@@ -36,6 +36,7 @@ object BatchRunner extends SparkSessionWrapper{
     logger.log(Level.INFO, "Starting Gold")
     Gold(workspace).run()
 
+
   }
 
 
