@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import java.io.FileNotFoundException
-import java.time.{LocalDate, LocalDateTime}
+import java.time.{Duration, LocalDate, LocalDateTime}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
@@ -637,8 +637,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def collectEventLogPaths(
-                                      fromTimeEpochMillis: Long,
-                                      untilTimeEpochMillis: Long,
+                                      fromTime: TimeTypes,
+                                      untilTime: TimeTypes,
                                       processedEventLogFiles: PipelineTable,
                                       clusterSnapshot: PipelineTable,
                                       isFirstRun: Boolean
@@ -648,6 +648,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "number of new paths.")
 
     val coreCount = getTotalCores
+    val fromTimeEpochMillis = fromTime.asUnixTimeMilli
+    val untilTimeEpochMillis = untilTime.asUnixTimeMilli
+    val fromDate = fromTime.asLocalDateTime.toLocalDate
+    val untilDate = untilTime.asLocalDateTime.toLocalDate
+    val daysToProcess = Duration.between(fromDate.atStartOfDay(), untilDate.plusDays(1L).atStartOfDay())
+      .toDays.toInt
+
+    // Shoot for partitions coreCount < 16 partitions per day < 576
+    // This forces autoscaling clusters to scale up appropriately to handle the volume
+    val optimizeParCount = math.min(math.max(coreCount, daysToProcess * 16), 576)
 
     // baseline of clusters from incremental audit logs
     // Incremental throughout this function means the incrementally loaded data between time x and time y
@@ -714,12 +724,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // all files considered for ingest
     allEventLogPrefixes
-      .repartition(coreCount)
+      .repartition(optimizeParCount)
       .as[String]
       .map(Helpers.parListFiles) // parallelized file lister since large / shared / long-running (months) clusters will have MANy paths
       .select(explode('value).alias("logPathPrefix"))
       .withColumn("logPathPrefix", concat_ws("/", 'logPathPrefix, lit("*"), lit("eventlo*")))
-      .repartition(coreCount)
+      .repartition(optimizeParCount)
       .as[String]
       .map(p => Helpers.globPath(p, Some(fromTimeEpochMillis), Some(untilTimeEpochMillis)))
       .select(explode('value).alias("simpleFileStatus"))
