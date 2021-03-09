@@ -103,7 +103,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendExecutorsProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(executorsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Some(Seq(executor())),
+    Seq(executor()),
     append(SilverTargets.executorsTarget)
   )
 
@@ -119,7 +119,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendExecutionsProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(executionsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Some(Seq(sqlExecutions())),
+    Seq(sqlExecutions()),
     append(SilverTargets.executionsTarget)
   )
 
@@ -127,7 +127,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendSparkJobsProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(sparkJobsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Some(Seq(sparkJobs())),
+    Seq(sparkJobs()),
     append(SilverTargets.jobsTarget)
   )
 
@@ -135,7 +135,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendSparkStagesProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(sparkStagesModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Some(Seq(sparkStages())),
+    Seq(sparkStages()),
     append(SilverTargets.stagesTarget)
   )
 
@@ -143,21 +143,21 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendSparkTasksProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(sparkTasksModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Some(Seq(sparkTasks())),
+    Seq(sparkTasks()),
     append(SilverTargets.tasksTarget)
   )
 
   private val jobStatusModule = Module(2010, "Silver_JobsStatus", this, Array(1004))
   lazy private val appendJobStatusProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, auditLogsIncrementalCols),
-    Some(Seq(dbJobsStatusSummary())),
+    Seq(dbJobsStatusSummary()),
     append(SilverTargets.dbJobsStatusTarget)
   )
 
   private val jobRunsModule = Module(2011, "Silver_JobsRuns", this, Array(1004, 2010, 2014))
   lazy private val appendJobRunsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, auditLogsIncrementalCols, 2),
-    Some(Seq(
+    Seq(
       dbJobRunsSummary(
         BronzeTargets.auditLogsTarget.withMinimumSchemaEnforcement.asDF,
         SilverTargets.clustersSpecTarget,
@@ -167,39 +167,39 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         jobRunsModule.fromTime.asColumnTS,
         jobRunsModule.fromTime.asUnixTimeMilli
       )
-    )),
+    ),
     append(SilverTargets.dbJobRunsTarget)
   )
 
   private val clusterSpecModule = Module(2014, "Silver_ClusterSpec", this, Array(1004))
   lazy private val appendClusterSpecProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, auditLogsIncrementalCols),
-    Some(Seq(
+    Seq(
       buildClusterSpec(
         BronzeTargets.clustersSnapshotTarget,
         BronzeTargets.auditLogsTarget
-      ))),
+      )),
     append(SilverTargets.clustersSpecTarget)
   )
 
   private val accountLoginsModule = Module(2016, "Silver_AccountLogins", this, Array(1004))
   lazy private val appendAccountLoginsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(accountLoginsModule, auditLogsIncrementalCols),
-    Some(Seq(accountLogins())),
+    Seq(accountLogins()),
     append(SilverTargets.accountLoginTarget)
   )
 
   private val modifiedAccountsModule = Module(2017, "Silver_ModifiedAccounts", this, Array(1004))
   lazy private val appendModifiedAccountsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(modifiedAccountsModule, auditLogsIncrementalCols),
-    Some(Seq(accountMods())),
+    Seq(accountMods()),
     append(SilverTargets.accountModTarget)
   )
 
   private val notebookSummaryModule = Module(2018, "Silver_Notebooks", this, Array(1004))
   lazy private val appendNotebookSummaryProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(notebookSummaryModule, auditLogsIncrementalCols),
-    Some(Seq(notebookSummary())),
+    Seq(notebookSummary()),
     append(SilverTargets.notebookStatusTarget)
   )
 

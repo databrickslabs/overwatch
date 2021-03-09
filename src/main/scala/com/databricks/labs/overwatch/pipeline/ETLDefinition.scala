@@ -6,7 +6,7 @@ import org.apache.spark.sql.{AnalysisException, DataFrame}
 
 class ETLDefinition(
                      _sourceDF: DataFrame,
-                     transforms: Option[Seq[DataFrame => DataFrame]],
+                     transforms: Seq[DataFrame => DataFrame],
                      write: (DataFrame, Module) => ModuleStatusReport
                    ) {
 
@@ -15,7 +15,7 @@ class ETLDefinition(
 
   def copy(
             _sourceDF: DataFrame = sourceDF,
-            transforms: Option[Seq[DataFrame => DataFrame]] = transforms,
+            transforms: Seq[DataFrame => DataFrame] = transforms,
             write: (DataFrame, Module) => ModuleStatusReport = write): ETLDefinition = {
     new ETLDefinition(_sourceDF, transforms, write)
   }
@@ -25,15 +25,11 @@ class ETLDefinition(
                   verifiedSourceDF: DataFrame = sourceDF
                 ): ModuleStatusReport = {
 
-    if (transforms.nonEmpty) {
-      val transformedDF = transforms.get.foldLeft(verifiedSourceDF) {
-        case (df, transform) =>
-          df.transform(transform)
-      }
-      write(transformedDF, module)
-    } else {
-      write(verifiedSourceDF, module)
+    val transformedDF = transforms.foldLeft(verifiedSourceDF) {
+      case (df, transform) =>
+        df.transform(transform)
     }
+    write(transformedDF, module)
   }
 
 }
@@ -41,12 +37,23 @@ class ETLDefinition(
 object ETLDefinition {
 
   def apply(sourceDF: DataFrame,
-            transforms: Option[Seq[DataFrame => DataFrame]],
+            transforms: Seq[DataFrame => DataFrame],
             write: (DataFrame, Module) => ModuleStatusReport): ETLDefinition = {
 
     new ETLDefinition(
       sourceDF,
       transforms,
+      write
+    )
+
+  }
+
+  def apply(sourceDF: DataFrame,
+            write: (DataFrame, Module) => ModuleStatusReport): ETLDefinition = {
+
+    new ETLDefinition(
+      sourceDF,
+      Seq(),
       write
     )
 

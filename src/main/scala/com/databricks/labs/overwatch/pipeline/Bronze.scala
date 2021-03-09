@@ -21,21 +21,20 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess = ETLDefinition(
     workspace.getJobsDF,
-    None,
     append(BronzeTargets.jobsSnapshotTarget)
   )
 
   lazy private val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
   lazy private val appendClustersAPIProcess = ETLDefinition(
     workspace.getClustersDF,
-    Some(Seq(cleanseRawClusterSnapDF(config.cloudProvider))),
+    Seq(cleanseRawClusterSnapDF(config.cloudProvider)),
     append(BronzeTargets.clustersSnapshotTarget)
   )
 
   lazy private val poolsSnapshotModule = Module(1003, "Bronze_Pools", this)
   lazy private val appendPoolsProcess = ETLDefinition(
     workspace.getPoolsDF,
-    Some(Seq(cleanseRawPoolsDF())),
+    Seq(cleanseRawPoolsDF()),
     append(BronzeTargets.poolsTarget)
   )
 
@@ -52,7 +51,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       config.runID,
       config.organizationId
     ),
-    None,
     append(BronzeTargets.auditLogsTarget)
   )
 
@@ -65,14 +63,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       config.apiEnv,
       config.organizationId
     ),
-    None,
     append(BronzeTargets.clusterEventsTarget)
   )
 
   lazy private val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols: _*),
-    Some(Seq(
+    Seq(
       collectEventLogPaths(
         sparkEventLogsModule.fromTime.asUnixTimeMilli,
         sparkEventLogsModule.untilTime.asUnixTimeMilli,
@@ -88,7 +85,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.runID,
         pipelineSnapTime.asColumnTS
       ) //,
-    )),
+    ),
     append(BronzeTargets.sparkEventLogsTarget) // Not new data only -- date filters handled in function logic
   )
 
