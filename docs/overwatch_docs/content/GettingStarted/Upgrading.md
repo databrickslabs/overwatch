@@ -5,5 +5,5 @@ draft: true
 weight: 5
 ---
 
-## Place Holder
-This section will describe the process for schema upgrades for post 1.0 upgrades
+## Performing your Upgrade
+This section will be populated when the first schema upgrade is released for Overwatch.

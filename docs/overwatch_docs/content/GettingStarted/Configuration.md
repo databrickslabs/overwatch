@@ -44,7 +44,7 @@ private val overwatchModules = "audit,accounts,sparkEvents,jobs,clusters,cluster
 val params = OverwatchParams(auditLogConfig)
 ```
 
-### Azure Example
+### Azure Example (Full)
 Azure does require an event hub to be set up and referenced in the config as an 
 [AzureAuditLogEventhubConfig](#azureauditlogeventhubconfig). More details for setting up this Event Hub
 can be found in the [Azure Environment Setup]({{%relref "EnvironmentSetup/azure.md"%}}) page.
@@ -77,11 +77,12 @@ val params = OverwatchParams(
   badRecordsPath = Some(s"/tmp/${etlDB}/sparkEventsBadrecords"),
   overwatchScope = Some(overwatchModules),
   maxDaysToLoad = 30,
+  primordialDateString = Some("2021-01-01"),
   databricksContractPrices = databricksContractPrices
 )
 ```
 
-### AWS Example
+### AWS Example (Full)
 ```scala
 import com.databricks.labs.overwatch.pipeline.{Initializer, Bronze, Silver, Gold}
 import com.databricks.labs.overwatch.utils._
@@ -105,6 +106,7 @@ val params = OverwatchParams(
   badRecordsPath = Some(s"/tmp/overwatch/sparkEventsBadrecords"),
   overwatchScope = Some(overwatchModules),
   maxDaysToLoad = 60,
+  primordialDateString = Some("2021-01-01"),
   databricksContractPrices = databricksContractPrices
 )
 ```
@@ -120,6 +122,7 @@ Config | Required Override | Default Value | Type | Description
 **badRecordsPath**|N|/tmp/overwatch/badRecordsPath|Option\[String\]|When reading the log files, where should Overwatch store the records / files that cannot be parsed. Overwatch must have write permissions to this path 
 **overwatchScope**|N|all|Option\[Seq\[String\]\]|List of [modules]({{%relref "GettingStarted/Modules.md"%}}) in scope for the run. It's important to note that there are many co-dependencies. When choosing a module, be sure to also enable it's requisites. If not value provided, all modules will execute.
 **maxDaysToLoad**|N|60|Int|On large, busy workspaces 60 days of data may amount in 10s of TB of raw data. This parameter allows the job to be broken out into several smaller runs.
+**primordialDateString**|N|Today's date minus 60 days, format = "yyyy-mm-dd"|String|Date from which data collection was to begin. This is the earliest date for which data should attempted to be collected.
 **databricksContractPrices**|N|DatabricksContractPrices(0.56, 0.26)|[DatabricksContractPrices](#databrickscontractprices)|Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the *instanceDetails* consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices(). 
 
 ### AuditLogConfig
