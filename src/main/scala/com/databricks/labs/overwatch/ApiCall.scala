@@ -54,27 +54,27 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   // Causing a padding error -- seemingly getting corrupted inside the class instance
   // or it could be from parallelization
-  private def decryptToken(retry: Int = 0): this.type = {
-    try {
-      val cipher = env.cipher
-      val encryptedToken = env.encryptedToken
-      val decryptedToken = cipher.decrypt(encryptedToken)
-      if (!decryptedToken.matches("^dapi[a-zA-Z0-9]{32}$")) {
-        if (retry <= 10) {decryptToken(retry + 1)}
-        else {
-          throw new TokenError(s"Could not decrypt token! Erroring: ${_apiName}")
-        }
-      } else {
-        _decryptedToken = decryptedToken
-        this
-      }
-    } catch { // place holder until the encrypted token can be resolved
-      case e: Throwable => {
-        logger.log(Level.ERROR, e)
-        this
-      }
-    }
-  }
+//  private def decryptToken(retry: Int = 0): this.type = {
+//    try {
+//      val cipher = env.cipher
+//      val encryptedToken = env.encryptedToken
+//      val decryptedToken = cipher.decrypt(encryptedToken)
+//      if (!decryptedToken.matches("^dapi[a-zA-Z0-9]{32}$")) {
+//        if (retry <= 10) {decryptToken(retry + 1)}
+//        else {
+//          throw new TokenError(s"Could not decrypt token! Erroring: ${_apiName}")
+//        }
+//      } else {
+//        _decryptedToken = decryptedToken
+//        this
+//      }
+//    } catch { // place holder until the encrypted token can be resolved
+//      case e: Throwable => {
+//        logger.log(Level.ERROR, e)
+//        this
+//      }
+//    }
+//  }
 
   private def setApiName(value: String): this.type = {
     _apiName = value

@@ -61,7 +61,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     Seq(
       // Retrieve cluster states for current time period plus 2 days for lagging states
       buildJobRunCostPotentialFact(
-        GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date_state_start"),
+        GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 90, "date_state_start"),
         // Lookups
         GoldTargets.clusterTarget.asDF,
         BronzeTargets.cloudMachineDetail.asDF,

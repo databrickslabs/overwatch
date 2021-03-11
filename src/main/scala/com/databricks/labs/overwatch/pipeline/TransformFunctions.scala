@@ -1,12 +1,14 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, ValidatedColumn, TSDF}
+import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
+
+import java.time.LocalDate
 
 object TransformFunctions {
 
@@ -107,6 +109,10 @@ object TransformFunctions {
   def getAlias(ds: Dataset[_]): Option[String] = ds.queryExecution.analyzed match {
     case SubqueryAlias(alias, _) => Some(alias.identifier)
     case _ => None
+  }
+
+  def datesStream(fromDate: LocalDate): Stream[LocalDate] = {
+    fromDate #:: datesStream(fromDate plusDays 1)
   }
 
   /**

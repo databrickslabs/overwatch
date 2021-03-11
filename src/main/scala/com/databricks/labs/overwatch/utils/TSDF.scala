@@ -36,7 +36,7 @@ sealed trait TSDF {
                leftPrefix: String = "",
                rightPrefix: String = "right_",
                maxLookback: Long = Window.unboundedPreceding,
-               maxLookAhead: Long = Window.unboundedFollowing,
+               maxLookAhead: Long = Window.currentRow,
                tsPartitionVal: Int = 0,
                fraction: Double = 0.1): TSDF
 
@@ -44,7 +44,7 @@ sealed trait TSDF {
                  leftPrefix: String = "",
                  rightPrefix: String = "right_",
                  maxLookback: Long = Window.unboundedPreceding,
-                 maxLookAhead: Long = Window.unboundedFollowing,
+                 maxLookAhead: Long = Window.currentRow,
                  tsPartitionVal: Int = 0,
                  fraction: Double = 0.1): TSDF
 

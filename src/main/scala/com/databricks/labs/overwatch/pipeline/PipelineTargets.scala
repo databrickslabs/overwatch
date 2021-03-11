@@ -354,6 +354,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("cluster_id", "unixTimeMS"),
       config,
       incrementalColumns = Array("unixTimeMS_state_start"),
+      zOrderBy = Array("unixTimeMS_state_start", "cluster_id"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 

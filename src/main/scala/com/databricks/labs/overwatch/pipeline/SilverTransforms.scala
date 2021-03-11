@@ -1,18 +1,22 @@
 package com.databricks.labs.overwatch.pipeline
 
 import java.util.UUID
-import com.databricks.labs.overwatch.utils.{Config, NoNewDataException, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{ApiEnv, Config, NoNewDataException, SchemaTools, SparkSessionWrapper}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import TransformFunctions._
+import com.databricks.labs.overwatch.ApiCall
+
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 trait SilverTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
-
+  private val logger: Logger = Logger.getLogger(this.getClass)
   private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
 
   //  final private val orgId = dbutils.notebook.getContext.tags("orgId")
@@ -676,6 +680,7 @@ trait SilverTransforms extends SparkSessionWrapper {
                                  clusterSnapshot: PipelineTable,
                                  jobsStatus: PipelineTable,
                                  jobsSnapshot: PipelineTable,
+                                 apiEnv: ApiEnv,
                                  etlStartTime: Column,
                                  etlStartEpochMS: Long)(df: DataFrame): DataFrame = {
 
@@ -700,12 +705,25 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobsAuditIncremental = getJobsBase(df)
 
+    /**
+     * JOBS-1709 -- JAWS team should fix multiple event emissions. If they do, this can be removed for a perf gain
+     * but for now, this is required or multiple records will be created in the fact due to the multiple events.
+     * Confirmed that the first event emitted is the correct event as per ES-65402
+     */
+    val firstRunSubmitW = Window.partitionBy('runId).orderBy('timestamp)
+    val firstCompletionW = Window.partitionBy('runId).orderBy('timestamp)
+    val firstRunStartW = Window.partitionBy('runId).orderBy('timestamp)
+    val firstCancellationW = Window.partitionBy('run_id).orderBy('timestamp)
+
     // Completes must be >= etlStartTime as it is the driver endpoint
     // All joiners to Completes may be from the past up to N days as defined in the incremental df
     // Identify all completed jobs in scope for this overwatch run
     val allCompletes = jobsAuditIncremental
       .filter('date >= etlStartTime.cast("date") && 'timestamp >= lit(etlStartEpochMS))
       .filter('actionName.isin("runSucceeded", "runFailed"))
+      .withColumn("rnk", rank().over(firstCompletionW))
+      .withColumn("rn", row_number().over(firstCompletionW))
+      .filter('rnk === 1 && 'rn === 1)
       .select(
         'serviceName, 'actionName,
         'organization_id,
@@ -724,6 +742,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Identify all cancelled jobs in scope for this overwatch run
     val allCancellations = jobsAuditIncremental
       .filter('actionName.isin("cancel"))
+      .withColumn("rnk", rank().over(firstCancellationW))
+      .withColumn("rn", row_number().over(firstCancellationW))
+      .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
         'run_id.cast("long").alias("runId"),
@@ -766,9 +787,13 @@ trait SilverTransforms extends SparkSessionWrapper {
     // DF for jobs launched with actionName == "submitRun"
     val runSubmitStart = jobsAuditIncremental
       .filter('actionName.isin("submitRun"))
+      .withColumn("runId", get_json_object($"response.result", "$.run_id").cast("long"))
+      .withColumn("rnk", rank().over(firstRunSubmitW))
+      .withColumn("rn", row_number().over(firstRunSubmitW))
+      .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
-        get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
+        'runId,
         'run_name,
         'timestamp.alias("submissionTime"),
         'new_cluster, 'existing_cluster_id,
@@ -787,7 +812,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         'response.alias("submitResponse"),
         'userAgent.alias("submitUserAgent"),
         'userIdentity.alias("submittedBy")
-      ).filter('runId.isNotNull)
+      )
+      .filter('runId.isNotNull)
 
     // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
     val allSubmissions = runNowStart
@@ -796,6 +822,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Find the corresponding runStart action for the completed jobs
     val runStarts = jobsAuditIncremental
       .filter('actionName.isin("runStart"))
+      .withColumn("rnk", rank().over(firstRunStartW))
+      .withColumn("rn", row_number().over(firstRunStartW))
+      .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
         'runId,
@@ -899,8 +928,55 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
       .withColumn("timestamp", $"jobRunTime.endEpochMS")
 
+    /**
+     * ES-74247 requires hit to API for notebook jobs running on existing clusters. PR submitted and will be
+     * rolled into 3.42 but until then, this is the hack around.
+     */
+
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(24))
+    val jrWFilledClusterIDs = jobRunsBase
+      .filter('jobClusterType === "existing")
+      .filter('jobTaskType === "notebook" && 'clusterId.isNull)
+      .filter(datediff(
+        from_unixtime(lit(System.currentTimeMillis().toDouble / 1000)).cast("timestamp").cast("date"),
+        $"jobRunTime.startTS".cast("date")) <= 67
+      )
+      .select('runId)
+      .distinct()
+      .as[Long]
+      .collect()
+      .par
+
+    jrWFilledClusterIDs.tasksupport = taskSupport
+
+    logger.log(Level.INFO, s"RUN_IDs staged for api grabber: ${jrWFilledClusterIDs.mkString(", ")}")
+
+    val runIdStrings = jrWFilledClusterIDs
+      .flatMap(runId => {
+        try {
+          val q = Map(
+            "run_id" -> runId
+          )
+          val runIDString = ApiCall("jobs/runs/get", apiEnv, Some(q), paginate = false)
+            .executeGet().asStrings
+          logger.log(Level.INFO, s"API CALL SUCCESS: RUN_ID == $runId")
+          runIDString
+        } catch {
+          case e: Throwable =>
+            logger.log(Level.ERROR, s"API CALL FAILED: RUN_ID == $runId --> ${e.getMessage}")
+            Array[String]()
+        }
+      })
+      .toArray
+
+    val notebookJobsWithClusterIDs = spark.read.json(Seq(runIdStrings: _*).toDS())
+      .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
+
     val jrBaseExisting = jobRunsBase
       .filter('jobClusterType === "existing")
+      .join(notebookJobsWithClusterIDs, Seq("runId"), "left")
+      .withColumn("clusterId", when('jobTaskType === "notebook" && 'clusterId.isNull, 'cluster_id_apiLookup).otherwise('clusterId))
+      .drop("cluster_id_apiLookup")
 
     val automatedJobRunsBase = jobRunsBase
       .filter('jobClusterType === "new")
@@ -1036,10 +1112,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter(get_json_object('workflow_context, "$.root_run_id").isNotNull)
 
     val childRunsForNesting = childJobRuns
-      .withColumn("children", struct(childJobRuns.schema.fieldNames map col: _*))
+      .withColumn("child", struct(childJobRuns.schema.fieldNames map col: _*))
       .select(
-        get_json_object('workflow_context, "$.root_run_id").alias("runId"), 'children
+        get_json_object('workflow_context, "$.root_run_id").alias("runId"), 'child
       )
+      .groupBy('runId)
+      .agg(collect_list('child).alias("children"))
 
     val jobRunsFinal = jobRunsWMeta
       .join(childRunsForNesting, Seq("runId"), "left")
