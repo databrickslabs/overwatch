@@ -1,10 +1,11 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Frequency, IncrementalFilter, NoNewDataException, SparkSessionWrapper, UnhandledException, UnsupportedTypeException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.functions._
+import TransformFunctions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
@@ -19,9 +20,10 @@ case class PipelineTable(
                           dataFrequency: Frequency = Frequency.milliSecond,
                           format: String = "delta", // TODO -- Convert to Enum
                           mode: String = "append", // TODO -- Convert to Enum
+                          _databaseName: String = "default",
                           autoOptimize: Boolean = false,
                           autoCompact: Boolean = false,
-                          partitionBy: Array[String] = Array(),
+                          partitionBy: Seq[String] = Seq(),
                           statsColumns: Array[String] = Array(),
                           shuffleFactor: Double = 1.0,
                           optimizeFrequency: Int = 24 * 7,
@@ -32,7 +34,8 @@ case class PipelineTable(
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true,
                           isTemp: Boolean = false,
-                          checkpointPath: Option[String] = None
+                          checkpointPath: Option[String] = None,
+                          masterSchema: Option[StructType] = None
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -40,7 +43,8 @@ case class PipelineTable(
 
   import spark.implicits._
 
-  //  col("c").get
+  val databaseName: String = if (_databaseName == "default") config.databaseName else config.consumerDatabaseName
+
   private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
     val dbCatalog = try {
       Some(spark.sessionState.catalog.getDatabaseMetadata(config.databaseName))
@@ -56,7 +60,7 @@ case class PipelineTable(
     (dbCatalog, dbCatalog)
   } else (None, None)
 
-  val tableFullName: String = s"${config.databaseName}.${name}"
+  val tableFullName: String = s"${databaseName}.${name}"
 
   if (autoOptimize) {
     spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
@@ -70,9 +74,33 @@ case class PipelineTable(
   }
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
 
+  // Minimum Schema Enforcement Management
+  private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
+  private var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
+  private def emitMissingMasterSchemaMessage: Unit = {
+    val msg = s"No Master Schema defined for Table $tableFullName"
+    logger.log(Level.ERROR, msg)
+    if (config.debugFlag) println(msg)
+  }
+
+  private[overwatch] def withMinimumSchemaEnforcement: this.type = withMinimumSchemaEnforcement(true)
+  private[overwatch] def withMinimumSchemaEnforcement(value: Boolean): this.type = {
+    if (masterSchema.nonEmpty) withMasterMinimumSchema = value
+    else emitMissingMasterSchemaMessage // cannot enforce master schema if not defined
+    this
+  }
+
+  private[overwatch] def enforceNullableRequirements: this.type = enforceNullableRequirements(true)
+  private[overwatch] def enforceNullableRequirements(value: Boolean): this.type = {
+    if (masterSchema.nonEmpty && exists) enforceNonNullable = value
+    else emitMissingMasterSchemaMessage // cannot enforce master schema if not defined
+    this
+  }
+
   /**
    * This EITHER appends/changes the spark overrides OR sets them. This can only set spark params if updates
    * are not passed --> setting the spark conf is really mean to be private action
+   *
    * @param updates spark conf updates
    */
   private[overwatch] def setSparkOverrides(updates: Map[String, String] = Map()): Unit = {
@@ -80,76 +108,116 @@ case class PipelineTable(
       currentSparkOverrides = currentSparkOverrides ++ updates
     }
     if (sparkOverrides.nonEmpty && updates.isEmpty) {
-      currentSparkOverrides foreach { case (k, v) =>
-        try {
-          if (config.debugFlag && spark.conf.get(k) != v)
-            println(s"Overriding $k from ${spark.conf.get(k)} --> $v")
-          spark.conf.set(k, v)
-        } catch {
-          case e: AnalysisException =>
-            logger.log(Level.WARN, s"Cannot Set Spark Param: ${k}", e)
-            if (config.debugFlag) println(s"Failed Setting $k", e)
-          case e: Throwable =>
-            if (config.debugFlag) println(s"Failed Setting $k", e)
-            logger.log(Level.WARN, s"Failed trying to set $k", e)
-        }
-      }
+      PipelineFunctions.setSparkOverrides(spark, currentSparkOverrides, config.debugFlag)
     }
   }
-
-  // TODO -- Add partition filter
-//  private def buildIncrementalDF(df: DataFrame, filter: IncrementalFilter): DataFrame = {
-//    val low = filter.low
-//    val high = filter.high
-//    val incrementalFilters = incrementalColumns.map(c => {
-//      df.schema.fields.filter(_.name == c).head.dataType match {
-//        case _: TimestampType => col(c).between(addOneTick(low.asColumnTS), high.asColumnTS)
-//        case _: DateType => {
-//          val maxVal = df.select(max(c)).as[String].collect().head
-//          col(c).between(addOneTick(lit(maxVal).cast("date"), DateType), high.asColumnTS.cast("date"))
-//        }
-//        case _: LongType => col(c).between(low.asUnixTimeMilli + 1, high.asUnixTimeMilli)
-//        case _: DoubleType => col(c).between(low.asUnixTimeMilli + 0.001, high.asUnixTimeMilli)
-//        case _: BooleanType => col(c) === lit(false)
-//        case dt: DataType =>
-//          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
-//      }
-//    })
-//
-//    incrementalFilters.foldLeft(df) {
-//      case (rawDF, incrementalFilter) =>
-//        rawDF.filter(incrementalFilter)
-//    }
-//
-//  }
 
   def exists: Boolean = {
     spark.catalog.tableExists(tableFullName)
   }
 
   def asDF: DataFrame = {
+    asDF()
+  }
+
+  def asDF(withGlobalFilters: Boolean = true): DataFrame = {
     try {
-      spark.table(tableFullName)
+      if (exists) {
+        val fullDF = if (withMasterMinimumSchema) { // infer master schema if true and available
+          logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for $tableFullName")
+          spark.table(tableFullName).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
+        } else spark.table(tableFullName)
+        if (withGlobalFilters && config.globalFilters.nonEmpty)
+          PipelineFunctions.applyFilters(fullDF, config.globalFilters)
+        else fullDF
+      } else spark.emptyDataFrame
     } catch {
       case e: AnalysisException =>
-        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
+        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist or cannot apply global filters. " +
+          s"Will attempt to continue", e)
         Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
     }
   }
 
-  // TODO - REMOVE try/catch???
-//  def asIncrementalDF(moduleID: Int): DataFrame = {
-//    try {
-//      buildIncrementalDF(spark.table(tableFullName), moduleID)
-//    } catch {
-//      case e: AnalysisException =>
-//        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist will attempt to continue", e)
-//        Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
-//    }
-//  }
+  @throws(classOf[UnhandledException])
+  def asIncrementalDF(module: Module, cronColumns: String*): DataFrame = {
+    asIncrementalDF(module, cronColumns, 0)
+  }
 
-  def asIncrementalDF(filters: Seq[IncrementalFilter]): DataFrame = {
-    PipelineFunctions.withIncrementalFilters(spark.table(tableFullName), filters)
+  @throws(classOf[UnhandledException])
+  def asIncrementalDF(module: Module, additionalLagDays: Int, cronColumns: String*): DataFrame = {
+    asIncrementalDF(module, cronColumns, additionalLagDays)
+  }
+
+  /**
+   * Build 1 or more incremental filters for a dataframe from standard start or aditionalStart less
+   * "additionalLagDays" when loading an incremental DF with some front-padding to capture lagging start events
+   *
+   * @param module            module used for logging and capturing status timestamps by module
+   * @param additionalLagDays Front-padded days prior to start
+   * @param cronColumnsNames  1 or many incremental columns
+   * @return Filtered Dataframe
+   */
+  def asIncrementalDF(
+                       module: Module,
+                       cronColumnsNames: Seq[String],
+                       additionalLagDays: Int = 0
+                     ): DataFrame = {
+    val moduleId = module.moduleId
+    val moduleName = module.moduleName
+
+    if (exists) {
+      val instanceDF = if (withMasterMinimumSchema) { // infer master schema if true and available
+        logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for Module: " +
+          s"$moduleId --> $moduleName for Table: $tableFullName")
+        spark.table(tableFullName).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
+      } else spark.table(tableFullName)
+      val dfFields = instanceDF.schema.fields
+      val cronCols = dfFields.filter(f => cronColumnsNames.contains(f.name))
+
+      if (additionalLagDays > 0) require(
+        dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
+        "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
+      val incrementalFilters = cronColumnsNames.map(filterCol => {
+
+        val field = cronCols.filter(_.name == filterCol).head
+
+        field.dataType match {
+          case dt: DateType => {
+            IncrementalFilter(
+              field.name,
+              date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays),
+              module.untilTime.asColumnTS.cast(dt)
+            )
+          }
+          case dt: TimestampType => {
+            val start = if (additionalLagDays > 0) {
+              val epochMillis = module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
+              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(dt)
+            } else {
+              module.fromTime.asColumnTS
+            }
+            IncrementalFilter(
+              field.name,
+              start,
+              module.untilTime.asColumnTS
+            )
+          }
+          case _: LongType => {
+            IncrementalFilter(field.name,
+              lit(module.fromTime.asUnixTimeMilli),
+              lit(module.untilTime.asUnixTimeMilli)
+            )
+          }
+          case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
+            s"a filter containing a ${field.dataType.typeName} type. ONLY Timestamp, Date, and Long types are supported.")
+        }
+      })
+
+      PipelineFunctions.withIncrementalFilters(instanceDF, module, incrementalFilters, config.globalFilters, dataFrequency)
+    } else { // Source doesn't exist
+      spark.emptyDataFrame
+    }
   }
 
   def writer(df: DataFrame): Any = {

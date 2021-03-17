@@ -1,11 +1,13 @@
 package com.databricks.labs.overwatch.utils
 
+import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.IvParameterSpec
@@ -145,6 +147,16 @@ class Cipher(key: String) {
 object SchemaTools extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  def flattenSchema(df: DataFrame): Array[Column] = {
+    flattenSchema(df.schema)
+  }
+
+  /**
+   *
+   * @param schema
+   * @param prefix
+   * @return
+   */
   def flattenSchema(schema: StructType, prefix: String = null): Array[Column] = {
     schema.fields.flatMap(f => {
       val columnName = if (prefix == null) f.name else (prefix + "." + f.name)
@@ -156,6 +168,14 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+  /**
+   *
+   * TODO: should it handle things like Array/Map(Struct) ?
+   *
+   * @param schema
+   * @param prefix
+   * @return
+   */
   def getAllColumnNames(schema: StructType, prefix: String = null): Array[String] = {
     schema.fields.flatMap(f => {
       val columnName = if (prefix == null) f.name else (prefix + "." + f.name)
@@ -168,32 +188,56 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   def modifyStruct(structToModify: StructType, changeInventory: Map[String, Column], prefix: String = null): Array[Column] = {
-      structToModify.fields.map(f => {
-        val fullFieldName = if (prefix == null) f.name else (prefix + "." + f.name)
+    structToModify.fields.map(f => {
+      val fullFieldName = if (prefix == null) f.name else (prefix + "." + f.name)
 
-        f.dataType match {
-          case c: StructType => {
-            changeInventory.getOrElse(fullFieldName, struct(modifyStruct(c, changeInventory, prefix = fullFieldName): _*)).alias(f.name)
-          }
-          case _ => changeInventory.getOrElse(fullFieldName, col(fullFieldName)).alias(f.name)
+      f.dataType match {
+        case c: StructType => {
+          changeInventory.getOrElse(fullFieldName, struct(modifyStruct(c, changeInventory, prefix = fullFieldName): _*)).alias(f.name)
         }
-      })
+        case _ => changeInventory.getOrElse(fullFieldName, col(fullFieldName)).alias(f.name)
+      }
+    })
   }
 
-//  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
-//    //    val columnInventory = df.select(s"${structColToModify}.*").columns
-//    //    val newStructInventory = columnInventory.map(cName => )
-//    val columnInventory = getAllColumnNames(df.select(s"${structColToModify}.*").schema).map(cn => {
-//      if (cn.contains(".")) {
-//        cn.split("\\.").dropRight(1).mkString(".")
-//      } else { cn }
-//    }).distinct
-//    // returning flat columns, need to return the struct column and stop
-//    val newStructInventory = columnInventory.map(cName => {
-//      changeInventory.getOrElse(cName, col(s"${structColToModify}.${cName}")).alias(cName)
-//    })
-//    struct(newStructInventory: _*)
-//  }
+  def nestedColExists(df: DataFrame, dotPathOfField: String): Boolean = {
+    val dotPathAr = dotPathOfField.split("\\.")
+    val elder = dotPathAr.head
+    val children = dotPathAr.tail
+    val startField = df.schema.fields.find(_.name == elder)
+    try {
+      children.foldLeft(startField) {
+        case (f, childName) => {
+          if (f.nonEmpty) {
+            f.get.dataType match {
+              case child: StructType => child.find(_.name == childName)
+            }
+          } else None
+        }
+      }.nonEmpty
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.WARN, s"${children.takeRight(1).head} column not found in source DF, attempting to continue without it", e)
+        false
+      }
+    }
+    //    jobsSnapshot.asDF().schema.fields.filter(_.name == "settings").head.dataType.asInstanceOf[StructType].fields.filter(_.name == "existing_cluster_id").map(_.name).headOption
+  }
+
+  //  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
+  //    //    val columnInventory = df.select(s"${structColToModify}.*").columns
+  //    //    val newStructInventory = columnInventory.map(cName => )
+  //    val columnInventory = getAllColumnNames(df.select(s"${structColToModify}.*").schema).map(cn => {
+  //      if (cn.contains(".")) {
+  //        cn.split("\\.").dropRight(1).mkString(".")
+  //      } else { cn }
+  //    }).distinct
+  //    // returning flat columns, need to return the struct column and stop
+  //    val newStructInventory = columnInventory.map(cName => {
+  //      changeInventory.getOrElse(cName, col(s"${structColToModify}.${cName}")).alias(cName)
+  //    })
+  //    struct(newStructInventory: _*)
+  //  }
 
   // TODO -- How to remove keys with nulls from maps?
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
@@ -255,8 +299,11 @@ object SchemaTools extends SparkSessionWrapper {
    * @return
    */
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
+    val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
     val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
-    val fieldNames = fields.map(_.name.trim.toLowerCase())
+    val fieldNames = if (caseSensitive) {
+      fields.map(_.name.trim)
+    } else fields.map(_.name.trim.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
     val dupCount = dups.length
     if (dupCount == 0) {
@@ -270,7 +317,8 @@ object SchemaTools extends SparkSessionWrapper {
       logger.log(Level.WARN, warnMsg)
       val uniqueSuffixes = (0 to fields.length + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
       fields.zipWithIndex.map(f => {
-        if (dups.contains(f._1.name.toLowerCase())) {
+        val fieldName = if (caseSensitive) f._1.name else f._1.name.toLowerCase
+        if (dups.contains(fieldName)) {
           val generatedUniqueName = f._1.name + "_" + uniqueSuffixes(f._2)
           val uniqueColumnMapping = s"\n${f._1.name} --> ${generatedUniqueName}"
           println(uniqueColumnMapping)
@@ -305,6 +353,7 @@ object SchemaTools extends SparkSessionWrapper {
    * Main function for cleaning a schema. The point is to remove special characters and duplicates all the way down
    * into the Arrays / Structs.
    * TODO -- Add support for map type recursion cleansing
+   * TODO -- convert to same pattern as schema validation function
    *
    * @param df Input dataframe to be cleansed
    * @return
@@ -314,28 +363,222 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   /**
-   * Delta, by default, calculates statistics on the first 32 columns and there's no way to specify which columns
-   * on which to calc stats. Delta can be configured to calc stats on less than 32 columns but it still starts
-   * from left to right moving to the nth position as configured. This simplifies the migration of columns to the
-   * front of the dataframe to allow them to be "indexed" in front of others.
-   *
-   * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
-   * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
-   * array should be reversed before progressing through the logic
-   * 
-   * TODO -- change colsToMove to the Seq[String]....
-   * TODO: checks for empty list, for existence of columns, etc.
-   *  
-   * @param df Input dataframe
-   * @param colsToMove Array of column names to be moved to front of schema
-   * @return
+   * The next several set of functions are used to clean a schema with a minimum required set of fields as the guide.
+   * Rules will be documented later but this section will likely benefit from a refactor to a more complex object
    */
-  def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val allNames = df.schema.names
-    val newColumns = (colsToMove ++ (allNames.diff(colsToMove))).map(col)
-    df.select(newColumns: _*)
+  // TODO -- Review viability of similifying all schema functions within the SchemaHelpers object
+  //  during next refactor
+
+
+  private def getPrefixedString(prefix: Option[String], fieldName: String): String = {
+    if (prefix.isEmpty) fieldName else s"${prefix.get}.${fieldName}"
   }
 
+  private def isComplexDataType(dataType: DataType): Boolean = {
+    dataType.isInstanceOf[ArrayType] || dataType.isInstanceOf[StructType] || dataType.isInstanceOf[MapType]
+  }
+
+  private def emitExclusionWarning(f: StructField, isDebug: Boolean, prefix: Option[String]): Unit = {
+    val fullColName = getPrefixedString(prefix, f.name)
+
+    val msg = s"SCHEMA WARNING: COLUMN STRIPPED from source --> Column $fullColName is required to be absent from " +
+      s"source as it's type has been identified as a NullType"
+    logger.log(Level.DEBUG, msg)
+  }
+
+  private def malformedSchemaErrorMessage(f: StructField, req: StructField, prefix: Option[String]): String = {
+    val fullColName = getPrefixedString(prefix, f.name)
+    val requiredTypeName = req.dataType.typeName
+    val fieldTypeName = f.dataType.typeName
+
+    val oneComplexOneNot = (isComplexDataType(req.dataType) && !isComplexDataType(f.dataType)) ||
+      (!isComplexDataType(req.dataType) && isComplexDataType(f.dataType))
+
+    val bothComplex = isComplexDataType(req.dataType) || isComplexDataType(f.dataType)
+
+    val neitherComplex = !isComplexDataType(req.dataType) && !isComplexDataType(f.dataType)
+
+    val genericSchemaErrorMsg = s"SCHEMA ERROR: Received type $fieldTypeName for $fullColName BUT required type " +
+      s"is $requiredTypeName"
+    val unsupportedComplexCastingMsg = s"SCHEMA ERROR: Required Schema for column $fullColName is $requiredTypeName " +
+      s"but input type was $fieldTypeName. Implicit casting between / to / from complex types not supported."
+
+    // if one field is complex and the other is not, fail
+    //noinspection TypeCheckCanBeMatch
+    if (oneComplexOneNot) unsupportedComplexCastingMsg
+    else if (req.dataType.isInstanceOf[ArrayType] && requiredTypeName == fieldTypeName) {
+      // Both Array but Element Type not Equal
+      val reqElementTypeName = req.dataType.asInstanceOf[ArrayType].elementType.typeName
+      val fieldElementTypeName = f.dataType.asInstanceOf[ArrayType].elementType.typeName
+      if (reqElementTypeName != fieldElementTypeName) {
+        s"SCHEMA ERROR: Array element types incompatible: Received array<$fieldElementTypeName> when " +
+          s"array<$reqElementTypeName> is required for column $fullColName. Implicit casting of Array " +
+          s"element types is not supported."
+      } else unsupportedComplexCastingMsg // cannot cast array types
+    }
+    else if (bothComplex && req.dataType != f.dataType) unsupportedComplexCastingMsg // complex type casting not supported
+    else if (neitherComplex) { // both simple types -- will attempt to cast
+      val scalarCastMessage = s"SCHEMA WARNING: IMPLICIT CAST: Required Type for column: " +
+        s"$fullColName is $requiredTypeName but received $fieldTypeName. " +
+        s"Attempting to cast to required type but may result in unexpected nulls or loss of precision"
+      logger.log(Level.DEBUG, scalarCastMessage)
+      scalarCastMessage
+    } else genericSchemaErrorMsg
+  }
+
+  private def checkNullable(missingField: StructField, prefix: Option[String], isDebug: Boolean): Unit = {
+    val fullColName = getPrefixedString(prefix, missingField.name)
+
+    if (missingField.nullable) { // if nulls allowed
+      val msg = s"SCHEMA WARNING: Input DF missing required field $fullColName of type " +
+        s"${missingField.dataType.typeName}. There's either an error or relevant data doesn't exist in " +
+        s"your environment and/or was not acquired during the current run."
+      logger.log(Level.DEBUG, msg)
+    } else { // FAIL --> trying to null non-nullable field
+      val msg = s"SCHEMA ERROR: Required Field $fullColName is NON-NULLABLE but nulls were received. Failing module"
+      if (isDebug) println(msg)
+      logger.log(Level.ERROR, msg)
+      throw new BadSchemaException(msg)
+    }
+  }
+
+  private def malformedStructureHandler(f: StructField, req: StructField, prefix: Option[String]): Exception = {
+    val msg = malformedSchemaErrorMessage(f, req, prefix)
+    println(msg)
+    logger.log(Level.ERROR, msg)
+    new BadSchemaException(msg)
+  }
+
+  def buildValidationRunner(
+                             dfSchema: StructType,
+                             minRequiredSchema: StructType,
+                             enforceNonNullCols: Boolean = true,
+                             isDebug: Boolean = false,
+                             cPrefix: Option[String] = None
+                           ): Seq[ValidatedColumn] = {
+
+    // Some fields are force excluded from the complex types due to duplicates or issues in underlying
+    // data sources
+    val exclusionsFields = minRequiredSchema.fields.filter(f => f.dataType.isInstanceOf[NullType])
+    val exclusions = exclusionsFields.map(_.name.toLowerCase)
+    exclusionsFields.foreach(emitExclusionWarning(_, isDebug, cPrefix))
+
+    val dfFieldsNames = dfSchema.fieldNames.map(_.toLowerCase)
+    val reqFieldsNames = minRequiredSchema.fieldNames.map(_.toLowerCase)
+    val missingRequiredFieldNames = reqFieldsNames.diff(dfFieldsNames).diff(exclusions)
+    val unconstrainedFieldNames = dfFieldsNames.diff(reqFieldsNames).diff(exclusions)
+    val fieldsNamesRequiringValidation = dfFieldsNames.intersect(reqFieldsNames).diff(exclusions)
+
+    // find missing required fields, add, type, and alias them
+    val missingFields = minRequiredSchema.filter(child => missingRequiredFieldNames.contains(child.name.toLowerCase))
+      .map(missingChild => {
+        if (enforceNonNullCols) checkNullable(missingChild, cPrefix, isDebug)
+        ValidatedColumn(lit(null).cast(missingChild.dataType).alias(missingChild.name))
+      })
+
+    // fields without requirements
+    // test field and recurse at lower layer
+    val unconstrainedFields = dfSchema.filter(f => unconstrainedFieldNames.contains(f.name.toLowerCase))
+      .map(f => {
+        ValidatedColumn(col(getPrefixedString(cPrefix, f.name)))
+      })
+
+    // fields to validate
+    val fieldsToValidate = dfSchema.filter(f => fieldsNamesRequiringValidation.contains(f.name.toLowerCase))
+      .map(f => {
+        ValidatedColumn(
+          col(getPrefixedString(cPrefix, f.name)),
+          dfSchema.fields.find(_.name.toLowerCase == f.name.toLowerCase),
+          minRequiredSchema.fields.find(_.name.toLowerCase == f.name.toLowerCase)
+        )
+      })
+
+    missingFields ++ unconstrainedFields ++ fieldsToValidate
+
+  }
+
+  def validateSchema(
+                      validator: ValidatedColumn,
+                      cPrefix: Option[String] = None,
+                      enforceNonNullCols: Boolean = true,
+                      isDebug: Boolean = false
+                    ): ValidatedColumn = {
+
+    if (validator.requiredStructure.nonEmpty) { // is requirement on the field
+      val fieldStructure = validator.fieldToValidate.get
+      val requiredFieldStructure = validator.requiredStructure.get
+      val newPrefix = Some(getPrefixedString(cPrefix, fieldStructure.name))
+
+      fieldStructure.dataType match {
+        case dt: StructType => { // field is struct type
+          val dtStruct = dt.asInstanceOf[StructType]
+          if (!requiredFieldStructure.dataType.isInstanceOf[StructType]) // requirement is not struct field
+            throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
+
+          // When struct type matches identify requirements and recurse
+          val validatedChildren = buildValidationRunner(
+            dtStruct,
+            requiredFieldStructure.dataType.asInstanceOf[StructType],
+            enforceNonNullCols,
+            isDebug,
+            newPrefix
+          )
+            .map(validateSchema(_, newPrefix)) // TODO -- check if recursive prefix is right
+
+          // build and return struct
+          validator.copy(column = struct(validatedChildren.map(_.column): _*).alias(fieldStructure.name))
+
+        }
+        case dt: ArrayType => { // field is ArrayType
+          val dtArray = dt.asInstanceOf[ArrayType]
+          // field is array BUT requirement is NOT array --> throw error
+          if (!requiredFieldStructure.dataType.isInstanceOf[ArrayType])
+            throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
+
+          // array[complexType]
+          // if elementType is nested complex, recurse to validate and return array of validated children
+          dtArray.elementType match {
+            case eType: StructType =>
+              val validatedChildren = buildValidationRunner(
+                eType,
+                requiredFieldStructure.dataType.asInstanceOf[StructType],
+                enforceNonNullCols,
+                isDebug,
+                newPrefix
+              ).map(validateSchema(_, newPrefix))
+
+              // build and return array(struct)
+              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias(fieldStructure.name))
+
+            case eType =>
+              if (eType != requiredFieldStructure.dataType.asInstanceOf[ArrayType].elementType) { //element types don't match FAIL
+                throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
+              } else { // element types match
+                validator.copy(column = col(getPrefixedString(cPrefix, fieldStructure.name)).alias(fieldStructure.name))
+              }
+          }
+        }
+        // TODO -- add support for MapType
+        case scalarField => { // field is base scalar
+          if (isComplexDataType(requiredFieldStructure.dataType)) { // FAIL -- Scalar to Complex not supported
+            throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
+          }
+          if (scalarField != requiredFieldStructure.dataType) { // if not same type, try to cast column to the required type;
+            val warnMsg = malformedSchemaErrorMessage(fieldStructure, requiredFieldStructure, cPrefix)
+            logger.log(Level.WARN, warnMsg)
+            if (isDebug) println(warnMsg)
+            val mutatedColumnt = col(getPrefixedString(cPrefix, fieldStructure.name))
+              .cast(requiredFieldStructure.dataType).alias(fieldStructure.name)
+            validator.copy(column = mutatedColumnt)
+          } else { // colType is simple and passes requirements
+            validator.copy(column = col(getPrefixedString(cPrefix, fieldStructure.name)).alias(fieldStructure.name))
+          }
+        }
+      }
+    } else { // no validation required
+      validator
+    }
+  }
 }
 
 /**
@@ -360,43 +603,6 @@ object Helpers extends SparkSessionWrapper {
   }
 
 
-  /**
-   * Generates a complex time struct to simplify time conversions.
-   * TODO - Currently ony supports input as a unix epoch time in milliseconds, check for column input type
-   * and support non millis (Long / Int / Double / etc.)
-   * This function should also support input column types of timestamp and date as well for robustness
-   *
-   * @param start LongType input as a column
-   * @param end   TimestampType input as a column
-   * @return
-   */
-  def SubtractTime(start: Column, end: Column): Column = {
-    val runTimeMS = end - start
-    val runTimeS = runTimeMS / 1000
-    val runTimeM = runTimeS / 60
-    val runTimeH = runTimeM / 60
-    struct(
-      start.alias("startEpochMS"),
-      from_unixtime(start / 1000).cast("timestamp").alias("startTS"),
-      end.alias("endEpochMS"),
-      from_unixtime(end / 1000).cast("timestamp").alias("endTS"),
-      lit(runTimeMS).alias("runTimeMS"),
-      lit(runTimeS).alias("runTimeS"),
-      lit(runTimeM).alias("runTimeM"),
-      lit(runTimeH).alias("runTimeH")
-    ).alias("RunTime")
-  }
-
-  /**
-   * Converts string ts column from standard spark ts string format to unix epoch millis. The input column must be a
-   * string and must be in the format of yyyy-dd-mmTHH:mm:ss.SSSz
-   * @param tsStringCol
-   * @return
-   */
-  def stringtsToUnixMillis(tsStringCol: Column): Column = {
-    (unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)
-  }
-
   // TODO -- This is broken -- It looks like I may have to pass in the df.schema as well
   //
   //  def getLocalTime(ts: Column, tz: String): Column = {
@@ -415,9 +621,24 @@ object Helpers extends SparkSessionWrapper {
    * @return
    */
   def pathExists(path: String): Boolean = {
-    val conf = sc.hadoopConfiguration
-    val fs = FileSystem.get(conf)
+    val conf = new Configuration()
+    val fs = new Path(path).getFileSystem(conf)
     fs.exists(new Path(path))
+  }
+
+  /**
+   * Serialized / parallelized method for rapidly listing paths under a sub directory
+   * @param path
+   * @return
+   */
+  def parListFiles(path: String): Array[String] = {
+    try {
+      val conf = new Configuration()
+      val fs = new Path(path).getFileSystem(conf)
+      fs.listStatus(new Path(path)).map(_.getPath.toString)
+    } catch {
+      case e: Throwable => Array(path)
+    }
   }
 
   /**
@@ -426,33 +647,60 @@ object Helpers extends SparkSessionWrapper {
    * is ensuring spark is used to serialize it meaning make sure that it's called from the lambda of a Dataset
    *
    * TODO - This function can be easily enhanced to take in String* so that multiple, unrelated wildcards can be
-   *  globbed simultaneously
+   * globbed simultaneously
    *
    * @param path wildcard path as string
    * @return list of all paths contained within the wildcard path
    */
-  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[String] = {
+
+  case class PathStringFileStatus(
+                                   pathString: String,
+                                   fileCreateEpochMS: Option[Long],
+                                   fileSize: Option[Long],
+                                   withinSpecifiedTimeRange: Boolean,
+                                   failed: Boolean,
+                                   failMsg: Option[String]
+                                 )
+
+  def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[PathStringFileStatus] = {
     val conf = new Configuration()
-    val fs = new Path(path).getFileSystem(conf)
-    val paths = fs.globStatus(new Path(path))
-    logger.log(Level.DEBUG, s"${path} expanded in ${paths.length} files")
-    paths.map(wildString => {
-      val path = wildString.getPath
-      val pathString = path.toString
-      val fileModEpochMillis = if (fromEpochMillis.nonEmpty) {
-        Some(fs.listStatus(path).filter(_.isFile).head.getModificationTime)
-      } else None
-      (pathString, fileModEpochMillis)
-    }).filter(p => {
-      // Ensure that the last modified time of the file was between from --> until
-      if (p._2.nonEmpty) {
-        val lastModifiedTS = p._2.get
-        // TODO -- Switch to Debug
-        println(s"PROOF: ${fromEpochMillis.getOrElse(0)} <= ${lastModifiedTS} < ${untilEpochMillis.getOrElse(0)}")
-        (fromEpochMillis.nonEmpty && fromEpochMillis.get <= lastModifiedTS) &&
-        untilEpochMillis.nonEmpty && untilEpochMillis.get > lastModifiedTS
-      } else false
-    }).map(_._1)
+    try {
+      val fs = new Path(path).getFileSystem(conf)
+      val paths = fs.globStatus(new Path(path))
+      logger.log(Level.DEBUG, s"$path expanded in ${paths.length} files")
+      paths.map(wildString => {
+        val path = wildString.getPath
+        val pathString = path.toString
+        val fileStatusOp = fs.listStatus(path).find(_.isFile)
+        if (fileStatusOp.nonEmpty) {
+          val fileStatus = fileStatusOp.get
+          val lastModifiedTS = fileStatus.getModificationTime
+          val debugProofMsg = s"PROOF: $pathString --> ${fromEpochMillis.getOrElse(0L)} <= " +
+            s"${lastModifiedTS} < ${untilEpochMillis.getOrElse(Long.MaxValue)}"
+          logger.log(Level.DEBUG, debugProofMsg)
+          val isWithinSpecifiedRange = fromEpochMillis.getOrElse(0L) <= lastModifiedTS &&
+            untilEpochMillis.getOrElse(Long.MaxValue) > lastModifiedTS
+          PathStringFileStatus(pathString, Some(lastModifiedTS), Some(fileStatus.getLen), isWithinSpecifiedRange, failed = false, None)
+        } else {
+          val msg = s"Could not retrieve FileStatus for path: $pathString"
+          logger.log(Level.ERROR, msg)
+          // Return failed if timeframe specified but fileStatus is Empty
+          val isFailed = if (fromEpochMillis.nonEmpty || untilEpochMillis.nonEmpty) true else false
+          PathStringFileStatus(pathString, None, None, withinSpecifiedTimeRange = false, failed = isFailed, Some(msg))
+        }
+      })
+    } catch {
+      case e: AmazonS3Exception =>
+        val errMsg = s"ACCESS DENIED: " +
+          s"Cluster Event Logs at path ${path} are inaccessible with given the Databricks account used to run Overwatch. " +
+          s"Validate access & try again.\n${e.getMessage}"
+        logger.log(Level.ERROR, errMsg)
+        Array(PathStringFileStatus(path, None, None, withinSpecifiedTimeRange = false, failed = true, Some(errMsg)))
+      case e: Throwable =>
+        val msg = s"Failed to retrieve FileStatus for Path: $path. ${e.getMessage}"
+        logger.log(Level.ERROR, msg)
+        Array(PathStringFileStatus(path, None, None, withinSpecifiedTimeRange = false, failed = true, Some(msg)))
+    }
   }
 
   /**
@@ -466,9 +714,12 @@ object Helpers extends SparkSessionWrapper {
   // TODO: also, should be a flag showing if we should omit temporary tables, etc.
   def getTables(db: String): Array[String] = {
     try {
-      spark.sessionState.catalog.listTables(db).toDF.select(col("name")).as[String].collect()
+      // TODO: change to spark.sessionState.catalog.listTables(db).map(_.table).toArray
+      spark.sessionState.catalog.listTables(db).map(_.table).toArray
     } catch {
-      case _: Throwable => spark.catalog.listTables(db).rdd.map(row => row.name).collect()
+      case _: Throwable =>
+        // TODO: change to spark.catalog.listTables(db).select("name").as[String].collect()
+        spark.catalog.listTables(db).select("name").as[String].collect()
     }
   }
 
@@ -688,7 +939,11 @@ object Helpers extends SparkSessionWrapper {
   private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
     topPaths.map(p => {
       if (p.reverse.head.toString == "/") s"${p}*" else s"${p}/*"
-    }).flatMap(p => globPath(p)).toSeq.toDF("filesToDelete")
+    }).toSeq.toDF("pathsToDrop")
+      .as[String]
+      .map(p => Helpers.globPath(p))
+      .select(explode('value).alias("pathsToDrop"))
+      .select($"pathsToDrop.pathString")
       .as[String]
       .foreach(f => rmSer(f))
 

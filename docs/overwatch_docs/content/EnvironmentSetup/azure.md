@@ -13,7 +13,7 @@ environment configuration may be required in addition to the Basic Deployment.
 
 #### Basic Deployment
 * Audit Log Delivery
-    * At present the only supported method for audit log delivery is through Eventhub delivery in LogAnalytics. 
+    * At present the only supported method for audit log delivery is through Eventhub delivery via Azure Diagnostic Logging. 
     Overwatch will consume the events as a batch stream (Trigger.Once) once/period when the job runs. To configure 
     Eventhub to deliver these logs, follow the steps below.
     
@@ -68,7 +68,7 @@ perform all Overwatch tasks.
     
 #### With AD Passthrough Security Capture
 {{% notice info %}}
-Targeted Q1 2021 -- See [Roadmap]({{%relref "UserGuide/Roadmap.md"%}})
+Targeted Q1 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
 #### With Databricks Billable Usage Delivery Logs
@@ -78,7 +78,7 @@ This data can significantly enhance deeper level cost metrics. Even though Overw
 if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
 to load all the historical data from the day that you began receiving it. 
 {{% notice info %}}
-Targeted Q1 2021 -- See [Roadmap]({{%relref "UserGuide/Roadmap.md"%}})
+Targeted Q1 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
 #### With Cloud Provider Costs
@@ -90,10 +90,10 @@ opt-in to this feature. If you're interested in this feature and would like to p
 and/or Databricks Account Team.
 
 {{% notice info %}}
-Targeted 2021 -- See [Roadmap]({{%relref "UserGuide/Roadmap.md"%}})
+Targeted 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
 #### Realtime Enablement
 {{% notice info %}}
-2021 Feature Release -- See [Roadmap]({{%relref "UserGuide/Roadmap.md"%}})
+2021 Feature Release -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}

@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.pipeline.{Bronze, Initializer, Silver}
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Silver}
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.log4j.{Level, Logger}
 
@@ -10,6 +10,7 @@ object BatchRunner extends SparkSessionWrapper{
 
   private def setGlobalDeltaOverrides(): Unit = {
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
+    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 128)
   }
 
   def main(args: Array[String]): Unit = {
@@ -31,6 +32,9 @@ object BatchRunner extends SparkSessionWrapper{
 
     logger.log(Level.INFO, "Starting Silver")
     Silver(workspace).run()
+
+    logger.log(Level.INFO, "Starting Gold")
+    Gold(workspace).run()
 
 
   }

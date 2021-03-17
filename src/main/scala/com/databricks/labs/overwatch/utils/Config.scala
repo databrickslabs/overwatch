@@ -1,28 +1,33 @@
 package com.databricks.labs.overwatch.utils
 
-import java.text.SimpleDateFormat
-import java.time.temporal.ChronoUnit
-import java.time.{LocalDate, LocalDateTime, LocalTime, ZoneId, ZoneOffset}
+import java.time.{Duration, Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset}
 import java.util.{Calendar, Date, TimeZone, UUID}
-
-import org.apache.spark.sql.{Column, Dataset}
-import org.apache.spark.sql.functions.{from_unixtime, lit}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.Column
+import org.apache.spark.sql.functions.{col, from_unixtime, lit}
 
 class Config() {
 
+
+  // TODO -- Build Module Inventory Map that tracks state of each module
+  //  publish to it during finalizeModule / moduleErrors
+  //  check state during module Initialization and validate dependencies
+  //  Add config needs into function for validation DURING pipeline Process
   private final val _overwatchSchemaVersion = "0.1"
-  private final val _runID = UUID.randomUUID().toString.replace("-","")
+  private final val _runID = UUID.randomUUID().toString.replace("-", "")
   private final val cipherKey = UUID.randomUUID().toString
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
   private var _isFirstRun: Boolean = false
   private var _debugFlag: Boolean = false
-  private var _lastRunDetail: Array[ModuleStatusReport] = Array[ModuleStatusReport]()
+  private var _organizationId: String = _
+  private var _lastRunDetail: Array[SimplifiedModuleStatusReport] = Array[SimplifiedModuleStatusReport]()
   private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
+  private var _consumerDatabaseName: String = _
+  private var _consumerDatabaseLocation: String = _
   private var _workspaceUrl: String = _
   private var _cloudProvider: String = _
   private var _token: Array[Byte] = _
@@ -30,6 +35,7 @@ class Config() {
   private var _apiEnv: ApiEnv = _
   private var _auditLogConfig: AuditLogConfig = _
   private var _badRecordsPath: String = _
+  private var _primordialDateString: Option[String] = None
   private var _maxDays: Int = 60
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
@@ -37,99 +43,20 @@ class Config() {
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
   private var _initialSparkConf: Map[String, String] = Map()
   private var _intialShuffleParts: Int = 200
+  private var _contractInteractiveDBUPrice: Double = 0.56
+  private var _contractAutomatedDBUPrice: Double = 0.26
 
   final private val cipher = new Cipher(cipherKey)
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private val fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-
-  /**
-   * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
-   * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
-   * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
-   * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
-   * age == 60 days.
-   * @return
-   */
-  private def primordealEpoch: Long = {
-    LocalDateTime.now(ZoneId.of("Etc/UTC")).minusDays(60).toInstant(ZoneOffset.UTC)
-      .truncatedTo(ChronoUnit.DAYS)
-      .toEpochMilli
-  }
-
-  /**
-   * This is also used for simulation of start/end times during testing. This also should not be a public function
-   * when completed. Note that this controlled by module. Not every module is executed on every run or a module could
-   * fail and this allows for missed data since the last successful run to be acquired without having to pull all the
-   * data for all modules each time.
-   * @param moduleID moduleID for modules in scope for the run
-   * @throws java.util.NoSuchElementException
-   * @return
-   */
-  @throws(classOf[NoSuchElementException])
-  def fromTime(moduleID: Int): TimeTypes = {
-    val lastRunStatus = if (!isFirstRun) lastRunDetail.filter(_.moduleID == moduleID) else lastRunDetail
-    require(lastRunStatus.length <= 1, "More than one start time identified from pipeline_report.")
-    val fromTime = if (lastRunStatus.length != 1) primordealEpoch else lastRunStatus.head.untilTS
-    createTimeDetail(fromTime)
-  }
-
-  /**
-   * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
-   * of time. The sheer number of sources and heterogeneous time rules makes time management very challenging,
-   * the idea here is to get it right once and just get the time type necessary.
-   * @param tsMilli Unix epoch as a Long in milliseconds
-   * @return
-   */
-  private[overwatch] def createTimeDetail(tsMilli: Long): TimeTypes = {
-    val localDT = new Date(tsMilli).toInstant.atZone(ZoneId.systemDefault()).toLocalDateTime
-    //    val localDT = LocalDateTime.ofInstant(dt.toInstant, ZoneId.of("Etc/UTC"))
-    TimeTypes(
-      tsMilli, // asUnixTimeMilli
-      tsMilli / 1000, // asUnixTimeS -- NOTE: THIS IS LOSSY
-      lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
-      new Date(java.time.Instant.ofEpochMilli(tsMilli).toEpochMilli), // asLocalDateTime
-      new Date(tsMilli).toInstant.atZone(ZoneId.of("Etc/UTC")), // asUTCZonedDateTime
-      localDT, // asLocalDateTime
-      localDT.toLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant.toEpochMilli, // asMidnightEpochMilli
-      tsFormat.format(new Date(tsMilli)), // asTSString
-      dtFormat.format(new Date(tsMilli)) // asDTString
-    )
-  }
-
   /**
    * BEGIN GETTERS
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
 
-  /**
-   * Getter for Pipeline Snap Time
-   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
-   * @return
-   */
-  def pipelineSnapTime: TimeTypes = {
-    createTimeDetail(_pipelineSnapTime)
-  }
-
-  /**
-   * Defines the latest timestamp to be used for a give module as a TimeType
-   * @param moduleID moduleID for which to get the until Time
-   * @return
-   */
-  def untilTime(moduleID: Int): TimeTypes = {
-    val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(maxDays)
-      .atZone(ZoneId.systemDefault()).toInstant.toEpochMilli
-    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
-    if (startSecondPlusMaxDays < defaultUntilSecond) {
-      createTimeDetail(startSecondPlusMaxDays)
-    } else {
-      createTimeDetail(defaultUntilSecond)
-    }
-  }
-
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
-  private[overwatch] def lastRunDetail: Array[ModuleStatusReport] = _lastRunDetail
+  private[overwatch] def lastRunDetail: Array[SimplifiedModuleStatusReport] = _lastRunDetail
 
   private[overwatch] def isLocalTesting: Boolean = _isLocalTesting
 
@@ -138,6 +65,8 @@ class Config() {
   private[overwatch] def isFirstRun: Boolean = _isFirstRun
 
   private[overwatch] def debugFlag: Boolean = _debugFlag
+
+  private[overwatch] def organizationId: String = _organizationId
 
   private[overwatch] def cloudProvider: String = _cloudProvider
 
@@ -148,6 +77,10 @@ class Config() {
   private[overwatch] def databaseName: String = _databaseName
 
   private[overwatch] def databaseLocation: String = _databaseLocation
+
+  private[overwatch] def consumerDatabaseName: String = _consumerDatabaseName
+
+  private[overwatch] def consumerDatabaseLocation: String = _consumerDatabaseLocation
 
   private[overwatch] def workspaceURL: String = _workspaceUrl
 
@@ -167,25 +100,32 @@ class Config() {
 
   private[overwatch] def runID: String = _runID
 
+  private[overwatch] def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
+
+  private[overwatch] def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
+
+  private[overwatch] def primordialDateString: Option[String] = _primordialDateString
+
+  private[overwatch] def globalFilters: Seq[Column] = {
+    Seq(
+      col("organization_id") === organizationId
+    )
+  }
+
   /**
    * OverwatchScope defines the modules active for the current run
    * Some have been disabled for the moment in a sprint to v1.0 release but this acts as the
    * cononical module inventory
+   *
    * @return
    */
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
     import OverwatchScope._
     //    jobs, clusters, clusterEvents, sparkEvents, pools, audit, passthrough, profiles
-    Seq(audit, jobs, clusters, clusterEvents, sparkEvents, notebooks)
+    Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
   }
 
   private[overwatch] def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
-
-  private[overwatch] def cal: Calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-
-  private[overwatch] def tsFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-
-  private[overwatch] def dtFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
     val manualOverrides = Map(
@@ -197,6 +137,10 @@ class Config() {
         value.getOrElse("spark.databricks.delta.optimize.maxFileSize", (1024 * 1024 * 128).toString),
       "spark.databricks.delta.retentionDurationCheck.enabled" ->
         value.getOrElse("spark.databricks.delta.retentionDurationCheck.enabled", "true"),
+      "spark.databricks.delta.optimizeWrite.numShuffleBlocks" ->
+        value.getOrElse("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "50000"),
+      "spark.databricks.delta.optimizeWrite.binSize" ->
+        value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
       "spark.sql.caseSensitive" -> "false"
     )
     _initialSparkConf = value ++ manualOverrides
@@ -223,33 +167,10 @@ class Config() {
    */
 
   /**
-   * Snapshot time of the time the snapshot was started. This is used throughout the process as the until timestamp
-   * such that every data point to be loaded during the current run must be < this pipeline SnapTime.
-   * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=
-   * @return
-   */
-  private[overwatch] def setPipelineSnapTime(): this.type = {
-    _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
-    this
-  }
-
-  // TODO -- This is for local testing only
-  /**
-   * Test setter to simulate snapshot times. During a simulation where this is set, all data retrieved must be before
-   * this time. This should not be a public-facing function in the final delivery
-   * @param tsMilli long in milliseconds as per unix epoch
-   * @return
-   */
-  def setPipelineSnapTime(tsMilli: Long): this.type = {
-    //    _pipelineSnapTime = LocalDateTime.now(ZoneId.of("Etc/UTC")).toInstant(ZoneOffset.UTC).toEpochMilli
-    _pipelineSnapTime = tsMilli
-    this
-  }
-
-  /**
    * Identify the initial value before overwatch for shuffle partitions. This value gets modified a lot through
    * this process but should be set back to the same as the value before Overwatch process when Overwatch finishes
    * its work
+   *
    * @param value number of shuffle partitions to be set
    * @return
    */
@@ -263,8 +184,25 @@ class Config() {
     this
   }
 
+  private[overwatch] def setPrimordialDateString(value: Option[String]): this.type = {
+    if (value.nonEmpty) {
+      logger.log(Level.INFO, s"CONFIG SET: Primordial Date String = ${value.get}")
+    } else {
+      logger.log(Level.INFO, "CONFIG NOT SET: Primordial Date String")
+    }
+    _primordialDateString = value
+    this
+  }
+
+  /**
+   * Set the Overwatch Scope in the correct order as per the ordered Seq. This is important for processing the
+   * modules in the correct order inside the pipeline
+   * @param value
+   * @return
+   */
   private[overwatch] def setOverwatchScope(value: Seq[OverwatchScope.Value]): this.type = {
-    _overwatchScope = value
+    val orderedScope = orderedOverwatchScope.filter(scope => value.contains(scope))
+    _overwatchScope = orderedScope
     this
   }
 
@@ -278,14 +216,21 @@ class Config() {
     this
   }
 
-  //TODO -- switch back to private -- public for testing only
-  //private[overwatch]
-  def setLastRunDetail(value: Array[ModuleStatusReport]): this.type = {
-    // Todo -- Add assertion --> number of rows <= number of modules or something to that effect
-    _lastRunDetail = value
+  private[overwatch] def setContractInteractiveDBUPrice(value: Double): this.type = {
+    _contractInteractiveDBUPrice = value
     this
   }
 
+  private[overwatch] def setContractAutomatedDBUPrice(value: Double): this.type = {
+    _contractAutomatedDBUPrice = value
+    this
+  }
+
+  private[overwatch] def setOrganizationId(value: String): this.type = {
+    if (debugFlag) println(s"organization ID set to ${value}")
+    _organizationId = value
+    this
+  }
   private def setApiEnv(value: ApiEnv): this.type = {
     _apiEnv = value
     this
@@ -293,6 +238,7 @@ class Config() {
 
   /**
    * After the input parameters have been serialized into the OverwatchParams object, set it
+   *
    * @param value
    * @return
    */
@@ -315,6 +261,7 @@ class Config() {
    * writing is not being used (the encrypted version). Notice the use of a "rawToken" which is fine but extra care
    * must be used to ensure the raw token doesn't get stored in clear text in any logs or passed in any
    * fashion that presents risk.
+   *
    * @param tokenSecret Optional input of the Token Secret. If left null, the token secret will be initialized
    *                    as the job owner or notebook user (if called from notebook)
    * @return
@@ -351,7 +298,7 @@ class Config() {
           _tokenType = "Owner"
         }
       }
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, _token, cipher))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken))
       this
     } catch {
       case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e); this
@@ -360,6 +307,7 @@ class Config() {
 
   /**
    * Set Overwatch DB and location
+   *
    * @param dbName
    * @param dbLocation
    * @return
@@ -367,12 +315,20 @@ class Config() {
   private[overwatch] def setDatabaseNameandLoc(dbName: String, dbLocation: String): this.type = {
     _databaseLocation = dbLocation
     _databaseName = dbName
-    println(s"DEBUG: Database Name and Locations set to ${_databaseName} and ${_databaseLocation}")
+    println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}")
+    this
+  }
+
+  private[overwatch] def setConsumerDatabaseNameandLoc(consumerDBName: String, consumerDBLocation: String): this.type = {
+    _consumerDatabaseName = consumerDBName
+    _consumerDatabaseLocation = consumerDBLocation
+    println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
     this
   }
 
   /**
    * Sets audit log config
+   *
    * @param value
    * @return
    */
@@ -384,6 +340,7 @@ class Config() {
   /**
    * Sets Passthrough log path
    * Passthrough logs will be enabled post v1.0.
+   *
    * @param value
    * @return
    */
@@ -394,6 +351,7 @@ class Config() {
 
   /**
    * Some input files have corrupted records, this sets the quarantine path for all such scenarios
+   *
    * @param value
    * @return
    */
@@ -405,6 +363,7 @@ class Config() {
   /**
    * Manual setters for DB Remote and Local Testing. This is not used if "isLocalTesting" == false
    * This function allows for hard coded parameters for rapid integration testing and prototyping
+   *
    * @return
    */
   def buildLocalOverwatchParams(): String = {
@@ -440,6 +399,32 @@ class Config() {
       |""".stripMargin
 
   }
+}
 
+object Config {
+  //  val utcZone: ZoneId = ZoneId.of("Etc/UTC")
+//  val systemZoneId: ZoneId = ZoneId.systemDefault()
+//  val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
 
+//  /**
+//   * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
+//   * of time. The sheer number of sources and heterogeneous time rules makes time management very challenging,
+//   * the idea here is to get it right once and just get the time type necessary.
+//   *
+//   * @param tsMilli Unix epoch as a Long in milliseconds
+//   * @return
+//   */
+//  def createTimeDetail(tsMilli: Long): TimeTypes = {
+//    // TODO: systemDefault is the ticking mine
+//    val localDT = new Date(tsMilli).toInstant.atZone(systemZoneId).toLocalDateTime
+//    val instant = Instant.ofEpochMilli(tsMilli)
+//    TimeTypes(
+//      tsMilli, // asUnixTimeMilli
+//      lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
+//      Date.from(instant), // asLocalDateTime
+//      instant.atZone(systemZoneId), // asSystemZonedDateTime
+//      localDT, // asLocalDateTime
+//      localDT.toLocalDate.atStartOfDay(systemZoneId).toInstant.toEpochMilli // asMidnightEpochMilli
+//    )
+//  }
 }

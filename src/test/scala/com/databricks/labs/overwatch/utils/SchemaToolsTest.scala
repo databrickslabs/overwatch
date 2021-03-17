@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
+import org.apache.spark.sql.functions.col
 import org.scalatest.funspec.AnyFunSpec
 
 class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper {
@@ -49,12 +50,45 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper {
       }
     }
 
+    it("should collect column names 1 ") {
+      val strings = Seq(
+        "{\"i1\": 1, \"b222\": [{\"c_145\": 123, \"abc\": \"ttt\"}, {\"c_145\": 124, \"abc\": \"sss\"}]}",
+        "{\"i1\": 2, \"b222\": [{\"c_145\": 234, \"abc\": \"bbb\"}, {\"c_145\": 434, \"abc\": \"aaa\"}]}"
+      ).toDS
+      val df = spark.read.json(strings)
+      assertResult(Array("b222", "i1"))(SchemaTools.getAllColumnNames(df.schema))
+    }
 
-    it("should moveColumnsToFront") {
-      assertResult(Seq("field3", "field2", "field1")){
-        val df = spark.createDataFrame(Seq((1,2,3))).toDF("field1", "field2", "field3")
-        SchemaTools.moveColumnsToFront(df, Array("field3", "field2")).schema.names.toSeq
+    it("should collect column names 2") {
+      val strings = Seq(
+        "{\"i1\": 1, \"b222\": {\"c_145\": 123, \"abc\": \"ttt\"}}",
+        "{\"i1\": 2, \"b222\": {\"c_145\": 234, \"abc\": \"bbb\"}}"
+      ).toDS
+      val df = spark.read.json(strings)
+      assertResult(Array("b222.abc", "b222.c_145", "i1"))(SchemaTools.getAllColumnNames(df.schema))
+    }
+
+    it("should flatten column names 1 ") {
+      val strings = Seq(
+        "{\"i1\": 1, \"b222\": [{\"c_145\": 123, \"abc\": \"ttt\"}, {\"c_145\": 124, \"abc\": \"sss\"}]}",
+        "{\"i1\": 2, \"b222\": [{\"c_145\": 234, \"abc\": \"bbb\"}, {\"c_145\": 434, \"abc\": \"aaa\"}]}"
+      ).toDS
+      val df = spark.read.json(strings)
+      assertResult("`b222` ARRAY<STRUCT<`abc`: STRING, `c_145`: BIGINT>>,`i1` BIGINT") {
+        df.select(SchemaTools.flattenSchema(df): _*).schema.toDDL
       }
     }
+
+    it("should flatten column names 2") {
+      val strings = Seq(
+        "{\"i1\": 1, \"b222\": {\"c_145\": 123, \"abc\": \"ttt\"}}",
+        "{\"i1\": 2, \"b222\": {\"c_145\": 234, \"abc\": \"bbb\"}}"
+      ).toDS
+      val df = spark.read.json(strings)
+      assertResult("`b222_abc` STRING,`b222_c_145` BIGINT,`i1` BIGINT") {
+        df.select(SchemaTools.flattenSchema(df): _*).schema.toDDL
+      }
+    }
+
   }
 }

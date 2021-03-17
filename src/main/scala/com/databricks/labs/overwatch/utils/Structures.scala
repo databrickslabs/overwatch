@@ -1,14 +1,16 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.pipeline.PipelineTable
+
+import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
-
+import org.apache.log4j.Level
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.catalyst.ScalaReflection
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.types.{StructField, StructType}
 
 case class DBDetail()
 
@@ -18,16 +20,37 @@ case class GangliaDetail()
 
 case class TokenSecret(scope: String, key: String)
 
-case class DataTarget(databaseName: Option[String], databaseLocation: Option[String])
+case class DataTarget(databaseName: Option[String], databaseLocation: Option[String],
+                      consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, encryptedToken: Array[Byte], cipher: Cipher)
+case class DatabricksContractPrices(interactiveDBUCostUSD: Double, automatedDBUCostUSD: Double)
+
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String)
+
+case class ValidatedColumn(
+                            column: Column,
+                            fieldToValidate: Option[StructField] = None,
+                            requiredStructure: Option[StructField] = None
+                          )
 
 // Todo Add Description
-case class Module(moduleID: Int, moduleName: String)
+//case class Module(moduleID: Int, moduleName: String)
 
-case class TimeTypes(asUnixTimeMilli: Long, asUnixTimeS: Long, asColumnTS: Column, asJavaDate: Date,
-                     asUTCDateTime: ZonedDateTime, asLocalDateTime: LocalDateTime, asMidnightEpochMilli: Long,
-                     asTSString: String, asDTString: String)
+object TimeTypesConstants {
+  val dtStringFormat: String = "yyyy-MM-dd"
+  val tsStringFormat: String = "yyyy-MM-dd HH:mm:ss"
+  val tsFormat: SimpleDateFormat = new SimpleDateFormat(tsStringFormat)
+  val dtFormat: SimpleDateFormat = new SimpleDateFormat(dtStringFormat)
+}
+
+// TODO: we need to try to get rid of the local date/time everywhere...
+case class TimeTypes(asUnixTimeMilli: Long, asColumnTS: Column, asJavaDate: Date,
+                     asUTCDateTime: ZonedDateTime, asLocalDateTime: LocalDateTime, asMidnightEpochMilli: Long) {
+
+  lazy val asUnixTimeS: Long = asUnixTimeMilli / 1000
+  lazy val asTSString: String = TimeTypesConstants.tsFormat.format(asJavaDate)
+  lazy val asDTString: String = TimeTypesConstants.dtFormat.format(asJavaDate)
+}
 
 case class AzureAuditLogEventhubConfig(
                                         connectionString: String,
@@ -45,7 +68,9 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            dataTarget: Option[DataTarget] = None,
                            badRecordsPath: Option[String] = None,
                            overwatchScope: Option[Seq[String]] = None,
-                           maxDaysToLoad: Int
+                           maxDaysToLoad: Int = 60,
+                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(0.56, 0.26),
+                           primordialDateString: Option[String] = None
                           )
 
 case class ParsedConfig(
@@ -58,8 +83,10 @@ case class ParsedConfig(
                        )
 
 case class ModuleStatusReport(
+                               organization_id: String,
                                moduleID: Int,
                                moduleName: String,
+                               primordialDateString: Option[String],
                                runStartTS: Long,
                                runEndTS: Long,
                                fromTS: Long,
@@ -71,13 +98,47 @@ case class ModuleStatusReport(
                                vacuumRetentionHours: Int,
                                inputConfig: OverwatchParams,
                                parsedConfig: ParsedConfig
-                             )
+                             ) {
+  def simple: SimplifiedModuleStatusReport = {
+    SimplifiedModuleStatusReport(
+      organization_id,
+      moduleID,
+      moduleName,
+      primordialDateString,
+      runStartTS,
+      runEndTS,
+      fromTS,
+      untilTS,
+      dataFrequency,
+      status,
+      recordsAppended,
+      lastOptimizedTS,
+      vacuumRetentionHours
+    )
+  }
+}
 
-case class IncrementalFilter(sourceCol: String, low: Column, high: Column)
+case class SimplifiedModuleStatusReport(
+                                         organization_id: String,
+                                         moduleID: Int,
+                                         moduleName: String,
+                                         primordialDateString: Option[String],
+                                         runStartTS: Long,
+                                         runEndTS: Long,
+                                         fromTS: Long,
+                                         untilTS: Long,
+                                         dataFrequency: String,
+                                         status: String,
+                                         recordsAppended: Long,
+                                         lastOptimizedTS: Long,
+                                         vacuumRetentionHours: Int
+                                       )
+
+case class IncrementalFilter(cronColName: String, low: Column, high: Column)
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools  = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value
   // TODO - iamPassthrough, profiles, pools
 }
 
@@ -91,11 +152,23 @@ object Frequency extends Enumeration {
   val milliSecond, daily = Value
 }
 
-private[overwatch] class NoNewDataException(s: String) extends Exception(s) {}
+private[overwatch] class NoNewDataException(s: String, val level: Level, val allowModuleProgression: Boolean = false) extends Exception(s) {}
+
 private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
+
 private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
+
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
+
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
+
+// TODO - enable these event handlers to right the Failed/Empty Module status reports
+//private[overwatch] class EmptyModuleException(s: String) extends Exception(s) {}
+private[overwatch] class FailedModuleException(s: String, val target: PipelineTable, level: Level) extends Exception(s) {}
+
+private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
+
+private[overwatch] class BadSchemaException(s: String) extends Exception(s) {}
 
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =

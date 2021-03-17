@@ -1,11 +1,11 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, Config, JsonUtils, NoNewDataException, SparkSessionWrapper, TokenError}
+import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, Config, JsonUtils, NoNewDataException, SchemaTools, SparkSessionWrapper, TokenError}
 import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
-import scalaj.http.Http
+import scalaj.http.{Http, HttpOptions}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -54,22 +54,27 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   // Causing a padding error -- seemingly getting corrupted inside the class instance
   // or it could be from parallelization
-  private def decryptToken(retry: Int = 0): this.type = {
-    try {
-      val cipher = env.cipher
-      val encryptedToken = env.encryptedToken
-      val decryptedToken = cipher.decrypt(encryptedToken)
-      if (!decryptedToken.matches("^dapi[a-zA-Z0-9]{32}$")) {
-        if (retry <= 10) {decryptToken(retry + 1)}
-        else {
-          throw new TokenError(s"Could not decrypt token! Erroring: ${_apiName}")
-        }
-      } else {
-        _decryptedToken = decryptedToken
-        this
-      }
-    }
-  }
+//  private def decryptToken(retry: Int = 0): this.type = {
+//    try {
+//      val cipher = env.cipher
+//      val encryptedToken = env.encryptedToken
+//      val decryptedToken = cipher.decrypt(encryptedToken)
+//      if (!decryptedToken.matches("^dapi[a-zA-Z0-9]{32}$")) {
+//        if (retry <= 10) {decryptToken(retry + 1)}
+//        else {
+//          throw new TokenError(s"Could not decrypt token! Erroring: ${_apiName}")
+//        }
+//      } else {
+//        _decryptedToken = decryptedToken
+//        this
+//      }
+//    } catch { // place holder until the encrypted token can be resolved
+//      case e: Throwable => {
+//        logger.log(Level.ERROR, e)
+//        this
+//      }
+//    }
+//  }
 
   private def setApiName(value: String): this.type = {
     _apiName = value
@@ -108,7 +113,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   def asStrings: Array[String] = results.toArray
 
   def asDF: DataFrame = {
-    try {
+    val apiDF = try {
       if (dataCol == "*") spark.read.json(Seq(results: _*).toDS)
       else spark.read.json(Seq(results: _*).toDS).select(explode(col(dataCol)).alias(dataCol))
         .select(col(s"${dataCol}.*"))
@@ -126,6 +131,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           emptyDF
         }
     }
+    SchemaTools.scrubSchema(apiDF)
   }
 
   private def dataCol: String = {
@@ -161,7 +167,10 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${_decryptedToken}"
-        )).asString
+        ))
+        .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+        .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+        .asString
       if (result.isError) {
         if (result.code == 429) {
           Thread.sleep(2000)
@@ -242,7 +251,10 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
           "Authorization" -> s"Bearer ${_decryptedToken}"
-        )).asString
+        ))
+        .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+        .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+        .asString
       if (result.isError) {
         val err = mapper.readTree(result.body).get("error_code").asText()
         val msg = mapper.readTree(result.body).get("message").asText()
@@ -280,6 +292,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
 object ApiCall {
 
+  val readTimeoutMS = 60000
+  val connTimeoutMS = 10000
   def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None,
             maxResults: Int = Int.MaxValue, paginate: Boolean = true): ApiCall = {
     new ApiCall(apiEnv).setApiName(apiName)

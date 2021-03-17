@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.env
 import com.databricks.backend.common.rpc.CommandContext
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.pipeline.Pipeline
 import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{AnalysisException, DataFrame}
@@ -43,6 +44,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       ApiCall(jobsEndpoint, config.apiEnv)
         .executeGet()
         .asDF
+        .withColumn("organization_id", lit(config.organizationId))
     } catch {
       case e: Throwable => {
         logger.log(Level.ERROR, "ERROR: Failed to execute jobs/list API call.", e)
@@ -65,6 +67,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(clustersEndpoint, config.apiEnv)
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
@@ -80,6 +83,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap))
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
@@ -91,6 +95,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(poolsEndpoint, config.apiEnv)
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
@@ -102,6 +107,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(profilesEndpoint, config.apiEnv)
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
@@ -113,9 +119,11 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")))
       .executeGet()
       .asDF
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
 }
+
 
 object Workspace {
   /**

@@ -7,6 +7,7 @@ spark-warehouse/
 target/
 project/project/
 project/target/
+/docs/overwatch_docs/public/
 *.DS_Store
 /src/main/scala/com/databricks/labs/overwatch/TestRunner.scala
 /data_samples/
@@ -17,3 +18,6 @@ project/target/
 /src/main/scala/com/databricks/labs/overwatch/ESxxxx.scala
 *~
 /Logo/
+\.terraform
+terraform.tfstate*
+\.terraform.lock.hcl
