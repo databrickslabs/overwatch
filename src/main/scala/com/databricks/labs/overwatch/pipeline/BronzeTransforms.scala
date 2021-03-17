@@ -81,9 +81,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     else results
   }
 
-  private def datesStream(fromDate: LocalDate): Stream[LocalDate] = {
-    fromDate #:: datesStream(fromDate plusDays 1)
-  }
+//  private def datesStream(fromDate: LocalDate): Stream[LocalDate] = {
+//    fromDate #:: datesStream(fromDate plusDays 1)
+//  }
 
   private def validateCleanPaths(isFirstRun: Boolean,
                                  ehConfig: AzureAuditLogEventhubConfig): Boolean = {

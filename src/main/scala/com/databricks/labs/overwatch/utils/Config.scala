@@ -298,7 +298,7 @@ class Config() {
           _tokenType = "Owner"
         }
       }
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, _token, cipher))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken))
       this
     } catch {
       case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e); this

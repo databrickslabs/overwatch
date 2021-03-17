@@ -219,6 +219,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       "/tmp/overwatch/bronze/clusterEventsBatches"
     ))
 
+    spark.catalog.clearCache()
   }
 
   protected def restoreSparkConf(): Unit = {

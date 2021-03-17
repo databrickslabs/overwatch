@@ -164,6 +164,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
+        config.apiEnv,
         jobRunsModule.fromTime.asColumnTS,
         jobRunsModule.fromTime.asUnixTimeMilli
       )
