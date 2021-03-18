@@ -65,7 +65,7 @@ class JsonToolsTest extends AnyFunSpec {
     }
 
     // TODO: debug why 'includeNulls = false' is ignored...
-/*    it("should convert almost empty object to JSON string without nulls & with empty values") {
+    /*it("should convert almost empty object to JSON string without nulls & with empty values") {
       val js = JsonUtils.objToJson(commonNoData, includeEmpty = true)
       assertResult(commonNoData)(js.fromObj)
       assertResult("{\"b\":false,\"l\":[],\"m\":{}}")(js.compactString)
