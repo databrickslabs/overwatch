@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
@@ -100,6 +100,58 @@ object TransformFunctions {
     }
 
   }
+
+  object Costs {
+//    val baseMetrics = Array("driver_compute_cost", "worker_compute_cost", "driver_dbu_cost", "worker_dbu_cost", "total_compute_cost", "total_DBU_cost", "total_driver_cost", "total_worker_cost", "total_cost")
+    def compute(
+                 isCloudBillable: Column,
+                 computeCost_H: Column,
+                 nodeCount: Column,
+                 computeTime_H: Column,
+                 smoothingCol: Option[Column] = None
+               ): Column = {
+      when(isCloudBillable, computeCost_H * computeTime_H * nodeCount * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
+    }
+
+    def dbu(
+             isDatabricksBillable: Column,
+             dbu_H: Column,
+             dbuRate_H: Column,
+             nodeCount: Column,
+             computeTime_H: Column,
+             smoothingCol: Option[Column] = None
+           ): Column = {
+      when(isDatabricksBillable, dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
+    }
+
+    @throws(classOf[AnalysisException])
+    def summarize(
+                   df: DataFrame,
+                   metrics: Array[String],
+                   by: Array[String],
+                   precision: Int,
+                   smoother: Column
+                 ): DataFrame = {
+      metrics.foreach(m => require(df.schema.fieldNames.map(_.toLowerCase).contains(m.toLowerCase),
+        s"Cost Summary Failed: Column $m does not exist in the dataframe provided."
+      ))
+      by.foreach(by => require(df.schema.fieldNames.map(_.toLowerCase).contains(by.toLowerCase),
+        s"Cost Summary Failed: Grouping Column $by does not exist in the dataframe provided."
+      ))
+
+      val aggs = metrics.map(m => {
+        greatest(round(sum(col(m) * smoother), precision), lit(0)).alias(m)
+      })
+
+      df
+        .groupBy(by map col: _*)
+        .agg(
+          aggs.head, aggs.tail: _*
+        )
+    }
+  }
+
+  def isAutomated(clusterName: Column): Column = clusterName.like("job-%-run-%")
 
   /**
    * Retrieve DF alias

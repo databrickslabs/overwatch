@@ -17,7 +17,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private val isAutomatedCluster = 'cluster_name.like("job-%-run-%")
 
   //  final private val orgId = dbutils.notebook.getContext.tags("orgId")
 
@@ -498,7 +497,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'autoscale,
       'autotermination_minutes.cast("int").alias("autotermination_minutes"),
       enableElasticDisk.alias("enable_elastic_disk"),
-      isAutomatedCluster.alias("is_automated"),
+      isAutomated('cluster_name).alias("is_automated"),
       when(isSingleNode, lit("Single Node"))
         .when(isServerless, lit("Serverless"))
         .when(isSQLAnalytics, lit("SQL Analytics"))
@@ -551,11 +550,11 @@ trait SilverTransforms extends SparkSessionWrapper {
         )
       )
       .withColumn("createdBy",
-        when(isAutomatedCluster && 'actionName === "create", lit("JobsService"))
-          .when(!isAutomatedCluster && 'actionName === "create", 'userEmail))
-      .withColumn("createdBy", when(!isAutomatedCluster && 'createdBy.isNull, last('createdBy, true).over(clusterBefore)).otherwise('createdBy))
+        when(isAutomated('cluster_name) && 'actionName === "create", lit("JobsService"))
+          .when(!isAutomated('cluster_name) && 'actionName === "create", 'userEmail))
+      .withColumn("createdBy", when(!isAutomated('cluster_name) && 'createdBy.isNull, last('createdBy, true).over(clusterBefore)).otherwise('createdBy))
       .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
-      .withColumn("lastEditedBy", when(!isAutomatedCluster && 'actionName === "edit", 'userEmail))
+      .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
