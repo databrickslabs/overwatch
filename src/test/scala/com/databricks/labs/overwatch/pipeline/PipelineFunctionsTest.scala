@@ -66,31 +66,41 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
   }
 
   describe("Tests for applyFilters") {
-    val smallDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
-    val filterSeq:Seq[Column] = Seq(col("int") === 15)
-    assertResult(1) {
-      PipelineFunctions.applyFilters(smallDF, filterSeq).first().getAs("dummy")
+    it("match record applyFilter") {
+      val smallDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
+      val filterSeq: Seq[Column] = Seq(col("int") === 15)
+      assertResult(1) {
+        PipelineFunctions.applyFilters(smallDF, filterSeq).first().getAs("dummy")
+      }
+    }
+    it("not match record applyFilter") {
+      val smallDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
+      val filterSeq: Seq[Column] = Seq(col("int") === 14)
+      assertResult(0) {
+        PipelineFunctions.applyFilters(smallDF, filterSeq).count()
+      }
     }
   }
 
-//  describe("Tests for withIncrementalFilters") {
-//
-//    it("should filter out not necessary data (single column)") {
-//      val filters = Seq(
-//        IncrementalFilter("int", lit(10), lit(20))
-//      )
-//
-//      val sourceDF = spark.createDataFrame(Seq((100, 1), (10, 1), (15, 1))).toDF("int", "dummy")
-//      val actualDF = PipelineFunctions.withIncrementalFilters(sourceDF, Module(0, "Test Module"), filters)
-//
-//      assertResult("`int` INT,`dummy` INT") {
-//        actualDF.schema.toDDL
-//      }
-//
-//      val expectedDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
-//      assertSmallDataFrameEquality(actualDF, expectedDF)
-//    }
-//
+
+  //describe("Tests for withIncrementalFilters") {
+
+    /*it("should filter out not necessary data (single column)") {
+      val filters = Seq(
+        IncrementalFilter("int", lit(10), lit(20))
+      )
+
+      val sourceDF = spark.createDataFrame(Seq((100, 1), (10, 1), (15, 1))).toDF("int", "dummy")
+      val actualDF = PipelineFunctions.withIncrementalFilters(sourceDF, Module(0, "Test Module"), filters)
+
+      assertResult("`int` INT,`dummy` INT") {
+        actualDF.schema.toDDL
+      }
+
+      val expectedDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
+      assertSmallDataFrameEquality(actualDF, expectedDF)
+    }*/
+
 //    it("should filter out not necessary data (two columns)") {
 //      val filters = Seq(
 //        IncrementalFilter("int", lit(10), lit(20)),
