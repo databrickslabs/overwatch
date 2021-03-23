@@ -8,6 +8,8 @@ import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
 import org.scalatest.funspec.AnyFunSpec
+import org.apache.spark.sql.execution.streaming.MemoryStream
+import org.apache.spark.sql.SQLContext
 
 class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
 
@@ -47,8 +49,12 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
   }
 
   describe("Tests for getSourceDFParts") {
-    val socketDF = spark.readStream.format("socket").option("host", "localhost").option("port", 9999).load()
-    this.assert(PipelineFunctions.getSourceDFParts(socketDF) === 200)
+    
+    implicit val sqlCtx: SQLContext = spark.sqlContext
+    import spark.implicits._
+    val streamingDF = MemoryStream[String].toDF
+
+    this.assert(PipelineFunctions.getSourceDFParts(streamingDF) === 200)
   }
 
 //  describe("Tests for withIncrementalFilters") {
