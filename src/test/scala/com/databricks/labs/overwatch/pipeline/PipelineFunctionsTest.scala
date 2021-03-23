@@ -46,6 +46,11 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
     }
   }
 
+  describe("Tests for getSourceDFParts") {
+    val socketDF = spark.readStream.format("socket").option("host", "localhost").option("port", 9999).load()
+    this.assert(PipelineFunctions.getSourceDFParts(socketDF) === 200)
+  }
+
 //  describe("Tests for withIncrementalFilters") {
 //
 //    it("should filter out not necessary data (single column)") {
