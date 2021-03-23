@@ -10,6 +10,7 @@ import org.apache.spark.sql.types._
 import org.scalatest.funspec.AnyFunSpec
 import org.apache.spark.sql.execution.streaming.MemoryStream
 import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.Column
 
 class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
 
@@ -49,12 +50,27 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
   }
 
   describe("Tests for getSourceDFParts") {
-    
-    implicit val sqlCtx: SQLContext = spark.sqlContext
-    import spark.implicits._
-    val streamingDF = MemoryStream[String].toDF
 
-    this.assert(PipelineFunctions.getSourceDFParts(streamingDF) === 200)
+    it("using streaming") {
+      implicit val sqlCtx: SQLContext = spark.sqlContext
+      import spark.implicits._
+      val streamingDF = MemoryStream[String].toDF
+
+      assert(PipelineFunctions.getSourceDFParts(streamingDF) === 200)
+    }
+
+    it("using a small dataframe") {
+      val smallDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
+      assert(PipelineFunctions.getSourceDFParts(smallDF) === 1)
+    }
+  }
+
+  describe("Tests for applyFilters") {
+    val smallDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
+    val filterSeq:Seq[Column] = Seq(col("int") === 15)
+    assertResult(1) {
+      PipelineFunctions.applyFilters(smallDF, filterSeq).first().getAs("dummy")
+    }
   }
 
 //  describe("Tests for withIncrementalFilters") {
