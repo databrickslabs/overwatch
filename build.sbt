@@ -4,7 +4,7 @@ organization := "com.databricks.labs"
 
 version := "0.3_RC1"
 
-scalaVersion := "2.12.12"
+scalaVersion := "2.12.10"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 
 val sparkVersion = "3.0.1"
