@@ -14,7 +14,6 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private var curlCommand: String = _
   private var _apiName: String = _
   private var _jsonQuery: String = _
   private var _getQueryString: String = _
@@ -27,7 +26,6 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private var _status: String = "SUCCESS"
   private var _errorFlag: Boolean = false
   private val mapper = JsonUtils.defaultObjectMapper
-  private var _decryptedToken: String = env.rawToken
 
   private def setQuery(value: Option[Map[String, Any]]): this.type = {
     if (value.nonEmpty) {
@@ -52,30 +50,6 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     this
   }
 
-  // Causing a padding error -- seemingly getting corrupted inside the class instance
-  // or it could be from parallelization
-//  private def decryptToken(retry: Int = 0): this.type = {
-//    try {
-//      val cipher = env.cipher
-//      val encryptedToken = env.encryptedToken
-//      val decryptedToken = cipher.decrypt(encryptedToken)
-//      if (!decryptedToken.matches("^dapi[a-zA-Z0-9]{32}$")) {
-//        if (retry <= 10) {decryptToken(retry + 1)}
-//        else {
-//          throw new TokenError(s"Could not decrypt token! Erroring: ${_apiName}")
-//        }
-//      } else {
-//        _decryptedToken = decryptedToken
-//        this
-//      }
-//    } catch { // place holder until the encrypted token can be resolved
-//      case e: Throwable => {
-//        logger.log(Level.ERROR, e)
-//        this
-//      }
-//    }
-//  }
-
   private def setApiName(value: String): this.type = {
     _apiName = value
 
@@ -98,8 +72,6 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   private def req: String = _req
 
-  private def jsonQuery: String = _jsonQuery
-
   private def getQueryString: String = _getQueryString
 
   private def limit: Long = _limit
@@ -108,15 +80,13 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   private[overwatch] def isError: Boolean = _errorFlag
 
-  def getCurlCommand: String = curlCommand
-
   def asStrings: Array[String] = results.toArray
 
   def asDF: DataFrame = {
     val apiDF = try {
       if (dataCol == "*") spark.read.json(Seq(results: _*).toDS)
       else spark.read.json(Seq(results: _*).toDS).select(explode(col(dataCol)).alias(dataCol))
-        .select(col(s"${dataCol}.*"))
+        .select(col(s"$dataCol.*"))
     } catch {
       case e: Throwable =>
         val emptyDF = sc.parallelize(Seq("")).toDF()
@@ -147,26 +117,26 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       }
     } catch {
       case _: scala.MatchError => logger.log(Level.WARN, "API not configured, returning full dataset"); "*"
-      case e: Throwable => {
+      case e: Throwable =>
         val msg = "API Not Supported."
         setStatus(msg, Level.ERROR, Some(e))
         ""
-      }
     }
   }
 
-  // TODO -- Simplify differences between get and post
+  // TODO -- Issue_87 -- Simplify differences between get and post
   //  and validate the error handling
   @throws(classOf[ApiCallFailure])
   @throws(classOf[java.lang.NoClassDefFoundError])
   def executeGet(pageCall: Boolean = false): this.type = {
-    logger.log(Level.INFO, s"Loading ${req} -> query: $getQueryString")
+    logger.log(Level.INFO, s"Loading $req -> query: $getQueryString")
     try {
       val result = Http(req + getQueryString)
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
-          "Authorization" -> s"Bearer ${_decryptedToken}"
+          "User-Agent" -> s"databricks-labs-overwatch/${env.packageVersion}",
+          "Authorization" -> s"Bearer ${env.rawToken}"
         ))
         .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
         .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
@@ -178,7 +148,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         }
         if (mapper.readTree(result.body).has("error_code")) {
           val err = mapper.readTree(result.body).get("error_code").asText()
-          throw new ApiCallFailure(s"${_apiName} could not execute: ${err}")
+          throw new ApiCallFailure(s"${_apiName} could not execute: $err")
         } else {
           throw new ApiCallFailure(s"${_apiName} could not execute: ${result.code}")
         }
@@ -192,16 +162,14 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       }
       this
     } catch {
-      case e: java.lang.NoClassDefFoundError => {
+      case e: java.lang.NoClassDefFoundError =>
         val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
         println(msg, e)
         throw new java.lang.NoClassDefFoundError
-      }
-      case e: Throwable => {
+      case e: Throwable =>
         val msg = "Could not execute API call."
         setStatus(msg, Level.ERROR, Some(e))
         this
-      }
     }
   }
 
@@ -243,14 +211,15 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
     // TODO -- Add proper try catch
     val jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
-    logger.log(Level.INFO, s"Loading ${req} -> query: $jsonQuery")
+    logger.log(Level.INFO, s"Loading $req -> query: $jsonQuery")
     try {
       val result = Http(req)
         .postData(jsonQuery)
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
-          "Authorization" -> s"Bearer ${_decryptedToken}"
+          "User-Agent" -> s"databricks-labs-overwatch/${env.packageVersion}",
+          "Authorization" -> s"Bearer ${env.rawToken}"
         ))
         .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
         .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
@@ -263,7 +232,6 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       }
       if (!pageCall) {
         val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
-//        val totalCount = JsonUtils.jsonToMap(jsonResult).getOrElse("total_count", 0).toString.toLong
         val totalCount = mapper.readTree(result.body).get("total_count").asInt(0)
         if (totalCount > 0) results.append(jsonResult)
         if (totalCount > limit && _paginate) paginate(totalCount)
@@ -272,17 +240,16 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       }
       this
     } catch {
-      case e: java.lang.NoClassDefFoundError => {
+      case e: java.lang.NoClassDefFoundError =>
         val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
         println(msg, e)
         throw new java.lang.NoClassDefFoundError
-      }
       case _: JsonMappingException =>
-        val msg = s"API POST: NO NEW DATA -> ${_apiName} Query: ${jsonQuery}"
+        val msg = s"API POST: NO NEW DATA -> ${_apiName} Query: $jsonQuery"
         setStatus(msg, Level.WARN)
         this
       case e: Throwable =>
-        val msg = s"POST FAILED: Endpoint: ${_apiName} Query: ${jsonQuery}"
+        val msg = s"POST FAILED: Endpoint: ${_apiName} Query: $jsonQuery"
         setStatus(msg, Level.ERROR, Some(e))
         this
     }
@@ -297,10 +264,9 @@ object ApiCall {
   def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None,
             maxResults: Int = Int.MaxValue, paginate: Boolean = true): ApiCall = {
     new ApiCall(apiEnv).setApiName(apiName)
-      .setQuery(queryMap) //.decryptToken()
+      .setQuery(queryMap)
       .setMaxResults(maxResults)
       .setPaginate(paginate)
   }
 
-  // TODO -- Accept jsonQuery as Map
 }

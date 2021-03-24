@@ -10,8 +10,6 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{lit, rank, row_number}
 
 /**
  * Take the config and validate the setup
@@ -192,8 +190,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
         s"available and accessible to this account.")
 
-      config.registeredEncryptedToken(Some(TokenSecret(scopeName, keyCheck.head.key)))
-    } else config.registeredEncryptedToken(None)
+      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)))
+    } else config.registerWorkspaceMeta(None)
 
     // Validate data Target
     if (!config.isLocalTesting) dataTargetIsValid(dataTarget)
@@ -427,6 +425,7 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)
+
 
     workspace
   }

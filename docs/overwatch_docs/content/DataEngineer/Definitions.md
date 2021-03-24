@@ -52,7 +52,8 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [jobRunCostPotentialFact](#jobruncostpotentialfact)
 * [notebook](#notebook)
 * [user](#user)
-* [userLoginFact](#userloginfact)
+* [accountLoginFact](#accountloginfact)
+* [accountModificationFact](#accountmodificationfact)
 * [sparkExecution](#sparkexecution)
 * [sparkExecutor](#sparkexecutor)
 * [sparkJob](#sparkjob)
@@ -63,12 +64,14 @@ Complete column descriptions are only provided for the consumption layer. The en
   was created as a reference to each of these.
 
 {{% notice info %}}
-Most tables below provide a data **SAMPLE** that you can download and review in Excel or your favorite CSV viewer.
-To do this, just right click the SAMPLE link and click saveTargetAs or saveLinkAs and save the file.
+Most tables below provide a data **SAMPLE** for reference. You may either click to view it or 
+right click the SAMPLE link and click saveTargetAs or saveLinkAs and save the file.
+Note that these files are **TAB** delimited, so you will need to view as such if you save to local file. 
+The data in the files were generated from an Azure, test deployment created by Overwatch Developers.
 {{% /notice %}}
 
 #### Cluster
-[**SAMPLE**](/assets/TableSamples/cluster.csv)
+[**SAMPLE**](/assets/TableSamples/cluster.tab)
 
 **KEY** -- organization_id + cluster_id + action + unixTimeMS_state_start
 
@@ -99,13 +102,21 @@ idempotency_token           |string           |Idempotent jobs token if used
 organization_id             |string           |Workspace / Organization ID on which the cluster was instantiated
 
 #### ClusterStateFact
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/clusterstatefact.tab)
 
-**KEY** -- organization_id + cluster_id + unixTimeMS_state_start
+**KEY** -- organization_id + cluster_id + state + unixTimeMS_state_start
+
+Costs and state details by cluster at every state in the cluster lifecycle.
+
+**NOTE** This fact table is not normalized on time. Some states will span multiple days and must be smoothed across 
+days (i.e. divide by days_in_state) when trying to calculate costs by day. Also, note that costs may not be captured
+for a cluster_state combination until that state ends.
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 cluster_id                  |string           |Canonical Databricks cluster ID (more info in [Common Meta Fields]())
+cluster_name                |string           |Name of cluster at beginning of state
+custom_tags                 |string           |JSON string of key/value pairs for all cluster associated custom tags give to the cluster
 \*_state_start              |various          |timestamp reference column at the time the state began
 \*_state_end                |various          |timestamp reference column at the time the state ended
 state                       |string           |state of the cluster -- full list [HERE](https://docs.databricks.com/dev-tools/api/latest/clusters.html#clustereventtype)
@@ -113,13 +124,30 @@ current_num_workers         |long             |number of workers in use by the c
 target_num_worers           |long             |number of workers targeted to be present by the completion of the state. Should be equal to *current_num_workers* except during RESIZING state
 uptime_since_restart_S      |double           |Seconds since the cluster was last restarted / terminated
 uptime_in_state_S           |double           |Seconds the cluster spent in current state
+uptime_in_state_H           |double           |Hours the cluster spent in current state 
 driver_node_type_id         |string           |KEY of driver node type to enable join to [instanceDetails](#instanceDetails)
 node_type_id                |string           |KEY of worker node type to enable join to [instanceDetails](#instanceDetails)
 cloud_billable              |boolean          |All current known states are cloud billable. This means that cloud provider charges are present during this state
 databricks_billable         |boolean          |State incurs databricks DBU costs. All states incur DBU costs except: INIT_SCRIPTS_FINISHED, INIT_SCRIPTS_STARTED, STARTING, TERMINATING, CREATING, RESTARTING
-core_hours                  |double           |All core hours of entire cluster (including driver). Nodes * cores * hours in state 
+isAutomated                 |boolean          |Whether the cluster was created as an "automated" or "interactive" cluster
+dbu_rate                    |double           |Effective dbu rate used for calculations (effective at time of pipeline run)
+days_in_state               |int              |Number of days in state
+worker_potential_core_H     |double           |Worker core hours available to execute spark tasks
+core_hours                  |double           |All core hours of entire cluster (including driver). Nodes * cores * hours in state
+driver_compute_cost         |double           |Compute costs associated with driver runtime
+driver_dbu_cost             |double           |DBU costs associated with driver runtime
+worker_compute_cost         |double           |Compute costs associated with worker runtime
+worker_dbu_cost             |double           |DBU costs associated with cumulative runtime of all worker nodes
+total_driver_cost           |double           |Driver costs including DBUs and compute
+total_worker_cost           |double           |Worker costs including DBUs and compute
+total_compute_cost          |double           |All compute costs for Driver and Workers
+total_dbu_cost              |double           |All dbu costs for Driver and Workers
+total_cost                  |double           |Total cost from Compute and DBUs for all nodes (including Driver)
+driverSpecs                 |struct           |Driver node details
+workerSpecs                 |struct           |Worker node details
 
 ### InstanceDetails
+[**AWS Sample**](/assets/TableSamples/instancedetails_aws.tab) | [**AZURE_Sample**](/assets/TableSamples/instancedetails_azure.tab)
 
 **KEY** -- API_name
 
@@ -134,7 +162,10 @@ this table may be dropped and recreated to suit your needs.
 
 The organization_id is automatically generated which means if Overwatch is deployed in multiple regions, each region
 will automatically append its organization_id and its associated costs to the unified master. Each organization_id 
-(i.e. workspace) often have unique costs, this table enables you to customize compute pricing. 
+(i.e. workspace) often have unique costs, this table enables you to customize compute pricing.
+
+Coming Soon: As costs change throughout time, it's important that this table allow for changing costs through time.
+[Issue 49](https://github.com/databrickslabs/overwatch/issues/49) has been created to implement this functionality.
 
 [Azure VM Pricing Page](https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/)
 
@@ -153,7 +184,7 @@ Linux_Reserved_Cost_Hourly  |double           |Reserved, list price for node typ
 Hourly_DBUs                 |double           |Number of DBUs charged for the node type
 
 #### Job
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/job.tab)
 
 **KEY** -- organization_id + job_id
 
@@ -181,7 +212,7 @@ response                    |struct           |response of api call including er
 source_ip_address           |string           |Origin IP of action requested
 
 #### JobRun
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/jobrun.tab)
 
 **KEY** -- organization_id + run_id
 
@@ -210,48 +241,78 @@ started_by                  |struct           |Run request received from user --
 request_detail              |struct           |Complete request detail received by the endpoint
 
 #### JobRunCostPotentialFact
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/jobruncostpotentialfact.tab)
 
 **KEY** -- organization_id + job_id + id_in_job
 
-This fact table defines the cost, potential, and utilization of a cluster associated with a specific Databricks 
-Job Run.
+This fact table defines the job, the cluster, the cost, the potential, and utilization (if cluster logging is enabled) 
+of a cluster associated with a specific Databricks Job Run.
+
+**Dimensionality** Note that this fact table is not normalized by time but rather by job run and cluster state. 
+Costs are not derived from job runs but from clusters thus the state\[s\] of the cluster are what's pertinent when
+tying to cost. This is **extremely important** in the case of long running jobs, such as streaming. 
+
+SCENARIO: <br>
+Imagine a streaming job with 12 concurrent runs on an existing cluster that run for 20 days at the end of which the 
+driver dies for some reason causing all runs fail and begin retrying but failing. When the 20 days end, the cost will 
+be captured solely on that date and even more importantly, not only will all 20 days be captured at that date but the 
+cost associated will be cluster runtime for 20 days * number of runs. Overwatch will automatically smooth the costs
+across the concurrent runs but not the days running since this fact table is not based by on an equidistant time axis. 
 
 * Potential: Total core_milliseconds for which the cluster COULD execute spark tasks. This derivation only includes
   the worker nodes in a state ready to receive spark tasks (i.e. Running). Nodes being added or running init scripts
   are not ready for spark jobs thus those core milliseconds are omitted from the total potential.
-* Cost: Derived from the [instanceDetails](#instancedetails) table. This table can be completely customized to the 
-  need of the user. The costs in this table are derived from the "Compute_Contract_Price" values associated with the
-  instance type in instanceDetails. The DBU costs are associated to the interactive and automated dbu contract rates
-  defined in the configuration of the Overwatch Job. These values are generally static by organization_id (i.e. workspace)
-  but can be referenced in the instanceDetails table as well.
+* Cost: Derived from the [instanceDetails](#instancedetails) table and DBU configured contract price (see
+  [**Configuration**](({{%relref "GettingStarted/Configuration.md"%}})) for more details).
+  The compute costs in [instanceDetails](#instancedetails) table are taken from the "Compute_Contract_Price" values associated with the
+  instance type in instanceDetails.
 * Utilization: Utilization is a function of core milliseconds used during spark task execution divided by the total
-  amount of core milliseconds available given the cluster size and state. (i.e. spark_task_runtime_H / worker_potential_core_H) 
+  amount of core milliseconds available given the cluster size and state. (i.e. spark_task_runtime_H / worker_potential_core_H)
+* Cluster State: The state\[s\] of a cluster during a run. As the cluster scales and morphs to accommodate the run's 
+  needs, the state changes. The number of state changes are recorded in this table as "run_cluster_states".
+* Run State: Advanced Topic for data engineers and developers. This topic is discussed in considerable detail in the 
+  [Advanced Topics]({{%relref "GettingStarted/AdvancedTopics.md"%}}) section.
+  Given a cluster state, the run state is a state of all runs on a cluster at a given moment in time. This 
+  is the measure used to calculate shared costs across concurrent runs. A run state cannot pass the boundaries of 
+  a cluster state, a run that continues across cluster-state lines will result in a new run state.
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 organization_id             |string           |Canonical workspace id
-job_id                      |string           |Canonical ID of job
-id_in_job                   |string           |Run instance of the job_id. This can be seen in the UI in a job spec denoted as "Run N". Each Job ID has first id_in_job as "Run 1" and is incrented and canonical ONLY for the job_id. This field omits the "Run " prefix and results in an integer value of run instance within job.
-job_start_date              |string           |Date the job was submitted for run
+job_id                      |long             |Canonical ID of job
+id_in_job                   |long             |Run instance of the job_id. This can be seen in the UI in a job spec denoted as "Run N". Each Job ID has first id_in_job as "Run 1" and is incrented and canonical ONLY for the job_id. This field omits the "Run " prefix and results in an integer value of run instance within job.
+job_runtime                 |struct           |Time details of job start/end in epoch millis and timestamps
 cluster_id                  |string           |Canonical workspace cluster id
-cluster_type                |string           |Either "automated" or "interactive"
+cluster_name                |string           |Name of cluster at time of run
+cluster_type                |string           |Either new OR existing. New == automated and existing == interactive cluster type
+custom_tags                 |string           |JSON string of key/value pairs for all cluster associated custom tags give to the cluster
 run_terminal_state          |string           |Final state of the job such as "Succeeded", "Failed" or "Cancelled"
-run_trigger_type            |string           |How the run was triggered (i.e. cron / manual) 
+run_trigger_type            |string           |How the run was triggered (i.e. cron / manual)
+run_task_type               |string           |Type of task in the job (i.e. notebook, jar, spark-submit, etc.)
+driver_node_type_id         |string           |KEY of driver node type to enable join to [instanceDetails](#instanceDetails)
+note_type_id                |string           |KEY of worker node type to enable join to [instanceDetails](#instanceDetails)
+dbu_rate                    |double           |Effective DBU rate at time of job run used for calculations based on configured contract price in [instanceDetails](#instanceDetails) at the time of the Overwatch Pipeline Run  
+running_days                |array<date>      |Array (or list) of dates (not strings) across which the job run executed. This simplifies day-level cost attribution, among other metrics, when trying to smooth costs for long-running / streaming jobs 
+avg_cluster_share           |double           |Average share of the cluster the run had available assuming fair scheduling. This DOES NOT account for activity outside of jobs (i.e. interactive notebooks running alongside job runs), this measure only splits out the share among concurrent job runs. Measure is only calculated for interactive clusters, automated clusters assume 100% run allocation. For more granular utilization detail, enable cluster logging and utilize "job_run_cluster_util" column which derives utilization at the spark task level.
+avg_overlapping_runs        |double           |Number of concurrent runs shared by the cluster on average throughout the run
+max_overlapping_runs        |long             |Highest number of concurrent runs on the cluster during the run
+run_cluster_states          |long             |Count of cluster states during the job run
 worker_potential_core_H     |double           |cluster core hours capable of executing spark tasks, "potential"
-driver_compute_cost         |double           |USD cloud compute cost of Driver node
-driver_dbu_cost             |double           |USD Databricks cost for DBUs associated with Driver node
-worker_compute_cost         |double           |USD cloud compute cost of Worker nodes
-worker_dbu_cost             |double           |USD Databricks cost for DBUs associated with Worker nodes
-total_driver_cost           |double           |USD sum of compute and DBU costs for driver
-total_worker_cost           |double           |USD sum of compute and DBU costs for workers
-total_cost                  |double           |USD sum of compute and DBU costs associated with entire cluster
+driver_compute_cost         |double           |Compute costs associated with driver runtime
+driver_dbu_cost             |double           |DBU costs associated with driver runtime
+worker_compute_cost         |double           |Compute costs associated with worker runtime
+worker_dbu_cost             |double           |DBU costs associated with cumulative runtime of all worker nodes
+total_driver_cost           |double           |Driver costs including DBUs and compute
+total_worker_cost           |double           |Worker costs including DBUs and compute
+total_compute_cost          |double           |All compute costs for Driver and Workers
+total_dbu_cost              |double           |All dbu costs for Driver and Workers
+total_cost                  |double           |Total cost from Compute and DBUs for all nodes (including Driver)
 spark_task_runtimeMS        |long             |Spark core execution time in milliseconds (i.e. task was operating/locking on core)
 spark_task_runtime_H        |double           |Spark core execution time in Hours (i.e. task was operating/locking on core)
-job_run_cluster_util        |double           |Cluster utilization: spark task execution time / cluster potential
+job_run_cluster_util        |double           |Cluster utilization: spark task execution time / cluster potential. True measure by core of utilization. Only available when cluster logging is enabled.
 
 #### Notebook
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/notebook.tab)
 
 **KEY** -- organization_id + notebook_id + action + unixTimeMS
 
@@ -277,14 +338,11 @@ user_email                  |string           |Email of the user requesting the 
 request_id                  |string           |Canonical request_id
 response                    |struct           |HTTP response including errorMessage, result, and statusCode
 
-#### User
-[SAMPLE]() **<-- TODO**
-
-**KEY** -- organization_id + user_id + action + unixTimeMS
+#### Account Tables
 
 {{% notice note%}}
-**Not exposed in the consumer database**. This table contains more sensitive information and by default is not
-exposed in the consumer database but held back in the etl datbase. This is done purposely to simplify security when/if
+**Not exposed in the consumer database**. These tables contain more sensitive information and by default are not
+exposed in the consumer database but held back in the ETL database. This is done purposely to simplify security when/if
 desired. If desired, this can be exposed in consumer database with a simple vew definition exposing the columns desired.
 {{% /notice %}}
 
@@ -312,8 +370,13 @@ added_from_ip_address       |string           |Source IP of the request
 added_by                    |string           |Authenticated user that made the request
 user_agent                  |string           |request origin such as browser, terraform, api, etc.
 
-#### UserLoginFact
-[SAMPLE]() **<-- TODO**
+#### AccountModificationFact
+[**SAMPLE**](/assets/TableSamples/accountmodificationfact.tab)
+
+TODO
+
+#### AccountLoginFact
+[**SAMPLE**](/assets/TableSamples/accountloginfact.tab)
 
 **KEY** -- organization_id + user_id + login_type + UnixTimeMS
 
@@ -342,7 +405,7 @@ make this section simpler. Please [**reference Spark Hierarchy For More Details*
 {{% /notice %}}
 
 #### SparkExecution
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/sparkexecution.tab)
 
 **KEY** -- organization_id + spark_context_id + execution_id + cluster_id
 
@@ -357,7 +420,7 @@ details                     |string           |Execution StackTrace
 sql_execution_runtime       |struct           |Complete runtime detail breakdown
 
 #### SparkExecutor
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/sparkexecutor.tab)
 
 **KEY** -- organization_id + spark_context_id + executor_id + cluster_id
 
@@ -372,7 +435,7 @@ removed_reason              |string           |Reason executor was removed
 executor_alivetime          |struct           |Complete lifetime detail breakdown
 
 #### SparkJob
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/sparkjob.tab)
 
 **KEY** -- organization_id + spark_context_id + job_id + cluster_id
 
@@ -396,7 +459,7 @@ job_runtime                 |string           |Complete job runtime detail break
 job_result                  |struct           |Job Result and Exception if present
 
 #### SparkStage
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/sparkstage.tab)
 
 **KEY** -- organization_id + spark_context_id + stage_id + stage_attempt_id + cluster_id
 
@@ -413,7 +476,7 @@ stage_runtime               |string           |Complete stage runtime detail
 stage_info                  |string           |Lineage of all accumulables for the Spark Stage
 
 #### SparkTask
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/sparktask.tab)
 
 **KEY** -- organization_id + spark_context_id + task_id + task_attempt_id + stage_id + stage_attempt_id + cluster_id
 
@@ -482,6 +545,8 @@ pipeline_report             |NA             |tracking       |Tracking table used
 ### Silver
 Table | Module | Layer | Description
 :---------------------------|:--------------|:--------------|:--------------------------------------------------
+account_login_silver        |accounts       |silver         |Login events
+account_mods_silver         |accounts       |silver         |Account modification events
 cluster_spec_silver         |clusters       |silver         |Slow changing dimension used to track all clusters through time including edits but **excluding state change**.
 cluster_status_silver       |clusters       |silver         |**Deprecated** Originally used to track cluster state and scale through time but is no longer used and is incomplete.
 job_status_silver           |jobs           |silver         |Slow changing dimension used to track all jobs specifications through time
@@ -498,6 +563,8 @@ user_login_silver           |accounts       |silver         |User login metadata
 ### Gold
 Table | Module | Layer | Description
 :---------------------------|:--------------|:--------------|:--------------------------------------------------
+account_login_gold          |accounts       |gold           |Login events
+account_mods_gold           |accounts       |gold           |Account modification events
 cluster_gold                |clusters       |gold           |Slow-changing dimension with all cluster creates and edits through time. These events **DO NOT INCLUDE automated cluster resize events or cluster state changes**. Automated cluster resize and cluster state changes will be in clusterstatefact_gold. If user changes min/max nodes or node count (non-autoscaling) the event will be registered here AND clusterstatefact_gold.  
 clusterStateFact_gold       |clusterEvents  |gold           |All cluster event changes along with the time spent in each state and the core hours in each state. This table should be used to find cluster anomalies and/or calculate compute/DBU costs of some given scope. 
 job_gold                    |jobs           |gold           |Slow-changing dimension of all changes to a job definition through time

@@ -22,7 +22,7 @@ Add the following dependencies to your cluster
   to run
     * Default PyPi - Tested with version 4.8.2
 * (only for Azure deployment) azure-eventhubs-spark - integration with Azure EventHubs
-    * Maven Coordinate: `~com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.17`
+    * Maven Coordinate: `~com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.18`
 
 ### Environment Setup
 There are some basic environment configuration steps that need to be enabled to allow Overwatch to do its job.
@@ -33,21 +33,25 @@ are slightly different depending on your cloud provider, currently Overwatch can
 reference the page that's right for you.
 
 ### Cluster Requirements
-* DBR 6.4 - DBR 6.6
-    * Spark 3 (DBR 7.x) has not yet been tested. Spark 3 implementation will be coming soon
+* DBR 7.6
 * Add the relevant [dependencies](#dependencies)
-* Auto-scaling compute (Strongly Recommended)
-    * Some of the modules paginate through API results which can take quite a bit of time and don't need a large
-      number of worker nodes to progress whereas other modules require complex compute and having a larger cluster
-      will greatly speed up the job
-* Auto-scaling Storage (Strongly Recommended)
+* Azure - Spot Instances not yet tested
+  
+#### Notes on Autoscaling
+* Auto-scaling compute -- **Not Recommended** 
+  Note that autoscaling compute will not be extremely efficient due to some of the compute tails 
+  as a result of log file size skew and storage mediums. Additionally, some modules require thousands of API calls 
+  (for historical loads) and have to be throttled to protect the workspace. As such, it's recommended to not use 
+  autoscaling at this time, but rather use a smaller cluster and just let Overwatch run. Until [Issue 16](https://github.com/databrickslabs/overwatch/issues/16)
+  can be implemented there will be a few inefficiencies.
+* Auto-scaling Storage -- **Strongly Recommended**
     * Some of the data sources can grow to be quite large and require very large shuffle stages which requires
       sufficient local disk. If you choose not to use auto-scaling storage be sure you provisions sufficient local
       disk space.
-    * SSD or NVME -- It's strongly recommended to use fast local disks as there can be very large shuffles
+    * SSD or NVME (preferred) -- It's strongly recommended to use fast local disks as there can be very large shuffles
 
 ### Run via Notebook
-Example Notebook ([HTML](assets/GettingStarted/Runner_Job.html) / [DBC](/assets/GettingStarted/Runner_Job.dbc)) --
+Example Notebook ([HTML](/assets/GettingStarted/Runner_Job.html) / [DBC](/assets/GettingStarted/Runner_Job.dbc)) --
 Create a notebook like the one referenced and substitute your
 [**configuration**]({{%relref "GettingStarted/Configuration.md"%}}) overrides.
 
@@ -108,11 +112,16 @@ JsonUtils.objToJson(params).escapedString
 This will output the string needed to be placed in the Main Class args. <br>
 Now that you have the string, setup the job. The Main Class for histoical batch is
 `com.databricks.labs.overwatch.BatchRunner`<br>
-{{% notice warning%}}
-TODO - These images must be anonymized
-{{% /notice %}}
+
 ![job_params](/images/GettingStarted/job_params.png) <br>
 ![jarSetupExample](/images/GettingStarted/jarSetupExample.png)
+
+#### The new Jobs UI
+There's a new jobs UI being rolled out around the same time as Overwatch. Furthermore, note that Overwatch will be 
+accessible via Maven Central and it can be referenced that way as well.
+
+![newUIJarSetup](/images/GettingStarted/jarSetupNewUI.png) <br>
+![newUIJarSetup](/images/GettingStarted/OverwatchViaMaven.png)
 
 ### Modules
 Choosing which modules are right for your organization can seem a bit overwhelming, but for now it should be

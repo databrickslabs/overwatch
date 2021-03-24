@@ -1,21 +1,18 @@
 package com.databricks.labs.overwatch.pipeline
 
-import java.io.{File, PrintWriter, StringWriter}
-
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
-
-import scala.collection.mutable.ArrayBuffer
 
 
 class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
     with BronzeTransforms {
 
-  import spark.implicits._
-
+  /**
+   * Enable access to Bronze pipeline tables externally.
+   * @return
+   */
   def getAllTargets: Array[PipelineTable] = {
     Array(
       BronzeTargets.jobsSnapshotTarget,
@@ -53,11 +50,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   lazy private val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
-  lazy private val  timeTest = s"DEBUG: AUDIT LOG MODULE bronze.scala = From -> To | ${auditLogsModule.fromTime.asTSString} --> ${auditLogsModule.untilTime.asTSString}"
   lazy private val appendAuditLogsProcess = ETLDefinition(
     getAuditLogsDF(
       config.auditLogConfig,
-      config.isFirstRun,
       config.cloudProvider,
       auditLogsModule.fromTime.asLocalDateTime,
       auditLogsModule.untilTime.asLocalDateTime,
@@ -71,7 +66,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
-      BronzeTargets.auditLogsTarget,
+      BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
+      BronzeTargets.clustersSnapshotTarget,
       clusterEventLogsModule.fromTime,
       clusterEventLogsModule.untilTime,
       config.apiEnv,
@@ -82,14 +78,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols: _*),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),
     Seq(
       collectEventLogPaths(
         sparkEventLogsModule.fromTime,
         sparkEventLogsModule.untilTime,
-        BronzeTargets.processedEventLogs,
-        BronzeTargets.clustersSnapshotTarget,
-        config.isFirstRun
+        BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols, 30),
+        BronzeTargets.clustersSnapshotTarget
       ),
       generateEventLogsDF(
         database,
@@ -115,12 +110,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
       rawAzureAuditEvents,
       BronzeTargets.auditLogAzureLandRaw,
-      spark, config, "azure_audit_log_preProcessing"
+      spark, config, "azure_audit_log_preProcessing", getTotalCores
     )
 
     database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw,pipelineSnapTime.asColumnTS)
-
-    //      Helpers.fastDrop(BronzeTargets.auditLogAzureLandRaw.tableFullName, "azure")
 
     val rawProcessCompleteMsg = "Azure audit ingest process complete"
     if (config.debugFlag) println(rawProcessCompleteMsg)
@@ -129,12 +122,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private def executeModules(): Unit = {
     config.overwatchScope.foreach {
-      case OverwatchScope.audit => {
-//        val x = auditLogsModule
-//        println(timeTest)
-//        logger.log(Level.INFO, timeTest)
-        auditLogsModule.execute(appendAuditLogsProcess)
-      }
+      case OverwatchScope.audit => auditLogsModule.execute(appendAuditLogsProcess)
       case OverwatchScope.clusters => clustersSnapshotModule.execute(appendClustersAPIProcess)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
@@ -144,7 +132,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
-  // TODO -- Is there a better way to run this? .map case...does not preserve necessary ordering of events
   def run(): Pipeline = {
 
     restoreSparkConf()
@@ -156,33 +143,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     }
 
     executeModules()
-
-
-//    appendAuditLogsProcess.process()
-//
-//    /** Current cluster snapshot is important because cluster spec details are only available from audit logs
-//     * during create/edit events. Thus all existing clusters created/edited last before the audit logs were
-//     * enabled will be missing all info. This is especially important for overwatch early stages
-//     */
-//    if (config.overwatchScope.contains(OverwatchScope.clusters)) {
-//      appendClustersAPIProcess.process()
-//    }
-//
-//    if (config.overwatchScope.contains(OverwatchScope.clusterEvents)) {
-//      appendClusterEventLogsProcess.process()
-//    }
-//
-//    if (config.overwatchScope.contains(OverwatchScope.jobs)) {
-//      appendJobsProcess.process()
-//    }
-//
-//    if (config.overwatchScope.contains(OverwatchScope.pools)) {
-//      appendPoolsProcess.process()
-//    }
-//
-//    if (config.overwatchScope.contains(OverwatchScope.sparkEvents)) {
-//      appendSparkEventLogsProcess.process()
-//    }
 
     initiatePostProcessing()
     this
@@ -196,8 +156,6 @@ object Bronze {
     new Bronze(workspace, workspace.database, workspace.getConfig)
       .initPipelineRun()
       .loadStaticDatasets()
-
   }
-  //    .setWorkspace(workspace).setDatabase(workspace.database)
 
 }

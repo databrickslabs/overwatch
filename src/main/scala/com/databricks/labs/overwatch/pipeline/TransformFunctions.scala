@@ -1,12 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, TSDF, ValidatedColumn}
+import com.databricks.labs.overwatch.utils.{SchemaTools, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset, SparkSession}
 
 import java.time.LocalDate
 
@@ -32,7 +32,7 @@ object TransformFunctions {
                      joinType: String = "inner"
                    ): DataFrame = {
       require(laggingSide == "left" || laggingSide == "right", s"laggingSide must be either 'left' or 'right'; received $laggingSide")
-      val (left, right) = if(laggingSide == "left") {
+      val (left, right) = if (laggingSide == "left") {
         (df.alias("laggard"), df2.alias("driver"))
       } else {
         (df.alias("driver"), df2.alias("laggard"))
@@ -49,8 +49,8 @@ object TransformFunctions {
     }
 
     def toTSDF(
-              timeSeriesColumnName: String,
-              partitionByColumnNames: String*
+                timeSeriesColumnName: String,
+                partitionByColumnNames: String*
               ): TSDF = {
       TSDF(df, timeSeriesColumnName, partitionByColumnNames: _*)
     }
@@ -101,13 +101,77 @@ object TransformFunctions {
 
   }
 
+  object Costs {
+    def compute(
+                 isCloudBillable: Column,
+                 computeCost_H: Column,
+                 nodeCount: Column,
+                 computeTime_H: Column,
+                 smoothingCol: Option[Column] = None
+               ): Column = {
+      when(isCloudBillable, computeCost_H * computeTime_H * nodeCount * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
+    }
+
+    def dbu(
+             isDatabricksBillable: Column,
+             dbu_H: Column,
+             dbuRate_H: Column,
+             nodeCount: Column,
+             computeTime_H: Column,
+             smoothingCol: Option[Column] = None
+           ): Column = {
+      when(isDatabricksBillable, dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
+    }
+
+    /**
+     * Will be improved upon and isn't used in this package but is a handy function for Overwatch users.
+     * This will likely be refactored out to utils later when we create user utils functions area.
+     *
+     * @param df
+     * @param metrics
+     * @param by
+     * @param precision
+     * @param smoother
+     * @throws org.apache.spark.sql.AnalysisException
+     * @return
+     */
+    @throws(classOf[AnalysisException])
+    def summarize(
+                   df: DataFrame,
+                   metrics: Array[String],
+                   by: Array[String],
+                   precision: Int,
+                   smoother: Column
+                 ): DataFrame = {
+      metrics.foreach(m => require(df.schema.fieldNames.map(_.toLowerCase).contains(m.toLowerCase),
+        s"Cost Summary Failed: Column $m does not exist in the dataframe provided."
+      ))
+      by.foreach(by => require(df.schema.fieldNames.map(_.toLowerCase).contains(by.toLowerCase),
+        s"Cost Summary Failed: Grouping Column $by does not exist in the dataframe provided."
+      ))
+
+      val aggs = metrics.map(m => {
+        greatest(round(sum(col(m) * smoother), precision), lit(0)).alias(m)
+      })
+
+      df
+        .groupBy(by map col: _*)
+        .agg(
+          aggs.head, aggs.tail: _*
+        )
+    }
+  }
+
+  def isAutomated(clusterName: Column): Column = clusterName.like("job-%-run-%")
+
   /**
    * Retrieve DF alias
+   *
    * @param ds
    * @return
    */
   def getAlias(ds: Dataset[_]): Option[String] = ds.queryExecution.analyzed match {
-    case SubqueryAlias(alias, _) => Some(alias.identifier)
+    case SubqueryAlias(alias, _) => Some(alias.name)
     case _ => None
   }
 
@@ -120,10 +184,11 @@ object TransformFunctions {
    * partition column so the explicit date condition[s] must be in the join clause to ensure
    * dynamic partition pruning (DPP)
    * join column names must match on both sides of the join
+   *
    * @param dateColumnName date column of DateType -- this column should also either be a partition or indexed col
-   * @param alias DF alias of latest event
-   * @param lagAlias DF alias potentially containing lagging events
-   * @param usingColumns Seq[String] for matching column names
+   * @param alias          DF alias of latest event
+   * @param lagAlias       DF alias potentially containing lagging events
+   * @param usingColumns   Seq[String] for matching column names
    * @return
    */
   def joinExprMinusOneDay(dateColumnName: String, alias: String, lagAlias: String, usingColumns: Seq[String]): Column = {
@@ -162,9 +227,9 @@ object TransformFunctions {
    * TODO - Currently ony supports input as a unix epoch time in milliseconds, check for column input type
    * and support non millis (Long / Int / Double / etc.)
    * This function should also support input column types of timestamp and date as well for robustness
-
-   * @param start : Column of LongType with start time in milliseconds
-   * @param end : Column of LongType with end time  in milliseconds
+   *
+   * @param start           : Column of LongType with start time in milliseconds
+   * @param end             : Column of LongType with end time  in milliseconds
    * @param inputResolution : String of milli, or second (nano to come)
    * @return
    *
@@ -192,7 +257,10 @@ object TransformFunctions {
    * Warning Does not remove null structs, arrays, etc.
    *
    * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
-   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns
+   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
+   * disregards structs
+   *
+   * Another helpful user function not utilized in the code base.
    *
    * @param df dataframe to more data
    * @return
@@ -204,7 +272,7 @@ object TransformFunctions {
       .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
       .map(col)
     val complexTypeFields = df.schema.fields
-      .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType]  || f.dataType.isInstanceOf[MapType])
+      .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType] || f.dataType.isInstanceOf[MapType])
       .map(_.name).map(col)
     val columns = nonNullCols ++ complexTypeFields
     val cleanDF = df.select(columns: _*)
@@ -238,11 +306,12 @@ object TransformFunctions {
    * This is an AS OF lookup function -- return the most recent slow-changing dim as of some timestamp. The window
    * partition column[s] act like the join keys. The Window partition column must be present in driving and lookup DF.
    * EX: Get latest columnsToLookup by Window's Partition column[s] as of latest Window's OrderByColumn
-   * @param primaryDF Driving dataframe to which the lookup values are to be added
+   *
+   * @param primaryDF          Driving dataframe to which the lookup values are to be added
    * @param primaryOnlyNoNulls Non-null column present only in the primary DF, not the lookup[s]
-   * @param columnsToLookup Column names to be looked up -- must be in driving DF AND all lookup DFs from which the value is to be looked up
-   * @param w Window spec to partition/sort the lookups. The partition and sort columns must be present in all DFs
-   * @param lookupDF One more more dataframes from which to lookup the values
+   * @param columnsToLookup    Column names to be looked up -- must be in driving DF AND all lookup DFs from which the value is to be looked up
+   * @param w                  Window spec to partition/sort the lookups. The partition and sort columns must be present in all DFs
+   * @param lookupDF           One more more dataframes from which to lookup the values
    * @return
    */
   def fillFromLookupsByTS(primaryDF: DataFrame, primaryOnlyNoNulls: String,
@@ -273,7 +342,7 @@ object TransformFunctions {
    * TODO -- change colsToMove to the Seq[String]....
    * TODO: checks for empty list, for existence of columns, etc.
    *
-   * @param df Input dataframe
+   * @param df         Input dataframe
    * @param colsToMove Array of column names to be moved to front of schema
    * @return
    */
@@ -286,11 +355,12 @@ object TransformFunctions {
   /**
    * Converts string ts column from standard spark ts string format to unix epoch millis. The input column must be a
    * string and must be in the format of yyyy-dd-mmTHH:mm:ss.SSSz
+   *
    * @param tsStringCol
    * @return
    */
   def stringTsToUnixMillis(tsStringCol: Column): Column = {
-    ((unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol,-4,3)).cast("long")
+    ((unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol, -4, 3)).cast("long")
   }
 
   private val applicableWorkers = when(col("type") === "RESIZING" &&
@@ -300,7 +370,7 @@ object TransformFunctions {
   def getNodeInfo(nodeType: String, metric: String, multiplyTime: Boolean): Column = {
     val baseMetric = if ("driver".compareToIgnoreCase(nodeType) == 0) {
       col(s"driverSpecs.${metric}")
-    } else if("worker".compareToIgnoreCase(nodeType) == 0) {
+    } else if ("worker".compareToIgnoreCase(nodeType) == 0) {
       col(s"workerSpecs.${metric}") * applicableWorkers
     } else {
       throw new Exception("nodeType must be either 'driver' or 'worker'")
@@ -313,6 +383,50 @@ object TransformFunctions {
       when(col("type") === "TERMINATING", lit(0))
         .otherwise(round(baseMetric, 2).alias(s"${nodeType}_${baseMetric}"))
     }
+  }
+
+  def cluster_idFromAudit: Column = {
+    //    import spark.implicits._
+    when(
+      col("serviceName") === "clusters" &&
+        col("actionName").like("%Result"),
+      col("requestParams.clusterId")
+    )
+      .when(
+        col("serviceName") === "clusters" &&
+          col("actionName").isin("permanentDelete", "delete", "resize", "edit"),
+        col("requestParams.cluster_id")
+      )
+      .when(
+        col("serviceName") === "clusters" &&
+          col("actionName") === "create",
+        get_json_object(col("response.result"), "$.cluster_id")
+      )
+      .otherwise(col("requestParams.cluster_id"))
+  }
+
+  def getClusterIdsWithNewEvents(filteredAuditLogDF: DataFrame,
+                                 clusterSnapshotTable: PipelineTable
+                                ): DataFrame = {
+
+    val newClustersIDs = filteredAuditLogDF
+      .select(cluster_idFromAudit.alias("cluster_id"))
+      .filter(col("cluster_id").isNotNull)
+      .distinct()
+
+    val latestSnapW = Window.partitionBy(col("organization_id")).orderBy(col("Pipeline_SnapTS").desc)
+    // capture long-running clusters not otherwise captured from audit
+    val currentlyRunningClusters = clusterSnapshotTable.asDF()
+      .withColumn("snapRnk", rank.over(latestSnapW))
+      .filter(col("snapRnk") === 1)
+      .filter(col("state") === "RUNNING")
+      .select(col("cluster_id"))
+      .distinct
+
+    newClustersIDs
+      .unionByName(currentlyRunningClusters)
+      .distinct
+
   }
 
 }
