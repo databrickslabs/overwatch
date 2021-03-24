@@ -42,9 +42,9 @@ object PipelineFunctions {
       TransformFunctions.moveColumnsToFront(mutationDF, target.zOrderBy ++ target.statsColumns)
     } else mutationDF
 
-    val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
+   val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
       val targetShufflePartitionSizeMB = 128.0
-      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").toDouble / 1024 / 1024
+      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").replace("b", "").toDouble / 1024 / 1024
       val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
 
       val sourceDFParts = getSourceDFParts(df)
@@ -65,9 +65,7 @@ object PipelineFunctions {
       if (config.debugFlag) {
         println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
         println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
-        println(s"DEBUG: Max PartitionBytes (MB): ${
-          spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
-        }")
+        println(s"DEBUG: Max PartitionBytes (MB): $readMaxPartitionBytesMB")
       }
 
       logger.log(Level.INFO, s"$moduleName: " +
@@ -157,30 +155,19 @@ object PipelineFunctions {
 
   }
 
-  def isIgnorableException(e: Exception): Boolean = {
-    val message = e.getMessage
-    message.contains("Cannot modify the value of a static config")
-  }
-
   def setSparkOverrides(spark: SparkSession, sparkOverrides: Map[String, String],
                         debugFlag: Boolean = false): Unit = {
     sparkOverrides foreach { case (k, v) =>
       try {
-        if (debugFlag) {
-          val opt = spark.conf.getOption(k)
+        val opt = spark.conf.getOption(k)
+        if (debugFlag) { // if debug write out the override
           if (opt.isEmpty || opt.get != v) {
-            println(s"Overriding $k from $opt --> $v")
+            println(s"Overriding $k from ${opt.getOrElse("UNDEFINED")} --> $v")
           }
         }
-        spark.conf.set(k, v)
+        // if sparkConf can be modified OR is unset, set spark conf
+        if (spark.conf.isModifiable(k) || opt.isEmpty) spark.conf.set(k, v)
       } catch {
-        case e: AnalysisException =>
-
-          if (!isIgnorableException(e)) {
-            logger.log(Level.WARN, s"Cannot Set Spark Param: $k", e)
-            if (debugFlag)
-              println(s"Failed Setting $k", e)
-          }
         case e: Throwable =>
           if (debugFlag)
             println(s"Failed Setting $k", e)

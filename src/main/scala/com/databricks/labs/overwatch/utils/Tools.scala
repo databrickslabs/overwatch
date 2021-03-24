@@ -3,9 +3,9 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.PipelineTable
-import com.fasterxml.jackson.annotation.JsonInclude.Include
+import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
-import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 import javax.crypto
@@ -37,10 +37,13 @@ object JsonUtils {
     // order of sets does matter...
     if (!includeNulls) {
       obj.setSerializationInclusion(Include.NON_NULL)
-      obj.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false)
+      obj.configOverride(classOf[java.util.Map[String, Object]])
+        .setInclude(Value.construct(Include.NON_NULL, Include.NON_NULL))
     }
     if (!includeEmpty) {
       obj.setSerializationInclusion(Include.NON_EMPTY)
+      obj.configOverride(classOf[java.util.Map[String, Object]])
+        .setInclude(Value.construct(Include.NON_EMPTY, Include.NON_EMPTY))
     }
     obj
   }
