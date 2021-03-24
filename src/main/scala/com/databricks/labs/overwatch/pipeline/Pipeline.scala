@@ -1,20 +1,21 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
+import com.databricks.labs.overwatch.pipeline.Pipeline.{systemZoneId, systemZoneOffset}
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.pipeline.Pipeline.{createTimeDetail, systemZoneId, systemZoneOffset}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{from_unixtime, lit, rank, row_number}
-import org.apache.spark.sql.DataFrame
 
-import java.time.{Duration, Instant, LocalDateTime, ZoneId, ZoneOffset}
+import java.time._
 import java.util.Date
 
 class Pipeline(_workspace: Workspace, _database: Database,
                _config: Config) extends PipelineTargets(_config) with SparkSessionWrapper {
 
   // TODO -- Validate Targets (unique table names, ModuleIDs and names, etc)
+  //  developer validation to guard against multiple Modules with same target and/or ID/Name
   private val logger: Logger = Logger.getLogger(this.getClass)
   final val workspace: Workspace = _workspace
   final val database: Database = _database
@@ -213,7 +214,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
   protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
 
   private[overwatch] def initiatePostProcessing(): Unit = {
-    //    postProcessor.analyze()
     postProcessor.optimize()
     Helpers.fastrm(Array(
       "/tmp/overwatch/bronze/clusterEventsBatches"
@@ -231,16 +231,13 @@ class Pipeline(_workspace: Workspace, _database: Database,
   }
 
   private def getLastOptimized(moduleID: Int): Long = {
-    val lastRunOptimizeTS = config.lastRunDetail.filter(_.moduleID == moduleID)
-    if (!config.isFirstRun && lastRunOptimizeTS.nonEmpty) lastRunOptimizeTS.head.lastOptimizedTS
-    else 0L
+    val state = pipelineState.get(moduleID)
+    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
   }
 
-  // TODO - make this timeframe configurable by module
-  private def needsOptimize(moduleID: Int): Boolean = {
-    // TODO -- Don't use 7 days -- use optimizeFrequency in PipelineTable
-    val WEEK = 1000L * 60L * 60L * 24L * 7L // week of milliseconds
-    val tsLessSevenD = System.currentTimeMillis() - WEEK.toLong
+  private def needsOptimize(moduleID: Int, optimizeFreq_H: Int): Boolean = {
+    val optFreq_Millis = 1000L * 60L * 60L * optimizeFreq_H.toLong
+    val tsLessSevenD = System.currentTimeMillis() - optFreq_Millis
     if ((getLastOptimized(moduleID) < tsLessSevenD || config.isFirstRun) && !config.isLocalTesting) true
     else false
   }
@@ -250,7 +247,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     try {
 
-      val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName)
+      val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, getTotalCores)
 
       val startLogMsg = s"Beginning append to ${target.tableFullName}"
       logger.log(Level.INFO, startLogMsg)
@@ -269,7 +266,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       logger.log(Level.INFO, msg)
 
       var lastOptimizedTS: Long = getLastOptimized(module.moduleId)
-      if (needsOptimize(module.moduleId)) {
+      if (needsOptimize(module.moduleId, target.optimizeFrequency_H)) {
         postProcessor.markOptimize(target)
         lastOptimizedTS = module.untilTime.asUnixTimeMilli
       }
@@ -300,7 +297,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       case e: Throwable =>
         val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
         logger.log(Level.ERROR, msg, e)
-        throw new FailedModuleException(msg, target, Level.ERROR)
+        throw new FailedModuleException(msg, target)
     }
 
   }

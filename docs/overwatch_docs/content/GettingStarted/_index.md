@@ -22,7 +22,7 @@ Add the following dependencies to your cluster
   to run
     * Default PyPi - Tested with version 4.8.2
 * (only for Azure deployment) azure-eventhubs-spark - integration with Azure EventHubs
-    * Maven Coordinate: `~com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.17`
+    * Maven Coordinate: `~com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.18`
 
 ### Environment Setup
 There are some basic environment configuration steps that need to be enabled to allow Overwatch to do its job.
@@ -33,8 +33,7 @@ are slightly different depending on your cloud provider, currently Overwatch can
 reference the page that's right for you.
 
 ### Cluster Requirements
-* DBR 6.4 - DBR 6.6
-    * Spark 3 (DBR 7.x) has not yet been tested. Spark 3 implementation will be coming soon
+* DBR 7.x
 * Add the relevant [dependencies](#dependencies)
 * Auto-scaling compute (Strongly Recommended)
     * Some of the modules paginate through API results which can take quite a bit of time and don't need a large
