@@ -388,7 +388,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         ).df
         .drop("timestamp")
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
-        .withColumn("uptime_in_state_H",
+        .withColumn("job_runtime_in_state",
           when('state.isin("CREATING", "STARTING") || 'job_cluster_type === "new", 'uptime_in_state_H) // get true cluster time when state is guaranteed fully initial
             .otherwise((array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)) // otherwise use jobStart as beginning time and min of stateEnd or jobEnd for end time
         //   .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
@@ -405,7 +405,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .drop("timestamp")
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull && 'unixTimeMS_state_end > $"job_runtime.endEpochMS")
         .join(jobRunInitialState.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti")
-        .withColumn("uptime_in_state_H", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
+        .withColumn("job_runtime_in_state", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
         //   .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
         .withColumn("lifecycleState", lit("terminal"))
 
@@ -425,7 +425,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .drop($"cpot.cluster_id").drop($"cpot.organization_id")
         .join(jobRunInitialState.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti")
         .join(jobRunTerminalState.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti")
-        .withColumn("uptime_in_state_H", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000) / 3600)
+        .withColumn("job_runtime_in_state", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000) / 3600)
         .withColumn("lifecycleState", lit("intermediate"))
 
       val concState = Window.partitionBy('cluster_id, 'unixTimeMS_state_start, 'unixTimeMS_state_end)
@@ -434,13 +434,13 @@ trait GoldTransforms extends SparkSessionWrapper {
         .unionByName(jobRunTerminalState)
         .withColumn("dbu_rate", when('job_cluster_type === "new", 'automatedDBUPrice).otherwise('interactiveDBUPrice)) // new | existing
         .withColumn("concurrent_runs", size(collect_set('run_id).over(concState)))
-        .withColumn("run_state_utilization", 'uptime_in_state_H / sum('uptime_in_state_H).over(concState)) // given n hours of uptime in state 1/n of said uptime was used by this job job
+        .withColumn("run_state_utilization", 'job_runtime_in_state / sum('job_runtime_in_state).over(concState)) // given n hours of uptime in state 1/n of said uptime was used by this job job
         .withColumn("running_days", sequence($"job_runtime.startTS".cast("date"), $"job_runtime.endTS".cast("date")))
         .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
-        .withColumn("driver_compute_cost", 'driver_compute_cost * 'run_state_utilization) // smothing across concurrency and running days
-        .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'run_state_utilization)
-        .withColumn("worker_compute_cost", 'worker_compute_cost * 'run_state_utilization)
-        .withColumn("worker_dbu_cost", 'worker_dbu_cost * 'run_state_utilization)
+        .withColumn("driver_compute_cost", 'driver_compute_cost * 'job_runtime_in_state * 'run_state_utilization) // smothing across concurrency and running days
+        .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'job_runtime_in_state * 'run_state_utilization)
+        .withColumn("worker_compute_cost", 'worker_compute_cost * 'job_runtime_in_state * 'run_state_utilization)
+        .withColumn("worker_dbu_cost", 'worker_dbu_cost * 'job_runtime_in_state * 'run_state_utilization)
         .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
         .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
         .withColumn("total_compute_cost", 'driver_compute_cost + 'worker_compute_cost)
