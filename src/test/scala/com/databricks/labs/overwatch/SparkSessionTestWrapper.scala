@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch
 
+import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 trait SparkSessionTestWrapper {
   lazy val spark: SparkSession = {
@@ -11,6 +12,6 @@ trait SparkSessionTestWrapper {
       .getOrCreate()
   }
 
-  lazy val sc = spark.sparkContext
+  lazy val sc: SparkContext = spark.sparkContext
 
 }

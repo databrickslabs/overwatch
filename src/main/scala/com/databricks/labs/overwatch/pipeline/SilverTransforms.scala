@@ -1,14 +1,13 @@
 package com.databricks.labs.overwatch.pipeline
 
-import java.util.UUID
-import com.databricks.labs.overwatch.utils.{ApiEnv, Config, NoNewDataException, SchemaTools, SparkSessionWrapper}
-import org.apache.spark.sql.expressions.{Window, WindowSpec}
+import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.utils.{ApiEnv, NoNewDataException, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import TransformFunctions._
-import com.databricks.labs.overwatch.ApiCall
+import org.apache.spark.sql.{Column, DataFrame}
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -16,96 +15,90 @@ import scala.concurrent.forkjoin.ForkJoinPool
 trait SilverTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
+
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  //  final private val orgId = dbutils.notebook.getContext.tags("orgId")
-
-  object UDF {
-
-    def structFromJson(df: DataFrame, c: String): Column = {
-      require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col ${c}")
-      require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
-      val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-      if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-        println(s"WARNING: The json schema for column ${c} was not parsed correctly, please review.")
-      }
-      from_json(col(c), jsonSchema).alias(c)
+  // TODO -- move to Transform Functions
+  def structFromJson(df: DataFrame, c: String): Column = {
+    require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col $c")
+    require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
+    val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
+    if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
+      println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
     }
-
-    def structFromJson(df: DataFrame, cs: String*): Column = {
-      val dfFields = df.schema.fields
-      cs.foreach(c => {
-        require(dfFields.map(_.name).contains(c), s"The dataframe does not contain col ${c}")
-        require(dfFields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
-      })
-      array(
-        cs.map(c => {
-          val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-          if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-            println(s"WARNING: The json schema for column ${c} was not parsed correctly, please review.")
-          }
-          from_json(col(c), jsonSchema).alias(c)
-        }): _*
-      )
-    }
-
-    def appendPowerProperties: Column = {
-      struct(
-        element_at('Properties, "sparkappname").alias("AppName"),
-        element_at('Properties, "sparkdatabricksapiurl").alias("WorkspaceURL"),
-        element_at('Properties, "sparkjobGroupid").alias("JobGroupID"),
-        element_at('Properties, "sparkdatabrickscloudProvider").alias("CloudProvider"),
-        struct(
-          element_at('Properties, "sparkdatabricksclusterSource").alias("ClusterSource"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsautoTerminationMinutes").alias("AutoTerminationMinutes"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterAllTags").alias("ClusterTags"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterAvailability").alias("ClusterAvailability"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterId").alias("ClusterID"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterInstancePoolId").alias("InstancePoolID"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterMaxWorkers").alias("MaxWorkers"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterMinWorkers").alias("MinWorkers"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterName").alias("Name"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterOwnerUserId").alias("OwnerUserID"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterScalingType").alias("ScalingType"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterSpotBidPricePercent").alias("SpotBidPricePercent"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterTargetWorkers").alias("TargetWorkers"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsclusterWorkers").alias("ActualWorkers"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagscontainerZoneId").alias("ZoneID"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsdataPlaneRegion").alias("Region"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagsdriverNodeType").alias("DriverNodeType"),
-          element_at('Properties, "sparkdatabricksworkerNodeTypeId").alias("WorkerNodeType"),
-          element_at('Properties, "sparkdatabricksclusterUsageTagssparkVersion").alias("SparkVersion")
-        ).alias("ClusterDetails"),
-        element_at('Properties, "sparkdatabricksnotebookid").alias("NotebookID"),
-        element_at('Properties, "sparkdatabricksnotebookpath").alias("NotebookPath"),
-        element_at('Properties, "sparkdatabrickssparkContextId").alias("SparkContextID"),
-        element_at('Properties, "sparkdriverhost").alias("DriverHostIP"),
-        element_at('Properties, "sparkdrivermaxResultSize").alias("DriverMaxResults"),
-        element_at('Properties, "sparkexecutorid").alias("ExecutorID"),
-        element_at('Properties, "sparkexecutormemory").alias("ExecutorMemory"),
-        element_at('Properties, "sparksqlexecutionid").alias("ExecutionID"),
-        element_at('Properties, "sparksqlexecutionparent").alias("ExecutionParent"),
-        element_at('Properties, "sparkdatabricksisolationID").alias("SparkDBIsolationID"),
-        element_at('Properties, "sparkhadoopfsazureaccountoauth2clientid").alias("AzureOAuth2ClientID"),
-        element_at('Properties, "sparkrddscope").alias("RDDScope"),
-        element_at('Properties, "sparkdatabricksreplId").alias("SparkDBREPLID"),
-        element_at('Properties, "sparkdatabricksjobid").alias("SparkDBJobID"),
-        element_at('Properties, "sparkdatabricksjobrunId").alias("SparkDBRunID"),
-        element_at('Properties, "sparkdatabricksjobtype").alias("sparkDBJobType"),
-        element_at('Properties, "sparksqlshufflepartitions").alias("ShufflePartitions"),
-        element_at('Properties, "user").alias("UserEmail"),
-        element_at('Properties, "userID").alias("UserID")
-      )
-    }
+    from_json(col(c), jsonSchema).alias(c)
   }
 
-  // Additional events for future research
-  // 'Event === "org.apache.spark.sql.execution.ui.SparkListenerSQLAdaptiveSQLMetricUpdates"
-  //    --> select sqlPlanMetrics, ExecutionID
-  // 'Event === "SparkListenerEnvironmentUpdate"
-  //    --> select JVMInformation
-  // 'Event.isin("SparkListenerBlockManagerAdded", "SparkListenerBlockManagerRemoved")
-  //    --> select BlockManagerID, MaximumMemory, MaximumOnheapMemory, Timestamp
+  // TODO -- move to Transform Functions
+  def structFromJson(df: DataFrame, cs: String*): Column = {
+    val dfFields = df.schema.fields
+    cs.foreach(c => {
+      require(dfFields.map(_.name).contains(c), s"The dataframe does not contain col $c")
+      require(dfFields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
+    })
+    array(
+      cs.map(c => {
+        val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
+        if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
+          println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
+        }
+        from_json(col(c), jsonSchema).alias(c)
+      }): _*
+    )
+  }
+
+  private def appendPowerProperties: Column = {
+    struct(
+      element_at('Properties, "sparkappname").alias("AppName"),
+      element_at('Properties, "sparkdatabricksapiurl").alias("WorkspaceURL"),
+      element_at('Properties, "sparkjobGroupid").alias("JobGroupID"),
+      element_at('Properties, "sparkdatabrickscloudProvider").alias("CloudProvider"),
+      struct(
+        element_at('Properties, "sparkdatabricksclusterSource").alias("ClusterSource"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsautoTerminationMinutes").alias("AutoTerminationMinutes"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterAllTags").alias("ClusterTags"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterAvailability").alias("ClusterAvailability"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterId").alias("ClusterID"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterInstancePoolId").alias("InstancePoolID"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterMaxWorkers").alias("MaxWorkers"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterMinWorkers").alias("MinWorkers"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterName").alias("Name"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterOwnerUserId").alias("OwnerUserID"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterScalingType").alias("ScalingType"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterSpotBidPricePercent").alias("SpotBidPricePercent"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterTargetWorkers").alias("TargetWorkers"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsclusterWorkers").alias("ActualWorkers"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagscontainerZoneId").alias("ZoneID"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsdataPlaneRegion").alias("Region"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagsdriverNodeType").alias("DriverNodeType"),
+        element_at('Properties, "sparkdatabricksworkerNodeTypeId").alias("WorkerNodeType"),
+        element_at('Properties, "sparkdatabricksclusterUsageTagssparkVersion").alias("SparkVersion")
+      ).alias("ClusterDetails"),
+      element_at('Properties, "sparkdatabricksnotebookid").alias("NotebookID"),
+      element_at('Properties, "sparkdatabricksnotebookpath").alias("NotebookPath"),
+      element_at('Properties, "sparkdatabrickssparkContextId").alias("SparkContextID"),
+      element_at('Properties, "sparkdriverhost").alias("DriverHostIP"),
+      element_at('Properties, "sparkdrivermaxResultSize").alias("DriverMaxResults"),
+      element_at('Properties, "sparkexecutorid").alias("ExecutorID"),
+      element_at('Properties, "sparkexecutormemory").alias("ExecutorMemory"),
+      element_at('Properties, "sparksqlexecutionid").alias("ExecutionID"),
+      element_at('Properties, "sparksqlexecutionparent").alias("ExecutionParent"),
+      element_at('Properties, "sparkdatabricksisolationID").alias("SparkDBIsolationID"),
+      element_at('Properties, "sparkhadoopfsazureaccountoauth2clientid").alias("AzureOAuth2ClientID"),
+      element_at('Properties, "sparkrddscope").alias("RDDScope"),
+      element_at('Properties, "sparkdatabricksreplId").alias("SparkDBREPLID"),
+      element_at('Properties, "sparkdatabricksjobid").alias("SparkDBJobID"),
+      element_at('Properties, "sparkdatabricksjobrunId").alias("SparkDBRunID"),
+      element_at('Properties, "sparkdatabricksjobtype").alias("sparkDBJobType"),
+      element_at('Properties, "sparksqlshufflepartitions").alias("ShufflePartitions"),
+      element_at('Properties, "user").alias("UserEmail"),
+      element_at('Properties, "userID").alias("UserID")
+    )
+  }
+
+  // TODO -- Value Opportunity -- Issue_84
+
+  // TODO -- Issue_81
 
   //  protected def getJDBCSession(sessionStartDF: DataFrame, sessionEndDF: DataFrame): DataFrame = {
   //    sessionStartDF
@@ -207,7 +200,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def simplifyJobStart(sparkEventsBronze: DataFrame): DataFrame = {
     sparkEventsBronze.filter('Event.isin("SparkListenerJobStart"))
-      .withColumn("PowerProperties", UDF.appendPowerProperties)
+      .withColumn("PowerProperties", appendPowerProperties)
       .select(
         'organization_id, 'fileCreateDate, 'clusterId, 'SparkContextID,
         $"PowerProperties.JobGroupID", $"PowerProperties.ExecutionID",
@@ -325,6 +318,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   // TODO -- Azure Review
+  //  Tested in AWS, azure account logic may be slightly different
   protected def accountLogins()(df: DataFrame): DataFrame = {
     val endpointLogins = df.filter(
       'serviceName === "accounts" &&
@@ -372,11 +366,10 @@ trait SilverTransforms extends SparkSessionWrapper {
         .drop("date")
     } else
       throw new NoNewDataException("No New Data", Level.INFO, allowModuleProgression = true)
-    //      throw new NoNewDataException("EMPTY: No new Account Logins")
-    //      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   // TODO -- Azure Review
+  //  Tested in AWS, azure account logic may be slightly different
   protected def accountMods()(df: DataFrame): DataFrame = {
     val uidLookup = Window.partitionBy('organization_id, 'user_name).orderBy('timestamp)
       .rowsBetween(Window.currentRow, Window.unboundedFollowing)
@@ -400,14 +393,11 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     } else
       throw new NoNewDataException("No New Data", Level.INFO, allowModuleProgression = true)
-    //      throw new NoNewDataException(s"EMPTY: Now new account modifications")
-    //      Seq("No New Records").toDF("__OVERWATCHEMPTY")
   }
 
   private val auditBaseCols: Array[Column] = Array(
     'timestamp, 'date, 'organization_id, 'serviceName, 'actionName,
     $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
-
 
   private def clusterBase(auditRawDF: DataFrame): DataFrame = {
     val cluster_id_gen_w = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
@@ -429,7 +419,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
       'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
       'user_id, 'sourceIPAddress, 'single_user_name)
-
 
     auditRawDF
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
@@ -461,7 +450,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val clusterBaseDF = clusterBase(df)
 
-    // TODO instance pool lookup pass in from bronze
+    // TODO -- Issue_37 -- instance pool lookup pass in from bronze
     val instancePoolLookup = auditRawTable.asDF
       .filter('serviceName === "instancePools" && 'actionName === "create")
       .select(
@@ -533,7 +522,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('actionName.isin("create", "edit"))
       .filter($"response.statusCode" === 200) //?
       .join(instancePoolLookup, Seq("organization_id", "instance_pool_id"), "left") //node_type must be derived from pool when cluster is pooled
-      // TODO -- this will need to be reviewed for mixed pools (i.e. driver of different type)
+      // TODO -- Issue_37 -- this will need to be reviewed for mixed pools (i.e. driver of different type)
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("organization_id", "cluster_id"), "left")
       .join(clustersRemoved, Seq("organization_id", "cluster_id"), "left")
@@ -559,25 +548,11 @@ trait SilverTransforms extends SparkSessionWrapper {
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
 
-  /**
-   * First shot At Silver Job Runs
-   *
-   * @param df
-   * @return
-   */
-
-  //TODO -- jobs snapshot api seems to be returning more data than audit logs, review
-  //  example = maxRetries, max_concurrent_runs, jar_task, python_task
-  //  audit also seems to be missing many job_names (if true, retrieve from snap)
   private def getJobsBase(df: DataFrame): DataFrame = {
     df.filter(col("serviceName") === "jobs")
       .selectExpr("*", "requestParams.*").drop("requestParams")
   }
 
-  // TODO -- Add union lookup to jobs snapshot to fill in holes
-  // TODO -- schedule is missing -- create function to check for missing columns and set them to null
-  //  schema validator
-  // TODO -- Remove the window lookups from here -- this should be in gold model
   protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
 
     val jobsBase = getJobsBase(df)
@@ -633,14 +608,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("last_edited_ts", last('last_edited_ts, true).over(lastJobStatus))
       .drop("userIdentity")
 
-    // TODO -- during gold build, new cluster needs to use modifyStruct and structToMap funcs to cleanse
-    //    val baseJobStatus = SchemaTools.scrubSchema(spark.table("overwatch.job_status_silver"))
-    //    private val changeInventory = Map[String, Column](
-    //      "new_cluster.custom_tags" -> SchemaTools.structToMap(baseJobStatus, "new_cluster.custom_tags"),
-    //      "new_cluster.spark_conf" -> SchemaTools.structToMap(baseJobStatus, "new_cluster.spark_conf"),
-    //      "new_cluster.spark_env_vars" -> SchemaTools.structToMap(baseJobStatus, "new_cluster.spark_env_vars")
-    //    )
-
     jobStatusBase
       .withColumn("jobCluster",
         last(
@@ -683,8 +650,6 @@ trait SilverTransforms extends SparkSessionWrapper {
                                  etlStartTime: Column,
                                  etlStartEpochMS: Long)(df: DataFrame): DataFrame = {
 
-    // TODO -- limit the lookback period to about 7 days -- no job should run for more than 7 days except
-    //  streaming jobs. This is only needed to improve performance if needed.
     val repartitionCount = spark.conf.get("spark.sql.shuffle.partitions").toInt * 2
 
     val rawAuditExclusions = StructType(Seq(
@@ -847,7 +812,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select('organization_id, 'timestamp, 'jobId, 'existing_cluster_id.alias("clusterId"))
       .filter('clusterId.isNotNull)
 
-    // tmpFix -- TODO -- build dfFunc df.selectWNulls
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
     lazy val existingClusterLookup2 = if (SchemaTools.nestedColExists(jobsSnapshot.asDF, "settings.existing_cluster_id")) {
       jobsSnapshot.asDF
@@ -868,13 +832,6 @@ trait SilverTransforms extends SparkSessionWrapper {
     if (clusterSnapshot.exists) clusterLookups.put("clusterSnapLookup", clusterSnapLookup)
     if (jobsStatus.exists) jobStatusClusterLookups.put("jobStatusLookup", existingClusterLookup)
     if (jobsSnapshot.exists) jobStatusClusterLookups.put("jobSnapshotLookup", existingClusterLookup2)
-
-    // TODO -- add the lag back but there's an error in the joinWithLag func atm
-    // Unify each run onto a single record and structure the df
-    //    val jobRunsBase = allCompletes.alias("completes")
-    //      .joinWithLag(allSubmissions, Seq("runId", "organization_id", "date"), "date", joinType = "left")
-    //      .joinWithLag(allCancellations, Seq("runId", "organization_id", "date"), "date", joinType = "left")
-    //      .joinWithLag(runStarts, Seq("runId", "organization_id", "date"), "date", joinType = "left")
 
     val jobRunsBase = allCompletes
       .join(allSubmissions, Seq("runId", "organization_id"), "left")

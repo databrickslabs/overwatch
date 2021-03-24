@@ -1,16 +1,14 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
-import TransformFunctions._
+import org.apache.spark.sql.{Column, DataFrame}
 
 trait GoldTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
-  //  final private val orgId = dbutils.notebook.getContext.tags("orgId")
 
   protected def buildCluster()(df: DataFrame): DataFrame = {
     val clusterCols: Array[Column] = Array(
@@ -376,7 +374,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .withColumn("timestamp", 'unixTimeMS_state_end)
         .select(keys ++ lookupCols: _*)
 
-      // Adjust the uptimeInState to smoothe the runtimes over the runPeriod across concurrent runs
+      // Adjust the uptimeInState to smooth the runtimes over the runPeriod across concurrent runs
       val stateLifecycleKeys = Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start")
       val jobRunInitialState = newTerminatedJobRuns //jobRun_gold
         .withColumn("timestamp", $"job_runtime.startEpochMS")
@@ -391,7 +389,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         .withColumn("job_runtime_in_state",
           when('state.isin("CREATING", "STARTING") || 'job_cluster_type === "new", 'uptime_in_state_H) // get true cluster time when state is guaranteed fully initial
             .otherwise((array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS")) - $"job_runtime.startEpochMS") / lit(1000) / 3600)) // otherwise use jobStart as beginning time and min of stateEnd or jobEnd for end time
-        //   .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
         .withColumn("lifecycleState", lit("init"))
 
       val jobRunTerminalState = newTerminatedJobRuns
@@ -406,7 +403,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull && 'unixTimeMS_state_end > $"job_runtime.endEpochMS")
         .join(jobRunInitialState.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti")
         .withColumn("job_runtime_in_state", ($"job_runtime.endEpochMS" - array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))) / lit(1000) / 3600)
-        //   .withColumn("worker_potential_core_H", when('databricks_billable, 'worker_cores * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)))
         .withColumn("lifecycleState", lit("terminal"))
 
       val topClusters = newTerminatedJobRuns
@@ -486,7 +482,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         val sparkJobMini = incrementalSparkJob
           .select('organization_id, 'date, 'spark_context_id, 'job_group_id,
             'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
-          //      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
           .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
 
         val sparkTaskMini = incrementalSparkTask

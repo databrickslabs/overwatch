@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.utils
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.{Bronze, PipelineTable}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{DataFrame, Dataset}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.functions.{col, lit, rand}

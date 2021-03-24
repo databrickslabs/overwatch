@@ -7,10 +7,6 @@ import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-
-import javax.crypto
-import javax.crypto.KeyGenerator
-import javax.crypto.spec.IvParameterSpec
 import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -19,6 +15,9 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
 
+import javax.crypto
+import javax.crypto.KeyGenerator
+import javax.crypto.spec.IvParameterSpec
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
@@ -105,41 +104,7 @@ object JsonUtils {
 }
 
 /**
- * This entire class was created in an attempt to ensure all API keys remain encrypted between module and that
- * no keys were ever logged. This was abandoned due to some errors but should be revisited. This code should either
- * be removed (along with removed from the APIEnv structure) after it's confirmed that the API key is not stored
- * anywhere in clear text in logs or otherwise.
- *
- * @param key
- */
-class Cipher(key: String) {
-
-  private val salt = Array[Byte](16)
-  private val keyGenner = {
-    val k = KeyGenerator.getInstance("AES")
-    k.init(128)
-    k
-  }
-  private val aesKey = keyGenner.generateKey()
-  private val iv = new IvParameterSpec("0102030405060708".getBytes("UTF-8"))
-  private val cipher = crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
-
-  private[overwatch] def encrypt(text: String): Array[Byte] = {
-    //    val aesKey = new SecretKeySpec(tempKey.getBytes(), "AES")
-    //    val aesKey = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec)
-    cipher.init(crypto.Cipher.ENCRYPT_MODE, aesKey, iv)
-    cipher.doFinal(text.getBytes("UTF-8"))
-  }
-
-  private[overwatch] def decrypt(byteStream: Array[Byte]): String = {
-    cipher.init(crypto.Cipher.DECRYPT_MODE, aesKey, iv)
-    new String(cipher.doFinal(byteStream))
-  }
-
-}
-
-/**
- * SchemaTools is one of the more complext objects in Overwatch as it handles the schema (or lack there of rather)
+ * SchemaTools is one of the more complex objects in Overwatch as it handles the schema (or lack there of rather)
  * evolution, oddities, and edge cases found when working with the event / audit logs. As of the 0.2 version, there's
  * still significant room for improvement here but it seems to be handling the challenges for now.
  *
@@ -224,25 +189,9 @@ object SchemaTools extends SparkSessionWrapper {
         false
       }
     }
-    //    jobsSnapshot.asDF().schema.fields.filter(_.name == "settings").head.dataType.asInstanceOf[StructType].fields.filter(_.name == "existing_cluster_id").map(_.name).headOption
   }
 
-  //  def modifyStruct(df: DataFrame, structColToModify: String, changeInventory: Map[String, Column], prefix: String = null): Column = {
-  //    //    val columnInventory = df.select(s"${structColToModify}.*").columns
-  //    //    val newStructInventory = columnInventory.map(cName => )
-  //    val columnInventory = getAllColumnNames(df.select(s"${structColToModify}.*").schema).map(cn => {
-  //      if (cn.contains(".")) {
-  //        cn.split("\\.").dropRight(1).mkString(".")
-  //      } else { cn }
-  //    }).distinct
-  //    // returning flat columns, need to return the struct column and stop
-  //    val newStructInventory = columnInventory.map(cName => {
-  //      changeInventory.getOrElse(cName, col(s"${structColToModify}.${cName}")).alias(cName)
-  //    })
-  //    struct(newStructInventory: _*)
-  //  }
-
-  // TODO -- How to remove keys with nulls from maps?
+  // TODO -- Remove keys with nulls from maps?
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
 
     val mapColName = colToConvert.split("\\.").reverse.head
@@ -265,12 +214,11 @@ object SchemaTools extends SparkSessionWrapper {
     }
   }
 
-  //    .cast(MapType(StringType, StringType, true))
-
   // TODO -- Delta writer is schema case sensitive and will fail on write if column case is not identical on both sides
   //  As such, schema case sensitive validation needs to be enabled and a handler for whether to assume the same data
   //  and merge the data, or drop it, or quarantine it or what. This is very common in cases where a column is of
   //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
+  //  UPDATE: This has been handled with spark.conf.get("spark.sql.caseSensitive") but needs to be tested on structs
   // TODO -- throw exception if the resulting string is empty
   /**
    * Remove special characters from the field name
@@ -336,6 +284,7 @@ object SchemaTools extends SparkSessionWrapper {
   /**
    * Recursive function to drill into the schema. Currently only supports recursion through structs and array.
    * TODO -- add support for recursion through Maps
+   *  Issue_86
    *
    * @param dataType
    * @return
@@ -356,6 +305,7 @@ object SchemaTools extends SparkSessionWrapper {
    * Main function for cleaning a schema. The point is to remove special characters and duplicates all the way down
    * into the Arrays / Structs.
    * TODO -- Add support for map type recursion cleansing
+   *  Issue_86
    * TODO -- convert to same pattern as schema validation function
    *
    * @param df Input dataframe to be cleansed
@@ -381,7 +331,7 @@ object SchemaTools extends SparkSessionWrapper {
     dataType.isInstanceOf[ArrayType] || dataType.isInstanceOf[StructType] || dataType.isInstanceOf[MapType]
   }
 
-  private def emitExclusionWarning(f: StructField, isDebug: Boolean, prefix: Option[String]): Unit = {
+  private def emitExclusionWarning(f: StructField, prefix: Option[String]): Unit = {
     val fullColName = getPrefixedString(prefix, f.name)
 
     val msg = s"SCHEMA WARNING: COLUMN STRIPPED from source --> Column $fullColName is required to be absent from " +
@@ -464,7 +414,7 @@ object SchemaTools extends SparkSessionWrapper {
     // data sources
     val exclusionsFields = minRequiredSchema.fields.filter(f => f.dataType.isInstanceOf[NullType])
     val exclusions = exclusionsFields.map(_.name.toLowerCase)
-    exclusionsFields.foreach(emitExclusionWarning(_, isDebug, cPrefix))
+    exclusionsFields.foreach(emitExclusionWarning(_, cPrefix))
 
     val dfFieldsNames = dfSchema.fieldNames.map(_.toLowerCase)
     val reqFieldsNames = minRequiredSchema.fieldNames.map(_.toLowerCase)
@@ -526,7 +476,7 @@ object SchemaTools extends SparkSessionWrapper {
             isDebug,
             newPrefix
           )
-            .map(validateSchema(_, newPrefix)) // TODO -- check if recursive prefix is right
+            .map(validateSchema(_, newPrefix))
 
           // build and return struct
           validator.copy(column = struct(validatedChildren.map(_.column): _*).alias(fieldStructure.name))
@@ -561,7 +511,7 @@ object SchemaTools extends SparkSessionWrapper {
               }
           }
         }
-        // TODO -- add support for MapType
+        // TODO -- Issue_86 -- add support for MapType
         case scalarField => { // field is base scalar
           if (isComplexDataType(requiredFieldStructure.dataType)) { // FAIL -- Scalar to Complex not supported
             throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
@@ -605,18 +555,6 @@ object Helpers extends SparkSessionWrapper {
     Math.min(driverCores, 8)
   }
 
-
-  // TODO -- This is broken -- It looks like I may have to pass in the df.schema as well
-  //
-  //  def getLocalTime(ts: Column, tz: String): Column = {
-  //    ts.expr.dataType match {
-  //      case _: TimestampType => from_utc_timestamp(ts, tz)
-  //      case _: LongType => from_utc_timestamp(from_unixtime(ts.cast("double") / 1000).cast("timestamp"), tz)
-  //      case _: DoubleType => from_utc_timestamp(from_unixtime(ts).cast("timestamp"), tz)
-  //      case _: IntegerType => from_utc_timestamp(from_unixtime(ts).cast("timestamp"), tz)
-  //    }
-  //  }
-
   /**
    * Check whether a path exists
    *
@@ -640,7 +578,7 @@ object Helpers extends SparkSessionWrapper {
       val fs = new Path(path).getFileSystem(conf)
       fs.listStatus(new Path(path)).map(_.getPath.toString)
     } catch {
-      case e: Throwable => Array(path)
+      case _: Throwable => Array(path)
     }
   }
 
@@ -792,9 +730,9 @@ object Helpers extends SparkSessionWrapper {
         val sql = s"""optimize ${tbl.tableFullName} ${zorderColumns}"""
         println(s"optimizing: ${tbl.tableFullName} --> $sql")
         spark.sql(sql)
-        if (tbl.vacuum > 0) {
-          println(s"vacuuming: ${tbl.tableFullName}, Retention == ${tbl.vacuum}")
-          spark.sql(s"VACUUM ${tbl.tableFullName} RETAIN ${tbl.vacuum} HOURS")
+        if (tbl.vacuum_H > 0) {
+          println(s"vacuuming: ${tbl.tableFullName}, Retention == ${tbl.vacuum_H}")
+          spark.sql(s"VACUUM ${tbl.tableFullName} RETAIN ${tbl.vacuum_H} HOURS")
         }
         println(s"Complete: ${tbl.tableFullName}")
       } catch {
@@ -824,60 +762,6 @@ object Helpers extends SparkSessionWrapper {
         println(s"Complete: ${tbl}")
       } catch {
         case e: Throwable => println(e.printStackTrace())
-      }
-    })
-  }
-
-  // TODO -- Combine the following two functions
-
-  /**
-   * Manual compute stats function for an entire database -- useful for parquet tables but generally unecessary for delta tables.
-   * Better to use the moveColumnsToFront and have those columns auto-indexed, in most cases.
-   * TODO -- Add input param "computeDelta: Boolean" and if false, omit delta tables from being computed
-   *
-   * @param db                Database for which to compute stats Note: this will compute stats for all tables currently
-   * @param parallelism       How many tables to compute stats simultaneously
-   * @param forColumnsByTable Which columns should have stats calculated.
-   */
-  def computeStats(db: String, parallelism: Int = parallelism - 1,
-                   forColumnsByTable: Map[String, Array[String]] = Map()): Unit = {
-    val tables = getTables(db)
-    val tablesPar = tables.par
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-    tablesPar.tasksupport = taskSupport
-
-    tablesPar.foreach(tbl => {
-      val forColumns = if (forColumnsByTable.contains(tbl)) s"for columns ${forColumnsByTable(tbl).mkString(", ")}" else ""
-      val sql = s"""analyze table ${db}.${tbl} compute statistics ${forColumns}"""
-      try {
-        println(s"Analyzing: $tbl --> $sql")
-        spark.sql(sql)
-        println(s"Completed: $tbl")
-      } catch {
-        case e: Throwable => println(s"FAILED: $tbl --> $sql")
-      }
-    })
-  }
-
-  /**
-   * Compute stats for Array of PipelineTables
-   *
-   * @param tables
-   */
-  def computeStats(tables: Array[PipelineTable]): Unit = {
-    val tablesPar = tables.par
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-    tablesPar.tasksupport = taskSupport
-
-    tablesPar.foreach(tbl => {
-      val forColumns = if (tbl.statsColumns.nonEmpty) s"for columns ${tbl.statsColumns.mkString(", ")}" else ""
-      val sql = s"""analyze table ${tbl.tableFullName} compute statistics ${forColumns}"""
-      try {
-        println(s"Analyzing: ${tbl.tableFullName} --> $sql")
-        spark.sql(sql)
-        println(s"Completed: ${tbl.tableFullName}")
-      } catch {
-        case e: Throwable => println(s"FAILED: ${tbl.tableFullName} --> $sql")
       }
     })
   }
