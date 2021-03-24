@@ -115,7 +115,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
       rawAzureAuditEvents,
       BronzeTargets.auditLogAzureLandRaw,
-      spark, config, "azure_audit_log_preProcessing"
+      spark, config, "azure_audit_log_preProcessing", getTotalCores
     )
 
     database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw,pipelineSnapTime.asColumnTS)

@@ -250,7 +250,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
     try {
 
-      val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName)
+      val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, getTotalCores)
 
       val startLogMsg = s"Beginning append to ${target.tableFullName}"
       logger.log(Level.INFO, startLogMsg)

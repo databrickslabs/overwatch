@@ -27,7 +27,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     Seq(buildClusterStateFact(
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.clustersSnapshotTarget,
-      SilverTargets.clustersSpecTarget
+      SilverTargets.clustersSpecTarget,
+      config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
     )),
     append(GoldTargets.clusterStateFactTarget)
   )
@@ -61,10 +62,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     Seq(
       // Retrieve cluster states for current time period plus 2 days for lagging states
       buildJobRunCostPotentialFact(
-        GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 90, "date_state_start"),
-        // Lookups
-        GoldTargets.clusterTarget.asDF,
-        BronzeTargets.cloudMachineDetail.asDF,
+        GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 90, "unixTimeMS_state_start"),
         GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
         GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
         config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
