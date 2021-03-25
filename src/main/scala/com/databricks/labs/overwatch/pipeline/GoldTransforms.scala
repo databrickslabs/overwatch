@@ -437,10 +437,10 @@ trait GoldTransforms extends SparkSessionWrapper {
         .withColumn("run_state_utilization", 'job_runtime_in_state / sum('job_runtime_in_state).over(concState)) // given n hours of uptime in state 1/n of said uptime was used by this job job
         .withColumn("running_days", sequence($"job_runtime.startTS".cast("date"), $"job_runtime.endTS".cast("date")))
         .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
-        .withColumn("driver_compute_cost", 'driver_compute_cost * 'job_runtime_in_state * 'run_state_utilization) // smothing across concurrency and running days
-        .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'job_runtime_in_state * 'run_state_utilization)
-        .withColumn("worker_compute_cost", 'worker_compute_cost * 'job_runtime_in_state * 'run_state_utilization)
-        .withColumn("worker_dbu_cost", 'worker_dbu_cost * 'job_runtime_in_state * 'run_state_utilization)
+        .withColumn("driver_compute_cost", 'driver_compute_cost * 'run_state_utilization) // smoothing across concurrency and running days
+        .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'run_state_utilization)
+        .withColumn("worker_compute_cost", 'worker_compute_cost * 'run_state_utilization)
+        .withColumn("worker_dbu_cost", 'worker_dbu_cost * 'run_state_utilization)
         .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
         .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
         .withColumn("total_compute_cost", 'driver_compute_cost + 'worker_compute_cost)
