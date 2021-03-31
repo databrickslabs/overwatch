@@ -3,9 +3,10 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.functions.{col, date_add, date_sub, lit, rand}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 
 object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -44,7 +45,9 @@ object PipelineFunctions {
 
    val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
       val targetShufflePartitionSizeMB = 128.0
-      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").replace("b", "").toDouble / 1024 / 1024
+      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes")
+        .replace("b", "").toDouble / 1024 / 1024
+
       val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
 
       val sourceDFParts = getSourceDFParts(df)
@@ -79,11 +82,13 @@ object PipelineFunctions {
 
     spark.conf.set("spark.sql.shuffle.partitions",targetShufflePartitions)
 
-    // repartition partitioned tables that are not auto-optimized into the range partitions for writing
-    // without this the file counts of partitioned tables will be extremely high
-    // also generate noise to prevent skewed partition writes into extremely low cardinality
-    // organization_ids/dates per run -- usually 1:1
-    // noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
+    /**
+     * repartition partitioned tables that are not auto-optimized into the range partitions for writing
+     * without this the file counts of partitioned tables will be extremely high
+     * also generate noise to prevent skewed partition writes into extremely low cardinality
+     * organization_ids/dates per run -- usually 1:1
+     * noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
+     */
 
     if (target.partitionBy.nonEmpty) {
       if (target.partitionBy.contains("__overwatch_ctrl_noise") && !target.autoOptimize) {
@@ -117,6 +122,7 @@ object PipelineFunctions {
   }
 
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
+  //  currently filters with nested columns aren't supported
   def withIncrementalFilters(
                               df: DataFrame,
                               module: Module,

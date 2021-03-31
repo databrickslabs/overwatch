@@ -1,10 +1,10 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.utils.asofJoin._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import asofJoin._
 
 /**
  * Added support for reverse sorting and lookup when

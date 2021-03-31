@@ -1,16 +1,14 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
-import TransformFunctions._
+import org.apache.spark.sql.{Column, DataFrame}
 
 trait GoldTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
-  //  final private val orgId = dbutils.notebook.getContext.tags("orgId")
 
   protected def buildCluster()(df: DataFrame): DataFrame = {
     val clusterCols: Array[Column] = Array(
@@ -376,6 +374,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .withColumn("timestamp", 'unixTimeMS_state_end)
         .select(keys ++ lookupCols: _*)
 
+      // Adjust the uptimeInState to smooth the runtimes over the runPeriod across concurrent runs
       val stateLifecycleKeys = Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start")
 
       // for states (CREATING and STARTING) OR automated cluster runstate start is same as cluster state start
@@ -557,7 +556,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         val sparkJobMini = incrementalSparkJob
           .select('organization_id, 'date, 'spark_context_id, 'job_group_id,
             'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
-          //      .filter('job_group_id.like("%job-%-run-%")) // temporary until all job/run ids are imputed in the gold layer
           .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
 
         val sparkTaskMini = incrementalSparkTask

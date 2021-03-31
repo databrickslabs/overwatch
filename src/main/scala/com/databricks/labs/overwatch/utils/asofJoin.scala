@@ -1,10 +1,10 @@
 package com.databricks.labs.overwatch.utils
 
 
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructField
-import org.apache.log4j.{Level, Logger}
 
 /**
  * Essentially a fork from dblabs tempo project
@@ -98,7 +98,7 @@ object asofJoin {
     val afterW: WindowSpec = tsdf.windowBetweenRows(Window.currentRow, maxLookAhead)
 
     val df = rightCols.foldLeft(tsdf.df) {
-      case (dfBuilder, rightCol) => {
+      case (dfBuilder, rightCol) =>
         val asofDF = dfBuilder.withColumn(rightCol.name,
           coalesce(last(col(rightCol.name), true).over(beforeW), lit(null).cast(rightCol.dataType))
         )
@@ -107,7 +107,6 @@ object asofJoin {
             coalesce(col(rightCol.name), first(col(rightCol.name), true).over(afterW), lit(null).cast(rightCol.dataType))
           )
         } else asofDF
-      }
     }
 
     TSDF(df, left_ts_col.name, tsdf.partitionCols.map(_.name): _*)
@@ -182,10 +181,6 @@ object asofJoin {
 
       logger.log(Level.DEBUG, msg)
 
-//      if (leftTSDF.partitionCols.forall(f => rightTSDF.partitionCols.map(_.name.toLowerCase).contains(f.name.toLowerCase))) {
-//        throw new IllegalArgumentException("Casting Aborted! Partition column names are different")
-//      }
-
     }
 
     // add Prefixes to TSDFs
@@ -227,7 +222,7 @@ object asofJoin {
     val slimSelects = structuralCols ++ outerColNames ++ dupColNames.map(cName => col(cName))
 
     val asofTSDF: TSDF = tsPartitionVal match {
-      case Some(partitionValue) => {
+      case Some(partitionValue) =>
         val timePartitionedTSDF = getTimePartitions(combinedTSDF, partitionValue, fraction)
 
         val asofDF = getLastRightRow(
@@ -241,7 +236,6 @@ object asofJoin {
           .drop("ts_partition", "is_original")
 
         TSDF(asofDF, prefixedLeftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name): _*)
-      }
       case None => getLastRightRow(
         combinedTSDF,
         maxLookback,
@@ -312,7 +306,7 @@ object asofJoin {
         addColumnsFromOtherDF(prefixedRightTSDF, leftCols))
 
       val asofTSDF: TSDF = tsPartitionVal match {
-        case Some(partitionValue) => {
+        case Some(partitionValue) =>
           val timePartitionedTSDF = getTimePartitions(combinedTSDF,partitionValue,fraction)
 
           val asofDF = getLastRightRow(
@@ -326,8 +320,7 @@ object asofJoin {
             .drop("ts_partition","is_original","__driving_df__")
 
           TSDF(asofDF, prefixedLeftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name):_*)
-        }
-        case None => {
+        case None =>
           val asofDF = getLastRightRow(
             combinedTSDF,
             maxLookback,
@@ -338,7 +331,6 @@ object asofJoin {
             .drop("__driving_df__")
 
           TSDF(asofDF, prefixedLeftTSDF.tsColumn.name, leftTSDF.partitionCols.map(_.name):_*)
-        }
       }
       asofTSDF
     }

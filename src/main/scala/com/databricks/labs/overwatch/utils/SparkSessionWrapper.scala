@@ -1,10 +1,8 @@
 package com.databricks.labs.overwatch.utils
 
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.SparkSession
-
-import scala.collection.JavaConverters._
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 
 /**
  * Enables access to the Spark variable.
@@ -38,6 +36,8 @@ trait SparkSessionWrapper extends Serializable {
     SparkSession.builder()
       .master("local")
       .appName("OverwatchBatch")
+//    Useful configs for local spark configs and/or using labs/spark-local-execution
+//    https://github.com/databricks-academy/spark-local-execution
 //      .config("spark.driver.bindAddress", "0.0.0.0")
 //      .enableHiveSupport()
 //      .config("spark.warehouse.dir", "metastore")

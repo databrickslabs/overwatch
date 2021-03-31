@@ -2,9 +2,6 @@ package com.databricks.labs.overwatch.pipeline
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import java.util.stream.Collectors
-import collection.JavaConverters._
-
 object InitializerFunctions {
   /**
    * Load text file

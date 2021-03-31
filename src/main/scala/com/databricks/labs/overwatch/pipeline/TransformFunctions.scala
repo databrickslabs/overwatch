@@ -1,14 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, TSDF, ValidatedColumn}
+import com.databricks.labs.overwatch.utils.{SchemaTools, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
-import org.apache.spark.sql.expressions.{Window, WindowSpec}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
+import org.apache.spark.sql.expressions.WindowSpec
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 
 import java.time.LocalDate
 
@@ -104,7 +102,6 @@ object TransformFunctions {
   }
 
   object Costs {
-//    val baseMetrics = Array("driver_compute_cost", "worker_compute_cost", "driver_dbu_cost", "worker_dbu_cost", "total_compute_cost", "total_DBU_cost", "total_driver_cost", "total_worker_cost", "total_cost")
     def compute(
                  isCloudBillable: Column,
                  computeCost_H: Column,
@@ -126,6 +123,17 @@ object TransformFunctions {
       when(isDatabricksBillable, dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
     }
 
+    /**
+     * Will be improved upon and isn't used in this package but is a handy function for Overwatch users.
+     * This will likely be refactored out to utils later when we create user utils functions area.
+     * @param df
+     * @param metrics
+     * @param by
+     * @param precision
+     * @param smoother
+     * @throws org.apache.spark.sql.AnalysisException
+     * @return
+     */
     @throws(classOf[AnalysisException])
     def summarize(
                    df: DataFrame,
@@ -246,8 +254,10 @@ object TransformFunctions {
    * Warning Does not remove null structs, arrays, etc.
    *
    * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
-   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns
+   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
+   *  disregards structs
    *
+   * Another helpful user function not utilized in the code base.
    * @param df dataframe to more data
    * @return
    *

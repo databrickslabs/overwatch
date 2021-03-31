@@ -1,9 +1,9 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
-import org.apache.spark.sql.DataFrame
-import TransformFunctions._
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.DataFrame
 
 class Module(
               _moduleID: Int,
@@ -80,25 +80,6 @@ class Module(
   private def mostLaggingDependency: SimplifiedModuleStatusReport = {
     moduleDependencies.map(depState => pipelineState(depState))
       .sortBy(_.untilTS).reverse.head
-  }
-
-  /**
-   * Override the initial untilTS with a new value equal to the specified value
-   *
-   * @param newUntilTime
-   */
-  private def overrideUntilTS(newUntilTime: Long): Unit = {
-    if (moduleDependencies.nonEmpty) {
-      // get earliest date of all required modules
-      val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${untilTime.asUnixTimeMilli} " +
-        s"exceeds that of an upstream requisite module: ${mostLaggingDependency.moduleID}-${mostLaggingDependency.moduleName} " +
-        s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module untilTS == min requisite module: " +
-        s"${mostLaggingDependency.untilTS}."
-      logger.log(Level.WARN, msg)
-      println(msg)
-    }
-    val newState = moduleState.copy(untilTS = newUntilTime)
-    pipeline.updateModuleState(newState)
   }
 
   private def initModuleState: SimplifiedModuleStatusReport = {
