@@ -148,9 +148,6 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
 
     val primordialDateString = getOptionString(masterNode, "primordialDateString")
 
-    //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":null}
-    //    {\"tokenSecret\":{\"scope\":\"tomes\",\"key\":\"main\"},\"dataTarget\":{\"databaseName\":\"Overwatch\",\"databaseLocation\":null}}
-
     OverwatchParams(
       auditLogConfig,
       token,

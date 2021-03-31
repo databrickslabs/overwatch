@@ -1,16 +1,16 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, FailedModuleException, Frequency, IncrementalFilter, NoNewDataException, SparkSessionWrapper, UnhandledException, UnsupportedTypeException}
+import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.functions._
-import TransformFunctions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
+import org.apache.spark.sql.{AnalysisException, DataFrame}
 
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
-//  also add ruleStrateg: Enum(Kill, Quarantine, Ignore) to determine when to require them
+//  also add ruleStrategy: Enum(Kill, Quarantine, Ignore) to determine when to require them
 //  Perhaps add the strategy into the Rule definition in the Rules Engine
 case class PipelineTable(
                           name: String,
@@ -26,9 +26,9 @@ case class PipelineTable(
                           partitionBy: Seq[String] = Seq(),
                           statsColumns: Array[String] = Array(),
                           shuffleFactor: Double = 1.0,
-                          optimizeFrequency: Int = 24 * 7,
+                          optimizeFrequency_H: Int = 24 * 7,
                           zOrderBy: Array[String] = Array(),
-                          vacuum: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
+                          vacuum_H: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
                           enableSchemaMerge: Boolean = true,
                           sparkOverrides: Map[String, String] = Map[String, String](),
                           withCreateDate: Boolean = true,
@@ -44,21 +44,6 @@ case class PipelineTable(
   import spark.implicits._
 
   val databaseName: String = if (_databaseName == "default") config.databaseName else config.consumerDatabaseName
-
-  private val (catalogDB, catalogTable) = if (!config.isFirstRun) {
-    val dbCatalog = try {
-      Some(spark.sessionState.catalog.getDatabaseMetadata(config.databaseName))
-    } catch {
-      case e: Throwable => None
-    }
-
-    val dbTable = try {
-      Some(spark.sessionState.catalog.getTableMetadata(new TableIdentifier(name, Some(config.databaseName))))
-    } catch {
-      case e: Throwable => None
-    }
-    (dbCatalog, dbCatalog)
-  } else (None, None)
 
   val tableFullName: String = s"${databaseName}.${name}"
 
@@ -77,7 +62,7 @@ case class PipelineTable(
   // Minimum Schema Enforcement Management
   private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
   private var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
-  private def emitMissingMasterSchemaMessage: Unit = {
+  private def emitMissingMasterSchemaMessage(): Unit = {
     val msg = s"No Master Schema defined for Table $tableFullName"
     logger.log(Level.ERROR, msg)
     if (config.debugFlag) println(msg)
@@ -86,14 +71,14 @@ case class PipelineTable(
   private[overwatch] def withMinimumSchemaEnforcement: this.type = withMinimumSchemaEnforcement(true)
   private[overwatch] def withMinimumSchemaEnforcement(value: Boolean): this.type = {
     if (masterSchema.nonEmpty) withMasterMinimumSchema = value
-    else emitMissingMasterSchemaMessage // cannot enforce master schema if not defined
+    else emitMissingMasterSchemaMessage() // cannot enforce master schema if not defined
     this
   }
 
   private[overwatch] def enforceNullableRequirements: this.type = enforceNullableRequirements(true)
   private[overwatch] def enforceNullableRequirements(value: Boolean): this.type = {
     if (masterSchema.nonEmpty && exists) enforceNonNullable = value
-    else emitMissingMasterSchemaMessage // cannot enforce master schema if not defined
+    else emitMissingMasterSchemaMessage() // cannot enforce master schema if not defined
     this
   }
 
@@ -246,9 +231,6 @@ case class PipelineTable(
       else dfWriter
       dfWriter
     }
-
-    // TODO - Validate proper repartition to minimize files per partition. Could be autoOptimize
-
 
   }
 
