@@ -1,12 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{SchemaTools, SparkSessionWrapper, TSDF, ValidatedColumn}
+import com.databricks.labs.overwatch.utils.{SchemaTools, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.expressions.{Window, WindowSpec}
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
+import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
+import org.apache.spark.sql.expressions.WindowSpec
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 
 import java.time.LocalDate
 
@@ -101,13 +101,75 @@ object TransformFunctions {
 
   }
 
+  object Costs {
+    def compute(
+                 isCloudBillable: Column,
+                 computeCost_H: Column,
+                 nodeCount: Column,
+                 computeTime_H: Column,
+                 smoothingCol: Option[Column] = None
+               ): Column = {
+      when(isCloudBillable, computeCost_H * computeTime_H * nodeCount * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
+    }
+
+    def dbu(
+             isDatabricksBillable: Column,
+             dbu_H: Column,
+             dbuRate_H: Column,
+             nodeCount: Column,
+             computeTime_H: Column,
+             smoothingCol: Option[Column] = None
+           ): Column = {
+      when(isDatabricksBillable, dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
+    }
+
+    /**
+     * Will be improved upon and isn't used in this package but is a handy function for Overwatch users.
+     * This will likely be refactored out to utils later when we create user utils functions area.
+     * @param df
+     * @param metrics
+     * @param by
+     * @param precision
+     * @param smoother
+     * @throws org.apache.spark.sql.AnalysisException
+     * @return
+     */
+    @throws(classOf[AnalysisException])
+    def summarize(
+                   df: DataFrame,
+                   metrics: Array[String],
+                   by: Array[String],
+                   precision: Int,
+                   smoother: Column
+                 ): DataFrame = {
+      metrics.foreach(m => require(df.schema.fieldNames.map(_.toLowerCase).contains(m.toLowerCase),
+        s"Cost Summary Failed: Column $m does not exist in the dataframe provided."
+      ))
+      by.foreach(by => require(df.schema.fieldNames.map(_.toLowerCase).contains(by.toLowerCase),
+        s"Cost Summary Failed: Grouping Column $by does not exist in the dataframe provided."
+      ))
+
+      val aggs = metrics.map(m => {
+        greatest(round(sum(col(m) * smoother), precision), lit(0)).alias(m)
+      })
+
+      df
+        .groupBy(by map col: _*)
+        .agg(
+          aggs.head, aggs.tail: _*
+        )
+    }
+  }
+
+  def isAutomated(clusterName: Column): Column = clusterName.like("job-%-run-%")
+
   /**
    * Retrieve DF alias
    * @param ds
    * @return
    */
   def getAlias(ds: Dataset[_]): Option[String] = ds.queryExecution.analyzed match {
-    case SubqueryAlias(alias, _) => Some(alias.identifier)
+    case SubqueryAlias(alias, _) => Some(alias.name)
     case _ => None
   }
 
@@ -192,8 +254,10 @@ object TransformFunctions {
    * Warning Does not remove null structs, arrays, etc.
    *
    * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
-   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns
+   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
+   *  disregards structs
    *
+   * Another helpful user function not utilized in the code base.
    * @param df dataframe to more data
    * @return
    *

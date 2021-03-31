@@ -3,9 +3,10 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.functions.{col, date_add, date_sub, lit, rand}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 
 object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -33,52 +34,61 @@ object PipelineFunctions {
                                target: PipelineTable,
                                spark: SparkSession,
                                config: Config,
-                               moduleName: String
+                               moduleName: String,
+                               currentClusterCoreCount: Int
                              ): DataFrame = {
 
-    val sourceDFParts = getSourceDFParts(df)
     var mutationDF = df
     mutationDF = if (target.zOrderBy.nonEmpty) {
       TransformFunctions.moveColumnsToFront(mutationDF, target.zOrderBy ++ target.statsColumns)
     } else mutationDF
 
-    val targetShufflePartitionSizeMB = 128.0
-    val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes").toDouble / 1024 / 1024
-    val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
+   val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
+      val targetShufflePartitionSizeMB = 128.0
+      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes")
+        .replace("b", "").toDouble / 1024 / 1024
 
-    // TODO -- handle streaming until Module refactor with source -> target mappings
-    val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
-      target.name match {
-        case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
-          .rdd.partitions.length * target.shuffleFactor
-        case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
+      val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
+
+      val sourceDFParts = getSourceDFParts(df)
+      // TODO -- handle streaming until Module refactor with source -> target mappings
+      val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
+        target.name match {
+          case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
+            .rdd.partitions.length * target.shuffleFactor
+          case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
+        }
+      } else {
+        sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
       }
+
+      val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
+      val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
+
+      if (config.debugFlag) {
+        println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
+        println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
+        println(s"DEBUG: Max PartitionBytes (MB): $readMaxPartitionBytesMB")
+      }
+
+      logger.log(Level.INFO, s"$moduleName: " +
+        s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
+        s"\nShufflePartitions: ${targetShufflePartitionCount}")
+
+      targetShufflePartitionCount
     } else {
-      sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
+      Math.max(currentClusterCoreCount * 2, spark.conf.get("spark.sql.shuffle.partitions").toInt)
     }
 
-    val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
-    val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
+    spark.conf.set("spark.sql.shuffle.partitions",targetShufflePartitions)
 
-    if (config.debugFlag) {
-      println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
-      println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
-      println(s"DEBUG: Max PartitionBytes (MB): ${
-        spark.conf.get("spark.sql.files.maxPartitionBytes").toInt / 1024 / 1024
-      }")
-    }
-
-    logger.log(Level.INFO, s"$moduleName: " +
-      s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
-      s"\nShufflePartitions: ${targetShufflePartitionCount}")
-
-    spark.conf.set("spark.sql.shuffle.partitions", targetShufflePartitionCount)
-
-    // repartition partitioned tables that are not auto-optimized into the range partitions for writing
-    // without this the file counts of partitioned tables will be extremely high
-    // also generate noise to prevent skewed partition writes into extremely low cardinality
-    // organization_ids/dates per run -- usually 1:1
-    // noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
+    /**
+     * repartition partitioned tables that are not auto-optimized into the range partitions for writing
+     * without this the file counts of partitioned tables will be extremely high
+     * also generate noise to prevent skewed partition writes into extremely low cardinality
+     * organization_ids/dates per run -- usually 1:1
+     * noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
+     */
 
     if (target.partitionBy.nonEmpty) {
       if (target.partitionBy.contains("__overwatch_ctrl_noise") && !target.autoOptimize) {
@@ -87,9 +97,9 @@ object PipelineFunctions {
       }
 
       if (!target.autoOptimize) {
-        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into $targetShufflePartitionCount " +
+        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into $targetShufflePartitions " +
           s" output partitions defined as ${target.partitionBy.mkString(", ")}")
-        mutationDF = mutationDF.repartition(targetShufflePartitionCount, target.partitionBy map col: _*)
+        mutationDF = mutationDF.repartition(targetShufflePartitions, target.partitionBy map col: _*)
       }
     }
 
@@ -112,6 +122,7 @@ object PipelineFunctions {
   }
 
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
+  //  currently filters with nested columns aren't supported
   def withIncrementalFilters(
                               df: DataFrame,
                               module: Module,
@@ -150,30 +161,19 @@ object PipelineFunctions {
 
   }
 
-  def isIgnorableException(e: Exception): Boolean = {
-    val message = e.getMessage
-    message.contains("Cannot modify the value of a static config")
-  }
-
   def setSparkOverrides(spark: SparkSession, sparkOverrides: Map[String, String],
                         debugFlag: Boolean = false): Unit = {
     sparkOverrides foreach { case (k, v) =>
       try {
-        if (debugFlag) {
-          val opt = spark.conf.getOption(k)
+        val opt = spark.conf.getOption(k)
+        if (debugFlag) { // if debug write out the override
           if (opt.isEmpty || opt.get != v) {
-            println(s"Overriding $k from $opt --> $v")
+            println(s"Overriding $k from ${opt.getOrElse("UNDEFINED")} --> $v")
           }
         }
-        spark.conf.set(k, v)
+        // if sparkConf can be modified OR is unset, set spark conf
+        if (spark.conf.isModifiable(k) || opt.isEmpty) spark.conf.set(k, v)
       } catch {
-        case e: AnalysisException =>
-
-          if (!isIgnorableException(e)) {
-            logger.log(Level.WARN, s"Cannot Set Spark Param: $k", e)
-            if (debugFlag)
-              println(s"Failed Setting $k", e)
-          }
         case e: Throwable =>
           if (debugFlag)
             println(s"Failed Setting $k", e)

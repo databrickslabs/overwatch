@@ -1,36 +1,27 @@
 package com.databricks.labs.overwatch.utils
 
-import java.time.{Duration, Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset}
-import java.util.{Calendar, Date, TimeZone, UUID}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.functions.{col, from_unixtime, lit}
+import org.apache.spark.sql.functions.col
+
+import java.util.UUID
 
 class Config() {
 
-
-  // TODO -- Build Module Inventory Map that tracks state of each module
-  //  publish to it during finalizeModule / moduleErrors
-  //  check state during module Initialization and validate dependencies
-  //  Add config needs into function for validation DURING pipeline Process
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-", "")
-  private final val cipherKey = UUID.randomUUID().toString
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
   private var _isFirstRun: Boolean = false
   private var _debugFlag: Boolean = false
   private var _organizationId: String = _
-  private var _lastRunDetail: Array[SimplifiedModuleStatusReport] = Array[SimplifiedModuleStatusReport]()
-  private var _pipelineSnapTime: Long = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
   private var _consumerDatabaseName: String = _
   private var _consumerDatabaseLocation: String = _
   private var _workspaceUrl: String = _
   private var _cloudProvider: String = _
-  private var _token: Array[Byte] = _
   private var _tokenType: String = _
   private var _apiEnv: ApiEnv = _
   private var _auditLogConfig: AuditLogConfig = _
@@ -39,14 +30,12 @@ class Config() {
   private var _maxDays: Int = 60
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
-  private var _parsedConfig: ParsedConfig = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
   private var _initialSparkConf: Map[String, String] = Map()
   private var _intialShuffleParts: Int = 200
   private var _contractInteractiveDBUPrice: Double = 0.56
   private var _contractAutomatedDBUPrice: Double = 0.26
 
-  final private val cipher = new Cipher(cipherKey)
   private val logger: Logger = Logger.getLogger(this.getClass)
   /**
    * BEGIN GETTERS
@@ -55,8 +44,6 @@ class Config() {
    */
 
   private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
-
-  private[overwatch] def lastRunDetail: Array[SimplifiedModuleStatusReport] = _lastRunDetail
 
   private[overwatch] def isLocalTesting: Boolean = _isLocalTesting
 
@@ -84,11 +71,7 @@ class Config() {
 
   private[overwatch] def workspaceURL: String = _workspaceUrl
 
-  private[overwatch] def token: String = cipher.decrypt(_token)
-
   private[overwatch] def apiEnv: ApiEnv = _apiEnv
-
-  private[overwatch] def encryptedToken: Array[Byte] = _token
 
   private[overwatch] def auditLogConfig: AuditLogConfig = _auditLogConfig
 
@@ -248,25 +231,16 @@ class Config() {
     this
   }
 
-  // TODO - figure out why decryption doesn't consistently work and correc this function. The setters for
-  //  rawToken should be removed throughout the codebase when this is resolved.
   /**
    * This function wraps all requisite parameters required for API calls and sets the complex type: APIEnv.
-   * Also sets all required details to enable API calls. Furthermore, this function attempts
-   * to encrypt the token and store as an attribute of the APIEnv.
+   * Also sets all required details to enable API calls.
    * An additional review should be completed to determine if all setters can be removed except the APIEnv registration.
-   * Goal is to store a complex object, "APIEnv" with an encrypted token only.
-   *
-   * There have been challenges in getting this to work consistently and as of this
-   * writing is not being used (the encrypted version). Notice the use of a "rawToken" which is fine but extra care
-   * must be used to ensure the raw token doesn't get stored in clear text in any logs or passed in any
-   * fashion that presents risk.
    *
    * @param tokenSecret Optional input of the Token Secret. If left null, the token secret will be initialized
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registeredEncryptedToken(tokenSecret: Option[TokenSecret]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret]): this.type = {
     var rawToken = ""
     try {
       // Token secrets not supported in local testing
@@ -276,7 +250,6 @@ class Config() {
         val scope = tokenSecret.get.scope
         val key = tokenSecret.get.key
         rawToken = dbutils.secrets.get(scope, key)
-        _token = cipher.encrypt(dbutils.secrets.get(scope, key))
         val authMessage = s"Valid Secret Identified: Executing with token located in secret, $scope : $key"
         logger.log(Level.INFO, authMessage)
         _tokenType = "Secret"
@@ -285,13 +258,11 @@ class Config() {
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
           //_cloudProvider setter not necessary -- done in local setup
           rawToken = System.getenv("OVERWATCH_TOKEN")
-          _token = cipher.encrypt(System.getenv("OVERWATCH_TOKEN"))
           _tokenType = "Environment"
         } else { // Use default token for job owner
           _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
           _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
           rawToken = dbutils.notebook.getContext().apiToken.get
-          _token = cipher.encrypt(dbutils.notebook.getContext().apiToken.get)
           val authMessage = "No secret parameters provided: attempting to continue with job owner's token."
           logger.log(Level.WARN, authMessage)
           println(authMessage)
@@ -368,63 +339,17 @@ class Config() {
    */
   def buildLocalOverwatchParams(): String = {
 
-    registeredEncryptedToken(None)
+    registerWorkspaceMeta(None)
     _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters)
-    val inputOverwatchScope = Array("audit", "clusters")
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
     //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
 
     // AWS TEST
     _cloudProvider = "azure"
-    //    _auditLogConfig = AuditLogConfig(Some("/mnt/tomesdata/logs/field_training_audit/"), None)
-
-    // AZURE TEST
-    //    _cloudProvider = "azure"
-    //    val EVENT_HUB_CONNECTION_STRING = "Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ="
-    //    val EVENT_HUB_NAME = "overwatch"
-    //    val MAX_EVENTS_PER_TRIGGER = 10000
-    //    val STATE_PREFIX = "abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state"
-    //    val ehConfig = AzureAuditLogEventhubConfig(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME, STATE_PREFIX)
-    //    _auditLogConfig = AuditLogConfig(None, Some(ehConfig))
-    //
-    //    OverwatchParams(
-    //      _auditLogConfig, None, Some(DataTarget(Some(_databaseName), Some(_databaseLocation))),
-    //      Some(_badRecordsPath), Some(inputOverwatchScope)
-    //    )
-
-    // FROM RAW PARAMS TEST
     """
-      |{"auditLogConfig":{"azureAuditLogEventhubConfig":{"connectionString":"Endpoint=sb://testconsumerems.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=AMtHCZQLecIxK51ZfZbrb/zhXdHZqrzrBbB+jDNgboQ=","eventHubName":"overwatch","auditRawEventsPrefix":"abfss://databricksoverwatch@hebdatalake05.dfs.core.windows.net/overwatch/auditlogs/state/overwatch","maxEventsPerTrigger":10000}},"tokenSecret":{"scope":"overwatch_test","key":"overwatch_updated"},"dataTarget":{"databaseName":"overwatch","databaseLocation":"dbfs:/user/hive/warehouse/overwatch.db"},"badRecordsPath":"/tmp/tomes/overwatch/sparkEventsBadrecords","overwatchScope":["audit","clusters","clusterEvents"],"maxDaysToLoad":60}
+      |{String for testing. Run string without escape chars. Do not commit secrets to git}
       |""".stripMargin
 
   }
-}
-
-object Config {
-  //  val utcZone: ZoneId = ZoneId.of("Etc/UTC")
-//  val systemZoneId: ZoneId = ZoneId.systemDefault()
-//  val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
-
-//  /**
-//   * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
-//   * of time. The sheer number of sources and heterogeneous time rules makes time management very challenging,
-//   * the idea here is to get it right once and just get the time type necessary.
-//   *
-//   * @param tsMilli Unix epoch as a Long in milliseconds
-//   * @return
-//   */
-//  def createTimeDetail(tsMilli: Long): TimeTypes = {
-//    // TODO: systemDefault is the ticking mine
-//    val localDT = new Date(tsMilli).toInstant.atZone(systemZoneId).toLocalDateTime
-//    val instant = Instant.ofEpochMilli(tsMilli)
-//    TimeTypes(
-//      tsMilli, // asUnixTimeMilli
-//      lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
-//      Date.from(instant), // asLocalDateTime
-//      instant.atZone(systemZoneId), // asSystemZonedDateTime
-//      localDT, // asLocalDateTime
-//      localDT.toLocalDate.atStartOfDay(systemZoneId).toInstant.toEpochMilli // asMidnightEpochMilli
-//    )
-//  }
 }
