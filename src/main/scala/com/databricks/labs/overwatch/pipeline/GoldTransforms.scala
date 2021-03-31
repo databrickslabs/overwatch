@@ -494,8 +494,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         .repartition()
         .cache
 
-
-      val jobW = Window.partitionBy('job_id)
       val runStateWithUtilizationAndCosts = jobRunByClusterState
         .join(cumulativeRunStateRunTimeByRunState, Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start", "unixTimeMS_state_end"), "left")
         .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
@@ -506,7 +504,6 @@ trait GoldTransforms extends SparkSessionWrapper {
             .otherwise(lit(1.0))
         ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
         .withColumn("overlapping_run_states", when('cluster_type === "automated", lit(0)).otherwise('overlapping_run_states))
-//        .withColumn("concurrent_runs_in_run_state_for_job", countDistinct('id_in_job).over(jobW))
         .withColumn("running_days", sequence($"job_runtime.startTS".cast("date"), $"job_runtime.endTS".cast("date")))
         .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
         .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'state_utilization_percent * 'run_state_utilization)
@@ -526,6 +523,7 @@ trait GoldTransforms extends SparkSessionWrapper {
           'job_runtime,
           'job_terminal_state.alias("run_terminal_state"),
           'job_trigger_type.alias("run_trigger_type"),
+          'job_task_type.alias("run_task_type"),
           'cluster_id,
           'cluster_name,
           'cluster_type,
@@ -535,10 +533,11 @@ trait GoldTransforms extends SparkSessionWrapper {
           'dbu_rate
         )
         .agg(
-          first(size('running_days)).alias("running_days"),
+          first('running_days).alias("running_days"),
           greatest(round(avg('run_state_utilization), 4), lit(0.0)).alias("avg_cluster_share"),
           greatest(round(avg('overlapping_run_states), 2), lit(0.0)).alias("avg_overlapping_runs"),
-          sum(lit(1)).alias("cluster_run_states"),
+          greatest(max('overlapping_run_states), lit(0.0)).alias("max_overlapping_runs"),
+          sum(lit(1)).alias("run_cluster_states"),
           greatest(round(sum('worker_potential_core_H), 6), lit(0)).alias("worker_potential_core_H"),
           greatest(round(sum('driver_compute_cost), 6), lit(0)).alias("driver_compute_cost"),
           greatest(round(sum('driver_dbu_cost), 6), lit(0)).alias("driver_dbu_cost"),
@@ -794,11 +793,11 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val jobRunCostPotentialFactViewColumnMapping: String =
     """
-      |organization_id, job_id, id_in_job, job_runtime, run_terminal_state, run_trigger_type, cluster_id,
+      |organization_id, job_id, id_in_job, job_runtime, run_terminal_state, run_trigger_type, run_task_type, cluster_id,
       |cluster_name, cluster_type, custom_tags, driver_node_type_id, node_type_id, dbu_rate, running_days,
-      |avg_concurrent_runs, cluster_run_states, worker_potential_core_H, driver_compute_cost, driver_dbu_cost,
-      |worker_compute_cost, worker_dbu_cost, total_driver_cost, total_worker_cost, total_compute_cost,
-      |total_dbu_cost, total_cost, spark_task_runtimeMS, spark_task_runtime_H, job_run_cluster_util
+      |run_cluster_states, avg_cluster_share, avg_overlapping_runs, max_overlapping_runs, worker_potential_core_H,
+      |driver_compute_cost, driver_dbu_cost, worker_compute_cost, worker_dbu_cost, total_driver_cost, total_worker_cost,
+      |total_compute_cost, total_dbu_cost, total_cost, spark_task_runtimeMS, spark_task_runtime_H, job_run_cluster_util
       |""".stripMargin
 
   protected val notebookViewColumnMappings: String =
