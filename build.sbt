@@ -2,12 +2,12 @@ name := "overwatch"
 
 organization := "com.databricks.labs"
 
-version := "0.2.1"
+version := "0.3_RC1"
 
-scalaVersion := "2.11.12"
+scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 
-val sparkVersion = "2.4.5"
+val sparkVersion = "3.0.1"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
@@ -15,7 +15,7 @@ libraryDependencies += "com.databricks" %% "dbutils-api" % "0.0.4" % Provided
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 
-libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.7" % Provided
+libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.18" % Provided
 libraryDependencies += "com.databricks.labs" %% "dataframe-rules-engine" % "0.1.2" % Provided
 
 //libraryDependencies += "io.delta" %% "delta-core" % "0.6.1"
