@@ -295,9 +295,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def prepClusterEventLogs(auditLogsTable: PipelineTable,
-                           start_time: TimeTypes, end_time: TimeTypes,
-                           apiEnv: ApiEnv,
-                           organizationId: String): DataFrame = {
+                                     clusterSnapshotTable: PipelineTable,
+                                     start_time: TimeTypes, end_time: TimeTypes,
+                                     apiEnv: ApiEnv,
+                                     organizationId: String): DataFrame = {
     val extraQuery = Map(
       "start_time" -> start_time.asUnixTimeMilli, // 1588935326000L, //
       "end_time" -> end_time.asUnixTimeMilli, //1589021726000L //
@@ -311,9 +312,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
           'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
       )
 
-    val existingClusterIds = auditDFBase
+    val responseServiceClusters = auditDFBase
       .filter('serviceName === "clusters" && 'actionName.like("%Result"))
       .select($"requestParams.clusterId".alias("cluster_id"))
+      .filter('cluster_id.isNotNull)
+      .distinct
+
+    val clustersWithNewRequestEvents = auditDFBase
+      .filter('serviceName === "clusters" && 'actionName.isin("create", "permanentDelete", "delete", "resize", "edit"))
+      .select($"requestParams.cluster_id".alias("cluster_id"))
       .filter('cluster_id.isNotNull)
       .distinct
 
@@ -323,8 +330,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .filter('cluster_id.isNotNull)
       .distinct
 
-    val clusterIDs = existingClusterIds
+    // capture long-running clusters not otherwise captured from audit
+    val currentlyRunningClusters = clusterSnapshotTable.asDF()
+      .filter('state === "RUNNING")
+      .select('cluster_id)
+      .distinct
+
+    val clusterIDs = responseServiceClusters
+      .unionByName(clustersWithNewRequestEvents)
       .unionByName(newClusterIds)
+      .unionByName(currentlyRunningClusters)
       .distinct
       .as[String]
       .collect()
@@ -414,6 +429,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   /**
    * Remove already processed and bad files
    * Before loading spark events files, ensure that only new, good files are ingested for processing
+   *
    * @param badRecordsPath
    * @param eventLogsDF
    * @param processedLogFiles
@@ -548,7 +564,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                  |update ${processedLogFilesTracker.tableFullName} set failed = true where
                  |Overwatch_RunID = $rundID
                  |""".stripMargin
-             spark.sql(failFilesSQL)
+            spark.sql(failFilesSQL)
             spark.conf.set("spark.sql.caseSensitive", "false")
             throw e
           }

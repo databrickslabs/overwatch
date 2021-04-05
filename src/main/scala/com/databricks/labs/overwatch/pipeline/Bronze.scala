@@ -67,6 +67,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget,
+      BronzeTargets.clustersSnapshotTarget,
       clusterEventLogsModule.fromTime,
       clusterEventLogsModule.untilTime,
       config.apiEnv,
