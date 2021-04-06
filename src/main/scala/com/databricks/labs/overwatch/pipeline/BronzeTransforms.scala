@@ -469,13 +469,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // eager force cache
     // TODO -- Delta auto-optimize seems to be scanning the source files again anyway during
     //  execute at DeltaInvariantCheckerExec.scala:95 -- review again after upgrade to DBR 7.x+
-    val cachedEventLogs = eventLogsDF.cache()
-    val eventLogsCount = cachedEventLogs.count()
-    logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
+//    val cachedEventLogs = eventLogsDF.cache()
+//    val eventLogsCount = cachedEventLogs.count()
+//    logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
 
-    if (eventLogsCount > 0) { // newly found file names
+    if (!eventLogsDF.isEmpty) { // newly found file names
       // All new files scanned including failed and outOfTimeRange files
-      val validNewFilesWMetaDF = retrieveNewValidSparkEventsWMeta(badRecordsPath, cachedEventLogs, processedLogFilesTracker)
+      val validNewFilesWMetaDF = retrieveNewValidSparkEventsWMeta(badRecordsPath, eventLogsDF, processedLogFilesTracker)
       // Filter out files that are Out of scope and sort data to attempt to get largest files into execution first to maximize stage time
       val pathsGlob = validNewFilesWMetaDF
         .filter(!'failed && 'withinSpecifiedTimeRange)
