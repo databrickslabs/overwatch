@@ -558,27 +558,40 @@ object Helpers extends SparkSessionWrapper {
   /**
    * Check whether a path exists
    *
-   * @param path
+   * @param filePath path to file or directory
    * @return
    */
-  def pathExists(path: String): Boolean = {
-    val conf = new Configuration()
-    val fs = new Path(path).getFileSystem(conf)
-    fs.exists(new Path(path))
+  def pathExists(filePath: String): Boolean = {
+    val path = new Path(filePath)
+    val fs = path.getFileSystem(new Configuration())
+    fs.exists(path)
+  }
+
+  /**
+   * Check whether a path exists & it's a directory
+   *
+   * @param dirPath path to directory
+   * @return
+   */
+  def directoryExists(dirPath: String): Boolean = {
+    val path = new Path(dirPath)
+    val fs = path.getFileSystem(new Configuration())
+    fs.exists(path) && fs.isDirectory(path)
   }
 
   /**
    * Serialized / parallelized method for rapidly listing paths under a sub directory
-   * @param path
+   * @param pathStr
    * @return
    */
-  def parListFiles(path: String): Array[String] = {
+  def parListFiles(pathStr: String): Array[String] = {
     try {
       val conf = new Configuration()
-      val fs = new Path(path).getFileSystem(conf)
-      fs.listStatus(new Path(path)).map(_.getPath.toString)
+      val path = new Path(pathStr)
+      val fs = path.getFileSystem(conf)
+      fs.listStatus(path).map(_.getPath.toString)
     } catch {
-      case _: Throwable => Array(path)
+      case _: Throwable => Array(pathStr)
     }
   }
 
@@ -796,22 +809,26 @@ object Helpers extends SparkSessionWrapper {
     }
   }
 
+
+  def getFilesystem(path: String): FileSystem = {
+    new Path(path).getFileSystem(new Configuration())
+  }
+
   /**
    * Helper private function for fastrm. Enables serialization
-   * This version only supports dbfs but s3 is easy to add it just wasn't necessary at the time this was written
-   * TODO -- add support for s3/abfs direct paths
+   * This version supports any file system when file name is specified with explicit schema.
+   * For file names without schema, it will be DBFS
    *
-   * @param file
+   * @param file file to delete
    */
-  private def rmSer(file: String): Unit = {
-    val conf = new Configuration()
-    val fs = FileSystem.get(new java.net.URI("dbfs:/"), conf)
+  private[overwatch] def rmSer(file: String): Unit = {
     try {
-      fs.delete(new Path(file), true)
+      val path = new Path(file)
+      val fs = path.getFileSystem(new Configuration())
+      fs.delete(path, true)
     } catch {
-      case e: Throwable => {
+      case e: Throwable =>
         logger.log(Level.ERROR, s"ERROR: Could not delete file $file, skipping", e)
-      }
     }
   }
 
