@@ -294,7 +294,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def prepClusterEventLogs(auditLogsTable: PipelineTable,
+  protected def prepClusterEventLogs(filteredAuditLogDF: DataFrame,
                                      clusterSnapshotTable: PipelineTable,
                                      start_time: TimeTypes, end_time: TimeTypes,
                                      apiEnv: ApiEnv,
@@ -305,42 +305,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "limit" -> 500
     )
 
-    // TODO -- upgrade to incrementalDF
-    val auditDFBase = auditLogsTable.asDF
-      .filter(
-        'date.between(start_time.asColumnTS.cast("date"), end_time.asColumnTS.cast("date")) &&
-          'timestamp.between(lit(start_time.asUnixTimeMilli), lit(end_time.asUnixTimeMilli))
-      )
-
-    val responseServiceClusters = auditDFBase
-      .filter('serviceName === "clusters" && 'actionName.like("%Result"))
-      .select($"requestParams.clusterId".alias("cluster_id"))
-      .filter('cluster_id.isNotNull)
-      .distinct
-
-    val clustersWithNewRequestEvents = auditDFBase
-      .filter('serviceName === "clusters" && 'actionName.isin("create", "permanentDelete", "delete", "resize", "edit"))
-      .select($"requestParams.cluster_id".alias("cluster_id"))
-      .filter('cluster_id.isNotNull)
-      .distinct
-
-    val newClusterIds = auditDFBase
-      .filter('serviceName === "clusters" && 'actionName === "create")
-      .select(get_json_object($"response.result", "$.cluster_id").alias("cluster_id"))
-      .filter('cluster_id.isNotNull)
-      .distinct
-
-    // capture long-running clusters not otherwise captured from audit
-    val currentlyRunningClusters = clusterSnapshotTable.asDF()
-      .filter('state === "RUNNING")
-      .select('cluster_id)
-      .distinct
-
-    val clusterIDs = responseServiceClusters
-      .unionByName(clustersWithNewRequestEvents)
-      .unionByName(newClusterIds)
-      .unionByName(currentlyRunningClusters)
-      .distinct
+    val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotTable)
       .as[String]
       .collect()
 
@@ -540,12 +505,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
           spark.conf.set("spark.sql.caseSensitive", "true")
 
           // read the df and convert the timestamp column
-          val basedDF = spark.read.option("badRecordsPath", badRecordsPath)
+          val baseDF = spark.read.option("badRecordsPath", badRecordsPath)
             .json(pathsGlob: _*)
             .drop(dropCols: _*)
 
-          val hasUpperTimestamp = basedDF.schema.fields.map(_.name).contains("Timestamp")
-          val hasLower_timestamp = basedDF.schema.fields.map(_.name).contains("timestamp")
+          val hasUpperTimestamp = baseDF.schema.fields.map(_.name).contains("Timestamp")
+          val hasLower_timestamp = baseDF.schema.fields.map(_.name).contains("timestamp")
 
           val fixDupTimestamps = if (hasUpperTimestamp && hasLower_timestamp) {
             when(streamingQueryListenerTS, TransformFunctions.stringTsToUnixMillis('timestamp)).otherwise('Timestamp)
@@ -553,7 +518,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             TransformFunctions.stringTsToUnixMillis('timestamp)
           } else col("Timestamp")
 
-          basedDF
+          baseDF
             .withColumn("Timestamp", fixDupTimestamps)
             .drop("timestamp")
 
@@ -606,7 +571,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         }
 
         val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
-          .join(cachedEventLogs, Seq("filename"))
+          .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
         //TODO -- use map_filter to remove massive redundant useless column to save space
         // asOf Spark 3.0.0
@@ -614,7 +579,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         spark.conf.set("spark.sql.caseSensitive", "false")
         // TODO -- PERF test without unpersist, may be unpersisted before re-utilized
-        cachedEventLogs.unpersist()
+//        cachedEventLogs.unpersist()
 
         bronzeEventsFinal
       } else {
@@ -633,8 +598,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
                                       processedEventLogFiles: PipelineTable,
+                                      historicalAuditLookupDF: DataFrame,
                                       clusterSnapshot: PipelineTable
-                                    )(df: DataFrame): DataFrame = {
+                                    )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
@@ -649,39 +615,31 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // Shoot for partitions coreCount < 16 partitions per day < 576
     // This forces autoscaling clusters to scale up appropriately to handle the volume
-    val optimizeParCount = math.min(math.max(coreCount, daysToProcess * 16), 576)
+    val optimizeParCount = math.min(math.max(coreCount * 2, daysToProcess * 32), 1024)
+    val incrementalClusterIDs = getClusterIdsWithNewEvents(incrementalAuditDF, clusterSnapshot)
 
-    // baseline of clusters from incremental audit logs
-    // Incremental throughout this function means the incrementally loaded data between time x and time y
-    val incrementalClusterBase = df
-      .selectExpr("*", "requestParams.*").drop("requestParams")
-      .filter('serviceName === "clusters" && 'actionName.isin("create", "edit"))
-      .withColumn("cluster_id", when('actionName === "create", get_json_object($"response.result", "$.cluster_id"))
-        .when('actionName =!= "create" && 'cluster_id.isNull, 'clusterId)
-        .otherwise('cluster_id).alias("cluster_id")
-      )
-      .select('organization_id, 'timestamp, 'cluster_id, 'cluster_name, 'cluster_log_conf)
+    // clusterIDs with activity identified from audit logs since last run
+    val incrementalClusterWLogging = historicalAuditLookupDF
+      .withColumn("global_cluster_id", cluster_idFromAudit)
+      .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
+      .join(incrementalClusterIDs, Seq("cluster_id"))
+      .filter('cluster_log_conf.isNotNull)
 
-    // Get incremental snapshot of clusters during current run
-    // This captures clusters that have not been edited/restarted (still not terminated) since the last run with
+    // Get latest incremental snapshot of clusters running during current run
+    // This captures clusters that have not been edited/restarted since the last run and are still RUNNING with
     // log confs as they will not be in the audit logs
     val latestSnapW = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
-    val currentlyDefinedClustersWithLogging = clusterSnapshot.asDF
+    val currentlyRunningClustersWithLogging = clusterSnapshot.asDF
       .withColumn("snapRnk", rank.over(latestSnapW))
-      .filter('snapRnk === 1)
+      .filter('snapRnk === 1 && 'state === "RUNNING")
       .withColumn("cluster_log_conf", to_json('cluster_log_conf))
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('cluster_id, 'cluster_log_conf)
 
-    // captures all incremental created/edited clusters from the audit log with logs enabled
-    val allIncrementalPrefixes = incrementalClusterBase
-      .filter('cluster_log_conf.isNotNull)
-      .select('cluster_id, 'cluster_log_conf)
-
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
-    val currentAndIncrementalLogRootPaths = currentlyDefinedClustersWithLogging
-      .unionByName(allIncrementalPrefixes)
+    val currentAndIncrementalLogRootPaths = currentlyRunningClustersWithLogging
+      .unionByName(incrementalClusterWLogging)
       .withColumn("s3", get_json_object('cluster_log_conf, "$.s3"))
       .withColumn("dbfs", get_json_object('cluster_log_conf, "$.dbfs"))
       .withColumn("destination",
