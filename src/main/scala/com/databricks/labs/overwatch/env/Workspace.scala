@@ -1,16 +1,10 @@
 package com.databricks.labs.overwatch.env
 
-import com.databricks.backend.common.rpc.CommandContext
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
-import com.databricks.labs.overwatch.pipeline.Pipeline
-import com.databricks.labs.overwatch.utils.{Config, JsonUtils, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{AnalysisException, DataFrame}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.StructType
-
-import scala.io.Source
 
 /**
  * The Workspace class gets instantiated once per run per Databricks workspace. THe need for this class evolved
@@ -54,13 +48,12 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   }
 
-  // TODO -- switch back to private overwatch after dev complete
   /**
    * Exposed config as a public getter to enable access to config for testing. This should not be public facing
    * public function.
    * @return
    */
-  def getConfig: Config = config
+  private[overwatch] def getConfig: Config = config
 
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"

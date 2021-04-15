@@ -1,7 +1,5 @@
 package com.databricks.labs.overwatch.pipeline
 
-import java.io.FileNotFoundException
-import java.time.{Duration, LocalDate, LocalDateTime}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
@@ -15,22 +13,23 @@ import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, Event
 import org.apache.spark.sql.catalyst.expressions.Slice
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DateType, StringType, StructField, StructType}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
+import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.{Column, DataFrame}
 
+import java.io.FileNotFoundException
+import java.time.{Duration, LocalDateTime}
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
 
 trait BronzeTransforms extends SparkSessionWrapper {
 
-  import spark.implicits._
   import TransformFunctions._
+  import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _newDataRetrieved: Boolean = true
 
-  //  case class ClusterEventsBuffer(clusterId: String, batch: Int, extraQuery: Map[String, Long])
   case class ClusterIdsWEventCounts(clusterId: String, count: Long)
 
   private def structFromJson(df: DataFrame, c: String): Column = {
@@ -79,10 +78,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       Array()
     }
     else results
-  }
-
-  private def datesStream(fromDate: LocalDate): Stream[LocalDate] = {
-    fromDate #:: datesStream(fromDate plusDays 1)
   }
 
   private def validateCleanPaths(isFirstRun: Boolean,
@@ -170,7 +165,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
-                               isFirstRun: Boolean,
                                cloudProvider: String,
                                fromTime: LocalDateTime,
                                untilTime: LocalDateTime,
@@ -214,9 +208,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     } else {
 
-      // TODO -- fix this -- SO UGLY
-      //  might be good to build from time in initializer better on a source case basis
-      //  don't attempt this until after tests are in place
       val fromDT = fromTime.toLocalDate
       val untilDT = untilTime.toLocalDate
       // inclusive from exclusive to
@@ -234,6 +225,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
             split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
           .drop("filenameAR")
       } else {
+        // TODO -- switch back to throwing NoNewDataException
+
         //        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data found between ${fromDT.toString}-${untilDT.toString}")
         spark.emptyDataFrame
         //        Seq("No New Records").toDF("__OVERWATCHEMPTY")
@@ -301,8 +294,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  //  protected
-  def prepClusterEventLogs(auditLogsTable: PipelineTable,
+  protected def prepClusterEventLogs(auditLogsTable: PipelineTable,
                            start_time: TimeTypes, end_time: TimeTypes,
                            apiEnv: ApiEnv,
                            organizationId: String): DataFrame = {
@@ -345,7 +337,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
      * spark.driver.maxResultSize 32g
      */
     val batchSize = 500000D
-    //    val batchSize = 50000D // DEBUG
+    // TODO -- remove hard-coded path
     val tmpClusterEventsPath = "/tmp/overwatch/bronze/clusterEventsBatches"
     val clusterEventsBuffer = buildClusterEventBatches(apiEnv, batchSize, start_time.asUnixTimeMilli, end_time.asUnixTimeMilli, clusterIDs)
 
@@ -364,9 +356,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
           spark.read.json(Seq(clusterEvents: _*).toDS()).select(explode('events).alias("events"))
             .select(col("events.*"))
         )
-
-        // DEBUG
-        //        tdf.printSchema()
 
         val changeInventory = Map[String, Column](
           "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
@@ -401,6 +390,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       clusterEventsDF
     } else {
       println("EMPTY MODULE: Cluster Events")
+      // TODO -- switch back to throwing NoNewDataException
       spark.emptyDataFrame
       //      Seq("").toDF("__OVERWATCHEMPTY")
       //      throw new NoNewDataException("EMPTY: No New Cluster Events")
@@ -464,15 +454,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val bySparkContextID = array_join(slice(segmentArray, 1, 6), "/").alias("bySparkContext")
     struct(filename, byCluster, byClusterHost, bySparkContextID).alias("filnameGroup")
   }
-
-
-  //  val index = df.schema.fieldIndex("properties")
-  //  val propSchema = df.schema(index).dataType.asInstanceOf[StructType]
-  //  var columns = mutable.LinkedHashSet[Column]()
-  //  propSchema.fields.foreach(field =>{
-  //    columns.add(lit(field.name))
-  //    columns.add(col("properties." + field.name))
-  //  })
 
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
@@ -550,9 +531,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
           val hasUpperTimestamp = basedDF.schema.fields.map(_.name).contains("Timestamp")
           val hasLower_timestamp = basedDF.schema.fields.map(_.name).contains("timestamp")
 
-          val fixDupTimestamps = if (hasUpperTimestamp && hasLower_timestamp) when(streamingQueryListenerTS, TransformFunctions.stringTsToUnixMillis('timestamp)).otherwise('Timestamp)
-          else if (hasLower_timestamp) TransformFunctions.stringTsToUnixMillis('timestamp)
-          else col("Timestamp")
+          val fixDupTimestamps = if (hasUpperTimestamp && hasLower_timestamp) {
+            when(streamingQueryListenerTS, TransformFunctions.stringTsToUnixMillis('timestamp)).otherwise('Timestamp)
+          } else if (hasLower_timestamp) {
+            TransformFunctions.stringTsToUnixMillis('timestamp)
+          } else col("Timestamp")
 
           basedDF
             .withColumn("Timestamp", fixDupTimestamps)
@@ -614,6 +597,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         //.withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
 
         spark.conf.set("spark.sql.caseSensitive", "false")
+        // TODO -- PERF test without unpersist, may be unpersisted before re-utilized
         cachedEventLogs.unpersist()
 
         bronzeEventsFinal
@@ -621,18 +605,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val msg = "Path Globs Empty, exiting"
         println(msg)
         throw new NoNewDataException(msg, Level.WARN, true)
-//        spark.emptyDataFrame
-        //        throw new NoNewDataException("EMPTY: No new Spark Events Files")
-        //        Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
       }
     } else {
       val msg = "Event Logs DF is empty, Exiting"
       println(msg)
       throw new NoNewDataException(msg, Level.WARN, true)
-
-//      spark.emptyDataFrame
-      //      throw new NoNewDataException("EMPTY: No new Spark Events Files")
-      //      Seq("No New Event Logs Found").toDF("__OVERWATCHEMPTY")
     }
   }
 
@@ -640,8 +617,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
                                       processedEventLogFiles: PipelineTable,
-                                      clusterSnapshot: PipelineTable,
-                                      isFirstRun: Boolean
+                                      clusterSnapshot: PipelineTable
                                     )(df: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -739,26 +715,5 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("fileCreateDate", 'fileCreateTS.cast("date"))
 
   }
-
-  //  protected def collectEventLogPaths()(df: DataFrame): DataFrame = {
-  //
-  //    // Best effort to get currently existing cluster ids
-  //    val colsDF = df.select($"cluster_log_conf.*")
-  //    val cols = colsDF.columns.map(c => s"${c}.destination")
-  //    val logsDF = df.select($"cluster_log_conf.*", $"cluster_id".alias("cluster_id"))
-  //    cols.flatMap(
-  //      c => {
-  //        logsDF.select(col("cluster_id"), col(c)).filter(col("destination").isNotNull).distinct
-  //          .select(
-  //            array(regexp_replace(col("destination"), "\\/$", ""), col("cluster_id"),
-  //              lit("eventlog"), lit("*"), lit("*"), lit("eventlo*"))
-  //          ).rdd
-  //          .map(r => r.getSeq[String](0).mkString("/")).collect()
-  //      }).distinct
-  //      .flatMap(Helpers.globPath)
-  //      .toSeq.toDF("filename")
-  //    setEventLogGlob(eventLogsPathGlobDF)
-  //    df
-  //  }
 
 }

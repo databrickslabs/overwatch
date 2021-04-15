@@ -2,13 +2,11 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
-import org.apache.log4j.{Level, Logger}
+import org.apache.log4j.Logger
 
 class Gold(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
     with GoldTransforms {
-
-  import spark.implicits._
 
   envInit()
 
@@ -27,11 +25,13 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     Seq(buildClusterStateFact(
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.clustersSnapshotTarget,
-      SilverTargets.clustersSpecTarget
+      SilverTargets.clustersSpecTarget,
+      config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
     )),
     append(GoldTargets.clusterStateFactTarget)
   )
 
+  // Issue_37
   //  private val poolsModule = Module(3006, "Gold_Pools")
   //  lazy private val appendPoolsProcess = EtlDefinition(
   //    BronzeTargets.poolsTarget.asIncrementalDF(
@@ -61,10 +61,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     Seq(
       // Retrieve cluster states for current time period plus 2 days for lagging states
       buildJobRunCostPotentialFact(
-        GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date_state_start"),
-        // Lookups
-        GoldTargets.clusterTarget.asDF,
-        BronzeTargets.cloudMachineDetail.asDF,
+        GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 90, "unixTimeMS_state_start"),
         GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
         GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
         config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
@@ -195,52 +192,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     restoreSparkConf()
     executeModules()
     buildFacts()
-
-    //    val scope = config.overwatchScope
-    //
-    //    if (scope.contains(OverwatchScope.accounts)) {
-    //      appendAccountModProcess.process()
-    //      appendAccountLoginProcess.process()
-    //
-    //      GoldTargets.accountLoginViewTarget.publish(accountLoginViewColumnMappings)
-    //      GoldTargets.accountModsViewTarget.publish(accountModViewColumnMappings)
-    //    }
-    //
-    //    if (scope.contains(OverwatchScope.clusters)) {
-    //      appendClusterProccess.process()
-    //      GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping)
-    //    }
-    //
-    ////    if (scope.contains(OverwatchScope.pools)) {
-    ////
-    ////    }
-    //
-    //    if (scope.contains(OverwatchScope.jobs)) {
-    //      appendJobsProcess.process()
-    //      appendJobRunsProcess.process()
-    //      GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
-    //      GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
-    //    }
-    //
-    //    if (scope.contains(OverwatchScope.notebooks)) {
-    //      appendNotebookProcess.process()
-    //      GoldTargets.notebookViewTarget.publish(notebookViewColumnMappings)
-    //    }
-    //
-    //    if (scope.contains(OverwatchScope.sparkEvents)) {
-    //      processSparkEvents()
-    //    }
-    //
-    //    //Build facts in scope -- this is done last as facts can consume from the gold model itself
-    //    if (scope.contains(OverwatchScope.clusterEvents)) {
-    //      appendClusterStateFactProccess.process()
-    //      GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings)
-    //    }
-    //
-    //    if (scope.contains(OverwatchScope.jobs)) {
-    //      appendJobRunCostPotentialFactProcess.process()
-    //      GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
-    //    }
 
         initiatePostProcessing()
     this // to be used as fail switch later if necessary

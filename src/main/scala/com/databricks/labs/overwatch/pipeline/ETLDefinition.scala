@@ -1,8 +1,8 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.ModuleStatusReport
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{AnalysisException, DataFrame}
+import org.apache.log4j.Logger
+import org.apache.spark.sql.DataFrame
 
 class ETLDefinition(
                      _sourceDF: DataFrame,

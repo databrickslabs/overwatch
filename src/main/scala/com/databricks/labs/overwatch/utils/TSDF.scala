@@ -1,10 +1,10 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.utils.asofJoin._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import asofJoin._
 
 /**
  * Added support for reverse sorting and lookup when
@@ -36,7 +36,7 @@ sealed trait TSDF {
                leftPrefix: String = "",
                rightPrefix: String = "right_",
                maxLookback: Long = Window.unboundedPreceding,
-               maxLookAhead: Long = Window.unboundedFollowing,
+               maxLookAhead: Long = Window.currentRow,
                tsPartitionVal: Int = 0,
                fraction: Double = 0.1): TSDF
 
@@ -44,7 +44,7 @@ sealed trait TSDF {
                  leftPrefix: String = "",
                  rightPrefix: String = "right_",
                  maxLookback: Long = Window.unboundedPreceding,
-                 maxLookAhead: Long = Window.unboundedFollowing,
+                 maxLookAhead: Long = Window.currentRow,
                  tsPartitionVal: Int = 0,
                  fraction: Double = 0.1): TSDF
 

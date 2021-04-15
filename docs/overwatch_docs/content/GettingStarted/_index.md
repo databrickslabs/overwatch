@@ -21,8 +21,8 @@ Add the following dependencies to your cluster
 * plotly -- pretty reporting for some reports, whether or not you will need this depends on the reports you wish
   to run
     * Default PyPi - Tested with version 4.8.2
-* (only for **Azure** deployment) azure-eventhubs-spark - integration with Azure EventHubs
-    * Maven Coordinate: `~com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.17`
+* (only for Azure deployment) azure-eventhubs-spark - integration with Azure EventHubs
+    * Maven Coordinate: `~com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.18`
 
 ### Environment Setup
 There are some basic environment configuration steps that need to be enabled to allow Overwatch to do its job.

@@ -1,16 +1,14 @@
 package com.databricks.labs.overwatch.env
 
-import java.util
-
 import com.databricks.labs.overwatch.pipeline.PipelineTable
-import com.databricks.labs.overwatch.utils.{Config, SchemaTools, SparkSessionWrapper}
-import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Dataset, Row}
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.catalog.{CatalogStorageFormat, CatalogTable, CatalogTableType}
-import org.apache.spark.sql.functions.{col, from_unixtime, lit, struct}
-import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
+import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.streaming.StreamingQueryListener._
+import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
+import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
+
+import java.util
 
 class Database(config: Config) extends SparkSessionWrapper {
 
@@ -29,7 +27,7 @@ class Database(config: Config) extends SparkSessionWrapper {
   //  all rollbacks should be completed during post processing from full inventory in par
   def rollbackTarget(target: PipelineTable): Unit = {
 
-    // TODO -- on failure this causes multiple deletes unecessarily -- improve this
+    // TODO -- on failure this causes multiple deletes unnecessarily -- improve this
     if (target.tableFullName matches ".*spark_.*_silver") {
       val sparkSilverTables = Array(
         "spark_executors_silver", "spark_Executions_silver", "spark_jobs_silver",
@@ -117,9 +115,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
 
-    // TODO -- Enhance schema scrubber. If target has an array of nested structs which is populated but the new
-    //  incoming data (finalDF) has nulls inside one of the nested structs the result is a schema failure.
-    //    try {
     logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
     if (target.checkpointPath.nonEmpty) {
 
@@ -152,33 +147,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     }
     logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
     true
-    //    } catch {
-    //      case e: Throwable => {
-    //        finalDF = df
-    //        finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", config.pipelineSnapTime.asColumnTS) else finalDF
-    //        finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
-    //        val newDataSchemaBeforeScrub = s"DEBUG: SCHEMA: Source Schema for: ${target.tableFullName} BEFORE SCRUBBER was: \n${finalDF.printSchema()}"
-    //        // Only do this for when not writing to a streaming target
-    //        if (target.checkpointPath.isEmpty) finalDF = SchemaTools.scrubSchema(finalDF)
-    //        val newDataSchemaMsg = s"DEBUG: SCHEMA: Source Schema for to be written to target: ${target.tableFullName} is \n${finalDF.printSchema()}"
-    //        val targetSchemaMsg = if (!config.isFirstRun) {
-    //          s"DEBUG: SCHEMA: Target Schema for target ${target.tableFullName}: \n${target.asDF.printSchema()}"
-    //        } else { "NO Target Schema -- First run or target doesn't yet exist" }
-    //        logger.log(Level.DEBUG, newDataSchemaBeforeScrub)
-    //        logger.log(Level.DEBUG, newDataSchemaMsg)
-    //        logger.log(Level.DEBUG, targetSchemaMsg)
-    //        if (config.debugFlag) {
-    //          println(newDataSchemaBeforeScrub)
-    //          println(newDataSchemaMsg)
-    //          println(targetSchemaMsg)
-    //        }
-    //        val failMsg = s"Failed to write to ${_databaseName}. Attempting to rollback"
-    //        logger.log(Level.ERROR, failMsg, e)
-    //        println(s"ERROR --> ${target.tableFullName}", e)
-    //        rollback(target)
-    //        false
-    //      }
-    //    }
   }
 
   def readTable(tableName: String): DataFrame = {
@@ -193,7 +161,9 @@ class Database(config: Config) extends SparkSessionWrapper {
     spark.catalog.tableExists(_databaseName, tableName)
   }
 
-  //TODO -- Add dbexists func
+  def exists: Boolean = {
+    spark.catalog.databaseExists(_databaseName)
+  }
 
 }
 

@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
-import org.apache.log4j.{Level, Logger}
+import org.apache.log4j.Logger
 
 class Silver(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
@@ -19,6 +19,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- Compare all configurations against defaults and notate non-default configs
 
+  // TODO -- Issue_50
   //  According to Michael -- don't use rdd cache
   //  private def cacheAuditLogs(auditModuleIDs: Array[Int]): Unit = {
   //    val minAuditTS = config.lastRunDetail.filter(run => auditModuleIDs.contains(run.moduleID)).map(_.untilTS).min
@@ -37,6 +38,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
    * ODBC/JDBC Sessions
    */
 
+  // Todo -- Issue_81
   //    val serverSessionStartDF: DataFrame = sparkEventsDF
   //      .filter('Event === "org.apache.spark.sql.hive.thriftserver.ui.SparkListenerThriftServerSessionCreated")
   //      .select('SparkContextID, 'ip, 'sessionId, 'startTime, 'userName, 'filenameGroup.alias("startFilenameGroup"))
@@ -63,21 +65,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   //      .join(serverOperationEndDF, Seq("SparkContextID", "id"))
   //      .withColumn("ServerOperationRunTime", subtractTime('startTime, 'closeTime))
   //      .drop("startTime", "finishTime")
-
-  /**
-   * Executor
-   */
-
-  //  lazy private val executorAddedDF: DataFrame = sparkEventsDF
-  //    .filter('Event === "SparkListenerExecutorAdded")
-  //    .select('SparkContextID, 'ExecutorID, 'ExecutorInfo, 'Timestamp.alias("executorAddedTS"),
-  //      'filenameGroup.alias("startFilenameGroup"))
-  //
-  //  lazy private val executorRemovedDF: DataFrame = sparkEventsDF
-  //    .filter('Event === "SparkListenerExecutorRemoved")
-  //    .select('SparkContextID, 'ExecutorID, 'RemovedReason, 'Timestamp.alias("executorRemovedTS"),
-  //      'filenameGroup.alias("endFilenameGroup"))
-
 
   /**
    * Module SparkEvents
@@ -156,6 +143,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val jobRunsModule = Module(2011, "Silver_JobsRuns", this, Array(1004, 2010, 2014))
   lazy private val appendJobRunsProcess = ETLDefinition(
+    // TODO -- TEST NEEDED, jobs running longer than "additionalLagDays" of 2 below, are they able to get joined up
+    //  with their jobStart events properly? If not, add logic to identify long running jobs and go get them
+    //  from historical
     BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, auditLogsIncrementalCols, 2),
     Seq(
       dbJobRunsSummary(
@@ -164,6 +154,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
+        config.apiEnv,
         jobRunsModule.fromTime.asColumnTS,
         jobRunsModule.fromTime.asUnixTimeMilli
       )
@@ -236,36 +227,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
     restoreSparkConf()
     executeModules()
-    // TODO -- see which transforms are possible without audit and rebuild for no-audit
-    //  CURRENTLY -- audit is required for silver
-//    val scope = config.overwatchScope
-//
-//    if (scope.contains(OverwatchScope.accounts)) {
-//      appendAccountLoginsProcess.process()
-//      appendModifiedAccountsProcess.process()
-//    }
-//
-//    if (scope.contains(OverwatchScope.clusters)) {
-//      appendClusterSpecProcess.process()
-//    }
-//
-//    if (scope.contains(OverwatchScope.jobs)) {
-//      appendJobStatusProcess.process()
-//      appendJobRunsProcess.process()
-//    }
-//
-//    if (scope.contains(OverwatchScope.notebooks)) {
-//      appendNotebookSummaryProcess.process()
-//    }
-//
-//    if (scope.contains(OverwatchScope.sparkEvents)) {
-//      processSparkEvents()
-//    }
-//
     initiatePostProcessing()
     this // to be used as fail switch later if necessary
   }
-
 
 }
 
@@ -275,7 +239,5 @@ object Silver {
       .initPipelineRun()
       .loadStaticDatasets()
   }
-
-  //    .setWorkspace(workspace).setDatabase(workspace.database)
 
 }

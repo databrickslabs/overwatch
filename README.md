@@ -1,5 +1,5 @@
 # Overwatch
-Governance & Insights for your Unified Analytics Platform
+Calibrated Precision for your Databricks Unified Analytics Platform enabling governance and actionable intelligence.
 
 ## Project Description
 Unify Spark and Databricks Platform telemetry to enable customers to gain key insights to their Databricks
@@ -12,5 +12,10 @@ Please note that all projects in the /databrickslabs github account are provided
 
 Any issues discovered through the use of this project should be filed as GitHub Issues on the Repo.  They will be reviewed as time permits, but there are no formal SLAs for support.
 
+
+## Addnlt Resources
+For additional resources please go to the following slack channels and review the pinned items.
+* #overwatch -- general high-level announcements, discussions, questions
+* #overwatch-devteam -- invite only -- if you'd like to contribute and/or are deploying at a customer, please request to be added to the devteam channel in #overwatch
 
 [Building the Project](Building.md)
