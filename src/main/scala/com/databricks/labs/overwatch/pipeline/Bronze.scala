@@ -83,7 +83,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       collectEventLogPaths(
         sparkEventLogsModule.fromTime,
         sparkEventLogsModule.untilTime,
-        BronzeTargets.processedEventLogs,
         BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols, 30),
         BronzeTargets.clustersSnapshotTarget
       ),

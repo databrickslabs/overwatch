@@ -604,6 +604,7 @@ object Helpers extends SparkSessionWrapper {
                                  )
 
   def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[PathStringFileStatus] = {
+    logger.log(Level.DEBUG, s"PATH PREFIX: $path")
     val conf = new Configuration()
     try {
       val fs = new Path(path).getFileSystem(conf)

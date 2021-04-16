@@ -597,7 +597,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
-                                      processedEventLogFiles: PipelineTable,
                                       historicalAuditLookupDF: DataFrame,
                                       clusterSnapshot: PipelineTable
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
@@ -638,7 +637,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
-    val currentAndIncrementalLogRootPaths = currentlyRunningClustersWithLogging
+    val allEventLogPrefixes = currentlyRunningClustersWithLogging
       .unionByName(incrementalClusterWLogging)
       .withColumn("s3", get_json_object('cluster_log_conf, "$.s3"))
       .withColumn("dbfs", get_json_object('cluster_log_conf, "$.dbfs"))
@@ -651,26 +650,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           lit("eventlog"))
       ).withColumn("wildPath", concat_ws("/", 'topLevelTargets))
       .select('wildPath)
-
-    // IF previously loaded log files
-    // Scan for new files in historical cluster, log configs and append them to the incrementals
-    val allEventLogPrefixes = if (processedEventLogFiles.exists) { // log files captured before
-      // Captures Terminated clusters with new files
-      // Assume cluster had log files during last run but was terminated between last run and current run and there
-      // were no edits or restarts to this cluster -- this cluster would not be in either the snapshot or the
-      // incremental audit logs -- thus it would be missed without loading these as well
-      val allHistoricalEventLogRootPrefixes = processedEventLogFiles.asDF
-        .withColumn("pathAr", split('filename, "/"))
-        .withColumn("pathDepth", size('pathAr))
-        .withColumn("clusterEventLogPrefix", new Column(Slice('pathAr.expr, lit(1).expr, ('pathDepth - lit(3)).expr))) // TODO - unsupported hack until DBR 8.0+
-        .withColumn("wildPath", concat_ws("/", 'clusterEventLogPrefix))
-        .select('wildPath)
-
-      currentAndIncrementalLogRootPaths
-        .unionByName(allHistoricalEventLogRootPrefixes)
-        .distinct
-
-    } else currentAndIncrementalLogRootPaths.distinct
+      .distinct()
 
     // all files considered for ingest
     allEventLogPrefixes
