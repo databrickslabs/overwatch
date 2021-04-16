@@ -102,7 +102,6 @@ abstract class PipelineTargets(config: Config) {
         partitionBy = Seq("organization_id")
       )
     } else {
-      // TODO -- implement for azure
       PipelineTable(
         "instanceDetails",
         Array("API_Name"),
@@ -114,13 +113,12 @@ abstract class PipelineTargets(config: Config) {
 
   }
 
-
-  // TODO -- When gold is built, partition silver by yyyyMM and move Zorders to gold
   /**
    * Silver Targets
    */
 
   object SilverTargets {
+    // TODO Issue_81
     // TODO -- validate -- need some test data
     //    lazy private[overwatch] val jdbcSessionsTarget: PipelineTable = PipelineTable("jdbc_sessions_silver",
     //      Array("SparkContextID", "sessionId", "ip"), "Pipeline_SnapTS", config)

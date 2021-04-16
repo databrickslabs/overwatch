@@ -101,7 +101,8 @@ other resources are heavily utilizing api calls.
 ### Pools
 *Dependencies:* Audit 
 
-**In Progress** -- The snapshots are currently being recorded but the slow changing dimensions are still in progress
+**In Progress** -- The snapshots are currently being recorded but the slow changing dimensions are still under construction
+and are not going to make it into the initial release.
 
 The Pools Module records the metadata related to Databricks Instance Pools.
 
@@ -123,7 +124,7 @@ point-in-time cluster definition and run-times can be very powerful, and very ha
 ### Accounts
 *Dependencies:* Audit
 
-*Gold Entities:* User|UserLoginFact
+*Gold Entities:* AccountModificationFact|AccountLoginFact
 
 The accounts module is very simple and is meant to assist the IT Admin team in keeping track of users. The Accounts
 module includes some very useful auditing information as well as enables authorized users to tie user_ids back to 

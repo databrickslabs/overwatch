@@ -1,16 +1,16 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.databricks.labs.overwatch.utils.Frequency.Frequency
+import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
+import org.apache.log4j.Level
+import org.apache.spark.sql.Column
+import org.apache.spark.sql.catalyst.ScalaReflection
+import org.apache.spark.sql.types.{StructField, StructType}
 
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
-import org.apache.log4j.Level
-import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
-import org.apache.spark.sql.Column
-import org.apache.spark.sql.catalyst.ScalaReflection
-import org.apache.spark.sql.types.{StructField, StructType}
 
 case class DBDetail()
 
@@ -33,9 +33,6 @@ case class ValidatedColumn(
                             requiredStructure: Option[StructField] = None
                           )
 
-// Todo Add Description
-//case class Module(moduleID: Int, moduleName: String)
-
 object TimeTypesConstants {
   val dtStringFormat: String = "yyyy-MM-dd"
   val tsStringFormat: String = "yyyy-MM-dd HH:mm:ss"
@@ -43,7 +40,6 @@ object TimeTypesConstants {
   val dtFormat: SimpleDateFormat = new SimpleDateFormat(dtStringFormat)
 }
 
-// TODO: we need to try to get rid of the local date/time everywhere...
 case class TimeTypes(asUnixTimeMilli: Long, asColumnTS: Column, asJavaDate: Date,
                      asUTCDateTime: ZonedDateTime, asLocalDateTime: LocalDateTime, asMidnightEpochMilli: Long) {
 
@@ -139,7 +135,7 @@ case class IncrementalFilter(cronColName: String, low: Column, high: Column)
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
   val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value
-  // TODO - iamPassthrough, profiles, pools
+  // Todo Issue_77
 }
 
 object Layer extends Enumeration {
@@ -152,6 +148,7 @@ object Frequency extends Enumeration {
   val milliSecond, daily = Value
 }
 
+// Todo Issue_56
 private[overwatch] class NoNewDataException(s: String, val level: Level, val allowModuleProgression: Boolean = false) extends Exception(s) {}
 
 private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
@@ -162,9 +159,7 @@ private[overwatch] class TokenError(s: String) extends Exception(s) {}
 
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
-// TODO - enable these event handlers to right the Failed/Empty Module status reports
-//private[overwatch] class EmptyModuleException(s: String) extends Exception(s) {}
-private[overwatch] class FailedModuleException(s: String, val target: PipelineTable, level: Level) extends Exception(s) {}
+private[overwatch] class FailedModuleException(s: String, val target: PipelineTable) extends Exception(s) {}
 
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
 

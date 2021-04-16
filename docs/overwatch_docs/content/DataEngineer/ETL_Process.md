@@ -20,10 +20,10 @@ the run. Each record created during the run will have an associated *Overwatch_R
 be used to determine exactly when a record was loaded.
 
 The "from_time" will be derived dynamically for each module as per the previous run snapshot time
-for the given module plus one millisecond. If the module has never been executed, the primordial time will be
+for the given module plus one millisecond. If the module has never been executed, the primordialDateString will be
 used which is defined as current_date - 60 days, by default. This can be overridden in the 
 [config]({{%relref "GettingStarted/Configuration.md"%}}). Some modules can be very slow / time-consuming on the 
-first run due to the data volume and/or trickle loads from APIs. Best practice is to set your primordial date 
+first run due to the data volume and/or trickle loads from APIs. Best practice is to set your primordialDateString 
 (if desired > 60d) AND set "*maxDaysToLoad*" to a low number like 5. It's important to balance sufficient data to 
 fully build out the implicit schemas and small enough data to get through an initial valid test.
 
@@ -39,7 +39,7 @@ The Pipeline Report is very useful for identifying issues in the pipeline. Each 
 The structure of the table is outlined below.
 
 ### Pipeline_Report Structure
-[SAMPLE]() **<-- TODO**
+[**SAMPLE**](/assets/TableSamples/pipeline_report.tab)
 
 **KEY** -- organization_id + moduleID + Overwatch_RunID
 
@@ -68,6 +68,49 @@ Overwatch_RunID             |string           |GUID for the overwatch run
 ## Overwatch Time
 Overwatch will default timezone to that of the server / cluster on which it runs. This is a critical point to 
 be aware of when aggregating Overwatch results from several workspaces across different regions.
+
+## Module Dependencies
+Several modules depend on other modules as source input; as such, as you can imagine, we don't want modules to 
+progress if one of their dependencies is erroring out and not populating any data. To handle this, Modules have
+dependencies such that upstream failures will cause downstream modules to be ineligible to continue. There are 
+several types of errors that result in a module failure, and those errors are written out in the pipeline_report 
+when they occur. Sometimes, there will truly be no new data in an upstream Module, this is ok and will not stop the 
+progression of the "until" time as no data is not considered an error. Below are the ETL Modules and their dependencies
+
+Module ID | Module Name | Module ID Dependencies
+:--------------------------|:---|:-----
+1001|Bronze_Jobs_Snapshot|
+1002|Bronze_Clusters_Snapshot|
+1003|Bronze_Pools|
+1004|Bronze_AuditLogs|
+1005|Bronze_ClusterEventLogs|1004
+1006|Bronze_SparkEventLogs|1004
+2003|Silver_SPARK_Executors|1006
+2005|Silver_SPARK_Executions|1006
+2006|Silver_SPARK_Jobs|1006
+2007|Silver_SPARK_Stages|1006
+2008|Silver_SPARK_Tasks|1006
+2010|Silver_JobsStatus|1004
+2011|Silver_JobsRuns|1004,2010,2014
+2014|Silver_ClusterSpec|1004
+2016|Silver_AccountLogins|1004
+2017|Silver_ModifiedAccounts|1004
+2018|Silver_Notebooks|1004
+3001|Gold_Cluster|2014
+3002|Gold_Job|2010
+3003|Gold_JobRun|2011
+3004|Gold_Notebook|2018
+3005|Gold_ClusterStateFact|1005,2014
+3007|Gold_AccountMod|2017
+3008|Gold_AccountLogin|2016
+3010|Gold_SparkJob|2006
+3011|Gold_SparkStage|2007
+3012|Gold_SparkTask|2008
+3013|Gold_SparkExecution|2005
+3014|Gold_SparkExecutor|2003
+3015|Gold_jobRunCostPotentialFact|3001,3003,3005,3010,3012
+
+
 
 ## Reloading Data
 **CAUTION** Be very careful when attempting to reload bronze data, much of the bronze source data expires to 
@@ -115,14 +158,14 @@ spark.sql(s"update overwatch_etl.pipeline_report set status = 'ROLLED_BACK' wher
 
 After performing the steps above, the next Overwatch run will load the data from 12-31 -> current.
 {{% notice warning%}}
-If back-loading more than 60 days, you must override the default primordial date in the config. Additionally, depending
+If back-loading more than 60 days, you must override the default primordialDateString in the config. Additionally, depending
 on data volume and cluster size, it may be best to only load 60 days at a time using the *maxDaysToLoad* config. This
 allows for the data to be loaded in chunks. Not necessary, but may have benefits depending on the situation.
 {{% /notice %}}
 
 {{% notice note%}}
 For smaller, dimensional, silver/gold entities and testing, it's often easier to just drop the table than 
-it is to delete records after some date. **Remember**, though, it's critical to set the primordial from time if 
+it is to delete records after some date. **Remember**, though, it's critical to set the primordialDateString from time if 
 rebuilding entities with more than 60 days.
 {{% /notice %}}
 
