@@ -9,3 +9,4 @@ pluralizeListTitles = false
     themeVariant = "blue"
     DisableShortcutsTitle = "true"
     author = "Daniel Tomes -- DatabricksLabs"
+    disableLandingPageButton = false

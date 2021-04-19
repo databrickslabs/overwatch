@@ -135,6 +135,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
+          "User-Agent" -> s"databricks-labs-overwatch/${env.packageVersion}",
           "Authorization" -> s"Bearer ${env.rawToken}"
         ))
         .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
@@ -217,6 +218,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         .headers(Map[String, String](
           "Content-Type" -> "application/json",
           "Charset"-> "UTF-8",
+          "User-Agent" -> s"databricks-labs-overwatch/${env.packageVersion}",
           "Authorization" -> s"Bearer ${env.rawToken}"
         ))
         .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))

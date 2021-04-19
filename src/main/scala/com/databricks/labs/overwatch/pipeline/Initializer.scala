@@ -426,6 +426,7 @@ object Initializer extends SparkSessionWrapper {
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)
 
+
     workspace
   }
 }

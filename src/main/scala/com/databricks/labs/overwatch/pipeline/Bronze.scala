@@ -66,7 +66,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
-      BronzeTargets.auditLogsTarget,
+      BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
+      BronzeTargets.clustersSnapshotTarget,
       clusterEventLogsModule.fromTime,
       clusterEventLogsModule.untilTime,
       config.apiEnv,
@@ -77,12 +78,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols: _*),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),
     Seq(
       collectEventLogPaths(
         sparkEventLogsModule.fromTime,
         sparkEventLogsModule.untilTime,
-        BronzeTargets.processedEventLogs,
+        BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols, 30),
         BronzeTargets.clustersSnapshotTarget
       ),
       generateEventLogsDF(

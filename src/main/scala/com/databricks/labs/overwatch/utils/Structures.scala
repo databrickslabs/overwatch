@@ -25,7 +25,7 @@ case class DataTarget(databaseName: Option[String], databaseLocation: Option[Str
 
 case class DatabricksContractPrices(interactiveDBUCostUSD: Double, automatedDBUCostUSD: Double)
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String)
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String)
 
 case class ValidatedColumn(
                             column: Column,

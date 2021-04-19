@@ -9,7 +9,7 @@ resource "databricks_job" "overwatch" {
       min_workers = var.min_node_count
       max_workers = var.max_node_count
     }
-    spark_version = "7.6.x-scala2.11"
+    spark_version = "7.6.x-scala2.12"
     node_type_id  = var.node_type
 
     cluster_log_conf {
