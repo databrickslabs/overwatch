@@ -1,8 +1,9 @@
+
 name := "overwatch"
 
 organization := "com.databricks.labs"
 
-version := "0.3.1_RC1"
+version := "0.4.0"
 
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
@@ -28,6 +29,19 @@ libraryDependencies += "com.holdenkarau" %% "spark-testing-base" % "3.0.0_1.0.0"
 run in Compile := Defaults.runTask(fullClasspath in Compile, mainClass in (Compile, run), runner in (Compile, run)).evaluated
 runMain in Compile := Defaults.runMainTask(fullClasspath in Compile, runner in(Compile, run)).evaluated
 
+// groupId, SCM, license information
+homepage := Some(url("https://github.com/databrickslabs/overwatch"))
+scmInfo := Some(ScmInfo(url("https://github.com/databrickslabs/overwatch"), "git@github.com:databrickslabs/overwatch.git"))
+developers := List(Developer("geeksheikh", "Daniel Tomes", "daniel@databricks.com", url("https://github.com/GeekSheikh")))
+licenses += ("Databricks", url("https://github.com/databrickslabs/overwatch/blob/develop/LICENSE"))
+publishMavenStyle := true
+
+publishTo := Some(
+  if (version.value.endsWith("SNAPSHOT"))
+    Opts.resolver.sonatypeSnapshots
+  else
+    Opts.resolver.sonatypeStaging
+)
 
 // enforce execution of tests during packaging - uncomment next line when we fix dependencies
 // Keys.`package` := (Compile / Keys.`package` dependsOn Test / test).value

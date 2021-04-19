@@ -11,6 +11,7 @@ class Config() {
 
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-", "")
+  private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
   private var _isFirstRun: Boolean = false
@@ -269,7 +270,7 @@ class Config() {
           _tokenType = "Owner"
         }
       }
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
       this
     } catch {
       case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e); this
