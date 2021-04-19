@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="en" class="js csstransforms3d">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="Hugo 0.76.5" />
+    <meta name="description" content="Overwatch Documentation">
+<meta name="author" content="Daniel Tomes -- DatabricksLabs">
+
+    <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
+
+    <title>Configuration :: Overwatch</title>
+
+    
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1618855333" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1618855333" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1618855333" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1618855333" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1618855333" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1618855333" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1618855333" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1618855333" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1618855333" rel="stylesheet">
+    
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1618855333" rel="stylesheet">
+    
+    
+
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1618855333"></script>
+
+    <style>
+      :root #header + #content > #left > #rlblock_left{
+          display:none !important;
+      }
+      
+    </style>
+    
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+  </head>
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/gettingstarted/configuration/">
+    <nav id="sidebar" class="">
+
+
+
+  <div id="header-wrapper">
+    <div id="header">
+      <a id="logo" href="https://databrickslabs.github.io/overwatch/">
+    <img src="https://databrickslabs.github.io/overwatch/images/tmp_logo4.png", width="85%">
+</a>
+
+    </div>
+    
+        <div class="searchbox">
+    <label for="search-by"><i class="fas fa-search"></i></label>
+    <input data-search-input id="search-by" type="search" placeholder="Search...">
+    <span data-search-clear=""><i class="fas fa-times"></i></span>
+</div>
+
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1618855333"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1618855333"></script>
+<script type="text/javascript">
+    
+        var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
+    
+</script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1618855333"></script>
+
+    
+  </div>
+  
+  <section id="homelinks">
+    <ul>
+      <li>
+        <a class="padding" href='https://databrickslabs.github.io/overwatch/'><i class='fas fa-home'></i> Home</a>
+      </li>
+    </ul>
+  </section>
+  
+
+    <div class="highlightable">
+    <ul class="topics">
+
+        
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/gettingstarted/" title="Getting Started" class="dd-item
+        parent
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/gettingstarted/">
+          Getting Started
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/configuration/" title="Configuration" class="dd-item active">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/configuration/">
+        Configuration
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/modules/" title="Modules" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/modules/">
+        Modules
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/advancedtopics/" title="Advanced Topics" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">
+        Advanced Topics
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/upgrading/" title="Upgrading" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/upgrading/">
+        Upgrading
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/troubleshooting/" title="Troubleshooting" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/troubleshooting/">
+        Troubleshooting
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/roadmap/" title="Roadmap" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/roadmap/">
+        Roadmap
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/environmentsetup/" title="Environment Setup" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/environmentsetup/">
+          Environment Setup
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/environmentsetup/azure/" title="Azure" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/environmentsetup/azure/">
+        Azure
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/environmentsetup/aws/" title="AWS" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/environmentsetup/aws/">
+        AWS
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/dataengineer/" title="Data Engineering" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dataengineer/">
+          Data Engineering
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/definitions/" title="Definitions" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions/">
+        Definitions
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/etl_process/" title="ETL Process" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process/">
+        ETL Process
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/developer_docs/" title="Developer Docs" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/developer_docs/">
+          Developer Docs
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/accounts/" title="Accounts" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/accounts/">
+        Accounts
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/notebooks/" title="Notebooks" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/notebooks/">
+        Notebooks
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/cluster-events/" title="Cluster Events" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/cluster-events/">
+        Cluster Events
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/audit/" title="Audit" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/audit/">
+        Audit
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/jobs/" title="Jobs" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/jobs/">
+        Jobs
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/resuming/" title="Resuming" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/resuming/">
+        Resuming
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/error-handling/" title="Error Handling" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/error-handling/">
+        Error Handling
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/spark-events/" title="Spark Events" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/spark-events/">
+        Spark Events
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/developer_docs/clusters/" title="Clusters" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/developer_docs/clusters/">
+        Clusters
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/contributing/" title="" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/contributing/">
+          
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+        
+    </ul>
+
+    
+    
+
+    
+    <section id="footer">
+      <center>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch/archive/refs/heads/master.zip"
+       data-icon="octicon-cloud-download" aria-label="Download Overwatch on GitHub">Download</a>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch" data-icon="octicon-star" data-show-count="true" aria-label="Star databrickslabs/overwatch on GitHub">Star</a>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch/fork"
+       data-icon="octicon-repo-forked" data-show-count="true" aria-label="Fork Overwatch on GitHub">Fork</a>
+
+    <p>A <a href="https://github.com/databrickslabs">Databricks Labs</a> project.</p>
+</center>
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+    </section>
+  </div>
+</nav>
+
+
+
+
+        <section id="body">
+        <div id="overlay"></div>
+        <div class="padding highlightable">
+              
+              <div>
+                <div id="top-bar">
+                
+                
+                <div id="breadcrumbs" itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb">
+                    <span id="sidebar-toggle-span">
+                        <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
+                          <i class="fas fa-bars"></i>
+                        </a>
+                    </span>
+                  
+                  <span id="toc-menu"><i class="fas fa-list-alt"></i></span>
+                  
+                  <span class="links">
+                 
+                 
+                    
+          
+          
+            
+            
+          
+          
+            
+            
+          
+          
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/gettingstarted/'>Getting Started</a> > Configuration
+          
+        
+          
+        
+          
+        
+                 
+                  </span>
+                </div>
+                
+                    <div class="progress">
+    <div class="wrapper">
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#configuration-basics">Configuration Basics</a></li>
+    <li><a href="#config-examples">Config Examples</a>
+      <ul>
+        <li><a href="#simplified-example">Simplified Example</a></li>
+        <li><a href="#azure-example-full">Azure Example (Full)</a></li>
+        <li><a href="#aws-example-full">AWS Example (Full)</a></li>
+        <li><a href="#overwatchparams">OverwatchParams</a></li>
+        <li><a href="#auditlogconfig">AuditLogConfig</a></li>
+        <li><a href="#tokensecret">TokenSecret</a></li>
+        <li><a href="#datatarget">DataTarget</a></li>
+        <li><a href="#azureauditlogeventhubconfig">AzureAuditLogEventhubConfig</a></li>
+        <li><a href="#databrickscontractprices">DatabricksContractPrices</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+    </div>
+</div>
+
+                
+              </div>
+            </div>
+            
+        <div id="head-tags">
+        
+        </div>
+        
+        <div id="body-inner">
+          
+            <h1>
+              
+              Configuration
+            </h1>
+          
+
+        
+
+
+<p>The configuration for Overwatch is fairly basic for the initial release but the plan is to open a lot of options
+and make the config much more robust to allow for much more granular control over operations. The ongoing changes
+will be documented here.</p>
+<h2 id="configuration-basics">Configuration Basics</h2>
+<p>The Overwatch configuration can be created as a case class of <a href="#overwatchparams">OverwatchParams</a> or as a json string passed into
+the main class <code>com.databricks.labs.overwatch.BatchRunner</code>. When passed in as a json string, it is 
+deserialized into an instance of <a href="#overwatchparams">OverwatchParams</a>. This provides strong validation on the input parameters
+and strong typing for additional validation options. All configs attempt to be defaulted to a reasonable default
+where possible. If a default is set, passing in a value will simply overwrite the default.</p>
+<h2 id="config-examples">Config Examples</h2>
+<p>Below are some configurations examples of building the configuration parameters called <em>params</em> which is a variable
+set to contain an instance of the class <em>OverwatchParams</em>.</p>
+<p>Once the config has been created according to your needs, refer back to the 
+<a href="https://databrickslabs.github.io/overwatch/gettingstarted/#run-via-notebook">Getting Started - Run Via Notebook</a> or
+<a href="https://databrickslabs.github.io/overwatch/gettingstarted/#run-via-main-class">Getting Started - Run Via Main Class</a> section to see how it&rsquo;s can be used
+when executing the Overwatch Run.</p>
+<h3 id="simplified-example">Simplified Example</h3>
+<p>The simplest configuration possible. This is just for testing and likely is not a sufficient configuration for 
+real-world application.</p>
+<p>If using Azure you must change the auditLogConfig to the Azure version
+which can be found below in <a href="#azure-example">Azure Example</a></p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.<span style="color:#f92672">{</span><span style="color:#a6e22e">Initializer</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Bronze</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Silver</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Gold</span><span style="color:#f92672">}</span>
+<span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils._
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> db <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch_Test&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;/path/to/aws/audit/logs&#34;</span><span style="color:#f92672">))</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>db<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">${</span>db<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">))</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;db_services&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;databricks_overwatch&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> overwatchModules <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;audit,accounts,sparkEvents,jobs,clusters,clusterEvents,notebooks&#34;</span><span style="color:#f92672">.</span>split<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;,&#34;</span><span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(</span>auditLogConfig<span style="color:#f92672">)</span>
+</code></pre></div><h3 id="azure-example-full">Azure Example (Full)</h3>
+<p>Azure does require an event hub to be set up and referenced in the config as an 
+<a href="#azureauditlogeventhubconfig">AzureAuditLogEventhubConfig</a>. More details for setting up this Event Hub
+can be found in the <a href="https://databrickslabs.github.io/overwatch/environmentsetup/azure/">Azure Environment Setup</a> page.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.<span style="color:#f92672">{</span><span style="color:#a6e22e">Initializer</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Bronze</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Silver</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Gold</span><span style="color:#f92672">}</span>
+<span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils._
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> consumerDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> etlDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch_ETL&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> evhName <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;overwatch-evhub&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> secretsScope <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;aott-kv&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> secretsEvHubKey <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;overwatch-eventhubs&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> overwatchKey <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;overwatch-pat&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>widgets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;automatedDBU&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>widgets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;interactiveDBU&#34;</span><span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">$etlDB</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">$consumerDB</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> overwatchKey<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> evhubConnString <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>secrets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> secretsEvHubKey<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> azureLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AzureAuditLogEventhubConfig</span><span style="color:#f92672">(</span>connectionString <span style="color:#66d9ef">=</span> evhubConnString<span style="color:#f92672">,</span> eventHubName <span style="color:#66d9ef">=</span> evhName<span style="color:#f92672">,</span> auditRawEventsPrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;/tmp/</span><span style="color:#e6db74">$etlDB</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> overwatchModules <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;audit,accounts,sparkEvents,jobs,clusters,clusterEvents,notebooks&#34;</span><span style="color:#f92672">.</span>split<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;,&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(</span>
+  auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span>azureAuditLogEventhubConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>azureLogConfig<span style="color:#f92672">)),</span>
+  tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>tokenSecret<span style="color:#f92672">),</span>
+  dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>dataTarget<span style="color:#f92672">),</span>
+  badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;/tmp/</span><span style="color:#e6db74">${</span>etlDB<span style="color:#e6db74">}</span><span style="color:#e6db74">/sparkEventsBadrecords&#34;</span><span style="color:#f92672">),</span>
+  overwatchScope <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>overwatchModules<span style="color:#f92672">),</span>
+  maxDaysToLoad <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">30</span><span style="color:#f92672">,</span>
+  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;2021-01-01&#34;</span><span style="color:#f92672">),</span>
+  databricksContractPrices <span style="color:#66d9ef">=</span> databricksContractPrices
+<span style="color:#f92672">)</span>
+</code></pre></div><h3 id="aws-example-full">AWS Example (Full)</h3>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.<span style="color:#f92672">{</span><span style="color:#a6e22e">Initializer</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Bronze</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Silver</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Gold</span><span style="color:#f92672">}</span>
+<span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils._
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> consumerDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> etlDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch_ETL&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>widgets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;automatedDBU&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>widgets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;interactiveDBU&#34;</span><span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">$etlDB</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">$consumerDB</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;db_services&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;databricks_overwatch&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> overwatchModules <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;audit,accounts,sparkEvents,jobs,clusters,clusterEvents,notebooks&#34;</span><span style="color:#f92672">.</span>split<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;,&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(</span>
+  auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;s3a://CORP_audit_logBucket/databricks/audit-logs&#34;</span><span style="color:#f92672">)),</span>
+  tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>tokenSecret<span style="color:#f92672">),</span>
+  dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>dataTarget<span style="color:#f92672">),</span> 
+  badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;/tmp/overwatch/sparkEventsBadrecords&#34;</span><span style="color:#f92672">),</span>
+  overwatchScope <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>overwatchModules<span style="color:#f92672">),</span>
+  maxDaysToLoad <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">60</span><span style="color:#f92672">,</span>
+  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;2021-01-01&#34;</span><span style="color:#f92672">),</span>
+  databricksContractPrices <span style="color:#66d9ef">=</span> databricksContractPrices
+<span style="color:#f92672">)</span>
+</code></pre></div><h3 id="overwatchparams">OverwatchParams</h3>
+<p>The configuration structure required for Overwatch</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Config</th>
+<th style="text-align:left">Required Override</th>
+<th style="text-align:left">Default Value</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>auditLogConfig</strong></td>
+<td style="text-align:left">Y</td>
+<td style="text-align:left">NULL</td>
+<td style="text-align:left"><a href="#auditlogconfig">AuditLogConfig</a></td>
+<td style="text-align:left">Databricks Audit Log delivery information.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>tokenSecret</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">Execution Owner&rsquo;s Token</td>
+<td style="text-align:left">Option<a href="#tokensecret">[TokenSecret]</a></td>
+<td style="text-align:left">Secret retrieval information</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>dataTarget</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">DataTarget(&ldquo;overwatch&rdquo;, &ldquo;/user/hive/warehouse/{databaseName}.db&rdquo;)</td>
+<td style="text-align:left">Option<a href="#datatarget">[DataTarget]</a></td>
+<td style="text-align:left">What to call the database and where to store it</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>badRecordsPath</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">/tmp/overwatch/badRecordsPath</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left">When reading the log files, where should Overwatch store the records / files that cannot be parsed. Overwatch must have write permissions to this path</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>overwatchScope</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">all</td>
+<td style="text-align:left">Option[Seq[String]]</td>
+<td style="text-align:left">List of <a href="https://databrickslabs.github.io/overwatch/gettingstarted/modules/">modules</a> in scope for the run. It&rsquo;s important to note that there are many co-dependencies. When choosing a module, be sure to also enable it&rsquo;s requisites. If not value provided, all modules will execute.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>maxDaysToLoad</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">60</td>
+<td style="text-align:left">Int</td>
+<td style="text-align:left">On large, busy workspaces 60 days of data may amount in 10s of TB of raw data. This parameter allows the job to be broken out into several smaller runs.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>primordialDateString</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">Today&rsquo;s date minus 60 days, format = &ldquo;yyyy-mm-dd&rdquo;</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Date from which data collection was to begin. This is the earliest date for which data should attempted to be collected.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>databricksContractPrices</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">DatabricksContractPrices(0.56, 0.26)</td>
+<td style="text-align:left"><a href="#databrickscontractprices">DatabricksContractPrices</a></td>
+<td style="text-align:left">Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the <em>instanceDetails</em> consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices().</td>
+</tr>
+</tbody>
+</table>
+<h3 id="auditlogconfig">AuditLogConfig</h3>
+<p>Config to point Overwatch to the location of the delivered audit logs</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Config</th>
+<th style="text-align:left">Required Override</th>
+<th style="text-align:left">Default Value</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>rawAuditPath</strong></td>
+<td style="text-align:left">Y</td>
+<td style="text-align:left">None</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left">Top-level path to directory containing workspace audit logs delivered by Databricks. The Overwatch user must have read access to this path</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>azureAuditLogEventhubConfig</strong></td>
+<td style="text-align:left">Y (only on Azure)</td>
+<td style="text-align:left">None</td>
+<td style="text-align:left">Option<a href="#azureauditlogeventhubconfig">AzureAuditLogEventhubConfig</a></td>
+<td style="text-align:left">Required configuration when using Azure as Azure must deliver audit logs via LogAnalytics via Eventhub</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tokensecret">TokenSecret</h3>
+<p>Overwatch must have permission to perform its functions; these are further discussed in <a href="advancedtopics.md">AdvancedTopics</a>.
+The token secret stores the Databricks Secret scope / key for Overwatch to retrieve. The key should store the 
+token secret to be used which usually starts with &ldquo;dapi&hellip;&rdquo;</p>
+<p>If no TokenSecret is passed into the config, the operation owner&rsquo;s token will be used. If Overwatch is being 
+executed in a notebook the notebook user&rsquo;s token will be used. If Overwatch is being executed through a job the 
+token of the job owner will be used. Whatever token is used, it must have the appropriate access or it will result 
+in missing data, or an Overwatch run failure.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Config</th>
+<th style="text-align:left">Required Override</th>
+<th style="text-align:left">Default Value</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>scope</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">NA</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Databricks secret scope</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>key</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">NA</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Databricks secret key within the scope defined in the Scope parameter</td>
+</tr>
+</tbody>
+</table>
+<h3 id="datatarget">DataTarget</h3>
+<p>Where to create the database and what to call it. This must be defined on first run or Overwatch will create a
+database named &ldquo;Overwatch&rdquo; at the default location which is &ldquo;/user/hive/warehouse/overwatch.db&rdquo;. This is challenging
+to change later, so be sure you choose a good starting point. After the initial run, this must not change without 
+and entire <a href="AdvancedTopics.md">database migration</a>. Overwatch performs destructive tasks within its own database and
+this is how it protects itself against harming existing data. Overwatch creates specific metadata inside the database
+at creation time to ensure the database is created and owned by the Overwatch process. Furthermore, metadata is 
+managed to track schema versions and other states.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Config</th>
+<th style="text-align:left">Required Override</th>
+<th style="text-align:left">Default Value</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>databaseName</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">Overwatch</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left">Name of the primary database to be created on first run or to which will be appended on subsequent runs. This database is typically used as the ETL database only as the consumer database is also usually specified to have a different name. If consumerDatabase is also specified in the configuration, on the ETL entities will be stored in this datbase.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>databaseLocation</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">/user/hive/warehouse/{databaseName}.db</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left">Location of the Overwatch database. Any compatible fully-qualified URI can be used here as long as Overwatch has access to write the target. Most customers, however, mount the qualified path and reference the mount point for simplicity but this is not required and may not be possible depending on security requirements and environment.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>consumerDatabaseName</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">{databaseName}</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left">Will be the same as the databaseName if not otherwise specified. Holds the user-facing entities and separates them from all the intermediate ETL entities for a less cluttered experience, easy-to-find entities, and simplified security.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>ConsumerDatabaseLocation</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">/user/hive/warehouse/{consumerDatabaseName}.db</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left"><em>See databaseLocation above</em></td>
+</tr>
+</tbody>
+</table>
+<h3 id="azureauditlogeventhubconfig">AzureAuditLogEventhubConfig</h3>
+<p>Not Required when using AWS <!-- raw HTML omitted -->
+Eventhub streaming environment configurations</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Config</th>
+<th style="text-align:left">Required Override</th>
+<th style="text-align:left">Default Value</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>connectionString</strong></td>
+<td style="text-align:left">Y</td>
+<td style="text-align:left">NA</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Retrieve from Azure Portal Event Hub</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>eventHubName</strong></td>
+<td style="text-align:left">Y</td>
+<td style="text-align:left">NA</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Retrieve from Azure Portal Event Hub</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>auditRawEventsPrefix</strong></td>
+<td style="text-align:left">Y</td>
+<td style="text-align:left">NA</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Path prefix for checkpoint directories</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>maxEventsPerTrigger</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">10000</td>
+<td style="text-align:left">Int</td>
+<td style="text-align:left">Events to pull for each trigger, this should be increased during initial cold runs or runs that have very large numbers of audit log events.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>auditRawEventsChk</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">{auditRawEventsPrefix}/rawEventsCheckpoint</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left">Checkpoint Directory name for the raw dump of events from Eventhub. This directory gets overwritten upon successful pull into Overwatch.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>auditLogChk</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">{auditRawEventsPrefix}/auditLogBronzeCheckpoint</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left"><strong>DEPRECATED</strong> Checkpoint Directory name for the audit log stream target. This target will continuously grow as more audit logs are created and delivered</td>
+</tr>
+</tbody>
+</table>
+<h3 id="databrickscontractprices">DatabricksContractPrices</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Config</th>
+<th style="text-align:left">Required Override</th>
+<th style="text-align:left">Default Value</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>interactiveDBUCostUSD</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">0.56</td>
+<td style="text-align:left">Double</td>
+<td style="text-align:left">Approximate list price of interactive DBU</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>automatedDBUCostUSD</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">0.23</td>
+<td style="text-align:left">Double</td>
+<td style="text-align:left">Approximate list price of automated DBU</td>
+</tr>
+</tbody>
+</table>
+
+
+<footer class="footline">
+	
+</footer>
+
+        
+        </div> 
+        
+
+      </div>
+
+    <div id="navigation">
+        
+        
+        
+        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+        
+        
+
+
+	 
+	 
+		
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/gettingstarted/" title="Getting Started"> <i class="fa fa-chevron-left"></i></a>
+		
+		
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/gettingstarted/modules/" title="Modules" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+	
+    </div>
+
+    </section>
+    
+    <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
+      <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
+    </div>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1618855333"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1618855333"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1618855333"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1618855333"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1618855333"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1618855333"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1618855333"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1618855333"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1618855333"></script>
+
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1618855333" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1618855333"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    
+
+  </body>
+</html>
+

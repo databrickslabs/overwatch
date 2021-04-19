@@ -7,7 +7,7 @@ spark-warehouse/
 target/
 project/project/
 project/target/
-/docs/overwatch_docs/public/
+/docs-compose/overwatch_docs/public/
 *.DS_Store
 /src/main/scala/com/databricks/labs/overwatch/TestRunner.scala
 /data_samples/

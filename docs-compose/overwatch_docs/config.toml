@@ -1,0 +1,14 @@
+baseURL = "https://databrickslabs.github.io/overwatch/"
+title = "Overwatch"
+theme = "hugo-theme-learn-2.5.0"
+
+pluralizeListTitles = false
+publishDir = "../../docs"
+canonifyURLs = true
+
+[params]
+    description = "Overwatch Documentation"
+    themeVariant = "blue"
+    DisableShortcutsTitle = "true"
+    author = "Daniel Tomes -- DatabricksLabs"
+    disableLandingPageButton = false

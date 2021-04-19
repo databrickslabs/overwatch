@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Environment Setup on Overwatch</title>
+    <link>https://databrickslabs.github.io/overwatch/environmentsetup/</link>
+    <description>Recent content in Environment Setup on Overwatch</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Tue, 12 Jan 2021 05:49:17 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/environmentsetup/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Azure</title>
+      <link>https://databrickslabs.github.io/overwatch/environmentsetup/azure/</link>
+      <pubDate>Wed, 28 Oct 2020 09:12:32 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/environmentsetup/azure/</guid>
+      <description>Configuring Overwatch on Azure Databricks Historical / Batch Environment Configuration Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+Basic Deployment  Audit Log Delivery  At present the only supported method for audit log delivery is through Eventhub delivery via Azure Diagnostic Logging.</description>
+    </item>
+    
+    <item>
+      <title>AWS</title>
+      <link>https://databrickslabs.github.io/overwatch/environmentsetup/aws/</link>
+      <pubDate>Wed, 28 Oct 2020 09:12:28 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/environmentsetup/aws/</guid>
+      <description>Configuring Overwatch on AWS - Databricks Historical / Batch Environment Configuration Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+Basic Deployment  Audit Log Delivery Create Service User and/or Token for Overwatch to use  Grant required privileges to the Overwatch token Register the token secret as a Databricks Secret If a secret is not created and defined the user that owns the process must have the necessary permissions to perform all Overwatch tasks.</description>
+    </item>
+    
+  </channel>
+</rss>

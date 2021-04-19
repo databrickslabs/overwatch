@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Overwatch</title>
+    <link>https://databrickslabs.github.io/overwatch/contributing/</link>
+    <description>Recent content on Overwatch</description>
+    <generator>Hugo -- gohugo.io</generator><atom:link href="https://databrickslabs.github.io/overwatch/contributing/index.xml" rel="self" type="application/rss+xml" />
+  </channel>
+</rss>

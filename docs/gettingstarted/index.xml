@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Getting Started on Overwatch</title>
+    <link>https://databrickslabs.github.io/overwatch/gettingstarted/</link>
+    <description>Recent content in Getting Started on Overwatch</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Tue, 27 Oct 2020 16:40:00 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/gettingstarted/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Configuration</title>
+      <link>https://databrickslabs.github.io/overwatch/gettingstarted/configuration/</link>
+      <pubDate>Wed, 28 Oct 2020 11:55:12 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/configuration/</guid>
+      <description>The configuration for Overwatch is fairly basic for the initial release but the plan is to open a lot of options and make the config much more robust to allow for much more granular control over operations. The ongoing changes will be documented here.
+Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.databricks.labs.overwatch.BatchRunner. When passed in as a json string, it is deserialized into an instance of OverwatchParams.</description>
+    </item>
+    
+    <item>
+      <title>Modules</title>
+      <link>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</link>
+      <pubDate>Wed, 28 Oct 2020 09:38:28 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</guid>
+      <description>Modules Modules are the method by which Overwatch is segmented; currently, the modules available include:
+ audit clusters clusterEvents pools jobs accounts notebooks sparkEvents  The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently, under normal, daily operations, there no significant cost to any of these modules. It&amp;rsquo;s likely best to leave them all turned on unless there&amp;rsquo;s a specific reason not to.</description>
+    </item>
+    
+    <item>
+      <title>Advanced Topics</title>
+      <link>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</link>
+      <pubDate>Wed, 28 Oct 2020 13:43:52 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</guid>
+      <description>Multiple Workspaces Security / Views  Recommendations for Token (Ownership) Required Privileges / Access for Token Job owner must have access to the secret   Directory Lifecycle (dropping raw log files)  SC-38627 filed to improve raw log delivery   Moving the Overwatch Database Getting through the historical load (first run)  Joining With Slow Changing Dimensions (SCD) The nature of time throughout the Overwatch project has resulted in the need to for advanced time-series DataFrame management.</description>
+    </item>
+    
+    <item>
+      <title>Upgrading</title>
+      <link>https://databrickslabs.github.io/overwatch/gettingstarted/upgrading/</link>
+      <pubDate>Wed, 28 Oct 2020 09:42:06 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/upgrading/</guid>
+      <description>Performing your Upgrade This section will be populated when the first schema upgrade is released for Overwatch.</description>
+    </item>
+    
+    <item>
+      <title>Troubleshooting</title>
+      <link>https://databrickslabs.github.io/overwatch/gettingstarted/troubleshooting/</link>
+      <pubDate>Wed, 28 Oct 2020 09:05:57 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/troubleshooting/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Roadmap</title>
+      <link>https://databrickslabs.github.io/overwatch/gettingstarted/roadmap/</link>
+      <pubDate>Wed, 28 Oct 2020 09:37:43 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/roadmap/</guid>
+      <description> Screenshot of Roadmap items from git tag  </description>
+    </item>
+    
+  </channel>
+</rss>
