@@ -5,38 +5,55 @@ draft: true
 ---
 
 ## Configuring Overwatch on AWS - Databricks
-### Historical / Batch Environment Configuration
 Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
 <br>
 To get started, the [Basic Deployment](#basic-deployment) configuration. As more modules are enabled, additional
 environment configuration may be required in addition to the Basic Deployment.
 
-#### Basic Deployment
-* [Audit Log Delivery](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)
-* Create Service User and/or Token for Overwatch to use
-    * Grant required privileges to the Overwatch token
-    * Register the token secret as a [Databricks Secret](https://docs.databricks.com/security/secrets/index.html)
-{{% notice warning %}}
-If a secret is not created and defined the user that owns the process must have the necessary permissions to 
-perform all Overwatch tasks.
-{{% /notice %}}
+There are two primary sources of data that need to be configured:
+* [Audit Logs](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)
+  * These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis 
+    and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions. 
+    We don't want multiple workspaces delivering into the same prefix. The audit logs contain data for every interaction
+    within the environment and are used to track the state of various objects through time along with which accounts 
+    interacted with them. This data is relatively small and delivery occurs infrequently which is why it's 
+    rarely of any consequence to deliver audit logs to buckets even outside of the control plane region.
+* Cluster Logs - Crucial to get the most out of Overwatch
+  * Cluster logs delivery location is configured in the cluster spec --> Advanced Options --> Logging. These logs can 
+    get quite large and they are stored in a very inefficient format for query and long-term storage. As such, it's 
+    crucial to store these logs in the same region as the worker nodes for best results. Additionally, using dedicated 
+    buckets provides more flexibility when configuring TTL (time-to-live) to minimize long-term, unnecessary costs.
+    It's not recommended to store these on DBFS directly (dbfs mount points are ok).
+  * Best Practice - Multi-Workspace -- When multiple workspaces are using Overwatch within a single region it's best to 
+    ensure that each are going to their own prefix, even if sharing a bucket. This greatly reduces Overwatch scan times
+    as the log files build up.
+  * Best Practice - Sharding -- When many clusters send their logs to the same prefix it reduces the AWS read parallelism
+    for these small files. It's best to find a methodology for log prefixes that works for your org. One example would 
+    be to have each workspace and each team store their logs in a specific prefix, etc to break up the number of log 
+    files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data 
+    to the data model.
+    ![AWSClusterLogging](/images/EnvironmentSetup/Cluster_Logs_AWS.png
+
+| Basic Deployment       | Multi-Region Deployment |
+| ---------------------- | ----------------------  |
+| ![BasicAwsArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_AWS.png)| ![AWSArch](/images/EnvironmentSetup/Overwatch_Arch_AWS.png)|
     
-#### With IAM Passthrough Security Capture
+### With IAM Passthrough Security Capture
 {{% notice info %}}
-Targeted Q1 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
+Targeted Q3 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
-#### With Databricks Billable Usage Delivery Logs
+### With Databricks Billable Usage Delivery Logs
 Detailed costs data 
 [directly from Databricks](https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html). 
 This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn't support this just yet, 
 if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
 to load all the historical data from the day that you began receiving it. 
 {{% notice info %}}
-Targeted Q1 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
+Targeted Q3 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
-#### With Cloud Provider Costs
+### With Cloud Provider Costs
 There can be substantial cloud provider costs associated with a cluster. Databricks (and Overwatch) has no visibility 
 to this by default. The plan here is to work with a few pilot customers to build API keys with appropriate 
 permissions to allow Overwatch to capture the compute, storage, etc costs associated with cluster machines. The 
@@ -56,7 +73,7 @@ this feature and would like to participate, please inform your CSE and/or Databr
 Targeted 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
-#### Realtime Enablement
+### Realtime Enablement
 {{% notice info %}}
 2021 Feature Release -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}

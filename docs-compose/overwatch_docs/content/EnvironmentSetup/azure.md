@@ -5,26 +5,46 @@ draft: true
 ---
 
 ## Configuring Overwatch on Azure Databricks
-### Historical / Batch Environment Configuration
 Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
 <br>
-To get started, the [Basic Deployment](#basic-deployment) configuration. As more modules are enabled, additional
-environment configuration may be required in addition to the Basic Deployment.
+To get started, the [Basic Deployment](#configuring-the-event-hub-for-audit-log-delivery) configuration. 
+As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
 
-#### Basic Deployment
+There are two primary sources of data that need to be configured:
+* Audit Logs
+  * These will be delivered through Event Hubs. The audit logs contain data for every interaction within the environment 
+    and are used to track the state of various objects through time along with which accounts interacted with them. This data
+    is relatively small and it certainly doesn't contain any large data sets like cluster/spark logs.
+* Cluster Logs - Crucial to get the most out of Overwatch
+  * These logs can get quite large and they are stored in a very inefficient format for query and long-term storage.
+    This is why it's crucial to create a dedicated storage account for these and ensure TTL (time-to-live) is enabled
+    to minimize long-term, unnecessary costs.
+    It's not recommended to store these on DBFS directly (dbfs mount points are ok).
+  * Best Practice - Multi-Workspace -- When multiple workspaces are using Overwatch within a single region it's best to
+    ensure that each are going to their own prefix, even if sharing a storage account. This greatly reduces Overwatch scan times
+    as the log files build up. If scan times get too long, the TTL can be reduced or additional storage accounts can 
+    be created to increase read IOPS throughput (rarely necessary) intra-region.
+    ![AzureClusterLogging](/images/EnvironmentSetup/Cluster_Logs_Azure.png
+
+| Basic Deployment       | Multi-Region Deployment |
+| ---------------------- | ----------------------  |
+| ![BasicAzureArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_Azure.png)| ![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure.png)|
+
+### Configuring the Event Hub For Audit Log Delivery
 * Audit Log Delivery
     * At present the only supported method for audit log delivery is through Eventhub delivery via Azure Diagnostic Logging. 
     Overwatch will consume the events as a batch stream (Trigger.Once) once/period when the job runs. To configure 
     Eventhub to deliver these logs, follow the steps below.
-    
-##### Step 1
+
+### Configuing The Event Hub
+#### Step 1
 [Create or reuse an Event Hub namespace.](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-create)
 {{% notice warning %}}
 **Tht Event Hub Namespace MUST be in the same location as your control plane** 
 {{% /notice %}}
 
 {{% notice info %}}
-If you select the "Basic" Pricing Tier, just noted that you will be required to ensure at least two successful 
+If you select the "Basic" Pricing Tier, just note that you will be required to ensure at least two successful 
 Overwatch runs per day to ensure there won't be data loss. This is because message retention is 1 day meaning that 
 data expires out of EH every 24 hours. "Standard" Pricing tier doesn't cost much more but 
 it will give you up to 7 days retention which is much safer if you grow dependent on Overwatch reports. 
@@ -33,13 +53,13 @@ it will give you up to 7 days retention which is much safer if you grow dependen
 {{% notice info %}}
 [**Throughput Units**](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-scalability#throughput-units) 
 In almost all cases, 1 static throughput unit is sufficient for Overwatch. Cases where this may not be true are 
-include cases where there are many users globally across many workspaces all moving through a single EH Namespace.
+include cases where there are many users across many workspaces sharing a single EH Namespace.
 Review the Throughput Units sizing and make the best decision for you.
 {{% /notice %}}
 
 Inside the namespace create an Event Hub
 
-##### Step 2
+#### Step 2
 Create an Event Hub inside your chosen (or created) EH Namespace.
 {{% notice info %}}
 [**Partitions**](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-scalability#partitions)
@@ -51,49 +71,23 @@ situation like this, the minimum autoscaling compute size should approximately e
 minimize waste.  
 {{% /notice %}}
 
-##### Step 3
+#### Step 3
 With your Event Hub created and ready to go, Navigate to your the Azure Databricks workspace[s] for which you'd like 
 to enable Overwatch. Under Monitoring section --> Diagnostics settings --> Add diagnostic setting. Configure 
-your log deliver at least to the following spec.
+your log delivery similar to the example in the image below.
+
+Additionally, ensure that the Overwatch account has sufficinet privileges to read data from the Event Hub\[s\] created
+above. A common method for providing Overwatch access to the Event Hub is to simply capture the connection string 
+and store it as a [secret](https://docs.databricks.com/security/secrets/index.html). 
+There are many methods through which to authorize Overwatch, just ensure it has the access to read from the Event Hub Stream.
 ![EH_Base_Setup](/images/EnvironmentSetup/EH_BaseConfig.png)
-
-
-* Create Service User and/or Token for Overwatch to use
-    * Grant required privileges to the Overwatch token
-    * Register the token secret as a [Databricks Secret](https://docs.databricks.com/security/secrets/index.html)
-{{% notice warning %}}
-If a secret is not created and defined the user that owns the process must have the necessary permissions to 
-perform all Overwatch tasks.
-{{% /notice %}}
     
-#### With AD Passthrough Security Capture
+### With AD Passthrough Security Capture
 {{% notice info %}}
-Targeted Q1 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
+Targeted Q3 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}
 
-#### With Databricks Billable Usage Delivery Logs
-Detailed costs data 
-[directly from Databricks](https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html). 
-This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn't support this just yet, 
-if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
-to load all the historical data from the day that you began receiving it. 
-{{% notice info %}}
-Targeted Q1 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
-{{% /notice %}}
-
-#### With Cloud Provider Costs
-There can be substantial cloud provider costs associated with a cluster. Databricks (and Overwatch) has no visibility 
-to this by default. The plan here is to work with a few pilot customers to build API keys with appropriate 
-permissions to allow Overwatch to capture the compute, storage, network, disk, etc costs associated with machines. 
-On Azure it's likely we work in tandem with LogAnalytics to some extent to build a repeatable solution to easily  
-opt-in to this feature. If you're interested in this feature and would like to participate, please inform your CSE 
-and/or Databricks Account Team.
-
-{{% notice info %}}
-Targeted 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
-{{% /notice %}}
-
-#### Realtime Enablement
+### Realtime Enablement
 {{% notice info %}}
 2021 Feature Release -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
 {{% /notice %}}

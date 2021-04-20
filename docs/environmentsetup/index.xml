@@ -12,8 +12,9 @@
       <pubDate>Wed, 28 Oct 2020 09:12:32 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/environmentsetup/azure/</guid>
-      <description>Configuring Overwatch on Azure Databricks Historical / Batch Environment Configuration Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
-Basic Deployment  Audit Log Delivery  At present the only supported method for audit log delivery is through Eventhub delivery via Azure Diagnostic Logging.</description>
+      <description>Configuring Overwatch on Azure Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+There are two primary sources of data that need to be configured:
+ Audit Logs  These will be delivered through Event Hubs. The audit logs contain data for every interaction within the environment and are used to track the state of various objects through time along with which accounts interacted with them.</description>
     </item>
     
     <item>
@@ -22,8 +23,9 @@ Basic Deployment  Audit Log Delivery  At present the only supported method for a
       <pubDate>Wed, 28 Oct 2020 09:12:28 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/environmentsetup/aws/</guid>
-      <description>Configuring Overwatch on AWS - Databricks Historical / Batch Environment Configuration Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
-Basic Deployment  Audit Log Delivery Create Service User and/or Token for Overwatch to use  Grant required privileges to the Overwatch token Register the token secret as a Databricks Secret If a secret is not created and defined the user that owns the process must have the necessary permissions to perform all Overwatch tasks.</description>
+      <description>Configuring Overwatch on AWS - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+There are two primary sources of data that need to be configured:
+ Audit Logs  These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
     </item>
     
   </channel>
