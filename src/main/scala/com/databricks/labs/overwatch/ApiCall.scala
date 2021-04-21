@@ -26,6 +26,12 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private var _status: String = "SUCCESS"
   private var _errorFlag: Boolean = false
   private val mapper = JsonUtils.defaultObjectMapper
+  private val httpHeaders = Seq[(String, String)](
+    ("Content-Type", "application/json"),
+    ("Charset",  "UTF-8"),
+    ("User-Agent",  s"databricks-labs-overwatch-${env.packageVersion}"),
+    ("Authorization", s"Bearer ${env.rawToken}")
+  )
 
   private def setQuery(value: Option[Map[String, Any]]): this.type = {
     if (value.nonEmpty) {
@@ -132,12 +138,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     logger.log(Level.INFO, s"Loading $req -> query: $getQueryString")
     try {
       val result = Http(req + getQueryString)
-        .headers(Map[String, String](
-          "Content-Type" -> "application/json",
-          "Charset"-> "UTF-8",
-          "User-Agent" -> s"databricks-labs-overwatch/${env.packageVersion}",
-          "Authorization" -> s"Bearer ${env.rawToken}"
-        ))
+        .copy(headers = httpHeaders)
         .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
         .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
         .asString
@@ -214,13 +215,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     logger.log(Level.INFO, s"Loading $req -> query: $jsonQuery")
     try {
       val result = Http(req)
+        .copy(headers = httpHeaders)
         .postData(jsonQuery)
-        .headers(Map[String, String](
-          "Content-Type" -> "application/json",
-          "Charset"-> "UTF-8",
-          "User-Agent" -> s"databricks-labs-overwatch/${env.packageVersion}",
-          "Authorization" -> s"Bearer ${env.rawToken}"
-        ))
         .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
         .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
         .asString
