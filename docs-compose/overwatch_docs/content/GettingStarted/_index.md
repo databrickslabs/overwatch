@@ -125,9 +125,12 @@ export the resulting dataset to external editor, add the required metrics mentio
 overwrite the target table with the customized cost information. This workflow could be improved and as such, 
 [Issue 103](https://github.com/databrickslabs/overwatch/issues/103) was added to backlog to simplify this process.
 
-Default Costs Table -- Right-click --> Save As to download
-
-[AWS](/assets/GettingStarted/AWS_Instance_Details.csv) | [Azure](/assets/GettingStarted/Azure_Instance_Details.csv)
+{{< rawhtml >}}
+<a href="https://drive.google.com/file/d/1tj0GV-vX1Ka9cRcJpJSwkQx6bbpueSwl/view?usp=sharing" target="_blank">AWS Example</a>
+{{< /rawhtml >}} |
+{{< rawhtml >}}
+<a href="https://drive.google.com/file/d/13hYZrOAmzLwIjfgNz0YWx-qE2TdWe0-c/view?usp=sharing" target="_blank">Azure Example</a>
+{{< /rawhtml >}}
 
 ### Executing Overwatch via Notebook
 Continuing from where we left off above in [Initializing The Environment](#initializing-the-environment), we'll 
