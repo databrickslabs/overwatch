@@ -1,7 +1,6 @@
 ---
 title: "Configuration"
 date: 2020-10-28T11:55:12-04:00
-draft: true
 weight: 2
 ---
 

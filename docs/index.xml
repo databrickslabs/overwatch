@@ -38,7 +38,7 @@ Configuration Basics The Overwatch configuration can be created as a case class 
     <item>
       <title>Modules</title>
       <link>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</link>
-      <pubDate>Wed, 28 Oct 2020 09:38:28 -0400</pubDate>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</guid>
       <description>Modules Modules are the method by which Overwatch is segmented; currently, the modules available include:
@@ -52,114 +52,6 @@ Configuration Basics The Overwatch configuration can be created as a case class 
       
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</guid>
       <description>Multiple Workspaces Security / Views  Recommendations for Token (Ownership) Required Privileges / Access for Token Job owner must have access to the secret   Directory Lifecycle (dropping raw log files)  SC-38627 filed to improve raw log delivery   Moving the Overwatch Database Getting through the historical load (first run)  Joining With Slow Changing Dimensions (SCD) The nature of time throughout the Overwatch project has resulted in the need to for advanced time-series DataFrame management.</description>
-    </item>
-    
-    <item>
-      <title>Upgrading</title>
-      <link>https://databrickslabs.github.io/overwatch/gettingstarted/upgrading/</link>
-      <pubDate>Wed, 28 Oct 2020 09:42:06 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/upgrading/</guid>
-      <description>Performing your Upgrade This section will be populated when the first schema upgrade is released for Overwatch.</description>
-    </item>
-    
-    <item>
-      <title>Troubleshooting</title>
-      <link>https://databrickslabs.github.io/overwatch/gettingstarted/troubleshooting/</link>
-      <pubDate>Wed, 28 Oct 2020 09:05:57 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/troubleshooting/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Accounts</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/accounts/</link>
-      <pubDate>Mon, 11 Jan 2021 16:58:03 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/accounts/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Notebooks</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/notebooks/</link>
-      <pubDate>Mon, 11 Jan 2021 16:57:57 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/notebooks/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Cluster Events</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/cluster-events/</link>
-      <pubDate>Mon, 11 Jan 2021 16:57:49 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/cluster-events/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Audit</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/audit/</link>
-      <pubDate>Mon, 11 Jan 2021 16:57:39 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/audit/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Jobs</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/jobs/</link>
-      <pubDate>Mon, 11 Jan 2021 16:57:28 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/jobs/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Resuming</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/resuming/</link>
-      <pubDate>Mon, 11 Jan 2021 16:55:49 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/resuming/</guid>
-      <description>TOOD - change the name of this to append_only or something better than Resuming ##Pipeline_Report How new data is identified and mapped through the pipeline</description>
-    </item>
-    
-    <item>
-      <title>Error Handling</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/error-handling/</link>
-      <pubDate>Mon, 11 Jan 2021 16:54:08 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/error-handling/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Spark Events</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/spark-events/</link>
-      <pubDate>Mon, 11 Jan 2021 16:53:50 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/spark-events/</guid>
-      <description>TODO Discuss manipulation of spark_events_processedfiles to reload and/or cleanup files Discuss the need for landing cluster logs in a storage location with TTL and/or using this table to do your own cleanup</description>
-    </item>
-    
-    <item>
-      <title>Clusters</title>
-      <link>https://databrickslabs.github.io/overwatch/developer_docs/clusters/</link>
-      <pubDate>Mon, 11 Jan 2021 16:53:34 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/developer_docs/clusters/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>Roadmap</title>
-      <link>https://databrickslabs.github.io/overwatch/gettingstarted/roadmap/</link>
-      <pubDate>Wed, 28 Oct 2020 09:37:43 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/roadmap/</guid>
-      <description> Screenshot of Roadmap items from git tag  </description>
     </item>
     
     <item>

@@ -1,7 +1,6 @@
 ---
 title: "Definitions"
 date: 2021-01-11T12:21:19-05:00
-draft: true
 weight: 1
 ---
 
@@ -543,7 +542,7 @@ cluster_events_bronze       |clusterEvents  |bronze         |Raw landing of data
 clusters_snapshot_bronze    |clusters       |bronze         |API snapshot of existing clusters defined in Databricks workspace at the time of the Overwatch run. Snapshot is taken on each run
 jobs_snapshot_bronze        |jobs           |bronze         |API snapshot of existing jobs defined in Databricks workspace at the time of the Overwatch run. Snapshot is taken on each run
 pools_snapshot_bronze       |pools          |bronze         |API snapshot of existing pools defined in Databricks workspace at the time of the Overwatch run. Snapshot is taken on each run
-spark_events_bronze         |sparkEvents    |bronze         |Raw landing of the master sparkEvents schema and data for all cluster logs. Cluster log locations are defined by cluster specs and all locations will be scanned for new files not yet captured by Overwatch. Overwatch uses an implicit schema generation here, as such, **a lack of real-world can cause unforeseen issues**. See [Spark Events]({{%relref "Developer_Docs/Spark Events.md"%}}) in Developer_Docs for more information.
+spark_events_bronze         |sparkEvents    |bronze         |Raw landing of the master sparkEvents schema and data for all cluster logs. Cluster log locations are defined by cluster specs and all locations will be scanned for new files not yet captured by Overwatch. Overwatch uses an implicit schema generation here, as such, **a lack of real-world can cause unforeseen issues**.
 spark_events_processedfiles |sparkEvents    |bronze         |Table that keeps track of all previously processed cluster log files (spark event logs) to minimize future file scanning and improve performance. This table can be used to reprocess and/or find specific eventLog files.
 pipeline_report             |NA             |tracking       |Tracking table used to identify state and status of each Overwatch Pipeline run. This table is also used to control the start and end points of each run. Altering the timestamps and status of this table will change the ETL start/end points.
 

@@ -1,7 +1,6 @@
 ---
 title: "Azure"
 date: 2020-10-28T09:12:32-04:00
-draft: true
 ---
 
 ## Configuring Overwatch on Azure Databricks
@@ -24,7 +23,8 @@ There are two primary sources of data that need to be configured:
     ensure that each are going to their own prefix, even if sharing a storage account. This greatly reduces Overwatch scan times
     as the log files build up. If scan times get too long, the TTL can be reduced or additional storage accounts can 
     be created to increase read IOPS throughput (rarely necessary) intra-region.
-    ![AzureClusterLogging](/images/EnvironmentSetup/Cluster_Logs_Azure.png
+    
+![AzureClusterLogging](/images/EnvironmentSetup/Cluster_Logs_Azure.png)
 
 | Basic Deployment       | Multi-Region Deployment |
 | ---------------------- | ----------------------  |
@@ -81,13 +81,3 @@ above. A common method for providing Overwatch access to the Event Hub is to sim
 and store it as a [secret](https://docs.databricks.com/security/secrets/index.html). 
 There are many methods through which to authorize Overwatch, just ensure it has the access to read from the Event Hub Stream.
 ![EH_Base_Setup](/images/EnvironmentSetup/EH_BaseConfig.png)
-    
-### With AD Passthrough Security Capture
-{{% notice info %}}
-Targeted Q3 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
-{{% /notice %}}
-
-### Realtime Enablement
-{{% notice info %}}
-2021 Feature Release -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
-{{% /notice %}}

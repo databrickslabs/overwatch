@@ -34,12 +34,6 @@
   
   <url>
     <loc>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</loc>
-    <lastmod>2020-10-28T09:38:28-04:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/</loc>
-    <lastmod>2021-01-12T05:48:24-05:00</lastmod>
   </url>
   
   <url>
@@ -48,68 +42,8 @@
   </url>
   
   <url>
-    <loc>https://databrickslabs.github.io/overwatch/gettingstarted/upgrading/</loc>
-    <lastmod>2020-10-28T09:42:06-04:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/gettingstarted/troubleshooting/</loc>
-    <lastmod>2020-10-28T09:05:57-04:00</lastmod>
-  </url>
-  
-  <url>
     <loc>https://databrickslabs.github.io/overwatch/</loc>
     <lastmod>2021-01-12T05:49:17-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/accounts/</loc>
-    <lastmod>2021-01-11T16:58:03-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/notebooks/</loc>
-    <lastmod>2021-01-11T16:57:57-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/cluster-events/</loc>
-    <lastmod>2021-01-11T16:57:49-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/audit/</loc>
-    <lastmod>2021-01-11T16:57:39-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/jobs/</loc>
-    <lastmod>2021-01-11T16:57:28-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/resuming/</loc>
-    <lastmod>2021-01-11T16:55:49-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/error-handling/</loc>
-    <lastmod>2021-01-11T16:54:08-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/spark-events/</loc>
-    <lastmod>2021-01-11T16:53:50-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/developer_docs/clusters/</loc>
-    <lastmod>2021-01-11T16:53:34-05:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://databrickslabs.github.io/overwatch/gettingstarted/roadmap/</loc>
-    <lastmod>2020-10-28T09:37:43-04:00</lastmod>
   </url>
   
   <url>

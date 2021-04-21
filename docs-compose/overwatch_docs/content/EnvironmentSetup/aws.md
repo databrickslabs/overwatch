@@ -1,7 +1,6 @@
 ---
 title: "AWS"
 date: 2020-10-28T09:12:28-04:00
-draft: true
 ---
 
 ## Configuring Overwatch on AWS - Databricks
@@ -32,16 +31,12 @@ There are two primary sources of data that need to be configured:
     be to have each workspace and each team store their logs in a specific prefix, etc to break up the number of log 
     files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data 
     to the data model.
-    ![AWSClusterLogging](/images/EnvironmentSetup/Cluster_Logs_AWS.png
+    
+![AWSClusterLogging](/images/EnvironmentSetup/Cluster_Logs_AWS.png)
 
 | Basic Deployment       | Multi-Region Deployment |
 | ---------------------- | ----------------------  |
 | ![BasicAwsArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_AWS.png)| ![AWSArch](/images/EnvironmentSetup/Overwatch_Arch_AWS.png)|
-    
-### With IAM Passthrough Security Capture
-{{% notice info %}}
-Targeted Q3 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
-{{% /notice %}}
 
 ### With Databricks Billable Usage Delivery Logs
 Detailed costs data 
@@ -50,7 +45,7 @@ This data can significantly enhance deeper level cost metrics. Even though Overw
 if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
 to load all the historical data from the day that you began receiving it. 
 {{% notice info %}}
-Targeted Q3 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
+Targeted Q3 2021
 {{% /notice %}}
 
 ### With Cloud Provider Costs
@@ -70,10 +65,5 @@ the wrong type (or not enough) can result in elevated compute bills due to ineff
 this feature and would like to participate, please inform your CSE and/or Databricks Account Team.
 
 {{% notice info %}}
-Targeted 2021 -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
-{{% /notice %}}
-
-### Realtime Enablement
-{{% notice info %}}
-2021 Feature Release -- See [Roadmap]({{%relref "GettingStarted/Roadmap.md"%}})
+Targeted 2021
 {{% /notice %}}

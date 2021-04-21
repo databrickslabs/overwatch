@@ -1,7 +1,6 @@
 ---
 title: "Advanced Topics"
 date: 2020-10-28T13:43:52-04:00
-draft: true
 weight: 4
 ---
 
@@ -48,7 +47,7 @@ The function signature for "lookupWhen" is:
 ```
 
 ```scala
-import com.databricks.labs.overwatch.utils.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 val metricDf = Seq(("cluster_id", 10, 1609459200000L)).toDF("partCol", "metric", "timestamp")
 val lookupDf = Seq(
   ("0218-060606-rouge895", "my_clusters_first_name", 1609459220320L),

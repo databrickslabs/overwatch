@@ -1,7 +1,6 @@
 ---
 title: "Modules"
-date: 2020-10-28T09:38:28-04:00
-draft: true
+date: 2020-10-28T09:38:28-04:0
 weight: 3
 ---
 

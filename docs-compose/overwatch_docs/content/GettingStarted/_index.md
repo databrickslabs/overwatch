@@ -1,7 +1,6 @@
 ---
 title: "Getting Started"
 date: 2020-10-27T16:40:00-04:00
-draft: true
 weight: 1
 ---
 
@@ -119,11 +118,16 @@ There are three essential components to the cost function:
 The two DBU contract costs are captured from the Overwatch run config; however, compute costs and dbu to node
 associations are maintained in the [InstanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table.
 **IMPORTANT** This table is automatically created in the target database upon first initialization. **DO NOT** try to
-manually create the target database outside of Overwatch as that will lead to database validation errors. The way to
-customize this table is run the [first initialization](#initializing-the-environment) as detailed above,  
+manually create the target database outside of Overwatch as that will lead to database validation errors. 
+
+**To customize costs** using this table run the [first initialization](#initializing-the-environment) as detailed above, 
 export the resulting dataset to external editor, add the required metrics mentioned above for each workspace, and 
 overwrite the target table with the customized cost information. This workflow could be improved and as such, 
 [Issue 103](https://github.com/databrickslabs/overwatch/issues/103) was added to backlog to simplify this process.
+
+Default Costs Table -- Right-click --> Save As to download
+
+[AWS](/assets/GettingStarted/AWS_Instance_Details.csv) | [Azure](/assets/GettingStarted/Azure_Instance_Details.csv)
 
 ### Executing Overwatch via Notebook
 Continuing from where we left off above in [Initializing The Environment](#initializing-the-environment), we'll 
