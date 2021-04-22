@@ -22,9 +22,10 @@ As a reference, a cost analysis was performed at a large Databricks customer.
 This customer had >1000 named users with >400 daily active users with a contract price with Databricks over $2MM/year. 
 Overwatch costs them approximately $8 USD / day to run which includes storage, compute, and DBUs. $8 / day == 
 approximately $3,000 / year or **0.15% of Databricks contract price**. This is just a single reference customer but 
-cost monitoring for your Overwatch job should be the same as any other job you run. At this specific customer, 
-Overwatch was used to discover > $2MM / year in savings between Databricks and their cloud provider. This additional
-$2MM/year enabled this customer to greatly accelerate its backlog and significantly lower cost of ownership. 
+cost monitoring for your Overwatch job should be the same as any other job you run. At the time of this writing 
+Overwatch has only been deployed as a pilot and has already proven several million dollars in value. The savings 
+customers found through these efficiency improvements allowed them to accelerate their backlogs, permanently lower the 
+total cost of ownership, and even take on additional exploratory efforts.
 
 ## How It Works
 Overwatch has two primary modes, Historical & Realtime
