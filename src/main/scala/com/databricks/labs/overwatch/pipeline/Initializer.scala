@@ -409,7 +409,10 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-    config.setOrganizationId(dbutils.notebook.getContext.tags("orgId"))
+    val orgId = if (dbutils.notebook.getContext.tags("orgId") == "0") {
+      dbutils.notebook.getContext.tags("browserHostName").split("\\.")(0)
+    } else dbutils.notebook.getContext.tags("orgId")
+    config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
     if (debugFlag) {
@@ -425,6 +428,7 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)
+
 
     workspace
   }
