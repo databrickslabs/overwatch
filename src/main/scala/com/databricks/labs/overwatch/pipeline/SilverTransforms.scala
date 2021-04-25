@@ -925,8 +925,14 @@ trait SilverTransforms extends SparkSessionWrapper {
       })
       .toArray
 
-    val notebookJobsWithClusterIDs = spark.read.json(Seq(runIdStrings: _*).toDS())
-      .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
+    val jrNotebookJobsWithClusterIDs = spark.read.json(Seq(runIdStrings: _*).toDS())
+
+    val notebookJobsWithClusterIDs = if (jrNotebookJobsWithClusterIDs.isEmpty) {
+      Seq.empty[(String, String)].toDF("runId", "cluster_id_apiLookup")
+    } else {
+      jrNotebookJobsWithClusterIDs
+        .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
+    }
 
     val jrBaseExisting = jobRunsBase
       .filter('jobClusterType === "existing")
