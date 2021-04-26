@@ -265,17 +265,25 @@ class Initializer(config: Config) extends SparkSessionWrapper {
           s"or drop existing database and allow Overwatch to recreate.")
       }
     } else { // Database does not exist
-      try { // If the fs.ls below doesn't not throw a FileNotFound exception the target is not empty and will fail the run
-        dbutils.fs.ls(dbLocation)
-        switch = false
-        throw new BadConfigException(s"The target database location: ${dbLocation} " +
-          s"already exists but does not appear to be associated with the Overwatch database name, $dbName " +
-          s"specified. Specify a path that doesn't already exist or choose an existing overwatch database AND " +
-          s"database its associated location.")
-      } catch { // If the fs.ls throws fileNotFound exception, the db target does not exist and the db will be created
-        case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Target location " +
-          s"is valid: will create database: $dbName at location: ${dbLocation}", e)
-      }
+        if ( // spark conf configured for overwatch multi workspace ok, otherwise fail
+          Helpers.pathExists(dbLocation) &&
+          spark.conf.getOption("overwatch_multi_workspace").getOrElse("false").toLowerCase != "true"
+        ) {
+          logger.log(Level.INFO, s"Target location " +
+            s"is valid as a non-primary Overwatch workspace. Data delivered from this workspace will be appended " +
+            s"to existing, registered workspaces. Registering Database: $dbName at location: ${dbLocation}")
+        } else if (!Helpers.pathExists(dbLocation)) {
+          logger.log(Level.INFO, s"Target location " +
+            s"is valid: will create database: $dbName at location: ${dbLocation}")
+        } else {
+          switch = false
+          throw new BadConfigException(s"The target database location: ${dbLocation} " +
+            s"already exists but does not appear to be associated with the Overwatch database name, $dbName " +
+            s"specified. Specify a path that doesn't already exist or choose an existing overwatch database AND " +
+            s"location.\n\nIF this is an OVERWATCH configuration intended to operate on a " +
+            s"secondary workspace referencing an existing data target, the spark config 'overwatch_multi_workspace' " +
+            s"must be set to 'true'. spark.conf.set(\"overwatch_multi_workspace\", \"true\")")
+        }
     }
 
     // todo - refactor away duplicity
@@ -300,16 +308,24 @@ class Initializer(config: Config) extends SparkSessionWrapper {
             s"dbfs:/...")
         }
       } else { // consumer DB is different from ETL DB AND db does not exist
-        try { // If the fs.ls below doesn't not throw a FileNotFound exception the target is not empty and will fail the run
-          dbutils.fs.ls(consumerDBLocation)
+        if ( // spark conf configured for overwatch multi workspace ok, or path does not exist otherwise fail
+          Helpers.pathExists(consumerDBLocation) &&
+            spark.conf.getOption("overwatch_multi_workspace").getOrElse("false").toLowerCase != "true"
+        ) {
+          logger.log(Level.INFO, s"Consumer DB location " +
+            s"is valid as a non-primary Overwatch workspace. Ensure the instanceDetails table is configured for this " +
+            s"workspace. Registering Database: $consumerDBName at location: ${consumerDBLocation}")
+        } else if (!Helpers.pathExists(consumerDBLocation)) {
+          logger.log(Level.INFO, s"Consumer DB location " +
+            s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}")
+        } else {
           switch = false
-          throw new BadConfigException(s"The target database location: ${consumerDBLocation} " +
+          throw new BadConfigException(s"The consumer database location: ${consumerDBLocation} " +
             s"already exists but does not appear to be associated with the Overwatch database name, $consumerDBName " +
             s"specified. Specify a path that doesn't already exist or choose an existing overwatch database AND " +
-            s"database its associated location.")
-        } catch { // If the fs.ls throws fileNotFound exception, the db target does not exist and the db will be created
-          case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Target location " +
-            s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}", e)
+            s"location.\n\nIF this is an OVERWATCH configuration intended to operate on a " +
+            s"secondary workspace referencing an existing data target, the spark config 'overwatch_multi_workspace' " +
+            s"must be set to 'true'. spark.conf.set(\"overwatch_multi_workspace\", \"true\")")
         }
       }
 
