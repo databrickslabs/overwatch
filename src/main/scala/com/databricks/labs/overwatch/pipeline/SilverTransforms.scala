@@ -903,6 +903,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .collect()
       .par
 
+    // If current batch does not include any runs with existing clusters, omit this lookup altogether.
     val jrBaseExisting = if (jrWFilledClusterIDs.nonEmpty) {
       jrWFilledClusterIDs.tasksupport = taskSupport
 
@@ -929,11 +930,15 @@ trait SilverTransforms extends SparkSessionWrapper {
       val notebookJobsWithClusterIDs = spark.read.json(Seq(runIdStrings: _*).toDS())
         .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
 
-      jobRunsBase
-        .filter('jobClusterType === "existing")
-        .join(notebookJobsWithClusterIDs, Seq("runId"), "left")
-        .withColumn("clusterId", when('jobTaskType === "notebook" && 'clusterId.isNull, 'cluster_id_apiLookup).otherwise('clusterId))
-        .drop("cluster_id_apiLookup")
+      // If batch has runs on existing clusters older than the API retention the previous DF will be empty. Only join
+      // if the api lookup successfully obtained the data
+      if (!notebookJobsWithClusterIDs.isEmpty) {
+        jobRunsBase
+          .filter('jobClusterType === "existing")
+          .join(notebookJobsWithClusterIDs, Seq("runId"), "left")
+          .withColumn("clusterId", when('jobTaskType === "notebook" && 'clusterId.isNull, 'cluster_id_apiLookup).otherwise('clusterId))
+          .drop("cluster_id_apiLookup")
+      } else jobRunsBase
     } else {
       jobRunsBase
         .filter('jobClusterType === "existing")
