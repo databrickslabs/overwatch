@@ -98,7 +98,6 @@ abstract class PipelineTargets(config: Config) {
         "instanceDetails",
         Array("API_Name"),
         config, mode = "overwrite",
-        _databaseName = config.consumerDatabaseName,
         partitionBy = Seq("organization_id")
       )
     } else {
@@ -106,10 +105,15 @@ abstract class PipelineTargets(config: Config) {
         "instanceDetails",
         Array("API_Name"),
         config, mode = "overwrite",
-        _databaseName = config.consumerDatabaseName,
         partitionBy = Seq("organization_id")
       )
     }
+
+    lazy private[overwatch] val cloudMachineDetailViewTarget: PipelineView = PipelineView(
+      name = "instanceDetails",
+      cloudMachineDetail,
+      config
+    )
 
   }
 

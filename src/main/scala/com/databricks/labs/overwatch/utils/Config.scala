@@ -20,6 +20,7 @@ class Config() {
   private var _organizationId: String = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
+  private var _etlDataPathPrefix: String = _
   private var _consumerDatabaseName: String = _
   private var _consumerDatabaseLocation: String = _
   private var _workspaceUrl: String = _
@@ -66,6 +67,8 @@ class Config() {
   private[overwatch] def databaseName: String = _databaseName
 
   private[overwatch] def databaseLocation: String = _databaseLocation
+
+  private[overwatch] def etlDataPathPrefix: String = _etlDataPathPrefix
 
   private[overwatch] def consumerDatabaseName: String = _consumerDatabaseName
 
@@ -285,25 +288,30 @@ class Config() {
    * @param dbLocation
    * @return
    */
-  private[overwatch] def setDatabaseNameandLoc(dbName: String, dbLocation: String): this.type = {
-    _databaseLocation = PipelineFunctions.dbLocationURIString(dbLocation)
+  private[overwatch] def setDatabaseNameAndLoc(dbName: String, dbLocation: String, dataLocation: String): this.type = {
+    val cleanDBLocation = PipelineFunctions.cleansePathURI(dbLocation)
+    val cleanETLDataLocation = PipelineFunctions.cleansePathURI(dataLocation)
+    _databaseLocation = cleanDBLocation
     _databaseName = dbName
-    println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}")
-    if (dbLocation.contains("/user/hive/warehouse/")) println("WARNING!!: You have chose a database location in " +
+    _etlDataPathPrefix = dataLocation
+    println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}.\n\n " +
+      s"DATA Prefix set to: $dataLocation")
+    if (dbLocation.contains("/user/hive/warehouse/")) println("\n\nWARNING!! You have chosen a database location in " +
       "/user/hive/warehouse prefix. While the tables are created as external tables this still presents a risk that " +
-      "'drop database cascade' command will permanently delete all data. It's strongly recommended to specify a " +
-      "database outside of the /user/hive/warehouse prefix to prevent this.")
+      "'drop database cascade' command will permanently delete all data for all Overwatch workspaces." +
+      "It's strongly recommended to specify a database outside of the /user/hive/warehouse prefix to prevent this.")
+    if (cleanDBLocation.toLowerCase == cleanETLDataLocation.toLowerCase) println("\n\nWARNING!! The ETL Database " +
+      "AND ETL Data Prefix locations " +
+      "are equal. If ETL database is accidentally dropped ALL data from all workspaces will be lost in spite of the " +
+      "tables being external. Specify a separate prefix for the ETL data to avoid this from happening.")
     this
   }
 
   private[overwatch] def setConsumerDatabaseNameandLoc(consumerDBName: String, consumerDBLocation: String): this.type = {
-    _consumerDatabaseLocation = PipelineFunctions.dbLocationURIString(consumerDBLocation)
+    val cleanConsumerDBLocation = PipelineFunctions.cleansePathURI(consumerDBLocation)
+    _consumerDatabaseLocation = cleanConsumerDBLocation
     _consumerDatabaseName = consumerDBName
     println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
-    if (consumerDBLocation.contains("/user/hive/warehouse/")) println("WARNING!!: You have chose a database location in " +
-      "/user/hive/warehouse prefix. While the tables are created as external tables this still presents a risk that " +
-      "'drop database cascade' command will permanently delete all data. It's strongly recommended to specify a " +
-      "database outside of the /user/hive/warehouse prefix to prevent this.")
     this
   }
 

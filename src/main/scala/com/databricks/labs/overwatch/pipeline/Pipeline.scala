@@ -120,6 +120,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         .coalesce(1)
 
       database.write(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
+      BronzeTargets.cloudMachineDetailViewTarget.publish("*")
     }
     this
   }
