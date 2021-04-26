@@ -8,6 +8,26 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
     with SilverTransforms {
 
+  /**
+   * Enable access to Silver pipeline tables externally.
+   * @return
+   */
+  def getAllTargets: Array[PipelineTable] = {
+    Array(
+      SilverTargets.executorsTarget,
+      SilverTargets.executionsTarget,
+      SilverTargets.jobsTarget,
+      SilverTargets.stagesTarget,
+      SilverTargets.tasksTarget,
+      SilverTargets.dbJobRunsTarget,
+      SilverTargets.accountLoginTarget,
+      SilverTargets.accountModTarget,
+      SilverTargets.clustersSpecTarget,
+      SilverTargets.dbJobsStatusTarget,
+      SilverTargets.notebookStatusTarget
+    )
+  }
+
   envInit()
 
   private val logger: Logger = Logger.getLogger(this.getClass)

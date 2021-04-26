@@ -8,6 +8,28 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
     with GoldTransforms {
 
+  /**
+   * Enable access to Gold pipeline tables externally.
+   * @return
+   */
+  def getAllTargets: Array[PipelineTable] = {
+    Array(
+      GoldTargets.clusterTarget,
+      GoldTargets.jobTarget,
+      GoldTargets.jobRunTarget,
+      GoldTargets.jobRunCostPotentialFactTarget,
+      GoldTargets.notebookTarget,
+      GoldTargets.accountModsTarget,
+      GoldTargets.accountLoginTarget,
+      GoldTargets.clusterStateFactTarget,
+      GoldTargets.sparkJobTarget,
+      GoldTargets.sparkStageTarget,
+      GoldTargets.sparkTaskTarget,
+      GoldTargets.sparkExecutionTarget,
+      GoldTargets.sparkExecutorTarget
+    )
+  }
+
   envInit()
 
   private val logger: Logger = Logger.getLogger(this.getClass)
