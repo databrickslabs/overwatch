@@ -236,7 +236,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   @throws(classOf[IllegalArgumentException])
   private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
     val dbName = dataTarget.databaseName.getOrElse("overwatch")
-    val dbLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
+    val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
+    val dbLocation = PipelineFunctions.dbLocationURIString(rawDBLocation)
     var switch = true
     if (spark.catalog.databaseExists(dbName)) {
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
@@ -245,7 +246,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       if (existingDBLocation != dbLocation) {
         switch = false
         throw new BadConfigException(s"The DB: $dbName exists " +
-          s"at location $existingDBLocation which is different than the location entered in the config. Ensure" +
+          s"at location $existingDBLocation which is different than the location entered in the config. Ensure " +
           s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
           s"dbfs:/...")
       }
@@ -285,7 +286,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      * to remove duplicity while still enabling control between which checks are done for which DataTarget.
      */
     val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
-    val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+    val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+    val consumerDBLocation = PipelineFunctions.dbLocationURIString(rawConsumerDBLocation)
     if (consumerDBName != dbName) { // separate consumer db
       if (spark.catalog.databaseExists(consumerDBName)) {
         val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
