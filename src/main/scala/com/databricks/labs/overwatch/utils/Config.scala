@@ -278,6 +278,20 @@ class Config() {
   }
 
   /**
+   * Ensure no duplicate slashes in path and default to dbfs:/ URI prefix where no uri specified to result in
+   * fully qualified URI for db location
+   * @param rawPathString
+   * @return
+   */
+  private def dbLocationURIString(rawPathString: String): String = {
+    if (rawPathString.replaceAllLiterally("//", "/").split("/")(0).isEmpty) {
+      s"dbfs:${rawPathString}"
+    } else {
+      rawPathString
+    }.replaceAllLiterally("//", "/")
+  }
+
+  /**
    * Set Overwatch DB and location
    *
    * @param dbName
@@ -285,7 +299,7 @@ class Config() {
    * @return
    */
   private[overwatch] def setDatabaseNameandLoc(dbName: String, dbLocation: String): this.type = {
-    _databaseLocation = dbLocation
+    _databaseLocation = dbLocationURIString(dbLocation)
     _databaseName = dbName
     println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}")
     if (dbLocation.contains("/user/hive/warehouse/")) println("WARNING!!: You have chose a database location in " +
@@ -296,7 +310,7 @@ class Config() {
   }
 
   private[overwatch] def setConsumerDatabaseNameandLoc(consumerDBName: String, consumerDBLocation: String): this.type = {
-    _consumerDatabaseName = consumerDBName
+    _consumerDatabaseName = dbLocationURIString(consumerDBLocation)
     _consumerDatabaseLocation = consumerDBLocation
     println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
     if (consumerDBLocation.contains("/user/hive/warehouse/")) println("WARNING!!: You have chose a database location in " +
