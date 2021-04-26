@@ -29,6 +29,9 @@ object PipelineFunctions {
   }
 
   def getSourceDFParts(df: DataFrame): Int = if (!df.isStreaming) df.rdd.partitions.length else 200
+  def registerTable(tablePath: String, tableName: String) = {
+    val stmt = s"""create table if not exists"""
+  }
   def optimizeWritePartitions(
                                df: DataFrame,
                                target: PipelineTable,

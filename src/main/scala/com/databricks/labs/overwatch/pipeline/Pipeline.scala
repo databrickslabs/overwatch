@@ -103,7 +103,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
    * @return
    */
   protected def loadStaticDatasets(): this.type = {
-    if (!spark.catalog.tableExists(config.consumerDatabaseName, "instanceDetails")) {
+    if (!BronzeTargets.cloudMachineDetail.exists) {
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
           InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
@@ -113,16 +113,13 @@ class Pipeline(_workspace: Workspace, _database: Database,
           throw new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure.")
       }
 
-      instanceDetailsDF
+      val finalInstanceDetailsDF = instanceDetailsDF
         .withColumn("organization_id", lit(config.organizationId))
         .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
-        .withColumn("Pipeline_SnapTS", pipelineSnapTime.asColumnTS)
-        .withColumn("Overwatch_RunID", lit(config.runID))
         .coalesce(1)
-        .write.format("delta")
-        .partitionBy("organization_id")
-        .saveAsTable(s"${config.consumerDatabaseName}.instanceDetails")
+
+      database.write(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
     }
     this
   }

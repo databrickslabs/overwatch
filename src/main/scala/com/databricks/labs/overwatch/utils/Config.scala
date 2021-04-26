@@ -288,6 +288,10 @@ class Config() {
     _databaseLocation = dbLocation
     _databaseName = dbName
     println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}")
+    if (dbLocation.contains("/user/hive/warehouse/")) println("WARNING!!: You have chose a database location in " +
+      "/user/hive/warehouse prefix. While the tables are created as external tables this still presents a risk that " +
+      "'drop database cascade' command will permanently delete all data. It's strongly recommended to specify a " +
+      "database outside of the /user/hive/warehouse prefix to prevent this.")
     this
   }
 
@@ -295,6 +299,10 @@ class Config() {
     _consumerDatabaseName = consumerDBName
     _consumerDatabaseLocation = consumerDBLocation
     println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
+    if (consumerDBLocation.contains("/user/hive/warehouse/")) println("WARNING!!: You have chose a database location in " +
+      "/user/hive/warehouse prefix. While the tables are created as external tables this still presents a risk that " +
+      "'drop database cascade' command will permanently delete all data. It's strongly recommended to specify a " +
+      "database outside of the /user/hive/warehouse prefix to prevent this.")
     this
   }
 
