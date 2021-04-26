@@ -62,40 +62,39 @@ processes).
 
 In a notebook, run the following commands (customized for your needs of course) to initialize the targets. For 
 additional details on config customization options see [**configuration**]({{%relref "GettingStarted/Configuration.md"%}}).
-Sample Notebook ([HTML](/assets/GettingStarted/Runner_Job.html) / [DBC](/assets/GettingStarted/Runner_Job.dbc)) --
+
+**Example Notebooks:**
+The following notebooks will demonstrate a typical best practice for multi-workspace (and stand-alone) configurations. 
+Simply populate the necessary variables for your environment.
+* AWS ([HTML](/assets/GettingStarted/aws_runner_docs_example.html) / [DBC](/assets/GettingStarted/aws_runner_docs_example.dbc))
+* AZURE ([HTML](/assets/GettingStarted/azure_runner_docs_example.html) / [DBC](/assets/GettingStarted/azure_runner_docs_example.dbc))
 ```scala
-val db = dbutils.widgets.get("dbName")
-val etlDBName = dbutils.widgets.get("ETLDBName")
-val automatedDBUPrice = dbutils.widgets.get("automatedDBU")
-val interactiveDBUPrice = dbutils.widgets.get("interactiveDBU")
-
-import com.databricks.labs.overwatch.pipeline.{Initializer, Bronze, Silver, Gold}
-import com.databricks.labs.overwatch.utils._
-
 private val dataTarget = DataTarget(
-  Some(etlDBName), Some(s"dbfs:/user/hive/warehouse/$etlDBName.db"),
-  Some(db), Some(s"dbfs:/user/hive/warehouse/$db.db")
+  Some(etlDB), Some(s"${storagePrefix}/${workspaceID}/${etlDB}.db"), Some(s"${storagePrefix}/global_share"),
+  Some(consumerDB), Some(s"${storagePrefix}/${workspaceID}/${consumerDB}.db")
 )
-private val tokenSecret = TokenSecret("databricks", "overwatch_key")
-private val databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice)
+
+private val tokenSecret = TokenSecret(secretsScope, dbPATKey)
+private val badRecordsPath = s"${storagePrefix}/${workspaceID}/sparkEventsBadrecords"
+private val auditSourcePath = s"${storagePrefix}/${workspaceID}/raw_audit_logs"
+private val interactiveDBUPrice = 0.56
+private val automatedDBUPrice = 0.26
 
 val params = OverwatchParams(
-  auditLogConfig = AuditLogConfig(Some("s3a://auditLogBucketMount/audit-logs")),
-  tokenSecret = Some(tokenSecret),
+  auditLogConfig = AuditLogConfig(rawAuditPath = Some(auditSourcePath)),
   dataTarget = Some(dataTarget),
-  badRecordsPath = Some(s"/tmp/tomes/overwatch/sparkEventsBadrecords"),
-  overwatchScope = Some("audit,accounts,sparkEvents,jobs,clusters,clusterEvents,notebooks".split(",")),
-  maxDaysToLoad = 30,
-  databricksContractPrices = databricksContractPrices
+  tokenSecret = Some(tokenSecret),
+  badRecordsPath = Some(badRecordsPath),
+  overwatchScope = Some(scopes),
+  maxDaysToLoad = maxDaysToLoad,
+  databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice),
+  primordialDateString = Some(primordialDateString)
 )
 
-// Initialize the targets
 private val args = JsonUtils.objToJson(params).compactString
 val workspace = if (args.length != 0) {
   Initializer(Array(args), debugFlag = true)
-} else {
-  Initializer(Array())
-}
+} else { Initializer(Array()) }
 ```
 
 This is also a great time to materialize the JSON configs for use in the Databricks job the main class (not notebook) 
@@ -120,10 +119,12 @@ associations are maintained in the [InstanceDetails]({{%relref "DataEngineer/Def
 **IMPORTANT** This table is automatically created in the target database upon first initialization. **DO NOT** try to
 manually create the target database outside of Overwatch as that will lead to database validation errors. 
 
-**To customize costs** using this table run the [first initialization](#initializing-the-environment) as detailed above, 
-export the resulting dataset to external editor, add the required metrics mentioned above for each workspace, and 
-overwrite the target table with the customized cost information. This workflow could be improved and as such, 
-[Issue 103](https://github.com/databrickslabs/overwatch/issues/103) was added to backlog to simplify this process.
+**To customize costs** using this table run the [first initialization](#initializing-the-environment) as detailed above.
+Note that each subsequent workspace on which you execute Overwatch and reference the same etlDataPathPrefix, the 
+default costs by node will be appended to instanceDetails table if no data is present for that organization_id 
+(i.e. workspace). If you would like to customize compute costs for all workspaces,   
+export the instanceDetails dataset to external editor (after first init), add the required metrics mentioned above 
+for each workspace, and overwrite the target table with the customized cost information.
 
 {{< rawhtml >}}
 <a href="https://drive.google.com/file/d/1tj0GV-vX1Ka9cRcJpJSwkQx6bbpueSwl/view?usp=sharing" target="_blank">AWS Example</a>

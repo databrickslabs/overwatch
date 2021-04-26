@@ -151,20 +151,18 @@ workerSpecs                 |struct           |Worker node details
 **KEY** -- Organization_ID + API_name
 
 This table is unique and it's purpose is to enable users to identify node specific details for the relevant
-cloud provider. Default examples are loaded by default and should closely (if not perfectly) represent your cloud
-node details including costs, CPUs, etc. This is a table not a view like the rest of the entities in the consumer 
-database. Everytime Overwatch runs, it checks to validate the presence of this table, if it does not exist it creates
-it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their needs.
-If you decide to completely customize the table, it's critical to note that **some columns are required** for the ETL
+cloud provider. Defaults are loaded as an example by workspace. These defaults should closely (if not perfectly) 
+represent your cloud node details including costs, CPUs, etc. Everytime Overwatch runs, it validates the presence of 
+this table and whether it has any data present for the current worksapce, if it does not creates / appends the relevant
+data to it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their 
+needs by workspace. Each organization_id (workspace), should provide complete cost data for each node used in that
+region. If you decide to completely customize the table, it's critical to note that **some columns are required** for the ETL
 to function; these fields include: **API_name, vCPUs, Compute_Contract_Price, Hourly_DBUs**. As long as these columns exist
-this table may be dropped and recreated to suit your needs. If this table is to be customized it **MUST be customized AFTER**
-the first initialization of the consumer database.
+this table may be dropped and recreated to suit your needs.
 
-The organization_id (i.e. workspace id) is automatically generated from the first workspace that initializes the target 
-consumer database but subsequent workspace ids will not be appended. As such if Overwatch is deployed in multiple regions, each
-subsequent region will need to be manually appended to the table along with the relevant associated costs as the 
-organization_id is an applied filter throughout the queried lookups. Each organization_id 
-(i.e. workspace) often have unique costs, this table enables you to customize compute pricing.
+The organization_id (i.e. workspace id) is automatically generated for each workspace if that organization_id is not
+present in the table already (or the table is not present at all). Each workspace
+(i.e. organization_id) often has unique costs, this table enables you to customize compute pricing.
 
 Coming Soon: As costs change throughout time, it's important that this table allow for changing costs through time.
 [Issue 49](https://github.com/databrickslabs/overwatch/issues/49) has been created to implement this functionality.
@@ -178,8 +176,7 @@ Column | Type | Description
 instance                    |string           |Common name of instance type 
 API_name                    |string           |Canonical KEY name of the node type -- use this to join to node_ids elsewhere
 vCPUs                       |int              |Number of virtual cpus provisioned for the node type
-Memory_GB                   |int              |Gigabyes of memory provisioned for the node type
-linux_vm_price_hour         |double           |Azure Only (deprecated)
+Memory_GB                   |double           |Gigabyes of memory provisioned for the node type
 Compute_Contract_Price      |double           |Contract price for the instance type as negotiated between customer and cloud vendor. This is the value used in cost functions to deliver cost estimates. It is defaulted to equal the on_demand compute price
 On_Demand_Cost_Hourly       |double           |On demand, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
 Linux_Reserved_Cost_Hourly  |double           |Reserved, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing

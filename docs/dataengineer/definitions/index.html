@@ -12,21 +12,21 @@
     <title>Definitions :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1619119001" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1619533784" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1619119001" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1619533784" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1619119001"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1619533784"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1619119001"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1619119001"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1619533784"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1619533784"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1619119001"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1619533784"></script>
 
     
   </div>
@@ -315,6 +315,27 @@
       <li data-nav-id="/dataengineer/etl_process/" title="ETL Process" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process/">
         ETL Process
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/changelog/" title="Change Log" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/changelog/">
+        Change Log
         
         </a>
     </li>
@@ -852,19 +873,17 @@ for a cluster_state combination until that state ends.</p>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_aws.tab"><strong>AWS Sample</strong></a> | <a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_azure.tab"><strong>AZURE_Sample</strong></a></p>
 <p><strong>KEY</strong> &ndash; Organization_ID + API_name</p>
 <p>This table is unique and it&rsquo;s purpose is to enable users to identify node specific details for the relevant
-cloud provider. Default examples are loaded by default and should closely (if not perfectly) represent your cloud
-node details including costs, CPUs, etc. This is a table not a view like the rest of the entities in the consumer 
-database. Everytime Overwatch runs, it checks to validate the presence of this table, if it does not exist it creates
-it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their needs.
-If you decide to completely customize the table, it&rsquo;s critical to note that <strong>some columns are required</strong> for the ETL
+cloud provider. Defaults are loaded as an example by workspace. These defaults should closely (if not perfectly) 
+represent your cloud node details including costs, CPUs, etc. Everytime Overwatch runs, it validates the presence of 
+this table and whether it has any data present for the current worksapce, if it does not creates / appends the relevant
+data to it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their 
+needs by workspace. Each organization_id (workspace), should provide complete cost data for each node used in that
+region. If you decide to completely customize the table, it&rsquo;s critical to note that <strong>some columns are required</strong> for the ETL
 to function; these fields include: <strong>API_name, vCPUs, Compute_Contract_Price, Hourly_DBUs</strong>. As long as these columns exist
-this table may be dropped and recreated to suit your needs. If this table is to be customized it <strong>MUST be customized AFTER</strong>
-the first initialization of the consumer database.</p>
-<p>The organization_id (i.e. workspace id) is automatically generated from the first workspace that initializes the target 
-consumer database but subsequent workspace ids will not be appended. As such if Overwatch is deployed in multiple regions, each
-subsequent region will need to be manually appended to the table along with the relevant associated costs as the 
-organization_id is an applied filter throughout the queried lookups. Each organization_id 
-(i.e. workspace) often have unique costs, this table enables you to customize compute pricing.</p>
+this table may be dropped and recreated to suit your needs.</p>
+<p>The organization_id (i.e. workspace id) is automatically generated for each workspace if that organization_id is not
+present in the table already (or the table is not present at all). Each workspace
+(i.e. organization_id) often has unique costs, this table enables you to customize compute pricing.</p>
 <p>Coming Soon: As costs change throughout time, it&rsquo;s important that this table allow for changing costs through time.
 <a href="https://github.com/databrickslabs/overwatch/issues/49">Issue 49</a> has been created to implement this functionality.</p>
 <p><a href="https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/">Azure VM Pricing Page</a></p>
@@ -895,13 +914,8 @@ organization_id is an applied filter throughout the queried lookups. Each organi
 </tr>
 <tr>
 <td style="text-align:left">Memory_GB</td>
-<td style="text-align:left">int</td>
-<td style="text-align:left">Gigabyes of memory provisioned for the node type</td>
-</tr>
-<tr>
-<td style="text-align:left">linux_vm_price_hour</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">Azure Only (deprecated)</td>
+<td style="text-align:left">Gigabyes of memory provisioned for the node type</td>
 </tr>
 <tr>
 <td style="text-align:left">Compute_Contract_Price</td>
@@ -2431,6 +2445,22 @@ all tables. Users should always reference Consumption and Gold layers unless the
             
         
                     
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
             
         
                     
@@ -2472,19 +2502,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1619119001"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1619533785"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1619119001"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1619533785"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1619119001" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1619119001"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1619533785" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1619533785"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

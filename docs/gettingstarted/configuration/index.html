@@ -12,21 +12,21 @@
     <title>Configuration :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1619119001" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1619119001" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1619533784" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1619119001" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1619533784" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1619119001"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1619533784"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1619119001"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1619119001"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1619533784"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1619533784"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1619119001"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1619533784"></script>
 
     
   </div>
@@ -324,6 +324,27 @@
 
             
           
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/changelog/" title="Change Log" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/changelog/">
+        Change Log
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
         
         </ul>
       
@@ -488,6 +509,16 @@ set to contain an instance of the class <em>OverwatchParams</em>.</p>
 <a href="https://databrickslabs.github.io/overwatch/gettingstarted/#run-via-notebook">Getting Started - Run Via Notebook</a> or
 <a href="https://databrickslabs.github.io/overwatch/gettingstarted/#run-via-main-class">Getting Started - Run Via Main Class</a> section to see how it&rsquo;s can be used
 when executing the Overwatch Run.</p>
+
+<div class="notices warning" ><p>The configuration examples below use a data target prefix of <em>/user/hive/warehouse</em>. It is strongly recommended that
+a data target with a prefix other than /user/hive/warehouse be used. Even though the tables are external, any 
+spark database located within the default warehouse will drop all tables (including external) with certain drop database
+commands resulting in permanent data loss. This is default behavior and has nothing to do with Overwatch specifically
+but it&rsquo;s called out here as a major precaution. If multiple workspaces are to be configured and someone with write 
+access to this location invokes certain drop database commands, all tables will be permanently deleted for all 
+workspaces.</p>
+</div>
+
 <h3 id="simplified-example">Simplified Example</h3>
 <p>The simplest configuration possible. This is just for testing and likely is not a sufficient configuration for 
 real-world application.</p>
@@ -495,9 +526,10 @@ real-world application.</p>
 which can be found below in <a href="#azure-example">Azure Example</a></p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.<span style="color:#f92672">{</span><span style="color:#a6e22e">Initializer</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Bronze</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Silver</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Gold</span><span style="color:#f92672">}</span>
 <span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils._
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> storagePrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch/&#34;</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> db <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch_Test&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;/path/to/aws/audit/logs&#34;</span><span style="color:#f92672">))</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>db<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">${</span>db<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">))</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/workspace_id/audit_logs&#34;</span><span style="color:#f92672">))</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>db<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/workspace_id/</span><span style="color:#e6db74">${</span>db<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/global_data&#34;</span><span style="color:#f92672">))</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;db_services&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;databricks_overwatch&#34;</span><span style="color:#f92672">)</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> overwatchModules <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;audit,accounts,sparkEvents,jobs,clusters,clusterEvents,notebooks&#34;</span><span style="color:#f92672">.</span>split<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;,&#34;</span><span style="color:#f92672">)</span>
 
@@ -505,63 +537,58 @@ which can be found below in <a href="#azure-example">Azure Example</a></p>
 </code></pre></div><h3 id="azure-example-full">Azure Example (Full)</h3>
 <p>Azure does require an event hub to be set up and referenced in the config as an 
 <a href="#azureauditlogeventhubconfig">AzureAuditLogEventhubConfig</a>. More details for setting up this Event Hub
-can be found in the <a href="https://databrickslabs.github.io/overwatch/environmentsetup/azure/">Azure Environment Setup</a> page.</p>
+can be found in the <a href="https://databrickslabs.github.io/overwatch/environmentsetup/azure/">Azure Environment Setup</a> page. An example notebook
+can be found <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example.html">here</a>.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.<span style="color:#f92672">{</span><span style="color:#a6e22e">Initializer</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Bronze</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Silver</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Gold</span><span style="color:#f92672">}</span>
 <span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils._
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> consumerDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> etlDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch_ETL&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> evhName <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;overwatch-evhub&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> secretsScope <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;aott-kv&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> secretsEvHubKey <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;overwatch-eventhubs&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> overwatchKey <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;overwatch-pat&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>widgets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;automatedDBU&#34;</span><span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>widgets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;interactiveDBU&#34;</span><span style="color:#f92672">)</span>
-
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span>
-  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">$etlDB</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span>
-  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">$consumerDB</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>etlDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/global_share&#34;</span><span style="color:#f92672">),</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>consumerDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
 <span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> overwatchKey<span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> evhubConnString <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>secrets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> secretsEvHubKey<span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> azureLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AzureAuditLogEventhubConfig</span><span style="color:#f92672">(</span>connectionString <span style="color:#66d9ef">=</span> evhubConnString<span style="color:#f92672">,</span> eventHubName <span style="color:#66d9ef">=</span> evhName<span style="color:#f92672">,</span> auditRawEventsPrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;/tmp/</span><span style="color:#e6db74">$etlDB</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> overwatchModules <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;audit,accounts,sparkEvents,jobs,clusters,clusterEvents,notebooks&#34;</span><span style="color:#f92672">.</span>split<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;,&#34;</span><span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> dbPATKey<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> ehConnString <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>secrets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> ehKey<span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> ehStatePath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/ehState&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/sparkEventsBadrecords&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> azureLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AzureAuditLogEventhubConfig</span><span style="color:#f92672">(</span>connectionString <span style="color:#66d9ef">=</span> ehConnString<span style="color:#f92672">,</span> eventHubName <span style="color:#66d9ef">=</span> ehName<span style="color:#f92672">,</span> auditRawEventsPrefix <span style="color:#66d9ef">=</span> ehStatePath<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.56</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.26</span>
 
 <span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(</span>
   auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span>azureAuditLogEventhubConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>azureLogConfig<span style="color:#f92672">)),</span>
-  tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>tokenSecret<span style="color:#f92672">),</span>
   dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>dataTarget<span style="color:#f92672">),</span>
-  badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;/tmp/</span><span style="color:#e6db74">${</span>etlDB<span style="color:#e6db74">}</span><span style="color:#e6db74">/sparkEventsBadrecords&#34;</span><span style="color:#f92672">),</span>
-  overwatchScope <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>overwatchModules<span style="color:#f92672">),</span>
-  maxDaysToLoad <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">30</span><span style="color:#f92672">,</span>
-  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;2021-01-01&#34;</span><span style="color:#f92672">),</span>
-  databricksContractPrices <span style="color:#66d9ef">=</span> databricksContractPrices
+  tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>tokenSecret<span style="color:#f92672">),</span>
+  badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>badRecordsPath<span style="color:#f92672">),</span>
+  overwatchScope <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>scopes<span style="color:#f92672">),</span>
+  maxDaysToLoad <span style="color:#66d9ef">=</span> maxDaysToLoad<span style="color:#f92672">,</span>
+  databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">),</span>
+  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>primordialDateString<span style="color:#f92672">)</span>
 <span style="color:#f92672">)</span>
 </code></pre></div><h3 id="aws-example-full">AWS Example (Full)</h3>
+<p>An example notebook can be found <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example.html">here</a>.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.<span style="color:#f92672">{</span><span style="color:#a6e22e">Initializer</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Bronze</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Silver</span><span style="color:#f92672">,</span> <span style="color:#a6e22e">Gold</span><span style="color:#f92672">}</span>
 <span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils._
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> consumerDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> etlDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Overwatch_ETL&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>widgets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;automatedDBU&#34;</span><span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>widgets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;interactiveDBU&#34;</span><span style="color:#f92672">)</span>
-
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span>
-  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">$etlDB</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span>
-  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;dbfs:/user/hive/warehouse/</span><span style="color:#e6db74">$consumerDB</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>etlDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/global_share&#34;</span><span style="color:#f92672">),</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>consumerDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
 <span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;db_services&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;databricks_overwatch&#34;</span><span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> overwatchModules <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;audit,accounts,sparkEvents,jobs,clusters,clusterEvents,notebooks&#34;</span><span style="color:#f92672">.</span>split<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;,&#34;</span><span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> dbPATKey<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/sparkEventsBadrecords&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> auditSourcePath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/raw_audit_logs&#34;</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.56</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.26</span>
 
 <span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(</span>
-  auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;s3a://CORP_audit_logBucket/databricks/audit-logs&#34;</span><span style="color:#f92672">)),</span>
+  auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span>rawAuditPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>auditSourcePath<span style="color:#f92672">)),</span>
+  dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>dataTarget<span style="color:#f92672">),</span>
   tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>tokenSecret<span style="color:#f92672">),</span>
-  dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>dataTarget<span style="color:#f92672">),</span> 
-  badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;/tmp/overwatch/sparkEventsBadrecords&#34;</span><span style="color:#f92672">),</span>
-  overwatchScope <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>overwatchModules<span style="color:#f92672">),</span>
-  maxDaysToLoad <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">60</span><span style="color:#f92672">,</span>
-  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;2021-01-01&#34;</span><span style="color:#f92672">),</span>
-  databricksContractPrices <span style="color:#66d9ef">=</span> databricksContractPrices
+  badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>badRecordsPath<span style="color:#f92672">),</span>
+  overwatchScope <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>scopes<span style="color:#f92672">),</span>
+  maxDaysToLoad <span style="color:#66d9ef">=</span> maxDaysToLoad<span style="color:#f92672">,</span>
+  databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">),</span>
+  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>primordialDateString<span style="color:#f92672">)</span>
 <span style="color:#f92672">)</span>
 </code></pre></div><h3 id="overwatchparams">OverwatchParams</h3>
 <p>The configuration structure required for Overwatch</p>
@@ -593,7 +620,7 @@ can be found in the <a href="https://databrickslabs.github.io/overwatch/environm
 <tr>
 <td style="text-align:left"><strong>dataTarget</strong></td>
 <td style="text-align:left">N</td>
-<td style="text-align:left">DataTarget(&ldquo;overwatch&rdquo;, &ldquo;/user/hive/warehouse/{databaseName}.db&rdquo;)</td>
+<td style="text-align:left">DataTarget(&ldquo;overwatch&rdquo;, &ldquo;/user/hive/warehouse/{databaseName}.db&rdquo;, &ldquo;/user/hive/warehouse/{databaseName}.db&rdquo;)</td>
 <td style="text-align:left">Option<a href="#datatarget">[DataTarget]</a></td>
 <td style="text-align:left">What to call the database and where to store it</td>
 </tr>
@@ -702,7 +729,7 @@ in missing data, or an Overwatch run failure.</p>
 <p>Where to create the database and what to call it. This must be defined on first run or Overwatch will create a
 database named &ldquo;Overwatch&rdquo; at the default location which is &ldquo;/user/hive/warehouse/overwatch.db&rdquo;. This is challenging
 to change later, so be sure you choose a good starting point. After the initial run, this must not change without 
-and entire <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">database migration</a>. Overwatch performs destructive tasks within its own database and
+and entire <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">database migration</a>. Overwatch can perform destructive tasks within its own database and
 this is how it protects itself against harming existing data. Overwatch creates specific metadata inside the database
 at creation time to ensure the database is created and owned by the Overwatch process. Furthermore, metadata is 
 managed to track schema versions and other states.</p>
@@ -730,6 +757,13 @@ managed to track schema versions and other states.</p>
 <td style="text-align:left">/user/hive/warehouse/{databaseName}.db</td>
 <td style="text-align:left">Option[String]</td>
 <td style="text-align:left">Location of the Overwatch database. Any compatible fully-qualified URI can be used here as long as Overwatch has access to write the target. Most customers, however, mount the qualified path and reference the mount point for simplicity but this is not required and may not be possible depending on security requirements and environment.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>etlDataPathPrefix</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">{databaseLocation}</td>
+<td style="text-align:left">Option[String]</td>
+<td style="text-align:left">The location the data will actually be stored. This is critical as data (even EXTERNAL) stored underneath a database path can be deleted if a user call drop database or drop database cascade. This is even more significant when working with multiple workspaces as the risk increases with the breadth of access.</td>
 </tr>
 <tr>
 <td style="text-align:left"><strong>consumerDatabaseName</strong></td>
@@ -827,7 +861,7 @@ Eventhub streaming environment configurations</p>
 <tr>
 <td style="text-align:left"><strong>automatedDBUCostUSD</strong></td>
 <td style="text-align:left">N</td>
-<td style="text-align:left">0.23</td>
+<td style="text-align:left">0.26</td>
 <td style="text-align:left">Double</td>
 <td style="text-align:left">Approximate list price of automated DBU</td>
 </tr>
@@ -1027,6 +1061,22 @@ Eventhub streaming environment configurations</p>
             
         
                     
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
             
         
                     
@@ -1068,19 +1118,19 @@ Eventhub streaming environment configurations</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1619119001"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1619533785"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1619119001"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1619119001"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1619533785"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1619119001" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1619119001"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1619533785" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1619533785"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

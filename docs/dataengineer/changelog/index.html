@@ -9,7 +9,7 @@
 
     <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
 
-    <title>Advanced Topics :: Overwatch</title>
+    <title>Change Log :: Overwatch</title>
 
     
     <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1619533784" rel="stylesheet">
@@ -38,7 +38,7 @@
 
 <script async defer src="https://buttons.github.io/buttons.js"></script>
   </head>
-  <body class="" data-url="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/dataengineer/changelog/">
     <nav id="sidebar" class="">
 
 
@@ -92,7 +92,7 @@
   
     
     <li data-nav-id="/gettingstarted/" title="Getting Started" class="dd-item
-        parent
+        
         
         
         ">
@@ -160,7 +160,7 @@
  
   
     
-      <li data-nav-id="/gettingstarted/advancedtopics/" title="Advanced Topics" class="dd-item active">
+      <li data-nav-id="/gettingstarted/advancedtopics/" title="Advanced Topics" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">
         Advanced Topics
         
@@ -265,7 +265,7 @@
   
     
     <li data-nav-id="/dataengineer/" title="Data Engineering" class="dd-item
-        
+        parent
         
         
         ">
@@ -333,7 +333,7 @@
  
   
     
-      <li data-nav-id="/dataengineer/changelog/" title="Change Log" class="dd-item ">
+      <li data-nav-id="/dataengineer/changelog/" title="Change Log" class="dd-item active">
         <a href="https://databrickslabs.github.io/overwatch/dataengineer/changelog/">
         Change Log
         
@@ -440,7 +440,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/gettingstarted/'>Getting Started</a> > Advanced Topics
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/dataengineer/'>Data Engineering</a> > Change Log
           
         
           
@@ -455,10 +455,8 @@
     <div class="wrapper">
 <nav id="TableOfContents">
   <ul>
-    <li><a href="#joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</a></li>
-    <li><a href="#optimizations-implemented">Optimizations Implemented</a></li>
-    <li><a href="#best-practices">Best Practices</a></li>
-    <li><a href="#enabling-debug">Enabling Debug</a></li>
+    <li><a href="#041">0.4.1</a></li>
+    <li><a href="#040">0.4.0</a></li>
   </ul>
 </nav>
     </div>
@@ -476,73 +474,49 @@
           
             <h1>
               
-              Advanced Topics
+              Change Log
             </h1>
           
 
         
 
 
+<h2 id="041">0.4.1</h2>
 <ul>
-<li>Multiple Workspaces</li>
-<li>Security / Views
+<li><a href="https://github.com/databrickslabs/overwatch/issues/50">Converted all delta targets from managed tables to external tables</a>
 <ul>
-<li>Recommendations for Token (Ownership)</li>
-<li>Required Privileges / Access for Token</li>
-<li>Job owner must have access to the secret</li>
+<li>Better security and best practice</li>
+<li>Enabled etl data path prefix to simplify and protect the raw data across workspaces</li>
 </ul>
 </li>
-<li>Directory Lifecycle (dropping raw log files)
+<li>pipeline_report - enabled partitioning by &ldquo;organization_id&rdquo;
 <ul>
-<li>SC-38627 filed to improve raw log delivery</li>
+<li>Necessary to guard against write concurrency issues across multiple workspaces</li>
 </ul>
 </li>
-<li>Moving the Overwatch Database</li>
-<li>Getting through the historical load (first run)</li>
+<li>orgianization_id - Single Tenant AWS workspaces with DNS would return &ldquo;0&rdquo; for organization_id, updated to change 
+organization_id to the workspace prefix.
+<ul>
+<li>EXAMPLE: <a href="https://myorg_dev.cloud.databricks.com">https://myorg_dev.cloud.databricks.com</a> &ndash;&gt; myorg_dev</li>
 </ul>
-<h2 id="joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</h2>
-<p>The nature of time throughout the Overwatch project has resulted in the need to for 
-advanced time-series DataFrame management. As such, a vanilla version of 
-<a href="https://github.com/databrickslabs/tempo">databrickslabs/tempo</a> was implemented 
-for the sole purpose of enabling Scala time-series DataFrames (TSDF). TSDFs enable
-&ldquo;asofJoin&rdquo; and &ldquo;lookupWhen&rdquo; functions that also efficiently handle massive skew as is 
-introduced with the partitioning of organization_id and cluster_id. Please refer to the Tempo
-documentation for deeper info. When Tempo&rsquo;s implementation for Scala is complete, Overwatch plans to 
-simply reference it as a dependency.</p>
-<p>This is discussed here because these functionalities have been made public through Overwatch which 
-means you can easily utilize &ldquo;lookupWhen&rdquo; and &ldquo;asofJoin&rdquo; when interrogating Overwatch. The details for 
-optimizing skewed windows is beyond the scope of this documentation but please do reference the Tempo 
-documentation for more details.</p>
-<p>In the example below, assume you wanted the cluster name at the time of some event in a fact table.
-Since cluster names can be edited, this name could be different throughout time so what was that 
-value at the time of some event in a driving table.</p>
-<p>The function signature for &ldquo;lookupWhen&rdquo; is:</p>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">  <span style="color:#66d9ef">def</span> lookupWhen<span style="color:#f92672">(</span>
-                  rightTSDF<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">TSDF</span><span style="color:#f92672">,</span>
-                  leftPrefix<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">String</span> <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">,</span>
-                  rightPrefix<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">String</span> <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;right_&#34;</span><span style="color:#f92672">,</span>
-                  maxLookback<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">Long</span> <span style="color:#f92672">=</span> <span style="color:#a6e22e">Window</span><span style="color:#f92672">.</span>unboundedPreceding<span style="color:#f92672">,</span>
-                  maxLookAhead<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">Long</span> <span style="color:#f92672">=</span> <span style="color:#a6e22e">Window</span><span style="color:#f92672">.</span>currentRow<span style="color:#f92672">,</span>
-                  tsPartitionVal<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">Int</span> <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span><span style="color:#f92672">,</span>
-                  fraction<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">Double</span> <span style="color:#f92672">=</span> <span style="color:#ae81ff">0.1</span>
-                <span style="color:#f92672">)</span><span style="color:#66d9ef">:</span> <span style="color:#66d9ef">TSDF</span> <span style="color:#f92672">=</span> <span style="color:#f92672">???</span>
-</code></pre></div><div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.TransformFunctions._
-<span style="color:#66d9ef">val</span> metricDf <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Seq</span><span style="color:#f92672">((</span><span style="color:#e6db74">&#34;cluster_id&#34;</span><span style="color:#f92672">,</span> <span style="color:#ae81ff">10</span><span style="color:#f92672">,</span> <span style="color:#ae81ff">1609459200000L</span><span style="color:#f92672">)).</span>toDF<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;partCol&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;metric&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;timestamp&#34;</span><span style="color:#f92672">)</span>
-<span style="color:#66d9ef">val</span> lookupDf <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Seq</span><span style="color:#f92672">(</span>
-  <span style="color:#f92672">(</span><span style="color:#e6db74">&#34;0218-060606-rouge895&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;my_clusters_first_name&#34;</span><span style="color:#f92672">,</span> <span style="color:#ae81ff">1609459220320L</span><span style="color:#f92672">),</span>
-  <span style="color:#f92672">(</span><span style="color:#e6db74">&#34;0218-060606-rouge895&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;my_clusters_new_name&#34;</span><span style="color:#f92672">,</span> <span style="color:#ae81ff">1609458708728L</span><span style="color:#f92672">)</span>
-<span style="color:#f92672">).</span>toDF<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;cluster_id&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;cluster_name&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;timestamp&#34;</span><span style="color:#f92672">)</span>
-
-metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;timestamp&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;cluster_id&#34;</span><span style="color:#f92672">)</span>
-  <span style="color:#f92672">.</span>lookupWhen<span style="color:#f92672">(</span>
-    lookupDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;timestamp&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;cluster_id&#34;</span><span style="color:#f92672">)</span>
-  <span style="color:#f92672">)</span>
-  <span style="color:#f92672">.</span>df
-  <span style="color:#f92672">.</span>show<span style="color:#f92672">(</span><span style="color:#ae81ff">20</span><span style="color:#f92672">,</span> <span style="color:#66d9ef">false</span><span style="color:#f92672">)</span>
-</code></pre></div><h2 id="optimizations-implemented">Optimizations Implemented</h2>
-<h2 id="best-practices">Best Practices</h2>
-<h2 id="enabling-debug">Enabling Debug</h2>
-<p>Might move this to troubleshooting</p>
+</li>
+<li>instanceDetails -
+<ul>
+<li>Converted from append mode to overwrite mode. Allows for multiple workspaces to create the compute pricing lookup 
+if it didn&rsquo;t already exist for the workspace</li>
+<li>Moved default table location from consumerDB to ETLDB and created mapped view to table in consumerDB</li>
+<li>Simplified the instanceDetails cost customization process (docs updated)</li>
+<li>Added proper filter to ensure ONLY current workspace compute costs are looked up during joins</li>
+<li>Converted Azure example Memory_GB to double to match data type from AWS</li>
+</ul>
+</li>
+<li>Bug fix for JSON to Map that caused certain escaped json strings to break when being pulled from the new Jobs UI</li>
+<li>Bug fix for <a href="https://github.com/databrickslabs/overwatch/issues/111">Issue 111</a></li>
+<li>Bug fix for multi-workspace Azure, filter from audit_raw_land table was incomplete</li>
+<li>Bug fix to allow for consumerDB to be omitted from DataTarget in config</li>
+</ul>
+<h2 id="040">0.4.0</h2>
+<p>Initial Public Release</p>
 
 
 <footer class="footline">
@@ -580,20 +554,6 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
             
                 
                     
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-                        
-            
-            
-                
-                    
                         
                         
                     
@@ -604,9 +564,6 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
                     
                     
 
-                    
-            
-        
                     
                         
             
@@ -623,42 +580,6 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
                     
             
         
-                    
-                        
-            
-            
-                
-                    
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                        
-                        
-                    
-                
-                
-
-                    
-                    
-                    
-
                     
                         
             
@@ -740,10 +661,63 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
             
         
                     
+            
+        
+                    
                         
             
             
                 
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
                     
                 
                 
@@ -763,6 +737,9 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
             
             
                 
+                    
+                        
+                        
                     
                 
                 
@@ -784,10 +761,10 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
 	 
 	 
 		
-			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/gettingstarted/modules/" title="Modules"> <i class="fa fa-chevron-left"></i></a>
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process/" title="ETL Process"> <i class="fa fa-chevron-left"></i></a>
 		
 		
-			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/environmentsetup/" title="Environment Setup" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/contributing/" title="" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
 		
 	
     </div>
@@ -797,19 +774,19 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1619533784"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1619533784"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1619533784"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1619533784"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1619533784"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1619533784"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1619533784"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1619533784"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1619533784"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1619533785" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1619533785"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1619533784" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1619533784"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
