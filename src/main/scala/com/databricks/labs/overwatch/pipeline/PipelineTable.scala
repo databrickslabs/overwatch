@@ -199,7 +199,7 @@ case class PipelineTable(
         }
       })
 
-      PipelineFunctions.withIncrementalFilters(instanceDF, module, incrementalFilters, config.globalFilters, dataFrequency)
+      PipelineFunctions.withIncrementalFilters(instanceDF, Some(module), incrementalFilters, config.globalFilters, dataFrequency)
     } else { // Source doesn't exist
       spark.emptyDataFrame
     }
