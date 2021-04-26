@@ -310,8 +310,8 @@ class Config() {
   }
 
   private[overwatch] def setConsumerDatabaseNameandLoc(consumerDBName: String, consumerDBLocation: String): this.type = {
-    _consumerDatabaseName = dbLocationURIString(consumerDBLocation)
-    _consumerDatabaseLocation = consumerDBLocation
+    _consumerDatabaseLocation = dbLocationURIString(consumerDBLocation)
+    _consumerDatabaseName = consumerDBName
     println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
     if (consumerDBLocation.contains("/user/hive/warehouse/")) println("WARNING!!: You have chose a database location in " +
       "/user/hive/warehouse prefix. While the tables are created as external tables this still presents a risk that " +
