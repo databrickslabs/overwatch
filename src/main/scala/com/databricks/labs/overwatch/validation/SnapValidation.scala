@@ -55,16 +55,7 @@ class SnapValidation(params: SnapValidationParams,
     val tableName = s"${params.sourceDatabaseName}.${target.name}"
 
     try {
-      val baseDF = spark.table(tableName)
-      val filteredDF = if (target.incrementalColumns.isEmpty) {
-        baseDF
-      } else {
-        target.incrementalColumns.foldLeft(baseDF)((df, incColName) =>
-          df.filter(tsFilter(colToTS(df, incColName), startCompare, endCompare))
-        )
-      }
-
-      val df1: DataFrame = filteredDF
+      val df1: DataFrame = getFilteredDF(target, tableName, startCompare, endCompare)
         .drop('__overwatch_ctrl_noise)
         .drop('Pipeline_SnapTS)
         .drop('Overwatch_RunID)
@@ -107,16 +98,7 @@ class SnapValidation(params: SnapValidationParams,
     val tableName = s"${params.sourceDatabaseName}.${target.name}"
 
     try {
-      val baseDF = spark.table(tableName)
-      val filteredDF = if (target.incrementalColumns.isEmpty) {
-        baseDF
-      } else {
-        target.incrementalColumns.foldLeft(baseDF)((df, incColName) =>
-          df.filter(tsFilter(colToTS(df, incColName), startCompare, endCompare))
-        )
-      }
-
-      filteredDF
+      getFilteredDF(target, tableName, startCompare, endCompare)
         .repartition()
         .write
         .format("delta")
@@ -126,8 +108,7 @@ class SnapValidation(params: SnapValidationParams,
 
       println(s"SNAPPED: ${target.tableFullName}")
 
-      val snappedDF = spark.read.table(databaseTable)
-      snappedDF
+      spark.read.table(databaseTable)
         .select(
           lit(target.tableFullName).alias("tableFullName"),
           startCompare.alias("from"),

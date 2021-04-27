@@ -49,4 +49,23 @@ class ValidationUtils extends SparkSessionWrapper {
       case _ => throw new Exception(s"${f.dataType} type not supported")
     }
   }
+
+  /**
+   * gets a pipeline table dataframe and outputs it after filtering, used to compare with recalculated tables.
+   * @param target
+   * @param tableName
+   * @param startCompare
+   * @param endCompare
+   * @return
+   */
+  protected def getFilteredDF(target: PipelineTable, tableName: String, startCompare: Column, endCompare: Column): DataFrame = {
+    val baseDF = spark.table(tableName)
+    if (target.incrementalColumns.isEmpty) {
+      baseDF
+    } else {
+      target.incrementalColumns.foldLeft(baseDF)((df, incColName) =>
+        df.filter(tsFilter(colToTS(df, incColName), startCompare, endCompare))
+      )
+    }
+  }
 }
