@@ -97,14 +97,14 @@ abstract class PipelineTargets(config: Config) {
       PipelineTable(
         "instanceDetails",
         Array("API_Name"),
-        config, mode = "overwrite",
+        config,
         partitionBy = Seq("organization_id")
       )
     } else {
       PipelineTable(
         "instanceDetails",
         Array("API_Name"),
-        config, mode = "overwrite",
+        config,
         partitionBy = Seq("organization_id")
       )
     }

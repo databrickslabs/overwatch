@@ -172,13 +172,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                overwatchRunID: String,
                                organizationId: String
                               ): DataFrame = {
+    val fromDT = fromTime.toLocalDate
+    val untilDT = untilTime.toLocalDate
     if (cloudProvider == "azure") {
+      val azureAuditSourceFilters = 'Overwatch_RunID === lit(overwatchRunID) && 'organization_id === organizationId
       val rawBodyLookup = spark.table(auditRawLand.tableFullName)
-        .filter('Overwatch_RunID === lit(overwatchRunID))
-        .filter('organization_id === organizationId)
+        .filter(azureAuditSourceFilters)
       val schemaBuilders = spark.table(auditRawLand.tableFullName)
-        .filter('Overwatch_RunID === lit(overwatchRunID))
-        .filter('organization_id === organizationId)
+        .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
         .selectExpr("streamRecord.*", "organization_id")
@@ -190,8 +191,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .selectExpr("*", "properties.*").drop("properties")
 
 
-      spark.table(auditRawLand.tableFullName)
-        .filter('Overwatch_RunID === lit(overwatchRunID))
+      val azureAuditDF = spark.table(auditRawLand.tableFullName)
+        .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
         .selectExpr("streamRecord.*", "organization_id")
@@ -206,10 +207,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("response", structFromJson(schemaBuilders, "response"))
         .drop("logId")
 
+      if (!azureAuditDF.isEmpty) azureAuditDF
+      else throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, " +
+        s"no new data found between ${fromDT.toString}-${untilDT.toString}", Level.WARN)
+
     } else {
 
-      val fromDT = fromTime.toLocalDate
-      val untilDT = untilTime.toLocalDate
       // inclusive from exclusive to
       val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
         .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
@@ -225,11 +228,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
             split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
           .drop("filenameAR")
       } else {
-        // TODO -- switch back to throwing NoNewDataException
-
-        //        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data found between ${fromDT.toString}-${untilDT.toString}")
-        spark.emptyDataFrame
-        //        Seq("No New Records").toDF("__OVERWATCHEMPTY")
+        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data " +
+          s"found between ${fromDT.toString}-${untilDT.toString}", Level.WARN)
       }
     }
   }
