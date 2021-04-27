@@ -103,7 +103,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
    * @return
    */
   protected def loadStaticDatasets(): this.type = {
-    if (!BronzeTargets.cloudMachineDetail.exists) {
+    if (
+      !BronzeTargets.cloudMachineDetail.exists ||
+        BronzeTargets.cloudMachineDetail.asDF.isEmpty
+    ) { // if not exists OR if empty for current orgID (.asDF applies global filters)
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
           InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")

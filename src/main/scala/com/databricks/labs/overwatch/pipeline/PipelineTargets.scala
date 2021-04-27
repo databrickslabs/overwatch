@@ -93,21 +93,12 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id")
     )
 
-    lazy private[overwatch] val cloudMachineDetail: PipelineTable = if (config.cloudProvider == "azure") {
-      PipelineTable(
-        "instanceDetails",
-        Array("API_Name"),
+    lazy private[overwatch] val cloudMachineDetail: PipelineTable = PipelineTable(
+        name = "instanceDetails",
+        keys = Array("API_Name"),
         config,
         partitionBy = Seq("organization_id")
       )
-    } else {
-      PipelineTable(
-        "instanceDetails",
-        Array("API_Name"),
-        config,
-        partitionBy = Seq("organization_id")
-      )
-    }
 
     lazy private[overwatch] val cloudMachineDetailViewTarget: PipelineView = PipelineView(
       name = "instanceDetails",
