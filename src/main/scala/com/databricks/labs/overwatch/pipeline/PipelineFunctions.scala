@@ -11,6 +11,20 @@ import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  /**
+   * Ensure no duplicate slashes in path and default to dbfs:/ URI prefix where no uri specified to result in
+   * fully qualified URI for db location
+   * @param rawPathString
+   * @return
+   */
+  def cleansePathURI(rawPathString: String): String = {
+    if (rawPathString.replaceAllLiterally("//", "/").split("/")(0).isEmpty) {
+      s"dbfs:${rawPathString}"
+    } else {
+      rawPathString
+    }.replaceAllLiterally("//", "/")
+  }
+
   def addOneTick(ts: Column, dataFrequency: Frequency, dt: DataType = TimestampType): Column = {
     dt match {
       case _: TimestampType =>
@@ -29,6 +43,7 @@ object PipelineFunctions {
   }
 
   def getSourceDFParts(df: DataFrame): Int = if (!df.isStreaming) df.rdd.partitions.length else 200
+
   def optimizeWritePartitions(
                                df: DataFrame,
                                target: PipelineTable,
