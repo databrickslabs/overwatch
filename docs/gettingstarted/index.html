@@ -12,21 +12,21 @@
     <title>Getting Started :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1619533784" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1619533784" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1619533784" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1619533784" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1619533784" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1619533784" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1619533784" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1619533784" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1619616343" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1619616343" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1619616343" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1619616343" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1619616343" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1619616343" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1619616343" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1619616343" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1619616343" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1619533784" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1619616343" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1619533784"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1619616343"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1619533784"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1619533784"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1619616343"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1619616343"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1619533784"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1619616343"></script>
 
     
   </div>
@@ -568,6 +568,7 @@ Simply populate the necessary variables for your environment.</p>
 <li>AWS (<a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example.html">HTML</a> / <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example.dbc">DBC</a>)</li>
 <li>AZURE (<a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example.html">HTML</a> / <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example.dbc">DBC</a>)</li>
 </ul>
+<p>The code snippet below will initialize the workspace.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span>
   <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>etlDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/global_share&#34;</span><span style="color:#f92672">),</span>
   <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>consumerDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
@@ -594,6 +595,11 @@ Simply populate the necessary variables for your environment.</p>
 <span style="color:#66d9ef">val</span> workspace <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">if</span> <span style="color:#f92672">(</span>args<span style="color:#f92672">.</span>length <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span><span style="color:#f92672">)</span> <span style="color:#f92672">{</span>
   <span style="color:#a6e22e">Initializer</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Array</span><span style="color:#f92672">(</span>args<span style="color:#f92672">),</span> debugFlag <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">)</span>
 <span style="color:#f92672">}</span> <span style="color:#66d9ef">else</span> <span style="color:#f92672">{</span> <span style="color:#a6e22e">Initializer</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Array</span><span style="color:#f92672">())</span> <span style="color:#f92672">}</span>
+</code></pre></div><p>If this is the first run and you&rsquo;d like to customize compute costs to mirror your region / contract price, be sure to 
+run the following to initialize the pipeline which will in turn create the instanceDetails table, which you can edit 
+/ complete according to your needs. This is only necessary for first-time init with custom costs. More information below 
+in the <a href="#configuring-custom-costs">Configuring Custom Costs</a> section.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#a6e22e">Bronze</span><span style="color:#f92672">(</span>workspace<span style="color:#f92672">)</span>
 </code></pre></div><p>This is also a great time to materialize the JSON configs for use in the Databricks job the main class (not notebook) 
 is to be used to execute the job.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">val</span> escapedConfigString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">JsonUtils</span><span style="color:#f92672">.</span>objToJson<span style="color:#f92672">(</span>params<span style="color:#f92672">).</span>escapedString
@@ -610,14 +616,17 @@ time to make customizations to this table, after first init but before first pip
 </ul>
 <p>The two DBU contract costs are captured from the Overwatch run config; however, compute costs and dbu to node
 associations are maintained in the <a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions//#instancedetails">InstanceDetails</a> table.
-<strong>IMPORTANT</strong> This table is automatically created in the target database upon first initialization. <strong>DO NOT</strong> try to
-manually create the target database outside of Overwatch as that will lead to database validation errors.</p>
-<p><strong>To customize costs</strong> using this table run the <a href="#initializing-the-environment">first initialization</a> as detailed above.
-Note that each subsequent workspace on which you execute Overwatch and reference the same etlDataPathPrefix, the 
+<strong>IMPORTANT</strong> This table is automatically created in the target database upon first initialization of the pipeline. 
+<strong>DO NOT</strong> try to manually create the target database outside of Overwatch as that will lead to database validation errors.</p>
+<p><strong>To customize costs</strong> using this table run the <a href="#initializing-the-environment">first initialization</a> as detailed above 
+including the pipeline initialization (e.g Bronze(workspace) - DO NOT call the .run function yet).
+Note that each subsequent workspace referencing the same etlDataPathPrefix on which you execute Overwatch, the 
 default costs by node will be appended to instanceDetails table if no data is present for that organization_id 
 (i.e. workspace). If you would like to customize compute costs for all workspaces,<br>
 export the instanceDetails dataset to external editor (after first init), add the required metrics mentioned above 
-for each workspace, and overwrite the target table with the customized cost information.</p>
+for each workspace, and overwrite the target table with the customized cost information. Note that the instanceDetails 
+object in the consumer database is just a view so you must edit/overwrite the table in the ETL database. The view 
+will automatically be recreated upon first pipeline run.</p>
 <p>
 
 <a href="https://drive.google.com/file/d/1tj0GV-vX1Ka9cRcJpJSwkQx6bbpueSwl/view?usp=sharing" target="_blank">AWS Example</a>
@@ -925,19 +934,19 @@ securing access to these tables would be the same as with any set of tables in y
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1619616343"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1619616343"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1619616343"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1619616343"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1619616343"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1619616343"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1619533785"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1619533785"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1619616343"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1619616343"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1619616343"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1619533785" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1619533785"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1619616343" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1619616343"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
