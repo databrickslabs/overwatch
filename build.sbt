@@ -3,7 +3,7 @@ name := "overwatch"
 
 organization := "com.databricks.labs"
 
-version := "0.4.0"
+version := "0.4.1"
 
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
