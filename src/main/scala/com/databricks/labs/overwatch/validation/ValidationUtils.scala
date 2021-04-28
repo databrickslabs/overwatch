@@ -6,7 +6,7 @@ import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions.{col, count, from_unixtime, length, lit, when}
 import org.apache.spark.sql.types.{DateType, LongType, TimestampType}
 
-class ValidationUtils extends SparkSessionWrapper {
+trait ValidationUtils extends SparkSessionWrapper {
 
   import spark.implicits._
 

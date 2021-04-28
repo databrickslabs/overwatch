@@ -13,17 +13,17 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
    * Enable access to Bronze pipeline tables externally.
    * @return
    */
-  def getAllTargets: Map[PipelineTable,Option[Int]] = {
-    Map(
-      BronzeTargets.jobsSnapshotTarget -> Some(1001),
-      BronzeTargets.clustersSnapshotTarget -> Some(1002),
-      BronzeTargets.poolsTarget -> Some(1003),
-      BronzeTargets.auditLogsTarget -> Some(1004),
-      BronzeTargets.auditLogAzureLandRaw -> None,
-      BronzeTargets.clusterEventsTarget -> Some(1005),
-      BronzeTargets.sparkEventLogsTarget -> Some(1006),
-      BronzeTargets.processedEventLogs -> None,
-      BronzeTargets.cloudMachineDetail -> None
+  def getAllTargets: Array[PipelineTable] = {
+    Array(
+      BronzeTargets.jobsSnapshotTarget,
+      BronzeTargets.clustersSnapshotTarget,
+      BronzeTargets.poolsTarget,
+      BronzeTargets.auditLogsTarget,
+      BronzeTargets.auditLogAzureLandRaw,
+      BronzeTargets.clusterEventsTarget,
+      BronzeTargets.sparkEventLogsTarget,
+      BronzeTargets.processedEventLogs,
+      BronzeTargets.cloudMachineDetail
     )
   }
 

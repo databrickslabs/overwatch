@@ -1,13 +1,14 @@
 package com.databricks.labs.overwatch.validation
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Pipeline, PipelineTable, Schema, Silver}
-import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Pipeline, PipelineTable, Silver}
 import com.databricks.labs.overwatch.utils.JsonUtils.objToJson
 import com.databricks.labs.overwatch.utils._
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions.{count, lit}
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 case class SnapReport(tableFullName: String,
                       from: java.sql.Timestamp,
@@ -16,22 +17,27 @@ case class SnapReport(tableFullName: String,
                       errorMessage: String)
 
 case class ValidationReport(tableSourceName: String,
+                            tableSourceCount: Long,
                             tableSnapName: String,
+                            tableSnapCount: Long,
                             from: java.sql.Timestamp,
                             until: java.sql.Timestamp,
                             totalDiscrepancies: Long,
-                            errorMessage: String)
+                            message: String)
 
 case class SnapValidationParams(snapDatabaseName: String,
                                 sourceDatabaseName: String,
                                 primordialDateString: String,
-                                maxDaysToLoad: Int)
+                                maxDaysToLoad: Int,
+                                parallelism: Int)
 
 class SnapValidation(params: SnapValidationParams,
                      config: OverwatchParams,
                      workspace: Workspace) extends ValidationUtils {
 
   import spark.implicits._
+
+  val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(params.parallelism))
 
   /**
    * Start and end time calculations
@@ -40,9 +46,9 @@ class SnapValidation(params: SnapValidationParams,
   var startCompareMillis = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get).getTime()
   var endCompareMillis = startCompareMillis + config.maxDaysToLoad.toLong * 86400000L
 
-  var startSnap = Pipeline.createTimeDetail(startCompareMillis).asColumnTS
-  var startCompare = Pipeline.createTimeDetail(startCompareMillis + 86400000L).asColumnTS
-  var endCompare = Pipeline.createTimeDetail(endCompareMillis).asColumnTS
+    var startSnap = Pipeline.createTimeDetail(startCompareMillis).asColumnTS
+    var startCompare = Pipeline.createTimeDetail(startCompareMillis + 86400000L).asColumnTS
+    var endCompare = Pipeline.createTimeDetail(endCompareMillis).asColumnTS
   println(s"DEBUG: Creating interval variables: ${startCompareMillis} to ${endCompareMillis}, ${config.maxDaysToLoad} days to load")
 
   /**
@@ -53,41 +59,53 @@ class SnapValidation(params: SnapValidationParams,
    * @param sourceDatabaseName
    * @return ValidateReport
    */
-  protected def compareTable(target: PipelineTable, moduleId: Option[Int]): ValidationReport = {
+  protected def compareTable(target: PipelineTable): ValidationReport = {
     val databaseTable = s"${params.snapDatabaseName}.${target.name}"
     val tableName = s"${params.sourceDatabaseName}.${target.name}"
 
-    val columnsToDrop = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID")
+    // drops columns not to be checked - some columns/structs are not always present, so we might want to avoid
+    // errors with field ordering, etc. others are random columns, so should be always dropped in all targets.
+    def dropUnecessaryCols(df: DataFrame, targetName: String) = {
+      val commonColumnsToDrop = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID")
 
-    def getMininumValidationDF(df: DataFrame, moduleId: Option[Int]) = {
-      (moduleId match {
-        case Some(id) => df.verifyMinimumSchema(Schema.get(moduleId.get), enforceNonNullCols = true, isDebug = true)
-        case None => df
-      }).drop(columnsToDrop: _*)
+      (targetName match {
+        case "spark_tasks_silver" => df.drop('TaskEndReason)
+        case "sparkTask_gold" => df.drop('task_end_reason)
+        case _ => df
+      }).drop(commonColumnsToDrop: _*)
     }
 
     try {
       // take df1 from target (recalculated from snap), df2 from original table
-      val df1 = getMininumValidationDF(getFilteredDF(target, tableName, startCompare, endCompare), moduleId)
-      val df2 = getMininumValidationDF(spark.table(databaseTable), moduleId)
+      val df1 = dropUnecessaryCols(getFilteredDF(target, tableName, startCompare, endCompare), target.name)
+      val df2 = dropUnecessaryCols(spark.table(databaseTable), target.name)
 
-      df1.except(df2)
+      val count1 = df1.cache.count
+      val count2 = df2.cache.count
+
+      val returndf = df1.except(df2)
         .union(df2.except(df1))
         .dropDuplicates()
         .select(
           lit(tableName).alias("tableSourceName"),
+          lit(count1).alias("tableSourceCount"),
           lit(databaseTable).alias("tableSnapName"),
+          lit(count2).alias("tableSnapCount"),
           startCompare.alias("from"),
           endCompare.alias("until"),
           count("*").alias("totalDiscrepancies"),
-          lit(null).cast("string").alias("errorMessage")
+          lit("processing ok").cast("string").alias("message")
         ).as[ValidationReport]
         .first()
 
+      df1.unpersist()
+      df2.unpersist()
+
+      returndf
     } catch {
       case e: Throwable =>
         println(s"FAILED: ${databaseTable} --> ${e.getMessage}")
-        ValidationReport(tableName, databaseTable, tsTojsql(startCompare), tsTojsql(endCompare), 0L, e.getMessage)
+        ValidationReport(tableName, 0L, databaseTable, 0L, tsTojsql(startCompare), tsTojsql(endCompare), 0L, e.getMessage)
     }
 
   }
@@ -155,7 +173,9 @@ class SnapValidation(params: SnapValidationParams,
     resetPipelineReportState(params.snapDatabaseName)
 
     // snapshots bronze tables, returns ds with report
-    val bronzeTargets = Bronze(workspace).getAllTargets.keys
+    val bronzeTargets = (Bronze(workspace).getAllTargets).par
+    bronzeTargets.tasksupport = taskSupport
+
     bronzeTargets
       .map(bronzeTarget => snapTable(bronzeTarget))
       .toArray.toSeq.toDS
@@ -177,9 +197,10 @@ class SnapValidation(params: SnapValidationParams,
    * @return
    */
   def equalityReport() = {
-    val targets = Silver(workspace).getAllTargets ++ Gold(workspace).getAllTargets
+    val targets = (Silver(workspace).getAllTargets ++ Gold(workspace).getAllTargets).par
+    targets.tasksupport = taskSupport
 
-    targets.map(kv => compareTable(kv._1, kv._2)).toArray.toSeq.toDS
+    targets.map(t => compareTable(t)).toArray.toSeq.toDS
   }
 }
 
