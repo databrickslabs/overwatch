@@ -68,6 +68,8 @@ The following notebooks will demonstrate a typical best practice for multi-works
 Simply populate the necessary variables for your environment.
 * AWS ([HTML](/assets/GettingStarted/aws_runner_docs_example.html) / [DBC](/assets/GettingStarted/aws_runner_docs_example.dbc))
 * AZURE ([HTML](/assets/GettingStarted/azure_runner_docs_example.html) / [DBC](/assets/GettingStarted/azure_runner_docs_example.dbc))
+
+The code snippet below will initialize the workspace.
 ```scala
 private val dataTarget = DataTarget(
   Some(etlDB), Some(s"${storagePrefix}/${workspaceID}/${etlDB}.db"), Some(s"${storagePrefix}/global_share"),
@@ -97,6 +99,14 @@ val workspace = if (args.length != 0) {
 } else { Initializer(Array()) }
 ```
 
+If this is the first run and you'd like to customize compute costs to mirror your region / contract price, be sure to 
+run the following to initialize the pipeline which will in turn create the instanceDetails table, which you can edit 
+/ complete according to your needs. This is only necessary for first-time init with custom costs. More information below 
+in the [Configuring Custom Costs](#configuring-custom-costs) section.
+```scala
+Bronze(workspace)
+```
+
 This is also a great time to materialize the JSON configs for use in the Databricks job the main class (not notebook) 
 is to be used to execute the job.
 ```scala
@@ -116,15 +126,18 @@ There are three essential components to the cost function:
 
 The two DBU contract costs are captured from the Overwatch run config; however, compute costs and dbu to node
 associations are maintained in the [InstanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table.
-**IMPORTANT** This table is automatically created in the target database upon first initialization. **DO NOT** try to
-manually create the target database outside of Overwatch as that will lead to database validation errors. 
+**IMPORTANT** This table is automatically created in the target database upon first initialization of the pipeline. 
+**DO NOT** try to manually create the target database outside of Overwatch as that will lead to database validation errors. 
 
-**To customize costs** using this table run the [first initialization](#initializing-the-environment) as detailed above.
-Note that each subsequent workspace on which you execute Overwatch and reference the same etlDataPathPrefix, the 
+**To customize costs** using this table run the [first initialization](#initializing-the-environment) as detailed above 
+including the pipeline initialization (e.g Bronze(workspace) - DO NOT call the .run function yet).
+Note that each subsequent workspace referencing the same etlDataPathPrefix on which you execute Overwatch, the 
 default costs by node will be appended to instanceDetails table if no data is present for that organization_id 
 (i.e. workspace). If you would like to customize compute costs for all workspaces,   
 export the instanceDetails dataset to external editor (after first init), add the required metrics mentioned above 
-for each workspace, and overwrite the target table with the customized cost information.
+for each workspace, and overwrite the target table with the customized cost information. Note that the instanceDetails 
+object in the consumer database is just a view so you must edit/overwrite the table in the ETL database. The view 
+will automatically be recreated upon first pipeline run.
 
 {{< rawhtml >}}
 <a href="https://drive.google.com/file/d/1tj0GV-vX1Ka9cRcJpJSwkQx6bbpueSwl/view?usp=sharing" target="_blank">AWS Example</a>
