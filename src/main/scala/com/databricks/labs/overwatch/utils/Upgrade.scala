@@ -36,7 +36,7 @@ object Upgrade extends SparkSessionWrapper {
       incrementalColumns = Array("Pipeline_SnapTS")
     )
 
-    val bronzeTargets = (pipeline.getAllTargets.filter(_.exists) :+ pipelineReportTarget).par
+    val bronzeTargets = (pipeline.getAllTargets.keys.toArray.filter(_.exists) :+ pipelineReportTarget).par
     bronzeTargets.tasksupport = taskSupport
     val targetsWActuals = bronzeTargets.map(target => {
       val tbli = TableIdentifier(target.name, Some(target.databaseName))

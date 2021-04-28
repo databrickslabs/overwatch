@@ -12,21 +12,21 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
    * Enable access to Gold pipeline tables externally.
    * @return
    */
-  def getAllTargets: Array[PipelineTable] = {
-    Array(
-      GoldTargets.clusterTarget,
-      GoldTargets.jobTarget,
-      GoldTargets.jobRunTarget,
-      GoldTargets.jobRunCostPotentialFactTarget,
-      GoldTargets.notebookTarget,
-      GoldTargets.accountModsTarget,
-      GoldTargets.accountLoginTarget,
-      GoldTargets.clusterStateFactTarget,
-      GoldTargets.sparkJobTarget,
-      GoldTargets.sparkStageTarget,
-      GoldTargets.sparkTaskTarget,
-      GoldTargets.sparkExecutionTarget,
-      GoldTargets.sparkExecutorTarget
+  def getAllTargets: Map[PipelineTable,Option[Int]] = {
+    Map(
+      GoldTargets.clusterTarget -> Some(3001),
+      GoldTargets.jobTarget -> Some(3002),
+      GoldTargets.jobRunTarget -> Some(3003),
+      GoldTargets.jobRunCostPotentialFactTarget -> Some(3015),
+      GoldTargets.notebookTarget -> Some(3004),
+      GoldTargets.accountModsTarget -> Some(3007),
+      GoldTargets.accountLoginTarget -> Some(3008),
+      GoldTargets.clusterStateFactTarget -> Some(3005),
+      GoldTargets.sparkJobTarget -> Some(3010),
+      GoldTargets.sparkStageTarget -> Some(3011),
+      GoldTargets.sparkTaskTarget -> Some(3012),
+      GoldTargets.sparkExecutionTarget -> Some(3013),
+      GoldTargets.sparkExecutorTarget -> Some(3014)
     )
   }
 

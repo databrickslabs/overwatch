@@ -1,7 +1,8 @@
 package com.databricks.labs.overwatch.validation
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Pipeline, PipelineTable, Silver}
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Pipeline, PipelineTable, Schema, Silver}
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.JsonUtils.objToJson
 import com.databricks.labs.overwatch.utils._
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -36,11 +37,13 @@ class SnapValidation(params: SnapValidationParams,
    * Start and end time calculations
    * TODO: check addOneTick, why are calculations taking place after startcompare + 1 day?
    */
-  val startCompareMillis = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get).getTime()
-  val endCompareMillis = startCompareMillis + config.maxDaysToLoad * 86400000
+  var startCompareMillis = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get).getTime()
+  var endCompareMillis = startCompareMillis + config.maxDaysToLoad.toLong * 86400000L
 
-  val startCompare = Pipeline.createTimeDetail(startCompareMillis + 86400000).asColumnTS
-  val endCompare = Pipeline.createTimeDetail(endCompareMillis).asColumnTS
+  var startSnap = Pipeline.createTimeDetail(startCompareMillis).asColumnTS
+  var startCompare = Pipeline.createTimeDetail(startCompareMillis + 86400000L).asColumnTS
+  var endCompare = Pipeline.createTimeDetail(endCompareMillis).asColumnTS
+  println(s"DEBUG: Creating interval variables: ${startCompareMillis} to ${endCompareMillis}, ${config.maxDaysToLoad} days to load")
 
   /**
    * Compares data between original source tables and tables recreates from snapshot
@@ -50,20 +53,23 @@ class SnapValidation(params: SnapValidationParams,
    * @param sourceDatabaseName
    * @return ValidateReport
    */
-  protected def compareTable(target: PipelineTable): ValidationReport = {
+  protected def compareTable(target: PipelineTable, moduleId: Option[Int]): ValidationReport = {
     val databaseTable = s"${params.snapDatabaseName}.${target.name}"
     val tableName = s"${params.sourceDatabaseName}.${target.name}"
 
-    try {
-      val df1: DataFrame = getFilteredDF(target, tableName, startCompare, endCompare)
-        .drop('__overwatch_ctrl_noise)
-        .drop('Pipeline_SnapTS)
-        .drop('Overwatch_RunID)
+    val columnsToDrop = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID")
 
-      val df2: DataFrame = spark.table(databaseTable)
-        .drop('__overwatch_ctrl_noise)
-        .drop('Pipeline_SnapTS)
-        .drop('Overwatch_RunID)
+    def getMininumValidationDF(df: DataFrame, moduleId: Option[Int]) = {
+      (moduleId match {
+        case Some(id) => df.verifyMinimumSchema(Schema.get(moduleId.get), enforceNonNullCols = true, isDebug = true)
+        case None => df
+      }).drop(columnsToDrop: _*)
+    }
+
+    try {
+      // take df1 from target (recalculated from snap), df2 from original table
+      val df1 = getMininumValidationDF(getFilteredDF(target, tableName, startCompare, endCompare), moduleId)
+      val df2 = getMininumValidationDF(spark.table(databaseTable), moduleId)
 
       df1.except(df2)
         .union(df2.except(df1))
@@ -98,7 +104,7 @@ class SnapValidation(params: SnapValidationParams,
     val tableName = s"${params.sourceDatabaseName}.${target.name}"
 
     try {
-      getFilteredDF(target, tableName, startCompare, endCompare)
+      getFilteredDF(target, tableName, startSnap, endCompare)
         .repartition()
         .write
         .format("delta")
@@ -149,7 +155,7 @@ class SnapValidation(params: SnapValidationParams,
     resetPipelineReportState(params.snapDatabaseName)
 
     // snapshots bronze tables, returns ds with report
-    val bronzeTargets = Bronze(workspace).getAllTargets
+    val bronzeTargets = Bronze(workspace).getAllTargets.keys
     bronzeTargets
       .map(bronzeTarget => snapTable(bronzeTarget))
       .toArray.toSeq.toDS
@@ -173,7 +179,7 @@ class SnapValidation(params: SnapValidationParams,
   def equalityReport() = {
     val targets = Silver(workspace).getAllTargets ++ Gold(workspace).getAllTargets
 
-    targets.map(t => compareTable(t)).toArray.toSeq.toDS
+    targets.map(kv => compareTable(kv._1, kv._2)).toArray.toSeq.toDS
   }
 }
 

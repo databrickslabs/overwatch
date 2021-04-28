@@ -12,19 +12,19 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
    * Enable access to Silver pipeline tables externally.
    * @return
    */
-  def getAllTargets: Array[PipelineTable] = {
-    Array(
-      SilverTargets.executorsTarget,
-      SilverTargets.executionsTarget,
-      SilverTargets.jobsTarget,
-      SilverTargets.stagesTarget,
-      SilverTargets.tasksTarget,
-      SilverTargets.dbJobRunsTarget,
-      SilverTargets.accountLoginTarget,
-      SilverTargets.accountModTarget,
-      SilverTargets.clustersSpecTarget,
-      SilverTargets.dbJobsStatusTarget,
-      SilverTargets.notebookStatusTarget
+  def getAllTargets: Map[PipelineTable,Option[Int]] = {
+    Map(
+      SilverTargets.executorsTarget -> Some(2003),
+      SilverTargets.executionsTarget -> Some(2005),
+      SilverTargets.jobsTarget -> Some(2006),
+      SilverTargets.stagesTarget -> Some(2007),
+      SilverTargets.tasksTarget -> Some(2008),
+      SilverTargets.dbJobRunsTarget -> Some(2011),
+      SilverTargets.accountLoginTarget -> Some(2016),
+      SilverTargets.accountModTarget -> Some(2017),
+      SilverTargets.clustersSpecTarget -> Some(2014),
+      SilverTargets.dbJobsStatusTarget -> Some(2010),
+      SilverTargets.notebookStatusTarget -> Some(2018)
     )
   }
 
