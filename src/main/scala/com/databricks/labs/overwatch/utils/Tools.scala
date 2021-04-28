@@ -4,8 +4,9 @@ import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.core.io.JsonStringEncoder
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.{JsonMappingException, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
@@ -69,13 +70,18 @@ object JsonUtils {
    */
   def jsonToMap(message: String): Map[String, Any] = {
     try {
+      // TODO: remove this workaround when we know that new Jobs UI is rolled out everywhere...
       val cleanMessage = StringEscapeUtils.unescapeJson(message)
       defaultObjectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
     } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"ERROR: Could not convert json to Map. \nJSON: ${message}", e)
-        Map("ERROR" -> "")
-      }
+      case e: Throwable =>
+        try {
+          defaultObjectMapper.readValue(message, classOf[Map[String, Any]])
+        } catch {
+          case e: Throwable =>
+            logger.log(Level.ERROR, s"ERROR: Could not convert json to Map. \nJSON: ${message}", e)
+            Map("ERROR" -> "")
+        }
     }
   }
 
