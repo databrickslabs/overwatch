@@ -35,7 +35,7 @@ import org.apache.spark.sql.expressions.Window
 // COMMAND ----------
 
 private val dataTarget = DataTarget(
-  Some(etlDBName), Some(s"dbfs:/user/hive/warehouse/${etlDBName}.db"),
+  Some(etlDBName), Some(s"dbfs:/user/hive/warehouse/${etlDBName}.db"), None,
   Some(prezDBName), Some(s"dbfs:/user/hive/warehouse/${prezDBName}.db")
 )
 

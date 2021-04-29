@@ -170,17 +170,17 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
 
   protected def buildClusterStateFact(
-                                       instanceDetails: PipelineTable,
+                                       instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
                                        interactiveDBUPrice: Double,
                                        automatedDBUPrice: Double
                                      )(clusterEventsDF: DataFrame): DataFrame = {
-    val driverNodeDetails = instanceDetails.asDF
-      .select('organization_id, 'API_Name.alias("driver_node_type_id"), struct(instanceDetails.asDF.columns map col: _*).alias("driverSpecs"))
+    val driverNodeDetails = instanceDetails
+      .select('organization_id, 'API_Name.alias("driver_node_type_id"), struct(instanceDetails.columns map col: _*).alias("driverSpecs"))
 
-    val workerNodeDetails = instanceDetails.asDF
-      .select('organization_id, 'API_Name.alias("node_type_id"), struct(instanceDetails.asDF.columns map col: _*).alias("workerSpecs"))
+    val workerNodeDetails = instanceDetails
+      .select('organization_id, 'API_Name.alias("node_type_id"), struct(instanceDetails.columns map col: _*).alias("workerSpecs"))
 
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
