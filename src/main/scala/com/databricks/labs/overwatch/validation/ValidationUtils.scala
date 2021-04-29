@@ -35,14 +35,33 @@ trait ValidationUtils extends SparkSessionWrapper {
   protected def tsTojsql(ts: Column): java.sql.Timestamp =
     new java.sql.Timestamp(Seq(("")).toDF("ts").withColumn("ts", ts.cast("long")).as[Long].first)
 
+  /**
+   * outputs column converted to normalized filtering
+   * TODO: find better approach to deal with incrementalcol being a nested field
+   * @param df
+   * @param tsCol
+   * @return
+   */
   protected def colToTS(df: DataFrame, tsCol: String): Column = {
     val fields = df.schema.fields
-    assert(fields.map(_.name.toLowerCase).contains(tsCol.toLowerCase))
-    val f = fields.find(_.name.toLowerCase == tsCol.toLowerCase).get
+
+    val Array(tsCol_splitted, rest @ _*) = tsCol split('.') // if the field is complex, split.
+    val restField = rest.mkString
+
+    assert(fields.map(_.name.toLowerCase).contains(tsCol_splitted.toLowerCase))
+    assert(!restField.contains('.')) // support 1 level deep only
+
+    val _f = fields.find(_.name.toLowerCase == tsCol_splitted.toLowerCase).get // get main field
+
+    val f = if (!restField.isEmpty) {
+      df.withColumn("__overwatch_incremental_col", col(tsCol))
+        .schema.fields.find(_.name == "__overwatch_incremental_col").get
+    } else _f
+
     val c = col(f.name)
     f.dataType match {
       case _: LongType =>
-        when(length(c) === 13, from_unixtime(c.cast("double") / lit(1000)).cast("timestamp"))
+        when(length(c) === 13, from_unixtime(c.cast("long") / lit(1000)).cast("timestamp"))
           .otherwise(from_unixtime(c).cast("timestamp"))
       case _: DateType => c.cast("timestamp")
       case _: TimestampType => c
@@ -52,6 +71,7 @@ trait ValidationUtils extends SparkSessionWrapper {
 
   /**
    * gets a pipeline table dataframe and outputs it after filtering, used to compare with recalculated tables.
+   * TODO: find better approach to deal with incrementalcol being a nested field
    * @param target
    * @param tableName
    * @param startCompare
@@ -63,9 +83,14 @@ trait ValidationUtils extends SparkSessionWrapper {
     if (target.incrementalColumns.isEmpty) {
       baseDF
     } else {
-      target.incrementalColumns.foldLeft(baseDF)((df, incColName) =>
-        df.filter(tsFilter(colToTS(df, incColName), startCompare, endCompare))
-      )
+      //println(s"DEBUG: adding df filter  (${tableName}) between (${startCompare}) and (${endCompare})")
+      target.incrementalColumns.foldLeft(baseDF)((df, incColName) => {
+        if (colToTS(df, incColName).toString == "__overwatch_incremental_col") {
+          df.withColumn("__overwatch_incremental_col", col(incColName))
+            .filter(tsFilter(colToTS(df, incColName), startCompare, endCompare))
+        } else
+          df.filter(tsFilter(colToTS(df, incColName), startCompare, endCompare))
+      })
     }
   }
 }

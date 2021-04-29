@@ -46,9 +46,9 @@ class SnapValidation(params: SnapValidationParams,
   var startCompareMillis = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get).getTime()
   var endCompareMillis = startCompareMillis + config.maxDaysToLoad.toLong * 86400000L
 
-    var startSnap = Pipeline.createTimeDetail(startCompareMillis).asColumnTS
-    var startCompare = Pipeline.createTimeDetail(startCompareMillis + 86400000L).asColumnTS
-    var endCompare = Pipeline.createTimeDetail(endCompareMillis).asColumnTS
+  var startSnap = Pipeline.createTimeDetail(startCompareMillis).asColumnTS
+  var startCompare = startSnap //Pipeline.createTimeDetail(startCompareMillis + 86400000L).asColumnTS
+  var endCompare = Pipeline.createTimeDetail(endCompareMillis).asColumnTS
   println(s"DEBUG: Creating interval variables: ${startCompareMillis} to ${endCompareMillis}, ${config.maxDaysToLoad} days to load")
 
   /**
@@ -66,11 +66,12 @@ class SnapValidation(params: SnapValidationParams,
     // drops columns not to be checked - some columns/structs are not always present, so we might want to avoid
     // errors with field ordering, etc. others are random columns, so should be always dropped in all targets.
     def dropUnecessaryCols(df: DataFrame, targetName: String) = {
-      val commonColumnsToDrop = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID")
+      val commonColumnsToDrop = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID", "__overwatch_incremental_col")
 
       (targetName match {
         case "spark_tasks_silver" => df.drop('TaskEndReason)
         case "sparkTask_gold" => df.drop('task_end_reason)
+        case "clusterStateFact_gold" => df.drop('driverSpecs).drop('workerSpecs)
         case _ => df
       }).drop(commonColumnsToDrop: _*)
     }
