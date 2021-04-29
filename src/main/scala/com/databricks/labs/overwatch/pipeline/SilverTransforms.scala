@@ -903,36 +903,46 @@ trait SilverTransforms extends SparkSessionWrapper {
       .collect()
       .par
 
-    jrWFilledClusterIDs.tasksupport = taskSupport
+    // If current batch does not include any runs with existing clusters, omit this lookup altogether.
+    val jrBaseExisting = if (jrWFilledClusterIDs.nonEmpty) {
+      jrWFilledClusterIDs.tasksupport = taskSupport
 
-    logger.log(Level.INFO, s"RUN_IDs staged for api grabber: ${jrWFilledClusterIDs.mkString(", ")}")
+      logger.log(Level.INFO, s"RUN_IDs staged for api grabber: ${jrWFilledClusterIDs.mkString(", ")}")
 
-    val runIdStrings = jrWFilledClusterIDs
-      .flatMap(runId => {
-        try {
-          val q = Map(
-            "run_id" -> runId
-          )
-          val runIDString = ApiCall("jobs/runs/get", apiEnv, Some(q), paginate = false)
-            .executeGet().asStrings
-          logger.log(Level.INFO, s"API CALL SUCCESS: RUN_ID == $runId")
-          runIDString
-        } catch {
-          case e: Throwable =>
-            logger.log(Level.ERROR, s"API CALL FAILED: RUN_ID == $runId --> ${e.getMessage}")
-            Array[String]()
-        }
-      })
-      .toArray
+      val runIdStrings = jrWFilledClusterIDs
+        .flatMap(runId => {
+          try {
+            val q = Map(
+              "run_id" -> runId
+            )
+            val runIDString = ApiCall("jobs/runs/get", apiEnv, Some(q), paginate = false)
+              .executeGet().asStrings
+            logger.log(Level.INFO, s"API CALL SUCCESS: RUN_ID == $runId")
+            runIDString
+          } catch {
+            case e: Throwable =>
+              logger.log(Level.ERROR, s"API CALL FAILED: RUN_ID == $runId --> ${e.getMessage}")
+              Array[String]()
+          }
+        })
+        .toArray
 
-    val notebookJobsWithClusterIDs = spark.read.json(Seq(runIdStrings: _*).toDS())
-      .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
+      val notebookJobsWithClusterIDs = spark.read.json(Seq(runIdStrings: _*).toDS())
+        .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
 
-    val jrBaseExisting = jobRunsBase
-      .filter('jobClusterType === "existing")
-      .join(notebookJobsWithClusterIDs, Seq("runId"), "left")
-      .withColumn("clusterId", when('jobTaskType === "notebook" && 'clusterId.isNull, 'cluster_id_apiLookup).otherwise('clusterId))
-      .drop("cluster_id_apiLookup")
+      // If batch has runs on existing clusters older than the API retention the previous DF will be empty. Only join
+      // if the api lookup successfully obtained the data
+      if (!notebookJobsWithClusterIDs.isEmpty) {
+        jobRunsBase
+          .filter('jobClusterType === "existing")
+          .join(notebookJobsWithClusterIDs, Seq("runId"), "left")
+          .withColumn("clusterId", when('jobTaskType === "notebook" && 'clusterId.isNull, 'cluster_id_apiLookup).otherwise('clusterId))
+          .drop("cluster_id_apiLookup")
+      } else jobRunsBase
+    } else {
+      jobRunsBase
+        .filter('jobClusterType === "existing")
+    }
 
     val automatedJobRunsBase = jobRunsBase
       .filter('jobClusterType === "new")
