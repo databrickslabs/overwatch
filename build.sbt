@@ -1,4 +1,3 @@
-
 name := "overwatch"
 
 organization := "com.databricks.labs"
