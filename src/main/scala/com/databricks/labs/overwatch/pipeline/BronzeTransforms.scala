@@ -191,7 +191,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .selectExpr("*", "properties.*").drop("properties")
 
 
-      val azureAuditDF = spark.table(auditRawLand.tableFullName)
+      spark.table(auditRawLand.tableFullName)
         .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
@@ -206,10 +206,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("requestParams", structFromJson(schemaBuilders, "requestParams"))
         .withColumn("response", structFromJson(schemaBuilders, "response"))
         .drop("logId")
-
-      if (!azureAuditDF.isEmpty) azureAuditDF
-      else throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, " +
-        s"no new data found between ${fromDT.toString}-${untilDT.toString}", Level.WARN)
 
     } else {
 
@@ -228,8 +224,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
           .drop("filenameAR")
       } else {
-        throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, no new data " +
-          s"found between ${fromDT.toString}-${untilDT.toString}", Level.WARN)
+        spark.emptyDataFrame
       }
     }
   }
