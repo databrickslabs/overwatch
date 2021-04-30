@@ -45,7 +45,7 @@ case class PipelineTable(
 
   val databaseName: String = if (_databaseName == "default") config.databaseName else _databaseName
   val tableFullName: String = s"${databaseName}.${name}"
-  val tableLocation: String = s"${config.etlDataPathPrefix}/$name"
+  val tableLocation: String = s"${config.etlDataPathPrefix}/$name".toLowerCase
 
   if (autoOptimize) {
     spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
