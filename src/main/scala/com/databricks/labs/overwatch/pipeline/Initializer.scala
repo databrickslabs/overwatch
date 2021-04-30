@@ -417,7 +417,7 @@ object Initializer extends SparkSessionWrapper {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
     val orgId = if (dbutils.notebook.getContext.tags("orgId") == "0") {
-      dbutils.notebook.getContext.tags("browserHostName").split("\\.")(0)
+      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
     } else dbutils.notebook.getContext.tags("orgId")
     config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
