@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions.col
@@ -11,6 +12,7 @@ class Config() {
 
   private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-", "")
+  private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
   private var _isFirstRun: Boolean = false
@@ -18,6 +20,7 @@ class Config() {
   private var _organizationId: String = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
+  private var _etlDataPathPrefix: String = _
   private var _consumerDatabaseName: String = _
   private var _consumerDatabaseLocation: String = _
   private var _workspaceUrl: String = _
@@ -64,6 +67,8 @@ class Config() {
   private[overwatch] def databaseName: String = _databaseName
 
   private[overwatch] def databaseLocation: String = _databaseLocation
+
+  private[overwatch] def etlDataPathPrefix: String = _etlDataPathPrefix
 
   private[overwatch] def consumerDatabaseName: String = _consumerDatabaseName
 
@@ -269,7 +274,7 @@ class Config() {
           _tokenType = "Owner"
         }
       }
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
       this
     } catch {
       case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e); this
@@ -283,16 +288,29 @@ class Config() {
    * @param dbLocation
    * @return
    */
-  private[overwatch] def setDatabaseNameandLoc(dbName: String, dbLocation: String): this.type = {
-    _databaseLocation = dbLocation
+  private[overwatch] def setDatabaseNameAndLoc(dbName: String, dbLocation: String, dataLocation: String): this.type = {
+    val cleanDBLocation = PipelineFunctions.cleansePathURI(dbLocation)
+    val cleanETLDataLocation = PipelineFunctions.cleansePathURI(dataLocation)
+    _databaseLocation = cleanDBLocation
     _databaseName = dbName
-    println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}")
+    _etlDataPathPrefix = dataLocation
+    println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}.\n\n " +
+      s"DATA Prefix set to: $dataLocation")
+    if (dbLocation.contains("/user/hive/warehouse/")) println("\n\nWARNING!! You have chosen a database location in " +
+      "/user/hive/warehouse prefix. While the tables are created as external tables this still presents a risk that " +
+      "'drop database cascade' command will permanently delete all data for all Overwatch workspaces." +
+      "It's strongly recommended to specify a database outside of the /user/hive/warehouse prefix to prevent this.")
+    if (cleanDBLocation.toLowerCase == cleanETLDataLocation.toLowerCase) println("\n\nWARNING!! The ETL Database " +
+      "AND ETL Data Prefix locations " +
+      "are equal. If ETL database is accidentally dropped ALL data from all workspaces will be lost in spite of the " +
+      "tables being external. Specify a separate prefix for the ETL data to avoid this from happening.")
     this
   }
 
   private[overwatch] def setConsumerDatabaseNameandLoc(consumerDBName: String, consumerDBLocation: String): this.type = {
+    val cleanConsumerDBLocation = PipelineFunctions.cleansePathURI(consumerDBLocation)
+    _consumerDatabaseLocation = cleanConsumerDBLocation
     _consumerDatabaseName = consumerDBName
-    _consumerDatabaseLocation = consumerDBLocation
     println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
     this
   }

@@ -21,6 +21,17 @@ class Database(config: Config) extends SparkSessionWrapper {
     this
   }
 
+  private def registerTarget(table: PipelineTable): Unit = {
+    if (!table.exists) {
+      val createStatement = s"create table ${table.tableFullName} " +
+        s"USING DELTA location '${table.tableLocation}'"
+      val logMessage = s"CREATING TABLE: ${table.tableFullName} at ${table.tableLocation}\n\n$createStatement"
+      logger.log(Level.INFO, logMessage)
+      if (config.debugFlag) println(logMessage)
+      spark.sql(createStatement)
+    }
+  }
+
   def getDatabaseName: String = _databaseName
 
   // TODO -- Move this to post processing and improve
@@ -83,7 +94,9 @@ class Database(config: Config) extends SparkSessionWrapper {
     val staticDFWriter = target.copy(checkpointPath = None).writer(dfWSchema)
     staticDFWriter
       .asInstanceOf[DataFrameWriter[Row]]
-      .saveAsTable(target.tableFullName)
+      .save(target.tableLocation)
+
+    registerTarget(target)
   }
 
   private def getQueryListener(query: StreamingQuery): StreamingQueryListener = {
@@ -128,10 +141,9 @@ class Database(config: Config) extends SparkSessionWrapper {
       if (config.isFirstRun || !spark.catalog.tableExists(config.databaseName, target.name)) {
         initializeStreamTarget(finalDF, target)
       }
-      val targetTablePath = s"${config.databaseLocation}/${target.name}"
       val streamWriter = target.writer(finalDF)
         .asInstanceOf[DataStreamWriter[Row]]
-        .option("path", targetTablePath)
+        .option("path", target.tableLocation)
         .start()
       val streamManager = getQueryListener(streamWriter)
       spark.streams.addListener(streamManager)
@@ -143,7 +155,8 @@ class Database(config: Config) extends SparkSessionWrapper {
       spark.streams.removeListener(streamManager)
 
     } else {
-      target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
+      target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
+      registerTarget(target)
     }
     logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
     true

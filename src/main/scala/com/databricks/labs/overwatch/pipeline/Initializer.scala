@@ -166,7 +166,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     val tokenSecret = rawParams.tokenSecret
     // TODO -- PRIORITY -- If data target is null -- default table gets dbfs:/null
     val dataTarget = rawParams.dataTarget.getOrElse(
-      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db")))
+      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None))
     val auditLogConfig = rawParams.auditLogConfig
     val badRecordsPath = rawParams.badRecordsPath
 
@@ -199,7 +199,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     // If data target is valid get db name and location and set it
     val dbName = dataTarget.databaseName.get
     val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
-    config.setDatabaseNameandLoc(dbName, dbLocation)
+    val dataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
+    config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
 
     val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
     val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
@@ -236,7 +237,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   @throws(classOf[IllegalArgumentException])
   private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
     val dbName = dataTarget.databaseName.getOrElse("overwatch")
-    val dbLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
+    val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
+    val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
+    val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
+    val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
     var switch = true
     if (spark.catalog.databaseExists(dbName)) {
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
@@ -245,7 +249,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       if (existingDBLocation != dbLocation) {
         switch = false
         throw new BadConfigException(s"The DB: $dbName exists " +
-          s"at location $existingDBLocation which is different than the location entered in the config. Ensure" +
+          s"at location $existingDBLocation which is different than the location entered in the config. Ensure " +
           s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
           s"dbfs:/...")
       }
@@ -264,18 +268,21 @@ class Initializer(config: Config) extends SparkSessionWrapper {
           s"or drop existing database and allow Overwatch to recreate.")
       }
     } else { // Database does not exist
-      try { // If the fs.ls below doesn't not throw a FileNotFound exception the target is not empty and will fail the run
-        dbutils.fs.ls(dbLocation)
+      if (!Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
+        logger.log(Level.INFO, s"Target location " +
+          s"is valid: will create database: $dbName at location: ${dbLocation}")
+      } else { // db does not exist AND path already exists
         switch = false
-        throw new BadConfigException(s"The target database location: ${dbLocation} " +
-          s"already exists but does not appear to be associated with the Overwatch database name, $dbName " +
-          s"specified. Specify a path that doesn't already exist or choose an existing overwatch database AND " +
-          s"database its associated location.")
-      } catch { // If the fs.ls throws fileNotFound exception, the db target does not exist and the db will be created
-        case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Target location " +
-          s"is valid: will create database: $dbName at location: ${dbLocation}", e)
+        throw new BadConfigException(
+          s"""The target database location: ${dbLocation}
+          already exists. Please specify a path that doesn't yet exist. If attempting to launch Overwatch on a secondary
+          workspace, please choose a unique location for the database on this workspace and use the "etlDataPathPrefix"
+          to reference the shared physical data location.""".stripMargin)
       }
     }
+
+    if (Helpers.pathExists(etlDataLocation)) println(s"\n\nWARNING!! The ETL Data Prefix exists. Verify that only " +
+      s"Overwatch data exists in this path.")
 
     // todo - refactor away duplicity
     /**
@@ -285,12 +292,13 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      * to remove duplicity while still enabling control between which checks are done for which DataTarget.
      */
     val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
-    val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+    val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+    val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
     if (consumerDBName != dbName) { // separate consumer db
       if (spark.catalog.databaseExists(consumerDBName)) {
         val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
         val existingConsumerDBLocation = consumerDBMeta.locationUri.toString
-        if (existingConsumerDBLocation != consumerDBLocation) {
+        if (existingConsumerDBLocation != consumerDBLocation) { // separated consumer DB but same location FAIL
           switch = false
           throw new BadConfigException(s"The Consumer DB: $consumerDBName exists" +
             s"at location $existingConsumerDBLocation which is different than the location entered in the config. Ensure" +
@@ -298,25 +306,24 @@ class Initializer(config: Config) extends SparkSessionWrapper {
             s"dbfs:/...")
         }
       } else { // consumer DB is different from ETL DB AND db does not exist
-        try { // If the fs.ls below doesn't not throw a FileNotFound exception the target is not empty and will fail the run
-          dbutils.fs.ls(consumerDBLocation)
+        if (!Helpers.pathExists(consumerDBLocation)) { // consumer db path is empty
+          logger.log(Level.INFO, s"Consumer DB location " +
+            s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}")
+        } else {
           switch = false
-          throw new BadConfigException(s"The target database location: ${consumerDBLocation} " +
-            s"already exists but does not appear to be associated with the Overwatch database name, $consumerDBName " +
-            s"specified. Specify a path that doesn't already exist or choose an existing overwatch database AND " +
-            s"database its associated location.")
-        } catch { // If the fs.ls throws fileNotFound exception, the db target does not exist and the db will be created
-          case e: java.io.FileNotFoundException => logger.log(Level.INFO, s"Target location " +
-            s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}", e)
+          throw new BadConfigException(
+            s"""The consumer database location: ${dbLocation}
+          already exists. Please specify a path that doesn't yet exist. If attempting to launch Overwatch on a secondary
+          workspace, please choose a unique location for the database on this workspace.""".stripMargin)
         }
       }
 
-      if (consumerDBLocation == dbLocation) { // separate db AND same location ERROR
+      if (consumerDBLocation == dbLocation && consumerDBName != dbName) { // separate db AND same location ERROR
         switch = false
         throw new BadConfigException("Consumer DB Name cannot differ from ETL DB Name while having the same location.")
       }
     } else { // same consumer db as etl db
-      if (consumerDBLocation != dbLocation) { // same db AND DIFFERENT location ERROR
+      if (consumerDBName == dbName && consumerDBLocation != dbLocation) { // same db AND DIFFERENT location ERROR
         switch = false
         throw new BadConfigException("Consumer DB cannot match ETL DB Name while having different locations.")
       }
@@ -409,7 +416,10 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-    config.setOrganizationId(dbutils.notebook.getContext.tags("orgId"))
+    val orgId = if (dbutils.notebook.getContext.tags("orgId") == "0") {
+      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+    } else dbutils.notebook.getContext.tags("orgId")
+    config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
     if (debugFlag) {
@@ -425,6 +435,7 @@ object Initializer extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)
+
 
     workspace
   }
