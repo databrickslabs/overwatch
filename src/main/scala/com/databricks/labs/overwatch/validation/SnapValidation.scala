@@ -6,7 +6,7 @@ import com.databricks.labs.overwatch.utils.JsonUtils.objToJson
 import com.databricks.labs.overwatch.utils._
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
-import org.apache.spark.sql.functions.{count, lit}
+import org.apache.spark.sql.functions.{count, lit, abs}
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
@@ -17,12 +17,13 @@ case class SnapReport(tableFullName: String,
                       errorMessage: String)
 
 case class ValidationReport(tableSourceName: String,
-                            tableSourceCount: Long,
                             tableSnapName: String,
+                            tableSourceCount: Long,
                             tableSnapCount: Long,
+                            tableCountDiff: Long,
+                            totalDiscrepancies: Long,
                             from: java.sql.Timestamp,
                             until: java.sql.Timestamp,
-                            totalDiscrepancies: Long,
                             message: String)
 
 case class SnapValidationParams(snapDatabaseName: String,
@@ -69,9 +70,16 @@ class SnapValidation(params: SnapValidationParams,
       val commonColumnsToDrop = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID", "__overwatch_incremental_col")
 
       (targetName match {
-        case "spark_tasks_silver" => df.drop('TaskEndReason)
-        case "sparkTask_gold" => df.drop('task_end_reason)
-        case "clusterStateFact_gold" => df.drop('driverSpecs).drop('workerSpecs)
+        case "spark_tasks_silver" => df.drop('TaskEndReason) // variable schema
+        case "sparkTask_gold" => df.drop('task_end_reason)  // variable schema
+        case "clusterStateFact_gold" => df.drop('driverSpecs).drop('workerSpecs) // api call or window func
+        case "jobrun_silver" |
+             "notebook_silver" |
+             "cluster_gold" |
+             "jobRun_gold" |
+             "notebook_gold" => df.drop('clusterId).drop('cluster_id) // api call or window func
+        case "job_status_silver" => df.drop('jobCluster) // api call or window func
+        case "sparkExecution_gold" => df.drop('event_log_start).drop('event_log_end) // filename can change to .gz after archival
         case _ => df
       }).drop(commonColumnsToDrop: _*)
     }
@@ -84,17 +92,18 @@ class SnapValidation(params: SnapValidationParams,
       val count1 = df1.cache.count
       val count2 = df2.cache.count
 
-      val returndf = df1.except(df2)
-        .union(df2.except(df1))
+      val returndf = df2.except(df1)
+        .union(df1.except(df2))
         .dropDuplicates()
         .select(
           lit(tableName).alias("tableSourceName"),
-          lit(count1).alias("tableSourceCount"),
           lit(databaseTable).alias("tableSnapName"),
+          lit(count1).alias("tableSourceCount"),
           lit(count2).alias("tableSnapCount"),
           startCompare.alias("from"),
           endCompare.alias("until"),
-          count("*").alias("totalDiscrepancies"),
+          lit(count2-count1).alias("tableCountDiff"),
+          abs(count("*")-abs(lit(count2)-lit(count1))).alias("totalDiscrepancies"),
           lit("processing ok").cast("string").alias("message")
         ).as[ValidationReport]
         .first()
@@ -106,7 +115,7 @@ class SnapValidation(params: SnapValidationParams,
     } catch {
       case e: Throwable =>
         println(s"FAILED: ${databaseTable} --> ${e.getMessage}")
-        ValidationReport(tableName, 0L, databaseTable, 0L, tsTojsql(startCompare), tsTojsql(endCompare), 0L, e.getMessage)
+        ValidationReport(tableName, databaseTable, 0L, 0L, 0L, 0L, tsTojsql(startCompare), tsTojsql(endCompare), e.getMessage)
     }
 
   }
@@ -214,7 +223,7 @@ object SnapValidation {
      * TODO: hardcoded for azure!
      */
     val dataTarget = DataTarget(
-      Some(params.snapDatabaseName), Some(s"dbfs:/user/hive/warehouse/${params.snapDatabaseName}.db"),
+      Some(params.snapDatabaseName), Some(s"dbfs:/user/hive/warehouse/${params.snapDatabaseName}.db"), None,
       Some(params.snapDatabaseName), Some(s"dbfs:/user/hive/warehouse/${params.snapDatabaseName}.db")
     )
 
