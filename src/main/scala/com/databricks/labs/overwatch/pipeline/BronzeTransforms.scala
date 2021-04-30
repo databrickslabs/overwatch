@@ -207,6 +207,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("response", structFromJson(schemaBuilders, "response"))
         .drop("logId")
 
+      if (!azureAuditDF.isEmpty) azureAuditDF
+      else throw new NoNewDataException(s"EMPTY: Audit Logs Bronze, " +
+        s"no new data found between ${fromDT.toString}-${untilDT.toString}", Level.WARN)
+
     } else {
 
       // inclusive from exclusive to
