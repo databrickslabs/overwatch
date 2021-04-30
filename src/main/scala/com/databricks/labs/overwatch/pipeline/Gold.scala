@@ -23,7 +23,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClusterStateFactProccess = ETLDefinition(
     BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateFactModule, "timestamp"),
     Seq(buildClusterStateFact(
-      BronzeTargets.cloudMachineDetail,
+      BronzeTargets.cloudMachineDetail.asDF,
       BronzeTargets.clustersSnapshotTarget,
       SilverTargets.clustersSpecTarget,
       config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice

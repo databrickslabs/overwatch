@@ -30,6 +30,13 @@ class JsonToolsTest extends AnyFunSpec {
       assertResult(true)(jsonMap.contains("ERROR"))
     }
 
+    it("Issue 105 is fixed") {
+      val jsonStr = scala.io.Source.fromFile("src/test/resources/overwatch-json-error.json").mkString
+      val jsonMap = JsonUtils.jsonToMap(jsonStr)
+      assertResult(1)(jsonMap.size)
+      assertResult(true)(jsonMap.contains("jobs"))
+    }
+
     it("should convert almost empty object to JSON string without nulls & empty values") {
       val js = JsonUtils.objToJson(commonNoData)
       assertResult(commonNoData)(js.fromObj)
@@ -140,9 +147,6 @@ class JsonToolsTest extends AnyFunSpec {
       val scalaMap = Map[String, Any]()
       val js = JsonUtils.objToJson(scalaMap)
       assertResult(scalaMap)(js.fromObj)
-      println(js.compactString)
-      println(js.escapedString)
-      println(js.prettyString)
       assertResult(
         "{}"
       )(js.compactString)

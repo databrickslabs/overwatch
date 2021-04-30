@@ -108,6 +108,7 @@ class Module(
       name = "pipeline_report",
       keys = Array("organization_id", "Overwatch_RunID"),
       config = config,
+      partitionBy = Array("organization_id"),
       incrementalColumns = Array("Pipeline_SnapTS")
     )
     pipeline.database.write(Seq(report).toDF, pipelineReportTarget, pipeline.pipelineSnapTime.asColumnTS)

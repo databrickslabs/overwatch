@@ -4,8 +4,9 @@ import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.core.io.JsonStringEncoder
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.{JsonMappingException, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
@@ -69,13 +70,18 @@ object JsonUtils {
    */
   def jsonToMap(message: String): Map[String, Any] = {
     try {
+      // TODO: remove this workaround when we know that new Jobs UI is rolled out everywhere...
       val cleanMessage = StringEscapeUtils.unescapeJson(message)
       defaultObjectMapper.readValue(cleanMessage, classOf[Map[String, Any]])
     } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, s"ERROR: Could not convert json to Map. \nJSON: ${message}", e)
-        Map("ERROR" -> "")
-      }
+      case e: Throwable =>
+        try {
+          defaultObjectMapper.readValue(message, classOf[Map[String, Any]])
+        } catch {
+          case e: Throwable =>
+            logger.log(Level.ERROR, s"ERROR: Could not convert json to Map. \nJSON: ${message}", e)
+            Map("ERROR" -> "")
+        }
     }
   }
 
@@ -769,22 +775,21 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * drop database cascade / drop table the standard functionality is serial. This function completes the deletion
-   * of files in serial along with the call to the drop command. A faster way to do this is to call truncate and
+   * of files in serial along with the call to the drop table command. A faster way to do this is to call truncate and
    * then vacuum to 0 hours which allows for eventual consistency to take care of the cleanup in the background.
    * Be VERY CAREFUL with this function as it's a nuke. There's a different methodology to make this work depending
    * on the cloud platform. At present Azure and AWS are both supported
-   * TODO - This function could be further improved by calling the fastrm function below, listing all files and dropping
-   * them in parallel, then dropping the table from the metastore. Testing needed to enable this.
    *
-   * @param fullTableName
+   * @param target
    * @param cloudProvider
    */
-  private[overwatch] def fastDrop(fullTableName: String, cloudProvider: String): Unit = {
+  private[overwatch] def fastDrop(target: PipelineTable, cloudProvider: String): Unit = {
     if (cloudProvider == "aws") {
       spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
-      spark.sql(s"truncate table ${fullTableName}")
-      spark.sql(s"VACUUM ${fullTableName} RETAIN 0 HOURS")
-      spark.sql(s"drop table if exists ${fullTableName}")
+      spark.sql(s"truncate table ${target.tableFullName}")
+      spark.sql(s"VACUUM ${target.tableFullName} RETAIN 0 HOURS")
+      spark.sql(s"drop table if exists ${target.tableFullName}")
+      fastrm(Array(target.tableLocation))
       spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
     } else {
       Seq("").toDF("HOLD")
@@ -792,8 +797,9 @@ object Helpers extends SparkSessionWrapper {
         .mode("overwrite")
         .format("delta")
         .option("overwriteSchema", "true")
-        .saveAsTable(fullTableName)
-      spark.sql(s"drop table if exists ${fullTableName}")
+        .saveAsTable(target.tableFullName)
+      spark.sql(s"drop table if exists ${target.tableFullName}")
+      fastrm(Array(target.tableLocation))
     }
   }
 
@@ -806,7 +812,9 @@ object Helpers extends SparkSessionWrapper {
    */
   private def rmSer(file: String): Unit = {
     val conf = new Configuration()
-    val fs = FileSystem.get(new java.net.URI("dbfs:/"), conf)
+    val fsPrefix = file.replaceAllLiterally("//", "/").split("/")(0)
+    val fsType = if (fsPrefix.isEmpty) "dbfs:/" else s"${fsPrefix}/"
+    val fs = FileSystem.get(new java.net.URI(fsType), conf)
     try {
       fs.delete(new Path(file), true)
     } catch {
