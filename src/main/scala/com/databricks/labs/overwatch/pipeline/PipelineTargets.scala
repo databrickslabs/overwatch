@@ -288,7 +288,7 @@ abstract class PipelineTargets(config: Config) {
       name = "jobRunCostPotentialFact_gold",
       keys = Array("organization_id", "job_id", "id_in_job"),
       config,
-      incrementalColumns = Array("job_start_date"),
+      incrementalColumns = Array("job_runtime.startTS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 

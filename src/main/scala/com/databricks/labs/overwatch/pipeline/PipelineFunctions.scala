@@ -140,7 +140,7 @@ object PipelineFunctions {
   //  currently filters with nested columns aren't supported
   def withIncrementalFilters(
                               df: DataFrame,
-                              module: Module,
+                              module: Option[Module],
                               filters: Seq[IncrementalFilter],
                               globalFilters: Seq[Column] = Seq(),
                               dataFrequency: Frequency
@@ -172,7 +172,7 @@ object PipelineFunctions {
 
     val allFilters = parsedFilters ++ globalFilters
 
-    applyFilters(df, allFilters, Some(module))
+    applyFilters(df, allFilters, module)
 
   }
 

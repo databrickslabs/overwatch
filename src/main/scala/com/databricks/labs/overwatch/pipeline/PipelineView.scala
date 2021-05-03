@@ -36,7 +36,12 @@ case class PipelineView(name: String,
       val msgLog = s"GOLD VIEW: CREATE: Statement --> $pubStatement"
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
-      spark.sql(pubStatement)
+      try {
+        spark.sql(pubStatement)
+      } catch {
+        case e: Throwable =>
+          println(s"GOLD VIEW: CREATE VIEW FAILED: Cannot create view: ${dataSource.tableFullName} --> ${e.getMessage}")
+      }
     } else {
       val msgLog = s"GOLD VIEW: CREATE VIEW FAILED: Source table: ${dataSource.tableFullName} empty or does not exist"
       logger.log(Level.INFO, msgLog)
