@@ -6,23 +6,27 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
 class Module(
-              _moduleID: Int,
-              _moduleName: String,
-              pipeline: Pipeline,
-              _moduleDependencies: Array[Int]
+              val moduleId: Int,
+              val moduleName: String,
+              private[overwatch] val pipeline: Pipeline,
+              val moduleDependencies: Array[Int]
             ) {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   import pipeline.spark.implicits._
   private val config = pipeline.config
 
-
-  val moduleId: Int = _moduleID
-  val moduleName: String = _moduleName
   private var _isFirstRun: Boolean = false
-  private val moduleDependencies: Array[Int] = _moduleDependencies
 
-  private def moduleState: SimplifiedModuleStatusReport = {
+  def copy(
+            _moduleID: Int = moduleId,
+            _moduleName: String = moduleName,
+            _pipeline: Pipeline = pipeline,
+            _moduleDependencies: Array[Int] = moduleDependencies): Module = {
+    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies)
+  }
+
+  private[overwatch] def moduleState: SimplifiedModuleStatusReport = {
     if (pipeline.getModuleState(moduleId).isEmpty) {
       _isFirstRun = true
       val initialModuleState = initModuleState
@@ -104,14 +108,7 @@ class Module(
 
   private def finalizeModule(report: ModuleStatusReport): Unit = {
     pipeline.updateModuleState(report.simple)
-    val pipelineReportTarget = PipelineTable(
-      name = "pipeline_report",
-      keys = Array("organization_id", "Overwatch_RunID"),
-      config = config,
-      partitionBy = Array("organization_id"),
-      incrementalColumns = Array("Pipeline_SnapTS")
-    )
-    pipeline.database.write(Seq(report).toDF, pipelineReportTarget, pipeline.pipelineSnapTime.asColumnTS)
+    pipeline.database.write(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
   }
 
   private def fail(msg: String, rollbackStatus: String = ""): Unit = {

@@ -29,27 +29,27 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  lazy private val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
+  lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess = ETLDefinition(
     workspace.getJobsDF,
     append(BronzeTargets.jobsSnapshotTarget)
   )
 
-  lazy private val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
+  lazy private[overwatch] val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
   lazy private val appendClustersAPIProcess = ETLDefinition(
     workspace.getClustersDF,
     Seq(cleanseRawClusterSnapDF(config.cloudProvider)),
     append(BronzeTargets.clustersSnapshotTarget)
   )
 
-  lazy private val poolsSnapshotModule = Module(1003, "Bronze_Pools", this)
+  lazy private[overwatch] val poolsSnapshotModule = Module(1003, "Bronze_Pools", this)
   lazy private val appendPoolsProcess = ETLDefinition(
     workspace.getPoolsDF,
     Seq(cleanseRawPoolsDF()),
     append(BronzeTargets.poolsTarget)
   )
 
-  lazy private val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
+  lazy private[overwatch] val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
   lazy private val appendAuditLogsProcess = ETLDefinition(
     getAuditLogsDF(
       config.auditLogConfig,
@@ -63,7 +63,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.auditLogsTarget)
   )
 
-  lazy private val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
+  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
@@ -76,7 +76,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clusterEventsTarget)
   )
 
-  lazy private val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
+  lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),
     Seq(

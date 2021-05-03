@@ -21,6 +21,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.spec.IvParameterSpec
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.util.Random
 
 // TODO -- Add loggers to objects with throwables
 object JsonUtils {
@@ -198,6 +199,9 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   // TODO -- Remove keys with nulls from maps?
+  //  Add test to ensure that null/"" key and null/"" value are both handled
+  //  as of 0.4.1 failed with key "" in spark_conf
+  //  TEST for multiple null/"" cols / keynames in same struct/record
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
 
     val mapColName = colToConvert.split("\\.").reverse.head
@@ -208,7 +212,15 @@ object SchemaTools extends SparkSessionWrapper {
       val schema = df.select(s"${colToConvert}.*").schema
       val mapCols = collection.mutable.LinkedHashSet[Column]()
       schema.fields.foreach(field => {
-        mapCols.add(lit(field.name))
+        val kRaw = field.name.trim
+        val k = if (kRaw.isEmpty || kRaw == "") {
+          val errMsg = s"SCHEMA WARNING: Column $colToConvert is being converted to a map but has a null key value. " +
+            s"This key value will be replaced with a 'null_<random_string>' but should be corrected."
+          logger.log(Level.WARN, errMsg)
+          println(errMsg)
+          s"null_${randomString(Some(42L), 6)}"
+        } else kRaw
+        mapCols.add(lit(k))
         mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
       })
       val newRawMap = map(mapCols.toSeq: _*)
@@ -218,6 +230,15 @@ object SchemaTools extends SparkSessionWrapper {
     } else {
       lit(null).cast(MapType(StringType, StringType, true)).alias(mapColName)
     }
+  }
+
+  def randomString(seed: Option[Long] = None, length: Int = 10): String = {
+    val r = if (seed.isEmpty) new Random() else new Random(seed.get) // Using seed to reuse suffixes on continuous duplicates
+    r.alphanumeric.take(length).mkString("")
+  }
+
+  def uniqueRandomStrings(uniquesNeeded: Option[Int] = None, seed: Option[Long] = None, length: Int = 10): Seq[String] = {
+    (0 to uniquesNeeded.getOrElse(500) + 10).map(_ => randomString(seed, length)).distinct
   }
 
   // TODO -- Delta writer is schema case sensitive and will fail on write if column case is not identical on both sides
@@ -257,7 +278,7 @@ object SchemaTools extends SparkSessionWrapper {
    */
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
     val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
-    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
+//    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
     val fieldNames = if (caseSensitive) {
       fields.map(_.name.trim)
     } else fields.map(_.name.trim.toLowerCase())
@@ -272,7 +293,7 @@ object SchemaTools extends SparkSessionWrapper {
         s"${dups.mkString("\n")}"
       println(warnMsg)
       logger.log(Level.WARN, warnMsg)
-      val uniqueSuffixes = (0 to fields.length + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
+      val uniqueSuffixes = uniqueRandomStrings(Some(fields.length), Some(42L), 6)
       fields.zipWithIndex.map(f => {
         val fieldName = if (caseSensitive) f._1.name else f._1.name.toLowerCase
         if (dups.contains(fieldName)) {

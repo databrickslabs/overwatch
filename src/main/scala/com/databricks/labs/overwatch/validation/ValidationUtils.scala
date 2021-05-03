@@ -5,8 +5,11 @@ import com.databricks.labs.overwatch.utils.{DataTarget, SparkSessionWrapper, Tim
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions.{col, count, from_unixtime, length, lit, when}
 import org.apache.spark.sql.types.{DateType, LongType, TimestampType}
+import org.apache.log4j.{Level, Logger}
+
 
 trait ValidationUtils extends SparkSessionWrapper {
+  private val logger: Logger = Logger.getLogger(this.getClass)
 
   import spark.implicits._
 
@@ -18,15 +21,18 @@ trait ValidationUtils extends SparkSessionWrapper {
    * @param target
    * @return
    */
-  protected def resetPipelineReportState(dbname: String): Unit = {
-    assert(dbname != "overwatch_etl")
+  protected def resetPipelineReportState(pipelineStateTable: PipelineTable): Unit = {
 
     try {
-      val sql = s"""delete from ${dbname}.pipeline_report where not moduleName like 'Bronze%'"""
-      println(s"deleting bronze and silver module state entries: $sql")
+      val sql = s"""delete from ${pipelineStateTable.tableFullName} where moduleID >= 2000"""
+      println(s"deleting silver and gold module state entries: $sql")
       spark.sql(sql)
     } catch {
-      case e: Throwable => println(e.printStackTrace())
+      case e: Throwable => {
+        val errMsg = s"FAILED to updated pipeline state: ${e.getMessage}"
+        println(errMsg)
+        logger.log(Level.ERROR, errMsg, e)
+      }
     }
   }
 
@@ -80,6 +86,7 @@ trait ValidationUtils extends SparkSessionWrapper {
    */
   protected def getFilteredDF(target: PipelineTable, tableName: String, startCompare: Column, endCompare: Column): DataFrame = {
     val baseDF = spark.table(tableName)
+    // TODO - TOMES - must add global and partition filters where relevant.
     if (target.incrementalColumns.isEmpty) {
       baseDF
     } else {

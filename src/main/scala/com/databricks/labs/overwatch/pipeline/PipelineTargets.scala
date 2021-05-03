@@ -5,6 +5,17 @@ import com.databricks.labs.overwatch.utils.{Config, Frequency}
 abstract class PipelineTargets(config: Config) {
 
   /**
+   * global pipeline state table
+   */
+  val pipelineStateTarget: PipelineTable = PipelineTable(
+    name = "pipeline_report",
+    keys = Array("organization_id", "Overwatch_RunID"),
+    config = config,
+    partitionBy = Array("organization_id"),
+    incrementalColumns = Array("Pipeline_SnapTS")
+  )
+
+  /**
    * Bronze Targets
    */
   object BronzeTargets {
@@ -13,6 +24,7 @@ abstract class PipelineTargets(config: Config) {
       name = "jobs_snapshot_bronze",
       keys = Array("organization_id", "job_id"),
       config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = "created_time, creator_user_name, job_id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
       partitionBy = Seq("organization_id")
     )
@@ -21,6 +33,7 @@ abstract class PipelineTargets(config: Config) {
       name = "clusters_snapshot_bronze",
       keys = Array("organization_id", "cluster_id"),
       config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = ("organization_id, cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
         "start_time, terminated_time, Overwatch_RunID").split(", "),
       partitionBy = Seq("organization_id")
@@ -30,6 +43,7 @@ abstract class PipelineTargets(config: Config) {
       name = "pools_snapshot_bronze",
       keys = Array("organization_id", "instance_pool_id"),
       config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = ("instance_pool_id, node_type_id, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "),
       partitionBy = Seq("organization_id")
@@ -52,6 +66,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("sequenceNumber"),
       config,
       partitionBy = Seq("organization_id", "Overwatch_RunID", "__overwatch_ctrl_noise"),
+      incrementalColumns = Array("Pipeline_SnapTS"),
       withOverwatchRunID = if (config.cloudProvider == "azure") false else true,
       checkpointPath = if (config.cloudProvider == "azure")
         config.auditLogConfig.azureAuditLogEventhubConfig.get.auditRawEventsChk
@@ -70,7 +85,7 @@ abstract class PipelineTargets(config: Config) {
       name = "spark_events_bronze",
       keys = Array("organization_id", "Event"), // really aren't any global valid keys for this table
       config,
-      incrementalColumns = Array("fileCreateEpochMS"),
+      incrementalColumns = Array("fileCreateDate", "fileCreateEpochMS"),
       partitionBy = Seq("organization_id", "Event", "fileCreateDate"),
       statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID," +
         "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename," +
@@ -90,6 +105,7 @@ abstract class PipelineTargets(config: Config) {
       name = "spark_events_processedFiles",
       keys = Array("filename"),
       config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
       partitionBy = Seq("organization_id")
     )
 
