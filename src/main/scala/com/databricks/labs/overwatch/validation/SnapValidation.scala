@@ -25,7 +25,6 @@ case class ValidationReport(tableSourceName: String,
                             tableSnapName: String,
                             tableSourceCount: Long,
                             tableSnapCount: Long,
-                            tableCountDiff: Long,
                             totalDiscrepancies: Long,
                             from: java.sql.Timestamp,
                             until: java.sql.Timestamp,
@@ -37,6 +36,8 @@ case class SnapValidationParams(snapDatabaseName: String,
                                 primordialDateString: String,
                                 maxDaysToLoad: Int,
                                 parallelism: Int)
+
+case class ModuleTarget(module: Module, target: PipelineTable)
 
 class SnapValidation(workspace: Workspace, sourceDB: String)
     extends ValidationUtils {
@@ -217,7 +218,6 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
    */
   def executeSnapshots(): Dataset[SnapReport] = {
     // state tables clone and reset for silver and gold modules
-    case class ModuleTarget(module: Module, target: PipelineTable)
 
     val bronzePipeline = Bronze(workspace)
     val bronzeTargets = bronzePipeline.BronzeTargets
@@ -256,12 +256,81 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
    * TODO: fix, brittle.
    * @return
    */
-//  def equalityReport() = {
-//    val targets = (Silver(workspace).getAllTargets ++ Gold(workspace).getAllTargets).par
-//    targets.tasksupport = taskSupport
-//
-//    targets.map(t => compareTable(t)).toArray.toSeq.toDS
-//  }
+  def equalityReport() = {
+
+    val silverPipeline = Silver(workspace)
+    val silverTargets = silverPipeline.SilverTargets
+    val goldPipeline = Gold(workspace)
+    val goldTargets = goldPipeline.GoldTargets
+
+    val silverTargetsWModule = silverPipeline.config.overwatchScope.flatMap {
+      case OverwatchScope.accounts => {
+        Seq(
+        ModuleTarget(silverPipeline.accountLoginsModule, silverTargets.accountLoginTarget),
+        ModuleTarget(silverPipeline.modifiedAccountsModule, silverTargets.accountModTarget)
+        )
+      }
+      case OverwatchScope.notebooks => Seq(ModuleTarget(silverPipeline.notebookSummaryModule, silverTargets.notebookStatusTarget))
+      case OverwatchScope.clusters => Seq(ModuleTarget(silverPipeline.clusterSpecModule, silverTargets.clustersSpecTarget))
+      case OverwatchScope.sparkEvents => {
+        Seq(
+          ModuleTarget(silverPipeline.executorsModule, silverTargets.executorsTarget),
+          ModuleTarget(silverPipeline.executionsModule, silverTargets.executionsTarget),
+          ModuleTarget(silverPipeline.sparkJobsModule, silverTargets.jobsTarget),
+          ModuleTarget(silverPipeline.sparkStagesModule, silverTargets.stagesTarget),
+          ModuleTarget(silverPipeline.sparkTasksModule, silverTargets.tasksTarget)
+        )
+      }
+      case OverwatchScope.jobs => {
+        Seq(
+          ModuleTarget(silverPipeline.jobStatusModule, silverTargets.dbJobsStatusTarget),
+          ModuleTarget(silverPipeline.jobRunsModule, silverTargets.dbJobRunsTarget)
+        )
+      }
+    }.toArray
+
+    val goldTargetsWModule = goldPipeline.config.overwatchScope.flatMap {
+      case OverwatchScope.accounts => {
+        Seq(
+          ModuleTarget(goldPipeline.accountModModule, goldTargets.accountModsTarget),
+          ModuleTarget(goldPipeline.accountLoginModule, goldTargets.accountLoginTarget)
+        )
+      }
+      case OverwatchScope.notebooks => {
+        Seq(ModuleTarget(goldPipeline.notebookModule, goldTargets.notebookTarget))
+      }
+      case OverwatchScope.clusters => {
+        Seq(
+          ModuleTarget(goldPipeline.clusterModule, goldTargets.clusterTarget),
+          ModuleTarget(goldPipeline.clusterStateFactModule, goldTargets.clusterStateFactTarget)
+        )
+      }
+      case OverwatchScope.sparkEvents => {
+        Seq(
+          ModuleTarget(goldPipeline.sparkExecutorModule, goldTargets.sparkExecutorTarget),
+          ModuleTarget(goldPipeline.sparkExecutionModule, goldTargets.sparkExecutionTarget),
+          ModuleTarget(goldPipeline.sparkJobModule, goldTargets.sparkJobTarget),
+          ModuleTarget(goldPipeline.sparkStageModule, goldTargets.sparkStageTarget),
+          ModuleTarget(goldPipeline.sparkTaskModule, goldTargets.sparkTaskTarget)
+        )
+      }
+      case OverwatchScope.jobs => {
+        Seq(
+          ModuleTarget(goldPipeline.jobsModule, goldTargets.accountModsTarget),
+          ModuleTarget(goldPipeline.jobRunsModule, goldTargets.accountLoginTarget),
+          ModuleTarget(goldPipeline.jobRunCostPotentialFactModule, goldTargets.jobRunCostPotentialFactTarget)
+        )
+      }
+    }.toArray
+
+    val targetsToValidate = (silverTargetsWModule ++ goldTargetsWModule).par
+    targetsToValidate.tasksupport = taskSupport
+
+    targetsToValidate.map(targetDetail => {
+      assertDataFrameDataEquals(targetDetail, sourceDB)
+    }).toArray.toSeq.toDS()
+
+  }
 }
 
 object SnapValidation {

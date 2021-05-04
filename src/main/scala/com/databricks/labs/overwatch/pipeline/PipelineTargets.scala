@@ -142,6 +142,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "ExecutorID"),
       config,
       partitionBy = Seq("organization_id"),
+      incrementalColumns = Array("addedTimestamp"),
       autoOptimize = true,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
@@ -155,6 +156,7 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("SparkContextID", "ExecutionID"),
       config,
       partitionBy = Seq("organization_id"),
+      incrementalColumns = Array("startTimestamp"),
       autoOptimize = true,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
@@ -332,7 +334,7 @@ abstract class PipelineTargets(config: Config) {
       name = "account_mods_gold",
       keys = Array("requestId"),
       config,
-      incrementalColumns = Array("timestamp"),
+      incrementalColumns = Array("mod_unixTimeMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
@@ -347,7 +349,7 @@ abstract class PipelineTargets(config: Config) {
       name = "account_login_gold",
       keys = Array("requestId"),
       config,
-      incrementalColumns = Array("timestamp"),
+      incrementalColumns = Array("login_unixTimeMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
@@ -362,9 +364,9 @@ abstract class PipelineTargets(config: Config) {
       name = "clusterStateFact_gold",
       keys = Array("cluster_id", "unixTimeMS"),
       config,
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("unixTimeMS_state_start"),
-      zOrderBy = Array("unixTimeMS_state_start", "cluster_id"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      zOrderBy = Array("unixTimeMS_state_start", "cluster_id")
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(
@@ -378,13 +380,13 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("spark_context_id", "job_id"),
       config,
       partitionBy = Seq("organization_id", "date"),
+      incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
         "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
       ),
-      zOrderBy = Array("cluster_id"),
-      incrementalColumns = Array("unixTimeMS")
+      zOrderBy = Array("cluster_id")
     )
 
     lazy private[overwatch] val sparkJobViewTarget: PipelineView = PipelineView(
@@ -398,13 +400,13 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("spark_context_id", "stage_id", "stage_attempt_id"),
       config,
       partitionBy = Seq("organization_id", "date"),
+      incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
         "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
       ),
-      zOrderBy = Array("cluster_id"),
-      incrementalColumns = Array("unixTimeMS")
+      zOrderBy = Array("cluster_id")
     )
 
     lazy private[overwatch] val sparkStageViewTarget: PipelineView = PipelineView(
@@ -419,7 +421,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       partitionBy = Seq("organization_id", "date"),
       zOrderBy = Array("cluster_id"),
-      incrementalColumns = Array("unixTimeMS"),
+      incrementalColumns = Array("date", "unixTimeMS"),
       shuffleFactor = 5,
       autoOptimize = true,
       sparkOverrides = Map(
@@ -438,8 +440,8 @@ abstract class PipelineTargets(config: Config) {
       name = "sparkExecution_gold",
       keys = Array("spark_context_id", "execution_id"),
       config,
-      incrementalColumns = Array("unixTimeMS"),
       partitionBy = Seq("organization_id"),
+      incrementalColumns = Array("unixTimeMS"),
       autoOptimize = true,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
@@ -457,8 +459,8 @@ abstract class PipelineTargets(config: Config) {
       name = "sparkExecutor_gold",
       keys = Array("spark_context_id", "executor_id"),
       config,
-      incrementalColumns = Array("unixTimeMS"),
       partitionBy = Seq("organization_id"),
+      incrementalColumns = Array("unixTimeMS"),
       autoOptimize = true,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",

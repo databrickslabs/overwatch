@@ -1,11 +1,14 @@
 package com.databricks.labs.overwatch.validation
 
-import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.databricks.labs.overwatch.pipeline.{PipelineTable, Schema}
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{DataTarget, SparkSessionWrapper, TimeTypesConstants}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions.{col, count, from_unixtime, length, lit, when}
-import org.apache.spark.sql.types.{DateType, LongType, TimestampType}
+import org.apache.spark.sql.types.{DateType, LongType, MapType, StringType, TimestampType}
 import org.apache.log4j.{Level, Logger}
+
+import java.sql.Timestamp
 
 
 trait ValidationUtils extends SparkSessionWrapper {
@@ -99,5 +102,60 @@ trait ValidationUtils extends SparkSessionWrapper {
           df.filter(tsFilter(colToTS(df, incColName), startCompare, endCompare))
       })
     }
+  }
+
+  def assertDataFrameDataEquals(targetDetail: ModuleTarget, sourceDB: String): ValidationReport = {
+    val module = targetDetail.module
+    val sourceTarget = targetDetail.target.copy(_databaseName = sourceDB)
+    val snapTarget = targetDetail.target
+    val expected = sourceTarget.asIncrementalDF(module, sourceTarget.incrementalColumns)
+
+    val result = snapTarget.asIncrementalDF(module, sourceTarget.incrementalColumns)
+
+    val expectedCol = "assertDataFrameNoOrderEquals_expected"
+    val actualCol = "assertDataFrameNoOrderEquals_actual"
+
+    val requiredFields = expected.schema.fields.filter(_.dataType != MapType(StringType, StringType))
+
+    val validationReport =
+      try {
+
+        val expectedElementsCount = expected
+          .groupBy(requiredFields.map(_.name) map col: _*)
+          .agg(count(lit(1)).as(expectedCol))
+        val resultElementsCount = result
+          .groupBy(requiredFields.map(_.name) map col: _*)
+          .agg(count(lit(1)).as(actualCol))
+
+        val diff = expectedElementsCount
+          .join(resultElementsCount, expected.columns, "full_outer")
+          .filter(col(expectedCol) =!= col(actualCol))
+
+        diff
+          .select(
+            lit(sourceTarget.tableFullName).alias("tableSourceName"),
+            lit(snapTarget.tableFullName).alias("tableSnapName"),
+            col(expectedCol).alias("tableSourceCount"),
+            col(actualCol).alias("tableSnapCount"),
+            (col(expectedCol) - col(actualCol)).alias("totalDiscrepancies"),
+            module.fromTime.asColumnTS.alias("from"),
+            module.untilTime.asColumnTS.alias("until"),
+            lit("SUCCESS").alias("message")
+          ).as[ValidationReport].first()
+      } catch {
+        case e: Throwable => {
+          val errMsg = s"FAILED VALIDATION RUN: ${snapTarget.tableFullName} --> ${e.getMessage}"
+          logger.log(Level.ERROR, errMsg, e)
+          ValidationReport(
+            sourceTarget.tableFullName,
+            snapTarget.tableFullName, 0L, 0L, 0L,
+            new Timestamp(module.fromTime.asUnixTimeMilli),
+            new Timestamp(module.untilTime.asUnixTimeMilli),
+            errMsg
+          )
+        }
+      }
+
+    validationReport
   }
 }
