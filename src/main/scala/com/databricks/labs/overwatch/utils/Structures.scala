@@ -157,6 +157,8 @@ private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
 
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
 
+private[overwatch] class PipelineStateException(s: String) extends Exception(s) {}
+
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
 private[overwatch] class ReadOnlyException(s: String) extends Exception(s) {}

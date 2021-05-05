@@ -30,6 +30,8 @@ class Pipeline(_workspace: Workspace, _database: Database,
 
   protected def pipeline: Pipeline = this
 
+  def getConfig: Config = this.config
+
   def getModuleState(moduleID: Int): Option[SimplifiedModuleStatusReport] = {
     pipelineState.get(moduleID)
   }
