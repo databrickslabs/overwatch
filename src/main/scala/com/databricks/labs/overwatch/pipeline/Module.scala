@@ -66,20 +66,48 @@ class Module(
       Pipeline.createTimeDetail(defaultUntilSecond)
     }
 
-    if (moduleDependencies.nonEmpty && mostLaggingDependency.untilTS < maxIndependentUntilTime.asUnixTimeMilli) {
-      val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${maxIndependentUntilTime.asUnixTimeMilli} " +
-        s"exceeds that of an upstream requisite module: ${mostLaggingDependency.moduleID}-${mostLaggingDependency.moduleName} " +
-        s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module untilTS == min requisite module: " +
-        s"${mostLaggingDependency.untilTS}."
-      logger.log(Level.WARN, msg)
-      if (pipeline.config.debugFlag) println(msg)
-      Pipeline.createTimeDetail(mostLaggingDependency.untilTS)
+    if (moduleDependencies.nonEmpty) {
+      val mostLaggingDependencyUntilTS = if (deriveMostLaggingDependency.isEmpty) {
+        // Return primordial time if upstream dependency is completely missing. This will act as place holder and keep
+        // usages of untilTime from failing until pipeline is ready to execute and is validated. The module will fail
+        // gracefully and place error in pipeline_report
+        fromTime.asUnixTimeMilli
+      } else { // all dependencies have state
+        deriveMostLaggingDependency.get.untilTS
+      }
+
+      // Check if any dependency states latest data content (untilTS state) is < this module's untilTS
+      // This check keeps a child module from getting ahead of it's parent
+      if (mostLaggingDependencyUntilTS < maxIndependentUntilTime.asUnixTimeMilli) {
+        val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${maxIndependentUntilTime.asUnixTimeMilli} " +
+          s"exceeds that of an upstream requisite module. " +
+          s"with untilTS of: ${mostLaggingDependencyUntilTS}. Setting current module untilTS == min requisite module: " +
+          s"${mostLaggingDependencyUntilTS}."
+        logger.log(Level.WARN, msg)
+        if (pipeline.config.debugFlag) println(msg)
+        Pipeline.createTimeDetail(mostLaggingDependencyUntilTS)
+      } else maxIndependentUntilTime
+
     } else maxIndependentUntilTime
   }
 
-  private def mostLaggingDependency: SimplifiedModuleStatusReport = {
-    moduleDependencies.map(depState => pipelineState(depState))
-      .sortBy(_.untilTS).reverse.head
+  private def deriveMostLaggingDependency: Option[SimplifiedModuleStatusReport] = {
+
+    val dependencyStates = moduleDependencies.map(depModID => pipelineState.get(depModID))
+    val missingModuleIds = moduleDependencies.filterNot(depModID => pipelineState.contains(depModID))
+    val modulesMissingStates = dependencyStates.filter(_.isEmpty)
+    if (modulesMissingStates.nonEmpty) {
+      val errMsg = s"Missing upstream requisite Modules (${missingModuleIds.mkString(", ")}) to execute this Module " +
+        s"$moduleId - $moduleName.\n\nThis is likely due to lacking " +
+        s"scenarios for this scope within this workspace. For example, if running the jobs scope but no jobs have " +
+        s"executed since your primordial date (i.e. ${pipeline.config.primordialDateString}), the downstream modules " +
+        s"that depend on jobs such as jobRunCostPotentialFact cannot execute as there's no data present."
+      if (pipeline.config.debugFlag) println(errMsg)
+      logger.log(Level.ERROR, errMsg)
+      None
+    } else {
+      Some(dependencyStates.map(_.get).sortBy(_.untilTS).reverse.head)
+    }
   }
 
   private def initModuleState: SimplifiedModuleStatusReport = {
@@ -195,7 +223,7 @@ class Module(
     }
   }
 
-  private def validatePipelineState(): Unit = {
+  private def validatePipelineState(): this.type = {
 
     if (moduleDependencies.nonEmpty) { // if dependencies present
       // If earliest untilTS of dependencies < current untilTS edit current untilTS to match
@@ -216,6 +244,7 @@ class Module(
         }
       })
     }// requirementsPassed
+    this
   }
 
   @throws(classOf[IllegalArgumentException])
