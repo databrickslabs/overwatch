@@ -158,4 +158,8 @@ object Bronze {
       .loadStaticDatasets()
   }
 
+  private[overwatch] def apply(workspace: Workspace, readOnly: Boolean): Bronze = {
+    apply(workspace).setReadOnly
+  }
+
 }

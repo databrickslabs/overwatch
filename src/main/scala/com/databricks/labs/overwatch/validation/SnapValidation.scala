@@ -51,86 +51,6 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
   val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
 
   /**
-   * Start and end time calculations
-   * TODO: check addOneTick, why are calculations taking place after startcompare + 1 day?
-   */
-//  private val startCompareMillis = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get).getTime
-//  private val endCompareMillis = startCompareMillis + config.maxDays.toLong * 86400000L
-//
-//  private val startSnap = Pipeline.createTimeDetail(startCompareMillis).asColumnTS
-//  private val startCompare = startSnap //Pipeline.createTimeDetail(startCompareMillis + 86400000L).asColumnTS
-//  private val endCompare = Pipeline.createTimeDetail(endCompareMillis).asColumnTS
-//  println(s"DEBUG: Creating interval variables: ${startCompareMillis} to ${endCompareMillis}, ${config.maxDays} days to load")
-
-  /**
-   * Compares data between original source tables and tables recreates from snapshot
-   *
-   * @param target
-   * @param snapDatabaseName
-   * @param sourceDatabaseName
-   * @return ValidateReport
-   */
-//  protected def compareTable(target: PipelineTable): ValidationReport = {
-//    val databaseTable = s"${params.snapDatabaseName}.${target.name}"
-//    val tableName = s"${params.sourceDatabaseName}.${target.name}"
-//
-//    // drops columns not to be checked - some columns/structs are not always present, so we might want to avoid
-//    // errors with field ordering, etc. others are random columns, so should be always dropped in all targets.
-//    def dropUnecessaryCols(df: DataFrame, targetName: String) = {
-//      val commonColumnsToDrop = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID", "__overwatch_incremental_col")
-//
-//      (targetName match {
-//        case "spark_tasks_silver" => df.drop('TaskEndReason) // variable schema
-//        case "sparkTask_gold" => df.drop('task_end_reason)  // variable schema
-//        case "clusterStateFact_gold" => df.drop('driverSpecs).drop('workerSpecs) // api call or window func
-//        case "jobrun_silver" |
-//             "notebook_silver" |
-//             "cluster_gold" |
-//             "jobRun_gold" |
-//             "notebook_gold" => df.drop('clusterId).drop('cluster_id) // api call or window func
-//        case "job_status_silver" => df.drop('jobCluster) // api call or window func
-//        case "sparkExecution_gold" => df.drop('event_log_start).drop('event_log_end) // filename can change to .gz after archival
-//        case _ => df
-//      }).drop(commonColumnsToDrop: _*)
-//    }
-//
-//    try {
-//      // take df1 from target (recalculated from snap), df2 from original table
-//      val df1 = dropUnecessaryCols(getFilteredDF(target, tableName, startCompare, endCompare), target.name)
-//      val df2 = dropUnecessaryCols(spark.table(databaseTable), target.name)
-//
-//      val count1 = df1.cache.count
-//      val count2 = df2.cache.count
-//
-//      val returndf = df2.except(df1)
-//        .union(df1.except(df2))
-//        .dropDuplicates()
-//        .select(
-//          lit(tableName).alias("tableSourceName"),
-//          lit(databaseTable).alias("tableSnapName"),
-//          lit(count1).alias("tableSourceCount"),
-//          lit(count2).alias("tableSnapCount"),
-//          startCompare.alias("from"),
-//          endCompare.alias("until"),
-//          lit(count2-count1).alias("tableCountDiff"),
-//          abs(count("*")-abs(lit(count2)-lit(count1))).alias("totalDiscrepancies"),
-//          lit("processing ok").cast("string").alias("message")
-//        ).as[ValidationReport]
-//        .first()
-//
-//      df1.unpersist()
-//      df2.unpersist()
-//
-//      returndf
-//    } catch {
-//      case e: Throwable =>
-//        println(s"FAILED: ${databaseTable} --> ${e.getMessage}")
-//        ValidationReport(tableName, databaseTable, 0L, 0L, 0L, 0L, tsTojsql(startCompare), tsTojsql(endCompare), e.getMessage)
-//    }
-//
-//  }
-
-  /**
    * Snapshots table
    *
    * @param target
@@ -220,7 +140,7 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
   def executeSnapshots(): Dataset[SnapReport] = {
     // state tables clone and reset for silver and gold modules
 
-    val bronzePipeline = Bronze(workspace)
+    val bronzePipeline = Bronze(workspace, readOnly = true)
     val bronzeTargets = bronzePipeline.BronzeTargets
     snapStateTables(bronzePipeline)
     resetPipelineReportState(bronzePipeline.pipelineStateTarget)
@@ -296,11 +216,11 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
    * TODO: fix, brittle.
    * @return
    */
-  def equalityReport() = {
+  def equalityReport(incrementalTest: Boolean): Dataset[ValidationReport] = {
 
-    val silverPipeline = Silver(workspace)
+    val silverPipeline = Silver(workspace, readOnly = true)
     val silverTargets = silverPipeline.SilverTargets
-    val goldPipeline = Gold(workspace)
+    val goldPipeline = Gold(workspace, readOnly = true)
     val goldTargets = goldPipeline.GoldTargets
     rollbackPipelineState(silverPipeline)
     rollbackPipelineState(goldPipeline)
@@ -371,7 +291,7 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
     targetsToValidate.tasksupport = taskSupport
 
     targetsToValidate.map(targetDetail => {
-      assertDataFrameDataEquals(targetDetail, sourceDB)
+      assertDataFrameDataEquals(targetDetail, sourceDB, incrementalTest)
     }).toArray.toSeq.toDS()
 
   }

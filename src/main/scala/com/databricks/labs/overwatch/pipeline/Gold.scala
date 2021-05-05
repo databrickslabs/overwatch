@@ -226,4 +226,8 @@ object Gold {
     .initPipelineRun()
     .loadStaticDatasets()
 
+  private[overwatch] def apply(workspace: Workspace, readOnly: Boolean): Gold = {
+    apply(workspace).setReadOnly
+  }
+
 }

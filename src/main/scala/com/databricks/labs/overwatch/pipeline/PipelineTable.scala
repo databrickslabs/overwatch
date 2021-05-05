@@ -165,6 +165,7 @@ case class PipelineTable(
         "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
       val incrementalFilters = cronColumnsNames.map(filterCol => {
 
+        logger.log(Level.INFO, s"FILTERING: ${module.moduleName} using cron columns: ${cronCols.mkString(", ")}")
         val field = cronCols.filter(_.name == filterCol).head
 
         field.dataType match {

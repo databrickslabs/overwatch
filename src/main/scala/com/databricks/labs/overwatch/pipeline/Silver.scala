@@ -260,4 +260,8 @@ object Silver {
       .loadStaticDatasets()
   }
 
+  private[overwatch] def apply(workspace: Workspace, readOnly: Boolean): Silver = {
+    apply(workspace).setReadOnly
+  }
+
 }

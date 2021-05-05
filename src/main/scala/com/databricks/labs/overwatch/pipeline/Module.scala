@@ -52,33 +52,59 @@ class Module(
   } else Pipeline.createTimeDetail(moduleState.untilTS)
 
   /**
-   * Defines the latest timestamp to be used for a give module as a TimeType
-   *
-   * @param moduleID moduleID for which to get the until Time
+   * Disallow pipeline start time state + max days to exceed snapshot time. Keeps pipelines from running into
+   * the future.
    * @return
    */
-  def untilTime: TimeTypes = {
+  private def limitUntilTimeToSnapTime: TimeTypes = {
     val startSecondPlusMaxDays = fromTime.asLocalDateTime.plusDays(pipeline.config.maxDays)
       .atZone(Pipeline.systemZoneId).toInstant.toEpochMilli
 
     val defaultUntilSecond = pipeline.pipelineSnapTime.asUnixTimeMilli
 
     // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
-    val maxIndependentUntilTime = if (startSecondPlusMaxDays < defaultUntilSecond) {
+    if (startSecondPlusMaxDays < defaultUntilSecond) {
       Pipeline.createTimeDetail(startSecondPlusMaxDays)
     } else {
       Pipeline.createTimeDetail(defaultUntilSecond)
     }
+  }
 
-    if (moduleDependencies.nonEmpty && mostLaggingDependency.untilTS < maxIndependentUntilTime.asUnixTimeMilli) {
-      val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${maxIndependentUntilTime.asUnixTimeMilli} " +
+  private def limitUntilTimeToMostLaggingDependency(originalUntilTime: TimeTypes): TimeTypes = {
+    if (moduleDependencies.nonEmpty && mostLaggingDependency.untilTS < originalUntilTime.asUnixTimeMilli) {
+      val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${originalUntilTime.asUnixTimeMilli} " +
         s"exceeds that of an upstream requisite module: ${mostLaggingDependency.moduleID}-${mostLaggingDependency.moduleName} " +
         s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module untilTS == min requisite module: " +
         s"${mostLaggingDependency.untilTS}."
       logger.log(Level.WARN, msg)
       if (pipeline.config.debugFlag) println(msg)
       Pipeline.createTimeDetail(mostLaggingDependency.untilTS)
-    } else maxIndependentUntilTime
+    } else originalUntilTime
+  }
+
+  /**
+   * Defines the latest timestamp to be used for a give module as a TimeType
+   * When pipeline is read only, module state can be read independent of upstream dependencies.
+   *
+   * @return
+   */
+  def untilTime: TimeTypes = {
+    // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
+    val maxIndependentUntilTime = limitUntilTimeToSnapTime
+
+    if (pipeline.readOnly) { // don't validate dependency progress when not writing data to pipeline
+      maxIndependentUntilTime
+    } else {
+      if (moduleDependencies.nonEmpty && mostLaggingDependency.untilTS < maxIndependentUntilTime.asUnixTimeMilli) {
+        val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${maxIndependentUntilTime.asUnixTimeMilli} " +
+          s"exceeds that of an upstream requisite module: ${mostLaggingDependency.moduleID}-${mostLaggingDependency.moduleName} " +
+          s"with untilTS of: ${mostLaggingDependency.untilTS}. Setting current module untilTS == min requisite module: " +
+          s"${mostLaggingDependency.untilTS}."
+        logger.log(Level.WARN, msg)
+        if (pipeline.config.debugFlag) println(msg)
+        Pipeline.createTimeDetail(mostLaggingDependency.untilTS)
+      } else maxIndependentUntilTime
+    }
   }
 
   private def mostLaggingDependency: SimplifiedModuleStatusReport = {
@@ -192,7 +218,7 @@ class Module(
     }
   }
 
-  private def validatePipelineState(): Unit = {
+  private[overwatch] def validatePipelineState(): Unit = {
 
     if (moduleDependencies.nonEmpty) { // if dependencies present
       // If earliest untilTS of dependencies < current untilTS edit current untilTS to match
@@ -224,6 +250,7 @@ class Module(
     println(debugMsg)
     logger.log(Level.INFO, debugMsg)
     try {
+      if (pipeline.readOnly) throw new ReadOnlyException(s"Pipeline is READONLY: ETL cannot execute in read only")
       validatePipelineState()
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
       val etlDefinition = _etlDefinition.copy()

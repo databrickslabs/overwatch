@@ -104,13 +104,26 @@ trait ValidationUtils extends SparkSessionWrapper {
     }
   }
 
-  def assertDataFrameDataEquals(targetDetail: ModuleTarget, sourceDB: String): ValidationReport = {
+  /**
+   *
+   * @param targetDetail
+   * @param sourceDB
+   * @param incrementalTest
+   * @return
+   */
+  def assertDataFrameDataEquals(targetDetail: ModuleTarget, sourceDB: String, incrementalTest: Boolean): ValidationReport = {
     val module = targetDetail.module
     val sourceTarget = targetDetail.target.copy(_databaseName = sourceDB)
     val snapTarget = targetDetail.target
-    val expected = sourceTarget.asIncrementalDF(module, sourceTarget.incrementalColumns)
 
-    val result = snapTarget.asIncrementalDF(module, sourceTarget.incrementalColumns)
+    val (expected, result) = if (incrementalTest) {
+      (
+        sourceTarget.asIncrementalDF(module, sourceTarget.incrementalColumns),
+        snapTarget.asIncrementalDF(module, sourceTarget.incrementalColumns)
+      )
+    } else {
+      (sourceTarget.asDF, snapTarget.asDF)
+    }
 
     val expectedCol = "assertDataFrameNoOrderEquals_expected"
     val actualCol = "assertDataFrameNoOrderEquals_actual"
@@ -118,6 +131,7 @@ trait ValidationUtils extends SparkSessionWrapper {
     val controlColumns = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID")
     val requiredFields = expected.schema.fields.filter(_.dataType != MapType(StringType, StringType))
       .filterNot(f => controlColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
+    val joinClause = requiredFields.map(_.name).toSeq
 
     val validationStatus = s"VALIDATING TABLE: ${snapTarget.tableFullName}\nFROM TIME: ${module.fromTime.asTSString} " +
       s"\nUNTIL TIME: ${module.untilTime.asTSString}\nFOR FIELDS: ${requiredFields.map(_.name).mkString(", ")}"
@@ -134,7 +148,7 @@ trait ValidationUtils extends SparkSessionWrapper {
           .agg(count(lit(1)).as(actualCol))
 
         val diff = expectedElementsCount
-          .join(resultElementsCount, expected.columns, "full_outer")
+          .join(resultElementsCount, joinClause, "full_outer")
           .filter(col(expectedCol) =!= col(actualCol))
 
         diff

@@ -21,6 +21,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
   final val database: Database = _database
   final val config: Config = _config
   private var _pipelineSnapTime: Long = _
+  private var _readOnly: Boolean = false
   lazy protected final val postProcessor = new PostProcessor()
   private val pipelineState = scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport]()
   import spark.implicits._
@@ -44,6 +45,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
   protected[overwatch] def clearPipelineState(): Unit = {
     pipelineState.clear()
   }
+
+  private[overwatch] def setReadOnly: this.type = {
+    _readOnly = true
+    this
+  }
+  private[overwatch] def readOnly: Boolean = _readOnly
 
   /**
    * Getter for Pipeline Snap Time
