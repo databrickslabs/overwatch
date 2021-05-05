@@ -97,6 +97,7 @@ object Schema extends SparkSessionWrapper {
         StructField("clusterState", StringType, nullable = true),
         StructField("jobId", LongType, nullable = true),
         StructField("job_id", LongType, nullable = true),
+        StructField("jobTaskType", StringType, nullable = true),
         StructField("job_type", StringType, nullable = true),
         StructField("runId", LongType, nullable = true),
         StructField("run_id", LongType, nullable = true),
