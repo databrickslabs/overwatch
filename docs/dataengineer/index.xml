@@ -5,7 +5,7 @@
     <link>https://databrickslabs.github.io/overwatch/dataengineer/</link>
     <description>Recent content in Data Engineering on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Tue, 27 Apr 2021 08:32:36 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Mon, 11 Jan 2021 12:21:46 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Definitions</title>
       <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/</link>
@@ -23,15 +23,6 @@
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/etl_process/</guid>
       <description>Data Ingestion and Resume Process The specificities can vary slightly between cloud provider but the general methodology is the exact same. Specific differences will be discussed in Cloud-Specific Variations section.
 Each module is responsible for building certain entities at each layer, bronze, silver, gold, and presentation. The mapping between module and gold entity can be found in the Modules section. Each module is also tracked individually in the primary tracking tabe, Pipeline_Report.</description>
-    </item>
-    
-    <item>
-      <title>Change Log</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/changelog/</link>
-      <pubDate>Tue, 27 Apr 2021 08:32:36 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/changelog/</guid>
-      <description>0.4.1  Converted all delta targets from managed tables to external tables  Better security and best practice Enabled etl data path prefix to simplify and protect the raw data across workspaces   pipeline_report - enabled partitioning by &amp;ldquo;organization_id&amp;rdquo;  Necessary to guard against write concurrency issues across multiple workspaces   orgianization_id - Single Tenant AWS workspaces with DNS would return &amp;ldquo;0&amp;rdquo; for organization_id, updated to change organization_id to the workspace prefix.</description>
     </item>
     
   </channel>

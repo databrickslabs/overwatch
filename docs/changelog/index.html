@@ -9,7 +9,7 @@
 
     <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
 
-    <title>Categories :: Overwatch</title>
+    <title>ChangeLog :: Overwatch</title>
 
     
     <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1620248503" rel="stylesheet">
@@ -38,7 +38,7 @@
 
 <script async defer src="https://buttons.github.io/buttons.js"></script>
   </head>
-  <body class="" data-url="https://databrickslabs.github.io/overwatch/categories/">
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/changelog/">
     <nav id="sidebar" class="">
 
 
@@ -341,8 +341,8 @@
   
     
     <li data-nav-id="/changelog/" title="ChangeLog" class="dd-item
-        
-        
+        parent
+        active
         
         ">
       <a href="https://databrickslabs.github.io/overwatch/changelog/">
@@ -439,7 +439,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > Categories
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > ChangeLog
           
         
           
@@ -450,7 +450,13 @@
                 
                     <div class="progress">
     <div class="wrapper">
-
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#0411">0.4.11</a></li>
+    <li><a href="#041">0.4.1</a></li>
+    <li><a href="#040">0.4.0</a></li>
+  </ul>
+</nav>
     </div>
 </div>
 
@@ -466,9 +472,7 @@
           
             <h1>
               
-                taxonomy ::
-              
-              Categories
+              ChangeLog
             </h1>
           
 
@@ -476,11 +480,52 @@
 
 
 
-
-
+	<h2 id="0411">0.4.11</h2>
 <ul>
-	
+<li>Hotfix for <a href="https://github.com/databrickslabs/overwatch/issues/119">Issue 119</a>. Issue was only present in edge cases.
+Edge cases include workspaces missing data and attempting to run modules for which data didn&rsquo;t exist.</li>
+<li>Added additional guard rails to pipeline state checks to help clarify workspace / pipeline state issues for
+future users.</li>
 </ul>
+<h2 id="041">0.4.1</h2>
+<ul>
+<li><a href="https://github.com/databrickslabs/overwatch/issues/50">Converted all delta targets from managed tables to external tables</a>
+<ul>
+<li>Better security and best practice</li>
+<li>Enabled etl data path prefix to simplify and protect the raw data across workspaces</li>
+</ul>
+</li>
+<li>pipeline_report - enabled partitioning by &ldquo;organization_id&rdquo;
+<ul>
+<li>Necessary to guard against write concurrency issues across multiple workspaces</li>
+</ul>
+</li>
+<li>orgianization_id - Single Tenant AWS workspaces with DNS would return &ldquo;0&rdquo; for organization_id, updated to change
+organization_id to the workspace prefix.
+<ul>
+<li>EXAMPLE: <a href="https://myorg_dev.cloud.databricks.com">https://myorg_dev.cloud.databricks.com</a> &ndash;&gt; myorg_dev</li>
+</ul>
+</li>
+<li>instanceDetails -
+<ul>
+<li>Converted from append mode to overwrite mode. Allows for multiple workspaces to create the compute pricing lookup
+if it didn&rsquo;t already exist for the workspace</li>
+<li>Moved default table location from consumerDB to ETLDB and created mapped view to table in consumerDB</li>
+<li>Simplified the instanceDetails cost customization process (docs updated)</li>
+<li>Added proper filter to ensure ONLY current workspace compute costs are looked up during joins</li>
+<li>Converted Azure example Memory_GB to double to match data type from AWS</li>
+</ul>
+</li>
+<li>Bug fix for JSON to Map that caused certain escaped json strings to break when being pulled from the new Jobs UI</li>
+<li>Bug fix for <a href="https://github.com/databrickslabs/overwatch/issues/111">Issue 111</a></li>
+<li>Bug fix for multi-workspace Azure, filter from audit_raw_land table was incomplete</li>
+<li>Bug fix to allow for consumerDB to be omitted from DataTarget in config</li>
+</ul>
+<h2 id="040">0.4.0</h2>
+<p>Initial Public Release</p>
+
+
+
 
 
 <footer class=" footline" >
@@ -681,6 +726,7 @@
             
                 
                     
+                    
                 
                 
 
@@ -697,6 +743,9 @@
             
                 
                     
+                        
+                        
+                    
                 
                 
 
@@ -717,8 +766,10 @@
 	 
 	 
 		
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process/" title="ETL Process"> <i class="fa fa-chevron-left"></i></a>
 		
-			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/gettingstarted/" title="Getting Started" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/contributing/" title="" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
 		
 	
     </div>
