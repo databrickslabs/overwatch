@@ -8,9 +8,10 @@ import com.databricks.labs.overwatch.utils.Layer.bronze
 import com.databricks.labs.overwatch.utils._
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
-import org.apache.spark.sql.functions.{abs, count, lit}
+import org.apache.spark.sql.functions.{abs, count, lit, rank, row_number}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.internal.config
+import org.apache.spark.sql.expressions.Window
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -225,13 +226,14 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
     resetPipelineReportState(bronzePipeline.pipelineStateTarget)
 
     // snapshots bronze tables, returns ds with report
-    val bronzeTargetsWModule = bronzePipeline.config.overwatchScope.map {
-      case OverwatchScope.audit => ModuleTarget(bronzePipeline.auditLogsModule, bronzeTargets.auditLogsTarget)
-      case OverwatchScope.clusters => ModuleTarget(bronzePipeline.clustersSnapshotModule, bronzeTargets.clustersSnapshotTarget)
-      case OverwatchScope.clusterEvents => ModuleTarget(bronzePipeline.clusterEventLogsModule, bronzeTargets.clusterEventsTarget)
-      case OverwatchScope.jobs => ModuleTarget(bronzePipeline.jobsSnapshotModule, bronzeTargets.jobsSnapshotTarget)
-      case OverwatchScope.pools => ModuleTarget(bronzePipeline.poolsSnapshotModule, bronzeTargets.poolsTarget)
-      case OverwatchScope.sparkEvents => ModuleTarget(bronzePipeline.sparkEventLogsModule, bronzeTargets.sparkEventLogsTarget)
+    val bronzeTargetsWModule = bronzePipeline.config.overwatchScope.flatMap {
+      case OverwatchScope.audit => Seq(ModuleTarget(bronzePipeline.auditLogsModule, bronzeTargets.auditLogsTarget))
+      case OverwatchScope.clusters => Seq(ModuleTarget(bronzePipeline.clustersSnapshotModule, bronzeTargets.clustersSnapshotTarget))
+      case OverwatchScope.clusterEvents => Seq(ModuleTarget(bronzePipeline.clusterEventLogsModule, bronzeTargets.clusterEventsTarget))
+      case OverwatchScope.jobs => Seq(ModuleTarget(bronzePipeline.jobsSnapshotModule, bronzeTargets.jobsSnapshotTarget))
+      case OverwatchScope.pools => Seq(ModuleTarget(bronzePipeline.poolsSnapshotModule, bronzeTargets.poolsTarget))
+      case OverwatchScope.sparkEvents => Seq(ModuleTarget(bronzePipeline.sparkEventLogsModule, bronzeTargets.sparkEventLogsTarget))
+      case _ => Seq[ModuleTarget]()
     }.par
 
     bronzeTargetsWModule.tasksupport = taskSupport
@@ -252,6 +254,44 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
   }
 
   /**
+   * TODO - generalize this function
+   *  Probably can add an overload to pipeline instantiation initialize pipeline to a specific state
+   *  Issue for Kitana is that the bronze state needs to be current but silver/gold must be
+   *  current - 1.
+   * @param pipeline
+   * @param versionsAgo
+   */
+  def rollbackPipelineState(pipeline: Pipeline, versionsAgo: Int = 2): Unit = {
+    // snapshot current state for bronze
+    val initialBronzeState = pipeline.getPipelineState.filter(_._1 < 2000)
+    // clear the state
+    pipeline.clearPipelineState()
+    if (spark.catalog.databaseExists(pipeline.config.databaseName) &&
+      spark.catalog.tableExists(pipeline.config.databaseName, "pipeline_report")) {
+      val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
+      val wRank = Window.partitionBy('organization_id, 'moduleID, 'rnk).orderBy('Pipeline_SnapTS.desc)
+      spark.table(s"${pipeline.config.databaseName}.pipeline_report")
+        .filter('Status === "SUCCESS" || 'Status.startsWith("EMPTY"))
+        .filter('organization_id === pipeline.config.organizationId)
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(wRank))
+        .filter('moduleID >= 2000) // only retrieves states for silver / gold
+        .filter('rnk === versionsAgo && 'rn === 1)
+        .drop("inputConfig", "parsedConfig")
+        .as[SimplifiedModuleStatusReport]
+        .collect()
+        .foreach(pipeline.updateModuleState)
+      // reapply the initial bronze state
+      initialBronzeState.foreach(state => pipeline.updateModuleState(state._2))
+    } else {
+      pipeline.config.setIsFirstRun(true)
+      Array[SimplifiedModuleStatusReport]()
+    }
+    println(s"Rolled pipeline back $versionsAgo versions. RESULT:\n")
+    pipeline.showRangeReport()
+  }
+
+  /**
    * Execute equality checks for silver and gold
    * TODO: fix, brittle.
    * @return
@@ -262,6 +302,8 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
     val silverTargets = silverPipeline.SilverTargets
     val goldPipeline = Gold(workspace)
     val goldTargets = goldPipeline.GoldTargets
+    rollbackPipelineState(silverPipeline)
+    rollbackPipelineState(goldPipeline)
 
     val silverTargetsWModule = silverPipeline.config.overwatchScope.flatMap {
       case OverwatchScope.accounts => {
@@ -287,6 +329,7 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
           ModuleTarget(silverPipeline.jobRunsModule, silverTargets.dbJobRunsTarget)
         )
       }
+      case _ => Seq[ModuleTarget]()
     }.toArray
 
     val goldTargetsWModule = goldPipeline.config.overwatchScope.flatMap {
@@ -321,6 +364,7 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
           ModuleTarget(goldPipeline.jobRunCostPotentialFactModule, goldTargets.jobRunCostPotentialFactTarget)
         )
       }
+      case _ => Seq[ModuleTarget]()
     }.toArray
 
     val targetsToValidate = (silverTargetsWModule ++ goldTargetsWModule).par

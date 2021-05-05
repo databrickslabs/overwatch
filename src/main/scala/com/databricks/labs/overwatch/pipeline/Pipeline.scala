@@ -41,6 +41,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
     pipelineState.put(moduleState.moduleID, moduleState)
   }
 
+  protected[overwatch] def clearPipelineState(): Unit = {
+    pipelineState.clear()
+  }
+
   /**
    * Getter for Pipeline Snap Time
    * NOTE: PipelineSnapTime is EXCLUSIVE meaning < ONLY NOT <=

@@ -115,7 +115,13 @@ trait ValidationUtils extends SparkSessionWrapper {
     val expectedCol = "assertDataFrameNoOrderEquals_expected"
     val actualCol = "assertDataFrameNoOrderEquals_actual"
 
+    val controlColumns = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID")
     val requiredFields = expected.schema.fields.filter(_.dataType != MapType(StringType, StringType))
+      .filterNot(f => controlColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
+
+    val validationStatus = s"VALIDATING TABLE: ${snapTarget.tableFullName}\nFROM TIME: ${module.fromTime.asTSString} " +
+      s"\nUNTIL TIME: ${module.untilTime.asTSString}\nFOR FIELDS: ${requiredFields.map(_.name).mkString(", ")}"
+    logger.log(Level.INFO, validationStatus)
 
     val validationReport =
       try {
