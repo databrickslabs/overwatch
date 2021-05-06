@@ -111,7 +111,7 @@ class Module(
       logger.log(Level.ERROR, errMsg)
       None
     } else {
-      Some(dependencyStates.map(_.get).sortBy(_.untilTS).reverse.head)
+      Some(dependencyStates.map(_.get).minBy(_.untilTS))
     }
   }
 

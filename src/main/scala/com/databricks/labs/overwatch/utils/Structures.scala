@@ -163,12 +163,6 @@ private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
 private[overwatch] class ReadOnlyException(s: String) extends Exception(s) {}
 
-private[overwatch] class TargetAcquisitionFailure(
-                                                   s: String,
-                                                   val target: PipelineTable,
-                                                   val module: Module
-                                                 ) extends Exception(s) {}
-
 private[overwatch] class FailedModuleException(s: String, val target: PipelineTable) extends Exception(s) {}
 
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}

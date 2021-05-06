@@ -8,6 +8,7 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{from_unixtime, lit, rank, row_number}
 
+import java.text.SimpleDateFormat
 import java.time._
 import java.util.Date
 
@@ -136,7 +137,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         .coalesce(1)
 
       database.write(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
-      BronzeTargets.cloudMachineDetailViewTarget.publish("*")
+      if (config.databaseName != config.consumerDatabaseName) BronzeTargets.cloudMachineDetailViewTarget.publish("*")
     }
     this
   }
@@ -181,6 +182,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
    * @return
    */
   def primordialEpoch: Long = {
+
     LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
       .toLocalDate.atStartOfDay
       .toInstant(systemZoneOffset)
@@ -322,6 +324,9 @@ object Pipeline {
 
   val systemZoneId: ZoneId = ZoneId.systemDefault()
   val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
+  def deriveLocalDate(dtString: String, dtFormat: SimpleDateFormat): LocalDate = {
+    dtFormat.parse(dtString).toInstant.atZone((systemZoneId)).toLocalDate
+  }
 
   /**
    * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats

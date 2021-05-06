@@ -20,6 +20,12 @@ import org.apache.log4j.{Level, Logger}
 class Initializer(config: Config) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+  private var _isSnap: Boolean = false
+  private def setIsSnap(value: Boolean): this.type = {
+    _isSnap = value
+    this
+  }
+  private def isSnap: Boolean = _isSnap
 
   /**
    * Initialize the "Database" object
@@ -32,16 +38,22 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   private def initializeDatabase(): Database = {
     // TODO -- Add metadata table
     // TODO -- refactor and clean up duplicity
-    logger.log(Level.INFO, "Initializing ETL Database")
+    val dbMeta = if (isSnap) {
+      logger.log(Level.INFO, "Initializing Snap Database")
+      "OVERWATCHDB='TRUE',SNAPDB='TRUE'"
+    } else {
+      logger.log(Level.INFO, "Initializing ETL Database")
+      "OVERWATCHDB='TRUE'"
+    }
     if (!spark.catalog.databaseExists(config.databaseName)) {
       logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
         s"${config.databaseLocation}.")
       val createDBIfNotExists = if (!config.isLocalTesting) {
         s"create database if not exists ${config.databaseName} location '" +
-          s"${config.databaseLocation}' WITH DBPROPERTIES (OVERWATCHDB='TRUE',SCHEMA=${config.overwatchSchemaVersion})"
+          s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
       } else {
         s"create database if not exists ${config.databaseName} " +
-          s"WITH DBPROPERTIES (OVERWATCHDB='TRUE',SCHEMA=${config.overwatchSchemaVersion})"
+          s"WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
       }
       spark.sql(createDBIfNotExists)
       logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
@@ -397,6 +409,22 @@ object Initializer extends SparkSessionWrapper {
   // Init the SparkSessionWrapper with envVars
   envInit()
 
+  private def initConfigState(debugFlag: Boolean): Config = {
+    logger.log(Level.INFO, "Initializing Config")
+    val config = new Config()
+    val orgId = if (dbutils.notebook.getContext.tags("orgId") == "0") {
+      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+    } else dbutils.notebook.getContext.tags("orgId")
+    config.setOrganizationId(orgId)
+    config.registerInitialSparkConf(spark.conf.getAll)
+    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
+    if (debugFlag) {
+      envInit("DEBUG")
+      config.setDebugFlag(debugFlag)
+    }
+    config
+  }
+
   /**
    * Companion object to validate environment initialize the config for the run.
    * Takes input of raw arg strings into the main class, parses and validates them,
@@ -414,18 +442,7 @@ object Initializer extends SparkSessionWrapper {
    */
   def apply(args: Array[String], debugFlag: Boolean = false): Workspace = {
 
-    logger.log(Level.INFO, "Initializing Config")
-    val config = new Config()
-    val orgId = if (dbutils.notebook.getContext.tags("orgId") == "0") {
-      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-    } else dbutils.notebook.getContext.tags("orgId")
-    config.setOrganizationId(orgId)
-    config.registerInitialSparkConf(spark.conf.getAll)
-    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
-    if (debugFlag) {
-      envInit("DEBUG")
-      config.setDebugFlag(debugFlag)
-    }
+    val config = initConfigState(debugFlag)
 
     logger.log(Level.INFO, "Initializing Environment")
     val initializer = new Initializer(config)
@@ -439,5 +456,25 @@ object Initializer extends SparkSessionWrapper {
 
     workspace
   }
+
+  private[overwatch] def apply(args: Array[String], debugFlag: Boolean, isSnap: Boolean): Workspace = {
+
+    val config = initConfigState(debugFlag)
+
+    logger.log(Level.INFO, "Initializing Environment")
+    val initializer = new Initializer(config)
+    val database = initializer
+      .setIsSnap(isSnap)
+      .validateAndRegisterArgs(args)
+      .initializeDatabase()
+
+    logger.log(Level.INFO, "Initializing Workspace")
+    val workspace = Workspace(database, config)
+
+
+    workspace
+  }
+
+
 }
 

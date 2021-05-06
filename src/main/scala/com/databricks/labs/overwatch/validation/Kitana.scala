@@ -11,8 +11,10 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 
 import java.sql.Timestamp
+import java.text.SimpleDateFormat
+import java.time.{Duration, LocalDate}
 import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.forkjoin.ForkJoinPool
+import java.util.concurrent.ForkJoinPool
 
 case class SnapReport(tableFullName: String,
                       from: java.sql.Timestamp,
@@ -29,24 +31,32 @@ case class ValidationReport(tableSourceName: Option[String],
                             until: Option[java.sql.Timestamp],
                             message: Option[String])
 
-case class SnapValidationParams(snapDatabaseName: String,
-                                sourceDatabaseName: String,
-                                scopes: Option[Seq[String]],
-                                primordialDateString: String,
-                                maxDaysToLoad: Int,
-                                parallelism: Int)
+case class ValidationParams(snapDatabaseName: String,
+                            sourceDatabaseName: String,
+                            primordialDateString: String,
+                            scopes: Option[Seq[String]] = None,
+                            maxDaysToLoad: Int,
+                            parallelism: Int)
 
 case class ModuleTarget(module: Module, target: PipelineTable)
 
-class SnapValidation(workspace: Workspace, sourceDB: String)
-    extends ValidationUtils {
+class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName: String)
+  extends ValidationUtils {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   import spark.implicits._
 
-  private val parallelism = getDriverCores - 1
-  val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+  private var _parallelism: Int = getDriverCores - 1
+
+  private def setParallelism(value: Option[Int]): this.type = {
+    _parallelism = value.getOrElse(getDriverCores - 1)
+    this
+  }
+
+  private def parallelism: Int = _parallelism
+
+  private val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
 
   /**
    * Snapshots table
@@ -61,14 +71,14 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
     val pipeline = module.pipeline
 
     try {
-      val finalDFToClone = target.copy(_databaseName = sourceDB).asIncrementalDF(module, target.incrementalColumns)
+      val finalDFToClone = target.copy(_databaseName = sourceDBName).asIncrementalDF(module, target.incrementalColumns)
       pipeline.database.write(finalDFToClone, target, pipeline.pipelineSnapTime.asColumnTS)
 
 
       println(s"SNAPPED: ${target.tableFullName}")
       val snapCount = spark.table(target.tableFullName).count()
 
-      println(s"UPDATING Module State")
+      println(s"UPDATING Module State for ${module.moduleId} --> ${module.moduleId}")
       pipeline.updateModuleState(module.moduleState.copy(
         fromTS = module.fromTime.asUnixTimeMilli,
         untilTS = module.untilTime.asUnixTimeMilli,
@@ -116,7 +126,7 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
 
     uniqueTablesToClone.foreach(target => {
       try {
-        val stmt = s"CREATE TABLE ${target.tableFullName} DEEP CLONE ${sourceDB}.${target.name}"
+        val stmt = s"CREATE TABLE ${target.tableFullName} DEEP CLONE ${sourceDBName}.${target.name}"
         println(s"CLONING TABLE ${target.tableFullName}.\nSTATEMENT: ${stmt}")
         spark.sql(stmt)
       } catch {
@@ -130,16 +140,51 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
   }
 
   /**
-   * Execute snapshots
+   *
+   * @param startDateString yyyy-MM-dd
+   * @param endDateString   yyyy-MM-dd
    * @return
    */
-  def executeBronzeSnapshot(): Dataset[SnapReport] = {
+  def executeBronzeSnapshot(
+                             startDateString: String,
+                             endDateString: String,
+                             dtFormat: Option[String] = None
+                           ): Dataset[SnapReport] = {
+    val dtFormatFinal = getDateFormat(dtFormat)
+    val startDate = Pipeline.deriveLocalDate(startDateString, dtFormatFinal)
+    val endDate = Pipeline.deriveLocalDate(endDateString, dtFormatFinal)
+    val fromTime = Pipeline.createTimeDetail(startDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+    val untilTime = Pipeline.createTimeDetail(endDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+    val daysToTest = Duration.between(startDate.atStartOfDay(), endDate.atStartOfDay()).toDays.toInt
+    _executeBronzeSnapshot(fromTime, untilTime, daysToTest)
+  }
+
+  /**
+   * Execute snapshots
+   *
+   * @return
+   */
+  private def _executeBronzeSnapshot(
+                                      snapFromTime: TimeTypes,
+                                      snapUntilTime: TimeTypes,
+                                      daysToSnap: Int
+                                   ): Dataset[SnapReport] = {
     // state tables clone and reset for silver and gold modules
 
-    val bronzePipeline = Bronze(workspace, readOnly = true)
+    val bronzeConfig = snapWorkspace.getConfig
+    bronzeConfig.setPrimordialDateString(Some(snapFromTime.asDTString))
+    bronzeConfig.setMaxDays(daysToSnap)
+
+    logger.log(Level.INFO, s"BRONZE Snap: Primordial Date Overridden: ${bronzeConfig.primordialDateString}")
+    logger.log(Level.INFO, s"BRONZE Snap: Max Days Overridden: ${bronzeConfig.maxDays}")
+    val bronzeSnapWorkspace = snapWorkspace.copy(_config = bronzeConfig)
+    val bronzePipeline = Bronze(bronzeSnapWorkspace, readOnly = true)
     val bronzeTargets = bronzePipeline.BronzeTargets
+
+    validateSnapPipeline(sourceWorkspace, bronzePipeline, snapFromTime, snapUntilTime)
+
     snapStateTables(bronzePipeline)
-    resetPipelineReportState(bronzePipeline.pipelineStateTarget)
+    resetPipelineReportState(bronzePipeline.pipelineStateTarget, bronzeConfig.primordialDateString.get)
 
     // snapshots bronze tables, returns ds with report
     val bronzeTargetsWModule = bronzePipeline.config.overwatchScope.flatMap {
@@ -161,18 +206,26 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
 
   /**
    * Execute recalculations for silver and gold with code from this package
+   *
    * @return
    */
-  def executeRecalculations() = {
-    Silver(workspace).run()
-    Gold(workspace).run()
+  def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Int = 2): (Pipeline, Pipeline) = {
+
+    val snapLookupPipeline = Bronze(snapWorkspace)
+    val recalcConfig = snapWorkspace.getConfig
+    recalcConfig.setMaxDays(maxDays)
+    recalcConfig.setPrimordialDateString(Some(deriveRecalcPrimordial(snapLookupPipeline, primordialPadding)))
+
+    val recalcWorkspace = snapWorkspace.copy(_config = recalcConfig)
+    (Silver(recalcWorkspace, readOnly = true).run(), Gold(recalcWorkspace, readOnly = true).run())
   }
 
   /**
-   * TODO - generalize this function
-   *  Probably can add an overload to pipeline instantiation initialize pipeline to a specific state
-   *  Issue for Kitana is that the bronze state needs to be current but silver/gold must be
-   *  current - 1.
+   * TODO - create generic version of this function
+   * Probably can add an overload to pipeline instantiation initialize pipeline to a specific state
+   * Issue for Kitana is that the bronze state needs to be current but silver/gold must be
+   * current - 1.
+   *
    * @param pipeline
    * @param versionsAgo
    */
@@ -211,11 +264,11 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
    * @param incrementalTest
    * @return
    */
-  def equalityReport(incrementalTest: Boolean): Dataset[ValidationReport] = {
+  def validateEquality(incrementalTest: Boolean): Dataset[ValidationReport] = {
 
-    val silverPipeline = Silver(workspace, readOnly = true)
+    val silverPipeline = Silver(snapWorkspace, readOnly = true)
     val silverTargets = silverPipeline.SilverTargets
-    val goldPipeline = Gold(workspace, readOnly = true)
+    val goldPipeline = Gold(snapWorkspace, readOnly = true)
     val goldTargets = goldPipeline.GoldTargets
     rollbackPipelineState(silverPipeline)
     rollbackPipelineState(goldPipeline)
@@ -223,8 +276,8 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
     val silverTargetsWModule = silverPipeline.config.overwatchScope.flatMap {
       case OverwatchScope.accounts => {
         Seq(
-        ModuleTarget(silverPipeline.accountLoginsModule, silverTargets.accountLoginTarget),
-        ModuleTarget(silverPipeline.modifiedAccountsModule, silverTargets.accountModTarget)
+          ModuleTarget(silverPipeline.accountLoginsModule, silverTargets.accountLoginTarget),
+          ModuleTarget(silverPipeline.modifiedAccountsModule, silverTargets.accountModTarget)
         )
       }
       case OverwatchScope.notebooks => Seq(ModuleTarget(silverPipeline.notebookSummaryModule, silverTargets.notebookStatusTarget))
@@ -286,55 +339,48 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
     targetsToValidate.tasksupport = taskSupport
 
     targetsToValidate.map(targetDetail => {
-//      try {
-        assertDataFrameDataEquals(targetDetail, sourceDB, incrementalTest)
-//      } catch {
-//        case e: Throwable => validationFailureReport(e)
-//      }
+      assertDataFrameDataEquals(targetDetail, sourceDBName, incrementalTest)
     }).toArray.toSeq.toDS()
 
   }
 }
 
-object SnapValidation {
-  def apply(params: SnapValidationParams): SnapValidation = {
+object Kitana {
 
-    /**
-     * create config environment for overwatch
-     * TODO: review datatarget
-     * TODO: hardcoded for azure!
-     */
+  def apply(
+             snapDBName: String,
+             workspace: Workspace,
+             snapDBLocation: Option[String] = None,
+             snapDBDataLocation: Option[String] = None,
+             snapTokenSecret: Option[TokenSecret] = None,
+             parallelism: Option[Int] = None
+           ): Kitana = {
+    val origConfig = workspace.getConfig
+    val origWorkspaceParams = origConfig.inputConfig
+    val origDataTarget = origWorkspaceParams.dataTarget
+    val sourceDBName = origDataTarget.get.databaseName.get
 
-    require(params.sourceDatabaseName != params.snapDatabaseName, "Source Overwatch database cannot be the same as " +
+    require(sourceDBName != snapDBName, "Source Overwatch database cannot be the same as " +
       "the snapshot target.")
-    val dataTarget = DataTarget(
-      Some(params.snapDatabaseName), Some(s"dbfs:/user/hive/warehouse/${params.snapDatabaseName}.db"), None
+
+    val snapDataTarget = DataTarget(
+      databaseName = Some(snapDBName),
+      databaseLocation = snapDBLocation,
+      etlDataPathPrefix = snapDBDataLocation,
+      consumerDatabaseName = None,
+      consumerDatabaseLocation = None
     )
 
-    val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = "", eventHubName = "", auditRawEventsPrefix = "")
-
-    val overwatchParams = OverwatchParams(
-      auditLogConfig = AuditLogConfig(rawAuditPath = Some(""), azureAuditLogEventhubConfig = Some(azureLogConfig)),
-      dataTarget = Some(dataTarget),
-      badRecordsPath = None,
-//      overwatchScope = Some("audit,accounts,jobs,sparkEvents,clusters,clusterEvents,notebooks,pools".split(",")),
-      overwatchScope = params.scopes,
-      maxDaysToLoad = params.maxDaysToLoad,
-      primordialDateString = Some(params.primordialDateString)
+    val snapWorkspaceParams = origWorkspaceParams.copy(
+      dataTarget = Some(snapDataTarget),
+      tokenSecret = if (snapTokenSecret.nonEmpty) snapTokenSecret else origWorkspaceParams.tokenSecret
     )
 
-    val args = objToJson(overwatchParams).compactString
+    val snapArgs = objToJson(snapWorkspaceParams).compactString
+    val snapWorkspace = Initializer(Array(snapArgs), debugFlag = origConfig.debugFlag, isSnap = true)
+    new Kitana(workspace, snapWorkspace, sourceDBName)
+      .setParallelism(parallelism)
 
-    val workspace = if (args.nonEmpty) {
-      Initializer(Array(args), debugFlag = true)
-    } else {
-      Initializer(Array())
-    }
-
-    // creates object
-//    new SnapValidation(params, overwatchParams, workspace)
-
-    new SnapValidation(workspace, params.sourceDatabaseName)
   }
 }
 
