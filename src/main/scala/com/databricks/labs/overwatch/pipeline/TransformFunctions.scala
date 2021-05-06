@@ -99,6 +99,15 @@ object TransformFunctions {
       }
     }
 
+    /**
+     * Supports strings, numericals, booleans. Defined keys don't contain any other types thus this function should
+     * ensure no nulls present for keys
+     * @return
+     */
+    def fillAllNAs: DataFrame = {
+      df.na.fill(0).na.fill("0").na.fill(false)
+    }
+
   }
 
   object Costs {

@@ -22,7 +22,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val jobsSnapshotTarget: PipelineTable = PipelineTable(
       name = "jobs_snapshot_bronze",
-      keys = Array("organization_id", "job_id"),
+      keys = Array("job_id"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = "created_time, creator_user_name, job_id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
@@ -31,7 +31,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clustersSnapshotTarget: PipelineTable = PipelineTable(
       name = "clusters_snapshot_bronze",
-      keys = Array("organization_id", "cluster_id"),
+      keys = Array("cluster_id"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = ("organization_id, cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
@@ -41,7 +41,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val poolsTarget: PipelineTable = PipelineTable(
       name = "pools_snapshot_bronze",
-      keys = Array("organization_id", "instance_pool_id"),
+      keys = Array("instance_pool_id"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = ("instance_pool_id, node_type_id, " +
@@ -51,7 +51,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val auditLogsTarget: PipelineTable = PipelineTable(
       name = "audit_log_bronze",
-      keys = Array("organization_id", "requestId"),
+      keys = Array("requestId"),
       config,
       incrementalColumns = Array("date", "timestamp"),
       partitionBy = Seq("organization_id", "date"),
@@ -75,7 +75,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterEventsTarget: PipelineTable = PipelineTable(
       name = "cluster_events_bronze",
-      keys = Array("organization_id", "cluster_id", "timestamp"),
+      keys = Array("cluster_id", "timestamp"),
       config,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("timestamp"),
@@ -83,7 +83,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
-      keys = Array("organization_id", "Event"), // really aren't any global valid keys for this table
+      keys = Array("Event"), // really aren't any global valid keys for this table
       config,
       incrementalColumns = Array("fileCreateDate", "fileCreateEpochMS"),
       partitionBy = Seq("organization_id", "Event", "fileCreateDate"),
@@ -209,7 +209,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(
       name = "jobrun_silver",
-      keys = Array("timestamp", "runId"),
+      keys = Array("runId", "idInJob", "endEpochMS"),
       config,
       incrementalColumns = Array("endEpochMS"), // don't load into gold until run is terminated
       zOrderBy = Array("runId", "jobId"),
@@ -218,7 +218,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
       name = "account_login_silver",
-      keys = Array("timestamp", "userEmail"),
+      keys = Array("timestamp", "login_type", "requestId", "sourceIPAddress"),
       config,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -242,7 +242,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable(
       name = "job_status_silver",
-      keys = Array("timestamp", "job_id"),
+      keys = Array("timestamp", "jobId"),
       config,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -250,7 +250,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val notebookStatusTarget: PipelineTable = PipelineTable(
       name = "notebook_silver",
-      keys = Array("timestamp", "notebook_id"),
+      keys = Array("timestamp", "notebookId", "requestId"),
       config,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -290,7 +290,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val jobRunTarget: PipelineTable = PipelineTable(
       name = "jobRun_gold",
-      keys = Array("run_id", "unixTimeMS"),
+      keys = Array("run_id", "id_in_job", "endEpochMS"),
       config,
       incrementalColumns = Array("endEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -304,9 +304,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val jobRunCostPotentialFactTarget: PipelineTable = PipelineTable(
       name = "jobRunCostPotentialFact_gold",
-      keys = Array("organization_id", "job_id", "id_in_job"),
+      keys = Array("job_id", "id_in_job"),
       config,
-      incrementalColumns = Array("job_runtime.startTS"),
+      incrementalColumns = Array("endEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
@@ -318,7 +318,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val notebookTarget: PipelineTable = PipelineTable(
       name = "notebook_gold",
-      keys = Array("notebook_id", "unixTimeMS"),
+      keys = Array("notebook_id", "request_id", "unixTimeMS", "request_id"),
       config,
       incrementalColumns = Array("unixTimeMS"),
       partitionBy = Seq("organization_id")
@@ -332,7 +332,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val accountModsTarget: PipelineTable = PipelineTable(
       name = "account_mods_gold",
-      keys = Array("requestId"),
+      keys = Array("action", "mod_unixTimeMS", "request_id"),
       config,
       incrementalColumns = Array("mod_unixTimeMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -347,7 +347,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
       name = "account_login_gold",
-      keys = Array("requestId"),
+      keys = Array("request_id", "login_type", "login_unixTimeMS", "from_ip_address"),
       config,
       incrementalColumns = Array("login_unixTimeMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -362,7 +362,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterStateFactTarget: PipelineTable = PipelineTable(
       name = "clusterStateFact_gold",
-      keys = Array("cluster_id", "unixTimeMS"),
+      keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
       config,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("unixTimeMS_state_start"),

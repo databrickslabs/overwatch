@@ -2,9 +2,9 @@ package com.databricks.labs.overwatch.validation
 
 import com.databricks.labs.overwatch.pipeline.{PipelineTable, Schema}
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.{DataTarget, SparkSessionWrapper, TimeTypesConstants}
+import com.databricks.labs.overwatch.utils.{DataTarget, SparkSessionWrapper, TargetAcquisitionFailure, TimeTypesConstants}
 import org.apache.spark.sql.{Column, DataFrame}
-import org.apache.spark.sql.functions.{col, count, from_unixtime, length, lit, when}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DateType, LongType, MapType, StringType, TimestampType}
 import org.apache.log4j.{Level, Logger}
 
@@ -47,6 +47,7 @@ trait ValidationUtils extends SparkSessionWrapper {
   /**
    * outputs column converted to normalized filtering
    * TODO: find better approach to deal with incrementalcol being a nested field
+   *
    * @param df
    * @param tsCol
    * @return
@@ -54,7 +55,7 @@ trait ValidationUtils extends SparkSessionWrapper {
   protected def colToTS(df: DataFrame, tsCol: String): Column = {
     val fields = df.schema.fields
 
-    val Array(tsCol_splitted, rest @ _*) = tsCol split('.') // if the field is complex, split.
+    val Array(tsCol_splitted, rest@_*) = tsCol split ('.') // if the field is complex, split.
     val restField = rest.mkString
 
     assert(fields.map(_.name.toLowerCase).contains(tsCol_splitted.toLowerCase))
@@ -81,6 +82,7 @@ trait ValidationUtils extends SparkSessionWrapper {
   /**
    * gets a pipeline table dataframe and outputs it after filtering, used to compare with recalculated tables.
    * TODO: find better approach to deal with incrementalcol being a nested field
+   *
    * @param target
    * @param tableName
    * @param startCompare
@@ -109,69 +111,96 @@ trait ValidationUtils extends SparkSessionWrapper {
    * @param targetDetail
    * @param sourceDB
    * @param incrementalTest
+   * @param tol
    * @return
    */
-  def assertDataFrameDataEquals(targetDetail: ModuleTarget, sourceDB: String, incrementalTest: Boolean): ValidationReport = {
+  def assertDataFrameDataEquals(
+                                 targetDetail: ModuleTarget,
+                                 sourceDB: String,
+                                 incrementalTest: Boolean,
+                                 tol: Double = 0D,
+                                 minimumPaddingDays: Int = 7
+                               ): ValidationReport = {
     val module = targetDetail.module
     val sourceTarget = targetDetail.target.copy(_databaseName = sourceDB)
     val snapTarget = targetDetail.target
 
     val (expected, result) = if (incrementalTest) {
       (
-        sourceTarget.asIncrementalDF(module, sourceTarget.incrementalColumns),
-        snapTarget.asIncrementalDF(module, sourceTarget.incrementalColumns)
+        sourceTarget.asIncrementalDF(module, sourceTarget.incrementalColumns).fillAllNAs,
+        snapTarget.asIncrementalDF(module, sourceTarget.incrementalColumns).fillAllNAs
       )
     } else {
-      (sourceTarget.asDF, snapTarget.asDF)
+      (sourceTarget.asDF.fillAllNAs, snapTarget.asDF.fillAllNAs)
     }
 
     val expectedCol = "assertDataFrameNoOrderEquals_expected"
     val actualCol = "assertDataFrameNoOrderEquals_actual"
 
-    val controlColumns = Array("__overwatch_ctrl_noise", "Pipeline_SnapTS", "Overwatch_RunID")
-    val requiredFields = expected.schema.fields.filter(_.dataType != MapType(StringType, StringType))
-      .filterNot(f => controlColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
-    val joinClause = requiredFields.map(_.name).toSeq
-
+    val validationColNames = sourceTarget.keys :+ "organization_id"
     val validationStatus = s"VALIDATING TABLE: ${snapTarget.tableFullName}\nFROM TIME: ${module.fromTime.asTSString} " +
-      s"\nUNTIL TIME: ${module.untilTime.asTSString}\nFOR FIELDS: ${requiredFields.map(_.name).mkString(", ")}"
+      s"\nUNTIL TIME: ${module.untilTime.asTSString}\nFOR FIELDS: ${sourceTarget.keys.mkString(", ")}"
     logger.log(Level.INFO, validationStatus)
 
     val validationReport =
       try {
 
         val expectedElementsCount = expected
-          .groupBy(requiredFields.map(_.name) map col: _*)
+          .groupBy(sourceTarget.keys map col: _*)
           .agg(count(lit(1)).as(expectedCol))
         val resultElementsCount = result
-          .groupBy(requiredFields.map(_.name) map col: _*)
+          .groupBy(snapTarget.keys map col: _*)
           .agg(count(lit(1)).as(actualCol))
 
         val diff = expectedElementsCount
-          .join(resultElementsCount, joinClause, "full_outer")
-          .filter(col(expectedCol) =!= col(actualCol))
+          .join(resultElementsCount, sourceTarget.keys.toSeq, "full_outer")
 
-        diff
-          .select(
-            lit(sourceTarget.tableFullName).alias("tableSourceName"),
-            lit(snapTarget.tableFullName).alias("tableSnapName"),
-            col(expectedCol).alias("tableSourceCount"),
-            col(actualCol).alias("tableSnapCount"),
-            (col(expectedCol) - col(actualCol)).alias("totalDiscrepancies"),
-            module.fromTime.asColumnTS.alias("from"),
-            module.untilTime.asColumnTS.alias("until"),
-            lit("SUCCESS").alias("message")
-          ).as[ValidationReport].first()
+        // Coalesce used because comparing null and long results in null. when one side is null return diff
+        val expectedCountCol = sum(coalesce(col(expectedCol), lit(0L))).alias("tableSourceCount")
+        val resultCountCol = sum(coalesce(col(actualCol), lit(0L))).alias("tableSnapCount")
+        val discrepancyCol = (expectedCountCol - resultCountCol).alias("totalDiscrepancies")
+        val discrepancyPctCol = discrepancyCol / expectedCountCol
+        val passFailMessage = when(discrepancyPctCol <= tol, lit("PASS"))
+          .otherwise(concat_ws(" ",
+            lit("FAIL: Discrepancy of"), discrepancyPctCol, lit("outside of specified tolerance"), lit(tol)
+          )).alias("message")
+
+        if (diff.isEmpty) {
+          // selecting from empty dataset gives next on empty iterator
+          // thus must create the DS manually
+          ValidationReport(
+            Some(sourceTarget.tableFullName),
+            Some(snapTarget.tableFullName),
+            Some(expectedElementsCount.count()),
+            Some(resultElementsCount.count()),
+            Some(0L),
+            Some(new Timestamp(module.fromTime.asUnixTimeMilli)),
+            Some(new Timestamp(module.untilTime.asUnixTimeMilli)),
+            Some("FAIL: No records could be compared")
+          )
+        } else {
+          diff
+            .select(
+              lit(sourceTarget.tableFullName).alias("tableSourceName"),
+              lit(snapTarget.tableFullName).alias("tableSnapName"),
+              expectedCountCol,
+              resultCountCol,
+              discrepancyCol,
+              module.fromTime.asColumnTS.alias("from"),
+              module.untilTime.asColumnTS.alias("until"),
+              passFailMessage
+            ).as[ValidationReport].first()
+        }
       } catch {
         case e: Throwable => {
           val errMsg = s"FAILED VALIDATION RUN: ${snapTarget.tableFullName} --> ${e.getMessage}"
           logger.log(Level.ERROR, errMsg, e)
           ValidationReport(
-            sourceTarget.tableFullName,
-            snapTarget.tableFullName, 0L, 0L, 0L,
-            new Timestamp(module.fromTime.asUnixTimeMilli),
-            new Timestamp(module.untilTime.asUnixTimeMilli),
-            errMsg
+            Some(sourceTarget.tableFullName),
+            Some(snapTarget.tableFullName), Some(0L), Some(0L), Some(0L),
+            Some(new Timestamp(module.fromTime.asUnixTimeMilli)),
+            Some(new Timestamp(module.untilTime.asUnixTimeMilli)),
+            Some(errMsg)
           )
         }
       }

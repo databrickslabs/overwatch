@@ -4,15 +4,13 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Module, Pipeline, PipelineTable, Silver}
 import com.databricks.labs.overwatch.utils.JsonUtils.objToJson
-import com.databricks.labs.overwatch.utils.Layer.bronze
 import com.databricks.labs.overwatch.utils._
-import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions.{abs, count, lit, rank, row_number}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.internal.config
 import org.apache.spark.sql.expressions.Window
 
+import java.sql.Timestamp
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
@@ -22,14 +20,14 @@ case class SnapReport(tableFullName: String,
                       totalCount: Long,
                       errorMessage: String)
 
-case class ValidationReport(tableSourceName: String,
-                            tableSnapName: String,
-                            tableSourceCount: Long,
-                            tableSnapCount: Long,
-                            totalDiscrepancies: Long,
-                            from: java.sql.Timestamp,
-                            until: java.sql.Timestamp,
-                            message: String)
+case class ValidationReport(tableSourceName: Option[String],
+                            tableSnapName: Option[String],
+                            tableSourceCount: Option[Long],
+                            tableSnapCount: Option[Long],
+                            totalDiscrepancies: Option[Long],
+                            from: Option[java.sql.Timestamp],
+                            until: Option[java.sql.Timestamp],
+                            message: Option[String])
 
 case class SnapValidationParams(snapDatabaseName: String,
                                 sourceDatabaseName: String,
@@ -133,11 +131,9 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
 
   /**
    * Execute snapshots
-   * TODO: fix, brittle.
-   * TODO: pipeline incremental processing not supported as state tables are replaced.
    * @return
    */
-  def executeSnapshots(): Dataset[SnapReport] = {
+  def executeBronzeSnapshot(): Dataset[SnapReport] = {
     // state tables clone and reset for silver and gold modules
 
     val bronzePipeline = Bronze(workspace, readOnly = true)
@@ -164,8 +160,7 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
   }
 
   /**
-   * Execute recalculations for silver and gold
-   * TODO: fix, brittle.
+   * Execute recalculations for silver and gold with code from this package
    * @return
    */
   def executeRecalculations() = {
@@ -212,8 +207,8 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
   }
 
   /**
-   * Execute equality checks for silver and gold
-   * TODO: fix, brittle.
+   *
+   * @param incrementalTest
    * @return
    */
   def equalityReport(incrementalTest: Boolean): Dataset[ValidationReport] = {
@@ -279,8 +274,8 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
       }
       case OverwatchScope.jobs => {
         Seq(
-          ModuleTarget(goldPipeline.jobsModule, goldTargets.accountModsTarget),
-          ModuleTarget(goldPipeline.jobRunsModule, goldTargets.accountLoginTarget),
+          ModuleTarget(goldPipeline.jobsModule, goldTargets.jobTarget),
+          ModuleTarget(goldPipeline.jobRunsModule, goldTargets.jobRunTarget),
           ModuleTarget(goldPipeline.jobRunCostPotentialFactModule, goldTargets.jobRunCostPotentialFactTarget)
         )
       }
@@ -291,7 +286,11 @@ class SnapValidation(workspace: Workspace, sourceDB: String)
     targetsToValidate.tasksupport = taskSupport
 
     targetsToValidate.map(targetDetail => {
-      assertDataFrameDataEquals(targetDetail, sourceDB, incrementalTest)
+//      try {
+        assertDataFrameDataEquals(targetDetail, sourceDB, incrementalTest)
+//      } catch {
+//        case e: Throwable => validationFailureReport(e)
+//      }
     }).toArray.toSeq.toDS()
 
   }
@@ -315,7 +314,7 @@ object SnapValidation {
     val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = "", eventHubName = "", auditRawEventsPrefix = "")
 
     val overwatchParams = OverwatchParams(
-      auditLogConfig = AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig)),
+      auditLogConfig = AuditLogConfig(rawAuditPath = Some(""), azureAuditLogEventhubConfig = Some(azureLogConfig)),
       dataTarget = Some(dataTarget),
       badRecordsPath = None,
 //      overwatchScope = Some("audit,accounts,jobs,sparkEvents,clusters,clusterEvents,notebooks,pools".split(",")),

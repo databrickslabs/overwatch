@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.log4j.Level
@@ -130,7 +130,7 @@ case class SimplifiedModuleStatusReport(
                                          vacuumRetentionHours: Int
                                        )
 
-case class IncrementalFilter(cronColName: String, low: Column, high: Column)
+case class IncrementalFilter(cronField: StructField, low: Column, high: Column)
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
@@ -162,6 +162,12 @@ private[overwatch] class PipelineStateException(s: String) extends Exception(s) 
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
 private[overwatch] class ReadOnlyException(s: String) extends Exception(s) {}
+
+private[overwatch] class TargetAcquisitionFailure(
+                                                   s: String,
+                                                   val target: PipelineTable,
+                                                   val module: Module
+                                                 ) extends Exception(s) {}
 
 private[overwatch] class FailedModuleException(s: String, val target: PipelineTable) extends Exception(s) {}
 

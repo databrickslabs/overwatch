@@ -519,6 +519,7 @@ trait GoldTransforms extends SparkSessionWrapper {
           'organization_id,
           'job_id,
           'id_in_job,
+          'endEpochMS,
           'job_runtime,
           'job_terminal_state.alias("run_terminal_state"),
           'job_trigger_type.alias("run_trigger_type"),

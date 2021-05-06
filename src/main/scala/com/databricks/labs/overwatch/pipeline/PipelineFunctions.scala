@@ -146,25 +146,26 @@ object PipelineFunctions {
                               dataFrequency: Frequency
                             ): DataFrame = {
     val parsedFilters = filters.map(filter => {
-      val c = filter.cronColName
+      val f = filter.cronField
+      val cName = f.name
       val low = filter.low
       val high = filter.high
-      val dt = df.schema.fields.filter(_.name == c).head.dataType
+      val dt = f.dataType
       dt match {
         case _: TimestampType =>
-          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency), high)
+          col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency), high)
         case _: DateType => {
-          col(c).between(
+          col(cName).between(
             PipelineFunctions.addOneTick(low.cast(DateType), dataFrequency, DateType),
             if (dataFrequency == Frequency.daily) date_sub(high.cast(DateType), 1) else high.cast(DateType)
           )
         }
         case _: LongType =>
-          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, LongType), high.cast(LongType))
+          col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, LongType), high.cast(LongType))
         case _: IntegerType =>
-          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, IntegerType), high.cast(IntegerType))
+          col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, IntegerType), high.cast(IntegerType))
         case _: DoubleType =>
-          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, DoubleType), high.cast(DoubleType))
+          col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, DoubleType), high.cast(DoubleType))
         case _ =>
           throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
       }

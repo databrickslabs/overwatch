@@ -56,19 +56,21 @@ class Module(
    * the future.
    * @return
    */
-  def untilTime: TimeTypes = {
+  private def limitUntilTimeToSnapTime: TimeTypes = {
     val startSecondPlusMaxDays = fromTime.asLocalDateTime.plusDays(pipeline.config.maxDays)
       .atZone(Pipeline.systemZoneId).toInstant.toEpochMilli
 
     val defaultUntilSecond = pipeline.pipelineSnapTime.asUnixTimeMilli
 
     // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
-    val maxIndependentUntilTime = if (startSecondPlusMaxDays < defaultUntilSecond) {
+    if (startSecondPlusMaxDays < defaultUntilSecond) {
       Pipeline.createTimeDetail(startSecondPlusMaxDays)
     } else {
       Pipeline.createTimeDetail(defaultUntilSecond)
     }
+  }
 
+  private def limitUntilTimeToMostLaggingDependency(originalUntilTime: TimeTypes): TimeTypes = {
     if (moduleDependencies.nonEmpty) {
       val mostLaggingDependencyUntilTS = if (deriveMostLaggingDependency.isEmpty) {
         // Return primordial time if upstream dependency is completely missing. This will act as place holder and keep
@@ -81,17 +83,17 @@ class Module(
 
       // Check if any dependency states latest data content (untilTS state) is < this module's untilTS
       // This check keeps a child module from getting ahead of it's parent
-      if (mostLaggingDependencyUntilTS < maxIndependentUntilTime.asUnixTimeMilli) {
-        val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${maxIndependentUntilTime.asUnixTimeMilli} " +
+      if (mostLaggingDependencyUntilTS < originalUntilTime.asUnixTimeMilli) {
+        val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${originalUntilTime.asUnixTimeMilli} " +
           s"exceeds that of an upstream requisite module. " +
           s"with untilTS of: ${mostLaggingDependencyUntilTS}. Setting current module untilTS == min requisite module: " +
           s"${mostLaggingDependencyUntilTS}."
         logger.log(Level.WARN, msg)
         if (pipeline.config.debugFlag) println(msg)
         Pipeline.createTimeDetail(mostLaggingDependencyUntilTS)
-      } else maxIndependentUntilTime
+      } else originalUntilTime
 
-    } else maxIndependentUntilTime
+    } else originalUntilTime
   }
 
   private def deriveMostLaggingDependency: Option[SimplifiedModuleStatusReport] = {
@@ -111,6 +113,22 @@ class Module(
     } else {
       Some(dependencyStates.map(_.get).sortBy(_.untilTS).reverse.head)
     }
+  }
+
+  /**
+   * Defines the latest timestamp to be used for a give module as a TimeType
+   * When pipeline is read only, module state can be read independent of upstream dependencies.
+   *
+   * @return
+   */
+  def untilTime: TimeTypes = {
+    // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
+    val maxIndependentUntilTime = limitUntilTimeToSnapTime
+
+    if (pipeline.readOnly) { // don't validate dependency progress when not writing data to pipeline
+      maxIndependentUntilTime
+    } else limitUntilTimeToMostLaggingDependency(maxIndependentUntilTime)
+
   }
 
   private def initModuleState: SimplifiedModuleStatusReport = {
@@ -240,7 +258,6 @@ class Module(
         }
       })
     }// requirementsPassed
-    this
   }
 
   @throws(classOf[IllegalArgumentException])

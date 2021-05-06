@@ -49,13 +49,13 @@ case class PipelineTable(
 
   if (autoOptimize) {
     spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
-    println(s"Setting Auto Optimize for ${name}")
+    if (config.debugFlag) println(s"Setting Auto Optimize for ${name}")
   }
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
 
   if (autoCompact) {
     spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
-    println(s"Setting Auto Compact for ${name}")
+    if (config.debugFlag) println(s"Setting Auto Compact for ${name}")
   }
   else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
 
@@ -134,6 +134,18 @@ case class PipelineTable(
     asIncrementalDF(module, cronColumns, additionalLagDays)
   }
 
+  private def casedCompare(s1: String, s2: String): Boolean = {
+    if ( // make lower case if column names are case insensitive
+      spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
+    ) s1 == s2 else s1.equalsIgnoreCase(s2)
+  }
+
+  private def casedSeqCompare(seq1: Seq[String], s2: String): Boolean = {
+    if ( // make lower case if column names are case insensitive
+      spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
+    ) seq1.contains(s2) else seq1.exists(s1 => s1.equalsIgnoreCase(s2))
+  }
+
   /**
    * Build 1 or more incremental filters for a dataframe from standard start or aditionalStart less
    * "additionalLagDays" when loading an incremental DF with some front-padding to capture lagging start events
@@ -158,20 +170,21 @@ case class PipelineTable(
         spark.table(tableFullName).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
       } else spark.table(tableFullName)
       val dfFields = instanceDF.schema.fields
-      val cronCols = dfFields.filter(f => cronColumnsNames.contains(f.name))
+      val cronFields = dfFields.filter(f => casedSeqCompare(cronColumnsNames, f.name))
 
       if (additionalLagDays > 0) require(
         dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
         "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
-      val incrementalFilters = cronColumnsNames.map(filterCol => {
 
-        logger.log(Level.INFO, s"FILTERING: ${module.moduleName} using cron columns: ${cronCols.mkString(", ")}")
-        val field = cronCols.filter(_.name == filterCol).head
+      logger.log(Level.INFO, s"FILTERING: ${module.moduleName} using cron columns: ${cronFields.map(_.name).mkString(", ")}")
+      val incrementalFilters = cronFields.map(field => {
+
+//        val field = cronFields.filter(_.name == filterCol).head
 
         field.dataType match {
           case dt: DateType => {
             IncrementalFilter(
-              field.name,
+              field,
               date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays),
               module.untilTime.asColumnTS.cast(dt)
             )
@@ -184,13 +197,14 @@ case class PipelineTable(
               module.fromTime.asColumnTS
             }
             IncrementalFilter(
-              field.name,
+              field,
               start,
               module.untilTime.asColumnTS
             )
           }
           case _: LongType => {
-            IncrementalFilter(field.name,
+            IncrementalFilter(
+              field,
               lit(module.fromTime.asUnixTimeMilli),
               lit(module.untilTime.asUnixTimeMilli)
             )
