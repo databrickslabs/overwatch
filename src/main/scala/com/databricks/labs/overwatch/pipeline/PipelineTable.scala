@@ -45,7 +45,6 @@ case class PipelineTable(
 
   val databaseName: String = if (_databaseName == "default") config.databaseName else _databaseName
   val tableFullName: String = s"${databaseName}.${name}"
-  val tableLocation: String = s"${config.etlDataPathPrefix}/$name".toLowerCase
 
   if (autoOptimize) {
     spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
@@ -96,6 +95,12 @@ case class PipelineTable(
       PipelineFunctions.setSparkOverrides(spark, currentSparkOverrides, config.debugFlag)
     }
   }
+
+  def getTableIdentifier = spark.sessionState.catalog.listTables(databaseName, name)
+//  val tblMeta = spark.sessionState.catalog.getTableMetadata(tbli)
+//  val isManaged = tblMeta.tableType.name == "MANAGED"
+//  val tblStoragePath = tblMeta.location.toString
+  val tableLocation: String = s"${config.etlDataPathPrefix}/$name".toLowerCase
 
   def exists: Boolean = {
     spark.catalog.tableExists(tableFullName)

@@ -1,17 +1,21 @@
 package com.databricks.labs.overwatch.validation
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Bronze, Pipeline, PipelineTable, Schema}
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Pipeline, PipelineTable, Schema, Silver}
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{BadConfigException, Config, DataTarget, PipelineStateException, SparkSessionWrapper, TimeTypes, TimeTypesConstants}
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DateType, LongType, MapType, StringType, TimestampType}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.expressions.Window
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.LocalDate
+import java.util.concurrent.ForkJoinPool
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.collection.parallel.mutable.ParArray
 
 
 trait ValidationUtils extends SparkSessionWrapper {
@@ -131,6 +135,101 @@ trait ValidationUtils extends SparkSessionWrapper {
         logger.log(Level.ERROR, errMsg, e)
       }
     }
+  }
+
+  protected def validateTargetKeys(targetsToValidate: ParArray[PipelineTable]): Dataset[KeyReport] = {
+
+    targetsToValidate.map (t => {
+      val keys = t.keys
+      val df = t.asDF()
+      val cols = df.columns
+      try {
+        val baseCount = df.count()
+        val keyCount = df.select(keys map col: _*).distinct.count
+        val nullKeys = keys.map(k => NullKey(k, df.select(col(k)).filter(col(k).isNull).count()))
+        val msg = if (baseCount == keyCount && nullKeys.exists(_.nullCount == 0L)) "PASS" else "FAIL"
+        KeyReport(
+          t.tableFullName,
+          keys,
+          baseCount,
+          keyCount,
+          nullKeys,
+          cols,
+          msg
+        )
+      } catch {
+        case e: Throwable => {
+          val errMsg = s"FAILED: ${t.tableFullName} $e.getMessage"
+          logger.log(Level.ERROR, errMsg, e)
+          KeyReport(
+            t.tableFullName,
+            keys,
+            0L,
+            0L,
+            Array[NullKey](),
+            cols,
+            errMsg
+          )
+        }
+      }
+    }).toArray.toSeq.toDS
+  }
+
+  protected def dupHunter(targetsToSearch: ParArray[PipelineTable]): (Dataset[DupReport], Array[TargetDupDetail]) = {
+
+    val dupsDetails = targetsToSearch.map(t => {
+      val w = Window.partitionBy(t.keys map col: _*).orderBy(t.incrementalColumns map col: _*)
+      val selects = t.keys ++ t.incrementalColumns ++ Array("rnk", "rn")
+      val dupsDF = t.asDF
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter('rnk > 1 || 'rn > 1)
+
+      if (dupsDF.isEmpty) {
+        val dupReport = DupReport(
+          t.tableFullName,
+          t.keys,
+          t.incrementalColumns,
+          0L, 0L, 0D,
+          "PASS"
+        )
+        (TargetDupDetail(t, None), dupReport)
+      } else {
+        val totalDistinctKeys = t.asDF.select(t.keys map col: _*).distinct().count()
+        val dupReport = dupsDF
+          .select(selects map col: _*)
+          .groupBy(t.keys map col: _*)
+          .agg(
+            countDistinct(col(t.keys.head), (t.keys.tail.map(col) :+ col("rnk") :+ col("rn")): _*)
+              .alias("dupsCountByKey")
+          )
+          .select(
+            lit(t.tableFullName).alias("tableName"),
+            lit(t.keys).alias("keys"),
+            lit(t.incrementalColumns).alias("incrementalColumns"),
+            sum('dupsCountByKey).alias("dupCount"),
+            countDistinct(col(t.keys.head), t.keys.tail.map(col): _*).alias("keysWithDups"),
+            ('keysWithDups.cast("double") / lit(totalDistinctKeys)).alias("pctKeysWithDups"),
+            lit("FAIL").alias("msg")
+        ).as[DupReport].first()
+        (TargetDupDetail(t, Some(dupsDF)), dupReport)
+      }
+    }).toArray
+
+    val finalDupReport = dupsDetails.map(_._2).toSeq.toDS()
+    val targetDupDetails = dupsDetails.map(_._1)
+    (finalDupReport, targetDupDetails)
+  }
+
+  protected def getAllPipelineTargets(workspace: Workspace): Array[PipelineTable] = {
+    val bronzePipeline = Bronze(workspace)
+    val silverPipeline = Silver(workspace)
+    val goldPipeline = Gold(workspace)
+
+    val bronzeTargets = bronzePipeline.getAllTargets
+    val silverTargets = silverPipeline.getAllTargets
+    val goldTargets = goldPipeline.getAllTargets
+    (bronzeTargets ++ silverTargets ++ goldTargets).filter(_.exists)
   }
 
   /**

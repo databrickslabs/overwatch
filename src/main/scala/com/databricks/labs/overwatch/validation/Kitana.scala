@@ -6,7 +6,7 @@ import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Module
 import com.databricks.labs.overwatch.utils.JsonUtils.objToJson
 import com.databricks.labs.overwatch.utils._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
-import org.apache.spark.sql.functions.{abs, count, lit, rank, row_number}
+import org.apache.spark.sql.functions._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 
@@ -37,6 +37,25 @@ case class ValidationParams(snapDatabaseName: String,
                             scopes: Option[Seq[String]] = None,
                             maxDaysToLoad: Int,
                             parallelism: Int)
+
+case class NullKey(k: String, nullCount: Long)
+case class KeyReport(tableName: String,
+                     keys: Array[String],
+                     baseCount: Long,
+                     keyCount: Long,
+                     nullKeys: Array[NullKey],
+                     cols: Array[String],
+                     msg: String)
+
+case class TargetDupDetail(target: PipelineTable, df: Option[DataFrame])
+case class DupReport(tableName: String,
+                     keys: Array[String],
+                     incrementalColumns: Array[String],
+                     dupCount: Long,
+                     keysWithDups: Long,
+                     pctKeysWithDups: Double,
+                     msg: String
+                    )
 
 case class ModuleTarget(module: Module, target: PipelineTable)
 
@@ -341,6 +360,63 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
     targetsToValidate.map(targetDetail => {
       assertDataFrameDataEquals(targetDetail, sourceDBName, incrementalTest)
     }).toArray.toSeq.toDS()
+
+  }
+
+  def validateKeys(workspace: Workspace = snapWorkspace): Dataset[KeyReport] = {
+    val targetsToValidate = getAllPipelineTargets(workspace).par
+    targetsToValidate.tasksupport = taskSupport
+    val keyValidationMessage = s"The targets that will be validated are:\n${targetsToValidate.map(_.tableFullName).mkString(", ")}"
+    if (workspace.getConfig.debugFlag || snapWorkspace.getConfig.debugFlag) println(keyValidationMessage)
+    logger.log(Level.INFO, keyValidationMessage)
+    validateTargetKeys(targetsToValidate)
+  }
+
+  def identifyDups(workspace: Workspace = snapWorkspace) : (Dataset[DupReport], Array[TargetDupDetail]) = {
+    val targetsToHunt = getAllPipelineTargets(workspace).par
+    targetsToHunt.tasksupport = taskSupport
+    dupHunter(targetsToHunt)
+  }
+
+  def refreshSnapshot(
+                       startDateString: String,
+                       endDateString: String,
+                       dtFormat: Option[String] = None,
+                       refreshTargetWorkspace: Workspace = snapWorkspace): Dataset[SnapReport] = {
+    val snapConfig = snapWorkspace.getConfig
+    val refConfig = refreshTargetWorkspace.getConfig
+    val sourceDBName = snapConfig.databaseName
+    val snapDBName = snapWorkspace.getConfig.databaseName
+    val cloudProvider = snapWorkspace.getConfig.cloudProvider
+    require(sourceDBName != snapDBName, "The source and snapshot databases cannot be the same. This function " +
+      "will completely remove the bronze tables from the snapshot database. Be careful and ensure you have " +
+      "identified the proper snapshot database name.\nEXITING")
+    val refreshDataRequirements = (snapDBName == refConfig.databaseName) &&
+      (snapConfig.databaseLocation == refConfig.databaseLocation) &&
+      (snapConfig.etlDataPathPrefix == refConfig.etlDataPathPrefix)
+
+    require(refreshDataRequirements, "CONFIG ERROR: When using this function " +
+      "you must pass in a workspace that has the same data target configuration as the original snapshot." +
+      "If you want to migrate the snapshot to a new database or location, please drop the snapshot database and " +
+      "rerun a fresh snapshot.")
+
+    val bronzePipeline = Bronze(snapWorkspace)
+    val bronzeTargets = bronzePipeline.getAllTargets.par
+    bronzeTargets.tasksupport = taskSupport
+    bronzeTargets.foreach(t => Helpers.fastDrop(t, cloudProvider))
+
+    val pipelineStateTargetWithOverwrite = bronzePipeline.pipelineStateTarget
+      .copy(mode = "overwrite", withCreateDate = false, withOverwatchRunID = false)
+    val pipStatesLessBronze = bronzePipeline.getVerbosePipelineState.filterNot(_.moduleID < 2000)
+
+    bronzePipeline.database.write(
+      pipStatesLessBronze.toSeq.toDS.toDF(),
+      pipelineStateTargetWithOverwrite,
+      bronzePipeline.pipelineSnapTime.asColumnTS
+    )
+
+    Kitana(snapDBName, refreshTargetWorkspace)
+      .executeBronzeSnapshot(startDateString, endDateString, dtFormat)
 
   }
 }

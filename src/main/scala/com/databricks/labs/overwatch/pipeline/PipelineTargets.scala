@@ -12,7 +12,9 @@ abstract class PipelineTargets(config: Config) {
     keys = Array("organization_id", "Overwatch_RunID"),
     config = config,
     partitionBy = Array("organization_id"),
-    incrementalColumns = Array("Pipeline_SnapTS")
+    incrementalColumns = Array("Pipeline_SnapTS"),
+    statsColumns = ("moduleID, moduleName, runStartTS, runEndTS, fromTS, untilTS, dataFrequency, status, " +
+      "recordsAppended, lastOptimizedTS, Pipeline_SnapTS, organization_id, primordialDateString").split(", ")
   )
 
   /**

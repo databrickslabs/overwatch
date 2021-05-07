@@ -8,6 +8,8 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{from_unixtime, lit, rank, row_number}
 
+//import io.delta.tables._
+
 import java.text.SimpleDateFormat
 import java.time._
 import java.util.Date
@@ -41,6 +43,10 @@ class Pipeline(_workspace: Workspace, _database: Database,
     pipelineState
   }
 
+  def getVerbosePipelineState: Array[ModuleStatusReport] = {
+    pipelineStateTarget.asDF.as[ModuleStatusReport].collect()
+  }
+
   def updateModuleState(moduleState: SimplifiedModuleStatusReport): Unit = {
     pipelineState.put(moduleState.moduleID, moduleState)
   }
@@ -49,7 +55,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
     pipelineState.clear()
   }
 
-  private[overwatch] def setReadOnly: this.type = {
+  private[overwatch] def setReadOnly(): this.type = {
     _readOnly = true
     this
   }
@@ -230,6 +236,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
   protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
 
   private[overwatch] def initiatePostProcessing(): Unit = {
+
     postProcessor.optimize()
     Helpers.fastrm(Array(
       "/tmp/overwatch/bronze/clusterEventsBatches"
