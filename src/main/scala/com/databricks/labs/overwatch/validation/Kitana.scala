@@ -79,7 +79,7 @@ case class DupReport(tableName: String,
 
 case class ModuleTarget(module: Module, target: PipelineTable)
 
-class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName: String)
+class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBName: String)
   extends ValidationUtils {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -87,7 +87,12 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
   import spark.implicits._
 
   private var _parallelism: Int = getDriverCores - 1
+  private var _isRefresh: Boolean = false
 
+  private def setRefresh(value: Boolean): this.type = {
+    _isRefresh = value
+    this
+  }
   private def setParallelism(value: Option[Int]): this.type = {
     _parallelism = value.getOrElse(getDriverCores - 1)
     this
@@ -96,89 +101,6 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
   private def parallelism: Int = _parallelism
 
   private val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-
-  /**
-   * Snapshots table
-   *
-   * @param target
-   * @param params
-   * @return
-   */
-  protected def snapTable(bronzeModule: Module, target: PipelineTable): SnapReport = {
-
-    val module = bronzeModule.copy(_moduleDependencies = Array[Int]())
-    val pipeline = module.pipeline
-
-    try {
-      val finalDFToClone = target
-        .copy(_databaseName = sourceDBName, withCreateDate = false, withOverwatchRunID = false)
-        .asIncrementalDF(module, target.incrementalColumns)
-      pipeline.database.write(finalDFToClone, target, pipeline.pipelineSnapTime.asColumnTS)
-
-
-      println(s"SNAPPED: ${target.tableFullName}")
-      val snapCount = spark.table(target.tableFullName).count()
-
-      println(s"UPDATING Module State for ${module.moduleId} --> ${module.moduleId}")
-      pipeline.updateModuleState(module.moduleState.copy(
-        fromTS = module.fromTime.asUnixTimeMilli,
-        untilTS = module.untilTime.asUnixTimeMilli,
-        recordsAppended = snapCount
-      ))
-
-      target.asDF()
-        .select(
-          lit(target.tableFullName).alias("tableFullName"),
-          module.fromTime.asColumnTS.alias("from"),
-          module.untilTime.asColumnTS.alias("until"),
-          lit(snapCount).alias("totalCount"),
-          lit(null).cast("string").alias("errorMessage")
-        ).as[SnapReport]
-        .first()
-
-    } catch {
-      case e: Throwable =>
-        val errMsg = s"FAILED SNAP: ${target.tableFullName} --> ${e.getMessage}"
-        println(errMsg)
-        logger.log(Level.ERROR, errMsg, e)
-        SnapReport(
-          target.tableFullName,
-          new java.sql.Timestamp(module.fromTime.asUnixTimeMilli),
-          new java.sql.Timestamp(module.untilTime.asUnixTimeMilli),
-          0L,
-          errMsg)
-    }
-  }
-
-  protected def snapStateTables(bronzePipeline: Pipeline): Unit = {
-
-    val tableLoc = bronzePipeline.BronzeTargets.cloudMachineDetail.tableLocation
-    val dropInstanceDetailsSql = s"drop table if exists ${bronzePipeline.BronzeTargets.cloudMachineDetail.tableFullName}"
-    println(s"Dropping instanceDetails in SnapDB created from instantiation\n${dropInstanceDetailsSql}")
-    spark.sql(dropInstanceDetailsSql)
-    dbutils.fs.rm(tableLoc, true)
-
-    val uniqueTablesToClone = Array(
-      bronzePipeline.BronzeTargets.processedEventLogs,
-      bronzePipeline.BronzeTargets.cloudMachineDetail.copy(mode = "overwrite"),
-      bronzePipeline.pipelineStateTarget
-    ).par
-    uniqueTablesToClone.tasksupport = taskSupport
-
-    uniqueTablesToClone.foreach(target => {
-      try {
-        val stmt = s"CREATE TABLE ${target.tableFullName} DEEP CLONE ${sourceDBName}.${target.name}"
-        println(s"CLONING TABLE ${target.tableFullName}.\nSTATEMENT: ${stmt}")
-        spark.sql(stmt)
-      } catch {
-        case e: Throwable => {
-          val errMsg = s"FAILED TO CLONE: ${target.tableFullName}\nERROR: ${e.getMessage}"
-          println(errMsg)
-          logger.log(Level.ERROR, errMsg, e)
-        }
-      }
-    })
-  }
 
   /**
    *
@@ -224,8 +146,8 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
 
     validateSnapPipeline(sourceWorkspace, bronzePipeline, snapFromTime, snapUntilTime)
 
-    snapStateTables(bronzePipeline)
-    resetPipelineReportState(bronzePipeline.pipelineStateTarget, bronzeConfig.primordialDateString.get)
+    snapStateTables(sourceDBName, taskSupport, bronzePipeline)
+    resetPipelineReportState(bronzePipeline.pipelineStateTarget, bronzeConfig.primordialDateString.get, _isRefresh)
 
     // snapshots bronze tables, returns ds with report
     val bronzeTargetsWModule = bronzePipeline.config.overwatchScope.flatMap {
@@ -241,7 +163,7 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
     bronzeTargetsWModule.tasksupport = taskSupport
 
     bronzeTargetsWModule
-      .map(targetDetail => snapTable(targetDetail.module, targetDetail.target))
+      .map(targetDetail => snapTable(sourceDBName, targetDetail.module, targetDetail.target))
       .toArray.toSeq.toDS
   }
 
@@ -412,44 +334,54 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
   def refreshSnapshot(
                        startDateString: String,
                        endDateString: String,
-                       dtFormat: Option[String] = None,
-                       refreshTargetWorkspace: Workspace = snapWorkspace): Dataset[SnapReport] = {
-    val snapConfig = snapWorkspace.getConfig
-    val refConfig = refreshTargetWorkspace.getConfig
-    val sourceDBName = snapConfig.databaseName
+                       dtFormat: Option[String] = None): Dataset[SnapReport] = {
+    val sourceConfig = sourceWorkspace.getConfig // prod source
+    val snapConfig = snapWorkspace.getConfig // existing bronze configs
+    val sourceDBName = sourceConfig.databaseName
     val snapDBName = snapWorkspace.getConfig.databaseName
     val cloudProvider = snapWorkspace.getConfig.cloudProvider
     require(sourceDBName != snapDBName, "The source and snapshot databases cannot be the same. This function " +
       "will completely remove the bronze tables from the snapshot database. Be careful and ensure you have " +
       "identified the proper snapshot database name.\nEXITING")
-    val refreshDataRequirements = (snapDBName == refConfig.databaseName) &&
-      (snapConfig.databaseLocation == refConfig.databaseLocation) &&
-      (snapConfig.etlDataPathPrefix == refConfig.etlDataPathPrefix)
 
-    require(refreshDataRequirements, "CONFIG ERROR: When using this function " +
-      "you must pass in a workspace that has the same data target configuration as the original snapshot." +
-      "If you want to migrate the snapshot to a new database or location, please drop the snapshot database and " +
-      "rerun a fresh snapshot.")
+//    val bronzePipeline = Bronze(snapWorkspace)
+//    val bronzeTargets = bronzePipeline.getAllTargets.par
+//    bronzeTargets.tasksupport = taskSupport
+//    bronzeTargets.foreach(t => Helpers.fastDrop(t, cloudProvider))
 
-    val bronzePipeline = Bronze(snapWorkspace)
-    val bronzeTargets = bronzePipeline.getAllTargets.par
-    bronzeTargets.tasksupport = taskSupport
-    bronzeTargets.foreach(t => Helpers.fastDrop(t, cloudProvider))
+//    val dropBronzeStateSQL = s"""delete from ${bronzePipeline.pipelineStateTarget.tableFullName} where moduleID < 2000"""
+//    logger.log(Level.INFO, s"Dropping bronze states in snap db for refresh: $dropBronzeStateSQL")
+//    spark.sql(dropBronzeStateSQL)
 
-    val pipelineStateTargetWithOverwrite = bronzePipeline.pipelineStateTarget
-      .copy(mode = "overwrite", withCreateDate = false, withOverwatchRunID = false)
-    val pipStatesLessBronze = bronzePipeline.getVerbosePipelineState.filterNot(_.moduleID < 2000)
+//    val pipelineStateTargetWithOverwrite = bronzePipeline.pipelineStateTarget
+//      .copy(mode = "overwrite", withCreateDate = false, withOverwatchRunID = false)
+//    val pipStatesLessBronze = bronzePipeline.getVerbosePipelineState.filterNot(_.moduleID < 2000)
+//
+//    bronzePipeline.database.write(
+//      pipStatesLessBronze.toSeq.toDS.toDF(),
+//      pipelineStateTargetWithOverwrite,
+//      bronzePipeline.pipelineSnapTime.asColumnTS
+//    )
 
-    bronzePipeline.database.write(
-      pipStatesLessBronze.toSeq.toDS.toDF(),
-      pipelineStateTargetWithOverwrite,
-      bronzePipeline.pipelineSnapTime.asColumnTS
-    )
-
-    Kitana(snapDBName, refreshTargetWorkspace)
+    Kitana(snapDBName, sourceWorkspace)
+      .setRefresh(true)
       .executeBronzeSnapshot(startDateString, endDateString, dtFormat)
 
   }
+
+  def fullResetSnapDB(): Unit = {
+    val targetsToDrop = getAllPipelineTargets(snapWorkspace).par
+    targetsToDrop.tasksupport = taskSupport
+    targetsToDrop.foreach(t => {
+      Helpers.fastDrop(t, snapWorkspace.getConfig.cloudProvider)
+    })
+  }
+
+  def validateSchemas = ???
+  def validatePartCols = ???
+  //TODO -- add spark.conf protection such that for resets the value of k/v has to be the target database name
+  // the user wants to blow up.
+
 }
 
 object Kitana {
