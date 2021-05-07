@@ -39,6 +39,7 @@ case class ValidationParams(snapDatabaseName: String,
                             parallelism: Int)
 
 case class NullKey(k: String, nullCount: Long)
+
 case class KeyReport(tableName: String,
                      keys: Array[String],
                      baseCount: Long,
@@ -47,13 +48,32 @@ case class KeyReport(tableName: String,
                      cols: Array[String],
                      msg: String)
 
-case class TargetDupDetail(target: PipelineTable, df: Option[DataFrame])
+case class TargetDupDetail(target: PipelineTable, df: Option[DataFrame]) extends SparkSessionWrapper {
+  def getDuplicatesDFForTable(keysOnly: Boolean = false): DataFrame = {
+    //    getDuplicatesDFsByTable
+    val selects = (target.keys(true) ++ target.incrementalColumns).distinct
+    if (df.isEmpty) {
+      spark.emptyDataFrame
+    } else {
+      if (keysOnly) {
+        df.get.select(selects map col: _*)
+          .orderBy(selects map col: _*)
+      } else {
+        df.get
+          .orderBy(selects map col: _*)
+      }
+    }
+  }
+}
+
 case class DupReport(tableName: String,
                      keys: Array[String],
                      incrementalColumns: Array[String],
                      dupCount: Long,
                      keysWithDups: Long,
+                     totalRecords: Long,
                      pctKeysWithDups: Double,
+                     pctDuplicateRecords: Double,
                      msg: String
                     )
 
@@ -90,7 +110,9 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
     val pipeline = module.pipeline
 
     try {
-      val finalDFToClone = target.copy(_databaseName = sourceDBName).asIncrementalDF(module, target.incrementalColumns)
+      val finalDFToClone = target
+        .copy(_databaseName = sourceDBName, withCreateDate = false, withOverwatchRunID = false)
+        .asIncrementalDF(module, target.incrementalColumns)
       pipeline.database.write(finalDFToClone, target, pipeline.pipelineSnapTime.asColumnTS)
 
 
@@ -187,7 +209,7 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
                                       snapFromTime: TimeTypes,
                                       snapUntilTime: TimeTypes,
                                       daysToSnap: Int
-                                   ): Dataset[SnapReport] = {
+                                    ): Dataset[SnapReport] = {
     // state tables clone and reset for silver and gold modules
 
     val bronzeConfig = snapWorkspace.getConfig
@@ -372,10 +394,19 @@ class Kitana(sourceWorkspace: Workspace, snapWorkspace: Workspace, sourceDBName:
     validateTargetKeys(targetsToValidate)
   }
 
-  def identifyDups(workspace: Workspace = snapWorkspace) : (Dataset[DupReport], Array[TargetDupDetail]) = {
+  def identifyDups(
+                    workspace: Workspace = snapWorkspace,
+                    dfsByKeysOnly: Boolean = true
+                  ): (Dataset[DupReport], Map[String, DataFrame]) = {
     val targetsToHunt = getAllPipelineTargets(workspace).par
     targetsToHunt.tasksupport = taskSupport
-    dupHunter(targetsToHunt)
+    val (dupReport, targetDupDetails) = dupHunter(targetsToHunt)
+
+    val dupsDFByTarget = targetDupDetails.map(td => {
+      td.target.name -> td.getDuplicatesDFForTable(keysOnly = dfsByKeysOnly)
+    }).toMap
+
+    (dupReport, dupsDFByTarget)
   }
 
   def refreshSnapshot(

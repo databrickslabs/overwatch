@@ -8,13 +8,14 @@ import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, DataFrame}
+import io.delta.tables.DeltaTable
 
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
 //  also add ruleStrategy: Enum(Kill, Quarantine, Ignore) to determine when to require them
 //  Perhaps add the strategy into the Rule definition in the Rules Engine
 case class PipelineTable(
                           name: String,
-                          keys: Array[String],
+                          private val _keys: Array[String],
                           config: Config,
                           incrementalColumns: Array[String] = Array(),
                           dataFrequency: Frequency = Frequency.milliSecond,
@@ -96,14 +97,24 @@ case class PipelineTable(
     }
   }
 
-  def getTableIdentifier = spark.sessionState.catalog.listTables(databaseName, name)
+//  def getTableIdentifier = spark.sessionState.catalog.listTables(databaseName, name)
 //  val tblMeta = spark.sessionState.catalog.getTableMetadata(tbli)
 //  val isManaged = tblMeta.tableType.name == "MANAGED"
 //  val tblStoragePath = tblMeta.location.toString
+//  DeltaTable.forName(tableFullName).
   val tableLocation: String = s"${config.etlDataPathPrefix}/$name".toLowerCase
 
   def exists: Boolean = {
     spark.catalog.tableExists(tableFullName)
+  }
+
+  def keys: Array[String] = keys()
+  def keys(withOveratchMeta: Boolean = false): Array[String] = {
+    if (withOveratchMeta) {
+      (_keys :+ "organization_id") ++ Array("Overwatch_RunID", "Pipeline_SnapTS")
+    } else {
+      _keys :+ "organization_id"
+    }
   }
 
   def asDF: DataFrame = {

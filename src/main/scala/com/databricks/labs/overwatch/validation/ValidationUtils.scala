@@ -177,47 +177,73 @@ trait ValidationUtils extends SparkSessionWrapper {
 
   protected def dupHunter(targetsToSearch: ParArray[PipelineTable]): (Dataset[DupReport], Array[TargetDupDetail]) = {
 
-    val dupsDetails = targetsToSearch.map(t => {
-      val w = Window.partitionBy(t.keys map col: _*).orderBy(t.incrementalColumns map col: _*)
-      val selects = t.keys ++ t.incrementalColumns ++ Array("rnk", "rn")
-      val dupsDF = t.asDF
-        .withColumn("rnk", rank().over(w))
-        .withColumn("rn", row_number().over(w))
-        .filter('rnk > 1 || 'rn > 1)
+    val dupsDetails = targetsToSearch.filterNot(_.name.toLowerCase == "instancedetails").map(t => {
+      try {
+        val w = Window.partitionBy(t.keys map col: _*).orderBy(t.incrementalColumns map col: _*)
+        val selects = t.keys(true) ++ t.incrementalColumns ++ Array("rnk", "rn")
 
-      if (dupsDF.isEmpty) {
-        val dupReport = DupReport(
-          t.tableFullName,
-          t.keys,
-          t.incrementalColumns,
-          0L, 0L, 0D,
-          "PASS"
-        )
-        (TargetDupDetail(t, None), dupReport)
-      } else {
-        val totalDistinctKeys = t.asDF.select(t.keys map col: _*).distinct().count()
-        val dupReport = dupsDF
-          .select(selects map col: _*)
-          .groupBy(t.keys map col: _*)
-          .agg(
-            countDistinct(col(t.keys.head), (t.keys.tail.map(col) :+ col("rnk") :+ col("rn")): _*)
-              .alias("dupsCountByKey")
+        val nullFilters = t.keys.map(k => col(k).isNotNull)
+        val baseDF = nullFilters.foldLeft(t.asDF)((df, f) => df.filter(f))
+
+        val dupsDF = baseDF
+          .withColumn("rnk", rank().over(w))
+          .withColumn("rn", row_number().over(w))
+          .filter('rnk > 1 || 'rn > 1)
+
+        val fullDupsDF = baseDF
+          .join(dupsDF.select(t.keys map col: _*), t.keys.toSeq)
+
+        if (dupsDF.isEmpty) {
+          val dupReport = DupReport(
+            t.tableFullName,
+            t.keys,
+            t.incrementalColumns,
+            0L, 0L, 0L, 0D, 0D,
+            "PASS"
           )
-          .select(
-            lit(t.tableFullName).alias("tableName"),
-            lit(t.keys).alias("keys"),
-            lit(t.incrementalColumns).alias("incrementalColumns"),
-            sum('dupsCountByKey).alias("dupCount"),
-            countDistinct(col(t.keys.head), t.keys.tail.map(col): _*).alias("keysWithDups"),
-            ('keysWithDups.cast("double") / lit(totalDistinctKeys)).alias("pctKeysWithDups"),
-            lit("FAIL").alias("msg")
-        ).as[DupReport].first()
-        (TargetDupDetail(t, Some(dupsDF)), dupReport)
+          (TargetDupDetail(t, None), dupReport)
+        } else {
+          val totalDistinctKeys = t.asDF.select(t.keys map col: _*).distinct().count()
+          val totalRecords = t.asDF.select(t.keys map col: _*).count()
+          val dupReport = dupsDF
+            .select(selects.distinct map col: _*)
+            .groupBy(t.keys map col: _*)
+            .agg(
+              countDistinct(col(t.keys.head), (t.keys.tail.map(col) :+ col("rnk") :+ col("rn")): _*)
+                .alias("dupsCountByKey")
+            )
+            .select(
+              lit(t.tableFullName).alias("tableName"),
+              lit(t.keys).alias("keys"),
+              lit(t.incrementalColumns).alias("incrementalColumns"),
+              sum('dupsCountByKey).alias("dupCount"),
+              countDistinct(col(t.keys.head), t.keys.tail.map(col): _*).alias("keysWithDups")
+            )
+            .withColumn("totalRecords", lit(totalRecords))
+            .withColumn("pctKeysWithDups", 'keysWithDups.cast("double") / lit(totalDistinctKeys))
+            .withColumn("pctDuplicateRecords", 'dupCount.cast("double") / lit(totalRecords))
+            .withColumn("msg", lit("FAIL"))
+            .as[DupReport].first()
+          (TargetDupDetail(t, Some(fullDupsDF)), dupReport)
+        }
+      } catch {
+        case e: Throwable => {
+          val msg = s"PROCESS FAIL: Table ${t.tableFullName}. ERROR: ${e.getMessage}"
+          logger.log(Level.ERROR, msg, e)
+          val dupReport = DupReport(
+            t.tableFullName,
+            t.keys,
+            t.incrementalColumns,
+            0L, 0L, 0L, 0D, 0D,
+            msg
+          )
+          (TargetDupDetail(t, None), dupReport)
+        }
       }
     }).toArray
 
     val finalDupReport = dupsDetails.map(_._2).toSeq.toDS()
-    val targetDupDetails = dupsDetails.map(_._1)
+    val targetDupDetails = dupsDetails.map(_._1).filter(_.df.nonEmpty)
     (finalDupReport, targetDupDetails)
   }
 
