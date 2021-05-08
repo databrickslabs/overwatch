@@ -201,6 +201,7 @@ class Config() {
 
   private[overwatch] def setIsFirstRun(value: Boolean): this.type = {
     _isFirstRun = value
+    logger.log(Level.INFO, s"IS FIRST RUN: ${value.toString}")
     this
   }
 

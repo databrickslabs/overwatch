@@ -2,19 +2,19 @@ package com.databricks.labs.overwatch.validation
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Module, Pipeline, PipelineTable, Schema, Silver}
+import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.{BadConfigException, Config, DataTarget, PipelineStateException, SparkSessionWrapper, TimeTypes, TimeTypesConstants}
+import com.databricks.labs.overwatch.utils._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DateType, LongType, MapType, StringType, TimestampType}
+import org.apache.spark.sql.types._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
-
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.concurrent.ForkJoinPool
+
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.collection.parallel.mutable.ParArray
 
@@ -25,6 +25,13 @@ trait ValidationUtils extends SparkSessionWrapper {
   import spark.implicits._
 
   protected def getDateFormat: SimpleDateFormat = getDateFormat(None)
+
+  protected def validateTargetDestruction(targetDBName: String): Unit = {
+    val sparkCheckValue = spark.conf.get("overwatch.permit.db.destruction")
+    require(sparkCheckValue == targetDBName, s"You selected to run a very destructive command. This is 100% ok in " +
+      s"certain circumstances but to protect your data you must set the following spark conf with a value equal " +
+      s"to the name of the database to which you're point this function.\n\noverwatch.permit.db.destruction = $targetDBName")
+  }
 
   protected def getDateFormat(dtFormatString: Option[String]): SimpleDateFormat = {
     val dtFormatStringFinal = dtFormatString.getOrElse(TimeTypesConstants.dtStringFormat)
@@ -105,28 +112,31 @@ trait ValidationUtils extends SparkSessionWrapper {
   /**
    * Snapshots table
    *
-   * @param target
+   * @param snapTarget
    * @param params
    * @return
    */
-  protected def snapTable(sourceDBName: String, bronzeModule: Module, target: PipelineTable): SnapReport = {
+  protected def snapTable(sourceDBName: String, bronzeModule: Module, snapTarget: PipelineTable): SnapReport = {
 
     val module = bronzeModule.copy(_moduleDependencies = Array[Int]())
     val pipeline = module.pipeline
 
     try {
-      val finalDFToClone = target
+      val sourceTarget = snapTarget
         .copy(
           _databaseName = sourceDBName,
           mode = "overwrite",
           withCreateDate = false,
           withOverwatchRunID = false)
-        .asIncrementalDF(module, target.incrementalColumns)
-      pipeline.database.write(finalDFToClone, target, pipeline.pipelineSnapTime.asColumnTS)
+
+      if (!sourceTarget.exists) throw new BronzeSnapException("MISSING SOURCE:", snapTarget, module)
+      val finalDFToClone = sourceTarget
+        .asIncrementalDF(module, snapTarget.incrementalColumns)
+      pipeline.database.write(finalDFToClone, snapTarget, pipeline.pipelineSnapTime.asColumnTS)
 
 
-      println(s"SNAPPED: ${target.tableFullName}")
-      val snapCount = spark.table(target.tableFullName).count()
+      println(s"SNAPPED: ${snapTarget.tableFullName}")
+      val snapCount = spark.table(snapTarget.tableFullName).count()
 
       println(s"UPDATING Module State for ${module.moduleId} --> ${module.moduleId}")
       pipeline.updateModuleState(module.moduleState.copy(
@@ -135,9 +145,9 @@ trait ValidationUtils extends SparkSessionWrapper {
         recordsAppended = snapCount
       ))
 
-      target.asDF()
+      snapTarget.asDF()
         .select(
-          lit(target.tableFullName).alias("tableFullName"),
+          lit(snapTarget.tableFullName).alias("tableFullName"),
           module.fromTime.asColumnTS.alias("from"),
           module.untilTime.asColumnTS.alias("until"),
           lit(snapCount).alias("totalCount"),
@@ -146,12 +156,16 @@ trait ValidationUtils extends SparkSessionWrapper {
         .first()
 
     } catch {
+      case e: BronzeSnapException =>
+        println(e.errMsg)
+        logger.log(Level.ERROR, e.errMsg, e)
+        e.snapReport
       case e: Throwable =>
-        val errMsg = s"FAILED SNAP: ${target.tableFullName} --> ${e.getMessage}"
+        val errMsg = s"FAILED SNAP: ${snapTarget.tableFullName} --> ${e.getMessage}"
         println(errMsg)
         logger.log(Level.ERROR, errMsg, e)
         SnapReport(
-          target.tableFullName,
+          snapTarget.tableFullName,
           new java.sql.Timestamp(module.fromTime.asUnixTimeMilli),
           new java.sql.Timestamp(module.untilTime.asUnixTimeMilli),
           0L,
@@ -201,7 +215,6 @@ trait ValidationUtils extends SparkSessionWrapper {
    * Warning: Should be applied to snapshotted pipeline_report table only!
    * TODO: list of modules to delete should be taken from pipeline definition, but is not exposed as a list as of now.
    *
-   * @param target
    * @return
    */
   protected def resetPipelineReportState(pipelineStateTable: PipelineTable, primordialDateString: String, isRefresh: Boolean = false): Unit = {
@@ -229,7 +242,7 @@ trait ValidationUtils extends SparkSessionWrapper {
 
   protected def validateTargetKeys(targetsToValidate: ParArray[PipelineTable]): Dataset[KeyReport] = {
 
-    targetsToValidate.map (t => {
+    targetsToValidate.map(t => {
       val keys = t.keys
       val df = t.asDF()
       val cols = df.columns

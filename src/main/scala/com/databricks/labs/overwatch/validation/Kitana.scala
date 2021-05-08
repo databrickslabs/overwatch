@@ -370,6 +370,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   }
 
   def fullResetSnapDB(): Unit = {
+    validateTargetDestruction(snapWorkspace.getConfig.databaseName)
     val targetsToDrop = getAllPipelineTargets(snapWorkspace).par
     targetsToDrop.tasksupport = taskSupport
     targetsToDrop.foreach(t => {

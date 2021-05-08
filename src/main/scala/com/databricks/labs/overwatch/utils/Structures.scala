@@ -7,10 +7,11 @@ import org.apache.log4j.Level
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types.{StructField, StructType}
-
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
+
+import com.databricks.labs.overwatch.validation.SnapReport
 
 case class DBDetail()
 
@@ -168,6 +169,21 @@ private[overwatch] class FailedModuleException(s: String, val target: PipelineTa
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
 
 private[overwatch] class BadSchemaException(s: String) extends Exception(s) {}
+
+private[overwatch] class BronzeSnapException(
+                                              s: String,
+                                              target: PipelineTable,
+                                              module: Module
+                                            ) extends Exception(s) {
+  val errMsg = s"FAILED SNAP: ${target.tableFullName} --> $s --> MODULE: ${module.moduleName}"
+  val snapReport = SnapReport(
+    target.tableFullName,
+    new java.sql.Timestamp(module.fromTime.asUnixTimeMilli),
+    new java.sql.Timestamp(module.untilTime.asUnixTimeMilli),
+    0L,
+    errMsg
+  )
+}
 
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =
