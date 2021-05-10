@@ -1,11 +1,11 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
+import com.databricks.labs.overwatch.utils.{Config, Layer, OverwatchScope}
 import org.apache.log4j.Logger
 
 class Gold(_workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config)
+  extends Pipeline(_workspace, _database, _config, Layer.gold)
     with GoldTransforms {
 
   /**

@@ -9,6 +9,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, DataFrame}
 import io.delta.tables.DeltaTable
+import org.apache.spark.sql.catalyst.catalog.CatalogTable
 
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
 //  also add ruleStrategy: Enum(Kill, Quarantine, Ignore) to determine when to require them
@@ -97,8 +98,20 @@ case class PipelineTable(
     }
   }
 
-//  def getTableIdentifier = spark.sessionState.catalog.listTables(databaseName, name)
-//  val tblMeta = spark.sessionState.catalog.getTableMetadata(tbli)
+  def tableIdentifier: Option[TableIdentifier] = {
+    val matchingTables = spark.sessionState.catalog.listTables(databaseName, name)
+    if (matchingTables.length > 1) {
+      throw new Exception(s"MULTIPLE TABLES MATCHED: $tableFullName")
+    } else matchingTables.headOption
+  }
+
+  def catalogTable: CatalogTable = {
+    if (tableIdentifier.nonEmpty) {
+      spark.sessionState.catalog.getTableMetadata(tableIdentifier.get)
+    } else {
+      throw new Exception(s"TARGET TABLE NOT FOUND: $tableFullName")
+    }
+  }
 //  val isManaged = tblMeta.tableType.name == "MANAGED"
 //  val tblStoragePath = tblMeta.location.toString
 //  DeltaTable.forName(tableFullName).

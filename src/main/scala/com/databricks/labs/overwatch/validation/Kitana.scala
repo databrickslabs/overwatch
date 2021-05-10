@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Module, Pipeline, PipelineTable, Silver}
 import com.databricks.labs.overwatch.utils.JsonUtils.objToJson
 import com.databricks.labs.overwatch.utils._
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.log4j.{Level, Logger}
@@ -48,6 +49,13 @@ case class KeyReport(tableName: String,
                      cols: Array[String],
                      msg: String)
 
+case class SchemaValidationReport(
+                                   tableName: String,
+                                   schemaTestType: String,
+                                   requiredColumns: Seq[String],
+                                   actualColumns: Seq[String],
+                                   msg: String)
+
 case class TargetDupDetail(target: PipelineTable, df: Option[DataFrame]) extends SparkSessionWrapper {
   def getDuplicatesDFForTable(keysOnly: Boolean = false): DataFrame = {
     //    getDuplicatesDFsByTable
@@ -87,12 +95,13 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   import spark.implicits._
 
   private var _parallelism: Int = getDriverCores - 1
-  private var _isRefresh: Boolean = false
+  private var isRefresh: Boolean = false
 
   private def setRefresh(value: Boolean): this.type = {
-    _isRefresh = value
+    isRefresh = value
     this
   }
+
   private def setParallelism(value: Option[Int]): this.type = {
     _parallelism = value.getOrElse(getDriverCores - 1)
     this
@@ -101,6 +110,12 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   private def parallelism: Int = _parallelism
 
   private val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+
+  def getBronzePipeline(workspace: Workspace = snapWorkspace, readOnly: Boolean = true): Bronze = Bronze(workspace, readOnly)
+
+  def getSilverPipeline(workspace: Workspace = snapWorkspace, readOnly: Boolean = true): Silver = Silver(workspace, readOnly)
+
+  def getGoldPipeline(workspace: Workspace = snapWorkspace, readOnly: Boolean = true): Gold = Gold(workspace, readOnly)
 
   /**
    *
@@ -119,7 +134,12 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     val fromTime = Pipeline.createTimeDetail(startDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
     val untilTime = Pipeline.createTimeDetail(endDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
     val daysToTest = Duration.between(startDate.atStartOfDay(), endDate.atStartOfDay()).toDays.toInt
-    _executeBronzeSnapshot(fromTime, untilTime, daysToTest)
+    try {
+      _executeBronzeSnapshot(fromTime, untilTime, daysToTest)
+    } catch {
+      case e: BronzeSnapException =>
+        Seq(e.snapReport).toDS()
+    }
   }
 
   /**
@@ -142,29 +162,23 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     logger.log(Level.INFO, s"BRONZE Snap: Max Days Overridden: ${bronzeConfig.maxDays}")
     val bronzeSnapWorkspace = snapWorkspace.copy(_config = bronzeConfig)
     val bronzePipeline = Bronze(bronzeSnapWorkspace, readOnly = true)
-    val bronzeTargets = bronzePipeline.BronzeTargets
 
-    validateSnapPipeline(sourceWorkspace, bronzePipeline, snapFromTime, snapUntilTime)
+    validateSnapPipeline(sourceWorkspace, bronzePipeline, snapFromTime, snapUntilTime, isRefresh)
 
-    snapStateTables(sourceDBName, taskSupport, bronzePipeline)
-    resetPipelineReportState(bronzePipeline.pipelineStateTarget, bronzeConfig.primordialDateString.get, _isRefresh)
+    val statefulSnapsReport = snapStateTables(sourceDBName, taskSupport, bronzePipeline)
+    resetPipelineReportState(bronzePipeline.pipelineStateTarget, snapFromTime.asDTString, isRefresh)
+    bronzePipeline.clearPipelineState() // clears states such that module fromTimes == primordial date
 
     // snapshots bronze tables, returns ds with report
-    val bronzeTargetsWModule = bronzePipeline.config.overwatchScope.flatMap {
-      case OverwatchScope.audit => Seq(ModuleTarget(bronzePipeline.auditLogsModule, bronzeTargets.auditLogsTarget))
-      case OverwatchScope.clusters => Seq(ModuleTarget(bronzePipeline.clustersSnapshotModule, bronzeTargets.clustersSnapshotTarget))
-      case OverwatchScope.clusterEvents => Seq(ModuleTarget(bronzePipeline.clusterEventLogsModule, bronzeTargets.clusterEventsTarget))
-      case OverwatchScope.jobs => Seq(ModuleTarget(bronzePipeline.jobsSnapshotModule, bronzeTargets.jobsSnapshotTarget))
-      case OverwatchScope.pools => Seq(ModuleTarget(bronzePipeline.poolsSnapshotModule, bronzeTargets.poolsTarget))
-      case OverwatchScope.sparkEvents => Seq(ModuleTarget(bronzePipeline.sparkEventLogsModule, bronzeTargets.sparkEventLogsTarget))
-      case _ => Seq[ModuleTarget]()
-    }.par
+    val bronzeTargetsWModule = getLinkedModuleTarget(bronzePipeline).par
 
     bronzeTargetsWModule.tasksupport = taskSupport
 
-    bronzeTargetsWModule
-      .map(targetDetail => snapTable(sourceDBName, targetDetail.module, targetDetail.target))
-      .toArray.toSeq.toDS
+    val scopeSnaps = bronzeTargetsWModule
+      .map(targetDetail => snapTable(sourceDBName, targetDetail.module, targetDetail.target, snapFromTime, snapUntilTime))
+      .toArray.toSeq
+
+    (statefulSnapsReport ++ scopeSnaps).toDS()
   }
 
   /**
@@ -174,13 +188,20 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    */
   def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Int = 2): (Pipeline, Pipeline) = {
 
-    val snapLookupPipeline = Bronze(snapWorkspace)
-    val recalcConfig = snapWorkspace.getConfig
-    recalcConfig.setMaxDays(maxDays)
-    recalcConfig.setPrimordialDateString(Some(deriveRecalcPrimordial(snapLookupPipeline, primordialPadding)))
+    val snapLookupPipeline = getBronzePipeline()
 
-    val recalcWorkspace = snapWorkspace.copy(_config = recalcConfig)
-    (Silver(recalcWorkspace, readOnly = true).run(), Gold(recalcWorkspace, readOnly = true).run())
+    val silverPipeline = getSilverPipeline(readOnly = false)
+    val goldPipeline = getGoldPipeline(readOnly = false)
+
+    // set primordial padding n days ahead of bronze primordial as per configured padding
+    silverPipeline.config
+      .setPrimordialDateString(Some(getPaddedPrimoridal(snapLookupPipeline, primordialPadding)))
+      .setMaxDays(maxDays)
+    goldPipeline.config
+      .setPrimordialDateString(Some(getPaddedPrimoridal(snapLookupPipeline, primordialPadding)))
+      .setMaxDays(maxDays)
+
+    (silverPipeline.run(), goldPipeline.run())
   }
 
   /**
@@ -215,7 +236,6 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
       // reapply the initial bronze state
       initialBronzeState.foreach(state => pipeline.updateModuleState(state._2))
     } else {
-      pipeline.config.setIsFirstRun(true)
       Array[SimplifiedModuleStatusReport]()
     }
     println(s"Rolled pipeline back $versionsAgo versions. RESULT:\n")
@@ -230,73 +250,13 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   def validateEquality(incrementalTest: Boolean): Dataset[ValidationReport] = {
 
     val silverPipeline = Silver(snapWorkspace, readOnly = true)
-    val silverTargets = silverPipeline.SilverTargets
     val goldPipeline = Gold(snapWorkspace, readOnly = true)
-    val goldTargets = goldPipeline.GoldTargets
     rollbackPipelineState(silverPipeline)
     rollbackPipelineState(goldPipeline)
 
-    val silverTargetsWModule = silverPipeline.config.overwatchScope.flatMap {
-      case OverwatchScope.accounts => {
-        Seq(
-          ModuleTarget(silverPipeline.accountLoginsModule, silverTargets.accountLoginTarget),
-          ModuleTarget(silverPipeline.modifiedAccountsModule, silverTargets.accountModTarget)
-        )
-      }
-      case OverwatchScope.notebooks => Seq(ModuleTarget(silverPipeline.notebookSummaryModule, silverTargets.notebookStatusTarget))
-      case OverwatchScope.clusters => Seq(ModuleTarget(silverPipeline.clusterSpecModule, silverTargets.clustersSpecTarget))
-      case OverwatchScope.sparkEvents => {
-        Seq(
-          ModuleTarget(silverPipeline.executorsModule, silverTargets.executorsTarget),
-          ModuleTarget(silverPipeline.executionsModule, silverTargets.executionsTarget),
-          ModuleTarget(silverPipeline.sparkJobsModule, silverTargets.jobsTarget),
-          ModuleTarget(silverPipeline.sparkStagesModule, silverTargets.stagesTarget),
-          ModuleTarget(silverPipeline.sparkTasksModule, silverTargets.tasksTarget)
-        )
-      }
-      case OverwatchScope.jobs => {
-        Seq(
-          ModuleTarget(silverPipeline.jobStatusModule, silverTargets.dbJobsStatusTarget),
-          ModuleTarget(silverPipeline.jobRunsModule, silverTargets.dbJobRunsTarget)
-        )
-      }
-      case _ => Seq[ModuleTarget]()
-    }.toArray
+    val silverTargetsWModule = getLinkedModuleTarget(silverPipeline)
 
-    val goldTargetsWModule = goldPipeline.config.overwatchScope.flatMap {
-      case OverwatchScope.accounts => {
-        Seq(
-          ModuleTarget(goldPipeline.accountModModule, goldTargets.accountModsTarget),
-          ModuleTarget(goldPipeline.accountLoginModule, goldTargets.accountLoginTarget)
-        )
-      }
-      case OverwatchScope.notebooks => {
-        Seq(ModuleTarget(goldPipeline.notebookModule, goldTargets.notebookTarget))
-      }
-      case OverwatchScope.clusters => {
-        Seq(
-          ModuleTarget(goldPipeline.clusterModule, goldTargets.clusterTarget),
-          ModuleTarget(goldPipeline.clusterStateFactModule, goldTargets.clusterStateFactTarget)
-        )
-      }
-      case OverwatchScope.sparkEvents => {
-        Seq(
-          ModuleTarget(goldPipeline.sparkExecutorModule, goldTargets.sparkExecutorTarget),
-          ModuleTarget(goldPipeline.sparkExecutionModule, goldTargets.sparkExecutionTarget),
-          ModuleTarget(goldPipeline.sparkJobModule, goldTargets.sparkJobTarget),
-          ModuleTarget(goldPipeline.sparkStageModule, goldTargets.sparkStageTarget),
-          ModuleTarget(goldPipeline.sparkTaskModule, goldTargets.sparkTaskTarget)
-        )
-      }
-      case OverwatchScope.jobs => {
-        Seq(
-          ModuleTarget(goldPipeline.jobsModule, goldTargets.jobTarget),
-          ModuleTarget(goldPipeline.jobRunsModule, goldTargets.jobRunTarget),
-          ModuleTarget(goldPipeline.jobRunCostPotentialFactModule, goldTargets.jobRunCostPotentialFactTarget)
-        )
-      }
-      case _ => Seq[ModuleTarget]()
-    }.toArray
+    val goldTargetsWModule = getLinkedModuleTarget(goldPipeline)
 
     val targetsToValidate = (silverTargetsWModule ++ goldTargetsWModule).par
     targetsToValidate.tasksupport = taskSupport
@@ -336,32 +296,11 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
                        endDateString: String,
                        dtFormat: Option[String] = None): Dataset[SnapReport] = {
     val sourceConfig = sourceWorkspace.getConfig // prod source
-    val snapConfig = snapWorkspace.getConfig // existing bronze configs
     val sourceDBName = sourceConfig.databaseName
     val snapDBName = snapWorkspace.getConfig.databaseName
-    val cloudProvider = snapWorkspace.getConfig.cloudProvider
     require(sourceDBName != snapDBName, "The source and snapshot databases cannot be the same. This function " +
       "will completely remove the bronze tables from the snapshot database. Be careful and ensure you have " +
       "identified the proper snapshot database name.\nEXITING")
-
-//    val bronzePipeline = Bronze(snapWorkspace)
-//    val bronzeTargets = bronzePipeline.getAllTargets.par
-//    bronzeTargets.tasksupport = taskSupport
-//    bronzeTargets.foreach(t => Helpers.fastDrop(t, cloudProvider))
-
-//    val dropBronzeStateSQL = s"""delete from ${bronzePipeline.pipelineStateTarget.tableFullName} where moduleID < 2000"""
-//    logger.log(Level.INFO, s"Dropping bronze states in snap db for refresh: $dropBronzeStateSQL")
-//    spark.sql(dropBronzeStateSQL)
-
-//    val pipelineStateTargetWithOverwrite = bronzePipeline.pipelineStateTarget
-//      .copy(mode = "overwrite", withCreateDate = false, withOverwatchRunID = false)
-//    val pipStatesLessBronze = bronzePipeline.getVerbosePipelineState.filterNot(_.moduleID < 2000)
-//
-//    bronzePipeline.database.write(
-//      pipStatesLessBronze.toSeq.toDS.toDF(),
-//      pipelineStateTargetWithOverwrite,
-//      bronzePipeline.pipelineSnapTime.asColumnTS
-//    )
 
     Kitana(snapDBName, sourceWorkspace)
       .setRefresh(true)
@@ -378,8 +317,49 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     })
   }
 
-  def validateSchemas = ???
-  def validatePartCols = ???
+  private def validatePartitionCols(target: PipelineTable): (PipelineTable, SchemaValidationReport) = {
+    val catPartCols = target.catalogTable.partitionColumnNames.map(_.toLowerCase)
+    val msg = if (catPartCols == target.partitionBy) "PASS" else s"FAIL: Partition Columns do not match"
+    val report = SchemaValidationReport(
+      target.tableFullName,
+      "Partition Columns",
+      catPartCols,
+      target.partitionBy,
+      msg
+    )
+    (target, report)
+  }
+
+  private def validateRequiredColumns(target: PipelineTable, schemaValidationReport: SchemaValidationReport): SchemaValidationReport = {
+    val existingColumns = target.asDF.columns
+    val requiredColumns = target.keys(true) ++ target.incrementalColumns ++ target.partitionBy
+    val caseSensitive = spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
+    val isError = !requiredColumns.forall(f => target.asDF.hasFieldNamed(f, caseSensitive))
+    val msg = if (isError) "FAIL: Missing required columns" else "PASS"
+    SchemaValidationReport(
+      target.tableFullName,
+      "Required Columns",
+      requiredColumns,
+      existingColumns,
+      msg
+    )
+
+  }
+
+  def validateSchemas(workspace: Workspace = snapWorkspace): Dataset[SchemaValidationReport] = {
+
+    val bronzeModuleTargets = getLinkedModuleTarget(getBronzePipeline(workspace))
+    val silverModuleTargets = getLinkedModuleTarget(getSilverPipeline(workspace))
+    val goldModuleTargets = getLinkedModuleTarget(getGoldPipeline(workspace))
+    val targetsInScope = (bronzeModuleTargets ++ silverModuleTargets ++ goldModuleTargets).map(_.target).par
+    targetsInScope.tasksupport = taskSupport
+
+    targetsInScope
+      .map(validatePartitionCols)
+      .map(x => validateRequiredColumns(x._1, x._2))
+      .toArray.toSeq.toDS()
+  }
+
   //TODO -- add spark.conf protection such that for resets the value of k/v has to be the target database name
   // the user wants to blow up.
 

@@ -2,11 +2,12 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{systemZoneId, systemZoneOffset}
+import com.databricks.labs.overwatch.utils.Layer.Layer
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{from_unixtime, lit, rank, row_number}
+import org.apache.spark.sql.functions.{from_unixtime, lit, log, rank, row_number}
 
 //import io.delta.tables._
 
@@ -14,14 +15,17 @@ import java.text.SimpleDateFormat
 import java.time._
 import java.util.Date
 
-class Pipeline(_workspace: Workspace, _database: Database,
-               _config: Config) extends PipelineTargets(_config) with SparkSessionWrapper {
+class Pipeline(
+                _workspace: Workspace,
+                final val database: Database,
+                _config: Config,
+                final val layer: Layer
+              ) extends PipelineTargets(_config) with SparkSessionWrapper {
 
   // TODO -- Validate Targets (unique table names, ModuleIDs and names, etc)
   //  developer validation to guard against multiple Modules with same target and/or ID/Name
   private val logger: Logger = Logger.getLogger(this.getClass)
   final val workspace: Workspace = _workspace
-  final val database: Database = _database
   final val config: Config = _config
   private var _pipelineSnapTime: Long = _
   private var _readOnly: Boolean = false
@@ -170,7 +174,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
         .collect()
         .foreach(updateModuleState)
     } else {
-      config.setIsFirstRun(true)
       Array[SimplifiedModuleStatusReport]()
     }
     setPipelineSnapTime()
@@ -261,7 +264,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
   private def needsOptimize(moduleID: Int, optimizeFreq_H: Int): Boolean = {
     val optFreq_Millis = 1000L * 60L * 60L * optimizeFreq_H.toLong
     val tsLessSevenD = System.currentTimeMillis() - optFreq_Millis
-    if ((getLastOptimized(moduleID) < tsLessSevenD || config.isFirstRun) && !config.isLocalTesting) true
+    if (getLastOptimized(moduleID) < tsLessSevenD && !config.isLocalTesting) true
     else false
   }
 
@@ -276,7 +279,12 @@ class Pipeline(_workspace: Workspace, _database: Database,
       logger.log(Level.INFO, startLogMsg)
 
       // Append the output
-      if (!_database.write(finalDF, target, pipelineSnapTime.asColumnTS)) throw new Exception("PIPELINE FAILURE")
+      if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
+      else {
+        val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
+        println(readOnlyMsg)
+        logger.log(Level.WARN, readOnlyMsg)
+      }
 
       // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
       // of attempting to re-read the very inefficient json.gz files.
@@ -297,6 +305,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       restoreSparkConf()
 
       val endTime = System.currentTimeMillis()
+
 
       // Generate Success Report
       ModuleStatusReport(
@@ -356,9 +365,9 @@ object Pipeline {
     )
   }
 
-  def apply(workspace: Workspace, database: Database, config: Config): Pipeline = {
+  def apply(workspace: Workspace, database: Database, config: Config, layer: Layer): Pipeline = {
 
-    new Pipeline(workspace, database, config)
+    new Pipeline(workspace, database, config, layer)
       .initPipelineRun()
       .loadStaticDatasets()
 

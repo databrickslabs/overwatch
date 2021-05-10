@@ -46,55 +46,53 @@ class Config() {
    * the getter may be obscure or more complicated.
    */
 
-  private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
+  def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
-  private[overwatch] def isLocalTesting: Boolean = _isLocalTesting
+  def isLocalTesting: Boolean = _isLocalTesting
 
-  private[overwatch] def isDBConnect: Boolean = _isDBConnect
+  def isDBConnect: Boolean = _isDBConnect
 
-  private[overwatch] def isFirstRun: Boolean = _isFirstRun
+  def debugFlag: Boolean = _debugFlag
 
-  private[overwatch] def debugFlag: Boolean = _debugFlag
+  def organizationId: String = _organizationId
 
-  private[overwatch] def organizationId: String = _organizationId
+  def cloudProvider: String = _cloudProvider
 
-  private[overwatch] def cloudProvider: String = _cloudProvider
+  def initialShuffleParts: Int = _intialShuffleParts
 
-  private[overwatch] def initialShuffleParts: Int = _intialShuffleParts
+  def maxDays: Int = _maxDays
 
-  private[overwatch] def maxDays: Int = _maxDays
+  def databaseName: String = _databaseName
 
-  private[overwatch] def databaseName: String = _databaseName
+  def databaseLocation: String = _databaseLocation
 
-  private[overwatch] def databaseLocation: String = _databaseLocation
+  def etlDataPathPrefix: String = _etlDataPathPrefix
 
-  private[overwatch] def etlDataPathPrefix: String = _etlDataPathPrefix
+  def consumerDatabaseName: String = _consumerDatabaseName
 
-  private[overwatch] def consumerDatabaseName: String = _consumerDatabaseName
+  def consumerDatabaseLocation: String = _consumerDatabaseLocation
 
-  private[overwatch] def consumerDatabaseLocation: String = _consumerDatabaseLocation
+  def workspaceURL: String = _workspaceUrl
 
-  private[overwatch] def workspaceURL: String = _workspaceUrl
+  def apiEnv: ApiEnv = _apiEnv
 
-  private[overwatch] def apiEnv: ApiEnv = _apiEnv
+  def auditLogConfig: AuditLogConfig = _auditLogConfig
 
-  private[overwatch] def auditLogConfig: AuditLogConfig = _auditLogConfig
+  def badRecordsPath: String = _badRecordsPath
 
-  private[overwatch] def badRecordsPath: String = _badRecordsPath
+  def passthroughLogPath: Option[String] = _passthroughLogPath
 
-  private[overwatch] def passthroughLogPath: Option[String] = _passthroughLogPath
+  def inputConfig: OverwatchParams = _inputConfig
 
-  private[overwatch] def inputConfig: OverwatchParams = _inputConfig
+  def runID: String = _runID
 
-  private[overwatch] def runID: String = _runID
+  def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
 
-  private[overwatch] def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
+  def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
 
-  private[overwatch] def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
+  def primordialDateString: Option[String] = _primordialDateString
 
-  private[overwatch] def primordialDateString: Option[String] = _primordialDateString
-
-  private[overwatch] def globalFilters: Seq[Column] = {
+  def globalFilters: Seq[Column] = {
     Seq(
       col("organization_id") === organizationId
     )

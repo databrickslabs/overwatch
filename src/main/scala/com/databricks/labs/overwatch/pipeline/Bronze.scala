@@ -1,12 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
+import com.databricks.labs.overwatch.utils.{Config, Layer, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
 
 
 class Bronze(_workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config)
+  extends Pipeline(_workspace, _database, _config, Layer.bronze)
     with BronzeTransforms {
 
   /**
@@ -100,9 +100,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
+    val isFirstAuditRun = BronzeTargets.auditLogsTarget.exists
     val rawAzureAuditEvents = landAzureAuditLogDF(
       config.auditLogConfig.azureAuditLogEventhubConfig.get,
-      config.isFirstRun,
+      isFirstAuditRun,
       config.organizationId,
       config.runID
     )
@@ -159,7 +160,7 @@ object Bronze {
   }
 
   private[overwatch] def apply(workspace: Workspace, readOnly: Boolean): Bronze = {
-    apply(workspace).setReadOnly
+    apply(workspace).setReadOnly()
   }
 
 }

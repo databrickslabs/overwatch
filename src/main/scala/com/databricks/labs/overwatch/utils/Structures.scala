@@ -10,6 +10,7 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
+import java.sql.Timestamp
 
 import com.databricks.labs.overwatch.validation.SnapReport
 
@@ -162,8 +163,6 @@ private[overwatch] class PipelineStateException(s: String) extends Exception(s) 
 
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
-private[overwatch] class ReadOnlyException(s: String) extends Exception(s) {}
-
 private[overwatch] class FailedModuleException(s: String, val target: PipelineTable) extends Exception(s) {}
 
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
@@ -175,11 +174,25 @@ private[overwatch] class BronzeSnapException(
                                               target: PipelineTable,
                                               module: Module
                                             ) extends Exception(s) {
-  val errMsg = s"FAILED SNAP: ${target.tableFullName} --> $s --> MODULE: ${module.moduleName}"
-  val snapReport = SnapReport(
+  private val pipeline = module.pipeline
+  private val emptyModule = pipeline.getModuleState(module.moduleId).isEmpty
+  private val fromTime = if (emptyModule) {
+    new Timestamp(pipeline.primordialEpoch)
+  } else {
+    new Timestamp(module.fromTime.asUnixTimeMilli)
+  }
+
+  private val untilTime = if (emptyModule) {
+    new Timestamp(pipeline.pipelineSnapTime.asUnixTimeMilli)
+  } else {
+    new Timestamp(module.untilTime.asUnixTimeMilli)
+  }
+
+  val errMsg = s"FAILED SNAP: ${target.tableFullName} --> MODULE: ${module.moduleName}: SNAP ERROR:\n$s"
+  val snapReport: SnapReport = SnapReport(
     target.tableFullName,
-    new java.sql.Timestamp(module.fromTime.asUnixTimeMilli),
-    new java.sql.Timestamp(module.untilTime.asUnixTimeMilli),
+    fromTime,
+    untilTime,
     0L,
     errMsg
   )

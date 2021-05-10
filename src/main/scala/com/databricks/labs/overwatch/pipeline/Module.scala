@@ -17,6 +17,7 @@ class Module(
   private val config = pipeline.config
 
   private var _isFirstRun: Boolean = false
+  def isFirstRun: Boolean = _isFirstRun
 
   def copy(
             _moduleID: Int = moduleId,
@@ -153,10 +154,12 @@ class Module(
 
   private def finalizeModule(report: ModuleStatusReport): Unit = {
     pipeline.updateModuleState(report.simple)
-    pipeline.database.write(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
+    if (!pipeline.readOnly) {
+      pipeline.database.write(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
+    }
   }
 
-  private def fail(msg: String, rollbackStatus: String = ""): Unit = {
+  private def fail(msg: String, rollbackStatus: String = ""): ModuleStatusReport = {
     val failedStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
       moduleID = moduleId,
@@ -175,9 +178,10 @@ class Module(
       parsedConfig = config.parsedConfig
     )
     finalizeModule(failedStatusReport)
+    failedStatusReport
   }
 
-  private def failWithRollback(target: PipelineTable, msg: String): Unit = {
+  private def failWithRollback(target: PipelineTable, msg: String): ModuleStatusReport = {
     val rollbackMsg = s"ROLLBACK: Attempting Roll back $moduleName."
     println(rollbackMsg)
     logger.log(Level.WARN, rollbackMsg)
@@ -203,7 +207,7 @@ class Module(
    * @param errorLevel
    * @param allowModuleProgression
    */
-  private def noNewDataHandler(msg: String, errorLevel: Level, allowModuleProgression: Boolean): Unit = {
+  private def noNewDataHandler(msg: String, errorLevel: Level, allowModuleProgression: Boolean): ModuleStatusReport = {
     logger.log(errorLevel, msg)
     val startTime = System.currentTimeMillis()
     val emptyStatusReport = ModuleStatusReport(
@@ -224,6 +228,7 @@ class Module(
       parsedConfig = config.parsedConfig
     )
     finalizeModule(emptyStatusReport)
+    emptyStatusReport
   }
 
   private def validateSourceDF(df: DataFrame): DataFrame = {
@@ -261,7 +266,7 @@ class Module(
   }
 
   @throws(classOf[IllegalArgumentException])
-  def execute(_etlDefinition: ETLDefinition): Unit = {
+  def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
     println(s"Beginning: $moduleName")
 
     val debugMsg = s"MODULE: $moduleId-$moduleName\nTIME RANGE: " +
@@ -269,14 +274,13 @@ class Module(
     println(debugMsg)
     logger.log(Level.INFO, debugMsg)
     try {
-      if (pipeline.readOnly) throw new ReadOnlyException(s"Pipeline is READONLY: ETL cannot execute in read only")
       validatePipelineState()
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
       val etlDefinition = _etlDefinition.copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
       val newState = etlDefinition.executeETL(this, verifiedSourceDF)
       finalizeModule(newState)
-
+      newState
     } catch {
       case e: FailedModuleException =>
         val errMessage = s"FAILED: $moduleId-$moduleName Module"

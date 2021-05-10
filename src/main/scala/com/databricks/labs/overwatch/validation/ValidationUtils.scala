@@ -54,7 +54,7 @@ trait ValidationUtils extends SparkSessionWrapper {
   }
 
   @throws(classOf[BadConfigException])
-  private def validateSnapDatabase(pipeline: Pipeline): Unit = {
+  private def validateSnapDatabase(pipeline: Pipeline, isRefresh: Boolean): Unit = {
     val config = pipeline.config
     val dbProperties = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName).properties
     val isVerifiedSnap = dbProperties.getOrElse("SNAPDB", "FALSE") == "TRUE"
@@ -62,7 +62,7 @@ trait ValidationUtils extends SparkSessionWrapper {
       s"process. Any target snap database must be created, owned, and maintained through Overwatch validation " +
       s"processes.")
 
-    if (pipeline.BronzeTargets.auditLogsTarget.exists) { // snap db already exists
+    if (pipeline.BronzeTargets.auditLogsTarget.exists && !isRefresh) { // snap db already exists
       throw new BadConfigException(s"A snapshot may only be created once and it must be created by " +
         s"the overwatch snapshot process. If you would like to create another snapshot and overwrite this one " +
         s"please use the 'refreshSnapshot' function in the validation package.")
@@ -72,11 +72,12 @@ trait ValidationUtils extends SparkSessionWrapper {
   @throws(classOf[BadConfigException])
   protected def validateSnapPipeline(
                                       sourceWorkspace: Workspace,
-                                      pipeline: Pipeline,
+                                      snapPipeline: Pipeline,
                                       snapFromTime: TimeTypes,
-                                      snapUntilTime: TimeTypes
+                                      snapUntilTime: TimeTypes,
+                                      isRefresh: Boolean
                                     ): Unit = {
-    validateSnapDatabase(pipeline)
+    validateSnapDatabase(snapPipeline, isRefresh)
     val sourceConfig = sourceWorkspace.getConfig
     val sourceBronzePipeline = Bronze(sourceWorkspace, readOnly = true)
     if (sourceBronzePipeline.getPipelineState.isEmpty) {
@@ -96,9 +97,14 @@ trait ValidationUtils extends SparkSessionWrapper {
       s"WITHIN the timeframe of the source data.")
 
     // already validated and confirmed max days == duration
-    validateDuration(pipeline.config.maxDays)
+    validateDuration(snapPipeline.config.maxDays)
   }
 
+  /**
+   * Returns primordial date from the bronze audit state
+   * @param pipeline
+   * @return
+   */
   @throws(classOf[PipelineStateException])
   protected def getPrimordialSnapshot(pipeline: Pipeline): LocalDate = {
     val snapAuditState = pipeline.getModuleState(1004)
@@ -110,13 +116,110 @@ trait ValidationUtils extends SparkSessionWrapper {
   }
 
   /**
+   * Returns ModuleTarget with each module by target for the configured scopes
+   * @param pipeline
+   * @return
+   */
+  protected def getLinkedModuleTarget(pipeline: Pipeline): Seq[ModuleTarget] = {
+    pipeline match {
+      case rawPipeline: Bronze => {
+        val bronzePipeline = rawPipeline.asInstanceOf[Bronze]
+        val bronzeTargets = bronzePipeline.BronzeTargets
+        bronzePipeline.getConfig.overwatchScope.flatMap {
+          case OverwatchScope.audit => Seq(ModuleTarget(bronzePipeline.auditLogsModule, bronzeTargets.auditLogsTarget))
+          case OverwatchScope.clusters => Seq(ModuleTarget(bronzePipeline.clustersSnapshotModule, bronzeTargets.clustersSnapshotTarget))
+          case OverwatchScope.clusterEvents => Seq(ModuleTarget(bronzePipeline.clusterEventLogsModule, bronzeTargets.clusterEventsTarget))
+          case OverwatchScope.jobs => Seq(ModuleTarget(bronzePipeline.jobsSnapshotModule, bronzeTargets.jobsSnapshotTarget))
+          case OverwatchScope.pools => Seq(ModuleTarget(bronzePipeline.poolsSnapshotModule, bronzeTargets.poolsTarget))
+          case OverwatchScope.sparkEvents => Seq(ModuleTarget(bronzePipeline.sparkEventLogsModule, bronzeTargets.sparkEventLogsTarget))
+          case _ => Seq[ModuleTarget]()
+        }
+      }
+      case rawPipeline: Silver => {
+        val silverPipeline = rawPipeline.asInstanceOf[Silver]
+        val silverTargets = silverPipeline.SilverTargets
+        silverPipeline.config.overwatchScope.flatMap {
+          case OverwatchScope.accounts => {
+            Seq(
+              ModuleTarget(silverPipeline.accountLoginsModule, silverTargets.accountLoginTarget),
+              ModuleTarget(silverPipeline.modifiedAccountsModule, silverTargets.accountModTarget)
+            )
+          }
+          case OverwatchScope.notebooks => Seq(ModuleTarget(silverPipeline.notebookSummaryModule, silverTargets.notebookStatusTarget))
+          case OverwatchScope.clusters => Seq(ModuleTarget(silverPipeline.clusterSpecModule, silverTargets.clustersSpecTarget))
+          case OverwatchScope.sparkEvents => {
+            Seq(
+              ModuleTarget(silverPipeline.executorsModule, silverTargets.executorsTarget),
+              ModuleTarget(silverPipeline.executionsModule, silverTargets.executionsTarget),
+              ModuleTarget(silverPipeline.sparkJobsModule, silverTargets.jobsTarget),
+              ModuleTarget(silverPipeline.sparkStagesModule, silverTargets.stagesTarget),
+              ModuleTarget(silverPipeline.sparkTasksModule, silverTargets.tasksTarget)
+            )
+          }
+          case OverwatchScope.jobs => {
+            Seq(
+              ModuleTarget(silverPipeline.jobStatusModule, silverTargets.dbJobsStatusTarget),
+              ModuleTarget(silverPipeline.jobRunsModule, silverTargets.dbJobRunsTarget)
+            )
+          }
+          case _ => Seq[ModuleTarget]()
+        }
+      }
+      case rawPipeline: Gold => {
+        val goldPipeline = rawPipeline.asInstanceOf[Gold]
+        val goldTargets = goldPipeline.GoldTargets
+        goldPipeline.config.overwatchScope.flatMap {
+          case OverwatchScope.accounts => {
+            Seq(
+              ModuleTarget(goldPipeline.accountModModule, goldTargets.accountModsTarget),
+              ModuleTarget(goldPipeline.accountLoginModule, goldTargets.accountLoginTarget)
+            )
+          }
+          case OverwatchScope.notebooks => {
+            Seq(ModuleTarget(goldPipeline.notebookModule, goldTargets.notebookTarget))
+          }
+          case OverwatchScope.clusters => {
+            Seq(
+              ModuleTarget(goldPipeline.clusterModule, goldTargets.clusterTarget),
+              ModuleTarget(goldPipeline.clusterStateFactModule, goldTargets.clusterStateFactTarget)
+            )
+          }
+          case OverwatchScope.sparkEvents => {
+            Seq(
+              ModuleTarget(goldPipeline.sparkExecutorModule, goldTargets.sparkExecutorTarget),
+              ModuleTarget(goldPipeline.sparkExecutionModule, goldTargets.sparkExecutionTarget),
+              ModuleTarget(goldPipeline.sparkJobModule, goldTargets.sparkJobTarget),
+              ModuleTarget(goldPipeline.sparkStageModule, goldTargets.sparkStageTarget),
+              ModuleTarget(goldPipeline.sparkTaskModule, goldTargets.sparkTaskTarget)
+            )
+          }
+          case OverwatchScope.jobs => {
+            Seq(
+              ModuleTarget(goldPipeline.jobsModule, goldTargets.jobTarget),
+              ModuleTarget(goldPipeline.jobRunsModule, goldTargets.jobRunTarget),
+              ModuleTarget(goldPipeline.jobRunCostPotentialFactModule, goldTargets.jobRunCostPotentialFactTarget)
+            )
+          }
+          case _ => Seq[ModuleTarget]()
+        }
+      }
+    }
+  }
+
+  /**
    * Snapshots table
    *
    * @param snapTarget
    * @param params
    * @return
    */
-  protected def snapTable(sourceDBName: String, bronzeModule: Module, snapTarget: PipelineTable): SnapReport = {
+  protected def snapTable(
+                           sourceDBName: String,
+                           bronzeModule: Module,
+                           snapTarget: PipelineTable,
+                           snapFromTime: TimeTypes,
+                           snapUntilTime: TimeTypes
+                         ): SnapReport = {
 
     val module = bronzeModule.copy(_moduleDependencies = Array[Int]())
     val pipeline = module.pipeline
@@ -129,21 +232,23 @@ trait ValidationUtils extends SparkSessionWrapper {
           withCreateDate = false,
           withOverwatchRunID = false)
 
-      if (!sourceTarget.exists) throw new BronzeSnapException("MISSING SOURCE:", snapTarget, module)
       val finalDFToClone = sourceTarget
         .asIncrementalDF(module, snapTarget.incrementalColumns)
       pipeline.database.write(finalDFToClone, snapTarget, pipeline.pipelineSnapTime.asColumnTS)
 
 
-      println(s"SNAPPED: ${snapTarget.tableFullName}")
       val snapCount = spark.table(snapTarget.tableFullName).count()
+      val snapLogMsg = s"SNAPPED: ${snapTarget.tableFullName}\nFROM: ${module.fromTime.asDTString}\nTO: " +
+        s"${module.untilTime.asDTString}\nTOTAL RECORDS: $snapCount"
+      println(snapLogMsg)
+      logger.log(Level.INFO, snapLogMsg)
 
-      println(s"UPDATING Module State for ${module.moduleId} --> ${module.moduleId}")
-      pipeline.updateModuleState(module.moduleState.copy(
-        fromTS = module.fromTime.asUnixTimeMilli,
-        untilTS = module.untilTime.asUnixTimeMilli,
-        recordsAppended = snapCount
-      ))
+//      println(s"UPDATING Module State for ${module.moduleId} --> ${module.moduleId}")
+//      pipeline.updateModuleState(module.moduleState.copy(
+//        fromTS = module.fromTime.asUnixTimeMilli,
+//        untilTS = module.untilTime.asUnixTimeMilli,
+//        recordsAppended = snapCount
+//      ))
 
       snapTarget.asDF()
         .select(
@@ -156,24 +261,19 @@ trait ValidationUtils extends SparkSessionWrapper {
         .first()
 
     } catch {
-      case e: BronzeSnapException =>
-        println(e.errMsg)
-        logger.log(Level.ERROR, e.errMsg, e)
-        e.snapReport
       case e: Throwable =>
         val errMsg = s"FAILED SNAP: ${snapTarget.tableFullName} --> ${e.getMessage}"
         println(errMsg)
         logger.log(Level.ERROR, errMsg, e)
-        SnapReport(
-          snapTarget.tableFullName,
-          new java.sql.Timestamp(module.fromTime.asUnixTimeMilli),
-          new java.sql.Timestamp(module.untilTime.asUnixTimeMilli),
-          0L,
-          errMsg)
+        throw new BronzeSnapException(errMsg, snapTarget, module)
     }
   }
 
-  protected def snapStateTables(sourceDBName: String, taskSupport: ForkJoinTaskSupport, bronzePipeline: Pipeline): Unit = {
+  protected def snapStateTables(
+                                 sourceDBName: String,
+                                 taskSupport: ForkJoinTaskSupport,
+                                 bronzePipeline: Pipeline
+                               ): Seq[SnapReport] = {
 
     val tableLoc = bronzePipeline.BronzeTargets.cloudMachineDetail.tableLocation
     val dropInstanceDetailsSql = s"drop table if exists ${bronzePipeline.BronzeTargets.cloudMachineDetail.tableFullName}"
@@ -183,27 +283,37 @@ trait ValidationUtils extends SparkSessionWrapper {
 
     val uniqueTablesToClone = Array(
       bronzePipeline.BronzeTargets.processedEventLogs,
-      bronzePipeline.BronzeTargets.cloudMachineDetail.copy(mode = "overwrite"),
+      bronzePipeline.BronzeTargets.cloudMachineDetail,
       bronzePipeline.pipelineStateTarget
-    ).par
+    ).map(_.copy(mode = "overwrite")).par
     uniqueTablesToClone.tasksupport = taskSupport
 
-    uniqueTablesToClone.foreach(target => {
+    uniqueTablesToClone.map(target => {
       try {
-        val stmt = s"CREATE TABLE ${target.tableFullName} DEEP CLONE ${sourceDBName}.${target.name}"
+        val stmt = s"CREATE OR REPLACE TABLE ${target.tableFullName} DEEP CLONE ${sourceDBName}.${target.name} " +
+          s"LOCATION '${target.tableLocation}'"
         println(s"CLONING TABLE ${target.tableFullName}.\nSTATEMENT: ${stmt}")
         spark.sql(stmt)
+        val snappedCount = target.asDF.count()
+        SnapReport(
+          target.tableFullName,
+          new java.sql.Timestamp(bronzePipeline.primordialEpoch),
+          new java.sql.Timestamp(bronzePipeline.pipelineSnapTime.asUnixTimeMilli),
+          snappedCount,
+          "null"
+        )
       } catch {
         case e: Throwable => {
           val errMsg = s"FAILED TO CLONE: ${target.tableFullName}\nERROR: ${e.getMessage}"
           println(errMsg)
           logger.log(Level.ERROR, errMsg, e)
+          throw new BronzeSnapException(errMsg, target, Module(0, "STATE_SNAP", bronzePipeline))
         }
       }
-    })
+    }).toArray.toSeq
   }
 
-  protected def deriveRecalcPrimordial(pipeline: Pipeline, daysToPad: Int): String = {
+  protected def getPaddedPrimoridal(pipeline: Pipeline, daysToPad: Int): String = {
     val primordialSnapDate = getPrimordialSnapshot(pipeline)
     val recalcPrimordialDate = primordialSnapDate.plusDays(daysToPad).toString
     logger.log(Level.INFO, s"PRIMORDIAL DATE: Set for recalculation as $recalcPrimordialDate.")
