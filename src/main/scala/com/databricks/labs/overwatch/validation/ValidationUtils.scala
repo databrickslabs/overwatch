@@ -81,7 +81,7 @@ trait ValidationUtils extends SparkSessionWrapper {
     val sourceConfig = sourceWorkspace.getConfig
     val sourceBronzePipeline = Bronze(sourceWorkspace, readOnly = true)
     if (sourceBronzePipeline.getPipelineState.isEmpty) {
-      throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.")
+      throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.", None)
     } else {
       val sourceMaxUntilTS = sourceBronzePipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS
       require(sourceMaxUntilTS >= snapUntilTime.asUnixTimeMilli, s"PIPELINE STATE ERROR: The maximum state of " +

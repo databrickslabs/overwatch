@@ -59,11 +59,11 @@ class Pipeline(
     pipelineState.clear()
   }
 
-  private[overwatch] def setReadOnly(): this.type = {
-    _readOnly = true
+  private[overwatch] def setReadOnly(value: Boolean): this.type = {
+    _readOnly = value
     this
   }
-  private[overwatch] def readOnly: Boolean = _readOnly
+  def readOnly: Boolean = _readOnly
 
   /**
    * Getter for Pipeline Snap Time
@@ -271,7 +271,8 @@ class Pipeline(
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
 
-    try {
+      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
+        s"Module ${module.moduleName} has a defined state but the target to which it writes is missing.", Some(target))
 
       val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, getTotalCores)
 
@@ -325,13 +326,6 @@ class Pipeline(
         inputConfig = config.inputConfig,
         parsedConfig = config.parsedConfig
       )
-    } catch {
-      case e: Throwable =>
-        val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
-        logger.log(Level.ERROR, msg, e)
-        throw new FailedModuleException(msg, target)
-    }
-
   }
 
 }

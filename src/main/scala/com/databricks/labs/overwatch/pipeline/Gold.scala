@@ -227,7 +227,7 @@ object Gold {
     .loadStaticDatasets()
 
   def apply(workspace: Workspace, readOnly: Boolean): Gold = {
-    apply(workspace).setReadOnly
+    apply(workspace).setReadOnly(readOnly)
   }
 
 }

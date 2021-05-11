@@ -186,22 +186,24 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    *
    * @return
    */
-  def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Int = 2): (Pipeline, Pipeline) = {
+  def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Int = 2): Unit = {
 
     val snapLookupPipeline = getBronzePipeline()
 
-    val silverPipeline = getSilverPipeline(readOnly = false)
-    val goldPipeline = getGoldPipeline(readOnly = false)
+    lazy val silverPipeline = getSilverPipeline(readOnly = false)
 
     // set primordial padding n days ahead of bronze primordial as per configured padding
     silverPipeline.config
       .setPrimordialDateString(Some(getPaddedPrimoridal(snapLookupPipeline, primordialPadding)))
       .setMaxDays(maxDays)
+
+    silverPipeline.run()
+
+    lazy val goldPipeline = getGoldPipeline(readOnly = false)
     goldPipeline.config
       .setPrimordialDateString(Some(getPaddedPrimoridal(snapLookupPipeline, primordialPadding)))
       .setMaxDays(maxDays)
-
-    (silverPipeline.run(), goldPipeline.run())
+    goldPipeline.run()
   }
 
   /**
@@ -213,7 +215,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    * @param pipeline
    * @param versionsAgo
    */
-  def rollbackPipelineState(pipeline: Pipeline, versionsAgo: Int = 2): Unit = {
+  private def rollbackPipelineState(pipeline: Pipeline, versionsAgo: Int = 2): Unit = {
     // snapshot current state for bronze
     val initialBronzeState = pipeline.getPipelineState.filter(_._1 < 2000)
     // clear the state
@@ -318,31 +320,54 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   }
 
   private def validatePartitionCols(target: PipelineTable): (PipelineTable, SchemaValidationReport) = {
-    val catPartCols = target.catalogTable.partitionColumnNames.map(_.toLowerCase)
-    val msg = if (catPartCols == target.partitionBy) "PASS" else s"FAIL: Partition Columns do not match"
-    val report = SchemaValidationReport(
-      target.tableFullName,
-      "Partition Columns",
-      catPartCols,
-      target.partitionBy,
-      msg
-    )
-    (target, report)
+    try {
+      val catPartCols = target.catalogTable.partitionColumnNames.map(_.toLowerCase)
+      val msg = if (catPartCols == target.partitionBy) "PASS" else s"FAIL: Partition Columns do not match"
+      val report = SchemaValidationReport(
+        target.tableFullName,
+        "Partition Columns",
+        catPartCols,
+        target.partitionBy,
+        msg
+      )
+      (target, report)
+    } catch {
+      case e: Throwable =>
+        val report = SchemaValidationReport(
+          target.tableFullName,
+          "Required Columns",
+          Array[String](),
+          Array[String](),
+          e.getMessage
+        )
+        (target, report)
+    }
   }
 
   private def validateRequiredColumns(target: PipelineTable, schemaValidationReport: SchemaValidationReport): SchemaValidationReport = {
-    val existingColumns = target.asDF.columns
-    val requiredColumns = target.keys(true) ++ target.incrementalColumns ++ target.partitionBy
-    val caseSensitive = spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
-    val isError = !requiredColumns.forall(f => target.asDF.hasFieldNamed(f, caseSensitive))
-    val msg = if (isError) "FAIL: Missing required columns" else "PASS"
-    SchemaValidationReport(
-      target.tableFullName,
-      "Required Columns",
-      requiredColumns,
-      existingColumns,
-      msg
-    )
+    try {
+      val existingColumns = target.asDF.columns
+      val requiredColumns = target.keys(true) ++ target.incrementalColumns ++ target.partitionBy
+      val caseSensitive = spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
+      val isError = !requiredColumns.forall(f => target.asDF.hasFieldNamed(f, caseSensitive))
+      val msg = if (isError) "FAIL: Missing required columns" else "PASS"
+      SchemaValidationReport(
+        target.tableFullName,
+        "Required Columns",
+        requiredColumns,
+        existingColumns,
+        msg
+      )
+    } catch {
+      case e: Throwable =>
+        SchemaValidationReport(
+          target.tableFullName,
+          "Required Columns",
+          Array[String](),
+          Array[String](),
+          e.getMessage
+        )
+    }
 
   }
 

@@ -261,7 +261,7 @@ object Silver {
   }
 
   def apply(workspace: Workspace, readOnly: Boolean): Silver = {
-    apply(workspace).setReadOnly()
+    apply(workspace).setReadOnly(readOnly)
   }
 
 }

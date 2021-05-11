@@ -170,7 +170,7 @@ class Module(
       fromTS = fromTime.asUnixTimeMilli,
       untilTS = untilTime.asUnixTimeMilli,
       dataFrequency = moduleState.dataFrequency,
-      status = s"FAILED --> $rollbackStatus: ERROR:\n$msg",
+      status = s"FAILED --> $rollbackStatus\nERROR:\n$msg",
       recordsAppended = 0L,
       lastOptimizedTS = moduleState.lastOptimizedTS,
       vacuumRetentionHours = moduleState.vacuumRetentionHours,
