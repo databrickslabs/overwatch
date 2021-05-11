@@ -188,22 +188,16 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    */
   def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Int = 2): Unit = {
 
-    val snapLookupPipeline = getBronzePipeline()
-
-    lazy val silverPipeline = getSilverPipeline(readOnly = false)
-
     // set primordial padding n days ahead of bronze primordial as per configured padding
-    silverPipeline.config
-      .setPrimordialDateString(Some(getPaddedPrimoridal(snapLookupPipeline, primordialPadding)))
-      .setMaxDays(maxDays)
+    val snapLookupPipeline = getBronzePipeline()
+    val recalcConfig = snapWorkspace.getConfig
+    recalcConfig.setMaxDays(maxDays)
+    recalcConfig.setPrimordialDateString(Some(getPaddedPrimoridal(snapLookupPipeline, primordialPadding)))
+    val recalcWorkspace = snapWorkspace.copy(_config = recalcConfig)
 
-    silverPipeline.run()
+    Silver(recalcWorkspace, readOnly = false).run()
+    Gold(recalcWorkspace, readOnly = false).run()
 
-    lazy val goldPipeline = getGoldPipeline(readOnly = false)
-    goldPipeline.config
-      .setPrimordialDateString(Some(getPaddedPrimoridal(snapLookupPipeline, primordialPadding)))
-      .setMaxDays(maxDays)
-    goldPipeline.run()
   }
 
   /**
@@ -215,7 +209,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    * @param pipeline
    * @param versionsAgo
    */
-  private def rollbackPipelineState(pipeline: Pipeline, versionsAgo: Int = 2): Unit = {
+  def rollbackPipelineState(pipeline: Pipeline, versionsAgo: Int = 2): Unit = {
     // snapshot current state for bronze
     val initialBronzeState = pipeline.getPipelineState.filter(_._1 < 2000)
     // clear the state

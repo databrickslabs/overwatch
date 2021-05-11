@@ -58,7 +58,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * public function.
    * @return
    */
-  private[overwatch] def getConfig: Config = config
+  def getConfig: Config = config
 
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"

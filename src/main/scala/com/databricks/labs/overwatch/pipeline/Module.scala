@@ -29,7 +29,6 @@ class Module(
 
   private[overwatch] def moduleState: SimplifiedModuleStatusReport = {
     if (pipeline.getModuleState(moduleId).isEmpty) {
-      _isFirstRun = true
       val initialModuleState = initModuleState
       pipeline.updateModuleState(initialModuleState)
       initialModuleState
@@ -48,7 +47,7 @@ class Module(
    * @param moduleID moduleID for modules in scope for the run
    * @return
    */
-  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty){
+  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty || isFirstRun){
     Pipeline.createTimeDetail(pipeline.primordialEpoch)
   } else Pipeline.createTimeDetail(moduleState.untilTS)
 
@@ -133,6 +132,7 @@ class Module(
   }
 
   private def initModuleState: SimplifiedModuleStatusReport = {
+    _isFirstRun = true
     val initState = SimplifiedModuleStatusReport(
       organization_id = config.organizationId,
       moduleID = moduleId,

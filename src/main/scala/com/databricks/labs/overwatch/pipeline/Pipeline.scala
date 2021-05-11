@@ -55,11 +55,11 @@ class Pipeline(
     pipelineState.put(moduleState.moduleID, moduleState)
   }
 
-  protected[overwatch] def clearPipelineState(): Unit = {
+  def clearPipelineState(): Unit = {
     pipelineState.clear()
   }
 
-  private[overwatch] def setReadOnly(value: Boolean): this.type = {
+  def setReadOnly(value: Boolean): this.type = {
     _readOnly = value
     this
   }
@@ -271,8 +271,8 @@ class Pipeline(
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
 
-      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
-        s"Module ${module.moduleName} has a defined state but the target to which it writes is missing.", Some(target))
+//      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
+//        s"Module ${module.moduleName} has a defined state but the target to which it writes is missing.", Some(target))
 
       val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, getTotalCores)
 
