@@ -5,6 +5,8 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
+import scala.collection.immutable.ListMap
+
 class Module(
               val moduleId: Int,
               val moduleName: String,
@@ -39,12 +41,12 @@ class Module(
   private def pipelineState: Map[Int, SimplifiedModuleStatusReport] = pipeline.getPipelineState.toMap
 
   /**
-   * This is also used for simulation of start/end times during testing. This also should not be a public function
-   * when completed. Note that this controlled by module. Not every module is executed on every run or a module could
+   * This is also used for simulation of start/end times during testing.
+   * Note that this controlled by module. Not every module is executed on every run or a module could
    * fail and this allows for missed data since the last successful run to be acquired without having to pull all the
    * data for all modules each time.
+   * fromTime is always INCLUSIVE >= when used for calculating incrementals
    *
-   * @param moduleID moduleID for modules in scope for the run
    * @return
    */
   def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty || isFirstRun){
@@ -118,6 +120,8 @@ class Module(
   /**
    * Defines the latest timestamp to be used for a give module as a TimeType
    * When pipeline is read only, module state can be read independent of upstream dependencies.
+   * untilTime is EXCLUSIVE in other words when it is used as a calculation in "asIncrementalDF" it is < untilTime
+   * not <= untilTime
    *
    * @return
    */
@@ -274,11 +278,15 @@ class Module(
     println(debugMsg)
     logger.log(Level.INFO, debugMsg)
     try {
+      val BREAKPipelineState = ListMap(pipelineState.toSeq.sortBy(_._1):_ *)
       validatePipelineState()
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
+      val BREAKPipelineState2 = ListMap(pipelineState.toSeq.sortBy(_._1):_ *)
       val etlDefinition = _etlDefinition.copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
+      val BREAKPipelineState3 = ListMap(pipelineState.toSeq.sortBy(_._1):_ *)
       val newState = etlDefinition.executeETL(this, verifiedSourceDF)
+      val BREAKPipelineState4 = ListMap(pipelineState.toSeq.sortBy(_._1):_ *)
       finalizeModule(newState)
       newState
     } catch {

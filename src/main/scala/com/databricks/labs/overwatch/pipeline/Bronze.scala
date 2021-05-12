@@ -159,8 +159,12 @@ object Bronze {
       .loadStaticDatasets()
   }
 
-  private[overwatch] def apply(workspace: Workspace, readOnly: Boolean): Bronze = {
-    apply(workspace).setReadOnly(readOnly)
+  private[overwatch] def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Bronze = {
+    new Bronze(workspace, workspace.database, workspace.getConfig)
+      .suppressRangeReport(suppressReport)
+      .setReadOnly(readOnly)
+      .initPipelineRun()
+      .loadStaticDatasets()
   }
 
 }

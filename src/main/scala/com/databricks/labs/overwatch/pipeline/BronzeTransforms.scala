@@ -93,7 +93,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
     pathsToValidate.foreach(path => {
       try { // succeeds if path does exist
         logger.log(Level.INFO, s"Validating: ${path}")
-        dbutils.fs.ls(path).head.isDir
+        try{
+          dbutils.fs.ls(path).head.isDir
+        } catch {
+          case _: NullPointerException => com.databricks.service.DBUtils.fs.ls(path).headOption.nonEmpty
+        }
         firstRunValid = false
         if (isFirstRun) {
           logger.log(Level.INFO, s"${path} exists as directory confirmed. Invalid first run")

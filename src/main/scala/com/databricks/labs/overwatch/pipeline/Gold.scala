@@ -222,12 +222,18 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 }
 
 object Gold {
-  def apply(workspace: Workspace): Gold = new Gold(workspace, workspace.database, workspace.getConfig)
-    .initPipelineRun()
-    .loadStaticDatasets()
+  def apply(workspace: Workspace): Gold = {
+    new Gold(workspace, workspace.database, workspace.getConfig)
+      .initPipelineRun()
+      .loadStaticDatasets()
+  }
 
-  def apply(workspace: Workspace, readOnly: Boolean): Gold = {
-    apply(workspace).setReadOnly(readOnly)
+  def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Gold = {
+    new Gold(workspace, workspace.database, workspace.getConfig)
+      .setReadOnly(readOnly)
+      .suppressRangeReport(suppressReport)
+      .initPipelineRun()
+      .loadStaticDatasets()
   }
 
 }

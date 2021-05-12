@@ -14,8 +14,6 @@ class Config() {
   private final val _runID = UUID.randomUUID().toString.replace("-", "")
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
-  private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
-  private var _isFirstRun: Boolean = false
   private var _debugFlag: Boolean = false
   private var _organizationId: String = _
   private var _databaseName: String = _
@@ -49,8 +47,6 @@ class Config() {
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
   def isLocalTesting: Boolean = _isLocalTesting
-
-  def isDBConnect: Boolean = _isDBConnect
 
   def debugFlag: Boolean = _debugFlag
 
@@ -197,12 +193,6 @@ class Config() {
     this
   }
 
-  private[overwatch] def setIsFirstRun(value: Boolean): this.type = {
-    _isFirstRun = value
-    logger.log(Level.INFO, s"IS FIRST RUN: ${value.toString}")
-    this
-  }
-
   private[overwatch] def setContractInteractiveDBUPrice(value: Double): this.type = {
     _contractInteractiveDBUPrice = value
     this
@@ -260,7 +250,7 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
-          //_cloudProvider setter not necessary -- done in local setup
+          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _tokenType = "Environment"
         } else { // Use default token for job owner

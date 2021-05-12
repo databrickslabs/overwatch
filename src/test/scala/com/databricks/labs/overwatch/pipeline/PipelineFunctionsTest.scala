@@ -14,19 +14,20 @@ import org.apache.spark.sql.Column
 
 class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
 
-  describe("Tests for addOneTick") {
+  describe("Tests for add and subtract incremental ticks") {
+
+    val generatedDf = spark.createDataFrame(
+      Seq((2, 2l, 2.0d, java.sql.Date.valueOf("2020-10-30"),
+        java.sql.Timestamp.valueOf("2011-10-31 10:01:11.000")))
+    ).toDF("int", "long", "double", "date", "timestamp")
 
     it("add tick to every column") {
-      val frequency = Frequency.milliSecond
-      val generatedDf = spark.createDataFrame(
-        Seq((1, 2l, 1.0d, java.sql.Date.valueOf("2020-10-30"),
-          java.sql.Timestamp.valueOf("2011-10-31 10:01:11.000")))
-      ).toDF("int", "long", "double", "date", "timestamp")
-        .select(PipelineFunctions.addOneTick(col("int"), frequency, IntegerType).as("int"),
-          PipelineFunctions.addOneTick(col("long"), frequency, LongType).as("long"),
-          PipelineFunctions.addOneTick(col("double"), frequency, DoubleType).as("double"),
-          PipelineFunctions.addOneTick(col("date"), frequency, DateType).as("date"),
-          PipelineFunctions.addOneTick(col("timestamp"), frequency).as("timestamp")
+      generatedDf
+        .select(PipelineFunctions.addNTicks(col("int"), 1, IntegerType).as("int"),
+          PipelineFunctions.addNTicks(col("long"), 1, LongType).as("long"),
+          PipelineFunctions.addNTicks(col("double"), 1, DoubleType).as("double"),
+          PipelineFunctions.addNTicks(col("date"), 1, DateType).as("date"),
+          PipelineFunctions.addNTicks(col("timestamp"), 1).as("timestamp")
         )
 
       assertResult("`int` INT,`long` BIGINT,`double` DOUBLE,`date` DATE,`timestamp` TIMESTAMP") {
@@ -34,8 +35,29 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       }
 
       val mustBeDf = spark.createDataFrame(
-        Seq((2, 3l, 1.001d, java.sql.Date.valueOf("2020-10-31"),
+        Seq((3, 3l, 2.001d, java.sql.Date.valueOf("2020-10-31"),
           java.sql.Timestamp.valueOf("2011-10-31 10:01:11.001")))
+      ).toDF("int", "long", "double", "date", "timestamp")
+
+      assertApproximateDataFrameEquality(generatedDf, mustBeDf, 0.001)
+    }
+
+    it("subtract tick from every column") {
+      generatedDf
+        .select(PipelineFunctions.subtractNTicks(col("int"), 1, IntegerType).as("int"),
+          PipelineFunctions.subtractNTicks(col("long"), 1, LongType).as("long"),
+          PipelineFunctions.subtractNTicks(col("double"), 1, DoubleType).as("double"),
+          PipelineFunctions.subtractNTicks(col("date"), 1, DateType).as("date"),
+          PipelineFunctions.subtractNTicks(col("timestamp"), 1).as("timestamp")
+        )
+
+      assertResult("`int` INT,`long` BIGINT,`double` DOUBLE,`date` DATE,`timestamp` TIMESTAMP") {
+        generatedDf.schema.toDDL
+      }
+
+      val mustBeDf = spark.createDataFrame(
+        Seq((1, 1l, 1.999d, java.sql.Date.valueOf("2020-10-29"),
+          java.sql.Timestamp.valueOf("2011-10-31 10:01:10.999")))
       ).toDF("int", "long", "double", "date", "timestamp")
 
       assertApproximateDataFrameEquality(generatedDf, mustBeDf, 0.001)
@@ -44,7 +66,7 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
     it("should fail on wrong column type") {
       val df = spark.range(1)
       assertThrows[UnsupportedOperationException] {
-        df.withColumn("abc", PipelineFunctions.addOneTick(col("id"), Frequency.milliSecond, StringType))
+        df.withColumn("abc", PipelineFunctions.addNTicks(col("id"), 1, StringType))
       }
     }
   }
@@ -70,14 +92,14 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       val smallDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
       val filterSeq: Seq[Column] = Seq(col("int") === 15)
       assertResult(1) {
-        PipelineFunctions.applyFilters(smallDF, filterSeq).first().getAs("dummy")
+        PipelineFunctions.applyFilters(smallDF, filterSeq, false).first().getAs("dummy")
       }
     }
     it("not match record applyFilter") {
       val smallDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
       val filterSeq: Seq[Column] = Seq(col("int") === 14)
       assertResult(0) {
-        PipelineFunctions.applyFilters(smallDF, filterSeq).count()
+        PipelineFunctions.applyFilters(smallDF, filterSeq, false).count()
       }
     }
   }

@@ -111,11 +111,23 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
   private val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
 
-  def getBronzePipeline(workspace: Workspace = snapWorkspace, readOnly: Boolean = true): Bronze = Bronze(workspace, readOnly)
+  def getBronzePipeline(
+                         workspace: Workspace = snapWorkspace,
+                         readOnly: Boolean = true,
+                         suppressReport: Boolean = true
+                       ): Bronze = Bronze(workspace, readOnly, suppressReport)
 
-  def getSilverPipeline(workspace: Workspace = snapWorkspace, readOnly: Boolean = true): Silver = Silver(workspace, readOnly)
+  def getSilverPipeline(
+                         workspace: Workspace = snapWorkspace,
+                         readOnly: Boolean = true,
+                         suppressReport: Boolean = true
+                       ): Silver = Silver(workspace, readOnly, suppressReport)
 
-  def getGoldPipeline(workspace: Workspace = snapWorkspace, readOnly: Boolean = true): Gold = Gold(workspace, readOnly)
+  def getGoldPipeline(
+                       workspace: Workspace = snapWorkspace,
+                       readOnly: Boolean = true,
+                       suppressReport: Boolean = true
+                     ): Gold = Gold(workspace, readOnly, suppressReport)
 
   /**
    *
@@ -161,11 +173,11 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     logger.log(Level.INFO, s"BRONZE Snap: Primordial Date Overridden: ${bronzeConfig.primordialDateString}")
     logger.log(Level.INFO, s"BRONZE Snap: Max Days Overridden: ${bronzeConfig.maxDays}")
     val bronzeSnapWorkspace = snapWorkspace.copy(_config = bronzeConfig)
-    val bronzePipeline = Bronze(bronzeSnapWorkspace, readOnly = true)
+    val bronzePipeline = getBronzePipeline(bronzeSnapWorkspace, readOnly = false)
 
     validateSnapPipeline(sourceWorkspace, bronzePipeline, snapFromTime, snapUntilTime, isRefresh)
 
-    val statefulSnapsReport = snapStateTables(sourceDBName, taskSupport, bronzePipeline)
+    val statefulSnapsReport = snapStateTables(sourceDBName, taskSupport, bronzePipeline, snapUntilTime)
     resetPipelineReportState(bronzePipeline.pipelineStateTarget, snapFromTime.asDTString, isRefresh)
     bronzePipeline.clearPipelineState() // clears states such that module fromTimes == primordial date
 
@@ -175,7 +187,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     bronzeTargetsWModule.tasksupport = taskSupport
 
     val scopeSnaps = bronzeTargetsWModule
-      .map(targetDetail => snapTable(sourceDBName, targetDetail.module, targetDetail.target, snapFromTime, snapUntilTime))
+      .map(targetDetail => snapTable(sourceDBName, targetDetail.module, targetDetail.target))
       .toArray.toSeq
 
     (statefulSnapsReport ++ scopeSnaps).toDS()
@@ -190,13 +202,23 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
     // set primordial padding n days ahead of bronze primordial as per configured padding
     val snapLookupPipeline = getBronzePipeline()
-    val recalcConfig = snapWorkspace.getConfig
-    recalcConfig.setMaxDays(maxDays)
-    recalcConfig.setPrimordialDateString(Some(getPaddedPrimoridal(snapLookupPipeline, primordialPadding)))
-    val recalcWorkspace = snapWorkspace.copy(_config = recalcConfig)
 
-    Silver(recalcWorkspace, readOnly = false).run()
-    Gold(recalcWorkspace, readOnly = false).run()
+    if (primordialPadding < 7) {
+      val msg = s"WARNING!!  The padding has been set to less than 7 days. This can misrepresent the accuracy of the " +
+        s"pipeline as the pipeline often requires >= 7 days to become accurate. The stateful calculations prior to " +
+        s"the primordial date are not available during the comparison.\nFor best results please use padding of at " +
+        s"least 7 days --> RECOMMENDED 30 days."
+      println(msg)
+      logger.log(Level.WARN, msg)
+    }
+    val paddedWorkspace = padPrimoridal(snapLookupPipeline, primordialPadding, Some(maxDays))
+
+    val silverPipeline = getSilverPipeline(paddedWorkspace, readOnly = false)
+    val BREAKState1 = silverPipeline.getConfig
+    silverPipeline.run()
+    val goldPipeline = getGoldPipeline(paddedWorkspace, readOnly = false)
+    val BREAKState2 = goldPipeline.getConfig
+    goldPipeline.run()
 
   }
 
@@ -209,7 +231,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    * @param pipeline
    * @param versionsAgo
    */
-  def rollbackPipelineState(pipeline: Pipeline, versionsAgo: Int = 2): Unit = {
+  private def rollbackPipelineState(pipeline: Pipeline, versionsAgo: Int = 2): Unit = {
     // snapshot current state for bronze
     val initialBronzeState = pipeline.getPipelineState.filter(_._1 < 2000)
     // clear the state
@@ -219,7 +241,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
       val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
       val wRank = Window.partitionBy('organization_id, 'moduleID, 'rnk).orderBy('Pipeline_SnapTS.desc)
       spark.table(s"${pipeline.config.databaseName}.pipeline_report")
-        .filter('Status === "SUCCESS" || 'Status.startsWith("EMPTY"))
+        .filter('Status === "SUCCESS") // || 'Status.startsWith("EMPTY"))
         .filter('organization_id === pipeline.config.organizationId)
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(wRank))
@@ -235,7 +257,6 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
       Array[SimplifiedModuleStatusReport]()
     }
     println(s"Rolled pipeline back $versionsAgo versions. RESULT:\n")
-    pipeline.showRangeReport()
   }
 
   /**
@@ -243,22 +264,37 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    * @param incrementalTest
    * @return
    */
-  def validateEquality(incrementalTest: Boolean): Dataset[ValidationReport] = {
+  def validateEquality(
+                        primordialPadding: Int = 7,
+                        tol: Double = 0D,
+                        maxDays: Option[Int] = None
+                      ): Dataset[ValidationReport] = {
 
-    val silverPipeline = Silver(snapWorkspace, readOnly = true)
-    val goldPipeline = Gold(snapWorkspace, readOnly = true)
-    rollbackPipelineState(silverPipeline)
-    rollbackPipelineState(goldPipeline)
+    val snapLookupPipeline = getBronzePipeline()
+    val paddedWorkspace = padPrimoridal(snapLookupPipeline, primordialPadding, maxDays)
+
+    val silverPipeline = getSilverPipeline(paddedWorkspace)
+      .clearPipelineState()
+
+    val BREAKState1 = silverPipeline.getPipelineState
+
+    val goldPipeline = getGoldPipeline(paddedWorkspace)
+      .clearPipelineState()
+//    rollbackPipelineState(silverPipeline)
+
+    val BREAKState2 = silverPipeline.getPipelineState
+//    rollbackPipelineState(goldPipeline)
 
     val silverTargetsWModule = getLinkedModuleTarget(silverPipeline)
 
     val goldTargetsWModule = getLinkedModuleTarget(goldPipeline)
 
     val targetsToValidate = (silverTargetsWModule ++ goldTargetsWModule).par
+      .filter(_.target.exists)
     targetsToValidate.tasksupport = taskSupport
 
     targetsToValidate.map(targetDetail => {
-      assertDataFrameDataEquals(targetDetail, sourceDBName, incrementalTest)
+      assertDataFrameDataEquals(targetDetail, sourceDBName, tol)
     }).toArray.toSeq.toDS()
 
   }

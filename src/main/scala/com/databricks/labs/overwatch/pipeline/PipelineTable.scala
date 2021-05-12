@@ -142,7 +142,7 @@ case class PipelineTable(
           spark.table(tableFullName).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
         } else spark.table(tableFullName)
         if (withGlobalFilters && config.globalFilters.nonEmpty)
-          PipelineFunctions.applyFilters(fullDF, config.globalFilters)
+          PipelineFunctions.applyFilters(fullDF, config.globalFilters, config.debugFlag)
         else fullDF
       } else spark.emptyDataFrame
     } catch {
@@ -178,6 +178,8 @@ case class PipelineTable(
   /**
    * Build 1 or more incremental filters for a dataframe from standard start or aditionalStart less
    * "additionalLagDays" when loading an incremental DF with some front-padding to capture lagging start events
+   * IMPORTANT: This logic is insufficient for date only filters. Date filters are meant to also be partition filters
+   * coupled with a more granular filter. Date filters are inclusive on both sides for paritioning.
    *
    * @param module            module used for logging and capturing status timestamps by module
    * @param additionalLagDays Front-padded days prior to start
@@ -205,13 +207,20 @@ case class PipelineTable(
         dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
         "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
 
-      logger.log(Level.INFO, s"FILTERING: ${module.moduleName} using cron columns: ${cronFields.map(_.name).mkString(", ")}")
+      val filterMsg = s"FILTERING: ${module.moduleName} using cron columns: ${cronFields.map(_.name).mkString(", ")}"
+      logger.log(Level.INFO, filterMsg)
+      if (config.debugFlag) println(filterMsg)
       val incrementalFilters = cronFields.map(field => {
-
-//        val field = cronFields.filter(_.name == filterCol).head
 
         field.dataType match {
           case dt: DateType => {
+            if (!partitionBy.map(_.toLowerCase).contains(field.name.toLowerCase)) {
+              val errmsg = s"Date filters are inclusive on both sides and are used for paritioning. Date filters " +
+                s"should not be used in the Overwatch package alone. Date filters must be accompanied by a more " +
+                s"granular filter to utilize df.asIncrementalDF.\nERROR: ${field.name} not in partition columns: " +
+                s"${partitionBy.mkString(", ")}"
+              throw new IncompleteFilterException(errmsg)
+            }
             IncrementalFilter(
               field,
               date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays),
@@ -243,7 +252,9 @@ case class PipelineTable(
         }
       })
 
-      PipelineFunctions.withIncrementalFilters(instanceDF, Some(module), incrementalFilters, config.globalFilters, dataFrequency)
+      PipelineFunctions.withIncrementalFilters(
+        instanceDF, Some(module), incrementalFilters, config.globalFilters, dataFrequency, config.debugFlag
+      )
     } else { // Source doesn't exist
       spark.emptyDataFrame
     }
@@ -251,12 +262,11 @@ case class PipelineTable(
 
   def writer(df: DataFrame): Any = {
     setSparkOverrides()
-    val f = if (config.isLocalTesting && !config.isDBConnect) "parquet" else format
     if (checkpointPath.nonEmpty) {
       val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
       if (config.debugFlag) println(streamWriterMessage)
       logger.log(Level.INFO, streamWriterMessage)
-      var streamWriter = df.writeStream.outputMode(mode).format(f).option("checkpointLocation", checkpointPath.get)
+      var streamWriter = df.writeStream.outputMode(mode).format(format).option("checkpointLocation", checkpointPath.get)
         .queryName(s"StreamTo_${name}")
       streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter
       streamWriter = if (mode == "overwrite") streamWriter.option("overwriteSchema", "true")
@@ -266,7 +276,7 @@ case class PipelineTable(
       else streamWriter
       streamWriter
     } else {
-      var dfWriter = df.write.mode(mode).format(f)
+      var dfWriter = df.write.mode(mode).format(format)
       dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter
       dfWriter = if (mode == "overwrite") dfWriter.option("overwriteSchema", "true")
       else if (enableSchemaMerge && mode != "overwrite")

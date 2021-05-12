@@ -29,8 +29,10 @@ class Pipeline(
   final val config: Config = _config
   private var _pipelineSnapTime: Long = _
   private var _readOnly: Boolean = false
+  private var _supressRangeReport: Boolean = false
   lazy protected final val postProcessor = new PostProcessor()
   private val pipelineState = scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport]()
+
   import spark.implicits._
 
   envInit()
@@ -55,15 +57,26 @@ class Pipeline(
     pipelineState.put(moduleState.moduleID, moduleState)
   }
 
-  def clearPipelineState(): Unit = {
+  def clearPipelineState(): this.type = {
     pipelineState.clear()
+    this
   }
 
   def setReadOnly(value: Boolean): this.type = {
     _readOnly = value
     this
   }
+
   def readOnly: Boolean = _readOnly
+
+  def suppressRangeReport: this.type = {
+    suppressRangeReport(true)
+    this
+  }
+  def suppressRangeReport(value: Boolean): this.type = {
+    _supressRangeReport = value
+    this
+  }
 
   /**
    * Getter for Pipeline Snap Time
@@ -73,23 +86,6 @@ class Pipeline(
    */
   def pipelineSnapTime: TimeTypes = {
     Pipeline.createTimeDetail(_pipelineSnapTime)
-  }
-
-  def fromTime(moduleId: Int): TimeTypes = if (getModuleState(moduleId).isEmpty){
-    Pipeline.createTimeDetail(primordialEpoch)
-  } else Pipeline.createTimeDetail(getModuleState(moduleId).get.untilTS)
-
-  def untilTime(moduleID: Int): TimeTypes = {
-    val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(config.maxDays)
-      .atZone(Pipeline.systemZoneId).toInstant.toEpochMilli
-
-    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
-
-    if (startSecondPlusMaxDays < defaultUntilSecond) {
-      Pipeline.createTimeDetail(startSecondPlusMaxDays)
-    } else {
-      Pipeline.createTimeDetail(defaultUntilSecond)
-    }
   }
 
   /**
@@ -106,18 +102,21 @@ class Pipeline(
   }
 
   def showRangeReport(): Unit = {
-    val rangeReport = pipelineState.values.map(lr => (
-      lr.moduleID,
-      lr.moduleName,
-      lr.primordialDateString,
-      fromTime(lr.moduleID).asTSString,
-      untilTime(lr.moduleID).asTSString,
-      pipelineSnapTime.asTSString
-    ))
+    if (!_supressRangeReport) {
+      val rangeReport = pipelineState.values.map(lr => (
+        lr.moduleID,
+        lr.moduleName,
+        lr.primordialDateString,
+        lr.fromTS,
+        lr.untilTS,
+        pipelineSnapTime.asTSString
+      ))
 
-    rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
-      .orderBy('snapTS.desc, 'moduleId)
-      .show(50, false)
+      println(s"Current Pipeline State: BEFORE this run.")
+      rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
+        .orderBy('snapTS.desc, 'moduleId)
+        .show(50, false)
+    }
   }
 
   /**
@@ -209,6 +208,7 @@ class Pipeline(
 
     if (config.primordialDateString.nonEmpty) {
       try {
+        val BREAKTest1 = config.primordialDateString.get
         val primordialLocalDate = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get)
           .toInstant.atZone(systemZoneId)
           .toLocalDate
@@ -233,9 +233,9 @@ class Pipeline(
   }
 
   /**
-    * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
-    * Accepting data with higher precision than delivery causes bad data
-    */
+   * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
+   * Accepting data with higher precision than delivery causes bad data
+   */
   protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
 
   private[overwatch] def initiatePostProcessing(): Unit = {
@@ -271,61 +271,63 @@ class Pipeline(
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
 
-//      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
-//        s"Module ${module.moduleName} has a defined state but the target to which it writes is missing.", Some(target))
+    //      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
+    //        s"Module ${module.moduleName} has a defined state but the target to which it writes is missing.", Some(target))
 
-      val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, getTotalCores)
+    val localSafeTotalCores = if (config.isLocalTesting) spark.conf.getOption("spark.sql.shuffle.partitions").getOrElse("200").toInt
+    else getTotalCores
+    val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, localSafeTotalCores)
 
-      val startLogMsg = s"Beginning append to ${target.tableFullName}"
-      logger.log(Level.INFO, startLogMsg)
+    val startLogMsg = s"Beginning append to ${target.tableFullName}"
+    logger.log(Level.INFO, startLogMsg)
 
-      // Append the output
-      if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
-      else {
-        val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
-        println(readOnlyMsg)
-        logger.log(Level.WARN, readOnlyMsg)
-      }
+    // Append the output
+    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
+    else {
+      val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
+      println(readOnlyMsg)
+      logger.log(Level.WARN, readOnlyMsg)
+    }
 
-      // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
-      // of attempting to re-read the very inefficient json.gz files.
-      val dfCount = if (target.name == "spark_events_bronze") {
-        target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
-      } else finalDF.count()
+    // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
+    // of attempting to re-read the very inefficient json.gz files.
+    val dfCount = if (target.name == "spark_events_bronze") {
+      target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
+    } else finalDF.count()
 
-      val msg = s"SUCCESS! ${module.moduleName}: $dfCount records appended."
-      println(msg)
-      logger.log(Level.INFO, msg)
+    val msg = s"SUCCESS! ${module.moduleName}: $dfCount records appended."
+    println(msg)
+    logger.log(Level.INFO, msg)
 
-      var lastOptimizedTS: Long = getLastOptimized(module.moduleId)
-      if (needsOptimize(module.moduleId, target.optimizeFrequency_H)) {
-        postProcessor.markOptimize(target)
-        lastOptimizedTS = module.untilTime.asUnixTimeMilli
-      }
+    var lastOptimizedTS: Long = getLastOptimized(module.moduleId)
+    if (needsOptimize(module.moduleId, target.optimizeFrequency_H)) {
+      postProcessor.markOptimize(target)
+      lastOptimizedTS = module.untilTime.asUnixTimeMilli
+    }
 
-      restoreSparkConf()
+    restoreSparkConf()
 
-      val endTime = System.currentTimeMillis()
+    val endTime = System.currentTimeMillis()
 
 
-      // Generate Success Report
-      ModuleStatusReport(
-        organization_id = config.organizationId,
-        moduleID = module.moduleId,
-        moduleName = module.moduleName,
-        primordialDateString = config.primordialDateString,
-        runStartTS = startTime,
-        runEndTS = endTime,
-        fromTS = module.fromTime.asUnixTimeMilli,
-        untilTS = module.untilTime.asUnixTimeMilli,
-        dataFrequency = target.dataFrequency.toString,
-        status = "SUCCESS",
-        recordsAppended = dfCount,
-        lastOptimizedTS = lastOptimizedTS,
-        vacuumRetentionHours = 24 * 7,
-        inputConfig = config.inputConfig,
-        parsedConfig = config.parsedConfig
-      )
+    // Generate Success Report
+    ModuleStatusReport(
+      organization_id = config.organizationId,
+      moduleID = module.moduleId,
+      moduleName = module.moduleName,
+      primordialDateString = config.primordialDateString,
+      runStartTS = startTime,
+      runEndTS = endTime,
+      fromTS = module.fromTime.asUnixTimeMilli,
+      untilTS = module.untilTime.asUnixTimeMilli,
+      dataFrequency = target.dataFrequency.toString,
+      status = "SUCCESS",
+      recordsAppended = dfCount,
+      lastOptimizedTS = lastOptimizedTS,
+      vacuumRetentionHours = 24 * 7,
+      inputConfig = config.inputConfig,
+      parsedConfig = config.parsedConfig
+    )
   }
 
 }
@@ -334,6 +336,7 @@ object Pipeline {
 
   val systemZoneId: ZoneId = ZoneId.systemDefault()
   val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
+
   def deriveLocalDate(dtString: String, dtFormat: SimpleDateFormat): LocalDate = {
     dtFormat.parse(dtString).toInstant.atZone((systemZoneId)).toLocalDate
   }

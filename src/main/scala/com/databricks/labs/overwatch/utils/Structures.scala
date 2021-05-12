@@ -155,6 +155,8 @@ private[overwatch] class NoNewDataException(s: String, val level: Level, val all
 
 private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 
+private[overwatch] class IncompleteFilterException(s: String) extends Exception(s) {}
+
 private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
 
 private[overwatch] class TokenError(s: String) extends Exception(s) {}

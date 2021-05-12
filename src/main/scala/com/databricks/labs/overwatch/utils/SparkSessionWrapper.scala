@@ -35,6 +35,7 @@ trait SparkSessionWrapper extends Serializable {
     logger.log(Level.INFO, "Using Custom, local SparkSession")
     SparkSession.builder()
       .master("local")
+      .config("spark.driver.maxResultSize", "8g")
       .appName("OverwatchBatch")
 //    Useful configs for local spark configs and/or using labs/spark-local-execution
 //    https://github.com/databricks-academy/spark-local-execution
@@ -45,7 +46,7 @@ trait SparkSessionWrapper extends Serializable {
   }
 
   lazy val sc: SparkContext = spark.sparkContext
-//  sc.setLogLevel("DEBUG")
+//  sc.setLogLevel("WARN")
 
   def getCoresPerWorker: Int = sc.parallelize("1", 1)
     .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0)
@@ -74,7 +75,8 @@ trait SparkSessionWrapper extends Serializable {
    * @return
    */
   def envInit(logLevel: String = "INFO"): Boolean = {
-    sc.setLogLevel(logLevel)
+    if (System.getenv().containsKey("LOGLEVEL")) sc.setLogLevel(System.getenv("LOGLEVEL"))
+    else sc.setLogLevel(logLevel)
     true
   }
 }

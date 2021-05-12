@@ -163,8 +163,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      */
     val rawParams = if (config.isLocalTesting) {
       //      config.buildLocalOverwatchParams()
-      val synthArgs = config.buildLocalOverwatchParams()
-      mapper.readValue[OverwatchParams](synthArgs)
+//      val synthArgs = config.buildLocalOverwatchParams()
+//      mapper.readValue[OverwatchParams](synthArgs)
+      mapper.readValue[OverwatchParams](args(0))
     } else {
       logger.log(Level.INFO, "Validating Input Parameters")
       mapper.readValue[OverwatchParams](args(0))
@@ -412,9 +413,11 @@ object Initializer extends SparkSessionWrapper {
   private def initConfigState(debugFlag: Boolean): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-    val orgId = if (dbutils.notebook.getContext.tags("orgId") == "0") {
-      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-    } else dbutils.notebook.getContext.tags("orgId")
+    val orgId = if (config.isLocalTesting) System.getenv("ORGID") else {
+      if (dbutils.notebook.getContext.tags("orgId") == "0") {
+        dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+      } else dbutils.notebook.getContext.tags("orgId")
+    }
     config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)

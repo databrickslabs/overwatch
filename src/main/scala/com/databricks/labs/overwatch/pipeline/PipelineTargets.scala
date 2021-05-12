@@ -252,7 +252,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val notebookStatusTarget: PipelineTable = PipelineTable(
       name = "notebook_silver",
-      _keys = Array("timestamp", "notebookId", "requestId"),
+      _keys = Array("notebookId", "requestId"),
       config,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")

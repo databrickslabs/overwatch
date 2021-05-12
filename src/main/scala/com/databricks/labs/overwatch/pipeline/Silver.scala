@@ -260,8 +260,12 @@ object Silver {
       .loadStaticDatasets()
   }
 
-  def apply(workspace: Workspace, readOnly: Boolean): Silver = {
-    apply(workspace).setReadOnly(readOnly)
+  def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Silver = {
+    new Silver(workspace, workspace.database, workspace.getConfig)
+      .suppressRangeReport(suppressReport)
+      .setReadOnly(readOnly)
+      .initPipelineRun()
+      .loadStaticDatasets()
   }
 
 }

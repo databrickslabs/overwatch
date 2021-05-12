@@ -5,16 +5,16 @@ import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
+
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.concurrent.ForkJoinPool
-
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.collection.parallel.mutable.ParArray
 
@@ -27,7 +27,7 @@ trait ValidationUtils extends SparkSessionWrapper {
   protected def getDateFormat: SimpleDateFormat = getDateFormat(None)
 
   protected def validateTargetDestruction(targetDBName: String): Unit = {
-    val sparkCheckValue = spark.conf.get("overwatch.permit.db.destruction")
+    val sparkCheckValue = spark.conf.getOption("overwatch.permit.db.destruction").getOrElse("")
     require(sparkCheckValue == targetDBName, s"You selected to run a very destructive command. This is 100% ok in " +
       s"certain circumstances but to protect your data you must set the following spark conf with a value equal " +
       s"to the name of the database to which you're point this function.\n\noverwatch.permit.db.destruction = $targetDBName")
@@ -79,7 +79,7 @@ trait ValidationUtils extends SparkSessionWrapper {
                                     ): Unit = {
     validateSnapDatabase(snapPipeline, isRefresh)
     val sourceConfig = sourceWorkspace.getConfig
-    val sourceBronzePipeline = Bronze(sourceWorkspace, readOnly = true)
+    val sourceBronzePipeline = Bronze(sourceWorkspace, readOnly = true).suppressRangeReport(true)
     if (sourceBronzePipeline.getPipelineState.isEmpty) {
       throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.", None)
     } else {
@@ -102,6 +102,7 @@ trait ValidationUtils extends SparkSessionWrapper {
 
   /**
    * Returns primordial date from the bronze audit state
+   *
    * @param pipeline
    * @return
    */
@@ -117,13 +118,14 @@ trait ValidationUtils extends SparkSessionWrapper {
 
   /**
    * Returns ModuleTarget with each module by target for the configured scopes
+   *
    * @param pipeline
    * @return
    */
   protected def getLinkedModuleTarget(pipeline: Pipeline): Seq[ModuleTarget] = {
     pipeline match {
       case rawPipeline: Bronze => {
-        val bronzePipeline = rawPipeline.asInstanceOf[Bronze]
+        val bronzePipeline = rawPipeline.asInstanceOf[Bronze].suppressRangeReport(true)
         val bronzeTargets = bronzePipeline.BronzeTargets
         bronzePipeline.getConfig.overwatchScope.flatMap {
           case OverwatchScope.audit => Seq(ModuleTarget(bronzePipeline.auditLogsModule, bronzeTargets.auditLogsTarget))
@@ -136,7 +138,7 @@ trait ValidationUtils extends SparkSessionWrapper {
         }
       }
       case rawPipeline: Silver => {
-        val silverPipeline = rawPipeline.asInstanceOf[Silver]
+        val silverPipeline = rawPipeline.asInstanceOf[Silver].suppressRangeReport(true)
         val silverTargets = silverPipeline.SilverTargets
         silverPipeline.config.overwatchScope.flatMap {
           case OverwatchScope.accounts => {
@@ -166,7 +168,7 @@ trait ValidationUtils extends SparkSessionWrapper {
         }
       }
       case rawPipeline: Gold => {
-        val goldPipeline = rawPipeline.asInstanceOf[Gold]
+        val goldPipeline = rawPipeline.asInstanceOf[Gold].suppressRangeReport(true)
         val goldTargets = goldPipeline.GoldTargets
         goldPipeline.config.overwatchScope.flatMap {
           case OverwatchScope.accounts => {
@@ -216,9 +218,7 @@ trait ValidationUtils extends SparkSessionWrapper {
   protected def snapTable(
                            sourceDBName: String,
                            bronzeModule: Module,
-                           snapTarget: PipelineTable,
-                           snapFromTime: TimeTypes,
-                           snapUntilTime: TimeTypes
+                           snapTarget: PipelineTable
                          ): SnapReport = {
 
     val module = bronzeModule.copy(_moduleDependencies = Array[Int]())
@@ -234,7 +234,7 @@ trait ValidationUtils extends SparkSessionWrapper {
 
       val finalDFToClone = sourceTarget
         .asIncrementalDF(module, snapTarget.incrementalColumns)
-      pipeline.database.write(finalDFToClone, snapTarget, pipeline.pipelineSnapTime.asColumnTS)
+      pipeline.database.write(finalDFToClone, sourceTarget, pipeline.pipelineSnapTime.asColumnTS)
 
 
       val snapCount = spark.table(snapTarget.tableFullName).count()
@@ -243,12 +243,12 @@ trait ValidationUtils extends SparkSessionWrapper {
       println(snapLogMsg)
       logger.log(Level.INFO, snapLogMsg)
 
-//      println(s"UPDATING Module State for ${module.moduleId} --> ${module.moduleId}")
-//      pipeline.updateModuleState(module.moduleState.copy(
-//        fromTS = module.fromTime.asUnixTimeMilli,
-//        untilTS = module.untilTime.asUnixTimeMilli,
-//        recordsAppended = snapCount
-//      ))
+      //      println(s"UPDATING Module State for ${module.moduleId} --> ${module.moduleId}")
+      //      pipeline.updateModuleState(module.moduleState.copy(
+      //        fromTS = module.fromTime.asUnixTimeMilli,
+      //        untilTS = module.untilTime.asUnixTimeMilli,
+      //        recordsAppended = snapCount
+      //      ))
 
       snapTarget.asDF()
         .select(
@@ -272,39 +272,53 @@ trait ValidationUtils extends SparkSessionWrapper {
   protected def snapStateTables(
                                  sourceDBName: String,
                                  taskSupport: ForkJoinTaskSupport,
-                                 bronzePipeline: Pipeline
+                                 bronzePipeline: Pipeline,
+                                 untilTS: TimeTypes
                                ): Seq[SnapReport] = {
-
-    val tableLoc = bronzePipeline.BronzeTargets.cloudMachineDetail.tableLocation
-    val dropInstanceDetailsSql = s"drop table if exists ${bronzePipeline.BronzeTargets.cloudMachineDetail.tableFullName}"
-    println(s"Dropping instanceDetails in SnapDB created from instantiation\n${dropInstanceDetailsSql}")
-    spark.sql(dropInstanceDetailsSql)
-    dbutils.fs.rm(tableLoc, true)
 
     val uniqueTablesToClone = Array(
       bronzePipeline.BronzeTargets.processedEventLogs,
       bronzePipeline.BronzeTargets.cloudMachineDetail,
       bronzePipeline.pipelineStateTarget
-    ).map(_.copy(mode = "overwrite")).par
+    ).par
     uniqueTablesToClone.tasksupport = taskSupport
 
     uniqueTablesToClone.map(target => {
+      // TODO -- don't use deep clone as it doesn't allow for predicate limitations. Use shallow clone
+      //  downstream targets will apply appropriate filters
+      val baseStatement = s"CREATE OR REPLACE TABLE ${target.tableFullName} DEEP CLONE ${sourceDBName}.${target.name} "
+      val timestampClause = s"TIMESTAMP AS OF '${untilTS.asTSString}' "
+      val locationClause = s"LOCATION '${target.tableLocation}' "
       try {
-        val stmt = s"CREATE OR REPLACE TABLE ${target.tableFullName} DEEP CLONE ${sourceDBName}.${target.name} " +
-          s"LOCATION '${target.tableLocation}'"
+        val stmt = baseStatement + timestampClause + locationClause
         println(s"CLONING TABLE ${target.tableFullName}.\nSTATEMENT: ${stmt}")
         spark.sql(stmt)
         val snappedCount = target.asDF.count()
         SnapReport(
           target.tableFullName,
           new java.sql.Timestamp(bronzePipeline.primordialEpoch),
-          new java.sql.Timestamp(bronzePipeline.pipelineSnapTime.asUnixTimeMilli),
+          new java.sql.Timestamp(untilTS.asUnixTimeMilli),
           snappedCount,
           "null"
         )
       } catch {
+        case e: AnalysisException if e.getMessage().contains("The provided timestamp") => {
+          val stmt = baseStatement + locationClause
+          val updatedQueryNotice = s"The untilTime was > than the last version of this table: ${target.tableFullName}. " +
+            s"The table will be cloned to it's latest state. The new statement is:\n$stmt"
+          logger.log(Level.INFO, updatedQueryNotice, e)
+          spark.sql(stmt)
+          val snappedCount = target.asDF.count()
+          SnapReport(
+            target.tableFullName,
+            new java.sql.Timestamp(bronzePipeline.primordialEpoch),
+            new java.sql.Timestamp(untilTS.asUnixTimeMilli),
+            snappedCount,
+            "null"
+          )
+        }
         case e: Throwable => {
-          val errMsg = s"FAILED TO CLONE: ${target.tableFullName}\nERROR: ${e.getMessage}"
+          val errMsg = s"FAILED TO CLONE: $sourceDBName.${target.name}\nERROR: ${e.getMessage}"
           println(errMsg)
           logger.log(Level.ERROR, errMsg, e)
           throw new BronzeSnapException(errMsg, target, Module(0, "STATE_SNAP", bronzePipeline))
@@ -313,11 +327,17 @@ trait ValidationUtils extends SparkSessionWrapper {
     }).toArray.toSeq
   }
 
-  protected def getPaddedPrimoridal(pipeline: Pipeline, daysToPad: Int): String = {
+  protected def padPrimoridal(pipeline: Pipeline, daysToPad: Int, maxDays: Option[Int] = None): Workspace = {
     val primordialSnapDate = getPrimordialSnapshot(pipeline)
-    val recalcPrimordialDate = primordialSnapDate.plusDays(daysToPad).toString
-    logger.log(Level.INFO, s"PRIMORDIAL DATE: Set for recalculation as $recalcPrimordialDate.")
-    recalcPrimordialDate
+    val primordialDatePlusPadding = primordialSnapDate.plusDays(daysToPad).toString
+    val modifiedConfig = pipeline.config
+    modifiedConfig.setPrimordialDateString(Some(primordialDatePlusPadding))
+    if (maxDays.nonEmpty) {
+      modifiedConfig.setMaxDays(maxDays.get)
+      logger.log(Level.INFO, s"MAX DAYS: Updated to ${maxDays.get}")
+    }
+    logger.log(Level.INFO, s"PRIMORDIAL DATE: Set for recalculation as $primordialDatePlusPadding.")
+    pipeline.workspace.copy(_config = modifiedConfig)
   }
 
   /**
@@ -334,7 +354,7 @@ trait ValidationUtils extends SparkSessionWrapper {
         val sql = s"""delete from ${pipelineStateTable.tableFullName} where moduleID >= 2000"""
         println(s"deleting silver and gold module state entries:\n$sql")
         spark.sql(sql)
-      }
+      } // else merge new data??
 
       val updatePrimordialDateSql =
         s"""update ${pipelineStateTable.tableFullName}
@@ -461,9 +481,9 @@ trait ValidationUtils extends SparkSessionWrapper {
   }
 
   protected def getAllPipelineTargets(workspace: Workspace): Array[PipelineTable] = {
-    val bronzePipeline = Bronze(workspace)
-    val silverPipeline = Silver(workspace)
-    val goldPipeline = Gold(workspace)
+    val bronzePipeline = Bronze(workspace, suppressReport = true)
+    val silverPipeline = Silver(workspace, suppressReport = true)
+    val goldPipeline = Gold(workspace, suppressReport = true)
 
     val bronzeTargets = bronzePipeline.getAllTargets
     val silverTargets = silverPipeline.getAllTargets
@@ -482,22 +502,19 @@ trait ValidationUtils extends SparkSessionWrapper {
   def assertDataFrameDataEquals(
                                  targetDetail: ModuleTarget,
                                  sourceDB: String,
-                                 incrementalTest: Boolean,
-                                 tol: Double = 0D,
-                                 minimumPaddingDays: Int = 7
+                                 tol: Double
                                ): ValidationReport = {
     val module = targetDetail.module
     val sourceTarget = targetDetail.target.copy(_databaseName = sourceDB)
     val snapTarget = targetDetail.target
 
-    val (expected, result) = if (incrementalTest) {
-      (
-        sourceTarget.asIncrementalDF(module, sourceTarget.incrementalColumns).fillAllNAs,
-        snapTarget.asIncrementalDF(module, sourceTarget.incrementalColumns).fillAllNAs
-      )
-    } else {
-      (sourceTarget.asDF.fillAllNAs, snapTarget.asDF.fillAllNAs)
-    }
+    val (expected, result) = (
+      sourceTarget.asIncrementalDF(module, sourceTarget.incrementalColumns).fillAllNAs,
+      snapTarget.asIncrementalDF(module, sourceTarget.incrementalColumns).fillAllNAs
+    )
+
+    val expectedIsEmpty = expected.isEmpty
+    val resultIsEmpty = result.isEmpty
 
     val expectedCol = "assertDataFrameNoOrderEquals_expected"
     val actualCol = "assertDataFrameNoOrderEquals_actual"
@@ -507,68 +524,83 @@ trait ValidationUtils extends SparkSessionWrapper {
       s"\nUNTIL TIME: ${module.untilTime.asTSString}\nFOR FIELDS: ${keyColNames.mkString(", ")}"
     logger.log(Level.INFO, validationStatus)
 
-    val validationReport =
-      try {
-
-        val expectedElementsCount = expected
-          .groupBy(keyColNames map col: _*)
-          .agg(count(lit(1)).as(expectedCol))
-        val resultElementsCount = result
-          .groupBy(keyColNames map col: _*)
-          .agg(count(lit(1)).as(actualCol))
-
-        val diff = expectedElementsCount
-          .join(resultElementsCount, keyColNames.toSeq, "full_outer")
-
-        // Coalesce used because comparing null and long results in null. when one side is null return diff
-        val expectedCountCol = sum(coalesce(col(expectedCol), lit(0L))).alias("tableSourceCount")
-        val resultCountCol = sum(coalesce(col(actualCol), lit(0L))).alias("tableSnapCount")
-        val discrepancyCol = (expectedCountCol - resultCountCol).alias("totalDiscrepancies")
-        val discrepancyPctCol = discrepancyCol / expectedCountCol
-        val passFailMessage = when(discrepancyPctCol <= tol, lit("PASS"))
-          .otherwise(concat_ws(" ",
-            lit("FAIL: Discrepancy of"), discrepancyPctCol, lit("outside of specified tolerance"), lit(tol)
-          )).alias("message")
-
-        if (diff.isEmpty) {
-          // selecting from empty dataset gives next on empty iterator
-          // thus must create the DS manually
-          ValidationReport(
-            Some(sourceTarget.tableFullName),
-            Some(snapTarget.tableFullName),
-            Some(expectedElementsCount.count()),
-            Some(resultElementsCount.count()),
-            Some(0L),
-            Some(new Timestamp(module.fromTime.asUnixTimeMilli)),
-            Some(new Timestamp(module.untilTime.asUnixTimeMilli)),
-            Some("FAIL: No records could be compared")
-          )
-        } else {
-          diff
-            .select(
-              lit(sourceTarget.tableFullName).alias("tableSourceName"),
-              lit(snapTarget.tableFullName).alias("tableSnapName"),
-              expectedCountCol,
-              resultCountCol,
-              discrepancyCol,
-              module.fromTime.asColumnTS.alias("from"),
-              module.untilTime.asColumnTS.alias("until"),
-              passFailMessage
-            ).as[ValidationReport].first()
-        }
-      } catch {
-        case e: Throwable => {
-          val errMsg = s"FAILED VALIDATION RUN: ${snapTarget.tableFullName} --> ${e.getMessage}"
-          logger.log(Level.ERROR, errMsg, e)
-          ValidationReport(
-            Some(sourceTarget.tableFullName),
-            Some(snapTarget.tableFullName), Some(0L), Some(0L), Some(0L),
-            Some(new Timestamp(module.fromTime.asUnixTimeMilli)),
-            Some(new Timestamp(module.untilTime.asUnixTimeMilli)),
-            Some(errMsg)
-          )
-        }
+    val validationReport = try {
+      if (expectedIsEmpty || resultIsEmpty) {
+        val msg = if (expectedIsEmpty) s"Source: ${sourceTarget.tableFullName} did not return any data "
+        else s"Validation Target: ${snapTarget.tableFullName} did not return any data "
+        val betweenMsg = s"for incrementals between ${module.fromTime.asTSString} AND ${module.untilTime.asTSString}"
+        throw new NoNewDataException(msg + betweenMsg, Level.ERROR)
       }
+
+      val expectedElementsCount = expected
+        .groupBy(keyColNames map col: _*)
+        .agg(count(lit(1)).as(expectedCol))
+      val resultElementsCount = result
+        .groupBy(keyColNames map col: _*)
+        .agg(count(lit(1)).as(actualCol))
+
+      val diff = expectedElementsCount
+        .join(resultElementsCount, keyColNames.toSeq, "full_outer")
+      val precision = tol.toString.split("\\.").reverse.headOption.getOrElse("0").length
+      // Coalesce used because comparing null and long results in null. when one side is null return diff
+      val expectedCountCol = sum(coalesce(col(expectedCol), lit(0L))).alias("tableSourceCount")
+      val resultCountCol = sum(coalesce(col(actualCol), lit(0L))).alias("tableSnapCount")
+      val discrepancyCol = abs(expectedCountCol - resultCountCol).alias("totalDiscrepancies")
+      val discrepancyPctCol = discrepancyCol / expectedCountCol
+      val passFailMessage = when(discrepancyPctCol <= tol, concat_ws(" ", lit("PASS:"),
+        discrepancyPctCol, lit("<="), lit(tol)
+      ))
+        .otherwise(concat_ws(" ",
+          lit("FAIL: Discrepancy of"), discrepancyPctCol, lit("outside of specified tolerance"), lit(tol)
+        )).alias("message")
+
+      if (diff.isEmpty) {
+        // selecting from empty dataset gives next on empty iterator
+        // thus must create the DS manually
+        ValidationReport(
+          Some(sourceTarget.tableFullName),
+          Some(snapTarget.tableFullName),
+          Some(expectedElementsCount.count()),
+          Some(resultElementsCount.count()),
+          Some(0L),
+          Some(new Timestamp(module.fromTime.asUnixTimeMilli)),
+          Some(new Timestamp(module.untilTime.asUnixTimeMilli)),
+          Some("FAIL: No records could be compared")
+        )
+      } else {
+        diff
+          .select(
+            lit(sourceTarget.tableFullName).alias("tableSourceName"),
+            lit(snapTarget.tableFullName).alias("tableSnapName"),
+            expectedCountCol,
+            resultCountCol,
+            discrepancyCol,
+            module.fromTime.asColumnTS.alias("from"),
+            module.untilTime.asColumnTS.alias("until"),
+            passFailMessage
+          ).as[ValidationReport].first()
+      }
+    } catch {
+      case e: NoNewDataException =>
+        logger.log(Level.ERROR, e.getMessage, e)
+        ValidationReport(
+          Some(sourceTarget.tableFullName),
+          Some(snapTarget.tableFullName), Some(0L), Some(0L), Some(0L),
+          Some(new Timestamp(module.fromTime.asUnixTimeMilli)),
+          Some(new Timestamp(module.untilTime.asUnixTimeMilli)),
+          Some(e.getMessage)
+        )
+      case e: Throwable =>
+        val errMsg = s"FAILED VALIDATION RUN: ${snapTarget.tableFullName} --> ${e.getMessage}"
+        logger.log(Level.ERROR, errMsg, e)
+        ValidationReport(
+          Some(sourceTarget.tableFullName),
+          Some(snapTarget.tableFullName), Some(0L), Some(0L), Some(0L),
+          Some(new Timestamp(module.fromTime.asUnixTimeMilli)),
+          Some(new Timestamp(module.untilTime.asUnixTimeMilli)),
+          Some(errMsg)
+        )
+    }
 
     validationReport
   }

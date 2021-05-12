@@ -866,7 +866,11 @@ object Helpers extends SparkSessionWrapper {
       .as[String]
       .foreach(f => rmSer(f))
 
-    topPaths.foreach(dir => dbutils.fs.rm(dir, true))
+    try {
+      topPaths.foreach(dir => dbutils.fs.rm(dir, true))
+    } catch {
+      case _: NullPointerException => topPaths.foreach(dir => com.databricks.service.DBUtils.fs.rm(dir, true))
+    }
 
   }
 
