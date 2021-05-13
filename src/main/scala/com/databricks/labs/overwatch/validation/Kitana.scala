@@ -87,47 +87,25 @@ case class DupReport(tableName: String,
 
 case class ModuleTarget(module: Module, target: PipelineTable)
 
-class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBName: String)
-  extends ValidationUtils {
+class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBName: String, parallelism: Option[Int])
+  extends ValidationUtils(sourceDBName, snapWorkspace, parallelism) {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   import spark.implicits._
 
-  private var _parallelism: Int = getDriverCores - 1
   private var isRefresh: Boolean = false
+  private var isCompleteRefresh: Boolean = false
 
   private def setRefresh(value: Boolean): this.type = {
     isRefresh = value
     this
   }
 
-  private def setParallelism(value: Option[Int]): this.type = {
-    _parallelism = value.getOrElse(getDriverCores - 1)
+  private def setCompleteRefresh(value: Boolean): this.type = {
+    isCompleteRefresh = value
     this
   }
-
-  private def parallelism: Int = _parallelism
-
-  private val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-
-  def getBronzePipeline(
-                         workspace: Workspace = snapWorkspace,
-                         readOnly: Boolean = true,
-                         suppressReport: Boolean = true
-                       ): Bronze = Bronze(workspace, readOnly, suppressReport)
-
-  def getSilverPipeline(
-                         workspace: Workspace = snapWorkspace,
-                         readOnly: Boolean = true,
-                         suppressReport: Boolean = true
-                       ): Silver = Silver(workspace, readOnly, suppressReport)
-
-  def getGoldPipeline(
-                       workspace: Workspace = snapWorkspace,
-                       readOnly: Boolean = true,
-                       suppressReport: Boolean = true
-                     ): Gold = Gold(workspace, readOnly, suppressReport)
 
   /**
    *
@@ -177,17 +155,19 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
     validateSnapPipeline(sourceWorkspace, bronzePipeline, snapFromTime, snapUntilTime, isRefresh)
 
-    val statefulSnapsReport = snapStateTables(sourceDBName, taskSupport, bronzePipeline, snapUntilTime)
-    resetPipelineReportState(bronzePipeline.pipelineStateTarget, snapFromTime.asDTString, isRefresh)
     bronzePipeline.clearPipelineState() // clears states such that module fromTimes == primordial date
 
-    // snapshots bronze tables, returns ds with report
     val bronzeTargetsWModule = getLinkedModuleTarget(bronzePipeline).par
-
     bronzeTargetsWModule.tasksupport = taskSupport
 
+    val statefulSnapsReport = snapStateTables(bronzePipeline, snapUntilTime)
+    resetPipelineReportState(
+      bronzePipeline, bronzeTargetsWModule.toArray, snapFromTime, snapUntilTime, isRefresh, isCompleteRefresh
+    )
+
+    // snapshots bronze tables, returns ds with report
     val scopeSnaps = bronzeTargetsWModule
-      .map(targetDetail => snapTable(sourceDBName, targetDetail.module, targetDetail.target))
+      .map(targetDetail => snapTable(targetDetail.module, targetDetail.target))
       .toArray.toSeq
 
     (statefulSnapsReport ++ scopeSnaps).toDS()
@@ -201,7 +181,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Int = 2): Unit = {
 
     // set primordial padding n days ahead of bronze primordial as per configured padding
-    val snapLookupPipeline = getBronzePipeline()
+    val snapLookupPipeline = getBronzePipeline(snapWorkspace)
 
     if (primordialPadding < 7) {
       val msg = s"WARNING!!  The padding has been set to less than 7 days. This can misrepresent the accuracy of the " +
@@ -270,7 +250,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
                         maxDays: Option[Int] = None
                       ): Dataset[ValidationReport] = {
 
-    val snapLookupPipeline = getBronzePipeline()
+    val snapLookupPipeline = getBronzePipeline(snapWorkspace)
     val paddedWorkspace = padPrimoridal(snapLookupPipeline, primordialPadding, maxDays)
 
     val silverPipeline = getSilverPipeline(paddedWorkspace)
@@ -300,7 +280,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   }
 
   def validateKeys(workspace: Workspace = snapWorkspace): Dataset[KeyReport] = {
-    val targetsToValidate = getAllPipelineTargets(workspace).par
+    val targetsToValidate = getAllKitanaTargets(workspace).par
     targetsToValidate.tasksupport = taskSupport
     val keyValidationMessage = s"The targets that will be validated are:\n${targetsToValidate.map(_.tableFullName).mkString(", ")}"
     if (workspace.getConfig.debugFlag || snapWorkspace.getConfig.debugFlag) println(keyValidationMessage)
@@ -312,7 +292,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
                     workspace: Workspace = snapWorkspace,
                     dfsByKeysOnly: Boolean = true
                   ): (Dataset[DupReport], Map[String, DataFrame]) = {
-    val targetsToHunt = getAllPipelineTargets(workspace).par
+    val targetsToHunt = getAllKitanaTargets(workspace).par
     targetsToHunt.tasksupport = taskSupport
     val (dupReport, targetDupDetails) = dupHunter(targetsToHunt)
 
@@ -326,7 +306,9 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   def refreshSnapshot(
                        startDateString: String,
                        endDateString: String,
-                       dtFormat: Option[String] = None): Dataset[SnapReport] = {
+                       dtFormat: Option[String] = None,
+                       completeRefresh: Boolean = false
+                     ): Dataset[SnapReport] = {
     val sourceConfig = sourceWorkspace.getConfig // prod source
     val sourceDBName = sourceConfig.databaseName
     val snapDBName = snapWorkspace.getConfig.databaseName
@@ -336,17 +318,15 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
     Kitana(snapDBName, sourceWorkspace)
       .setRefresh(true)
+      .setCompleteRefresh(completeRefresh)
       .executeBronzeSnapshot(startDateString, endDateString, dtFormat)
+
 
   }
 
   def fullResetSnapDB(): Unit = {
     validateTargetDestruction(snapWorkspace.getConfig.databaseName)
-    val targetsToDrop = getAllPipelineTargets(snapWorkspace).par
-    targetsToDrop.tasksupport = taskSupport
-    targetsToDrop.foreach(t => {
-      Helpers.fastDrop(t, snapWorkspace.getConfig.cloudProvider)
-    })
+    fastDropTargets(getAllKitanaTargets(snapWorkspace, includePipelineStateTable = true).par)
   }
 
   private def validatePartitionCols(target: PipelineTable): (PipelineTable, SchemaValidationReport) = {
@@ -453,8 +433,7 @@ object Kitana {
 
     val snapArgs = objToJson(snapWorkspaceParams).compactString
     val snapWorkspace = Initializer(Array(snapArgs), debugFlag = origConfig.debugFlag, isSnap = true)
-    new Kitana(workspace, snapWorkspace, sourceDBName)
-      .setParallelism(parallelism)
+    new Kitana(workspace, snapWorkspace, sourceDBName, parallelism)
 
   }
 }

@@ -12,8 +12,9 @@ val sparkVersion = "3.0.1"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
-libraryDependencies += "com.databricks" %% "dbutils-api" % "0.0.5"
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595"
+//libraryDependencies += "com.databricks" %% "dbutils-api" % "0.0.5" % Provided
+libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
 libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 
@@ -50,3 +51,12 @@ publishTo := Some(
 
 // exclude scala-library dependency
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+
+assemblyExcludedJars in assembly := {
+    val cp = (fullClasspath in assembly).value
+    cp filter { f =>
+        f.data.getName.contains("dbutils-api_2.12") ||
+        f.data.getName.contains("spark-core") ||
+          f.data.getName.contains("spark-sql")
+    }
+}

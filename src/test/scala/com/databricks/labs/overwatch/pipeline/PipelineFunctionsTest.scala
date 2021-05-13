@@ -16,13 +16,13 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
 
   describe("Tests for add and subtract incremental ticks") {
 
-    val generatedDf = spark.createDataFrame(
+    val rawDF = spark.createDataFrame(
       Seq((2, 2l, 2.0d, java.sql.Date.valueOf("2020-10-30"),
         java.sql.Timestamp.valueOf("2011-10-31 10:01:11.000")))
     ).toDF("int", "long", "double", "date", "timestamp")
 
     it("add tick to every column") {
-      generatedDf
+      val generatedDf = rawDF
         .select(PipelineFunctions.addNTicks(col("int"), 1, IntegerType).as("int"),
           PipelineFunctions.addNTicks(col("long"), 1, LongType).as("long"),
           PipelineFunctions.addNTicks(col("double"), 1, DoubleType).as("double"),
@@ -43,7 +43,7 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
     }
 
     it("subtract tick from every column") {
-      generatedDf
+      val generatedDf = rawDF
         .select(PipelineFunctions.subtractNTicks(col("int"), 1, IntegerType).as("int"),
           PipelineFunctions.subtractNTicks(col("long"), 1, LongType).as("long"),
           PipelineFunctions.subtractNTicks(col("double"), 1, DoubleType).as("double"),
@@ -107,38 +107,38 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
 
   //describe("Tests for withIncrementalFilters") {
 
-    /*it("should filter out not necessary data (single column)") {
-      val filters = Seq(
-        IncrementalFilter("int", lit(10), lit(20))
-      )
+  /*it("should filter out not necessary data (single column)") {
+    val filters = Seq(
+      IncrementalFilter("int", lit(10), lit(20))
+    )
 
-      val sourceDF = spark.createDataFrame(Seq((100, 1), (10, 1), (15, 1))).toDF("int", "dummy")
-      val actualDF = PipelineFunctions.withIncrementalFilters(sourceDF, Module(0, "Test Module"), filters)
+    val sourceDF = spark.createDataFrame(Seq((100, 1), (10, 1), (15, 1))).toDF("int", "dummy")
+    val actualDF = PipelineFunctions.withIncrementalFilters(sourceDF, Module(0, "Test Module"), filters)
 
-      assertResult("`int` INT,`dummy` INT") {
-        actualDF.schema.toDDL
-      }
+    assertResult("`int` INT,`dummy` INT") {
+      actualDF.schema.toDDL
+    }
 
-      val expectedDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
-      assertSmallDataFrameEquality(actualDF, expectedDF)
-    }*/
+    val expectedDF = spark.createDataFrame(Seq((15, 1))).toDF("int", "dummy")
+    assertSmallDataFrameEquality(actualDF, expectedDF)
+  }*/
 
-//    it("should filter out not necessary data (two columns)") {
-//      val filters = Seq(
-//        IncrementalFilter("int", lit(10), lit(20)),
-//        IncrementalFilter("dummy", lit(10), lit(20))
-//      )
-//
-//      val sourceDF = spark.createDataFrame(Seq((100, 1), (10, 1), (15, 11), (15, 1))).toDF("int", "dummy")
-//      val actualDF = PipelineFunctions.withIncrementalFilters(sourceDF, Module(0, "Test Module"), filters)
-//      assertResult("`int` INT,`dummy` INT") {
-//        actualDF.schema.toDDL
-//      }
-//
-//      val expectedDF = spark.createDataFrame(Seq((15, 11))).toDF("int", "dummy")
-//      assertSmallDataFrameEquality(actualDF, expectedDF)
-//    }
-//  }
+  //    it("should filter out not necessary data (two columns)") {
+  //      val filters = Seq(
+  //        IncrementalFilter("int", lit(10), lit(20)),
+  //        IncrementalFilter("dummy", lit(10), lit(20))
+  //      )
+  //
+  //      val sourceDF = spark.createDataFrame(Seq((100, 1), (10, 1), (15, 11), (15, 1))).toDF("int", "dummy")
+  //      val actualDF = PipelineFunctions.withIncrementalFilters(sourceDF, Module(0, "Test Module"), filters)
+  //      assertResult("`int` INT,`dummy` INT") {
+  //        actualDF.schema.toDDL
+  //      }
+  //
+  //      val expectedDF = spark.createDataFrame(Seq((15, 11))).toDF("int", "dummy")
+  //      assertSmallDataFrameEquality(actualDF, expectedDF)
+  //    }
+  //  }
 
   describe("Tests for setSparkOverrides") {
 

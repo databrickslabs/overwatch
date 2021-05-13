@@ -176,7 +176,7 @@ class Pipeline(
       Array[SimplifiedModuleStatusReport]()
     }
     setPipelineSnapTime()
-    if (pipelineState.nonEmpty) showRangeReport()
+    if (pipelineState.nonEmpty && !_supressRangeReport) showRangeReport()
     this
   }
 

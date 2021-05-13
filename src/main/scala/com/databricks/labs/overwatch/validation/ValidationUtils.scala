@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
+import io.delta.tables.{DeltaMergeBuilder, DeltaTable}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -15,20 +16,44 @@ import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.concurrent.ForkJoinPool
-import scala.collection.parallel.ForkJoinTaskSupport
+import scala.collection.parallel.{ForkJoinTaskSupport, ParSeq}
 import scala.collection.parallel.mutable.ParArray
 
 
-trait ValidationUtils extends SparkSessionWrapper {
+class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralellism: Option[Int]) extends SparkSessionWrapper {
+  //  private var taskSupport =
   private val logger: Logger = Logger.getLogger(this.getClass)
+  protected val parallelism: Int = _paralellism.getOrElse(getDriverCores - 1)
+  protected val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+
 
   import spark.implicits._
 
+  def getBronzePipeline(
+                         workspace: Workspace = snapWorkspace,
+                         readOnly: Boolean = true,
+                         suppressReport: Boolean = true
+                       ): Bronze = Bronze(workspace, readOnly, suppressReport)
+
+  def getSilverPipeline(
+                         workspace: Workspace = snapWorkspace,
+                         readOnly: Boolean = true,
+                         suppressReport: Boolean = true
+                       ): Silver = Silver(workspace, readOnly, suppressReport)
+
+  def getGoldPipeline(
+                       workspace: Workspace = snapWorkspace,
+                       readOnly: Boolean = true,
+                       suppressReport: Boolean = true
+                     ): Gold = Gold(workspace, readOnly, suppressReport)
+
   protected def getDateFormat: SimpleDateFormat = getDateFormat(None)
 
+  @throws(classOf[BadConfigException])
   protected def validateTargetDestruction(targetDBName: String): Unit = {
-    val sparkCheckValue = spark.conf.getOption("overwatch.permit.db.destruction").getOrElse("")
-    require(sparkCheckValue == targetDBName, s"You selected to run a very destructive command. This is 100% ok in " +
+    val sparkCheckValue = spark.conf.getOption("overwatch.permit.db.destruction").getOrElse("__OverwatchDBNOTSET")
+    require(sparkCheckValue == targetDBName, s"DESTRUCTIVE MODE DISABLED: " +
+      s"You selected to run a very destructive command. This is 100% ok in " +
       s"certain circumstances but to protect your data you must set the following spark conf with a value equal " +
       s"to the name of the database to which you're point this function.\n\noverwatch.permit.db.destruction = $targetDBName")
   }
@@ -62,10 +87,12 @@ trait ValidationUtils extends SparkSessionWrapper {
       s"process. Any target snap database must be created, owned, and maintained through Overwatch validation " +
       s"processes.")
 
-    if (pipeline.BronzeTargets.auditLogsTarget.exists && !isRefresh) { // snap db already exists
-      throw new BadConfigException(s"A snapshot may only be created once and it must be created by " +
-        s"the overwatch snapshot process. If you would like to create another snapshot and overwrite this one " +
-        s"please use the 'refreshSnapshot' function in the validation package.")
+    if (!config.isLocalTesting) { // temp workaround for dbconnect until ES-99139 is resolved
+      if (pipeline.BronzeTargets.auditLogsTarget.exists && !isRefresh) { // snap db already exists
+        throw new BadConfigException(s"A snapshot may only be created once and it must be created by " +
+          s"the overwatch snapshot process. If you would like to create another snapshot and overwrite this one " +
+          s"please use the 'refreshSnapshot' function in the validation package.")
+      }
     }
   }
 
@@ -208,6 +235,12 @@ trait ValidationUtils extends SparkSessionWrapper {
     }
   }
 
+  private def buildCloneStatement(target: PipelineTable): String = {
+    val baseStatement = s"CREATE OR REPLACE TABLE ${target.tableFullName} SHALLOW CLONE ${sourceDBName}.${target.name} "
+    val locationClause = s"LOCATION '${target.tableLocation}' "
+    baseStatement + locationClause
+  }
+
   /**
    * Snapshots table
    *
@@ -216,39 +249,24 @@ trait ValidationUtils extends SparkSessionWrapper {
    * @return
    */
   protected def snapTable(
-                           sourceDBName: String,
                            bronzeModule: Module,
                            snapTarget: PipelineTable
                          ): SnapReport = {
 
     val module = bronzeModule.copy(_moduleDependencies = Array[Int]())
-    val pipeline = module.pipeline
 
     try {
-      val sourceTarget = snapTarget
-        .copy(
-          _databaseName = sourceDBName,
-          mode = "overwrite",
-          withCreateDate = false,
-          withOverwatchRunID = false)
 
-      val finalDFToClone = sourceTarget
-        .asIncrementalDF(module, snapTarget.incrementalColumns)
-      pipeline.database.write(finalDFToClone, sourceTarget, pipeline.pipelineSnapTime.asColumnTS)
+      val stmt = buildCloneStatement(snapTarget)
+      println(s"CLONING TABLE ${snapTarget.tableFullName}.\nSTATEMENT: ${stmt}")
+      spark.sql(stmt)
 
+      val snapCount = snapTarget.asIncrementalDF(module, snapTarget.incrementalColumns).count()
 
-      val snapCount = spark.table(snapTarget.tableFullName).count()
       val snapLogMsg = s"SNAPPED: ${snapTarget.tableFullName}\nFROM: ${module.fromTime.asDTString}\nTO: " +
         s"${module.untilTime.asDTString}\nTOTAL RECORDS: $snapCount"
       println(snapLogMsg)
       logger.log(Level.INFO, snapLogMsg)
-
-      //      println(s"UPDATING Module State for ${module.moduleId} --> ${module.moduleId}")
-      //      pipeline.updateModuleState(module.moduleState.copy(
-      //        fromTS = module.fromTime.asUnixTimeMilli,
-      //        untilTS = module.untilTime.asUnixTimeMilli,
-      //        recordsAppended = snapCount
-      //      ))
 
       snapTarget.asDF()
         .select(
@@ -270,8 +288,6 @@ trait ValidationUtils extends SparkSessionWrapper {
   }
 
   protected def snapStateTables(
-                                 sourceDBName: String,
-                                 taskSupport: ForkJoinTaskSupport,
                                  bronzePipeline: Pipeline,
                                  untilTS: TimeTypes
                                ): Seq[SnapReport] = {
@@ -284,13 +300,8 @@ trait ValidationUtils extends SparkSessionWrapper {
     uniqueTablesToClone.tasksupport = taskSupport
 
     uniqueTablesToClone.map(target => {
-      // TODO -- don't use deep clone as it doesn't allow for predicate limitations. Use shallow clone
-      //  downstream targets will apply appropriate filters
-      val baseStatement = s"CREATE OR REPLACE TABLE ${target.tableFullName} DEEP CLONE ${sourceDBName}.${target.name} "
-      val timestampClause = s"TIMESTAMP AS OF '${untilTS.asTSString}' "
-      val locationClause = s"LOCATION '${target.tableLocation}' "
       try {
-        val stmt = baseStatement + timestampClause + locationClause
+        val stmt = buildCloneStatement(target)
         println(s"CLONING TABLE ${target.tableFullName}.\nSTATEMENT: ${stmt}")
         spark.sql(stmt)
         val snappedCount = target.asDF.count()
@@ -302,21 +313,6 @@ trait ValidationUtils extends SparkSessionWrapper {
           "null"
         )
       } catch {
-        case e: AnalysisException if e.getMessage().contains("The provided timestamp") => {
-          val stmt = baseStatement + locationClause
-          val updatedQueryNotice = s"The untilTime was > than the last version of this table: ${target.tableFullName}. " +
-            s"The table will be cloned to it's latest state. The new statement is:\n$stmt"
-          logger.log(Level.INFO, updatedQueryNotice, e)
-          spark.sql(stmt)
-          val snappedCount = target.asDF.count()
-          SnapReport(
-            target.tableFullName,
-            new java.sql.Timestamp(bronzePipeline.primordialEpoch),
-            new java.sql.Timestamp(untilTS.asUnixTimeMilli),
-            snappedCount,
-            "null"
-          )
-        }
         case e: Throwable => {
           val errMsg = s"FAILED TO CLONE: $sourceDBName.${target.name}\nERROR: ${e.getMessage}"
           println(errMsg)
@@ -340,6 +336,44 @@ trait ValidationUtils extends SparkSessionWrapper {
     pipeline.workspace.copy(_config = modifiedConfig)
   }
 
+  private def prepareFreshStateTable(
+                                      pipelineStateTable: PipelineTable,
+                                      primordialDateString: String
+                                    ): Unit = {
+    val dropSilverGoldStateSql = s"""delete from ${pipelineStateTable.tableFullName} where moduleID >= 2000"""
+    val dropSqlMsg = s"deleting silver and gold module state entries\nSTATEMENT: $dropSilverGoldStateSql"
+    println(dropSqlMsg)
+    logger.log(Level.INFO, dropSqlMsg)
+    spark.sql(dropSilverGoldStateSql)
+
+    val updatePrimordialDateSql =
+      s"""update ${pipelineStateTable.tableFullName}
+         |set primordialDateString = '$primordialDateString' where moduleID < 2000""".stripMargin
+    println(s"updating primordial date for snapped stated:\n$updatePrimordialDateSql")
+    spark.sql(updatePrimordialDateSql)
+  }
+
+  //  private def deepCloneStateTable(pipelineStateTable: PipelineTable): Unit = {
+  //    val deepCloneStateTableSql =
+  //      s"""CREATE OR REPLACE TABLE ${pipelineStateTable.tableFullName}
+  //         | DEEP CLONE ${sourceDBName}.${pipelineStateTable.name} LOCATION '${pipelineStateTable.tableLocation}'"""
+  //        .stripMargin
+  //
+  //    val stateCloneMsg = s"CLONING TABLE ${pipelineStateTable.tableFullName}.\nSTATEMENT: ${deepCloneStateTableSql}"
+  //    println(stateCloneMsg)
+  //    logger.log(Level.INFO, stateCloneMsg)
+  //    spark.sql(deepCloneStateTableSql)
+  //  }
+
+  protected def fastDropTargets(targetsToDrop: ParSeq[PipelineTable]): Unit = {
+    targetsToDrop.tasksupport = taskSupport
+    targetsToDrop.map(_.databaseName).foreach(validateTargetDestruction)
+    targetsToDrop.foreach(t => {
+      Helpers.fastDrop(t, snapWorkspace.getConfig.cloudProvider)
+    })
+    spark.conf.unset("overwatch.permit.db.destruction")
+  }
+
   /**
    * Deletes all targets states silver and gold. Used to recalculate modules from scratch after snapshotting bronze.
    * Warning: Should be applied to snapshotted pipeline_report table only!
@@ -347,21 +381,57 @@ trait ValidationUtils extends SparkSessionWrapper {
    *
    * @return
    */
-  protected def resetPipelineReportState(pipelineStateTable: PipelineTable, primordialDateString: String, isRefresh: Boolean = false): Unit = {
-
+  protected def resetPipelineReportState(
+                                          bronzePipeline: Bronze,
+                                          moduleTargets: Array[ModuleTarget],
+                                          fromTime: TimeTypes,
+                                          untilTime: TimeTypes,
+                                          isRefresh: Boolean = false,
+                                          completeRefresh: Boolean = false
+                                        ): Unit = {
     try {
-      if (!isRefresh) {
-        val sql = s"""delete from ${pipelineStateTable.tableFullName} where moduleID >= 2000"""
-        println(s"deleting silver and gold module state entries:\n$sql")
-        spark.sql(sql)
-      } // else merge new data??
+      val pipelineStateTable = bronzePipeline.pipelineStateTarget
+      val modulesToBeReset = moduleTargets.map(_.module.moduleId)
+      val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
 
-      val updatePrimordialDateSql =
-        s"""update ${pipelineStateTable.tableFullName}
-           |set primordialDateString = '$primordialDateString' where moduleID < 2000""".stripMargin
-      println(s"updating primordial date for snapped stated:\n$updatePrimordialDateSql")
-      spark.sql(updatePrimordialDateSql)
+      val latestMatchedModules = spark.table(pipelineStateTable.tableFullName)
+        .filter('status === "SUCCESS" || 'status.startsWith("EMPTY"))
+        .filter('moduleId.isin(modulesToBeReset: _*)) // limit to the modules identified from the scope
+        .withColumn("rnk", rank().over(w))
+        .filter('rnk === 1)
+
+      if (!isRefresh) { // is initial snap
+        prepareFreshStateTable(pipelineStateTable, fromTime.asDTString)
+      } else { // is refresh of snapshot
+        if (completeRefresh) { // Overwrite state table keeping only the latest, state for active modules
+
+          fastDropTargets(getAllKitanaTargets(bronzePipeline.workspace).par)
+          val newStateTable = pipelineStateTable
+            .copy(mode = "overwrite", withCreateDate = false, withOverwatchRunID = false)
+          bronzePipeline.database.write(latestMatchedModules, newStateTable, bronzePipeline.pipelineSnapTime.asColumnTS)
+        } else { // not complete refresh -- update state table for the latest run for all modules
+
+          // NOTE: NOT SUPPORTED via DBConnect
+          DeltaTable.forName(pipelineStateTable.tableFullName)
+            .as("target")
+            .merge(
+              latestMatchedModules.as("src"),
+              "src.Overwatch_RunID = target.Overwatch_RunID AND src.moduleID = target.moduleID"
+            ).whenMatched
+            .updateExpr(Map(
+              "fromTS" -> fromTime.asUnixTimeMilli.toString,
+              "untilTS" -> untilTime.asUnixTimeMilli.toString,
+              "primordialDateString" -> s"'${fromTime.asDTString}'"
+            ))
+            .execute()
+        }
+      }
+
     } catch {
+      case e: BadConfigException if e.getMessage.contains("DESTRUCTIVE MODE DISABLED") => {
+        println(e.getMessage)
+        throw new BadConfigException(e.getMessage)
+      }
       case e: Throwable => {
         val errMsg = s"FAILED to updated pipeline state: ${e.getMessage}"
         println(errMsg)
@@ -480,15 +550,17 @@ trait ValidationUtils extends SparkSessionWrapper {
     (finalDupReport, targetDupDetails)
   }
 
-  protected def getAllPipelineTargets(workspace: Workspace): Array[PipelineTable] = {
-    val bronzePipeline = Bronze(workspace, suppressReport = true)
-    val silverPipeline = Silver(workspace, suppressReport = true)
-    val goldPipeline = Gold(workspace, suppressReport = true)
+  protected def getAllKitanaTargets(workspace: Workspace, includePipelineStateTable: Boolean = false): Array[PipelineTable] = {
+
+    val bronzePipeline = getBronzePipeline(workspace)
 
     val bronzeTargets = bronzePipeline.getAllTargets
-    val silverTargets = silverPipeline.getAllTargets
-    val goldTargets = goldPipeline.getAllTargets
-    (bronzeTargets ++ silverTargets ++ goldTargets).par.filter(_.exists).toArray
+    val silverTargets = getSilverPipeline(workspace).getAllTargets
+    val goldTargets = getGoldPipeline(workspace).getAllTargets
+    val targets = if (includePipelineStateTable) bronzeTargets ++ silverTargets ++ goldTargets
+    else bronzeTargets ++ silverTargets ++ goldTargets :+ bronzePipeline.pipelineStateTarget
+
+    targets.par.filter(_.exists).toArray
   }
 
   /**

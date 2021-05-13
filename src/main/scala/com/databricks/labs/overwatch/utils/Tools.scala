@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
-import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.JsonProcessingException
@@ -16,6 +16,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
 
+import java.net.URI
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.IvParameterSpec
@@ -278,7 +279,7 @@ object SchemaTools extends SparkSessionWrapper {
    */
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
     val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
-//    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
+    //    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
     val fieldNames = if (caseSensitive) {
       fields.map(_.name.trim)
     } else fields.map(_.name.trim.toLowerCase())
@@ -311,7 +312,7 @@ object SchemaTools extends SparkSessionWrapper {
   /**
    * Recursive function to drill into the schema. Currently only supports recursion through structs and array.
    * TODO -- add support for recursion through Maps
-   *  Issue_86
+   * Issue_86
    *
    * @param dataType
    * @return
@@ -332,7 +333,7 @@ object SchemaTools extends SparkSessionWrapper {
    * Main function for cleaning a schema. The point is to remove special characters and duplicates all the way down
    * into the Arrays / Structs.
    * TODO -- Add support for map type recursion cleansing
-   *  Issue_86
+   * Issue_86
    * TODO -- convert to same pattern as schema validation function
    *
    * @param df Input dataframe to be cleansed
@@ -596,6 +597,7 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * Serialized / parallelized method for rapidly listing paths under a sub directory
+   *
    * @param path
    * @return
    */
@@ -826,6 +828,12 @@ object Helpers extends SparkSessionWrapper {
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "false")
   }
 
+  private def getURI(pathString: String): URI = {
+    val fsPrefix = pathString.replaceAllLiterally("//", "/").split("/")(0)
+    val fsType = if (fsPrefix.isEmpty) "dbfs:/" else s"${fsPrefix}/"
+    new URI(fsType)
+  }
+
   /**
    * Helper private function for fastrm. Enables serialization
    * This version only supports dbfs but s3 is easy to add it just wasn't necessary at the time this was written
@@ -835,9 +843,10 @@ object Helpers extends SparkSessionWrapper {
    */
   private def rmSer(file: String): Unit = {
     val conf = new Configuration()
-    val fsPrefix = file.replaceAllLiterally("//", "/").split("/")(0)
-    val fsType = if (fsPrefix.isEmpty) "dbfs:/" else s"${fsPrefix}/"
-    val fs = FileSystem.get(new java.net.URI(fsType), conf)
+    //    val fsPrefix = file.replaceAllLiterally("//", "/").split("/")(0)
+    //    val fsType = if (fsPrefix.isEmpty) "dbfs:/" else s"${fsPrefix}/"
+    val fsURI = getURI(file)
+    val fs = FileSystem.get(fsURI, conf)
     try {
       fs.delete(new Path(file), true)
     } catch {
@@ -866,12 +875,12 @@ object Helpers extends SparkSessionWrapper {
       .as[String]
       .foreach(f => rmSer(f))
 
-    try {
-      topPaths.foreach(dir => dbutils.fs.rm(dir, true))
-    } catch {
-      case _: NullPointerException => topPaths.foreach(dir => com.databricks.service.DBUtils.fs.rm(dir, true))
-    }
-
+    val conf = new Configuration()
+    topPaths.foreach(dir => {
+      val fsURI = getURI(dir)
+      val fs = FileSystem.get(fsURI, conf)
+      fs.delete(new Path(dir), true)
+    })
   }
 
 }
