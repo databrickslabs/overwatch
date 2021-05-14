@@ -106,7 +106,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
                                     ): Unit = {
     validateSnapDatabase(snapPipeline, isRefresh)
     val sourceConfig = sourceWorkspace.getConfig
-    val sourceBronzePipeline = Bronze(sourceWorkspace, readOnly = true).suppressRangeReport(true)
+    val sourceBronzePipeline = Bronze(sourceWorkspace, readOnly = true, suppressReport = true)
     if (sourceBronzePipeline.getPipelineState.isEmpty) {
       throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.", None)
     } else {
@@ -336,7 +336,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     pipeline.workspace.copy(_config = modifiedConfig)
   }
 
-  private def prepareFreshStateTable(
+  private def updateStateTable(
                                       pipelineStateTable: PipelineTable,
                                       primordialDateString: String
                                     ): Unit = {
@@ -352,18 +352,6 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     println(s"updating primordial date for snapped stated:\n$updatePrimordialDateSql")
     spark.sql(updatePrimordialDateSql)
   }
-
-  //  private def deepCloneStateTable(pipelineStateTable: PipelineTable): Unit = {
-  //    val deepCloneStateTableSql =
-  //      s"""CREATE OR REPLACE TABLE ${pipelineStateTable.tableFullName}
-  //         | DEEP CLONE ${sourceDBName}.${pipelineStateTable.name} LOCATION '${pipelineStateTable.tableLocation}'"""
-  //        .stripMargin
-  //
-  //    val stateCloneMsg = s"CLONING TABLE ${pipelineStateTable.tableFullName}.\nSTATEMENT: ${deepCloneStateTableSql}"
-  //    println(stateCloneMsg)
-  //    logger.log(Level.INFO, stateCloneMsg)
-  //    spark.sql(deepCloneStateTableSql)
-  //  }
 
   protected def fastDropTargets(targetsToDrop: ParSeq[PipelineTable]): Unit = {
     targetsToDrop.tasksupport = taskSupport
@@ -389,6 +377,8 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
                                           isRefresh: Boolean = false,
                                           completeRefresh: Boolean = false
                                         ): Unit = {
+    logger.log(Level.INFO, s"isRefresh = ${isRefresh.toString}")
+    logger.log(Level.INFO, s"isCompleteRefresh = ${completeRefresh.toString}")
     try {
       val pipelineStateTable = bronzePipeline.pipelineStateTarget
       val modulesToBeReset = moduleTargets.map(_.module.moduleId)
@@ -399,11 +389,23 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         .filter('moduleId.isin(modulesToBeReset: _*)) // limit to the modules identified from the scope
         .withColumn("rnk", rank().over(w))
         .filter('rnk === 1)
+        .drop("rnk")
 
       if (!isRefresh) { // is initial snap
-        prepareFreshStateTable(pipelineStateTable, fromTime.asDTString)
+        updateStateTable(pipelineStateTable, fromTime.asDTString)
       } else { // is refresh of snapshot
         if (completeRefresh) { // Overwrite state table keeping only the latest, state for active modules
+
+          // TEST
+//          val BREAK1 = getAllKitanaTargets(bronzePipeline.workspace)
+//          val BREAK2 = latestMatchedModules.count()
+//          val BREAK3 = latestMatchedModules.schema
+//          val BREAK4 = latestMatchedModules.columns
+//
+//          BREAK1
+//          BREAK2
+//          BREAK3
+//          BREAK4
 
           fastDropTargets(getAllKitanaTargets(bronzePipeline.workspace).par)
           val newStateTable = pipelineStateTable
@@ -433,7 +435,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         throw new BadConfigException(e.getMessage)
       }
       case e: Throwable => {
-        val errMsg = s"FAILED to updated pipeline state: ${e.getMessage}"
+        val errMsg = s"FAILED to update pipeline state: ${e.getMessage}"
         println(errMsg)
         logger.log(Level.ERROR, errMsg, e)
       }
@@ -557,8 +559,8 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     val bronzeTargets = bronzePipeline.getAllTargets
     val silverTargets = getSilverPipeline(workspace).getAllTargets
     val goldTargets = getGoldPipeline(workspace).getAllTargets
-    val targets = if (includePipelineStateTable) bronzeTargets ++ silverTargets ++ goldTargets
-    else bronzeTargets ++ silverTargets ++ goldTargets :+ bronzePipeline.pipelineStateTarget
+    val targets = if (includePipelineStateTable) bronzeTargets ++ silverTargets ++ goldTargets :+ bronzePipeline.pipelineStateTarget
+    else bronzeTargets ++ silverTargets ++ goldTargets
 
     targets.par.filter(_.exists).toArray
   }
