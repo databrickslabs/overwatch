@@ -14,7 +14,7 @@ import org.apache.spark.sql.expressions.Window
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
-import java.time.LocalDate
+import java.time.{Duration, LocalDate}
 import java.util.concurrent.ForkJoinPool
 import scala.collection.parallel.{ForkJoinTaskSupport, ParSeq}
 import scala.collection.parallel.mutable.ParArray
@@ -128,22 +128,6 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
   }
 
   /**
-   * Returns primordial date from the bronze audit state
-   *
-   * @param pipeline
-   * @return
-   */
-  @throws(classOf[PipelineStateException])
-  protected def getPrimordialSnapshot(pipeline: Pipeline): LocalDate = {
-    val snapAuditState = pipeline.getModuleState(1004)
-    require(snapAuditState.nonEmpty, "The state of the bronze snapshot cannot be determine. A bronze snapshot " +
-      "must exist prior to executing Silver/Gold recalculations. If you haven't yet run created the snapshot you " +
-      "may do so by running Kitana.executeBronzeSnapshot(...)")
-    val bronzeSnapPrimordialDateString = snapAuditState.get.primordialDateString.get
-    Pipeline.deriveLocalDate(bronzeSnapPrimordialDateString, getDateFormat)
-  }
-
-  /**
    * Returns ModuleTarget with each module by target for the configured scopes
    *
    * @param pipeline
@@ -250,7 +234,8 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
    */
   protected def snapTable(
                            bronzeModule: Module,
-                           snapTarget: PipelineTable
+                           snapTarget: PipelineTable,
+                           snapUntilTime: TimeTypes
                          ): SnapReport = {
 
     val module = bronzeModule.copy(_moduleDependencies = Array[Int]())
@@ -261,19 +246,16 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
       println(s"CLONING TABLE ${snapTarget.tableFullName}.\nSTATEMENT: ${stmt}")
       spark.sql(stmt)
 
-      val snapCount = snapTarget.asIncrementalDF(module, snapTarget.incrementalColumns).count()
-
       val snapLogMsg = s"SNAPPED: ${snapTarget.tableFullName}\nFROM: ${module.fromTime.asDTString}\nTO: " +
-        s"${module.untilTime.asDTString}\nTOTAL RECORDS: $snapCount"
+        s"${module.untilTime.asDTString}"
       println(snapLogMsg)
       logger.log(Level.INFO, snapLogMsg)
 
       snapTarget.asDF()
         .select(
           lit(snapTarget.tableFullName).alias("tableFullName"),
-          module.fromTime.asColumnTS.alias("from"),
-          module.untilTime.asColumnTS.alias("until"),
-          lit(snapCount).alias("totalCount"),
+          module.fromTime.asColumnTS.alias("from"), // pipeline state has been cleared, fromTime == primordial
+          snapUntilTime.asColumnTS.alias("until"),
           lit(null).cast("string").alias("errorMessage")
         ).as[SnapReport]
         .first()
@@ -304,12 +286,10 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         val stmt = buildCloneStatement(target)
         println(s"CLONING TABLE ${target.tableFullName}.\nSTATEMENT: ${stmt}")
         spark.sql(stmt)
-        val snappedCount = target.asDF.count()
         SnapReport(
           target.tableFullName,
           new java.sql.Timestamp(bronzePipeline.primordialEpoch),
           new java.sql.Timestamp(untilTS.asUnixTimeMilli),
-          snappedCount,
           "null"
         )
       } catch {
@@ -323,23 +303,46 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }).toArray.toSeq
   }
 
-  protected def padPrimoridal(pipeline: Pipeline, daysToPad: Int, maxDays: Option[Int] = None): Workspace = {
-    val primordialSnapDate = getPrimordialSnapshot(pipeline)
-    val primordialDatePlusPadding = primordialSnapDate.plusDays(daysToPad).toString
+  protected def padPrimordialAndSetMaxDays(pipeline: Pipeline, daysToPad: Int, maxDays: Option[Int]): Workspace = {
+    if (pipeline.getPipelineState.isEmpty) {
+      val errorMsg = "The state of the bronze snapshot cannot be determine. A bronze snapshot " +
+        "must exist prior to executing Silver/Gold recalculations/validations. " +
+        "If you haven't yet run created the snapshot you " +
+        "may do so by running Kitana.executeBronzeSnapshot(...)"
+      throw new PipelineStateException(errorMsg, None)
+    }
+
+    // derive dates and total bronze duration
+    val snappedPrimordialString = pipeline.getPipelineState.values
+      .minBy(state => Pipeline.deriveLocalDate(state.primordialDateString.get, getDateFormat).toEpochDay)
+      .primordialDateString.get
+    val snappedPrimordialTime = Pipeline.createTimeDetail(
+      Pipeline.deriveLocalDate(snappedPrimordialString, getDateFormat)
+        .atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli
+    )
+    val lookupPipelineMaxUntil = Pipeline.createTimeDetail(pipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS)
+
+    val calculatedMaxDays = maxDays.getOrElse(
+      Duration.between(
+        snappedPrimordialTime.asLocalDateTime.toLocalDate.atStartOfDay(),
+        lookupPipelineMaxUntil.asLocalDateTime.toLocalDate.atStartOfDay()
+      ).toDays.toInt - daysToPad
+    )
+
+    // set config and returns modified workspace
+    val primordialDatePlusPadding = snappedPrimordialTime.asLocalDateTime.plusDays(daysToPad).toString
     val modifiedConfig = pipeline.config
     modifiedConfig.setPrimordialDateString(Some(primordialDatePlusPadding))
-    if (maxDays.nonEmpty) {
-      modifiedConfig.setMaxDays(maxDays.get)
-      logger.log(Level.INFO, s"MAX DAYS: Updated to ${maxDays.get}")
-    }
+    modifiedConfig.setMaxDays(calculatedMaxDays)
+    logger.log(Level.INFO, s"MAX DAYS: Updated to $maxDays")
     logger.log(Level.INFO, s"PRIMORDIAL DATE: Set for recalculation as $primordialDatePlusPadding.")
     pipeline.workspace.copy(_config = modifiedConfig)
   }
 
   private def updateStateTable(
-                                      pipelineStateTable: PipelineTable,
-                                      primordialDateString: String
-                                    ): Unit = {
+                                pipelineStateTable: PipelineTable,
+                                primordialDateString: String
+                              ): Unit = {
     val dropSilverGoldStateSql = s"""delete from ${pipelineStateTable.tableFullName} where moduleID >= 2000"""
     val dropSqlMsg = s"deleting silver and gold module state entries\nSTATEMENT: $dropSilverGoldStateSql"
     println(dropSqlMsg)
@@ -390,6 +393,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         .withColumn("rnk", rank().over(w))
         .filter('rnk === 1)
         .drop("rnk")
+        .withColumn("primordialDateString", lit(fromTime.asDTString))
 
       if (!isRefresh) { // is initial snap
         updateStateTable(pipelineStateTable, fromTime.asDTString)
@@ -397,20 +401,21 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         if (completeRefresh) { // Overwrite state table keeping only the latest, state for active modules
 
           // TEST
-//          val BREAK1 = getAllKitanaTargets(bronzePipeline.workspace)
-//          val BREAK2 = latestMatchedModules.count()
-//          val BREAK3 = latestMatchedModules.schema
-//          val BREAK4 = latestMatchedModules.columns
-//
-//          BREAK1
-//          BREAK2
-//          BREAK3
-//          BREAK4
+          //          val BREAK1 = getAllKitanaTargets(bronzePipeline.workspace)
+          //          val BREAK2 = latestMatchedModules.count()
+          //          val BREAK3 = latestMatchedModules.schema
+          //          val BREAK4 = latestMatchedModules.columns
+          //
+          //          BREAK1
+          //          BREAK2
+          //          BREAK3
+          //          BREAK4
 
           fastDropTargets(getAllKitanaTargets(bronzePipeline.workspace).par)
           val newStateTable = pipelineStateTable
             .copy(mode = "overwrite", withCreateDate = false, withOverwatchRunID = false)
           bronzePipeline.database.write(latestMatchedModules, newStateTable, bronzePipeline.pipelineSnapTime.asColumnTS)
+
         } else { // not complete refresh -- update state table for the latest run for all modules
 
           // NOTE: NOT SUPPORTED via DBConnect
@@ -486,7 +491,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
       try {
         val w = Window.partitionBy(t.keys map col: _*).orderBy(t.incrementalColumns map col: _*)
         val selects = t.keys(true) ++ t.incrementalColumns ++ Array("rnk", "rn")
-
+        val totalRecords = t.asDF.select(t.keys map col: _*).count()
         val nullFilters = t.keys.map(k => col(k).isNotNull)
         val baseDF = nullFilters.foldLeft(t.asDF)((df, f) => df.filter(f))
 
@@ -503,13 +508,12 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
             t.tableFullName,
             t.keys,
             t.incrementalColumns,
-            0L, 0L, 0L, 0D, 0D,
+            0L, 0L, totalRecords, 0D, 0D,
             "PASS"
           )
           (TargetDupDetail(t, None), dupReport)
         } else {
           val totalDistinctKeys = t.asDF.select(t.keys map col: _*).distinct().count()
-          val totalRecords = t.asDF.select(t.keys map col: _*).count()
           val dupReport = dupsDF
             .select(selects.distinct map col: _*)
             .groupBy(t.keys map col: _*)

@@ -195,7 +195,6 @@ private[overwatch] class BronzeSnapException(
     target.tableFullName,
     fromTime,
     untilTime,
-    0L,
     errMsg
   )
 }

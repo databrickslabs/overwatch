@@ -182,6 +182,9 @@ class Pipeline(
 
   /**
    * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
+   * If primordial date is not provided in the config use now() - maxDays to derive a primordial date otherwise
+   * use provided primordial date.
+   *
    * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
    * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
    * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
@@ -227,7 +230,7 @@ class Pipeline(
         }
       }
     } else {
-      60
+      config.maxDays
     }
 
   }

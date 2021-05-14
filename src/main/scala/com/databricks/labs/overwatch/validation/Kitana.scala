@@ -20,7 +20,6 @@ import java.util.concurrent.ForkJoinPool
 case class SnapReport(tableFullName: String,
                       from: java.sql.Timestamp,
                       until: java.sql.Timestamp,
-                      totalCount: Long,
                       errorMessage: String)
 
 case class ValidationReport(tableSourceName: Option[String],
@@ -107,67 +106,60 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     this
   }
 
-  /**
-   *
-   * @param startDateString yyyy-MM-dd
-   * @param endDateString   yyyy-MM-dd
-   * @return
-   */
-  def executeBronzeSnapshot(
-                             startDateString: String,
-                             endDateString: String,
-                             dtFormat: Option[String] = None
-                           ): Dataset[SnapReport] = {
-    val dtFormatFinal = getDateFormat(dtFormat)
-    val startDate = Pipeline.deriveLocalDate(startDateString, dtFormatFinal)
-    val endDate = Pipeline.deriveLocalDate(endDateString, dtFormatFinal)
-    val fromTime = Pipeline.createTimeDetail(startDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-    val untilTime = Pipeline.createTimeDetail(endDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-    val daysToTest = Duration.between(startDate.atStartOfDay(), endDate.atStartOfDay()).toDays.toInt
-    try {
-      _executeBronzeSnapshot(fromTime, untilTime, daysToTest)
-    } catch {
-      case e: BronzeSnapException =>
-        Seq(e.snapReport).toDS()
-    }
-  }
+//  /**
+//   *
+//   * @param startDateString yyyy-MM-dd
+//   * @param endDateString   yyyy-MM-dd
+//   * @return
+//   */
+//  def executeBronzeSnapshot(
+//                             startDateString: String,
+//                             endDateString: String,
+//                             dtFormat: Option[String] = None
+//                           ): Dataset[SnapReport] = {
+//    val dtFormatFinal = getDateFormat(dtFormat)
+//    val startDate = Pipeline.deriveLocalDate(startDateString, dtFormatFinal)
+//    val endDate = Pipeline.deriveLocalDate(endDateString, dtFormatFinal)
+//    val fromTime = Pipeline.createTimeDetail(startDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+//    val untilTime = Pipeline.createTimeDetail(endDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+//    val daysToTest = Duration.between(startDate.atStartOfDay(), endDate.atStartOfDay()).toDays.toInt
+//    try {
+//      _executeBronzeSnapshot(fromTime, untilTime, daysToTest)
+//    } catch {
+//      case e: BronzeSnapException =>
+//        Seq(e.snapReport).toDS()
+//    }
+//  }
 
   /**
    * Execute snapshots
    *
    * @return
    */
-  private def _executeBronzeSnapshot(
-                                      snapFromTime: TimeTypes,
-                                      snapUntilTime: TimeTypes,
-                                      daysToSnap: Int
-                                    ): Dataset[SnapReport] = {
-    // state tables clone and reset for silver and gold modules
+  private def executeBronzeSnapshot(): Dataset[SnapReport] = {
 
-    val bronzeConfig = snapWorkspace.getConfig
-    bronzeConfig.setPrimordialDateString(Some(snapFromTime.asDTString))
-    bronzeConfig.setMaxDays(daysToSnap)
+    val bronzePipeline = getBronzePipeline(readOnly = false)
+    val primordialDateString = bronzePipeline.config.primordialDateString.get
+    val fromDate = Pipeline.deriveLocalDate(primordialDateString, getDateFormat)
+    val fromTime = Pipeline.createTimeDetail(fromDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+    val untilTime = Pipeline.createTimeDetail(bronzePipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
 
-    logger.log(Level.INFO, s"BRONZE Snap: Primordial Date Overridden: ${bronzeConfig.primordialDateString}")
-    logger.log(Level.INFO, s"BRONZE Snap: Max Days Overridden: ${bronzeConfig.maxDays}")
-    val bronzeSnapWorkspace = snapWorkspace.copy(_config = bronzeConfig)
-    val bronzePipeline = getBronzePipeline(bronzeSnapWorkspace, readOnly = false)
 
-    validateSnapPipeline(sourceWorkspace, bronzePipeline, snapFromTime, snapUntilTime, isRefresh)
+    validateSnapPipeline(sourceWorkspace, bronzePipeline, fromTime, untilTime, isRefresh)
 
     bronzePipeline.clearPipelineState() // clears states such that module fromTimes == primordial date
 
     val bronzeTargetsWModule = getLinkedModuleTarget(bronzePipeline).par
     bronzeTargetsWModule.tasksupport = taskSupport
 
-    val statefulSnapsReport = snapStateTables(bronzePipeline, snapUntilTime)
+    val statefulSnapsReport = snapStateTables(bronzePipeline, untilTime)
     resetPipelineReportState(
-      bronzePipeline, bronzeTargetsWModule.toArray, snapFromTime, snapUntilTime, isRefresh, isCompleteRefresh
+      bronzePipeline, bronzeTargetsWModule.toArray, fromTime, untilTime, isRefresh, isCompleteRefresh
     )
 
     // snapshots bronze tables, returns ds with report
     val scopeSnaps = bronzeTargetsWModule
-      .map(targetDetail => snapTable(targetDetail.module, targetDetail.target))
+      .map(targetDetail => snapTable(targetDetail.module, targetDetail.target, untilTime))
       .toArray.toSeq
 
     (statefulSnapsReport ++ scopeSnaps).toDS()
@@ -178,10 +170,11 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    *
    * @return
    */
-  def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Int = 2): Unit = {
+  def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Option[Int] = None): Unit = {
 
     // set primordial padding n days ahead of bronze primordial as per configured padding
     val snapLookupPipeline = getBronzePipeline(snapWorkspace)
+
 
     if (primordialPadding < 7) {
       val msg = s"WARNING!!  The padding has been set to less than 7 days. This can misrepresent the accuracy of the " +
@@ -191,7 +184,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
       println(msg)
       logger.log(Level.WARN, msg)
     }
-    val paddedWorkspace = padPrimoridal(snapLookupPipeline, primordialPadding, Some(maxDays))
+    val paddedWorkspace = padPrimordialAndSetMaxDays(snapLookupPipeline, primordialPadding, maxDays)
 
     val silverPipeline = getSilverPipeline(paddedWorkspace, readOnly = false)
     val BREAKState1 = silverPipeline.getConfig
@@ -200,43 +193,6 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     val BREAKState2 = goldPipeline.getConfig
     goldPipeline.run()
 
-  }
-
-  /**
-   * TODO - create generic version of this function
-   * Probably can add an overload to pipeline instantiation initialize pipeline to a specific state
-   * Issue for Kitana is that the bronze state needs to be current but silver/gold must be
-   * current - 1.
-   *
-   * @param pipeline
-   * @param versionsAgo
-   */
-  private def rollbackPipelineState(pipeline: Pipeline, versionsAgo: Int = 2): Unit = {
-    // snapshot current state for bronze
-    val initialBronzeState = pipeline.getPipelineState.filter(_._1 < 2000)
-    // clear the state
-    pipeline.clearPipelineState()
-    if (spark.catalog.databaseExists(pipeline.config.databaseName) &&
-      spark.catalog.tableExists(pipeline.config.databaseName, "pipeline_report")) {
-      val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
-      val wRank = Window.partitionBy('organization_id, 'moduleID, 'rnk).orderBy('Pipeline_SnapTS.desc)
-      spark.table(s"${pipeline.config.databaseName}.pipeline_report")
-        .filter('Status === "SUCCESS") // || 'Status.startsWith("EMPTY"))
-        .filter('organization_id === pipeline.config.organizationId)
-        .withColumn("rnk", rank().over(w))
-        .withColumn("rn", row_number().over(wRank))
-        .filter('moduleID >= 2000) // only retrieves states for silver / gold
-        .filter('rnk === versionsAgo && 'rn === 1)
-        .drop("inputConfig", "parsedConfig")
-        .as[SimplifiedModuleStatusReport]
-        .collect()
-        .foreach(pipeline.updateModuleState)
-      // reapply the initial bronze state
-      initialBronzeState.foreach(state => pipeline.updateModuleState(state._2))
-    } else {
-      Array[SimplifiedModuleStatusReport]()
-    }
-    println(s"Rolled pipeline back $versionsAgo versions. RESULT:\n")
   }
 
   /**
@@ -251,7 +207,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
                       ): Dataset[ValidationReport] = {
 
     val snapLookupPipeline = getBronzePipeline(snapWorkspace)
-    val paddedWorkspace = padPrimoridal(snapLookupPipeline, primordialPadding, maxDays)
+    val paddedWorkspace = padPrimordialAndSetMaxDays(snapLookupPipeline, primordialPadding, maxDays)
 
     val silverPipeline = getSilverPipeline(paddedWorkspace)
       .clearPipelineState()
@@ -303,12 +259,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     (dupReport, dupsDFByTarget)
   }
 
-  def refreshSnapshot(
-                       startDateString: String,
-                       endDateString: String,
-                       dtFormat: Option[String] = None,
-                       completeRefresh: Boolean = false
-                     ): Dataset[SnapReport] = {
+  def refreshSnapshot(completeRefresh: Boolean = false): Dataset[SnapReport] = {
     val sourceConfig = sourceWorkspace.getConfig // prod source
     val sourceDBName = sourceConfig.databaseName
     val snapDBName = snapWorkspace.getConfig.databaseName
@@ -319,7 +270,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     Kitana(snapDBName, sourceWorkspace)
       .setRefresh(true)
       .setCompleteRefresh(completeRefresh)
-      .executeBronzeSnapshot(startDateString, endDateString, dtFormat)
+      .executeBronzeSnapshot()
 
 
   }
@@ -383,10 +334,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
   def validateSchemas(workspace: Workspace = snapWorkspace): Dataset[SchemaValidationReport] = {
 
-    val bronzeModuleTargets = getLinkedModuleTarget(getBronzePipeline(workspace))
-    val silverModuleTargets = getLinkedModuleTarget(getSilverPipeline(workspace))
-    val goldModuleTargets = getLinkedModuleTarget(getGoldPipeline(workspace))
-    val targetsInScope = (bronzeModuleTargets ++ silverModuleTargets ++ goldModuleTargets).map(_.target).par
+    val targetsInScope = getAllKitanaTargets(workspace, includePipelineStateTable = true).par
     targetsInScope.tasksupport = taskSupport
 
     targetsInScope

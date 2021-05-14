@@ -48,18 +48,6 @@ case class PipelineTable(
   val databaseName: String = if (_databaseName == "default") config.databaseName else _databaseName
   val tableFullName: String = s"${databaseName}.${name}"
 
-  if (autoOptimize) {
-    spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
-    if (config.debugFlag) println(s"Setting Auto Optimize for ${name}")
-  }
-  else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
-
-  if (autoCompact) {
-    spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
-    if (config.debugFlag) println(s"Setting Auto Compact for ${name}")
-  }
-  else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
-
   // Minimum Schema Enforcement Management
   private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
   private var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
@@ -90,6 +78,19 @@ case class PipelineTable(
    * @param updates spark conf updates
    */
   private[overwatch] def setSparkOverrides(updates: Map[String, String] = Map()): Unit = {
+
+    if (autoOptimize) {
+      spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+      if (config.debugFlag) println(s"Setting Auto Optimize for ${name}")
+    }
+    else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
+
+    if (autoCompact) {
+      spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
+      if (config.debugFlag) println(s"Setting Auto Compact for ${name}")
+    }
+    else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
+
     if (updates.nonEmpty) {
       currentSparkOverrides = currentSparkOverrides ++ updates
     }
