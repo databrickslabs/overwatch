@@ -8,7 +8,6 @@ import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, DataFrame}
-import io.delta.tables.DeltaTable
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append

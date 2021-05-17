@@ -197,7 +197,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val tasksTarget: PipelineTable = PipelineTable(
       name = "spark_tasks_silver",
-      _keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID"),
+      _keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID", "TaskAttempt", "ExecutorID", "Host"),
       config,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
@@ -252,7 +252,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val notebookStatusTarget: PipelineTable = PipelineTable(
       name = "notebook_silver",
-      _keys = Array("notebookId", "requestId"),
+      _keys = Array("notebookId", "requestId", "actionName", "timestamp"),
       config,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -309,7 +309,10 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("job_id", "id_in_job"),
       config,
       incrementalColumns = Array("endEpochMS"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      sparkOverrides = Map(
+        "spark.sql.autoBroadcastJoinThreshold" -> "-1"
+      )
     )
 
     lazy private[overwatch] val jobRunCostPotentialFactViewTarget: PipelineView = PipelineView(
@@ -320,7 +323,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val notebookTarget: PipelineTable = PipelineTable(
       name = "notebook_gold",
-      _keys = Array("notebook_id", "request_id", "unixTimeMS", "request_id"),
+      _keys = Array("notebook_id", "request_id", "action", "unixTimeMS"),
       config,
       incrementalColumns = Array("unixTimeMS"),
       partitionBy = Seq("organization_id")

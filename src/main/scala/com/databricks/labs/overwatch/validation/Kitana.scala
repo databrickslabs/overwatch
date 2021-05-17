@@ -106,55 +106,60 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     this
   }
 
-//  /**
-//   *
-//   * @param startDateString yyyy-MM-dd
-//   * @param endDateString   yyyy-MM-dd
-//   * @return
-//   */
-//  def executeBronzeSnapshot(
-//                             startDateString: String,
-//                             endDateString: String,
-//                             dtFormat: Option[String] = None
-//                           ): Dataset[SnapReport] = {
-//    val dtFormatFinal = getDateFormat(dtFormat)
-//    val startDate = Pipeline.deriveLocalDate(startDateString, dtFormatFinal)
-//    val endDate = Pipeline.deriveLocalDate(endDateString, dtFormatFinal)
-//    val fromTime = Pipeline.createTimeDetail(startDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-//    val untilTime = Pipeline.createTimeDetail(endDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-//    val daysToTest = Duration.between(startDate.atStartOfDay(), endDate.atStartOfDay()).toDays.toInt
-//    try {
-//      _executeBronzeSnapshot(fromTime, untilTime, daysToTest)
-//    } catch {
-//      case e: BronzeSnapException =>
-//        Seq(e.snapReport).toDS()
-//    }
-//  }
+  //  /**
+  //   *
+  //   * @param startDateString yyyy-MM-dd
+  //   * @param endDateString   yyyy-MM-dd
+  //   * @return
+  //   */
+  //  def executeBronzeSnapshot(
+  //                             startDateString: String,
+  //                             endDateString: String,
+  //                             dtFormat: Option[String] = None
+  //                           ): Dataset[SnapReport] = {
+  //    val dtFormatFinal = getDateFormat(dtFormat)
+  //    val startDate = Pipeline.deriveLocalDate(startDateString, dtFormatFinal)
+  //    val endDate = Pipeline.deriveLocalDate(endDateString, dtFormatFinal)
+  //    val fromTime = Pipeline.createTimeDetail(startDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+  //    val untilTime = Pipeline.createTimeDetail(endDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+  //    val daysToTest = Duration.between(startDate.atStartOfDay(), endDate.atStartOfDay()).toDays.toInt
+  //    try {
+  //      _executeBronzeSnapshot(fromTime, untilTime, daysToTest)
+  //    } catch {
+  //      case e: BronzeSnapException =>
+  //        Seq(e.snapReport).toDS()
+  //    }
+  //  }
 
   /**
    * Execute snapshots
    *
    * @return
    */
-  private def executeBronzeSnapshot(): Dataset[SnapReport] = {
+  def executeBronzeSnapshot(): Dataset[SnapReport] = {
 
-    val bronzePipeline = getBronzePipeline(readOnly = false)
-    val primordialDateString = bronzePipeline.config.primordialDateString.get
+    val bronzeLookupPipeline = if (isRefresh) getBronzePipeline(workspace = snapWorkspace)
+    else getBronzePipeline(workspace = sourceWorkspace)
+
+    val snapPipeline = getBronzePipeline(readOnly = false)
+    val primordialDateString = bronzeLookupPipeline.config.primordialDateString.get
     val fromDate = Pipeline.deriveLocalDate(primordialDateString, getDateFormat)
     val fromTime = Pipeline.createTimeDetail(fromDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-    val untilTime = Pipeline.createTimeDetail(bronzePipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
+    val BREAK1 = bronzeLookupPipeline.getPipelineState.values.toArray
+    val BREAK2 = bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS
+    val untilTime = Pipeline.createTimeDetail(bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
 
 
-    validateSnapPipeline(sourceWorkspace, bronzePipeline, fromTime, untilTime, isRefresh)
+    validateSnapPipeline(bronzeLookupPipeline, snapPipeline, fromTime, untilTime, isRefresh)
 
-    bronzePipeline.clearPipelineState() // clears states such that module fromTimes == primordial date
+    snapPipeline.clearPipelineState() // clears states such that module fromTimes == primordial date
 
-    val bronzeTargetsWModule = getLinkedModuleTarget(bronzePipeline).par
+    val bronzeTargetsWModule = getLinkedModuleTarget(snapPipeline).par
     bronzeTargetsWModule.tasksupport = taskSupport
 
-    val statefulSnapsReport = snapStateTables(bronzePipeline, untilTime)
+    val statefulSnapsReport = snapStateTables(snapPipeline, untilTime)
     resetPipelineReportState(
-      bronzePipeline, bronzeTargetsWModule.toArray, fromTime, untilTime, isRefresh, isCompleteRefresh
+      snapPipeline, bronzeTargetsWModule.toArray, fromTime, untilTime, isRefresh, isCompleteRefresh
     )
 
     // snapshots bronze tables, returns ds with report
@@ -216,10 +221,10 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
     val goldPipeline = getGoldPipeline(paddedWorkspace)
       .clearPipelineState()
-//    rollbackPipelineState(silverPipeline)
+    //    rollbackPipelineState(silverPipeline)
 
     val BREAKState2 = silverPipeline.getPipelineState
-//    rollbackPipelineState(goldPipeline)
+    //    rollbackPipelineState(goldPipeline)
 
     val silverTargetsWModule = getLinkedModuleTarget(silverPipeline)
 
@@ -248,7 +253,8 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
                     workspace: Workspace = snapWorkspace,
                     dfsByKeysOnly: Boolean = true
                   ): (Dataset[DupReport], Map[String, DataFrame]) = {
-    val targetsToHunt = getAllKitanaTargets(workspace).par
+    val targetsToIgnore = Array("audit_log_bronze", "spark_events_bronze")
+    val targetsToHunt = getAllKitanaTargets(workspace).filterNot(t => targetsToIgnore.contains(t.name)).par
     targetsToHunt.tasksupport = taskSupport
     val (dupReport, targetDupDetails) = dupHunter(targetsToHunt)
 

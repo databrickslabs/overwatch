@@ -10,6 +10,7 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.expressions.Window
 
 import java.sql.Timestamp
@@ -98,25 +99,23 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
 
   @throws(classOf[BadConfigException])
   protected def validateSnapPipeline(
-                                      sourceWorkspace: Workspace,
+                                      bronzeLookupPipeline: Bronze,
                                       snapPipeline: Pipeline,
                                       snapFromTime: TimeTypes,
                                       snapUntilTime: TimeTypes,
                                       isRefresh: Boolean
                                     ): Unit = {
     validateSnapDatabase(snapPipeline, isRefresh)
-    val sourceConfig = sourceWorkspace.getConfig
-    val sourceBronzePipeline = Bronze(sourceWorkspace, readOnly = true, suppressReport = true)
-    if (sourceBronzePipeline.getPipelineState.isEmpty) {
+    if (bronzeLookupPipeline.getPipelineState.isEmpty) {
       throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.", None)
     } else {
-      val sourceMaxUntilTS = sourceBronzePipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS
+      val sourceMaxUntilTS = bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS
       require(sourceMaxUntilTS >= snapUntilTime.asUnixTimeMilli, s"PIPELINE STATE ERROR: The maximum state of " +
         s"any module in the source is < the specified end period of ${snapUntilTime.asDTString}. The snap window " +
         s"must be WITHIN the timeframe of the source data.")
     }
 
-    val sourcePrimordialDate = Pipeline.deriveLocalDate(sourceConfig.primordialDateString.get, getDateFormat(None))
+    val sourcePrimordialDate = Pipeline.deriveLocalDate(bronzeLookupPipeline.config.primordialDateString.get, getDateFormat(None))
     val snapPrimordialDate = snapFromTime.asLocalDateTime.toLocalDate
 
     require(snapPrimordialDate.toEpochDay >= sourcePrimordialDate.toEpochDay, s"The specified start date of " +
@@ -424,7 +423,8 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
             .merge(
               latestMatchedModules.as("src"),
               "src.Overwatch_RunID = target.Overwatch_RunID AND src.moduleID = target.moduleID"
-            ).whenMatched
+            )
+            .whenMatched
             .updateExpr(Map(
               "fromTS" -> fromTime.asUnixTimeMilli.toString,
               "untilTS" -> untilTime.asUnixTimeMilli.toString,
