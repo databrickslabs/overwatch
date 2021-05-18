@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
-import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.JsonProcessingException
@@ -16,11 +16,13 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
 
+import java.net.URI
 import javax.crypto
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.IvParameterSpec
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.util.Random
 
 // TODO -- Add loggers to objects with throwables
 object JsonUtils {
@@ -198,6 +200,9 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   // TODO -- Remove keys with nulls from maps?
+  //  Add test to ensure that null/"" key and null/"" value are both handled
+  //  as of 0.4.1 failed with key "" in spark_conf
+  //  TEST for multiple null/"" cols / keynames in same struct/record
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
 
     val mapColName = colToConvert.split("\\.").reverse.head
@@ -208,7 +213,15 @@ object SchemaTools extends SparkSessionWrapper {
       val schema = df.select(s"${colToConvert}.*").schema
       val mapCols = collection.mutable.LinkedHashSet[Column]()
       schema.fields.foreach(field => {
-        mapCols.add(lit(field.name))
+        val kRaw = field.name.trim
+        val k = if (kRaw.isEmpty || kRaw == "") {
+          val errMsg = s"SCHEMA WARNING: Column $colToConvert is being converted to a map but has a null key value. " +
+            s"This key value will be replaced with a 'null_<random_string>' but should be corrected."
+          logger.log(Level.WARN, errMsg)
+          println(errMsg)
+          s"null_${randomString(Some(42L), 6)}"
+        } else kRaw
+        mapCols.add(lit(k))
         mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
       })
       val newRawMap = map(mapCols.toSeq: _*)
@@ -218,6 +231,15 @@ object SchemaTools extends SparkSessionWrapper {
     } else {
       lit(null).cast(MapType(StringType, StringType, true)).alias(mapColName)
     }
+  }
+
+  def randomString(seed: Option[Long] = None, length: Int = 10): String = {
+    val r = if (seed.isEmpty) new Random() else new Random(seed.get) // Using seed to reuse suffixes on continuous duplicates
+    r.alphanumeric.take(length).mkString("")
+  }
+
+  def uniqueRandomStrings(uniquesNeeded: Option[Int] = None, seed: Option[Long] = None, length: Int = 10): Seq[String] = {
+    (0 to uniquesNeeded.getOrElse(500) + 10).map(_ => randomString(seed, length)).distinct
   }
 
   // TODO -- Delta writer is schema case sensitive and will fail on write if column case is not identical on both sides
@@ -257,7 +279,7 @@ object SchemaTools extends SparkSessionWrapper {
    */
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
     val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
-    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
+    //    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
     val fieldNames = if (caseSensitive) {
       fields.map(_.name.trim)
     } else fields.map(_.name.trim.toLowerCase())
@@ -272,7 +294,7 @@ object SchemaTools extends SparkSessionWrapper {
         s"${dups.mkString("\n")}"
       println(warnMsg)
       logger.log(Level.WARN, warnMsg)
-      val uniqueSuffixes = (0 to fields.length + 10).map(_ => r.alphanumeric.take(6).mkString("")).distinct
+      val uniqueSuffixes = uniqueRandomStrings(Some(fields.length), Some(42L), 6)
       fields.zipWithIndex.map(f => {
         val fieldName = if (caseSensitive) f._1.name else f._1.name.toLowerCase
         if (dups.contains(fieldName)) {
@@ -290,7 +312,7 @@ object SchemaTools extends SparkSessionWrapper {
   /**
    * Recursive function to drill into the schema. Currently only supports recursion through structs and array.
    * TODO -- add support for recursion through Maps
-   *  Issue_86
+   * Issue_86
    *
    * @param dataType
    * @return
@@ -311,7 +333,7 @@ object SchemaTools extends SparkSessionWrapper {
    * Main function for cleaning a schema. The point is to remove special characters and duplicates all the way down
    * into the Arrays / Structs.
    * TODO -- Add support for map type recursion cleansing
-   *  Issue_86
+   * Issue_86
    * TODO -- convert to same pattern as schema validation function
    *
    * @param df Input dataframe to be cleansed
@@ -575,6 +597,7 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * Serialized / parallelized method for rapidly listing paths under a sub directory
+   *
    * @param path
    * @return
    */
@@ -784,6 +807,7 @@ object Helpers extends SparkSessionWrapper {
    * @param cloudProvider
    */
   private[overwatch] def fastDrop(target: PipelineTable, cloudProvider: String): Unit = {
+    spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "true")
     if (cloudProvider == "aws") {
       spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
       spark.sql(s"truncate table ${target.tableFullName}")
@@ -801,6 +825,13 @@ object Helpers extends SparkSessionWrapper {
       spark.sql(s"drop table if exists ${target.tableFullName}")
       fastrm(Array(target.tableLocation))
     }
+    spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "false")
+  }
+
+  private def getURI(pathString: String): URI = {
+    val fsPrefix = pathString.replaceAllLiterally("//", "/").split("/")(0)
+    val fsType = if (fsPrefix.isEmpty) "dbfs:/" else s"${fsPrefix}/"
+    new URI(fsType)
   }
 
   /**
@@ -812,9 +843,10 @@ object Helpers extends SparkSessionWrapper {
    */
   private def rmSer(file: String): Unit = {
     val conf = new Configuration()
-    val fsPrefix = file.replaceAllLiterally("//", "/").split("/")(0)
-    val fsType = if (fsPrefix.isEmpty) "dbfs:/" else s"${fsPrefix}/"
-    val fs = FileSystem.get(new java.net.URI(fsType), conf)
+    //    val fsPrefix = file.replaceAllLiterally("//", "/").split("/")(0)
+    //    val fsType = if (fsPrefix.isEmpty) "dbfs:/" else s"${fsPrefix}/"
+    val fsURI = getURI(file)
+    val fs = FileSystem.get(fsURI, conf)
     try {
       fs.delete(new Path(file), true)
     } catch {
@@ -843,8 +875,12 @@ object Helpers extends SparkSessionWrapper {
       .as[String]
       .foreach(f => rmSer(f))
 
-    topPaths.foreach(dir => dbutils.fs.rm(dir, true))
-
+    val conf = new Configuration()
+    topPaths.foreach(dir => {
+      val fsURI = getURI(dir)
+      val fs = FileSystem.get(fsURI, conf)
+      fs.delete(new Path(dir), true)
+    })
   }
 
 }

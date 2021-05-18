@@ -2,27 +2,37 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{systemZoneId, systemZoneOffset}
+import com.databricks.labs.overwatch.utils.Layer.Layer
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{from_unixtime, lit, rank, row_number}
+import org.apache.spark.sql.functions.{from_unixtime, lit, log, rank, row_number}
 
+//import io.delta.tables._
+
+import java.text.SimpleDateFormat
 import java.time._
 import java.util.Date
 
-class Pipeline(_workspace: Workspace, _database: Database,
-               _config: Config) extends PipelineTargets(_config) with SparkSessionWrapper {
+class Pipeline(
+                _workspace: Workspace,
+                final val database: Database,
+                _config: Config,
+                final val layer: Layer
+              ) extends PipelineTargets(_config) with SparkSessionWrapper {
 
   // TODO -- Validate Targets (unique table names, ModuleIDs and names, etc)
   //  developer validation to guard against multiple Modules with same target and/or ID/Name
   private val logger: Logger = Logger.getLogger(this.getClass)
   final val workspace: Workspace = _workspace
-  final val database: Database = _database
   final val config: Config = _config
   private var _pipelineSnapTime: Long = _
+  private var _readOnly: Boolean = false
+  private var _supressRangeReport: Boolean = false
   lazy protected final val postProcessor = new PostProcessor()
   private val pipelineState = scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport]()
+
   import spark.implicits._
 
   envInit()
@@ -39,8 +49,33 @@ class Pipeline(_workspace: Workspace, _database: Database,
     pipelineState
   }
 
+  def getVerbosePipelineState: Array[ModuleStatusReport] = {
+    pipelineStateTarget.asDF.as[ModuleStatusReport].collect()
+  }
+
   def updateModuleState(moduleState: SimplifiedModuleStatusReport): Unit = {
     pipelineState.put(moduleState.moduleID, moduleState)
+  }
+
+  def clearPipelineState(): this.type = {
+    pipelineState.clear()
+    this
+  }
+
+  def setReadOnly(value: Boolean): this.type = {
+    _readOnly = value
+    this
+  }
+
+  def readOnly: Boolean = _readOnly
+
+  def suppressRangeReport: this.type = {
+    suppressRangeReport(true)
+    this
+  }
+  def suppressRangeReport(value: Boolean): this.type = {
+    _supressRangeReport = value
+    this
   }
 
   /**
@@ -51,23 +86,6 @@ class Pipeline(_workspace: Workspace, _database: Database,
    */
   def pipelineSnapTime: TimeTypes = {
     Pipeline.createTimeDetail(_pipelineSnapTime)
-  }
-
-  def fromTime(moduleId: Int): TimeTypes = if (getModuleState(moduleId).isEmpty){
-    Pipeline.createTimeDetail(primordialEpoch)
-  } else Pipeline.createTimeDetail(getModuleState(moduleId).get.untilTS)
-
-  def untilTime(moduleID: Int): TimeTypes = {
-    val startSecondPlusMaxDays = fromTime(moduleID).asLocalDateTime.plusDays(config.maxDays)
-      .atZone(Pipeline.systemZoneId).toInstant.toEpochMilli
-
-    val defaultUntilSecond = pipelineSnapTime.asUnixTimeMilli
-
-    if (startSecondPlusMaxDays < defaultUntilSecond) {
-      Pipeline.createTimeDetail(startSecondPlusMaxDays)
-    } else {
-      Pipeline.createTimeDetail(defaultUntilSecond)
-    }
   }
 
   /**
@@ -84,18 +102,21 @@ class Pipeline(_workspace: Workspace, _database: Database,
   }
 
   def showRangeReport(): Unit = {
-    val rangeReport = pipelineState.values.map(lr => (
-      lr.moduleID,
-      lr.moduleName,
-      lr.primordialDateString,
-      fromTime(lr.moduleID).asTSString,
-      untilTime(lr.moduleID).asTSString,
-      pipelineSnapTime.asTSString
-    ))
+    if (!_supressRangeReport) {
+      val rangeReport = pipelineState.values.map(lr => (
+        lr.moduleID,
+        lr.moduleName,
+        lr.primordialDateString,
+        lr.fromTS,
+        lr.untilTS,
+        pipelineSnapTime.asTSString
+      ))
 
-    rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
-      .orderBy('snapTS.desc, 'moduleId)
-      .show(50, false)
+      println(s"Current Pipeline State: BEFORE this run.")
+      rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
+        .orderBy('snapTS.desc, 'moduleId)
+        .show(50, false)
+    }
   }
 
   /**
@@ -125,7 +146,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
         .coalesce(1)
 
       database.write(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
-      BronzeTargets.cloudMachineDetailViewTarget.publish("*")
+      if (config.databaseName != config.consumerDatabaseName) BronzeTargets.cloudMachineDetailViewTarget.publish("*")
     }
     this
   }
@@ -152,16 +173,18 @@ class Pipeline(_workspace: Workspace, _database: Database,
         .collect()
         .foreach(updateModuleState)
     } else {
-      config.setIsFirstRun(true)
       Array[SimplifiedModuleStatusReport]()
     }
     setPipelineSnapTime()
-    if (pipelineState.nonEmpty) showRangeReport()
+    if (pipelineState.nonEmpty && !_supressRangeReport) showRangeReport()
     this
   }
 
   /**
    * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
+   * If primordial date is not provided in the config use now() - maxDays to derive a primordial date otherwise
+   * use provided primordial date.
+   *
    * If trying to pull more than 60 days of data before https://databricks.atlassian.net/browse/SC-38627 is complete
    * The primary concern is that the historical data from the cluster events API generally expires on/before 60 days
    * and the event logs are not stored in an optimal way at all. SC-38627 should help with this but for now, max
@@ -170,6 +193,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
    * @return
    */
   def primordialEpoch: Long = {
+
     LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
       .toLocalDate.atStartOfDay
       .toInstant(systemZoneOffset)
@@ -205,18 +229,19 @@ class Pipeline(_workspace: Workspace, _database: Database,
         }
       }
     } else {
-      60
+      config.maxDays
     }
 
   }
 
   /**
-    * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
-    * Accepting data with higher precision than delivery causes bad data
-    */
+   * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
+   * Accepting data with higher precision than delivery causes bad data
+   */
   protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
 
   private[overwatch] def initiatePostProcessing(): Unit = {
+
     postProcessor.optimize()
     Helpers.fastrm(Array(
       "/tmp/overwatch/bronze/clusterEventsBatches"
@@ -241,68 +266,70 @@ class Pipeline(_workspace: Workspace, _database: Database,
   private def needsOptimize(moduleID: Int, optimizeFreq_H: Int): Boolean = {
     val optFreq_Millis = 1000L * 60L * 60L * optimizeFreq_H.toLong
     val tsLessSevenD = System.currentTimeMillis() - optFreq_Millis
-    if ((getLastOptimized(moduleID) < tsLessSevenD || config.isFirstRun) && !config.isLocalTesting) true
+    if (getLastOptimized(moduleID) < tsLessSevenD && !config.isLocalTesting) true
     else false
   }
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
 
-    try {
+    //      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
+    //        s"Module ${module.moduleName} has a defined state but the target to which it writes is missing.", Some(target))
 
-      val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, getTotalCores)
+    val localSafeTotalCores = if (config.isLocalTesting) spark.conf.getOption("spark.sql.shuffle.partitions").getOrElse("200").toInt
+    else getTotalCores
+    val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, localSafeTotalCores)
 
-      val startLogMsg = s"Beginning append to ${target.tableFullName}"
-      logger.log(Level.INFO, startLogMsg)
+    val startLogMsg = s"Beginning append to ${target.tableFullName}"
+    logger.log(Level.INFO, startLogMsg)
 
-      // Append the output
-      if (!_database.write(finalDF, target, pipelineSnapTime.asColumnTS)) throw new Exception("PIPELINE FAILURE")
-
-      // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
-      // of attempting to re-read the very inefficient json.gz files.
-      val dfCount = if (target.name == "spark_events_bronze") {
-        target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
-      } else finalDF.count()
-
-      val msg = s"SUCCESS! ${module.moduleName}: $dfCount records appended."
-      println(msg)
-      logger.log(Level.INFO, msg)
-
-      var lastOptimizedTS: Long = getLastOptimized(module.moduleId)
-      if (needsOptimize(module.moduleId, target.optimizeFrequency_H)) {
-        postProcessor.markOptimize(target)
-        lastOptimizedTS = module.untilTime.asUnixTimeMilli
-      }
-
-      restoreSparkConf()
-
-      val endTime = System.currentTimeMillis()
-
-      // Generate Success Report
-      ModuleStatusReport(
-        organization_id = config.organizationId,
-        moduleID = module.moduleId,
-        moduleName = module.moduleName,
-        primordialDateString = config.primordialDateString,
-        runStartTS = startTime,
-        runEndTS = endTime,
-        fromTS = module.fromTime.asUnixTimeMilli,
-        untilTS = module.untilTime.asUnixTimeMilli,
-        dataFrequency = target.dataFrequency.toString,
-        status = "SUCCESS",
-        recordsAppended = dfCount,
-        lastOptimizedTS = lastOptimizedTS,
-        vacuumRetentionHours = 24 * 7,
-        inputConfig = config.inputConfig,
-        parsedConfig = config.parsedConfig
-      )
-    } catch {
-      case e: Throwable =>
-        val msg = s"${module.moduleName} FAILED -->\nMessage: ${e.getMessage}\nCause:${e.getCause}"
-        logger.log(Level.ERROR, msg, e)
-        throw new FailedModuleException(msg, target)
+    // Append the output
+    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
+    else {
+      val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
+      println(readOnlyMsg)
+      logger.log(Level.WARN, readOnlyMsg)
     }
 
+    // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
+    // of attempting to re-read the very inefficient json.gz files.
+    val dfCount = if (target.name == "spark_events_bronze") {
+      target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
+    } else finalDF.count()
+
+    val msg = s"SUCCESS! ${module.moduleName}: $dfCount records appended."
+    println(msg)
+    logger.log(Level.INFO, msg)
+
+    var lastOptimizedTS: Long = getLastOptimized(module.moduleId)
+    if (needsOptimize(module.moduleId, target.optimizeFrequency_H)) {
+      postProcessor.markOptimize(target)
+      lastOptimizedTS = module.untilTime.asUnixTimeMilli
+    }
+
+    restoreSparkConf()
+
+    val endTime = System.currentTimeMillis()
+
+
+    // Generate Success Report
+    ModuleStatusReport(
+      organization_id = config.organizationId,
+      moduleID = module.moduleId,
+      moduleName = module.moduleName,
+      primordialDateString = config.primordialDateString,
+      runStartTS = startTime,
+      runEndTS = endTime,
+      fromTS = module.fromTime.asUnixTimeMilli,
+      untilTS = module.untilTime.asUnixTimeMilli,
+      dataFrequency = target.dataFrequency.toString,
+      status = "SUCCESS",
+      recordsAppended = dfCount,
+      lastOptimizedTS = lastOptimizedTS,
+      vacuumRetentionHours = 24 * 7,
+      inputConfig = config.inputConfig,
+      parsedConfig = config.parsedConfig
+    )
   }
 
 }
@@ -311,6 +338,10 @@ object Pipeline {
 
   val systemZoneId: ZoneId = ZoneId.systemDefault()
   val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
+
+  def deriveLocalDate(dtString: String, dtFormat: SimpleDateFormat): LocalDate = {
+    dtFormat.parse(dtString).toInstant.atZone((systemZoneId)).toLocalDate
+  }
 
   /**
    * Most of Overwatch uses a custom time type, "TimeTypes" which simply pre-builds the most common forms / formats
@@ -333,9 +364,9 @@ object Pipeline {
     )
   }
 
-  def apply(workspace: Workspace, database: Database, config: Config): Pipeline = {
+  def apply(workspace: Workspace, database: Database, config: Config, layer: Layer): Pipeline = {
 
-    new Pipeline(workspace, database, config)
+    new Pipeline(workspace, database, config, layer)
       .initPipelineRun()
       .loadStaticDatasets()
 

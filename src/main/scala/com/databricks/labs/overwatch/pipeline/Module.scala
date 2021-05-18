@@ -5,26 +5,32 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
+import scala.collection.immutable.ListMap
+
 class Module(
-              _moduleID: Int,
-              _moduleName: String,
-              pipeline: Pipeline,
-              _moduleDependencies: Array[Int]
+              val moduleId: Int,
+              val moduleName: String,
+              private[overwatch] val pipeline: Pipeline,
+              val moduleDependencies: Array[Int]
             ) {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   import pipeline.spark.implicits._
   private val config = pipeline.config
 
-
-  val moduleId: Int = _moduleID
-  val moduleName: String = _moduleName
   private var _isFirstRun: Boolean = false
-  private val moduleDependencies: Array[Int] = _moduleDependencies
+  def isFirstRun: Boolean = _isFirstRun
 
-  private def moduleState: SimplifiedModuleStatusReport = {
+  def copy(
+            _moduleID: Int = moduleId,
+            _moduleName: String = moduleName,
+            _pipeline: Pipeline = pipeline,
+            _moduleDependencies: Array[Int] = moduleDependencies): Module = {
+    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies)
+  }
+
+  private[overwatch] def moduleState: SimplifiedModuleStatusReport = {
     if (pipeline.getModuleState(moduleId).isEmpty) {
-      _isFirstRun = true
       val initialModuleState = initModuleState
       pipeline.updateModuleState(initialModuleState)
       initialModuleState
@@ -35,37 +41,38 @@ class Module(
   private def pipelineState: Map[Int, SimplifiedModuleStatusReport] = pipeline.getPipelineState.toMap
 
   /**
-   * This is also used for simulation of start/end times during testing. This also should not be a public function
-   * when completed. Note that this controlled by module. Not every module is executed on every run or a module could
+   * This is also used for simulation of start/end times during testing.
+   * Note that this controlled by module. Not every module is executed on every run or a module could
    * fail and this allows for missed data since the last successful run to be acquired without having to pull all the
    * data for all modules each time.
+   * fromTime is always INCLUSIVE >= when used for calculating incrementals
    *
-   * @param moduleID moduleID for modules in scope for the run
    * @return
    */
-  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty){
+  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty || isFirstRun){
     Pipeline.createTimeDetail(pipeline.primordialEpoch)
   } else Pipeline.createTimeDetail(moduleState.untilTS)
 
   /**
-   * Defines the latest timestamp to be used for a give module as a TimeType
-   *
-   * @param moduleID moduleID for which to get the until Time
+   * Disallow pipeline start time state + max days to exceed snapshot time. Keeps pipelines from running into
+   * the future.
    * @return
    */
-  def untilTime: TimeTypes = {
+  private def limitUntilTimeToSnapTime: TimeTypes = {
     val startSecondPlusMaxDays = fromTime.asLocalDateTime.plusDays(pipeline.config.maxDays)
       .atZone(Pipeline.systemZoneId).toInstant.toEpochMilli
 
     val defaultUntilSecond = pipeline.pipelineSnapTime.asUnixTimeMilli
 
     // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
-    val maxIndependentUntilTime = if (startSecondPlusMaxDays < defaultUntilSecond) {
+    if (startSecondPlusMaxDays < defaultUntilSecond) {
       Pipeline.createTimeDetail(startSecondPlusMaxDays)
     } else {
       Pipeline.createTimeDetail(defaultUntilSecond)
     }
+  }
 
+  private def limitUntilTimeToMostLaggingDependency(originalUntilTime: TimeTypes): TimeTypes = {
     if (moduleDependencies.nonEmpty) {
       val mostLaggingDependencyUntilTS = if (deriveMostLaggingDependency.isEmpty) {
         // Return primordial time if upstream dependency is completely missing. This will act as place holder and keep
@@ -78,17 +85,17 @@ class Module(
 
       // Check if any dependency states latest data content (untilTS state) is < this module's untilTS
       // This check keeps a child module from getting ahead of it's parent
-      if (mostLaggingDependencyUntilTS < maxIndependentUntilTime.asUnixTimeMilli) {
-        val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${maxIndependentUntilTime.asUnixTimeMilli} " +
+      if (mostLaggingDependencyUntilTS < originalUntilTime.asUnixTimeMilli) {
+        val msg = s"WARNING: ENDING TIMESTAMP CHANGED:\nInitial UntilTS of ${originalUntilTime.asUnixTimeMilli} " +
           s"exceeds that of an upstream requisite module. " +
           s"with untilTS of: ${mostLaggingDependencyUntilTS}. Setting current module untilTS == min requisite module: " +
           s"${mostLaggingDependencyUntilTS}."
         logger.log(Level.WARN, msg)
         if (pipeline.config.debugFlag) println(msg)
         Pipeline.createTimeDetail(mostLaggingDependencyUntilTS)
-      } else maxIndependentUntilTime
+      } else originalUntilTime
 
-    } else maxIndependentUntilTime
+    } else originalUntilTime
   }
 
   private def deriveMostLaggingDependency: Option[SimplifiedModuleStatusReport] = {
@@ -106,11 +113,30 @@ class Module(
       logger.log(Level.ERROR, errMsg)
       None
     } else {
-      Some(dependencyStates.map(_.get).sortBy(_.untilTS).reverse.head)
+      Some(dependencyStates.map(_.get).minBy(_.untilTS))
     }
   }
 
+  /**
+   * Defines the latest timestamp to be used for a give module as a TimeType
+   * When pipeline is read only, module state can be read independent of upstream dependencies.
+   * untilTime is EXCLUSIVE in other words when it is used as a calculation in "asIncrementalDF" it is < untilTime
+   * not <= untilTime
+   *
+   * @return
+   */
+  def untilTime: TimeTypes = {
+    // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
+    val maxIndependentUntilTime = limitUntilTimeToSnapTime
+
+    if (pipeline.readOnly) { // don't validate dependency progress when not writing data to pipeline
+      maxIndependentUntilTime
+    } else limitUntilTimeToMostLaggingDependency(maxIndependentUntilTime)
+
+  }
+
   private def initModuleState: SimplifiedModuleStatusReport = {
+    _isFirstRun = true
     val initState = SimplifiedModuleStatusReport(
       organization_id = config.organizationId,
       moduleID = moduleId,
@@ -132,17 +158,12 @@ class Module(
 
   private def finalizeModule(report: ModuleStatusReport): Unit = {
     pipeline.updateModuleState(report.simple)
-    val pipelineReportTarget = PipelineTable(
-      name = "pipeline_report",
-      keys = Array("organization_id", "Overwatch_RunID"),
-      config = config,
-      partitionBy = Array("organization_id"),
-      incrementalColumns = Array("Pipeline_SnapTS")
-    )
-    pipeline.database.write(Seq(report).toDF, pipelineReportTarget, pipeline.pipelineSnapTime.asColumnTS)
+    if (!pipeline.readOnly) {
+      pipeline.database.write(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
+    }
   }
 
-  private def fail(msg: String, rollbackStatus: String = ""): Unit = {
+  private def fail(msg: String, rollbackStatus: String = ""): ModuleStatusReport = {
     val failedStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
       moduleID = moduleId,
@@ -153,7 +174,7 @@ class Module(
       fromTS = fromTime.asUnixTimeMilli,
       untilTS = untilTime.asUnixTimeMilli,
       dataFrequency = moduleState.dataFrequency,
-      status = s"FAILED --> $rollbackStatus: ERROR:\n$msg",
+      status = s"FAILED --> $rollbackStatus\nERROR:\n$msg",
       recordsAppended = 0L,
       lastOptimizedTS = moduleState.lastOptimizedTS,
       vacuumRetentionHours = moduleState.vacuumRetentionHours,
@@ -161,9 +182,10 @@ class Module(
       parsedConfig = config.parsedConfig
     )
     finalizeModule(failedStatusReport)
+    failedStatusReport
   }
 
-  private def failWithRollback(target: PipelineTable, msg: String): Unit = {
+  private def failWithRollback(target: PipelineTable, msg: String): ModuleStatusReport = {
     val rollbackMsg = s"ROLLBACK: Attempting Roll back $moduleName."
     println(rollbackMsg)
     logger.log(Level.WARN, rollbackMsg)
@@ -189,7 +211,7 @@ class Module(
    * @param errorLevel
    * @param allowModuleProgression
    */
-  private def noNewDataHandler(msg: String, errorLevel: Level, allowModuleProgression: Boolean): Unit = {
+  private def noNewDataHandler(msg: String, errorLevel: Level, allowModuleProgression: Boolean): ModuleStatusReport = {
     logger.log(errorLevel, msg)
     val startTime = System.currentTimeMillis()
     val emptyStatusReport = ModuleStatusReport(
@@ -210,6 +232,7 @@ class Module(
       parsedConfig = config.parsedConfig
     )
     finalizeModule(emptyStatusReport)
+    emptyStatusReport
   }
 
   private def validateSourceDF(df: DataFrame): DataFrame = {
@@ -223,7 +246,7 @@ class Module(
     }
   }
 
-  private def validatePipelineState(): this.type = {
+  private[overwatch] def validatePipelineState(): Unit = {
 
     if (moduleDependencies.nonEmpty) { // if dependencies present
       // If earliest untilTS of dependencies < current untilTS edit current untilTS to match
@@ -244,11 +267,10 @@ class Module(
         }
       })
     }// requirementsPassed
-    this
   }
 
   @throws(classOf[IllegalArgumentException])
-  def execute(_etlDefinition: ETLDefinition): Unit = {
+  def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
     println(s"Beginning: $moduleName")
 
     val debugMsg = s"MODULE: $moduleId-$moduleName\nTIME RANGE: " +
@@ -262,7 +284,7 @@ class Module(
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
       val newState = etlDefinition.executeETL(this, verifiedSourceDF)
       finalizeModule(newState)
-
+      newState
     } catch {
       case e: FailedModuleException =>
         val errMessage = s"FAILED: $moduleId-$moduleName Module"

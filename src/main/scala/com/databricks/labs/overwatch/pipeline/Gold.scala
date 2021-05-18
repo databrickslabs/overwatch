@@ -1,25 +1,47 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
+import com.databricks.labs.overwatch.utils.{Config, Layer, OverwatchScope}
 import org.apache.log4j.Logger
 
 class Gold(_workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config)
+  extends Pipeline(_workspace, _database, _config, Layer.gold)
     with GoldTransforms {
+
+  /**
+   * Enable access to Gold pipeline tables externally.
+   * @return
+   */
+  def getAllTargets: Array[PipelineTable] = {
+    Array(
+      GoldTargets.clusterTarget,
+      GoldTargets.jobTarget,
+      GoldTargets.jobRunTarget,
+      GoldTargets.jobRunCostPotentialFactTarget,
+      GoldTargets.notebookTarget,
+      GoldTargets.accountModsTarget,
+      GoldTargets.accountLoginTarget,
+      GoldTargets.clusterStateFactTarget,
+      GoldTargets.sparkJobTarget,
+      GoldTargets.sparkStageTarget,
+      GoldTargets.sparkTaskTarget,
+      GoldTargets.sparkExecutionTarget,
+      GoldTargets.sparkExecutorTarget
+    )
+  }
 
   envInit()
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  lazy private val clusterModule = Module(3001, "Gold_Cluster", this, Array(2014))
+  lazy private[overwatch] val clusterModule = Module(3001, "Gold_Cluster", this, Array(2014))
   lazy private val appendClusterProccess = ETLDefinition(
     SilverTargets.clustersSpecTarget.asIncrementalDF(clusterModule, "timestamp"),
     Seq(buildCluster()),
     append(GoldTargets.clusterTarget)
   )
 
-  lazy private val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(1005, 2014))
+  lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(1005, 2014))
   lazy private val appendClusterStateFactProccess = ETLDefinition(
     BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateFactModule, "timestamp"),
     Seq(buildClusterStateFact(
@@ -39,21 +61,21 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   //    )
   //  )
 
-  lazy private val jobsModule = Module(3002, "Gold_Job", this, Array(2010))
+  lazy private[overwatch] val jobsModule = Module(3002, "Gold_Job", this, Array(2010))
   lazy private val appendJobsProcess = ETLDefinition(
     SilverTargets.dbJobsStatusTarget.asIncrementalDF(jobsModule, "timestamp"),
     Seq(buildJobs()),
     append(GoldTargets.jobTarget)
   )
 
-  lazy private val jobRunsModule = Module(3003, "Gold_JobRun", this, Array(2011))
+  lazy private[overwatch] val jobRunsModule = Module(3003, "Gold_JobRun", this, Array(2011))
   lazy private val appendJobRunsProcess = ETLDefinition(
     SilverTargets.dbJobRunsTarget.asIncrementalDF(jobRunsModule, "endEpochMS"),
     Seq(buildJobRuns()),
     append(GoldTargets.jobRunTarget)
   )
 
-  lazy private val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact", this, Array(3001, 3003, 3005, 3010, 3012))
+  lazy private[overwatch] val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact", this, Array(3001, 3003, 3005, 3010, 3012))
   //Incremental current spark job and tasks DFs plus 2 days for lag coverage
   lazy private val appendJobRunCostPotentialFactProcess = ETLDefinition(
     // new jobRuns to be considered are job runs completed since the last overwatch import for this module
@@ -69,56 +91,56 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.jobRunCostPotentialFactTarget)
   )
 
-  lazy private val notebookModule = Module(3004, "Gold_Notebook", this, Array(2018))
+  lazy private[overwatch] val notebookModule = Module(3004, "Gold_Notebook", this, Array(2018))
   lazy private val appendNotebookProcess = ETLDefinition(
     SilverTargets.notebookStatusTarget.asIncrementalDF(notebookModule, "timestamp"),
     Seq(buildNotebook()),
     append(GoldTargets.notebookTarget)
   )
 
-  lazy private val accountModModule = Module(3007, "Gold_AccountMod", this, Array(2017))
+  lazy private[overwatch] val accountModModule = Module(3007, "Gold_AccountMod", this, Array(2017))
   lazy private val appendAccountModProcess = ETLDefinition(
     SilverTargets.accountModTarget.asIncrementalDF(accountModModule, "timestamp"),
     Seq(buildAccountMod()),
     append(GoldTargets.accountModsTarget)
   )
 
-  lazy private val accountLoginModule = Module(3008, "Gold_AccountLogin", this, Array(2016))
+  lazy private[overwatch] val accountLoginModule = Module(3008, "Gold_AccountLogin", this, Array(2016))
   lazy private val appendAccountLoginProcess = ETLDefinition(
     SilverTargets.accountLoginTarget.asIncrementalDF(accountLoginModule, "timestamp"),
     Seq(buildLogin(SilverTargets.accountModTarget.asDF)),
     append(GoldTargets.accountLoginTarget)
   )
 
-  lazy private val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006))
+  lazy private[overwatch] val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006))
   lazy private val appendSparkJobProcess = ETLDefinition(
     SilverTargets.jobsTarget.asIncrementalDF(sparkJobModule, "startTimestamp"),
     Seq(buildSparkJob(config.cloudProvider)),
     append(GoldTargets.sparkJobTarget)
   )
 
-  lazy private val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007))
+  lazy private[overwatch] val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007))
   lazy private val appendSparkStageProcess = ETLDefinition(
     SilverTargets.stagesTarget.asIncrementalDF(sparkStageModule, "startTimestamp"),
     Seq(buildSparkStage()),
     append(GoldTargets.sparkStageTarget)
   )
 
-  lazy private val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008))
+  lazy private[overwatch] val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008))
   lazy private val appendSparkTaskProcess = ETLDefinition(
     SilverTargets.tasksTarget.asIncrementalDF(sparkTaskModule, "startTimestamp"),
     Seq(buildSparkTask()),
     append(GoldTargets.sparkTaskTarget)
   )
 
-  lazy private val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005))
+  private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005))
   lazy private val appendSparkExecutionProcess = ETLDefinition(
     SilverTargets.executionsTarget.asIncrementalDF(sparkExecutionModule, "startTimestamp"),
     Seq(buildSparkExecution()),
     append(GoldTargets.sparkExecutionTarget)
   )
 
-  lazy private val sparkExecutorModule = Module(3014, "Gold_SparkExecutor", this, Array(2003))
+  lazy private[overwatch] val sparkExecutorModule = Module(3014, "Gold_SparkExecutor", this, Array(2003))
   lazy private val appendSparkExecutorProcess = ETLDefinition(
     SilverTargets.executorsTarget.asIncrementalDF(sparkExecutorModule, "addedTimestamp"),
     Seq(buildSparkExecutor()),
@@ -200,8 +222,18 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 }
 
 object Gold {
-  def apply(workspace: Workspace): Gold = new Gold(workspace, workspace.database, workspace.getConfig)
-    .initPipelineRun()
-    .loadStaticDatasets()
+  def apply(workspace: Workspace): Gold = {
+    new Gold(workspace, workspace.database, workspace.getConfig)
+      .initPipelineRun()
+      .loadStaticDatasets()
+  }
+
+  def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Gold = {
+    new Gold(workspace, workspace.database, workspace.getConfig)
+      .setReadOnly(readOnly)
+      .suppressRangeReport(suppressReport)
+      .initPipelineRun()
+      .loadStaticDatasets()
+  }
 
 }

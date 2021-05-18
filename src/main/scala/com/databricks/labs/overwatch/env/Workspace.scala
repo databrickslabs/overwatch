@@ -24,6 +24,11 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     this
   }
 
+  def copy(_config: Config = config): Workspace = {
+    val db = this.database
+    Workspace(db, _config)
+  }
+
   /**
    * Most of the jobs data comes from the audit logs but there are several edge cases that result in incomplete
    * jobs log data in the audit logs (same true for cluster specs). As such, each time the jobs module executes
@@ -53,7 +58,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * public function.
    * @return
    */
-  private[overwatch] def getConfig: Config = config
+  def getConfig: Config = config
 
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"
