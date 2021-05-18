@@ -278,15 +278,11 @@ class Module(
     println(debugMsg)
     logger.log(Level.INFO, debugMsg)
     try {
-      val BREAKPipelineState = ListMap(pipelineState.toSeq.sortBy(_._1):_ *)
       validatePipelineState()
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
-      val BREAKPipelineState2 = ListMap(pipelineState.toSeq.sortBy(_._1):_ *)
       val etlDefinition = _etlDefinition.copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
-      val BREAKPipelineState3 = ListMap(pipelineState.toSeq.sortBy(_._1):_ *)
       val newState = etlDefinition.executeETL(this, verifiedSourceDF)
-      val BREAKPipelineState4 = ListMap(pipelineState.toSeq.sortBy(_._1):_ *)
       finalizeModule(newState)
       newState
     } catch {

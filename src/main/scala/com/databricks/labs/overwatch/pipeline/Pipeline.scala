@@ -211,7 +211,6 @@ class Pipeline(
 
     if (config.primordialDateString.nonEmpty) {
       try {
-        val BREAKTest1 = config.primordialDateString.get
         val primordialLocalDate = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get)
           .toInstant.atZone(systemZoneId)
           .toLocalDate

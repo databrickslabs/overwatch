@@ -169,32 +169,7 @@ object PipelineFunctions {
       val cName = f.name
       val low = filter.low
       val high = filter.high
-      val dt = f.dataType
-      val BREAKPOINTA = col(cName) >= low && col(cName) < high
-      BREAKPOINTA
-//      dt match {
-//        case _: TimestampType =>
-//          val a = col(cName) >= low && col(cName) < high
-////          val a = col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency), high)
-//          a
-//        case _: DateType => {
-//          val b = col(cName) >= low && col(cName) < high
-////          val b = col(cName).between(
-////            PipelineFunctions.addOneTick(low.cast(DateType), dataFrequency, DateType),
-////            if (dataFrequency == Frequency.daily) date_sub(high.cast(DateType), 1) else high.cast(DateType)
-////          )
-//          b
-//        }
-//        case _: LongType =>
-//          val c = col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, LongType), high.cast(LongType))
-//          c
-//        case _: IntegerType =>
-//          col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, IntegerType), high.cast(IntegerType))
-//        case _: DoubleType =>
-//          col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, DoubleType), high.cast(DoubleType))
-//        case _ =>
-//          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
-//      }
+      col(cName) >= low && col(cName) < high
     })
 
     val allFilters = parsedFilters ++ globalFilters

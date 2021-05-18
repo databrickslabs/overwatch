@@ -30,6 +30,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
 
   import spark.implicits._
 
+
   def getBronzePipeline(
                          workspace: Workspace = snapWorkspace,
                          readOnly: Boolean = true,
@@ -399,17 +400,6 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
       } else { // is refresh of snapshot
         if (completeRefresh) { // Overwrite state table keeping only the latest, state for active modules
 
-          // TEST
-          //          val BREAK1 = getAllKitanaTargets(bronzePipeline.workspace)
-          //          val BREAK2 = latestMatchedModules.count()
-          //          val BREAK3 = latestMatchedModules.schema
-          //          val BREAK4 = latestMatchedModules.columns
-          //
-          //          BREAK1
-          //          BREAK2
-          //          BREAK3
-          //          BREAK4
-
           fastDropTargets(getAllKitanaTargets(bronzePipeline.workspace).par)
           val newStateTable = pipelineStateTable
             .copy(mode = "overwrite", withCreateDate = false, withOverwatchRunID = false)
@@ -577,11 +567,11 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
    * @param tol
    * @return
    */
-  def assertDataFrameDataEquals(
-                                 targetDetail: ModuleTarget,
-                                 sourceDB: String,
-                                 tol: Double
-                               ): ValidationReport = {
+  protected def assertDataFrameDataEquals(
+                                           targetDetail: ModuleTarget,
+                                           sourceDB: String,
+                                           tol: Double
+                                         ): ValidationReport = {
     val module = targetDetail.module
     val sourceTarget = targetDetail.target.copy(_databaseName = sourceDB)
     val snapTarget = targetDetail.target
@@ -619,7 +609,6 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
 
       val diff = expectedElementsCount
         .join(resultElementsCount, keyColNames.toSeq, "full_outer")
-      val precision = tol.toString.split("\\.").reverse.headOption.getOrElse("0").length
       // Coalesce used because comparing null and long results in null. when one side is null return diff
       val expectedCountCol = sum(coalesce(col(expectedCol), lit(0L))).alias("tableSourceCount")
       val resultCountCol = sum(coalesce(col(actualCol), lit(0L))).alias("tableSnapCount")

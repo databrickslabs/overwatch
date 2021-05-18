@@ -106,35 +106,11 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     this
   }
 
-  //  /**
-  //   *
-  //   * @param startDateString yyyy-MM-dd
-  //   * @param endDateString   yyyy-MM-dd
-  //   * @return
-  //   */
-  //  def executeBronzeSnapshot(
-  //                             startDateString: String,
-  //                             endDateString: String,
-  //                             dtFormat: Option[String] = None
-  //                           ): Dataset[SnapReport] = {
-  //    val dtFormatFinal = getDateFormat(dtFormat)
-  //    val startDate = Pipeline.deriveLocalDate(startDateString, dtFormatFinal)
-  //    val endDate = Pipeline.deriveLocalDate(endDateString, dtFormatFinal)
-  //    val fromTime = Pipeline.createTimeDetail(startDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-  //    val untilTime = Pipeline.createTimeDetail(endDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-  //    val daysToTest = Duration.between(startDate.atStartOfDay(), endDate.atStartOfDay()).toDays.toInt
-  //    try {
-  //      _executeBronzeSnapshot(fromTime, untilTime, daysToTest)
-  //    } catch {
-  //      case e: BronzeSnapException =>
-  //        Seq(e.snapReport).toDS()
-  //    }
-  //  }
-
   /**
-   * Execute snapshots
+   * Creates databases for snapshot and creates shallow clones for bronze in the snapshot database.
+   * These snapshots are complete and rely on downstream filters to limit the data from the source table snap version.
    *
-   * @return
+   * @return snap report dataset for summary of events
    */
   def executeBronzeSnapshot(): Dataset[SnapReport] = {
 
@@ -145,8 +121,6 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     val primordialDateString = bronzeLookupPipeline.config.primordialDateString.get
     val fromDate = Pipeline.deriveLocalDate(primordialDateString, getDateFormat)
     val fromTime = Pipeline.createTimeDetail(fromDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-    val BREAK1 = bronzeLookupPipeline.getPipelineState.values.toArray
-    val BREAK2 = bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS
     val untilTime = Pipeline.createTimeDetail(bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
 
 
@@ -172,8 +146,14 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
   /**
    * Execute recalculations for silver and gold with code from this package
+   * This function will build all target tables for active scopes commensurate with pipeline state table
+   * "pipeline_report". On first run it will load from primordial date, subsequent runs will execute from
+   * point left off allowing for multi-run validations.
    *
-   * @return
+   * @param primordialPadding Days between bronze primordial date and silver primordial. This padding is strongly
+   *                          recommended as there are several multi-dag lagging lookups in the codebase that
+   *                          can result in incorrect data in the first few days of logs.
+   * @param maxDays maximum number of days for which to load data
    */
   def executeSilverGoldRebuild(primordialPadding: Int = 7, maxDays: Option[Int] = None): Unit = {
 
@@ -192,17 +172,19 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     val paddedWorkspace = padPrimordialAndSetMaxDays(snapLookupPipeline, primordialPadding, maxDays)
 
     val silverPipeline = getSilverPipeline(paddedWorkspace, readOnly = false)
-    val BREAKState1 = silverPipeline.getConfig
     silverPipeline.run()
     val goldPipeline = getGoldPipeline(paddedWorkspace, readOnly = false)
-    val BREAKState2 = goldPipeline.getConfig
     goldPipeline.run()
 
   }
 
   /**
-   *
-   * @param incrementalTest
+   * Completes comparison between snapped and rebuilt silver/gold compared to the source/prod silver/gold to ensure
+   * that current code base generates the same output given equal input.
+   * @param primordialPadding Days to add to the silver/gold primordial dates from which to begin comparison between
+   *                          snapped/derived and production silver/gold
+   * @param tol allowable tolerance of misses as a percentage represented as a double between 0.0 and 1.0
+   * @param maxDays Maximum number of days to validate. If null, all available data will be valiated
    * @return
    */
   def validateEquality(
@@ -217,14 +199,8 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     val silverPipeline = getSilverPipeline(paddedWorkspace)
       .clearPipelineState()
 
-    val BREAKState1 = silverPipeline.getPipelineState
-
     val goldPipeline = getGoldPipeline(paddedWorkspace)
       .clearPipelineState()
-    //    rollbackPipelineState(silverPipeline)
-
-    val BREAKState2 = silverPipeline.getPipelineState
-    //    rollbackPipelineState(goldPipeline)
 
     val silverTargetsWModule = getLinkedModuleTarget(silverPipeline)
 
@@ -240,6 +216,13 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
   }
 
+  /**
+   * Validates keys through several tests and provides a report to show the status of each test
+   * Test 1: are keys unique
+   * Test 2: do any keys contain null values
+   * @param workspace snapshot workspace, can be overridden
+   * @return KeyReport -- results from the tests
+   */
   def validateKeys(workspace: Workspace = snapWorkspace): Dataset[KeyReport] = {
     val targetsToValidate = getAllKitanaTargets(workspace).par
     targetsToValidate.tasksupport = taskSupport
@@ -249,6 +232,14 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     validateTargetKeys(targetsToValidate)
   }
 
+  /**
+   * Searches all data for duplicate values by keys only or by entire record.
+   * Keys are a composite of keys AND incremental columns search for true duplicates
+   *
+   * @param workspace snapshot workspace, can be overridden
+   * @param dfsByKeysOnly whether or not to validate uniqueness by keys only (true) or entire record
+   * @return
+   */
   def identifyDups(
                     workspace: Workspace = snapWorkspace,
                     dfsByKeysOnly: Boolean = true
@@ -265,6 +256,12 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     (dupReport, dupsDFByTarget)
   }
 
+  /**
+   * Rebuild the bronze snapshots. User chooses whether to completely reset the snapshot database or to refresh the
+   * bronze shallow clones.
+   * @param completeRefresh A complete refresh will drop all silver and gold data and clear the pipeline state.
+   * @return
+   */
   def refreshSnapshot(completeRefresh: Boolean = false): Dataset[SnapReport] = {
     val sourceConfig = sourceWorkspace.getConfig // prod source
     val sourceDBName = sourceConfig.databaseName
@@ -281,12 +278,19 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
   }
 
+  /**
+   * CAUTION: Very dangerous function. Permanently deletes all tables in snapshot database. To protect user from
+   * accidentally deleting data from undesired targets, an external check is made to ensure a spark config is set
+   * properly to allow removal of data from target database.
+   * spark conf overwatch.permit.db.destruction MUST equal target database name where target database is the
+   * kitana snapshot database
+   */
   def fullResetSnapDB(): Unit = {
     validateTargetDestruction(snapWorkspace.getConfig.databaseName)
     fastDropTargets(getAllKitanaTargets(snapWorkspace, includePipelineStateTable = true).par)
   }
 
-  private def validatePartitionCols(target: PipelineTable): (PipelineTable, SchemaValidationReport) = {
+  private def validatePartitionCols(target: PipelineTable): SchemaValidationReport = {
     try {
       val catPartCols = target.catalogTable.partitionColumnNames.map(_.toLowerCase)
       val msg = if (catPartCols == target.partitionBy) "PASS" else s"FAIL: Partition Columns do not match"
@@ -297,7 +301,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
         target.partitionBy,
         msg
       )
-      (target, report)
+      report
     } catch {
       case e: Throwable =>
         val report = SchemaValidationReport(
@@ -307,11 +311,11 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
           Array[String](),
           e.getMessage
         )
-        (target, report)
+        report
     }
   }
 
-  private def validateRequiredColumns(target: PipelineTable, schemaValidationReport: SchemaValidationReport): SchemaValidationReport = {
+  private def validateRequiredColumns(target: PipelineTable): SchemaValidationReport = {
     try {
       val existingColumns = target.asDF.columns
       val requiredColumns = target.keys(true) ++ target.incrementalColumns ++ target.partitionBy
@@ -338,15 +342,26 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
   }
 
+  /**
+   * Validates key components of the schema such as:
+   * presence of all partitions columns incremental columns, and key columns
+   * @param workspace snapshot workspace, can be overridden
+   * @return SchemaValidationReport
+   */
   def validateSchemas(workspace: Workspace = snapWorkspace): Dataset[SchemaValidationReport] = {
 
     val targetsInScope = getAllKitanaTargets(workspace, includePipelineStateTable = true).par
     targetsInScope.tasksupport = taskSupport
 
-    targetsInScope
+    val partitionReport = targetsInScope
       .map(validatePartitionCols)
-      .map(x => validateRequiredColumns(x._1, x._2))
-      .toArray.toSeq.toDS()
+      .toArray
+
+    val requiredColumnsReport = targetsInScope
+      .map(validateRequiredColumns)
+      .toArray
+
+    (partitionReport ++ requiredColumnsReport).toSeq.toDS()
   }
 
   //TODO -- add spark.conf protection such that for resets the value of k/v has to be the target database name
