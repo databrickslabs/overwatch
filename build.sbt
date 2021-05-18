@@ -14,7 +14,7 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provid
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
 //libraryDependencies += "com.databricks" %% "dbutils-api" % "0.0.5" % Provided
 libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5"
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595"
 libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 
@@ -25,7 +25,7 @@ libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.23.0" % 
 libraryDependencies += "org.mockito" % "mockito-core" % "3.5.15" % Test
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.2" % Test
 
-run in Compile := Defaults.runTask(fullClasspath in Compile, mainClass in (Compile, run), runner in (Compile, run)).evaluated
+run in Compile := Defaults.runTask(fullClasspath in Compile, mainClass in(Compile, run), runner in(Compile, run)).evaluated
 runMain in Compile := Defaults.runMainTask(fullClasspath in Compile, runner in(Compile, run)).evaluated
 
 // groupId, SCM, license information
@@ -53,10 +53,11 @@ publishTo := Some(
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
 
 assemblyExcludedJars in assembly := {
-    val cp = (fullClasspath in assembly).value
-    cp filter { f =>
-        f.data.getName.contains("dbutils-api_2.12") ||
-        f.data.getName.contains("spark-core") ||
-          f.data.getName.contains("spark-sql")
-    }
+  val cp = (fullClasspath in assembly).value
+  cp filter { f =>
+    f.data.getName.contains("dbutils-api_2.12") ||
+      f.data.getName.contains("spark-core") ||
+      f.data.getName.contains("spark-sql") ||
+      f.data.getName.contains("com.amazonaws")
+  }
 }
