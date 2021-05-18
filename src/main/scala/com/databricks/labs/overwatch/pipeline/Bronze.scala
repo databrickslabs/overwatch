@@ -63,7 +63,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.auditLogsTarget)
   )
 
-  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
+  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), Some(30))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),

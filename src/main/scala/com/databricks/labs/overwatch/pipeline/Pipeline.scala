@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.pipeline.Pipeline.{systemZoneId, systemZoneOffset}
+import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
 import com.databricks.labs.overwatch.utils.Layer.Layer
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
@@ -211,9 +211,7 @@ class Pipeline(
 
     if (config.primordialDateString.nonEmpty) {
       try {
-        val primordialLocalDate = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get)
-          .toInstant.atZone(systemZoneId)
-          .toLocalDate
+        val primordialLocalDate = deriveLocalDate(config.primordialDateString.get, TimeTypesConstants.dtFormat)
 
         Duration.between(
           primordialLocalDate.atStartOfDay(),

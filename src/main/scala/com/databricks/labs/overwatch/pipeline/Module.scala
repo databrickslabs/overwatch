@@ -1,32 +1,38 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.labs.overwatch.pipeline.Pipeline.deriveLocalDate
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
-import scala.collection.immutable.ListMap
+import java.time.{Instant, LocalDate}
 
 class Module(
               val moduleId: Int,
               val moduleName: String,
               private[overwatch] val pipeline: Pipeline,
-              val moduleDependencies: Array[Int]
+              val moduleDependencies: Array[Int],
+              hardLimitMaxHistory: Option[Int]
             ) {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
   import pipeline.spark.implicits._
+
   private val config = pipeline.config
 
   private var _isFirstRun: Boolean = false
+
   def isFirstRun: Boolean = _isFirstRun
 
   def copy(
             _moduleID: Int = moduleId,
             _moduleName: String = moduleName,
             _pipeline: Pipeline = pipeline,
-            _moduleDependencies: Array[Int] = moduleDependencies): Module = {
-    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies)
+            _moduleDependencies: Array[Int] = moduleDependencies,
+            _hardLimitMaxHistory: Option[Int] = hardLimitMaxHistory): Module = {
+    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies, _hardLimitMaxHistory)
   }
 
   private[overwatch] def moduleState: SimplifiedModuleStatusReport = {
@@ -49,13 +55,14 @@ class Module(
    *
    * @return
    */
-  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty || isFirstRun){
+  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty || isFirstRun) {
     Pipeline.createTimeDetail(pipeline.primordialEpoch)
   } else Pipeline.createTimeDetail(moduleState.untilTS)
 
   /**
    * Disallow pipeline start time state + max days to exceed snapshot time. Keeps pipelines from running into
    * the future.
+   *
    * @return
    */
   private def limitUntilTimeToSnapTime: TimeTypes = {
@@ -135,13 +142,33 @@ class Module(
 
   }
 
+  private def initPrimordialDate: Option[String] = {
+
+    val pipelineSnapDate = pipeline.pipelineSnapTime.asLocalDateTime.toLocalDate
+
+    val basePrimordialString = if (config.primordialDateString.nonEmpty) { // primordialDateString is provided
+      val configuredPrimordial = deriveLocalDate(config.primordialDateString.get, TimeTypesConstants.dtFormat).atStartOfDay()
+
+      if (hardLimitMaxHistory.nonEmpty) {
+        val minEpochDay = Math.max( // if module has max history allowed get latest date configured primordial or snap - limit
+          configuredPrimordial.toLocalDate.toEpochDay,
+          pipelineSnapDate.minusDays(hardLimitMaxHistory.get.toLong).toEpochDay
+        )
+        LocalDate.ofEpochDay(minEpochDay)
+      } else configuredPrimordial.toLocalDate // no hard limit, use configured primordial
+
+    } else Instant.ofEpochMilli(pipeline.primordialEpoch).atZone(Pipeline.systemZoneId).toLocalDate // if no limit and no configured primordial, calc by max days
+
+    Some(TimeTypesConstants.dtFormat.format(basePrimordialString))
+  }
+
   private def initModuleState: SimplifiedModuleStatusReport = {
     _isFirstRun = true
     val initState = SimplifiedModuleStatusReport(
       organization_id = config.organizationId,
       moduleID = moduleId,
       moduleName = moduleName,
-      primordialDateString = config.primordialDateString,
+      primordialDateString = initPrimordialDate,
       runStartTS = 0L,
       runEndTS = 0L,
       fromTS = fromTime.asUnixTimeMilli,
@@ -250,7 +277,7 @@ class Module(
 
     if (moduleDependencies.nonEmpty) { // if dependencies present
       // If earliest untilTS of dependencies < current untilTS edit current untilTS to match
-//      if (mostLaggingDependency.untilTS < untilTime.asUnixTimeMilli) overrideUntilTS(mostLaggingDependency.untilTS)
+      //      if (mostLaggingDependency.untilTS < untilTime.asUnixTimeMilli) overrideUntilTS(mostLaggingDependency.untilTS)
       moduleDependencies.foreach(dependentModuleId => {
         val depStateOp = pipelineState.get(dependentModuleId)
         if (depStateOp.isEmpty) { // No existing state for pre-requisite
@@ -266,7 +293,7 @@ class Module(
           }
         }
       })
-    }// requirementsPassed
+    } // requirementsPassed
   }
 
   @throws(classOf[IllegalArgumentException])
@@ -313,14 +340,16 @@ object Module {
   def apply(moduleId: Int,
             moduleName: String,
             pipeline: Pipeline,
-            moduleDependencies: Array[Int] = Array()
+            moduleDependencies: Array[Int] = Array(),
+            hardLimitMaxHistory: Option[Int] = None
            ): Module = {
 
     new Module(
       moduleId,
       moduleName,
       pipeline,
-      moduleDependencies
+      moduleDependencies,
+      hardLimitMaxHistory
     )
   }
 
