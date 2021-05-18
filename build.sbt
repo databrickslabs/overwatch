@@ -12,7 +12,6 @@ val sparkVersion = "3.0.1"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
-//libraryDependencies += "com.databricks" %% "dbutils-api" % "0.0.5" % Provided
 libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5"
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595"
 libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0" % Provided
@@ -25,7 +24,7 @@ libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.23.0" % 
 libraryDependencies += "org.mockito" % "mockito-core" % "3.5.15" % Test
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.2" % Test
 
-run in Compile := Defaults.runTask(fullClasspath in Compile, mainClass in(Compile, run), runner in(Compile, run)).evaluated
+run in Compile := Defaults.runTask(fullClasspath in Compile, mainClass in (Compile, run), runner in (Compile, run)).evaluated
 runMain in Compile := Defaults.runMainTask(fullClasspath in Compile, runner in(Compile, run)).evaluated
 
 // groupId, SCM, license information
