@@ -14,8 +14,6 @@ class Config() {
   private final val _runID = UUID.randomUUID().toString.replace("-", "")
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
-  private val _isDBConnect: Boolean = System.getenv("DBCONNECT") == "TRUE"
-  private var _isFirstRun: Boolean = false
   private var _debugFlag: Boolean = false
   private var _organizationId: String = _
   private var _databaseName: String = _
@@ -46,55 +44,51 @@ class Config() {
    * the getter may be obscure or more complicated.
    */
 
-  private[overwatch] def overwatchSchemaVersion: String = _overwatchSchemaVersion
+  def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
-  private[overwatch] def isLocalTesting: Boolean = _isLocalTesting
+  def isLocalTesting: Boolean = _isLocalTesting
 
-  private[overwatch] def isDBConnect: Boolean = _isDBConnect
+  def debugFlag: Boolean = _debugFlag
 
-  private[overwatch] def isFirstRun: Boolean = _isFirstRun
+  def organizationId: String = _organizationId
 
-  private[overwatch] def debugFlag: Boolean = _debugFlag
+  def cloudProvider: String = _cloudProvider
 
-  private[overwatch] def organizationId: String = _organizationId
+  def initialShuffleParts: Int = _intialShuffleParts
 
-  private[overwatch] def cloudProvider: String = _cloudProvider
+  def maxDays: Int = _maxDays
 
-  private[overwatch] def initialShuffleParts: Int = _intialShuffleParts
+  def databaseName: String = _databaseName
 
-  private[overwatch] def maxDays: Int = _maxDays
+  def databaseLocation: String = _databaseLocation
 
-  private[overwatch] def databaseName: String = _databaseName
+  def etlDataPathPrefix: String = _etlDataPathPrefix
 
-  private[overwatch] def databaseLocation: String = _databaseLocation
+  def consumerDatabaseName: String = _consumerDatabaseName
 
-  private[overwatch] def etlDataPathPrefix: String = _etlDataPathPrefix
+  def consumerDatabaseLocation: String = _consumerDatabaseLocation
 
-  private[overwatch] def consumerDatabaseName: String = _consumerDatabaseName
+  def workspaceURL: String = _workspaceUrl
 
-  private[overwatch] def consumerDatabaseLocation: String = _consumerDatabaseLocation
+  def apiEnv: ApiEnv = _apiEnv
 
-  private[overwatch] def workspaceURL: String = _workspaceUrl
+  def auditLogConfig: AuditLogConfig = _auditLogConfig
 
-  private[overwatch] def apiEnv: ApiEnv = _apiEnv
+  def badRecordsPath: String = _badRecordsPath
 
-  private[overwatch] def auditLogConfig: AuditLogConfig = _auditLogConfig
+  def passthroughLogPath: Option[String] = _passthroughLogPath
 
-  private[overwatch] def badRecordsPath: String = _badRecordsPath
+  def inputConfig: OverwatchParams = _inputConfig
 
-  private[overwatch] def passthroughLogPath: Option[String] = _passthroughLogPath
+  def runID: String = _runID
 
-  private[overwatch] def inputConfig: OverwatchParams = _inputConfig
+  def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
 
-  private[overwatch] def runID: String = _runID
+  def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
 
-  private[overwatch] def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
+  def primordialDateString: Option[String] = _primordialDateString
 
-  private[overwatch] def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
-
-  private[overwatch] def primordialDateString: Option[String] = _primordialDateString
-
-  private[overwatch] def globalFilters: Seq[Column] = {
+  def globalFilters: Seq[Column] = {
     Seq(
       col("organization_id") === organizationId
     )
@@ -199,11 +193,6 @@ class Config() {
     this
   }
 
-  private[overwatch] def setIsFirstRun(value: Boolean): this.type = {
-    _isFirstRun = value
-    this
-  }
-
   private[overwatch] def setContractInteractiveDBUPrice(value: Double): this.type = {
     _contractInteractiveDBUPrice = value
     this
@@ -261,7 +250,7 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
-          //_cloudProvider setter not necessary -- done in local setup
+          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _tokenType = "Environment"
         } else { // Use default token for job owner

@@ -25,18 +25,35 @@ object PipelineFunctions {
     }.replaceAllLiterally("//", "/")
   }
 
-  def addOneTick(ts: Column, dataFrequency: Frequency, dt: DataType = TimestampType): Column = {
+  def addNTicks(ts: Column, n:Int, dt: DataType = TimestampType): Column = {
     dt match {
       case _: TimestampType =>
-        ((ts.cast("double") * 1000 + 1) / 1000).cast("timestamp")
+        ((ts.cast("double") * 1000 + n) / 1000).cast("timestamp")
       case _: DateType =>
-        if (dataFrequency == Frequency.daily) ts else date_add(ts, 1)
+        date_add(ts, n)
       case _: DoubleType =>
-        ts + 0.001d
+        ts + s"0.00$n".toDouble
       case _: LongType =>
-        ts + 1
+        ts + n
       case _: IntegerType =>
-        ts + 1
+        ts + n
+      case _ => throw
+        new UnsupportedOperationException(s"Cannot add milliseconds to ${dt.typeName}")
+    }
+  }
+
+  def subtractNTicks(ts: Column, n: Int, dt: DataType = TimestampType): Column = {
+    dt match {
+      case _: TimestampType =>
+        ((ts.cast("double") * 1000 - n) / 1000).cast("timestamp")
+      case _: DateType =>
+        date_sub(ts, n)
+      case _: DoubleType =>
+        ts - s"0.00$n".toDouble
+      case _: LongType =>
+        ts - n
+      case _: IntegerType =>
+        ts - n
       case _ => throw
         new UnsupportedOperationException(s"Cannot add milliseconds to ${dt.typeName}")
     }
@@ -122,13 +139,14 @@ object PipelineFunctions {
 
   }
 
-  def applyFilters(df: DataFrame, filters: Seq[Column], module: Option[Module] = None): DataFrame = {
+  def applyFilters(df: DataFrame, filters: Seq[Column], debugFlag: Boolean, module: Option[Module] = None): DataFrame = {
     if (module.nonEmpty) {
       val filterLogMessageSB: StringBuilder = new StringBuilder
       filterLogMessageSB.append(s"APPLIED FILTERS:\nMODULE_ID: ${module.get.moduleId}\nMODULE_NAME: ${module.get.moduleName}\nFILTERS:\n")
       filters.map(_.expr).foreach(filterLogMessageSB.append)
       val filterLogMessage = filterLogMessageSB.toString()
       logger.log(Level.INFO, filterLogMessage)
+      if (debugFlag) println(filterLogMessage)
     }
     filters.foldLeft(df) {
       case (rawDF, filter) =>
@@ -143,36 +161,45 @@ object PipelineFunctions {
                               module: Option[Module],
                               filters: Seq[IncrementalFilter],
                               globalFilters: Seq[Column] = Seq(),
-                              dataFrequency: Frequency
+                              dataFrequency: Frequency,
+                              debugFlag: Boolean
                             ): DataFrame = {
     val parsedFilters = filters.map(filter => {
-      val c = filter.cronColName
+      val f = filter.cronField
+      val cName = f.name
       val low = filter.low
       val high = filter.high
-      val dt = df.schema.fields.filter(_.name == c).head.dataType
-      dt match {
-        case _: TimestampType =>
-          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency), high)
-        case _: DateType => {
-          col(c).between(
-            PipelineFunctions.addOneTick(low.cast(DateType), dataFrequency, DateType),
-            if (dataFrequency == Frequency.daily) date_sub(high.cast(DateType), 1) else high.cast(DateType)
-          )
-        }
-        case _: LongType =>
-          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, LongType), high.cast(LongType))
-        case _: IntegerType =>
-          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, IntegerType), high.cast(IntegerType))
-        case _: DoubleType =>
-          col(c).between(PipelineFunctions.addOneTick(low, dataFrequency, DoubleType), high.cast(DoubleType))
-        case _ =>
-          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
-      }
+      val dt = f.dataType
+      val BREAKPOINTA = col(cName) >= low && col(cName) < high
+      BREAKPOINTA
+//      dt match {
+//        case _: TimestampType =>
+//          val a = col(cName) >= low && col(cName) < high
+////          val a = col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency), high)
+//          a
+//        case _: DateType => {
+//          val b = col(cName) >= low && col(cName) < high
+////          val b = col(cName).between(
+////            PipelineFunctions.addOneTick(low.cast(DateType), dataFrequency, DateType),
+////            if (dataFrequency == Frequency.daily) date_sub(high.cast(DateType), 1) else high.cast(DateType)
+////          )
+//          b
+//        }
+//        case _: LongType =>
+//          val c = col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, LongType), high.cast(LongType))
+//          c
+//        case _: IntegerType =>
+//          col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, IntegerType), high.cast(IntegerType))
+//        case _: DoubleType =>
+//          col(cName).between(PipelineFunctions.addOneTick(low, dataFrequency, DoubleType), high.cast(DoubleType))
+//        case _ =>
+//          throw new IllegalArgumentException(s"IncreasingID Type: ${dt.typeName} is Not supported")
+//      }
     })
 
     val allFilters = parsedFilters ++ globalFilters
 
-    applyFilters(df, allFilters, module)
+    applyFilters(df, allFilters, debugFlag, module)
 
   }
 

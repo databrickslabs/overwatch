@@ -1,16 +1,18 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.log4j.Level
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types.{StructField, StructType}
-
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
+import java.sql.Timestamp
+
+import com.databricks.labs.overwatch.validation.SnapReport
 
 case class DBDetail()
 
@@ -130,7 +132,7 @@ case class SimplifiedModuleStatusReport(
                                          vacuumRetentionHours: Int
                                        )
 
-case class IncrementalFilter(cronColName: String, low: Column, high: Column)
+case class IncrementalFilter(cronField: StructField, low: Column, high: Column)
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
@@ -153,9 +155,13 @@ private[overwatch] class NoNewDataException(s: String, val level: Level, val all
 
 private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 
+private[overwatch] class IncompleteFilterException(s: String) extends Exception(s) {}
+
 private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
 
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
+
+private[overwatch] class PipelineStateException(s: String, val target: Option[PipelineTable]) extends Exception(s) {}
 
 private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
 
@@ -164,6 +170,34 @@ private[overwatch] class FailedModuleException(s: String, val target: PipelineTa
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
 
 private[overwatch] class BadSchemaException(s: String) extends Exception(s) {}
+
+private[overwatch] class BronzeSnapException(
+                                              s: String,
+                                              target: PipelineTable,
+                                              module: Module
+                                            ) extends Exception(s) {
+  private val pipeline = module.pipeline
+  private val emptyModule = pipeline.getModuleState(module.moduleId).isEmpty
+  private val fromTime = if (emptyModule) {
+    new Timestamp(pipeline.primordialEpoch)
+  } else {
+    new Timestamp(module.fromTime.asUnixTimeMilli)
+  }
+
+  private val untilTime = if (emptyModule) {
+    new Timestamp(pipeline.pipelineSnapTime.asUnixTimeMilli)
+  } else {
+    new Timestamp(module.untilTime.asUnixTimeMilli)
+  }
+
+  val errMsg = s"FAILED SNAP: ${target.tableFullName} --> MODULE: ${module.moduleName}: SNAP ERROR:\n$s"
+  val snapReport: SnapReport = SnapReport(
+    target.tableFullName,
+    fromTime,
+    untilTime,
+    errMsg
+  )
+}
 
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =

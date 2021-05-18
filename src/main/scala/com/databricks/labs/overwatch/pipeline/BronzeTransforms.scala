@@ -30,6 +30,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _newDataRetrieved: Boolean = true
 
+  //  private val dbutils = com.databricks.service.DBUtils
+
   case class ClusterIdsWEventCounts(clusterId: String, count: Long)
 
   private def structFromJson(df: DataFrame, c: String): Column = {
@@ -80,48 +82,63 @@ trait BronzeTransforms extends SparkSessionWrapper {
     else results
   }
 
-  private def validateCleanPaths(isFirstRun: Boolean,
-                                 ehConfig: AzureAuditLogEventhubConfig): Boolean = {
-    var firstRunValid = true
-    var appendRunValid = true
+  private def validateCleanPaths(
+                                  isFirstRun: Boolean,
+                                  ehConfig: AzureAuditLogEventhubConfig,
+                                  etlDataPathPrefix: String,
+                                  etlDBLocation: String,
+                                  consumerDBLocation: String
+                                ): Unit = {
+
     val pathsToValidate = Array(
       ehConfig.auditRawEventsChk.get
     )
 
-    logger.log(Level.INFO, s"chkpoint paths for validation are ${pathsToValidate.mkString(",")}")
+    logger.log(Level.INFO, s"Checkpoint paths to validate: ${pathsToValidate.mkString(",")}")
+    val dataTargetPaths = Array(etlDataPathPrefix, etlDBLocation, consumerDBLocation).map(_.toLowerCase)
 
-    pathsToValidate.foreach(path => {
-      try { // succeeds if path does exist
-        logger.log(Level.INFO, s"Validating: ${path}")
-        dbutils.fs.ls(path).head.isDir
-        firstRunValid = false
-        if (isFirstRun) {
-          logger.log(Level.INFO, s"${path} exists as directory confirmed. Invalid first run")
-          logger.log(Level.ERROR, s"${path} is not empty.")
-          println(s"${path} is not empty. First run requires empty checkpoints.")
-        }
-      } catch { // path does not exist
-        case _: FileNotFoundException =>
-          appendRunValid = false
-          logger.log(Level.INFO, s"Path: ${path} Does not exist. To append new data, a checkpoint dir must " +
-            s"exist and be current.")
-        case e: Throwable => logger.log(Level.ERROR, s"Could not validate path ${path}", e)
+    val baseErrMsg = "Azure Event Hub Paths are not empty on first run."
+    pathsToValidate.foreach(p => {
+      logger.log(Level.INFO, s"Validating: $p")
+      val exists = Helpers.pathExists(p)
+
+      if (isFirstRun && dataTargetPaths.contains(p.toLowerCase)) { // on new pipeline, data target paths != eh paths
+        val errMsg = s"$baseErrMsg\nOne or more data target paths == the event hub state parent directory. Event Hub checkpoint " +
+          s"directories may not be in the same path as your data targets, please select another directory.\nDATA " +
+          s"TARGETS: ${dataTargetPaths.mkString(", ")}\nEVENT HUB STATE PATH: $p"
+        logger.log(Level.ERROR, errMsg)
+        println(errMsg)
+        throw new BadConfigException(errMsg)
+      }
+
+      if (exists && isFirstRun) { // Path cannot already exist on first run
+        val errMsg = s"$baseErrMsg\nPATH: ${p} is not empty. First run requires empty checkpoints."
+        logger.log(Level.ERROR, errMsg)
+        println(errMsg)
+        throw new BadConfigException(errMsg)
+      }
+
+      if (!exists && !isFirstRun) { // If not first run checkpoint paths must already exist.
+        val errMsg = s"$baseErrMsg\nPath: ${p} does not exist. To append new data, a checkpoint dir must " +
+          s"exist and be current."
+        logger.log(Level.ERROR, errMsg)
+        println(errMsg)
+        throw new BadConfigException(errMsg)
       }
     })
-
-    if (isFirstRun) firstRunValid
-    else appendRunValid
   }
 
   @throws(classOf[BadConfigException])
   protected def landAzureAuditLogDF(ehConfig: AzureAuditLogEventhubConfig,
+                                    etlDataPathPrefix: String,
+                                    etlDBLocation: String,
+                                    consumerDBLocation: String,
                                     isFirstRun: Boolean,
                                     organizationId: String,
                                     runID: String
                                    ): DataFrame = {
 
-    if (!validateCleanPaths(isFirstRun, ehConfig))
-      throw new BadConfigException("Azure Event Hub Paths are not empty on first run")
+    validateCleanPaths(isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
 
     val connectionString = ConnectionStringBuilder(ehConfig.connectionString)
       .setEventHubName(ehConfig.eventHubName)
@@ -445,9 +462,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // eager force cache
     // TODO -- Delta auto-optimize seems to be scanning the source files again anyway during
     //  execute at DeltaInvariantCheckerExec.scala:95 -- review again after upgrade to DBR 7.x+
-//    val cachedEventLogs = eventLogsDF.cache()
-//    val eventLogsCount = cachedEventLogs.count()
-//    logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
+    //    val cachedEventLogs = eventLogsDF.cache()
+    //    val eventLogsCount = cachedEventLogs.count()
+    //    logger.log(Level.INFO, s"EVENT LOGS FOUND: Total Found --> ${eventLogsCount}")
 
     if (!eventLogsDF.isEmpty) { // newly found file names
       // All new files scanned including failed and outOfTimeRange files
@@ -574,7 +591,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         spark.conf.set("spark.sql.caseSensitive", "false")
         // TODO -- PERF test without unpersist, may be unpersisted before re-utilized
-//        cachedEventLogs.unpersist()
+        //        cachedEventLogs.unpersist()
 
         bronzeEventsFinal
       } else {

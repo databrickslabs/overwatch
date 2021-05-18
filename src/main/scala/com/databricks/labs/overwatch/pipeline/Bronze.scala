@@ -1,12 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
+import com.databricks.labs.overwatch.utils.{Config, Layer, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
 
 
 class Bronze(_workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config)
+  extends Pipeline(_workspace, _database, _config, Layer.bronze)
     with BronzeTransforms {
 
   /**
@@ -29,27 +29,27 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  lazy private val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
+  lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess = ETLDefinition(
     workspace.getJobsDF,
     append(BronzeTargets.jobsSnapshotTarget)
   )
 
-  lazy private val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
+  lazy private[overwatch] val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
   lazy private val appendClustersAPIProcess = ETLDefinition(
     workspace.getClustersDF,
     Seq(cleanseRawClusterSnapDF(config.cloudProvider)),
     append(BronzeTargets.clustersSnapshotTarget)
   )
 
-  lazy private val poolsSnapshotModule = Module(1003, "Bronze_Pools", this)
+  lazy private[overwatch] val poolsSnapshotModule = Module(1003, "Bronze_Pools", this)
   lazy private val appendPoolsProcess = ETLDefinition(
     workspace.getPoolsDF,
     Seq(cleanseRawPoolsDF()),
     append(BronzeTargets.poolsTarget)
   )
 
-  lazy private val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
+  lazy private[overwatch] val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
   lazy private val appendAuditLogsProcess = ETLDefinition(
     getAuditLogsDF(
       config.auditLogConfig,
@@ -63,7 +63,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.auditLogsTarget)
   )
 
-  lazy private val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
+  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
@@ -76,7 +76,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clusterEventsTarget)
   )
 
-  lazy private val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
+  lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),
     Seq(
@@ -100,9 +100,11 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
+    val isFirstAuditRun = BronzeTargets.auditLogsTarget.exists
     val rawAzureAuditEvents = landAzureAuditLogDF(
       config.auditLogConfig.azureAuditLogEventhubConfig.get,
-      config.isFirstRun,
+      config.etlDataPathPrefix, config.databaseLocation, config.consumerDatabaseLocation,
+      isFirstAuditRun,
       config.organizationId,
       config.runID
     )
@@ -154,6 +156,14 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 object Bronze {
   def apply(workspace: Workspace): Bronze = {
     new Bronze(workspace, workspace.database, workspace.getConfig)
+      .initPipelineRun()
+      .loadStaticDatasets()
+  }
+
+  private[overwatch] def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Bronze = {
+    new Bronze(workspace, workspace.database, workspace.getConfig)
+      .suppressRangeReport(suppressReport)
+      .setReadOnly(readOnly)
       .initPipelineRun()
       .loadStaticDatasets()
   }

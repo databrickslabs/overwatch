@@ -5,6 +5,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 object InitializerFunctions {
   /**
    * Load text file
+   *
    * @param path path to the local resource
    * @return sequence of lines read from the file
    */
@@ -18,12 +19,13 @@ object InitializerFunctions {
 
   /**
    * Load database for cloud provider node details
+   *
    * @param path path to the local resource
    * @return
    */
   def loadLocalCSVResource(spark: SparkSession, path: String): DataFrame = {
-    import spark.implicits._
 
+    import spark.implicits._
     val csvData = loadLocalResource(path).toDS()
     spark.read.option("header", "true").option("inferSchema", "true").csv(csvData).coalesce(1)
   }

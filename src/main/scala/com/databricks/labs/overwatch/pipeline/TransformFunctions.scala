@@ -99,6 +99,33 @@ object TransformFunctions {
       }
     }
 
+    /**
+     * Supports strings, numericals, booleans. Defined keys don't contain any other types thus this function should
+     * ensure no nulls present for keys
+     * @return
+     */
+    def fillAllNAs: DataFrame = {
+      df.na.fill(0).na.fill("0").na.fill(false)
+    }
+
+    /**
+     *
+     * @param name
+     * @param searchNestedFields NOT yet implemented
+     * @param caseSensitive
+     * @return
+     */
+    def hasFieldNamed(name: String, searchNestedFields: Boolean = false, caseSensitive: Boolean = false): Boolean = {
+      val (casedName, fieldNames) = if (caseSensitive) (name, df.columns) else (name.toLowerCase, df.columns.map(_.toLowerCase))
+      if (searchNestedFields) { // search nested
+        fieldNames.contains(casedName)
+      } else { // top level only
+        fieldNames.contains(casedName)
+      }
+    }
+
+//    private[overwatch] def colByName(df: DataFrame)(colName: String): StructField =
+//      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
   }
 
   object Costs {
