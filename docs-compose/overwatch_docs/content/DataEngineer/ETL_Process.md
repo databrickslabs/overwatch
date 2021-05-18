@@ -76,38 +76,38 @@ several types of errors that result in a module failure, and those errors are wr
 when they occur. Sometimes, there will truly be no new data in an upstream Module, this is ok and will not stop the 
 progression of the "until" time as no data is not considered an error. Below are the ETL Modules and their dependencies
 
-Module ID | Module Name | Module ID Dependencies
-:--------------------------|:---|:-----
-1001|Bronze_Jobs_Snapshot|
-1002|Bronze_Clusters_Snapshot|
-1003|Bronze_Pools|
-1004|Bronze_AuditLogs|
-1005|Bronze_ClusterEventLogs|1004
-1006|Bronze_SparkEventLogs|1004
-2003|Silver_SPARK_Executors|1006
-2005|Silver_SPARK_Executions|1006
-2006|Silver_SPARK_Jobs|1006
-2007|Silver_SPARK_Stages|1006
-2008|Silver_SPARK_Tasks|1006
-2010|Silver_JobsStatus|1004
-2011|Silver_JobsRuns|1004,2010,2014
-2014|Silver_ClusterSpec|1004
-2016|Silver_AccountLogins|1004
-2017|Silver_ModifiedAccounts|1004
-2018|Silver_Notebooks|1004
-3001|Gold_Cluster|2014
-3002|Gold_Job|2010
-3003|Gold_JobRun|2011
-3004|Gold_Notebook|2018
-3005|Gold_ClusterStateFact|1005,2014
-3007|Gold_AccountMod|2017
-3008|Gold_AccountLogin|2016
-3010|Gold_SparkJob|2006
-3011|Gold_SparkStage|2007
-3012|Gold_SparkTask|2008
-3013|Gold_SparkExecution|2005
-3014|Gold_SparkExecutor|2003
-3015|Gold_jobRunCostPotentialFact|3001,3003,3005,3010,3012
+Module ID | Module Name | Target Table Name | Module ID Dependencies
+:--------------------------|:---|:---|:-----
+1001|Bronze_Jobs_Snapshot|jobs_snapshot_bronze|
+1002|Bronze_Clusters_Snapshot|clusters_snapshot_bronze|
+1003|Bronze_Pools|pools_snapshot_bronze|
+1004|Bronze_AuditLogs|audit_log_bronze|
+1005|Bronze_ClusterEventLogs|cluster_events_bronze|1004
+1006|Bronze_SparkEventLogs|spark_events_bronze|1004
+2003|Silver_SPARK_Executors|spark_executors_silver|1006
+2005|Silver_SPARK_Executions|spark_executions_silver|1006
+2006|Silver_SPARK_Jobs|spark_jobs_silver|1006
+2007|Silver_SPARK_Stages|spark_stages_silver|1006
+2008|Silver_SPARK_Tasks|spark_tasks_silver|1006
+2010|Silver_JobsStatus|job_status_silver|1004
+2011|Silver_JobsRuns|jobrun_silver|1004,2010,2014
+2014|Silver_ClusterSpec|cluster_spec_silver|1004
+2016|Silver_AccountLogins|accountlogin|1004
+2017|Silver_ModifiedAccounts|account_mods_silver|1004
+2018|Silver_Notebooks|notebook_silver|1004
+3001|Gold_Cluster|cluster_gold|2014
+3002|Gold_Job|job_gold|2010
+3003|Gold_JobRun|jobrun_gold|2011
+3004|Gold_Notebook|notebook_gold|2018
+3005|Gold_ClusterStateFact|clusterstatefact_gold|1005,2014
+3007|Gold_AccountMod|account_mods_gold|2017
+3008|Gold_AccountLogin|account_login_gold|2016
+3010|Gold_SparkJob|sparkjob_gold|2006
+3011|Gold_SparkStage|sparkstage_gold|2007
+3012|Gold_SparkTask|sparktask_gold|2008
+3013|Gold_SparkExecution|sparkexecution_gold|2005
+3014|Gold_SparkExecutor|sparkexecutor_gold|2003
+3015|Gold_jobRunCostPotentialFact|jobruncostpotentialfact_gold|3001,3003,3005,3010,3012
 
 
 

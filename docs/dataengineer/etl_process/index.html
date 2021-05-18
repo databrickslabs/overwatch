@@ -12,21 +12,21 @@
     <title>ETL Process :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1620248503" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1621364739" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1620248503" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1621364739" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1620248503"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1621364739"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1620248503"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1620248503"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1621364739"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1621364739"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1620248503"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1621364739"></script>
 
     
   </div>
@@ -639,6 +639,7 @@ progression of the &ldquo;until&rdquo; time as no data is not considered an erro
 <tr>
 <th style="text-align:left">Module ID</th>
 <th style="text-align:left">Module Name</th>
+<th style="text-align:left">Target Table Name</th>
 <th style="text-align:left">Module ID Dependencies</th>
 </tr>
 </thead>
@@ -646,151 +647,181 @@ progression of the &ldquo;until&rdquo; time as no data is not considered an erro
 <tr>
 <td style="text-align:left">1001</td>
 <td style="text-align:left">Bronze_Jobs_Snapshot</td>
+<td style="text-align:left">jobs_snapshot_bronze</td>
 <td></td>
 </tr>
 <tr>
 <td style="text-align:left">1002</td>
 <td style="text-align:left">Bronze_Clusters_Snapshot</td>
+<td style="text-align:left">clusters_snapshot_bronze</td>
 <td></td>
 </tr>
 <tr>
 <td style="text-align:left">1003</td>
 <td style="text-align:left">Bronze_Pools</td>
+<td style="text-align:left">pools_snapshot_bronze</td>
 <td></td>
 </tr>
 <tr>
 <td style="text-align:left">1004</td>
 <td style="text-align:left">Bronze_AuditLogs</td>
+<td style="text-align:left">audit_log_bronze</td>
 <td></td>
 </tr>
 <tr>
 <td style="text-align:left">1005</td>
 <td style="text-align:left">Bronze_ClusterEventLogs</td>
+<td style="text-align:left">cluster_events_bronze</td>
 <td style="text-align:left">1004</td>
 </tr>
 <tr>
 <td style="text-align:left">1006</td>
 <td style="text-align:left">Bronze_SparkEventLogs</td>
+<td style="text-align:left">spark_events_bronze</td>
 <td style="text-align:left">1004</td>
 </tr>
 <tr>
 <td style="text-align:left">2003</td>
 <td style="text-align:left">Silver_SPARK_Executors</td>
+<td style="text-align:left">spark_executors_silver</td>
 <td style="text-align:left">1006</td>
 </tr>
 <tr>
 <td style="text-align:left">2005</td>
 <td style="text-align:left">Silver_SPARK_Executions</td>
+<td style="text-align:left">spark_executions_silver</td>
 <td style="text-align:left">1006</td>
 </tr>
 <tr>
 <td style="text-align:left">2006</td>
 <td style="text-align:left">Silver_SPARK_Jobs</td>
+<td style="text-align:left">spark_jobs_silver</td>
 <td style="text-align:left">1006</td>
 </tr>
 <tr>
 <td style="text-align:left">2007</td>
 <td style="text-align:left">Silver_SPARK_Stages</td>
+<td style="text-align:left">spark_stages_silver</td>
 <td style="text-align:left">1006</td>
 </tr>
 <tr>
 <td style="text-align:left">2008</td>
 <td style="text-align:left">Silver_SPARK_Tasks</td>
+<td style="text-align:left">spark_tasks_silver</td>
 <td style="text-align:left">1006</td>
 </tr>
 <tr>
 <td style="text-align:left">2010</td>
 <td style="text-align:left">Silver_JobsStatus</td>
+<td style="text-align:left">job_status_silver</td>
 <td style="text-align:left">1004</td>
 </tr>
 <tr>
 <td style="text-align:left">2011</td>
 <td style="text-align:left">Silver_JobsRuns</td>
+<td style="text-align:left">jobrun_silver</td>
 <td style="text-align:left">1004,2010,2014</td>
 </tr>
 <tr>
 <td style="text-align:left">2014</td>
 <td style="text-align:left">Silver_ClusterSpec</td>
+<td style="text-align:left">cluster_spec_silver</td>
 <td style="text-align:left">1004</td>
 </tr>
 <tr>
 <td style="text-align:left">2016</td>
 <td style="text-align:left">Silver_AccountLogins</td>
+<td style="text-align:left">accountlogin</td>
 <td style="text-align:left">1004</td>
 </tr>
 <tr>
 <td style="text-align:left">2017</td>
 <td style="text-align:left">Silver_ModifiedAccounts</td>
+<td style="text-align:left">account_mods_silver</td>
 <td style="text-align:left">1004</td>
 </tr>
 <tr>
 <td style="text-align:left">2018</td>
 <td style="text-align:left">Silver_Notebooks</td>
+<td style="text-align:left">notebook_silver</td>
 <td style="text-align:left">1004</td>
 </tr>
 <tr>
 <td style="text-align:left">3001</td>
 <td style="text-align:left">Gold_Cluster</td>
+<td style="text-align:left">cluster_gold</td>
 <td style="text-align:left">2014</td>
 </tr>
 <tr>
 <td style="text-align:left">3002</td>
 <td style="text-align:left">Gold_Job</td>
+<td style="text-align:left">job_gold</td>
 <td style="text-align:left">2010</td>
 </tr>
 <tr>
 <td style="text-align:left">3003</td>
 <td style="text-align:left">Gold_JobRun</td>
+<td style="text-align:left">jobrun_gold</td>
 <td style="text-align:left">2011</td>
 </tr>
 <tr>
 <td style="text-align:left">3004</td>
 <td style="text-align:left">Gold_Notebook</td>
+<td style="text-align:left">notebook_gold</td>
 <td style="text-align:left">2018</td>
 </tr>
 <tr>
 <td style="text-align:left">3005</td>
 <td style="text-align:left">Gold_ClusterStateFact</td>
+<td style="text-align:left">clusterstatefact_gold</td>
 <td style="text-align:left">1005,2014</td>
 </tr>
 <tr>
 <td style="text-align:left">3007</td>
 <td style="text-align:left">Gold_AccountMod</td>
+<td style="text-align:left">account_mods_gold</td>
 <td style="text-align:left">2017</td>
 </tr>
 <tr>
 <td style="text-align:left">3008</td>
 <td style="text-align:left">Gold_AccountLogin</td>
+<td style="text-align:left">account_login_gold</td>
 <td style="text-align:left">2016</td>
 </tr>
 <tr>
 <td style="text-align:left">3010</td>
 <td style="text-align:left">Gold_SparkJob</td>
+<td style="text-align:left">sparkjob_gold</td>
 <td style="text-align:left">2006</td>
 </tr>
 <tr>
 <td style="text-align:left">3011</td>
 <td style="text-align:left">Gold_SparkStage</td>
+<td style="text-align:left">sparkstage_gold</td>
 <td style="text-align:left">2007</td>
 </tr>
 <tr>
 <td style="text-align:left">3012</td>
 <td style="text-align:left">Gold_SparkTask</td>
+<td style="text-align:left">sparktask_gold</td>
 <td style="text-align:left">2008</td>
 </tr>
 <tr>
 <td style="text-align:left">3013</td>
 <td style="text-align:left">Gold_SparkExecution</td>
+<td style="text-align:left">sparkexecution_gold</td>
 <td style="text-align:left">2005</td>
 </tr>
 <tr>
 <td style="text-align:left">3014</td>
 <td style="text-align:left">Gold_SparkExecutor</td>
+<td style="text-align:left">sparkexecutor_gold</td>
 <td style="text-align:left">2003</td>
 </tr>
 <tr>
 <td style="text-align:left">3015</td>
 <td style="text-align:left">Gold_jobRunCostPotentialFact</td>
+<td style="text-align:left">jobruncostpotentialfact_gold</td>
 <td style="text-align:left">3001,3003,3005,3010,3012</td>
 </tr>
 </tbody>
@@ -1173,19 +1204,19 @@ out to result in only a Silver/Gold layer run.</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1620248503"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1621364740"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1621364740"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1621364740"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1621364740"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1621364740"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1621364740"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1620248503"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1621364740"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1621364740"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1621364740"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1620248503" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1620248503"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1621364740" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1621364740"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

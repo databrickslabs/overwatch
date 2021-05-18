@@ -42,7 +42,9 @@ Hard dates have not been set for these but will be delivered as soon as availabl
 repo](https://github.com/databrickslabs/overwatch) for release updates.  
 
 ### Audit
-*Dependencies:* None
+*Requires:* None
+
+*Enables:* All
 
 Audit is the base, fundamental module from which the other modules build upon. This module is required. 
 
@@ -63,7 +65,9 @@ to reduce/eliminate data gaps.
 {{% /notice %}}
 
 ### Clusters
-*Dependencies:* Audit
+*Requires:* Audit
+
+*Enables:* All
 
 *Gold Entities:* Cluster
 
@@ -77,7 +81,9 @@ Overwatch. From the logging path the SparkEvents (event log) locations can be ex
 the clusters module, the sparkEvents cannot function.
 
 ### ClusterEvents
-*Dependencies:* Clusters
+*Requires:* Clusters
+
+*Enables:* ClusterStateFact|JobRunCostPotentialFact
 
 *Gold Entities:* ClusterStateFact
 
@@ -98,7 +104,7 @@ other resources are heavily utilizing api calls.
 {{% /notice %}}
 
 ### Pools
-*Dependencies:* Audit 
+*Requires:* Audit 
 
 **In Progress** -- The snapshots are currently being recorded but the slow changing dimensions are still under construction
 and are not going to make it into the initial release.
@@ -106,7 +112,8 @@ and are not going to make it into the initial release.
 The Pools Module records the metadata related to Databricks Instance Pools.
 
 ### Jobs
-*Dependencies:* Audit|Clusters|ClusterEvents
+*Requires:* Audit|Clusters|ClusterEvents
+*Enables:* JobRunCostPotentialFact
 
 *Gold Entities:* Job|JobRun|JobRunCostPotentialFact
 
@@ -120,7 +127,7 @@ point-in-time cluster definition and run-times can be very powerful, and very ha
 ![run_id_v_id_in_job](/images/GettingStarted/Modules/run_id_v_id_in_job.png)
 
 ### Accounts
-*Dependencies:* Audit
+*Requires:* Audit
 
 *Gold Entities:* AccountModificationFact|AccountLoginFact
 
@@ -140,14 +147,14 @@ Overwatch should not be used as single source of truth for any audit requirement
 {{% /notice %}}
 
 ### Notebooks
-*Dependencies:* Audit
+*Requires:* Audit
 
 *Gold Entities:* Notebook
 
 Currently a very simple module that just enables the materialization of notebooks as slow changing dimensions. 
 
 ### SparkEvents
-*Dependencies:* Clusters
+*Requires:* Clusters
 
 *Gold Entities:* SparkExecution|SparkJob|SparkStage|SparkTask|SparkExecutor|SparkJDBC
 

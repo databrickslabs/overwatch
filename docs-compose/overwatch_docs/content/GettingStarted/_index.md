@@ -22,7 +22,7 @@ and the job run setup, Overwatch runs best as a black box -- enable it and forge
 
 ### Cluster Dependencies
 Add the following dependencies to your cluster
-* Overwatch Assembly (fat jar): `com.databricks.labs:overwatch_2.12:0.4.0`
+* Overwatch Assembly (fat jar): `com.databricks.labs:overwatch_2.12:<latest>`
   * Note if using a custom Jar, one not in Maven, it may not have the scalaj dependency so be sure to add it as well
   or the API calls will fail `org.scalaj:scalaj-http_2.12:2.4.2`
 * (Azure Only) azure-eventhubs-spark - integration with Azure EventHubs
@@ -138,6 +138,9 @@ export the instanceDetails dataset to external editor (after first init), add th
 for each workspace, and overwrite the target table with the customized cost information. Note that the instanceDetails 
 object in the consumer database is just a view so you must edit/overwrite the table in the ETL database. The view 
 will automatically be recreated upon first pipeline run.
+
+[Helpful Tool (AZURE_Only)](https://azureprice.net/) to get pricing by region by node.
+
 
 {{< rawhtml >}}
 <a href="https://drive.google.com/file/d/1tj0GV-vX1Ka9cRcJpJSwkQx6bbpueSwl/view?usp=sharing" target="_blank">AWS Example</a>

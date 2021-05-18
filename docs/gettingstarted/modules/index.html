@@ -12,21 +12,21 @@
     <title>Modules :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1620248503" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1620248503" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1621364739" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1621364739" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1620248503" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1621364739" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1620248503"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1621364739"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1620248503"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1620248503"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1621364739"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1621364739"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1620248503"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1621364739"></script>
 
     
   </div>
@@ -531,7 +531,8 @@ contains most of the metadata to enable the other overwatch modules.</p>
 <p>Hard dates have not been set for these but will be delivered as soon as available. Please star the <a href="https://github.com/databrickslabs/overwatch">GitHub
 repo</a> for release updates.</p>
 <h3 id="audit">Audit</h3>
-<p><em>Dependencies:</em> None</p>
+<p><em>Requires:</em> None</p>
+<p><em>Enables:</em> All</p>
 <p>Audit is the base, fundamental module from which the other modules build upon. This module is required.</p>
 <p>For details on how to configure audit logging please refer to the Databricks docs online and/or the <a href="https://databrickslabs.github.io/overwatch/environmentsetup/">environment
 setup</a> details for your cloud provider.</p>
@@ -548,7 +549,8 @@ to reduce/eliminate data gaps.</p>
 </div>
 
 <h3 id="clusters">Clusters</h3>
-<p><em>Dependencies:</em> Audit</p>
+<p><em>Requires:</em> Audit</p>
+<p><em>Enables:</em> All</p>
 <p><em>Gold Entities:</em> Cluster</p>
 <p>The clusters module is pretty low-level. The cluster_id field throughout the layers is the primary method through 
 which users can tie spark-side data to databricks-side data. Additionally, cluster_ids are required to calculated 
@@ -558,7 +560,8 @@ is signifcantly stifled.</p>
 Overwatch. From the logging path the SparkEvents (event log) locations can be extrapolated and consumed; without
 the clusters module, the sparkEvents cannot function.</p>
 <h3 id="clusterevents">ClusterEvents</h3>
-<p><em>Dependencies:</em> Clusters</p>
+<p><em>Requires:</em> Clusters</p>
+<p><em>Enables:</em> ClusterStateFact|JobRunCostPotentialFact</p>
 <p><em>Gold Entities:</em> ClusterStateFact</p>
 <p>Cluster Events are just what they sound like, events that occur on a cluster which usually result in a cluster state
 change. All of these events can be seen in the UI if you navigate to a spcific cluster and click on <em>eEvent Log</em>.
@@ -576,12 +579,13 @@ other resources are heavily utilizing api calls.</p>
 </div>
 
 <h3 id="pools">Pools</h3>
-<p><em>Dependencies:</em> Audit</p>
+<p><em>Requires:</em> Audit</p>
 <p><strong>In Progress</strong> &ndash; The snapshots are currently being recorded but the slow changing dimensions are still under construction
 and are not going to make it into the initial release.</p>
 <p>The Pools Module records the metadata related to Databricks Instance Pools.</p>
 <h3 id="jobs">Jobs</h3>
-<p><em>Dependencies:</em> Audit|Clusters|ClusterEvents</p>
+<p><em>Requires:</em> Audit|Clusters|ClusterEvents
+<em>Enables:</em> JobRunCostPotentialFact</p>
 <p><em>Gold Entities:</em> Job|JobRun|JobRunCostPotentialFact</p>
 <p>Overwatch curates all the job definitions through time, capturing as much metadata about these job definitions as 
 possible. In addition to the job definition metadata, Overwatch also captures each run and ties the run to a cluster_id
@@ -592,7 +596,7 @@ can be completely different from day to day and combining the point-in-time defi
 point-in-time cluster definition and run-times can be very powerful, and very hard to curate without Overwatch.
 <img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/Modules/run_id_v_id_in_job.png" alt="run_id_v_id_in_job"></p>
 <h3 id="accounts">Accounts</h3>
-<p><em>Dependencies:</em> Audit</p>
+<p><em>Requires:</em> Audit</p>
 <p><em>Gold Entities:</em> AccountModificationFact|AccountLoginFact</p>
 <p>The accounts module is very simple and is meant to assist the IT Admin team in keeping track of users. The Accounts
 module includes some very useful auditing information as well as enables authorized users to tie user_ids back to 
@@ -610,11 +614,11 @@ If desired, views, can be created manually in the consumer database to publish t
 </div>
 
 <h3 id="notebooks">Notebooks</h3>
-<p><em>Dependencies:</em> Audit</p>
+<p><em>Requires:</em> Audit</p>
 <p><em>Gold Entities:</em> Notebook</p>
 <p>Currently a very simple module that just enables the materialization of notebooks as slow changing dimensions.</p>
 <h3 id="sparkevents">SparkEvents</h3>
-<p><em>Dependencies:</em> Clusters</p>
+<p><em>Requires:</em> Clusters</p>
 <p><em>Gold Entities:</em> SparkExecution|SparkJob|SparkStage|SparkTask|SparkExecutor|SparkJDBC</p>
 <p>Databricks captures all &ldquo;SparkEvents&rdquo; captured by Open Source Spark (OSS) AND some additional events that are 
 proprietary to Databricks. These events are captured and persisted in event log files when cluster logging is enabled.
@@ -937,19 +941,19 @@ ExecutorID is the node on which the work was executed.
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1620248503"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1621364739"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1621364739"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1621364739"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1621364739"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1621364739"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1621364739"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1620248503"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1620248503"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1621364739"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1621364739"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1621364739"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1620248503" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1620248503"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1621364739" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1621364739"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
