@@ -112,11 +112,13 @@ abstract class PipelineTargets(config: Config) {
     )
 
     lazy private[overwatch] val cloudMachineDetail: PipelineTable = PipelineTable(
-        name = "instanceDetails",
-        _keys = Array("API_Name"),
-        config,
-        partitionBy = Seq("organization_id")
-      )
+      name = "instanceDetails",
+      _keys = Array("API_Name"),
+      config,
+      withOverwatchRunID = false,
+      withCreateDate = false,
+      partitionBy = Seq("organization_id")
+    )
 
     lazy private[overwatch] val cloudMachineDetailViewTarget: PipelineView = PipelineView(
       name = "instanceDetails",
