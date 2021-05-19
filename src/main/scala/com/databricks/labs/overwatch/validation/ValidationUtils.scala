@@ -133,7 +133,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
    * @param pipeline
    * @return
    */
-  protected def getLinkedModuleTarget(pipeline: Pipeline): Seq[ModuleTarget] = {
+  protected[overwatch] def getLinkedModuleTarget(pipeline: Pipeline): Seq[ModuleTarget] = {
     pipeline match {
       case rawPipeline: Bronze => {
         val bronzePipeline = rawPipeline.asInstanceOf[Bronze].suppressRangeReport(true)
@@ -288,7 +288,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         spark.sql(stmt)
         SnapReport(
           target.tableFullName,
-          new java.sql.Timestamp(bronzePipeline.primordialEpoch),
+          new java.sql.Timestamp(bronzePipeline.primordialTime.asUnixTimeMilli),
           new java.sql.Timestamp(untilTS.asUnixTimeMilli),
           "null"
         )

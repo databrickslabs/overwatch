@@ -21,5 +21,3 @@ project/target/
 \.terraform
 terraform.tfstate*
 \.terraform.lock.hcl
-/src/main/scala/com/databricks/labs/overwatch/DBConnect_Runner.scala
-/src/main/scala/com/databricks/labs/overwatch/DBConnect_Helpers.scala

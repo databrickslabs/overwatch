@@ -56,7 +56,7 @@ class Module(
    * @return
    */
   def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty || isFirstRun) {
-    Pipeline.createTimeDetail(pipeline.primordialEpoch)
+    Pipeline.createTimeDetail(pipeline.primordialTime(hardLimitMaxHistory).asUnixTimeMilli)
   } else Pipeline.createTimeDetail(moduleState.untilTS)
 
   /**
@@ -142,33 +142,13 @@ class Module(
 
   }
 
-  private def initPrimordialDate: Option[String] = {
-
-    val pipelineSnapDate = pipeline.pipelineSnapTime.asLocalDateTime.toLocalDate
-
-    val basePrimordialString = if (config.primordialDateString.nonEmpty) { // primordialDateString is provided
-      val configuredPrimordial = deriveLocalDate(config.primordialDateString.get, TimeTypesConstants.dtFormat).atStartOfDay()
-
-      if (hardLimitMaxHistory.nonEmpty) {
-        val minEpochDay = Math.max( // if module has max history allowed get latest date configured primordial or snap - limit
-          configuredPrimordial.toLocalDate.toEpochDay,
-          pipelineSnapDate.minusDays(hardLimitMaxHistory.get.toLong).toEpochDay
-        )
-        LocalDate.ofEpochDay(minEpochDay)
-      } else configuredPrimordial.toLocalDate // no hard limit, use configured primordial
-
-    } else Instant.ofEpochMilli(pipeline.primordialEpoch).atZone(Pipeline.systemZoneId).toLocalDate // if no limit and no configured primordial, calc by max days
-
-    Some(TimeTypesConstants.dtFormat.format(basePrimordialString))
-  }
-
   private def initModuleState: SimplifiedModuleStatusReport = {
     _isFirstRun = true
     val initState = SimplifiedModuleStatusReport(
       organization_id = config.organizationId,
       moduleID = moduleId,
       moduleName = moduleName,
-      primordialDateString = initPrimordialDate,
+      primordialDateString = Some(pipeline.primordialTime(hardLimitMaxHistory).asDTString),
       runStartTS = 0L,
       runEndTS = 0L,
       fromTS = fromTime.asUnixTimeMilli,

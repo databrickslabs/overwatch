@@ -180,6 +180,8 @@ class Pipeline(
     this
   }
 
+  def primordialTime: TimeTypes = primordialTime(None)
+
   /**
    * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
    * If primordial date is not provided in the config use now() - maxDays to derive a primordial date otherwise
@@ -192,12 +194,32 @@ class Pipeline(
    *
    * @return
    */
-  def primordialEpoch: Long = {
+  def primordialTime(hardLimitMaxHistory: Option[Int]): TimeTypes = {
 
-    LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
-      .toLocalDate.atStartOfDay
-      .toInstant(systemZoneOffset)
-      .toEpochMilli
+    val pipelineSnapDate = pipelineSnapTime.asLocalDateTime.toLocalDate
+
+    val primordialEpoch = if (config.primordialDateString.nonEmpty) { // primordialDateString is provided
+      val configuredPrimordial = deriveLocalDate(config.primordialDateString.get, TimeTypesConstants.dtFormat)
+        .atStartOfDay(Pipeline.systemZoneId)
+
+      if (hardLimitMaxHistory.nonEmpty) {
+        val minEpochDay = Math.max( // if module has max history allowed get latest date configured primordial or snap - limit
+          configuredPrimordial.toLocalDate.toEpochDay,
+          pipelineSnapDate.minusDays(hardLimitMaxHistory.get.toLong).toEpochDay
+        )
+        LocalDate.ofEpochDay(minEpochDay).atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli
+      } else configuredPrimordial.toInstant.toEpochMilli // no hard limit, use configured primordial
+
+    } else { // if no limit and no configured primordial, calc by max days
+
+      LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
+        .toLocalDate.atStartOfDay
+        .toInstant(systemZoneOffset)
+        .toEpochMilli
+    }
+
+    Pipeline.createTimeDetail(primordialEpoch)
+
   }
 
   /**
@@ -355,7 +377,7 @@ object Pipeline {
     TimeTypes(
       tsMilli, // asUnixTimeMilli
       lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
-      Date.from(instant), // asLocalDateTime
+      Date.from(instant), // asJavadate
       instant.atZone(systemZoneId), // asSystemZonedDateTime
       localDT, // asLocalDateTime
       localDT.toLocalDate.atStartOfDay(systemZoneId).toInstant.toEpochMilli // asMidnightEpochMilli

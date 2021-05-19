@@ -179,7 +179,7 @@ private[overwatch] class BronzeSnapException(
   private val pipeline = module.pipeline
   private val emptyModule = pipeline.getModuleState(module.moduleId).isEmpty
   private val fromTime = if (emptyModule) {
-    new Timestamp(pipeline.primordialEpoch)
+    new Timestamp(pipeline.primordialTime.asUnixTimeMilli)
   } else {
     new Timestamp(module.fromTime.asUnixTimeMilli)
   }
