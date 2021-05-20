@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
@@ -131,7 +132,7 @@ case class SimplifiedModuleStatusReport(
                                        )
 
 case class IncrementalFilter(cronColName: String, low: Column, high: Column)
-
+case class UpgradeReport(db: String, tbl: String, errorMsg: Option[String])
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
   val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value
@@ -166,6 +167,12 @@ private[overwatch] class FailedModuleException(s: String, val target: PipelineTa
 private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
 
 private[overwatch] class BadSchemaException(s: String) extends Exception(s) {}
+
+private[overwatch] class UpgradeException(s: String, target: PipelineTable) extends Exception(s) {
+  def getUpgradeReport: UpgradeReport = {
+    UpgradeReport(target.databaseName, target.name, Some(s))
+  }
+}
 
 object OverwatchEncoders {
   implicit def overwatchScopeValues: org.apache.spark.sql.Encoder[Array[OverwatchScope.Value]] =

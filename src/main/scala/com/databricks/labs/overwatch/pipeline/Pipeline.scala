@@ -142,7 +142,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
       spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
       val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
       spark.table(s"${config.databaseName}.pipeline_report")
-        .filter('Status === "SUCCESS" || 'Status.startsWith("EMPTY"))
+        .filter('status === "SUCCESS" || 'status.startsWith("EMPTY"))
         .filter('organization_id === config.organizationId)
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
