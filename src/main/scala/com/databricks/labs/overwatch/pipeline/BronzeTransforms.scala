@@ -163,18 +163,29 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
-    var outputDF = SchemaTools.scrubSchema(df)
+  protected def cleanseRawJobsSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+    val outputDF = SchemaTools.scrubSchema(df)
 
-    outputDF = outputDF
+    val changeInventory = Map[String, Column](
+      "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
+      "settings.new_cluster.spark_conf" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_conf"),
+      "settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_env_vars"),
+      s"settings.new_cluster.${cloudProvider}_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.${cloudProvider}_attributes"),
+      "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
+    )
+
+    outputDF.select(SchemaTools.modifyStruct(outputDF.schema, changeInventory): _*)
+  }
+
+  protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+    val outputDF = SchemaTools.scrubSchema(df)
+
+    outputDF
       .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
       .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
       .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
+      .withColumn(s"${cloudProvider}_attributes", SchemaTools.structToMap(outputDF, s"${cloudProvider}_attributes"))
 
-    if (cloudProvider == "aws") outputDF = outputDF
-      .withColumn("aws_attributes", SchemaTools.structToMap(outputDF, "aws_attributes"))
-
-    outputDF
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
