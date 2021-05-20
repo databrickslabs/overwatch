@@ -17,7 +17,30 @@ object Upgrade extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   import spark.implicits._
 
+  private def getSchemaVersion(dbName: String): String = {
+    val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
+    dbMeta.properties.getOrElse("SCHEMA", "UNKNOWN")
+  }
+
+  private def upgradeSchema(dbName: String, upgradeToVersion: String): Unit = {
+    val existingSchemaVersion = getSchemaVersion(dbName)
+    val upgradeStatement =
+      s"""ALTER DATABASE $dbName SET DBPROPERTIES
+         |(SCHEMA=$upgradeToVersion)""".stripMargin
+
+    val upgradeMsg = s"upgrading schema from $existingSchemaVersion --> $upgradeToVersion with STATEMENT:\n " +
+      s"$upgradeStatement"
+    logger.log(Level.INFO, upgradeMsg)
+    spark.sql(upgradeStatement)
+    val newSchemaVersion = getSchemaVersion(dbName)
+    assert(newSchemaVersion == upgradeToVersion)
+    logger.log(Level.INFO, s"UPGRADE SUCCEEDED")
+
+  }
+
   def upgrade0412(prodWorkspace: Workspace): Dataset[UpgradeReport] = {
+
+    prodWorkspace.getConfig.setOverwatchSchemaVersion(getSchemaVersion(prodWorkspace.getConfig.databaseName))
     val bronzePipeline = Bronze(prodWorkspace)
     val jobsSnapshotTarget = bronzePipeline.getAllTargets.filter(_.name == "jobs_snapshot_bronze").head
 
@@ -48,7 +71,7 @@ object Upgrade extends SparkSessionWrapper {
         withOverwatchRunID = false
       )
       prodWorkspace.database.write(upgradedDF, upgradedJobsSnapTarget, lit(null))
-
+      upgradeSchema(jobsSnapshotTarget.databaseName, "0.412")
       Seq(UpgradeReport(jobsSnapshotTarget.databaseName, jobsSnapshotTarget.name, Some("SUCCESS"))).toDS()
     }
 

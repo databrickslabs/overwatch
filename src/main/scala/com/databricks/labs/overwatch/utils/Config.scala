@@ -10,11 +10,11 @@ import java.util.UUID
 
 class Config() {
 
-  private final val _overwatchSchemaVersion = "0.1"
   private final val _runID = UUID.randomUUID().toString.replace("-", "")
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _debugFlag: Boolean = false
+  private var _overwatchSchemaVersion = "0.412"
   private var _organizationId: String = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
@@ -190,6 +190,11 @@ class Config() {
 
   def setDebugFlag(value: Boolean): this.type = {
     _debugFlag = value
+    this
+  }
+
+  private[overwatch] def setOverwatchSchemaVersion(value: String): this.type = {
+    _overwatchSchemaVersion = value
     this
   }
 

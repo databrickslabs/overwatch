@@ -273,13 +273,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         throw new BadConfigException(s"The Database: $dbName was not created by overwatch. Specify a " +
           s"database name that does not exist or was created by Overwatch.")
       }
-      val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
-      if (overwatchSchemaVersion != config.overwatchSchemaVersion) {
-        switch = false
-        throw new BadConfigException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
-          s" version of Overwatch requires ${config.overwatchSchemaVersion}. Upgrade Overwatch Schema to proceed " +
-          s"or drop existing database and allow Overwatch to recreate.")
-      }
     } else { // Database does not exist
       if (!Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
         logger.log(Level.INFO, s"Target location " +

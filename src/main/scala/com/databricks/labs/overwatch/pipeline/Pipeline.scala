@@ -159,6 +159,15 @@ class Pipeline(
    */
   protected def initPipelineRun(): this.type = {
     logger.log(Level.INFO, "INIT: Pipeline Run")
+    val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName)
+    val dbProperties = dbMeta.properties
+    val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
+    if (overwatchSchemaVersion != config.overwatchSchemaVersion) {
+      throw new BadConfigException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
+        s" version of Overwatch requires ${config.overwatchSchemaVersion}. Upgrade Overwatch Schema to proceed " +
+        s"or drop existing database and allow Overwatch to recreate.")
+    }
+
     if (spark.catalog.databaseExists(config.databaseName) &&
       spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
       val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
