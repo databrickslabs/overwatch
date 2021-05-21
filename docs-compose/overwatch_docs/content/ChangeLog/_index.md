@@ -4,6 +4,13 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.4.12
+**SCHEMA UPGRADE REQUIRED**
+* Hotfix for [Issue 126](https://github.com/databrickslabs/overwatch/issues/126).
+* Schema upgrade capability enabled.
+  * To upgrade your schema to 0.412, all you need to do is follow the 
+  example in [this notebook]()
+
 ## 0.4.11
 * Hotfix for [Issue 119](https://github.com/databrickslabs/overwatch/issues/119). Issue was only present in edge cases.
   Edge cases include workspaces missing data and attempting to run modules for which data didn't exist.
