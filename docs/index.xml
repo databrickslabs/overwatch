@@ -5,7 +5,7 @@
     <link>https://databrickslabs.github.io/overwatch/</link>
     <description>Recent content in Welcome To OverWatch on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Wed, 05 May 2021 17:00:13 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 20 May 2021 21:27:44 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Definitions</title>
       <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/</link>
@@ -33,6 +33,16 @@ Each module is responsible for building certain entities at each layer, bronze, 
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/configuration/</guid>
       <description>The configuration for Overwatch is fairly basic for the initial release but the plan is to open a lot of options and make the config much more robust to allow for much more granular control over operations. The ongoing changes will be documented here.
 Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.databricks.labs.overwatch.BatchRunner. When passed in as a json string, it is deserialized into an instance of OverwatchParams.</description>
+    </item>
+    
+    <item>
+      <title>Upgrade</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</link>
+      <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
+      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. The general upgrade process is:
+ Import the upgrade package Retrieve your production workspace  Should be done with the same parameters and method as the pipeline / environment that is being upgraded   Call the upgrade function for the version to which you&amp;rsquo;re upgrading.  To upgrade to version 0.</description>
     </item>
     
     <item>

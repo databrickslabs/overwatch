@@ -5,11 +5,16 @@ weight: 4
 ---
 
 ## 0.4.12
-**SCHEMA UPGRADE REQUIRED**
+**[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED**
 * Hotfix for [Issue 126](https://github.com/databrickslabs/overwatch/issues/126).
 * Schema upgrade capability enabled.
   * To upgrade your schema to 0.412, all you need to do is follow the 
-  example in [this notebook]()
+  example in the notebook below.
+    * ([HTML](/assets/ChangeLog/Upgrade_Example.html) / [DBC](/assets/ChangeLog/Upgrade_Example.dbc))
+* Corrected case sensitivity issue. When failure would occur in spark_events_bronze, there were column references 
+  to state tables with mismatched column name case sensitivity causing errors
+* Corrected issue with missing quotes around update statement to track failed files in 
+  spark_events_processedFiles
 
 ## 0.4.11
 * Hotfix for [Issue 119](https://github.com/databrickslabs/overwatch/issues/119). Issue was only present in edge cases.
