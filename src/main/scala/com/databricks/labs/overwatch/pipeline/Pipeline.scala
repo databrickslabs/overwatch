@@ -94,7 +94,7 @@ class Pipeline(_workspace: Workspace, _database: Database,
     ))
 
     rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
-      .orderBy('snapTS.desc, 'moduleId)
+      .orderBy('snapTS.desc, 'moduleID)
       .show(50, false)
   }
 
