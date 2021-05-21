@@ -463,7 +463,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                           badRecordsPath: String,
                           processedLogFilesTracker: PipelineTable,
                           organizationId: String,
-                          rundID: String,
+                          runID: String,
                           pipelineSnapTime: Column
                          )(eventLogsDF: DataFrame): DataFrame = {
 
@@ -550,7 +550,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             val failFilesSQL =
               s"""
                  |update ${processedLogFilesTracker.tableFullName} set failed = true where
-                 |Overwatch_RunID = $rundID
+                 |Overwatch_RunID = '$runID'
                  |""".stripMargin
             spark.sql(failFilesSQL)
             spark.conf.set("spark.sql.caseSensitive", "false")

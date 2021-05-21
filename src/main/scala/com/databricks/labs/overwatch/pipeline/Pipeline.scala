@@ -114,7 +114,7 @@ class Pipeline(
 
       println(s"Current Pipeline State: BEFORE this run.")
       rangeReport.toSeq.toDF("moduleID", "moduleName", "primordialDateString", "fromTS", "untilTS", "snapTS")
-        .orderBy('snapTS.desc, 'moduleId)
+        .orderBy('snapTS.desc, 'moduleID)
         .show(50, false)
     }
   }
