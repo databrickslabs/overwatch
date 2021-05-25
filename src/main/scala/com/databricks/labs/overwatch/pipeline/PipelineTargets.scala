@@ -289,7 +289,10 @@ abstract class PipelineTargets(config: Config) {
       keys = Array("organization_id", "job_id", "id_in_job"),
       config,
       incrementalColumns = Array("job_start_date"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      sparkOverrides = Map(
+        "spark.sql.autoBroadcastJoinThreshold" -> "-1"
+      )
     )
 
     lazy private[overwatch] val jobRunCostPotentialFactViewTarget: PipelineView = PipelineView(

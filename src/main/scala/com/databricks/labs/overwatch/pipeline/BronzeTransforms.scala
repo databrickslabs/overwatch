@@ -439,7 +439,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val byCluster = array_join(slice(segmentArray, 1, 3), "/").alias("byCluster")
     val byClusterHost = array_join(slice(segmentArray, 1, 5), "/").alias("byDriverHost")
     val bySparkContextID = array_join(slice(segmentArray, 1, 6), "/").alias("bySparkContext")
-    struct(filename, byCluster, byClusterHost, bySparkContextID).alias("filnameGroup")
+    struct(filename, byCluster, byClusterHost, bySparkContextID)
   }
 
   def generateEventLogsDF(database: Database,
