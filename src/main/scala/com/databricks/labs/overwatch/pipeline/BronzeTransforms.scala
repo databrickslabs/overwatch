@@ -549,9 +549,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
         }
 
         // Temporary Solution for Speculative Tasks bad Schema - SC-38615
-        val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("Stage ID")) {
-          when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
-        } else 'StageID
+        val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("stageId")) {
+          when('Event === "org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted", col("stageId"))
+            .otherwise(col("Stage ID"))
+        } else col("Stage ID")
 
         val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
           SchemaTools.scrubSchema(baseEventsDF
@@ -561,7 +562,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
             .withColumn("StageID", stageIDColumnOverride)
-            .drop("pathSize", "Stage ID")
+            .drop("pathSize", "Stage ID", "stageId")
             .withColumn("filenameGroup", groupFilename('filename))
           )
         } else {
