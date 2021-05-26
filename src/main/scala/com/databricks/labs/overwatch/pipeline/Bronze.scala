@@ -32,6 +32,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess = ETLDefinition(
     workspace.getJobsDF,
+    Seq(cleanseRawJobsSnapDF(config.cloudProvider)),
     append(BronzeTargets.jobsSnapshotTarget)
   )
 

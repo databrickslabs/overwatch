@@ -146,18 +146,29 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
-    var outputDF = SchemaTools.scrubSchema(df)
+  protected def cleanseRawJobsSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+    val outputDF = SchemaTools.scrubSchema(df)
 
-    outputDF = outputDF
+    val changeInventory = Map[String, Column](
+      "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
+      "settings.new_cluster.spark_conf" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_conf"),
+      "settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_env_vars"),
+      s"settings.new_cluster.${cloudProvider}_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.${cloudProvider}_attributes"),
+      "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
+    )
+
+    outputDF.select(SchemaTools.modifyStruct(outputDF.schema, changeInventory): _*)
+  }
+
+  protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+    val outputDF = SchemaTools.scrubSchema(df)
+
+    outputDF
       .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
       .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
       .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
+      .withColumn(s"${cloudProvider}_attributes", SchemaTools.structToMap(outputDF, s"${cloudProvider}_attributes"))
 
-    if (cloudProvider == "aws") outputDF = outputDF
-      .withColumn("aws_attributes", SchemaTools.structToMap(outputDF, "aws_attributes"))
-
-    outputDF
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
@@ -428,14 +439,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val byCluster = array_join(slice(segmentArray, 1, 3), "/").alias("byCluster")
     val byClusterHost = array_join(slice(segmentArray, 1, 5), "/").alias("byDriverHost")
     val bySparkContextID = array_join(slice(segmentArray, 1, 6), "/").alias("bySparkContext")
-    struct(filename, byCluster, byClusterHost, bySparkContextID).alias("filnameGroup")
+    struct(filename, byCluster, byClusterHost, bySparkContextID)
   }
 
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
                           processedLogFilesTracker: PipelineTable,
                           organizationId: String,
-                          rundID: String,
+                          runID: String,
                           pipelineSnapTime: Column
                          )(eventLogsDF: DataFrame): DataFrame = {
 
@@ -522,7 +533,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             val failFilesSQL =
               s"""
                  |update ${processedLogFilesTracker.tableFullName} set failed = true where
-                 |Overwatch_RunID = $rundID
+                 |Overwatch_RunID = '$runID'
                  |""".stripMargin
             spark.sql(failFilesSQL)
             spark.conf.set("spark.sql.caseSensitive", "false")
@@ -538,9 +549,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
         }
 
         // Temporary Solution for Speculative Tasks bad Schema - SC-38615
-        val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("Stage ID")) {
-          when('StageID.isNull && $"Stage ID".isNotNull, $"Stage ID").otherwise('StageID)
-        } else 'StageID
+        val stageIDColumnOverride: Column = if (baseEventsDF.columns.contains("stageId")) {
+          when('Event === "org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted", col("stageId"))
+            .otherwise(col("Stage ID"))
+        } else col("Stage ID")
+
+        val stageAttemptIDColumnOverride: Column = if (baseEventsDF.columns.contains("stageAttemptId")) {
+          when('Event === "org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted", col("stageAttemptId"))
+            .otherwise(col("Stage Attempt ID"))
+        } else col("Stage Attempt ID")
 
         val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
           SchemaTools.scrubSchema(baseEventsDF
@@ -550,7 +567,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
             .withColumn("StageID", stageIDColumnOverride)
-            .drop("pathSize", "Stage ID")
+            .withColumn("StageAttemptID", stageAttemptIDColumnOverride)
+            .drop("pathSize", "Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId")
             .withColumn("filenameGroup", groupFilename('filename))
           )
         } else {

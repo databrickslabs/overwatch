@@ -151,8 +151,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      */
     val rawParams = if (config.isLocalTesting) {
       //      config.buildLocalOverwatchParams()
-      val synthArgs = config.buildLocalOverwatchParams()
-      mapper.readValue[OverwatchParams](synthArgs)
+//      val synthArgs = config.buildLocalOverwatchParams()
+//      mapper.readValue[OverwatchParams](synthArgs)
+      mapper.readValue[OverwatchParams](args(0))
     } else {
       logger.log(Level.INFO, "Validating Input Parameters")
       mapper.readValue[OverwatchParams](args(0))
@@ -259,13 +260,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         switch = false
         throw new BadConfigException(s"The Database: $dbName was not created by overwatch. Specify a " +
           s"database name that does not exist or was created by Overwatch.")
-      }
-      val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
-      if (overwatchSchemaVersion != config.overwatchSchemaVersion) {
-        switch = false
-        throw new BadConfigException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
-          s" version of Overwatch requires ${config.overwatchSchemaVersion}. Upgrade Overwatch Schema to proceed " +
-          s"or drop existing database and allow Overwatch to recreate.")
       }
     } else { // Database does not exist
       if (!Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
@@ -397,6 +391,24 @@ object Initializer extends SparkSessionWrapper {
   // Init the SparkSessionWrapper with envVars
   envInit()
 
+  private def initConfigState(debugFlag: Boolean): Config = {
+    logger.log(Level.INFO, "Initializing Config")
+    val config = new Config()
+    val orgId = if (config.isLocalTesting) System.getenv("ORGID") else {
+      if (dbutils.notebook.getContext.tags("orgId") == "0") {
+        dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+      } else dbutils.notebook.getContext.tags("orgId")
+    }
+    config.setOrganizationId(orgId)
+    config.registerInitialSparkConf(spark.conf.getAll)
+    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
+    if (debugFlag) {
+      envInit("DEBUG")
+      config.setDebugFlag(debugFlag)
+    }
+    config
+  }
+
   /**
    * Companion object to validate environment initialize the config for the run.
    * Takes input of raw arg strings into the main class, parses and validates them,
@@ -414,18 +426,7 @@ object Initializer extends SparkSessionWrapper {
    */
   def apply(args: Array[String], debugFlag: Boolean = false): Workspace = {
 
-    logger.log(Level.INFO, "Initializing Config")
-    val config = new Config()
-    val orgId = if (dbutils.notebook.getContext.tags("orgId") == "0") {
-      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-    } else dbutils.notebook.getContext.tags("orgId")
-    config.setOrganizationId(orgId)
-    config.registerInitialSparkConf(spark.conf.getAll)
-    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
-    if (debugFlag) {
-      envInit("DEBUG")
-      config.setDebugFlag(debugFlag)
-    }
+    val config = initConfigState(debugFlag)
 
     logger.log(Level.INFO, "Initializing Environment")
     val initializer = new Initializer(config)
@@ -439,5 +440,24 @@ object Initializer extends SparkSessionWrapper {
 
     workspace
   }
+
+  private[overwatch] def apply(args: Array[String], debugFlag: Boolean, isSnap: Boolean): Workspace = {
+
+    val config = initConfigState(debugFlag)
+
+    logger.log(Level.INFO, "Initializing Environment")
+    val initializer = new Initializer(config)
+    val database = initializer
+      .validateAndRegisterArgs(args)
+      .initializeDatabase()
+
+    logger.log(Level.INFO, "Initializing Workspace")
+    val workspace = Workspace(database, config)
+
+
+    workspace
+  }
+
+
 }
 
