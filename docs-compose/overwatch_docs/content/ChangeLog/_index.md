@@ -7,6 +7,7 @@ weight: 4
 ## 0.4.12
 **[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED**
 * Hotfix for [Issue 126](https://github.com/databrickslabs/overwatch/issues/126).
+* Hotfix for [Issue 129](https://github.com/databrickslabs/overwatch/issues/129).
 * Schema upgrade capability enabled.
   * To upgrade your schema to 0.412, all you need to do is follow the 
   example in the notebook below.
