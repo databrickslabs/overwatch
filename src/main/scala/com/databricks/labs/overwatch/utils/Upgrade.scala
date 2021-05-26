@@ -48,7 +48,7 @@ object Upgrade extends SparkSessionWrapper {
     if (!jobsSnapshotTarget.exists) {
       val errMsg = s"The jobs_snapshot_bronze source does not exist in the workspace's configured database: " +
         s"${bronzePipeline.config.databaseName}. This upgrade is only necessary if this source was created by " +
-        s"a version < 0.4.2"
+        s"a version < 0.4.12"
       logger.log(Level.ERROR, errMsg)
       throw new UpgradeException(errMsg, jobsSnapshotTarget)
     } else {
