@@ -5,7 +5,7 @@
     <link>https://databrickslabs.github.io/overwatch/dataengineer/</link>
     <description>Recent content in Data Engineering on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Mon, 11 Jan 2021 12:21:46 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 20 May 2021 21:27:44 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Definitions</title>
       <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/</link>
@@ -23,6 +23,16 @@
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/etl_process/</guid>
       <description>Data Ingestion and Resume Process The specificities can vary slightly between cloud provider but the general methodology is the exact same. Specific differences will be discussed in Cloud-Specific Variations section.
 Each module is responsible for building certain entities at each layer, bronze, silver, gold, and presentation. The mapping between module and gold entity can be found in the Modules section. Each module is also tracked individually in the primary tracking tabe, Pipeline_Report.</description>
+    </item>
+    
+    <item>
+      <title>Upgrade</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</link>
+      <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
+      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. The general upgrade process is:
+ Import the upgrade package Retrieve your production workspace  Should be done with the same parameters and method as the pipeline / environment that is being upgraded   Call the upgrade function for the version to which you&amp;rsquo;re upgrading.  To upgrade to version 0.</description>
     </item>
     
   </channel>

@@ -9,7 +9,7 @@
 
     <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
 
-    <title>Tags :: Overwatch</title>
+    <title>Upgrade :: Overwatch</title>
 
     
     <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1622044744" rel="stylesheet">
@@ -38,7 +38,7 @@
 
 <script async defer src="https://buttons.github.io/buttons.js"></script>
   </head>
-  <body class="" data-url="https://databrickslabs.github.io/overwatch/tags/">
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/dataengineer/upgrade/">
     <nav id="sidebar" class="">
 
 
@@ -265,7 +265,7 @@
   
     
     <li data-nav-id="/dataengineer/" title="Data Engineering" class="dd-item
-        
+        parent
         
         
         ">
@@ -333,7 +333,7 @@
  
   
     
-      <li data-nav-id="/dataengineer/upgrade/" title="Upgrade" class="dd-item ">
+      <li data-nav-id="/dataengineer/upgrade/" title="Upgrade" class="dd-item active">
         <a href="https://databrickslabs.github.io/overwatch/dataengineer/upgrade/">
         Upgrade
         
@@ -460,7 +460,13 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > Tags
+            
+            
+          
+          
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/dataengineer/'>Data Engineering</a> > Upgrade
+          
+        
           
         
           
@@ -471,7 +477,7 @@
                 
                     <div class="progress">
     <div class="wrapper">
-
+<nav id="TableOfContents"></nav>
     </div>
 </div>
 
@@ -487,24 +493,55 @@
           
             <h1>
               
-                taxonomy ::
-              
-              Tags
+              Upgrade
             </h1>
           
 
         
 
 
-
-
-
+<p>Sometimes upgrading from one version to the next requires a schema change. In these cases, the 
+<a href="https://databrickslabs.github.io/overwatch/changelog/">CHANGELOG</a> will be explicit. The general upgrade process is:</p>
 <ul>
-	
+<li>Import the upgrade package</li>
+<li>Retrieve your production workspace
+<ul>
+<li>Should be done with the same parameters and method as the pipeline / environment that is being upgraded</li>
 </ul>
+</li>
+<li>Call the upgrade function for the version to which you&rsquo;re upgrading.</li>
+</ul>
+<p>To upgrade to version 0.4.12, the code is below. Note, the &ldquo;buildWorkspace&rdquo; function is just a helper function to 
+construct the workspace. Same as using Databricks widgets and passing parameters, this function just 
+builds the OverwatchParams and returns the workspace instance.</p>
 
+<div class="notices warning" ><p>When a schema upgrade is required between versions, <strong>this step cannot be skipped</strong>. Overwatch will not allow you 
+to continue on a version that requires a newer schema.</p>
+</div>
 
-<footer class=" footline" >
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Upgrade
+<span style="color:#66d9ef">val</span> prodConfigs <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Map</span><span style="color:#f92672">(</span>
+  <span style="color:#e6db74">&#34;storagePrefix&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;etlDBName&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;overwatch_etl&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;consumerDBName&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;overwatch&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;secretsScope&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;dbPATKey&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;ehKey&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;ehName&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;primordialDateString&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;2021-01-01&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;maxDaysToLoad&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;60&#34;</span><span style="color:#f92672">,</span>
+  <span style="color:#e6db74">&#34;scopes&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;all&#34;</span>
+<span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">val</span> logger<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">Logger</span> <span style="color:#f92672">=</span> <span style="color:#a6e22e">Logger</span><span style="color:#f92672">.</span>getLogger<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;Upgrade&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">val</span> parallelism <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">24</span>
+<span style="color:#66d9ef">val</span> prodWorkspace <span style="color:#66d9ef">=</span> buildWorkspace<span style="color:#f92672">(</span>prodConfigs<span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">val</span> upgradeReport <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Upgrade</span><span style="color:#f92672">.</span>upgrade0412<span style="color:#f92672">(</span>prodWorkspace<span style="color:#f92672">)</span>
+upgradeReport<span style="color:#f92672">.</span>show<span style="color:#f92672">()</span>
+</code></pre></div>
+
+<footer class="footline">
 	
 </footer>
 
@@ -654,6 +691,7 @@
             
                 
                     
+                    
                 
                 
 
@@ -666,6 +704,9 @@
             
             
                 
+                    
+                        
+                        
                     
                 
                 
@@ -699,6 +740,7 @@
             
                 
                     
+                    
                 
                 
 
@@ -717,6 +759,9 @@
             
             
                 
+                    
+                        
+                        
                     
                 
                 
@@ -754,8 +799,10 @@
 	 
 	 
 		
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process/" title="ETL Process"> <i class="fa fa-chevron-left"></i></a>
 		
-			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/gettingstarted/" title="Getting Started" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/changelog/" title="ChangeLog" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
 		
 	
     </div>
@@ -785,3 +832,4 @@
 
   </body>
 </html>
+

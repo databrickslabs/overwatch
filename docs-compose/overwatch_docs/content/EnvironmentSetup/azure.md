@@ -71,13 +71,29 @@ situation like this, the minimum autoscaling compute size should approximately e
 minimize waste.  
 {{% /notice %}}
 
+#### Validate Messages Are Flowing
+Now that you have configured you Overwatch EventHub Namespace and a named Event Hub inside of the namespace, it's
+time to validate that messages are flowing. You may have to wait several minutes to begin to see messages flowing
+depending on how busy the workspace is. There are two things that are commonly missed, please double check the
+two bullet points below, there are images to help clarify as well.
+* A named Event Hub has been created within the Namespace.
+* Messages are flowing into the named event hub
+![Named_EH_Visual](/images/EnvironmentSetup/Azure_EH_Example.png) ![EH_Validation](/images/EnvironmentSetup/EH_Validation.png)
+
 #### Step 3
-With your Event Hub created and ready to go, Navigate to your the Azure Databricks workspace[s] for which you'd like 
+With your Event Hub Namespace and Named Event Hub created with data flowing, 
+Navigate to your the Azure Databricks workspace[s] (in the portal) for which you'd like 
 to enable Overwatch. Under Monitoring section --> Diagnostics settings --> Add diagnostic setting. Configure 
 your log delivery similar to the example in the image below.
 
-Additionally, ensure that the Overwatch account has sufficinet privileges to read data from the Event Hub\[s\] created
+Additionally, ensure that the Overwatch account has sufficient privileges to read data from the Event Hub\[s\] created
 above. A common method for providing Overwatch access to the Event Hub is to simply capture the connection string 
 and store it as a [secret](https://docs.databricks.com/security/secrets/index.html). 
 There are many methods through which to authorize Overwatch, just ensure it has the access to read from the Event Hub Stream.
+
+{{% notice warning %}}
+**DO NOT** leave **Event hub name** empty! Even though Azure doesn't require an event hub name, you must create an
+event hub underneath the event hub namespace and give it a name. Reference the name here.
+{{% /notice %}}
+
 ![EH_Base_Setup](/images/EnvironmentSetup/EH_BaseConfig.png)

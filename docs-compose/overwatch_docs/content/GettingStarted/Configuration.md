@@ -88,6 +88,16 @@ val params = OverwatchParams(
 )
 ```
 
+**NOTE** The connection string stored in the *ehConnString* above is stored as a secret since it contains a key. 
+**THIS IS NOT THE KEY** but the actual connection string from the SAS Policy. To find this follow the path in the 
+Azure portal below.
+
+eh-namespace --> eventhub --> shared access policies --> Connection String-primary key
+
+The connection string should begin with `Endpoing=sb://`. Note that the policy only needs the Listen permission
+
+![ConnStringExample](/images/GettingStarted/Azure_EH_ConnString.png)
+
 ### AWS Example (Full)
 An example notebook can be found [here](/assets/GettingStarted/aws_runner_docs_example.html).
 ```scala
