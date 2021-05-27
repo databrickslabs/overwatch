@@ -316,25 +316,37 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     val snappedPrimordialString = pipeline.getPipelineState.values
       .minBy(state => Pipeline.deriveLocalDate(state.primordialDateString.get, getDateFormat).toEpochDay)
       .primordialDateString.get
+    logger.log(Level.INFO, s"Snapped Primordial String: $snappedPrimordialString")
+
     val snappedPrimordialTime = Pipeline.createTimeDetail(
       Pipeline.deriveLocalDate(snappedPrimordialString, getDateFormat)
         .atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli
     )
-    val lookupPipelineMaxUntil = Pipeline.createTimeDetail(pipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS)
+    logger.log(Level.INFO, s"snappedPrimordialTimeDateString: ${snappedPrimordialTime.asTSString}")
 
-    val calculatedMaxDays = maxDays.getOrElse(
-      Duration.between(
-        snappedPrimordialTime.asLocalDateTime.toLocalDate.atStartOfDay(),
-        lookupPipelineMaxUntil.asLocalDateTime.toLocalDate.atStartOfDay()
-      ).toDays.toInt - daysToPad
+    val lookupPipelineMaxUntil = Pipeline.createTimeDetail(
+      pipeline.getPipelineState.values.toArray
+        .filter(_.moduleID >= 2000)
+        .maxBy(_.untilTS).untilTS
     )
+    logger.log(Level.INFO, s"lookupPipelineMaxUntil: ${lookupPipelineMaxUntil.asTSString}")
+
+    val daysInScope = Duration.between(
+      snappedPrimordialTime.asLocalDateTime.toLocalDate.atStartOfDay(),
+      lookupPipelineMaxUntil.asLocalDateTime.toLocalDate.atStartOfDay()
+    ).toDays.toInt - daysToPad
+    logger.log(Level.INFO, s"daysInScope: $daysInScope")
+
+    // default right padding when maxDays is empty is 2 days.
+    val calculatedMaxDays = maxDays.getOrElse(daysInScope - 2)
+    logger.log(Level.INFO, s"calculatedMaxDays: $calculatedMaxDays")
 
     // set config and returns modified workspace
-    val primordialDatePlusPadding = snappedPrimordialTime.asLocalDateTime.plusDays(daysToPad).toString
+    val primordialDatePlusPadding = snappedPrimordialTime.asLocalDateTime.plusDays(daysToPad).toLocalDate.toString
     val modifiedConfig = pipeline.config
     modifiedConfig.setPrimordialDateString(Some(primordialDatePlusPadding))
     modifiedConfig.setMaxDays(calculatedMaxDays)
-    logger.log(Level.INFO, s"MAX DAYS: Updated to $maxDays")
+    logger.log(Level.INFO, s"MAX DAYS: Updated to $calculatedMaxDays")
     logger.log(Level.INFO, s"PRIMORDIAL DATE: Set for recalculation as $primordialDatePlusPadding.")
     pipeline.workspace.copy(_config = modifiedConfig)
   }

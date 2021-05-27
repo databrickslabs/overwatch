@@ -121,7 +121,9 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     val primordialDateString = bronzeLookupPipeline.config.primordialDateString.get
     val fromDate = Pipeline.deriveLocalDate(primordialDateString, getDateFormat)
     val fromTime = Pipeline.createTimeDetail(fromDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-    val untilTime = Pipeline.createTimeDetail(bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
+    val untilTime = Pipeline.createTimeDetail(fromTime.asLocalDateTime.plusDays(bronzeLookupPipeline.config.maxDays).toLocalDate
+      .atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+//    val untilTime = Pipeline.createTimeDetail(bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
 
 
     validateSnapPipeline(bronzeLookupPipeline, snapPipeline, fromTime, untilTime, isRefresh)
