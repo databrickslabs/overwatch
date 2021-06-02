@@ -217,19 +217,24 @@ trait GoldTransforms extends SparkSessionWrapper {
                                        instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
-                                       interactiveDBUPrice: Double,
-                                       automatedDBUPrice: Double,
                                        pipelineSnapTime: TimeTypes
                                      )(clusterEventsDF: DataFrame): DataFrame = {
     validateInstanceDetails(instanceDetails, pipelineSnapTime.asDTString)
 
     val driverNodeDetails = instanceDetails
-      .select('organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil, 'API_Name.alias("driver_node_type_id_lookup"), struct(instanceDetails.columns map col: _*).alias("driverSpecs"))
+      .select('organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil,
+        'API_Name.alias("driver_node_type_id_lookup"),
+        struct(instanceDetails.columns map col: _*).alias("driverSpecs")
+      )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
       .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
 
     val workerNodeDetails = instanceDetails
-      .select('organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil, 'API_Name.alias("node_type_id_lookup"), struct(instanceDetails.columns map col: _*).alias("workerSpecs"))
+      .select('organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil,
+        'API_Name.alias("node_type_id_lookup"),
+        'automatedDBUPrice, 'interactiveDBUPrice,
+        struct(instanceDetails.columns map col: _*).alias("workerSpecs")
+      )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
       .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
 
@@ -334,7 +339,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       ))
       .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
       .withColumn("isAutomated", isAutomated('cluster_name))
-      .withColumn("dbu_rate", when('isAutomated, lit(automatedDBUPrice)).otherwise(lit(interactiveDBUPrice)))
+      .withColumn("dbu_rate", when('isAutomated, 'automatedDBUPrice).otherwise('interactiveDBUPrice))
       .withColumn("days_in_state", size(sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date"))))
       .withColumn("worker_potential_core_H", 'worker_potential_core_S / lit(3600))
       .withColumn("driver_compute_cost", Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H))
