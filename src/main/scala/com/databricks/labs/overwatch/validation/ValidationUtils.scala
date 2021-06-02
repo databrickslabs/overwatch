@@ -312,6 +312,10 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
       throw new PipelineStateException(errorMsg, None)
     }
 
+    // TEMP
+    DeltaTable
+      .forName("instanceDetails_test52721")
+
     // derive dates and total bronze duration
     val snappedPrimordialString = pipeline.getPipelineState.values
       .minBy(state => Pipeline.deriveLocalDate(state.primordialDateString.get, getDateFormat).toEpochDay)

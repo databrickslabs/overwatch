@@ -14,7 +14,7 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provid
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
 libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5"
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595"
-libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0" % Provided
+libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0"
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 
 libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.18" % Provided
@@ -57,6 +57,7 @@ assemblyExcludedJars in assembly := {
     f.data.getName.contains("dbutils-api_2.12") ||
       f.data.getName.contains("spark-core") ||
       f.data.getName.contains("spark-sql") ||
+      f.data.getName.contains("delta-core") ||
       f.data.getName.contains("com.amazonaws")
   }
 }

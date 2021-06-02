@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import com.databricks.labs.overwatch.utils.{BadConfigException, SparkSessionWrapper, TimeTypes}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
@@ -169,18 +169,67 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
   }
 
+  private def validateInstanceDetails(
+                                       instanceDetails: DataFrame,
+                                       snapDate: String
+                                     ): Unit = {
+    val w = Window.partitionBy(lower(trim('API_name))).orderBy('activeFrom)
+    val wKeyCheck = Window.partitionBy(lower(trim('API_name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
+    val dfCheck = instanceDetails
+      .withColumn("activeUntil", coalesce('activeUntil, lit(snapDate)))
+      .withColumn("previousUntil", lag('activeUntil, 1).over(w))
+      .withColumn("rnk", rank().over(wKeyCheck))
+      .withColumn("rn", row_number().over(wKeyCheck))
+      .withColumn("isValid", when('previousUntil.isNull, lit(true)).otherwise(
+        datediff('activeFrom, 'previousUntil) === 1
+      ))
+      .filter(!'isValid || 'rnk > 1 || 'rn > 1)
+
+    if (!dfCheck.isEmpty) {
+      val erroredRecordsReport = instanceDetails
+        .withColumn("API_name", lower(trim('API_name)))
+        .join(
+          dfCheck
+            .select(
+              lower(trim('API_name)).alias("API_name"),
+              'rnk, 'rn, 'previousUntil,
+              datediff('activeFrom, 'previousUntil).alias("daysBetweenCurrentAndPrevious")
+            ),
+          Seq("API_name")
+        )
+        .orderBy('API_name, 'activeFrom, 'activeUntil)
+
+      println("InstanceDetails Error Report: ")
+      erroredRecordsReport.show(numRows = 1000, false)
+
+      val badRecords = dfCheck.count()
+      val badRawKeys = dfCheck.select('API_name).as[String].collect().mkString(", ")
+      val errMsg = s"instanceDetails Invalid: Each key (API_name) must be unique for a given time period " +
+        s"(activeFrom --> activeUntil) AND the previous costs activeUntil must run through the previous date " +
+        s"such that the function 'datediff' returns 1. Please correct the instanceDetails table before continuing " +
+        s"with this module.\nThe API_name keys with errors are: $badRawKeys. A total of $badRecords records were " +
+        s"found in conflict."
+      throw new BadConfigException(errMsg)
+    }
+  }
+
   protected def buildClusterStateFact(
                                        instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
                                        interactiveDBUPrice: Double,
-                                       automatedDBUPrice: Double
+                                       automatedDBUPrice: Double,
+                                       pipelineSnapTime: TimeTypes
                                      )(clusterEventsDF: DataFrame): DataFrame = {
     val driverNodeDetails = instanceDetails
-      .select('organization_id, 'API_Name.alias("driver_node_type_id"), struct(instanceDetails.columns map col: _*).alias("driverSpecs"))
+      .select('organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil, 'API_Name.alias("driver_node_type_id_lookup"), struct(instanceDetails.columns map col: _*).alias("driverSpecs"))
+      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
+      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeuntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
 
     val workerNodeDetails = instanceDetails
-      .select('organization_id, 'API_Name.alias("node_type_id"), struct(instanceDetails.columns map col: _*).alias("workerSpecs"))
+      .select('organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil, 'API_Name.alias("node_type_id_lookup"), struct(instanceDetails.columns map col: _*).alias("workerSpecs"))
+      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
+      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeuntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
 
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
@@ -257,8 +306,25 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
       .withColumn("cloud_billable", 'isRunning)
       .withColumn("databricks_billable", 'isRunning && !'type.isin(nonBillableTypes: _*))
-      .join(driverNodeDetails, Seq("organization_id", "driver_node_type_id"), "left")
-      .join(workerNodeDetails, Seq("organization_id", "node_type_id"), "left")
+      .alias("clusterPotential")
+      .join(
+        driverNodeDetails.alias("driverNodeDetails"),
+        $"clusterPotential.organization_id" === $"driverNodeDetails.driver_orgid" &&
+          trim(lower($"clusterPotential.driver_node_type_id")) === trim(lower($"driverNodeDetails.driver_node_type_id_lookup")) &&
+          $"clusterPotential.timestamp" >= $"driverNodeDetails.activeFromEpochMillis" &&
+          $"clusterPotential.timestamp" < $"driverNodeDetails.activeUntilEpochMillis",
+        "left"
+      )
+      .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "driver_orgid", "driver_node_type_id_lookup")
+      .alias("clusterPotential")
+      .join(
+        workerNodeDetails.alias("workerNodeDetails"),
+        $"clusterPotential.organization_id" === $"workerNodeDetails.worker_orgid" &&
+          trim(lower($"clusterPotential.node_type_id")) === trim(lower($"workerNodeDetails.node_type_id_lookup")) &&
+          $"clusterPotential.timestamp" >= $"workerNodeDetails.activeFromEpochMillis" &&
+          $"clusterPotential.timestamp" < $"workerNodeDetails.activeUntilEpochMillis",
+        "left")
+      .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "worker_orgid", "node_type_id_lookup")
       .withColumn("worker_potential_core_S", when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0)))
       .withColumn("core_hours", when('isRunning,
         round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
@@ -394,7 +460,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
         .withColumn("runtime_in_cluster_state",
           when('state.isin("CREATING", "STARTING") || 'job_cluster_type === "new", 'uptime_in_state_H * 1000 * 3600) // get true cluster time when state is guaranteed fully initial
-          .otherwise(runStateFirstToEnd - $"job_runtime.startEpochMS")) // otherwise use jobStart as beginning time and min of stateEnd or jobEnd for end time )
+            .otherwise(runStateFirstToEnd - $"job_runtime.startEpochMS")) // otherwise use jobStart as beginning time and min of stateEnd or jobEnd for end time )
         .withColumn("lifecycleState", lit("init"))
 
       val jobRunTerminalState = newTerminatedJobRuns

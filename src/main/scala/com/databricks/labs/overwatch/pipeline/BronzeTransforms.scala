@@ -164,17 +164,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
-    var outputDF = SchemaTools.scrubSchema(df)
+    val outputDF = SchemaTools.scrubSchema(df)
 
-    outputDF = outputDF
+    outputDF
       .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
       .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
       .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
+      .withColumn(s"${cloudProvider}_attributes", SchemaTools.structToMap(outputDF, s"${cloudProvider}_attributes"))
 
-    if (cloudProvider == "aws") outputDF = outputDF
-      .withColumn("aws_attributes", SchemaTools.structToMap(outputDF, "aws_attributes"))
-
-    outputDF
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {

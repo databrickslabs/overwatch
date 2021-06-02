@@ -143,6 +143,8 @@ class Pipeline(
         .withColumn("organization_id", lit(config.organizationId))
         .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
+        .withColumn("activeFrom", lit(primordialTime.asDTString).cast("date"))
+        .withColumn("activeUntil", lit(null).cast("date"))
         .coalesce(1)
 
       database.write(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
