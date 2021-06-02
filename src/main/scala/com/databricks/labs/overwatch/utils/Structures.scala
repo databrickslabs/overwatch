@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
@@ -133,7 +132,7 @@ case class SimplifiedModuleStatusReport(
                                          vacuumRetentionHours: Int
                                        )
 
-case class IncrementalFilter(cronColName: String, low: Column, high: Column)
+case class IncrementalFilter(cronField: StructField, low: Column, high: Column)
 case class UpgradeReport(db: String, tbl: String, errorMsg: Option[String])
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
