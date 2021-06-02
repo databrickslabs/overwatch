@@ -13,7 +13,7 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provid
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
 libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5" % Provided
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
-libraryDependencies += "io.delta" % "delta-core" % "0.8.0" % Provided
+libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 
 libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.18" % Provided

@@ -43,17 +43,19 @@ object Upgrade extends SparkSessionWrapper {
     prodWorkspace.getConfig.setOverwatchSchemaVersion(getSchemaVersion(prodWorkspace.getConfig.databaseName))
     val bronzePipeline = Bronze(prodWorkspace)
     val jobsSnapshotTarget = bronzePipeline.getAllTargets.filter(_.name == "jobs_snapshot_bronze").head
+    val clusterSnapshotTarget = bronzePipeline.getAllTargets.filter(_.name == "clusters_snapshot_bronze").head
+    val cloudProvider = bronzePipeline.config.cloudProvider
 
     try {
-    if (!jobsSnapshotTarget.exists) {
-      val errMsg = s"The jobs_snapshot_bronze source does not exist in the workspace's configured database: " +
+      // Jobs Table
+    if (!jobsSnapshotTarget.exists && !clusterSnapshotTarget.exists) {
+      val errMsg = s"Neither the jobs_snapshot_bronze nor the clusters_snapshot_bronze sources exist in the workspace's configured database: " +
         s"${bronzePipeline.config.databaseName}. This upgrade is only necessary if this source was created by " +
         s"a version < 0.4.12"
       logger.log(Level.ERROR, errMsg)
       throw new UpgradeException(errMsg, jobsSnapshotTarget)
     } else {
       val jobSnapshotDF = jobsSnapshotTarget.asDF(withGlobalFilters = false)
-      val cloudProvider = bronzePipeline.config.cloudProvider
       val outputDF = SchemaTools.scrubSchema(jobSnapshotDF)
 
       val changeInventory = Map[String, Column](
@@ -71,8 +73,27 @@ object Upgrade extends SparkSessionWrapper {
         withOverwatchRunID = false
       )
       prodWorkspace.database.write(upgradedDF, upgradedJobsSnapTarget, lit(null))
+
+      // clusters table
+      if (cloudProvider != "azure") {
+        val errMsg = s"cluster_snapshot schema changes not present. Only present for Azure workspaces. Skipping."
+        logger.log(Level.ERROR, errMsg)
+      } else {
+        val clusterSnapshotDF = SchemaTools.scrubSchema(clusterSnapshotTarget.asDF(withGlobalFilters = false))
+        val newClusterSnap = clusterSnapshotDF
+          .withColumn("azure_attributes", SchemaTools.structToMap(clusterSnapshotDF, "azure_attributes"))
+        val upgradeClusterSnapTarget = clusterSnapshotTarget.copy(
+          mode = "overwrite",
+          withCreateDate = false,
+          withOverwatchRunID = false
+        )
+        prodWorkspace.database.write(newClusterSnap, upgradeClusterSnapTarget, lit(null))
+      }
+
       upgradeSchema(jobsSnapshotTarget.databaseName, "0.412")
-      Seq(UpgradeReport(jobsSnapshotTarget.databaseName, jobsSnapshotTarget.name, Some("SUCCESS"))).toDS()
+      Seq(
+        UpgradeReport(jobsSnapshotTarget.databaseName, jobsSnapshotTarget.name, Some("SUCCESS"))
+      ).toDS()
     }
 
     } catch {

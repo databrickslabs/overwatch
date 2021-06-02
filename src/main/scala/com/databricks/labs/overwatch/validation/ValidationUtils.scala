@@ -324,11 +324,12 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     )
     logger.log(Level.INFO, s"snappedPrimordialTimeDateString: ${snappedPrimordialTime.asTSString}")
 
-    val lookupPipelineMaxUntil = Pipeline.createTimeDetail(
-      pipeline.getPipelineState.values.toArray
-        .filter(_.moduleID >= 2000)
-        .maxBy(_.untilTS).untilTS
-    )
+//    val lookupPipelineMaxUntil = Pipeline.createTimeDetail(
+//      pipeline.getPipelineState.values.toArray
+//        .filter(_.moduleID >= 2000)
+//        .maxBy(_.untilTS).untilTS
+//    )
+    val lookupPipelineMaxUntil = Pipeline.createTimeDetail(pipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS)
     logger.log(Level.INFO, s"lookupPipelineMaxUntil: ${lookupPipelineMaxUntil.asTSString}")
 
     val daysInScope = Duration.between(

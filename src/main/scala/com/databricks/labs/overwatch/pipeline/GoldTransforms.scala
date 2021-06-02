@@ -221,15 +221,17 @@ trait GoldTransforms extends SparkSessionWrapper {
                                        automatedDBUPrice: Double,
                                        pipelineSnapTime: TimeTypes
                                      )(clusterEventsDF: DataFrame): DataFrame = {
+    validateInstanceDetails(instanceDetails, pipelineSnapTime.asDTString)
+
     val driverNodeDetails = instanceDetails
       .select('organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil, 'API_Name.alias("driver_node_type_id_lookup"), struct(instanceDetails.columns map col: _*).alias("driverSpecs"))
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
-      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeuntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
+      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
 
     val workerNodeDetails = instanceDetails
       .select('organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil, 'API_Name.alias("node_type_id_lookup"), struct(instanceDetails.columns map col: _*).alias("workerSpecs"))
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
-      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeuntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
+      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
 
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
