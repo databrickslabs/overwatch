@@ -163,6 +163,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  protected def cleanseRawJobsSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+    val outputDF = SchemaTools.scrubSchema(df)
+
+    val changeInventory = Map[String, Column](
+      "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
+      "settings.new_cluster.spark_conf" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_conf"),
+      "settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_env_vars"),
+      s"settings.new_cluster.${cloudProvider}_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.${cloudProvider}_attributes"),
+      "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
+    )
+
+    outputDF.select(SchemaTools.modifyStruct(outputDF.schema, changeInventory): _*)
+  }
+
   protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
     val outputDF = SchemaTools.scrubSchema(df)
 
