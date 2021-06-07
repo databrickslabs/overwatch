@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.utils.{Config, Layer, OverwatchScope}
 import org.apache.log4j.Logger
 
 class Silver(_workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config, Layer.silver)
+  extends Pipeline(_workspace, _database, _config)
     with SilverTransforms {
 
   /**
@@ -122,7 +122,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   //    Module(2004, "SPARK_Applications_Raw")
   //  )
 
-  lazy private[overwatch] val executionsModule = Module(2005, "Silver_SPARK_Executions", this, Array(1006))
+  lazy private[overwatch] val executionsModule = Module(2005, "Silver_SPARK_Executions", this, Array(1006), 8.0)
   lazy private val appendExecutionsProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(executionsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
@@ -130,7 +130,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.executionsTarget)
   )
 
-  lazy private[overwatch] val sparkJobsModule = Module(2006, "Silver_SPARK_Jobs", this, Array(1006))
+  lazy private[overwatch] val sparkJobsModule = Module(2006, "Silver_SPARK_Jobs", this, Array(1006), 8.0)
   lazy private val appendSparkJobsProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(sparkJobsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
@@ -138,7 +138,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.jobsTarget)
   )
 
-  lazy private[overwatch] val sparkStagesModule = Module(2007, "Silver_SPARK_Stages", this, Array(1006))
+  lazy private[overwatch] val sparkStagesModule = Module(2007, "Silver_SPARK_Stages", this, Array(1006), 8.0)
   lazy private val appendSparkStagesProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(sparkStagesModule, 2, "fileCreateDate", "fileCreateEpochMS"),
@@ -146,7 +146,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.stagesTarget)
   )
 
-  lazy private[overwatch] val sparkTasksModule = Module(2008, "Silver_SPARK_Tasks", this, Array(1006))
+  lazy private[overwatch] val sparkTasksModule = Module(2008, "Silver_SPARK_Tasks", this, Array(1006), 8.0)
   lazy private val appendSparkTasksProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget
       .asIncrementalDF(sparkTasksModule, 2, "fileCreateDate", "fileCreateEpochMS"),

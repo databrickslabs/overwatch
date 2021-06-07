@@ -61,6 +61,20 @@ object PipelineFunctions {
 
   def getSourceDFParts(df: DataFrame): Int = if (!df.isStreaming) df.rdd.partitions.length else 200
 
+  def scaleCluster(pipeline: Pipeline, scaleCoefficient: Double): Unit = {
+    // TODO -- parameterize max cores
+    val maxCoreCount = 512
+    val nodeCountUpperBound = Math.floor(maxCoreCount / pipeline.getCoresPerWorker).toInt
+    val newNodeCount = Math.min(Math.max(1, Math.ceil(pipeline.config.initialWorkerCount * scaleCoefficient).toInt), nodeCountUpperBound)
+    if (newNodeCount != pipeline.getNumberOfWorkerNodes) {
+      logger.log(Level.INFO, s"Cluster Scaling: Max Core Count set to $maxCoreCount")
+      logger.log(Level.INFO, s"Cluster Scaling: Max Nodes --> $nodeCountUpperBound")
+      logger.log(Level.INFO, s"Cluster Scaling: New Target Node Count --> $newNodeCount")
+      pipeline.workspace.resizeCluster(pipeline.config.apiEnv, newNodeCount)
+    }
+
+  }
+
   def optimizeWritePartitions(
                                df: DataFrame,
                                target: PipelineTable,

@@ -413,6 +413,7 @@ object Initializer extends SparkSessionWrapper {
     }
     config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
+    config.setInitialWorkerCount(getNumberOfWorkerNodes)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
     if (debugFlag) {
       envInit("DEBUG")

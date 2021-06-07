@@ -13,6 +13,7 @@ class Module(
               val moduleName: String,
               private[overwatch] val pipeline: Pipeline,
               val moduleDependencies: Array[Int],
+              val clusterScaleCoefficient: Double,
               hardLimitMaxHistory: Option[Int]
             ) {
 
@@ -32,7 +33,7 @@ class Module(
             _pipeline: Pipeline = pipeline,
             _moduleDependencies: Array[Int] = moduleDependencies,
             _hardLimitMaxHistory: Option[Int] = hardLimitMaxHistory): Module = {
-    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies, _hardLimitMaxHistory)
+    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies, clusterScaleCoefficient, _hardLimitMaxHistory)
   }
 
   private[overwatch] def moduleState: SimplifiedModuleStatusReport = {
@@ -286,6 +287,7 @@ class Module(
     logger.log(Level.INFO, debugMsg)
     try {
       validatePipelineState()
+      PipelineFunctions.scaleCluster(pipeline, clusterScaleCoefficient)
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
       val etlDefinition = _etlDefinition.copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
@@ -321,6 +323,7 @@ object Module {
             moduleName: String,
             pipeline: Pipeline,
             moduleDependencies: Array[Int] = Array(),
+            clusterScaleUpPercent: Double = 1.0,
             hardLimitMaxHistory: Option[Int] = None
            ): Module = {
 
@@ -329,6 +332,7 @@ object Module {
       moduleName,
       pipeline,
       moduleDependencies,
+      clusterScaleUpPercent,
       hardLimitMaxHistory
     )
   }

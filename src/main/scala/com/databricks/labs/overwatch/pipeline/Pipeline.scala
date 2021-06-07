@@ -2,7 +2,6 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
-import com.databricks.labs.overwatch.utils.Layer.Layer
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -18,8 +17,7 @@ import java.util.Date
 class Pipeline(
                 _workspace: Workspace,
                 final val database: Database,
-                _config: Config,
-                final val layer: Layer
+                _config: Config
               ) extends PipelineTargets(_config) with SparkSessionWrapper {
 
   // TODO -- Validate Targets (unique table names, ModuleIDs and names, etc)
@@ -273,7 +271,7 @@ class Pipeline(
 
   private[overwatch] def initiatePostProcessing(): Unit = {
 
-    postProcessor.optimize()
+    postProcessor.optimize(this, 12)
     Helpers.fastrm(Array(
       "/tmp/overwatch/bronze/clusterEventsBatches"
     ))
@@ -395,9 +393,9 @@ object Pipeline {
     )
   }
 
-  def apply(workspace: Workspace, database: Database, config: Config, layer: Layer): Pipeline = {
+  def apply(workspace: Workspace, database: Database, config: Config): Pipeline = {
 
-    new Pipeline(workspace, database, config, layer)
+    new Pipeline(workspace, database, config)
       .initPipelineRun()
       .loadStaticDatasets()
 

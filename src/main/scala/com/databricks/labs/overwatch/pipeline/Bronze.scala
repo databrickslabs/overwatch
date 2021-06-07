@@ -6,7 +6,7 @@ import org.apache.log4j.{Level, Logger}
 
 
 class Bronze(_workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config, Layer.bronze)
+  extends Pipeline(_workspace, _database, _config)
     with BronzeTransforms {
 
   /**
@@ -64,7 +64,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.auditLogsTarget)
   )
 
-  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), Some(30))
+  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), 0.0, Some(30))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
     prepClusterEventLogs(
       BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
@@ -77,7 +77,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clusterEventsTarget)
   )
 
-  lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
+  lazy private val sparkLogClusterScaleCoefficient = 6.0
+  lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004), sparkLogClusterScaleCoefficient)
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),
     Seq(
@@ -85,7 +86,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         sparkEventLogsModule.fromTime,
         sparkEventLogsModule.untilTime,
         BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols, 30),
-        BronzeTargets.clustersSnapshotTarget
+        BronzeTargets.clustersSnapshotTarget,
+        sparkLogClusterScaleCoefficient
       ),
       generateEventLogsDF(
         database,

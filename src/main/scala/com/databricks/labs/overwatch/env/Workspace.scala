@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.ApiCall
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{ApiEnv, Config, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -118,6 +118,16 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {
+    val endpoint = "clusters/resize"
+    val query = Map(
+      "cluster_id" -> spark.conf.get("spark.databricks.clusterUsageTags.clusterId"),
+      "num_workers" -> numWorkers
+    )
+
+    ApiCall(endpoint, apiEnv, Some(query)).executePost()
   }
 
 }

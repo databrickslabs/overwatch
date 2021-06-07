@@ -29,6 +29,7 @@ class Config() {
   private var _badRecordsPath: String = _
   private var _primordialDateString: Option[String] = None
   private var _maxDays: Int = 60
+  private var _initialWorkerCount: Int = _
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
@@ -57,6 +58,8 @@ class Config() {
   def initialShuffleParts: Int = _intialShuffleParts
 
   def maxDays: Int = _maxDays
+
+  def initialWorkerCount: Int = _initialWorkerCount
 
   def databaseName: String = _databaseName
 
@@ -163,6 +166,11 @@ class Config() {
 
   private[overwatch] def setMaxDays(value: Int): this.type = {
     _maxDays = value
+    this
+  }
+
+  private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
+    _initialWorkerCount = value
     this
   }
 

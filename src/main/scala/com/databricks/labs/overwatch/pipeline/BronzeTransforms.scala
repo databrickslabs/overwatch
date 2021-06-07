@@ -628,13 +628,18 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
                                       historicalAuditLookupDF: DataFrame,
-                                      clusterSnapshot: PipelineTable
+                                      clusterSnapshot: PipelineTable,
+                                      sparkLogClusterScaleCoefficient: Double
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
 
-    val coreCount = getTotalCores
+    /**
+     * Multiplying current totalCores by scaleCoeff because the cluster will not have scaled up by the time this
+     * variable is set, thus this must account for the impending scale up event by scaleCoeff
+     */
+    val coreCount = (getTotalCores * sparkLogClusterScaleCoefficient).toInt
     val fromTimeEpochMillis = fromTime.asUnixTimeMilli
     val untilTimeEpochMillis = untilTime.asUnixTimeMilli
     val fromDate = fromTime.asLocalDateTime.toLocalDate
