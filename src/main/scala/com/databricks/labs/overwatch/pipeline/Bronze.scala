@@ -77,7 +77,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clusterEventsTarget)
   )
 
-  lazy private val sparkLogClusterScaleCoefficient = 6.0
+  lazy private val sparkLogClusterScaleCoefficient = 4.0
   lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004), sparkLogClusterScaleCoefficient)
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),

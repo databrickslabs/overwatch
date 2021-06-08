@@ -35,8 +35,11 @@ class Config() {
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
   private var _initialSparkConf: Map[String, String] = Map()
   private var _intialShuffleParts: Int = 200
-  private var _contractInteractiveDBUPrice: Double = 0.56
-  private var _contractAutomatedDBUPrice: Double = 0.26
+  private var _contractInteractiveDBUPrice: Double = _
+  private var _contractAutomatedDBUPrice: Double = _
+  private var _contractSQLComputeDBUPrice: Double = _
+  private var _contractJobsLightDBUPrice: Double = _
+
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   /**
@@ -86,8 +89,9 @@ class Config() {
   def runID: String = _runID
 
   def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
-
   def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
+  def contractSQLComputeDBUPrice: Double = _contractSQLComputeDBUPrice
+  def contractJobsLightDBUPrice: Double = _contractJobsLightDBUPrice
 
   def primordialDateString: Option[String] = _primordialDateString
 
@@ -212,6 +216,16 @@ class Config() {
   }
 
   private[overwatch] def setContractAutomatedDBUPrice(value: Double): this.type = {
+    _contractAutomatedDBUPrice = value
+    this
+  }
+
+  private[overwatch] def setContractSQLComputeDBUPrice(value: Double): this.type = {
+    _contractAutomatedDBUPrice = value
+    this
+  }
+
+  private[overwatch] def setContractJobsLightDBUPrice(value: Double): this.type = {
     _contractAutomatedDBUPrice = value
     this
   }

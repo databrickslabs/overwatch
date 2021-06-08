@@ -115,8 +115,7 @@ abstract class PipelineTargets(config: Config) {
       name = "instanceDetails",
       _keys = Array("API_Name"),
       config,
-      withOverwatchRunID = false,
-      withCreateDate = false,
+      incrementalColumns = Array("Pipeline_SnapTS"),
       partitionBy = Seq("organization_id")
     )
 

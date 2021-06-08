@@ -232,7 +232,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     val workerNodeDetails = instanceDetails
       .select('organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil,
         'API_Name.alias("node_type_id_lookup"),
-        'automatedDBUPrice, 'interactiveDBUPrice,
+        'automatedDBUPrice, 'interactiveDBUPrice, 'sqlComputeDBUPrice, 'jobsLightDBUPrice,
         struct(instanceDetails.columns map col: _*).alias("workerSpecs")
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
@@ -271,11 +271,11 @@ trait GoldTransforms extends SparkSessionWrapper {
     )
 
     val nodeTypeLookup = clusterSpec.asDF
-      .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id)
+      .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
 
     val nodeTypeLookup2 = clusterSnapshot.asDF
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
-      .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id)
+      .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
 
     val clusterPotential = clusterEventsBaseline
       .toTSDF("timestamp", "organization_id", "cluster_id")
@@ -339,6 +339,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       ))
       .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
       .withColumn("isAutomated", isAutomated('cluster_name))
+      // TODO -- add additional skus
       .withColumn("dbu_rate", when('isAutomated, 'automatedDBUPrice).otherwise('interactiveDBUPrice))
       .withColumn("days_in_state", size(sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date"))))
       .withColumn("worker_potential_core_H", 'worker_potential_core_S / lit(3600))
@@ -351,6 +352,11 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
       .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
       .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
+
+    // TODO - finish this logic for pricing compute by sku for a final dbuRate
+//    val derivedDBURate = when('isAutomated && 'spark_version.like("apache-spark-%"), 'jobsLightDBUPrice)
+//      .when('isAutomated && !'spark_version.like("apache-spark-%"), 'automatedDBUPrice)
+
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
@@ -396,9 +402,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected def buildJobRunCostPotentialFact(
                                               clusterStateFact: DataFrame,
                                               incrementalSparkJob: DataFrame,
-                                              incrementalSparkTask: DataFrame,
-                                              interactiveDBUPrice: Double,
-                                              automatedDBUPrice: Double
+                                              incrementalSparkTask: DataFrame
                                             )(newTerminatedJobRuns: DataFrame): DataFrame = {
 
     if (clusterStateFact.isEmpty) {
@@ -413,7 +417,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       val lookupCols: Array[Column] = Array(
         'cluster_name, 'custom_tags, 'unixTimeMS_state_start, 'unixTimeMS_state_end, 'timestamp_state_start,
         'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
-        lit(interactiveDBUPrice).alias("interactiveDBUPrice"), lit(automatedDBUPrice).alias("automatedDBUPrice"),
+//        lit(interactiveDBUPrice).alias("interactiveDBUPrice"), lit(automatedDBUPrice).alias("automatedDBUPrice"),
         $"driverSpecs.API_name".alias("driver_node_type_id"),
         $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
         $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
@@ -569,13 +573,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       val runStateWithUtilizationAndCosts = jobRunByClusterState
         .join(cumulativeRunStateRunTimeByRunState, Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start", "unixTimeMS_state_end"), "left")
         .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
-        .withColumn("dbu_rate", when('cluster_type === "automated", 'automatedDBUPrice).otherwise('interactiveDBUPrice))
+//        .withColumn("dbu_rate", when('cluster_type === "automated", 'automatedDBUPrice).otherwise('interactiveDBUPrice)) // removed 4.2
         .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time
         .withColumn("run_state_utilization",
           when('cluster_type === "interactive", least('runtime_in_cluster_state / 'cum_runtime_in_cluster_state, lit(1.0)))
             .otherwise(lit(1.0))
         ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
-        .withColumn("overlapping_run_states", when('cluster_type === "automated", lit(0)).otherwise('overlapping_run_states))
+        .withColumn("overlapping_run_states", when('cluster_type === "interactive", 'overlapping_run_states).otherwise(lit(0)))
+//        .withColumn("overlapping_run_states", when('cluster_type === "automated", lit(0)).otherwise('overlapping_run_states)) // removed 4.2
         .withColumn("running_days", sequence($"job_runtime.startTS".cast("date"), $"job_runtime.endTS".cast("date")))
         .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
         .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'state_utilization_percent * 'run_state_utilization)

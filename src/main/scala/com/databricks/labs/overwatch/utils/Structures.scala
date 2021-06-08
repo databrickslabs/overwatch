@@ -25,7 +25,12 @@ case class TokenSecret(scope: String, key: String)
 case class DataTarget(databaseName: Option[String], databaseLocation: Option[String], etlDataPathPrefix: Option[String],
                       consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
 
-case class DatabricksContractPrices(interactiveDBUCostUSD: Double, automatedDBUCostUSD: Double)
+case class DatabricksContractPrices(
+                                     interactiveDBUCostUSD: Double,
+                                     automatedDBUCostUSD: Double,
+                                     sqlComputeDBUCostUSD: Double,
+                                     jobsLightDBUCostUSD: Double
+                                   )
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String)
 
@@ -67,7 +72,7 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            badRecordsPath: Option[String] = None,
                            overwatchScope: Option[Seq[String]] = None,
                            maxDaysToLoad: Int = 60,
-                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(0.56, 0.26),
+                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(0.55, 0.15, 0.22, 0.1),
                            primordialDateString: Option[String] = None
                           )
 

@@ -142,9 +142,12 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
 
     val maxDaysToLoad = getOptionInt(masterNode, "maxDaysToLoad").getOrElse(60)
 
+    // Defaulted to list pricing as of June 07 2021
     val dbContractPrices = DatabricksContractPrices(
-      getOptionDouble(masterNode, "databricksContractPrices.interactiveDBUCostUSD").getOrElse(0.56),
-      getOptionDouble(masterNode, "databricksContractPrices.automatedDBUCostUSD").getOrElse(0.26)
+      getOptionDouble(masterNode, "databricksContractPrices.interactiveDBUCostUSD").getOrElse(0.55),
+      getOptionDouble(masterNode, "databricksContractPrices.automatedDBUCostUSD").getOrElse(0.15),
+      getOptionDouble(masterNode, "databricksContractPrices.sqlComputeDBUCostUSD").getOrElse(0.22),
+      getOptionDouble(masterNode, "databricksContractPrices.jobsLightDBUCostUSD").getOrElse(0.10),
     )
 
     val primordialDateString = getOptionString(masterNode, "primordialDateString")

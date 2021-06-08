@@ -19,7 +19,7 @@ class ParamDeserializerTest extends AnyFunSpec {
         |"badRecordsPath":"/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords",
         |"overwatchScope":["audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools"],
         |"maxDaysToLoad":60,
-        |"databricksContractPrices":{"interactiveDBUCostUSD":0.56,"automatedDBUCostUSD":0.26}}
+        |"databricksContractPrices":{"interactiveDBUCostUSD":0.55,"automatedDBUCostUSD":0.15, "sqlComputeDBUCostUSD":0.22, "jobsLightDBUCostUSD":0.1}}
         |""".stripMargin
 
       val paramModule: SimpleModule = new SimpleModule()
@@ -43,7 +43,7 @@ class ParamDeserializerTest extends AnyFunSpec {
         Some("/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords"),
         Some(Seq("audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools")),
         60,
-        DatabricksContractPrices(0.56, 0.26),
+        DatabricksContractPrices(0.55, 0.15, 0.22, 0.1),
         None
       )
       assertResult(expected)(mapper.readValue[OverwatchParams](incomplete))

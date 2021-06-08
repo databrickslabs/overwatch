@@ -107,6 +107,12 @@ object Upgrade extends SparkSessionWrapper {
 
   }
 
+  def upgrade042(workspace: Workspace): Dataset[UpgradeReport] = ???
+
+    // call previous upgrades if not coming from 0412
+    // upgrade schema for jrcp_gold
+    // drop instanceDetails
+
   // Placeholder for schema upgrade logic
 
 }

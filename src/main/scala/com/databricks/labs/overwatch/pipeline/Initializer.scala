@@ -220,9 +220,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
 
     // Set Databricks Contract Prices from Config
-    // Defaulted to 0.56 interactive and 0.26 automated
     config.setContractInteractiveDBUPrice(rawParams.databricksContractPrices.interactiveDBUCostUSD)
     config.setContractAutomatedDBUPrice(rawParams.databricksContractPrices.automatedDBUCostUSD)
+    config.setContractSQLComputeDBUPrice(rawParams.databricksContractPrices.sqlComputeDBUCostUSD)
+    config.setContractJobsLightDBUPrice(rawParams.databricksContractPrices.jobsLightDBUCostUSD)
 
     // Set Primordial Date
     config.setPrimordialDateString(rawParams.primordialDateString)

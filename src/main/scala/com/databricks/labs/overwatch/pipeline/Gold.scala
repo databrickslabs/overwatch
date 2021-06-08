@@ -85,8 +85,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       buildJobRunCostPotentialFact(
         GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 90, "unixTimeMS_state_start"),
         GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
-        GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
-        config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
+        GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date")
       )),
     append(GoldTargets.jobRunCostPotentialFactTarget)
   )

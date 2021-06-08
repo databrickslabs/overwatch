@@ -3,10 +3,11 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
 import com.databricks.labs.overwatch.utils._
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{from_unixtime, lit, log, rank, row_number}
+import org.apache.spark.sql.functions._
 
 //import io.delta.tables._
 
@@ -118,6 +119,80 @@ class Pipeline(
   }
 
   /**
+   * If latest, active records contain a DBU contract price that differs from those found in the config, return
+   * true, otherwise return false
+   * @param lastRunPricing instanceDetails dataframe with rnk column
+   * @return
+   */
+  private def dbuContractPriceChange(lastRunPricing: DataFrame): Boolean = {
+
+    lastRunPricing
+      .filter('rnk === 1 && 'activeUntil.isNull) // most recent, active records
+      .filter(
+        'interactiveDBUPrice === config.contractInteractiveDBUPrice &&
+          'automatedDBUPrice === config.contractAutomatedDBUPrice &&
+          'sqlComputeDBUPrice === config.contractSQLComputeDBUPrice &&
+          'jobsLightDBUPrice === config.contractJobsLightDBUPrice
+      )
+      .isEmpty
+
+  }
+
+  /**
+   * Check for changes between last instance details contract DBU Prices and configured prices from Overwatch
+   * config. If changes are detected, rebuild the slow-changing dim appropriately.
+   * @param cloudDetailTarget PipelineTable for instanceDetails
+   */
+  private def updateDBUContractPricing(cloudDetailTarget: PipelineTable): Unit = {
+    val lastRunDBUPriceW = Window.partitionBy('API_Name).orderBy('Pipeline_SnapTS.desc)
+    val lastRunPricing = cloudDetailTarget.asDF()
+      .withColumn("rnk", rank().over(lastRunDBUPriceW))
+
+    if (dbuContractPriceChange(lastRunPricing)) {
+      val msg = "DBU Pricing differences detected in config. Updating prices."
+      logger.log(Level.INFO, msg)
+      if (config.debugFlag) println(msg)
+
+      // All active records with new DBU pricing
+      val newDBUPriceRecords = lastRunPricing
+        .filter('rnk === 1 && 'activeUntil.isNull)
+        .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
+        .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
+        .withColumn("sqlComputeDBUPrice", lit(config.contractSQLComputeDBUPrice))
+        .withColumn("jobsLightDBUPrice", lit(config.contractJobsLightDBUPrice))
+        .withColumn("activeFrom", lit(pipelineSnapTime.asDTString).cast("date"))
+        .withColumn("activeUntil", lit(null).cast("date"))
+        .withColumn("Pipeline_SnapTS", lit(pipelineSnapTime.asColumnTS))
+        .withColumn("Overwatch_RunID", lit(config.runID))
+
+      // All originally active records with expiration date of yesterday
+      val expiredRecords = lastRunPricing
+        .filter('rnk === 1)
+        .withColumn("activeUntil",
+          when('activeUntil.isNull, date_sub(lit(pipelineSnapTime.asDTString).cast("date"), 1))
+            .otherwise('activeUntil)
+        )
+
+      // New pricing records ++ expired pricing records ++ historical records
+      val newCloudDetailsDF = newDBUPriceRecords
+        .unionByName(expiredRecords)
+        .unionByName(lastRunPricing.filter('rnk > 1))
+        .drop("rnk")
+        .repartition(4)
+
+      // overwrite the target and preserve original Overwatch metadata
+      val overwriteTarget = cloudDetailTarget.copy(
+        withOverwatchRunID = false,
+        withCreateDate = false,
+        mode = "overwrite"
+      )
+      database.write(newCloudDetailsDF, overwriteTarget, lit(null))
+
+    }
+
+  }
+
+  /**
    * Ensure all static datasets exist in the newly initialized Database. This function must be called after
    * the database has been initialized.
    *
@@ -141,12 +216,16 @@ class Pipeline(
         .withColumn("organization_id", lit(config.organizationId))
         .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
+        .withColumn("sqlComputeDBUPrice", lit(config.contractSQLComputeDBUPrice))
+        .withColumn("jobsLightDBUPrice", lit(config.contractJobsLightDBUPrice))
         .withColumn("activeFrom", lit(primordialTime.asDTString).cast("date"))
         .withColumn("activeUntil", lit(null).cast("date"))
         .coalesce(1)
 
       database.write(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
       if (config.databaseName != config.consumerDatabaseName) BronzeTargets.cloudMachineDetailViewTarget.publish("*")
+    } else {
+      updateDBUContractPricing(BronzeTargets.cloudMachineDetail)
     }
     this
   }
