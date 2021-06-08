@@ -101,7 +101,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
-    val isFirstAuditRun = BronzeTargets.auditLogsTarget.exists
+
+    val isFirstAuditRun = !BronzeTargets.auditLogsTarget.exists
     val rawAzureAuditEvents = landAzureAuditLogDF(
       config.auditLogConfig.azureAuditLogEventhubConfig.get,
       config.etlDataPathPrefix, config.databaseLocation, config.consumerDatabaseLocation,

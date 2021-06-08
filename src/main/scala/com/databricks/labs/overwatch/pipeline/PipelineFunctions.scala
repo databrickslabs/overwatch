@@ -11,6 +11,8 @@ import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  private val uriSchemeRegex = "^([a-zA-Z][-.+a-zA-Z0-9]*):/.*".r
+
   /**
    * Ensure no duplicate slashes in path and default to dbfs:/ URI prefix where no uri specified to result in
    * fully qualified URI for db location
@@ -18,11 +20,17 @@ object PipelineFunctions {
    * @return
    */
   def cleansePathURI(rawPathString: String): String = {
-    if (rawPathString.replaceAllLiterally("//", "/").split("/")(0).isEmpty) {
-      s"dbfs:${rawPathString}"
-    } else {
-      rawPathString
-    }.replaceAllLiterally("//", "/")
+    uriSchemeRegex.findFirstMatchIn(rawPathString) match {
+      case Some(i) =>
+        val schema = i.group(1).toLowerCase
+        if (schema == "dbfs") {
+          rawPathString.replaceAllLiterally("//", "/")
+        } else {
+          rawPathString
+        }
+      case None =>
+        "dbfs:%s".format(rawPathString.replaceAllLiterally("//", "/"))
+    }
   }
 
   def addNTicks(ts: Column, n:Int, dt: DataType = TimestampType): Column = {

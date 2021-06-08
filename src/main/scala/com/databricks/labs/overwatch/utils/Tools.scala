@@ -15,6 +15,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.util.SerializableConfiguration
 
 import java.net.URI
 import javax.crypto
@@ -589,10 +590,10 @@ object Helpers extends SparkSessionWrapper {
    * @param path
    * @return
    */
-  def pathExists(path: String): Boolean = {
-    val conf = new Configuration()
-    val fs = new Path(path).getFileSystem(conf)
-    fs.exists(new Path(path))
+  def pathExists(name: String): Boolean = {
+    val path = new Path(name)
+    val fs = path.getFileSystem(spark.sparkContext.hadoopConfiguration)
+    fs.exists(path)
   }
 
   /**
@@ -603,8 +604,7 @@ object Helpers extends SparkSessionWrapper {
    */
   def parListFiles(path: String): Array[String] = {
     try {
-      val conf = new Configuration()
-      val fs = new Path(path).getFileSystem(conf)
+      val fs = new Path(path).getFileSystem(spark.sparkContext.hadoopConfiguration)
       fs.listStatus(new Path(path)).map(_.getPath.toString)
     } catch {
       case _: Throwable => Array(path)
@@ -633,8 +633,16 @@ object Helpers extends SparkSessionWrapper {
                                  )
 
   def globPath(path: String, fromEpochMillis: Option[Long] = None, untilEpochMillis: Option[Long] = None): Array[PathStringFileStatus] = {
+    globPath(path, spark.sparkContext.hadoopConfiguration, fromEpochMillis, untilEpochMillis)
+  }
+
+  def globPath(path: String, conf: SerializableConfiguration, fromEpochMillis: Option[Long],
+               untilEpochMillis: Option[Long]): Array[PathStringFileStatus] = {
+    globPath(path, conf.value, fromEpochMillis, untilEpochMillis)
+  }
+
+  def globPath(path: String, conf: Configuration, fromEpochMillis: Option[Long], untilEpochMillis: Option[Long]): Array[PathStringFileStatus] = {
     logger.log(Level.DEBUG, s"PATH PREFIX: $path")
-    val conf = new Configuration()
     try {
       val fs = new Path(path).getFileSystem(conf)
       val paths = fs.globStatus(new Path(path))
@@ -842,19 +850,24 @@ object Helpers extends SparkSessionWrapper {
    * @param file
    */
   private def rmSer(file: String): Unit = {
-    val conf = new Configuration()
-    //    val fsPrefix = file.replaceAllLiterally("//", "/").split("/")(0)
-    //    val fsType = if (fsPrefix.isEmpty) "dbfs:/" else s"${fsPrefix}/"
+    rmSer(file, spark.sparkContext.hadoopConfiguration)
+  }
+
+  private def rmSer(file: String, conf: SerializableConfiguration): Unit = {
+    rmSer(file, conf.value)
+  }
+
+  private def rmSer(file: String, conf: Configuration): Unit = {
     val fsURI = getURI(file)
     val fs = FileSystem.get(fsURI, conf)
     try {
       fs.delete(new Path(file), true)
     } catch {
-      case e: Throwable => {
+      case e: Throwable =>
         logger.log(Level.ERROR, s"ERROR: Could not delete file $file, skipping", e)
-      }
     }
   }
+
 
   /**
    * SERIALIZABLE drop function
@@ -865,20 +878,20 @@ object Helpers extends SparkSessionWrapper {
    *                 globs will be dropped in parallel
    */
   private[overwatch] def fastrm(topPaths: Array[String]): Unit = {
+    val conf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
     topPaths.map(p => {
       if (p.reverse.head.toString == "/") s"${p}*" else s"${p}/*"
     }).toSeq.toDF("pathsToDrop")
       .as[String]
-      .map(p => Helpers.globPath(p))
+      .map(p => Helpers.globPath(p, conf, None, None))
       .select(explode('value).alias("pathsToDrop"))
       .select($"pathsToDrop.pathString")
       .as[String]
-      .foreach(f => rmSer(f))
+      .foreach(f => rmSer(f, conf))
 
-    val conf = new Configuration()
     topPaths.foreach(dir => {
       val fsURI = getURI(dir)
-      val fs = FileSystem.get(fsURI, conf)
+      val fs = FileSystem.get(fsURI, conf.value)
       fs.delete(new Path(dir), true)
     })
   }
