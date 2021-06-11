@@ -126,7 +126,7 @@ class Pipeline(
    */
   private def dbuContractPriceChange(lastRunPricing: DataFrame): Boolean = {
 
-    lastRunPricing
+    !lastRunPricing
       .filter('rnk === 1 && 'activeUntil.isNull) // most recent, active records
       .filter(
         'interactiveDBUPrice === config.contractInteractiveDBUPrice &&
@@ -169,7 +169,7 @@ class Pipeline(
       val expiredRecords = lastRunPricing
         .filter('rnk === 1)
         .withColumn("activeUntil",
-          when('activeUntil.isNull, date_sub(lit(pipelineSnapTime.asDTString).cast("date"), 1))
+          when('activeUntil.isNull, lit(pipelineSnapTime.asDTString).cast("date"))
             .otherwise('activeUntil)
         )
 
@@ -187,7 +187,6 @@ class Pipeline(
         mode = "overwrite"
       )
       database.write(newCloudDetailsDF, overwriteTarget, lit(null))
-
     }
 
   }
