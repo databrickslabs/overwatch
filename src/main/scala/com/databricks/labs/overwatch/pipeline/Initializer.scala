@@ -137,10 +137,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
    *
-   * @param args JSON string of input args from input into main class.
+   * @param overwatchArgs JSON string of input args from input into main class.
    * @return
    */
-  private def validateAndRegisterArgs(args: Array[String]): this.type = {
+  private def validateAndRegisterArgs(overwatchArgs: String): this.type = {
 
     /**
      * Register custom deserializer to create OverwatchParams object
@@ -165,10 +165,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       //      config.buildLocalOverwatchParams()
 //      val synthArgs = config.buildLocalOverwatchParams()
 //      mapper.readValue[OverwatchParams](synthArgs)
-      mapper.readValue[OverwatchParams](args(0))
+      mapper.readValue[OverwatchParams](overwatchArgs)
     } else {
       logger.log(Level.INFO, "Validating Input Parameters")
-      mapper.readValue[OverwatchParams](args(0))
+      mapper.readValue[OverwatchParams](overwatchArgs)
     }
 
     // Now that the input parameters have been parsed -- set them in the config
@@ -430,7 +430,7 @@ object Initializer extends SparkSessionWrapper {
    * and checks for avoidable issues. The initializer is also responsible for identifying any errors in the
    * configuration that can be identified before the runs begins to enable fail fast.
    *
-   * @param args      Json string of args -- When passing into args in Databricks job UI, the json string must
+   * @param overwatchArgs      Json string of args -- When passing into args in Databricks job UI, the json string must
    *                  be passed in as an escaped Json String. Use JsonUtils in Tools to build and extract the string
    *                  to be used here.
    * @param debugFlag manual Boolean setter to enable the debug flag. This is different than the log4j DEBUG Level
@@ -438,14 +438,14 @@ object Initializer extends SparkSessionWrapper {
    *                  is more robust output when debug is enabled.
    * @return
    */
-  def apply(args: Array[String], debugFlag: Boolean = false): Workspace = {
+  def apply(overwatchArgs: String, debugFlag: Boolean = false): Workspace = {
 
     val config = initConfigState(debugFlag)
 
     logger.log(Level.INFO, "Initializing Environment")
     val initializer = new Initializer(config)
     val database = initializer
-      .validateAndRegisterArgs(args)
+      .validateAndRegisterArgs(overwatchArgs)
       .initializeDatabase()
 
     logger.log(Level.INFO, "Initializing Workspace")
@@ -455,7 +455,7 @@ object Initializer extends SparkSessionWrapper {
     workspace
   }
 
-  private[overwatch] def apply(args: Array[String], debugFlag: Boolean, isSnap: Boolean): Workspace = {
+  private[overwatch] def apply(overwatchArgs: String, debugFlag: Boolean, isSnap: Boolean): Workspace = {
 
     val config = initConfigState(debugFlag)
 
@@ -463,7 +463,7 @@ object Initializer extends SparkSessionWrapper {
     val initializer = new Initializer(config)
     val database = initializer
       .setIsSnap(isSnap)
-      .validateAndRegisterArgs(args)
+      .validateAndRegisterArgs(overwatchArgs)
       .initializeDatabase()
 
     logger.log(Level.INFO, "Initializing Workspace")
