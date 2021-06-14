@@ -16,8 +16,8 @@ libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provid
 libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 
-libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.18" % Provided
-libraryDependencies += "com.databricks.labs" %% "dataframe-rules-engine" % "0.1.2" % Provided
+libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.18"
+libraryDependencies += "com.databricks.labs" %% "dataframe-rules-engine" % "0.1.2"
 
 libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.23.0" % Test
 libraryDependencies += "org.mockito" % "mockito-core" % "3.5.15" % Test
