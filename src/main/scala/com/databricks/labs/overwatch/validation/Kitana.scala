@@ -93,19 +93,6 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
   import spark.implicits._
 
-  private var isRefresh: Boolean = false
-  private var isCompleteRefresh: Boolean = false
-
-  private def setRefresh(value: Boolean): this.type = {
-    isRefresh = value
-    this
-  }
-
-  private def setCompleteRefresh(value: Boolean): this.type = {
-    isCompleteRefresh = value
-    this
-  }
-
   /**
    * Creates databases for snapshot and creates shallow clones for bronze in the snapshot database.
    * These snapshots are complete and rely on downstream filters to limit the data from the source table snap version.
@@ -114,8 +101,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    */
   def executeBronzeSnapshot(): Dataset[SnapReport] = {
 
-    val bronzeLookupPipeline = if (isRefresh) getBronzePipeline(workspace = snapWorkspace)
-    else getBronzePipeline(workspace = sourceWorkspace)
+    val bronzeLookupPipeline = getBronzePipeline(workspace = sourceWorkspace)
 
     val snapPipeline = getBronzePipeline(readOnly = false)
     val primordialDateString = bronzeLookupPipeline.config.primordialDateString.get
@@ -126,7 +112,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 //    val untilTime = Pipeline.createTimeDetail(bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
 
 
-    validateSnapPipeline(bronzeLookupPipeline, snapPipeline, fromTime, untilTime, isRefresh)
+    validateSnapPipeline(bronzeLookupPipeline, snapPipeline, fromTime, untilTime)
 
     snapPipeline.clearPipelineState() // clears states such that module fromTimes == primordial date
 
@@ -134,9 +120,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     bronzeTargetsWModule.tasksupport = taskSupport
 
     val statefulSnapsReport = snapStateTables(snapPipeline, untilTime)
-    resetPipelineReportState(
-      snapPipeline, bronzeTargetsWModule.toArray, fromTime, untilTime, isRefresh, isCompleteRefresh
-    )
+    resetPipelineReportState(snapPipeline, bronzeTargetsWModule.toArray, fromTime, untilTime)
 
     // snapshots bronze tables, returns ds with report
     val scopeSnaps = bronzeTargetsWModule
@@ -226,7 +210,10 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
    * @return KeyReport -- results from the tests
    */
   def validateKeys(workspace: Workspace = snapWorkspace): Dataset[KeyReport] = {
-    val targetsToValidate = getAllKitanaTargets(workspace).par
+    val nonDistinctTargets = Array("audit_log_bronze", "spark_events_bronze")
+    val targetsToValidate = getAllKitanaTargets(workspace)
+      .filterNot(t => nonDistinctTargets.contains(t.name))
+      .par
     targetsToValidate.tasksupport = taskSupport
     val keyValidationMessage = s"The targets that will be validated are:\n${targetsToValidate.map(_.tableFullName).mkString(", ")}"
     if (workspace.getConfig.debugFlag || snapWorkspace.getConfig.debugFlag) println(keyValidationMessage)
@@ -259,28 +246,6 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   }
 
   /**
-   * Rebuild the bronze snapshots. User chooses whether to completely reset the snapshot database or to refresh the
-   * bronze shallow clones.
-   * @param completeRefresh A complete refresh will drop all silver and gold data and clear the pipeline state.
-   * @return
-   */
-  def refreshSnapshot(completeRefresh: Boolean = false): Dataset[SnapReport] = {
-    val sourceConfig = sourceWorkspace.getConfig // prod source
-    val sourceDBName = sourceConfig.databaseName
-    val snapDBName = snapWorkspace.getConfig.databaseName
-    require(sourceDBName != snapDBName, "The source and snapshot databases cannot be the same. This function " +
-      "will completely remove the bronze tables from the snapshot database. Be careful and ensure you have " +
-      "identified the proper snapshot database name.\nEXITING")
-
-    Kitana(snapDBName, sourceWorkspace)
-      .setRefresh(true)
-      .setCompleteRefresh(completeRefresh)
-      .executeBronzeSnapshot()
-
-
-  }
-
-  /**
    * CAUTION: Very dangerous function. Permanently deletes all tables in snapshot database. To protect user from
    * accidentally deleting data from undesired targets, an external check is made to ensure a spark config is set
    * properly to allow removal of data from target database.
@@ -294,7 +259,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 
   private def validatePartitionCols(target: PipelineTable): SchemaValidationReport = {
     try {
-      val catPartCols = target.catalogTable.partitionColumnNames.map(_.toLowerCase)
+      val catPartCols = target.catalogTable.partitionColumnNames
       val msg = if (catPartCols == target.partitionBy) "PASS" else s"FAIL: Partition Columns do not match"
       val report = SchemaValidationReport(
         target.tableFullName,

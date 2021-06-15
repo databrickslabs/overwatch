@@ -57,7 +57,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     require(sparkCheckValue == targetDBName, s"DESTRUCTIVE MODE DISABLED: " +
       s"You selected to run a very destructive command. This is 100% ok in " +
       s"certain circumstances but to protect your data you must set the following spark conf with a value equal " +
-      s"to the name of the database to which you're point this function.\n\noverwatch.permit.db.destruction = $targetDBName")
+      s"to the name of the database to which you're point this function. \"overwatch.permit.db.destruction=$targetDBName\"")
   }
 
   protected def getDateFormat(dtFormatString: Option[String]): SimpleDateFormat = {
@@ -81,7 +81,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
   }
 
   @throws(classOf[BadConfigException])
-  private def validateSnapDatabase(pipeline: Pipeline, isRefresh: Boolean): Unit = {
+  private def validateSnapDatabase(pipeline: Pipeline): Unit = {
     val config = pipeline.config
     val dbProperties = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName).properties
     val isVerifiedSnap = dbProperties.getOrElse("SNAPDB", "FALSE") == "TRUE"
@@ -90,10 +90,10 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
       s"processes.")
 
     if (!config.isLocalTesting) { // temp workaround for dbconnect until ES-99139 is resolved
-      if (pipeline.BronzeTargets.auditLogsTarget.exists && !isRefresh) { // snap db already exists
+      if (pipeline.BronzeTargets.auditLogsTarget.exists) { // snap db already exists
         throw new BadConfigException(s"A snapshot may only be created once and it must be created by " +
           s"the overwatch snapshot process. If you would like to create another snapshot and overwrite this one " +
-          s"please use the 'refreshSnapshot' function in the validation package.")
+          s"please use Kitana's 'fullResetSnapDB' function in the validation package.")
       }
     }
   }
@@ -103,10 +103,9 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
                                       bronzeLookupPipeline: Bronze,
                                       snapPipeline: Pipeline,
                                       snapFromTime: TimeTypes,
-                                      snapUntilTime: TimeTypes,
-                                      isRefresh: Boolean
+                                      snapUntilTime: TimeTypes
                                     ): Unit = {
-    validateSnapDatabase(snapPipeline, isRefresh)
+    validateSnapDatabase(snapPipeline)
     if (bronzeLookupPipeline.getPipelineState.isEmpty) {
       throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.", None)
     } else {
@@ -324,11 +323,11 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     )
     logger.log(Level.INFO, s"snappedPrimordialTimeDateString: ${snappedPrimordialTime.asTSString}")
 
-//    val lookupPipelineMaxUntil = Pipeline.createTimeDetail(
-//      pipeline.getPipelineState.values.toArray
-//        .filter(_.moduleID >= 2000)
-//        .maxBy(_.untilTS).untilTS
-//    )
+    //    val lookupPipelineMaxUntil = Pipeline.createTimeDetail(
+    //      pipeline.getPipelineState.values.toArray
+    //        .filter(_.moduleID >= 2000)
+    //        .maxBy(_.untilTS).untilTS
+    //    )
     val lookupPipelineMaxUntil = Pipeline.createTimeDetail(pipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS)
     logger.log(Level.INFO, s"lookupPipelineMaxUntil: ${lookupPipelineMaxUntil.asTSString}")
 
@@ -389,12 +388,8 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
                                           bronzePipeline: Bronze,
                                           moduleTargets: Array[ModuleTarget],
                                           fromTime: TimeTypes,
-                                          untilTime: TimeTypes,
-                                          isRefresh: Boolean = false,
-                                          completeRefresh: Boolean = false
+                                          untilTime: TimeTypes
                                         ): Unit = {
-    logger.log(Level.INFO, s"isRefresh = ${isRefresh.toString}")
-    logger.log(Level.INFO, s"isCompleteRefresh = ${completeRefresh.toString}")
     try {
       val pipelineStateTable = bronzePipeline.pipelineStateTarget
       val modulesToBeReset = moduleTargets.map(_.module.moduleId)
@@ -408,36 +403,25 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         .drop("rnk")
         .withColumn("primordialDateString", lit(fromTime.asDTString))
 
-      if (!isRefresh) { // is initial snap
-        updateStateTable(pipelineStateTable, fromTime.asDTString)
-      } else { // is refresh of snapshot
-        if (completeRefresh) { // Overwrite state table keeping only the latest, state for active modules
+      updateStateTable(pipelineStateTable, fromTime.asDTString)
 
-          fastDropTargets(getAllKitanaTargets(bronzePipeline.workspace).par)
-          val newStateTable = pipelineStateTable
-            .copy(mode = "overwrite", withCreateDate = false, withOverwatchRunID = false)
-          bronzePipeline.database.write(latestMatchedModules, newStateTable, bronzePipeline.pipelineSnapTime.asColumnTS)
+      // NOTE: NOT SUPPORTED via DBConnect
+      DeltaTable.forName(pipelineStateTable.tableFullName)
+        .as("target")
+        .merge(
+          latestMatchedModules.as("src"),
+          "src.Overwatch_RunID = target.Overwatch_RunID AND src.moduleID = target.moduleID"
+        )
+        .whenMatched
+        .updateExpr(Map(
+          "fromTS" -> fromTime.asUnixTimeMilli.toString,
+          "untilTS" -> untilTime.asUnixTimeMilli.toString,
+          "primordialDateString" -> s"'${fromTime.asDTString}'"
+        ))
+        .execute()
+    }
 
-        } else { // not complete refresh -- update state table for the latest run for all modules
-
-          // NOTE: NOT SUPPORTED via DBConnect
-          DeltaTable.forName(pipelineStateTable.tableFullName)
-            .as("target")
-            .merge(
-              latestMatchedModules.as("src"),
-              "src.Overwatch_RunID = target.Overwatch_RunID AND src.moduleID = target.moduleID"
-            )
-            .whenMatched
-            .updateExpr(Map(
-              "fromTS" -> fromTime.asUnixTimeMilli.toString,
-              "untilTS" -> untilTime.asUnixTimeMilli.toString,
-              "primordialDateString" -> s"'${fromTime.asDTString}'"
-            ))
-            .execute()
-        }
-      }
-
-    } catch {
+    catch {
       case e: BadConfigException if e.getMessage.contains("DESTRUCTIVE MODE DISABLED") => {
         println(e.getMessage)
         throw new BadConfigException(e.getMessage)
@@ -472,7 +456,9 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         )
       } catch {
         case e: Throwable => {
-          val errMsg = s"FAILED: ${t.tableFullName} $e.getMessage"
+          val errMsg = s"FAILED: ${
+            t.tableFullName
+          } $e.getMessage"
           logger.log(Level.ERROR, errMsg, e)
           KeyReport(
             t.tableFullName,
@@ -540,7 +526,11 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         }
       } catch {
         case e: Throwable => {
-          val msg = s"PROCESS FAIL: Table ${t.tableFullName}. ERROR: ${e.getMessage}"
+          val msg = s"PROCESS FAIL: Table ${
+            t.tableFullName
+          }. ERROR: ${
+            e.getMessage
+          }"
           logger.log(Level.ERROR, msg, e)
           val dupReport = DupReport(
             t.tableFullName,
@@ -601,15 +591,31 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     val actualCol = "assertDataFrameNoOrderEquals_actual"
 
     val keyColNames = sourceTarget.keys :+ "organization_id"
-    val validationStatus = s"VALIDATING TABLE: ${snapTarget.tableFullName}\nFROM TIME: ${module.fromTime.asTSString} " +
-      s"\nUNTIL TIME: ${module.untilTime.asTSString}\nFOR FIELDS: ${keyColNames.mkString(", ")}"
+    val validationStatus = s"VALIDATING TABLE: ${
+      snapTarget.tableFullName
+    }\nFROM TIME: ${
+      module.fromTime.asTSString
+    } " +
+      s"\nUNTIL TIME: ${
+        module.untilTime.asTSString
+      }\nFOR FIELDS: ${
+        keyColNames.mkString(", ")
+      }"
     logger.log(Level.INFO, validationStatus)
 
     val validationReport = try {
       if (expectedIsEmpty || resultIsEmpty) {
-        val msg = if (expectedIsEmpty) s"Source: ${sourceTarget.tableFullName} did not return any data "
-        else s"Validation Target: ${snapTarget.tableFullName} did not return any data "
-        val betweenMsg = s"for incrementals between ${module.fromTime.asTSString} AND ${module.untilTime.asTSString}"
+        val msg = if (expectedIsEmpty) s"Source: ${
+          sourceTarget.tableFullName
+        } did not return any data "
+        else s"Validation Target: ${
+          snapTarget.tableFullName
+        } did not return any data "
+        val betweenMsg = s"for incrementals between ${
+          module.fromTime.asTSString
+        } AND ${
+          module.untilTime.asTSString
+        }"
         throw new NoNewDataException(msg + betweenMsg, Level.ERROR)
       }
 
@@ -671,7 +677,11 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
           Some(e.getMessage)
         )
       case e: Throwable =>
-        val errMsg = s"FAILED VALIDATION RUN: ${snapTarget.tableFullName} --> ${e.getMessage}"
+        val errMsg = s"FAILED VALIDATION RUN: ${
+          snapTarget.tableFullName
+        } --> ${
+          e.getMessage
+        }"
         logger.log(Level.ERROR, errMsg, e)
         ValidationReport(
           Some(sourceTarget.tableFullName),

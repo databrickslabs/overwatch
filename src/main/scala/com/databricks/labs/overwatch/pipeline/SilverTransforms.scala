@@ -560,6 +560,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobs_statusCols: Array[Column] = Array(
       'organization_id, 'serviceName, 'actionName, 'timestamp,
       when('actionName === "create", get_json_object($"response.result", "$.job_id").cast("long"))
+        .when('actionName === "changeJobAcl", 'resourceId.cast("long"))
         .otherwise('job_id).cast("long").alias("jobId"),
       'job_type,
       'name.alias("jobName"),
@@ -579,10 +580,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobStatusBase = jobsBase
       .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
-      .withColumn("jobId",
-        when('actionName === "changeJobAcl", 'resourceId.cast("long"))
-          .otherwise('jobId.cast("long"))
-      )
       .select(jobs_statusCols: _*)
       .withColumn("existing_cluster_id", coalesce('existing_cluster_id, get_json_object('new_settings, "$.existing_cluster_id")))
       .withColumn("new_cluster",
