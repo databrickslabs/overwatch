@@ -151,6 +151,12 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     )
 
     val primordialDateString = getOptionString(masterNode, "primordialDateString")
+    val intelligentScalingConfig = IntelligentScaling(
+      getOptionBoolean(masterNode, "intelligentScaling.enabled").getOrElse(false),
+      getOptionInt(masterNode, "intelligentScaling.minimumCores").getOrElse(4),
+      getOptionInt(masterNode, "intelligentScaling.maximumCores").getOrElse(512),
+      getOptionDouble(masterNode, "intelligentScaling.coeff").getOrElse(1.0)
+    )
 
     OverwatchParams(
       auditLogConfig,
@@ -160,7 +166,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       overwatchScopes,
       maxDaysToLoad,
       dbContractPrices,
-      primordialDateString
+      primordialDateString,
+      intelligentScalingConfig
     )
   }
 }

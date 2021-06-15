@@ -61,18 +61,36 @@ object PipelineFunctions {
 
   def getSourceDFParts(df: DataFrame): Int = if (!df.isStreaming) df.rdd.partitions.length else 200
 
+  /**
+   * if intelligent scaling is enabled, cluster will scale to the best known appropriate size for the work being
+   * done. If the cluster is completing modules extremely rapidly, this could cause scaling issues and it's
+   * recommended to disable intelligent scaling; this feature is meant for large workloads.
+   *
+   * Resulting cluster size is bound by configured minimum/maximum core count allotted by user
+   * and defaulted to 4/512 respectfully if enabled. Default is disabled.
+   *
+   * new cluster scale will be minimum core count * workload scale coefficient * user specified coefficient multiplier
+   * (defaulted to 1.0).
+   *
+   * 4 core minimum * 4 workload coefficient * 1.0 user multiplier == 16 target cores. If in bounds, will set otherwise,
+   * will use maximum specified cores.
+   * @param pipeline
+   * @param scaleCoefficient
+   */
   def scaleCluster(pipeline: Pipeline, scaleCoefficient: Double): Unit = {
-    // TODO -- parameterize max cores
-    val maxCoreCount = 512
-    val nodeCountUpperBound = Math.floor(maxCoreCount / pipeline.getCoresPerWorker).toInt
-    val newNodeCount = Math.min(Math.max(1, Math.ceil(pipeline.config.initialWorkerCount * scaleCoefficient).toInt), nodeCountUpperBound)
-    if (newNodeCount != pipeline.getNumberOfWorkerNodes) {
-      logger.log(Level.INFO, s"Cluster Scaling: Max Core Count set to $maxCoreCount")
-      logger.log(Level.INFO, s"Cluster Scaling: Max Nodes --> $nodeCountUpperBound")
-      logger.log(Level.INFO, s"Cluster Scaling: New Target Node Count --> $newNodeCount")
-      pipeline.workspace.resizeCluster(pipeline.config.apiEnv, newNodeCount)
+    val maxCoreCount = pipeline.getConfig.intelligentScaling.maximumCores
+    val baseCoreCount = pipeline.getConfig.intelligentScaling.minimumCores
+    val userCoeffMultiplier = pipeline.getConfig.intelligentScaling.coeff
+    if (pipeline.getConfig.intelligentScaling.enabled) {
+      val nodeCountUpperBound = Math.floor(maxCoreCount / pipeline.getCoresPerWorker).toInt
+      val newNodeCount = Math.min(Math.max(baseCoreCount, Math.ceil(baseCoreCount * scaleCoefficient * userCoeffMultiplier).toInt), nodeCountUpperBound)
+      if (newNodeCount != pipeline.getNumberOfWorkerNodes) {
+        logger.log(Level.INFO, s"Cluster Scaling: Max Core Count set to $maxCoreCount")
+        logger.log(Level.INFO, s"Cluster Scaling: Max Nodes --> $nodeCountUpperBound")
+        logger.log(Level.INFO, s"Cluster Scaling: New Target Node Count --> $newNodeCount")
+        pipeline.workspace.resizeCluster(pipeline.config.apiEnv, newNodeCount)
+      }
     }
-
   }
 
   def optimizeWritePartitions(

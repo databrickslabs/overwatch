@@ -76,6 +76,21 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     Database(config)
   }
 
+  private def validateIntelligentScaling(intelligentScaling: IntelligentScaling): IntelligentScaling = {
+    if (intelligentScaling.enabled) {
+      if (intelligentScaling.minimumCores < 1)
+        throw new BadConfigException(s"Intelligent Scaling: Minimum cores must be > 0. Set to ${intelligentScaling.minimumCores}")
+      if (intelligentScaling.minimumCores > intelligentScaling.maximumCores)
+        throw new BadConfigException(s"Intelligent Scaling: Minimum cores must be > 0. \n" +
+          s"Minimum = ${intelligentScaling.minimumCores}\nMaximum = ${intelligentScaling.maximumCores}")
+      if (intelligentScaling.coeff >= 10.0 || intelligentScaling.coeff <= 0.0)
+        throw new BadConfigException(s"Intelligent Scaling: Scaling Coeff must be between 0.0 and 10.0 (exclusive). \n" +
+          s"coeff configured at = ${intelligentScaling.coeff}")
+    }
+
+    intelligentScaling
+  }
+
   @throws(classOf[BadConfigException])
   private def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): this.type = {
 
@@ -235,6 +250,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
     config.setMaxDays(rawParams.maxDaysToLoad)
+
+    config.setIntelligentScaling(validateIntelligentScaling(rawParams.intelligentScaling))
 
     this
   }

@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.utils.{AuditLogConfig, AzureAuditLogEventhubConfig, DatabricksContractPrices, OverwatchParams}
+import com.databricks.labs.overwatch.utils.{AuditLogConfig, AzureAuditLogEventhubConfig, DatabricksContractPrices, IntelligentScaling, OverwatchParams}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -19,7 +19,8 @@ class ParamDeserializerTest extends AnyFunSpec {
         |"badRecordsPath":"/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords",
         |"overwatchScope":["audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools"],
         |"maxDaysToLoad":60,
-        |"databricksContractPrices":{"interactiveDBUCostUSD":0.55,"automatedDBUCostUSD":0.15, "sqlComputeDBUCostUSD":0.22, "jobsLightDBUCostUSD":0.1}}
+        |"databricksContractPrices":{"interactiveDBUCostUSD":0.55,"automatedDBUCostUSD":0.15, "sqlComputeDBUCostUSD":0.22, "jobsLightDBUCostUSD":0.1},
+        |"intelligentScaling":{"enabled":false, "minimumCores":4 , "maximumCores":512 , "coeff":1.0}}
         |""".stripMargin
 
       val paramModule: SimpleModule = new SimpleModule()
@@ -43,8 +44,9 @@ class ParamDeserializerTest extends AnyFunSpec {
         Some("/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords"),
         Some(Seq("audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools")),
         60,
-        DatabricksContractPrices(0.55, 0.15, 0.22, 0.1),
-        None
+        DatabricksContractPrices(),
+        None,
+        IntelligentScaling()
       )
       assertResult(expected)(mapper.readValue[OverwatchParams](incomplete))
 

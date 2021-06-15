@@ -65,6 +65,7 @@ case class AzureAuditLogEventhubConfig(
                                       )
 
 case class AuditLogConfig(rawAuditPath: Option[String] = None, azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None)
+case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
 
 case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            tokenSecret: Option[TokenSecret] = None,
@@ -72,8 +73,9 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            badRecordsPath: Option[String] = None,
                            overwatchScope: Option[Seq[String]] = None,
                            maxDaysToLoad: Int = 60,
-                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(0.55, 0.15, 0.22, 0.1),
-                           primordialDateString: Option[String] = None
+                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(),
+                           primordialDateString: Option[String] = None,
+                           intelligentScaling: IntelligentScaling
                           )
 
 case class ParsedConfig(

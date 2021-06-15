@@ -14,7 +14,7 @@ class Config() {
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _debugFlag: Boolean = false
-  private var _overwatchSchemaVersion = "0.412"
+  private var _overwatchSchemaVersion = "0.420"
   private var _organizationId: String = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
@@ -30,6 +30,7 @@ class Config() {
   private var _primordialDateString: Option[String] = None
   private var _maxDays: Int = 60
   private var _initialWorkerCount: Int = _
+  private var _intelligentScaling: IntelligentScaling = IntelligentScaling()
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
@@ -94,6 +95,8 @@ class Config() {
   def contractJobsLightDBUPrice: Double = _contractJobsLightDBUPrice
 
   def primordialDateString: Option[String] = _primordialDateString
+
+  def intelligentScaling: IntelligentScaling = _intelligentScaling
 
   def globalFilters: Seq[Column] = {
     Seq(
@@ -227,6 +230,11 @@ class Config() {
 
   private[overwatch] def setContractJobsLightDBUPrice(value: Double): this.type = {
     _contractAutomatedDBUPrice = value
+    this
+  }
+
+  private [overwatch] def setIntelligentScaling(value: IntelligentScaling): this.type = {
+    _intelligentScaling = value
     this
   }
 

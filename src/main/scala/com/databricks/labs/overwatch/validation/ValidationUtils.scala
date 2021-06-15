@@ -57,7 +57,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     require(sparkCheckValue == targetDBName, s"DESTRUCTIVE MODE DISABLED: " +
       s"You selected to run a very destructive command. This is 100% ok in " +
       s"certain circumstances but to protect your data you must set the following spark conf with a value equal " +
-      s"to the name of the database to which you're point this function. \"overwatch.permit.db.destruction=$targetDBName\"")
+      s"to the name of the database to which you're point this function. 'overwatch.permit.db.destruction=$targetDBName''")
   }
 
   protected def getDateFormat(dtFormatString: Option[String]): SimpleDateFormat = {
