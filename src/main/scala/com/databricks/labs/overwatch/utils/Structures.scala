@@ -26,10 +26,10 @@ case class DataTarget(databaseName: Option[String], databaseLocation: Option[Str
                       consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
 
 case class DatabricksContractPrices(
-                                     interactiveDBUCostUSD: Double,
-                                     automatedDBUCostUSD: Double,
-                                     sqlComputeDBUCostUSD: Double,
-                                     jobsLightDBUCostUSD: Double
+                                     interactiveDBUCostUSD: Double = 0.55,
+                                     automatedDBUCostUSD: Double = 0.15,
+                                     sqlComputeDBUCostUSD: Double = 0.22,
+                                     jobsLightDBUCostUSD: Double = 0.10
                                    )
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String)

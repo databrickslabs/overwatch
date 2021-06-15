@@ -127,7 +127,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "num_workers" -> numWorkers
     )
 
-    ApiCall(endpoint, apiEnv, Some(query)).executePost()
+    ApiCall(endpoint, apiEnv, Some(query), paginate = false).executePost()
   }
 
 }

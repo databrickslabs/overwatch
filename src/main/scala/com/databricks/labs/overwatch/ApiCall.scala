@@ -34,13 +34,13 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   )
 
   private def setQuery(value: Option[Map[String, Any]]): this.type = {
-    if (value.nonEmpty) {
+    if (value.nonEmpty && _paginate) {
       _limit = value.get.getOrElse("limit", 150).toString.toInt
       _initialQueryMap = value.get + ("limit" -> _limit) + ("offset" -> value.get.getOrElse("offset", 0))
-    } else {
+    } else if (_paginate) {
       _limit = 150
       _initialQueryMap = Map("limit" -> _limit, "offset" -> 0)
-    }
+    } else _initialQueryMap = value.get
     _jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
     _getQueryString = "?" + _initialQueryMap.map { case(k, v) => s"$k=$v"}.mkString("&")
     this
@@ -154,10 +154,10 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           throw new ApiCallFailure(s"${_apiName} could not execute: ${result.code}")
         }
       }
-      if (!pageCall) {
+      if (!pageCall && _paginate) {
         // Append initial results
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
-        if (_paginate) paginate()
+        paginate()
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
@@ -226,11 +226,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         setStatus(s"$err -> $msg", Level.WARN)
         throw new ApiCallFailure(s"$err -> $msg")
       }
-      if (!pageCall) {
+      if (!pageCall && _paginate) {
         val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
         val totalCount = mapper.readTree(result.body).get("total_count").asInt(0)
         if (totalCount > 0) results.append(jsonResult)
-        if (totalCount > limit && _paginate) paginate(totalCount)
+        if (totalCount > limit) paginate(totalCount)
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
