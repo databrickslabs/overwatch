@@ -75,7 +75,7 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            maxDaysToLoad: Int = 60,
                            databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(),
                            primordialDateString: Option[String] = None,
-                           intelligentScaling: IntelligentScaling
+                           intelligentScaling: IntelligentScaling = IntelligentScaling()
                           )
 
 case class ParsedConfig(

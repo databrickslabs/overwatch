@@ -93,6 +93,15 @@ object PipelineFunctions {
     }
   }
 
+  /**
+   * converts a long type
+   * @param epochColName
+   * @return
+   */
+  def epochMilliToTs(epochColName: String): Column = {
+    from_unixtime(col(epochColName).cast("double") / 1000).cast("timestamp").alias("epochColName")
+  }
+
   def optimizeWritePartitions(
                                df: DataFrame,
                                target: PipelineTable,
