@@ -15,6 +15,7 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.util.SerializableConfiguration
 
 import java.io.FileNotFoundException
 import java.time.{Duration, LocalDateTime}
@@ -683,15 +684,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .distinct()
 
     // all files considered for ingest
+    val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
     allEventLogPrefixes
       .repartition(optimizeParCount)
       .as[String]
-      .map(Helpers.parListFiles) // parallelized file lister since large / shared / long-running (months) clusters will have MANy paths
+      .map(x => Helpers.parListFiles(x, hadoopConf)) // parallelized file lister since large / shared / long-running (months) clusters will have MANy paths
       .select(explode('value).alias("logPathPrefix"))
       .withColumn("logPathPrefix", concat_ws("/", 'logPathPrefix, lit("*"), lit("eventlo*")))
       .repartition(optimizeParCount)
       .as[String]
-      .map(p => Helpers.globPath(p, Some(fromTimeEpochMillis), Some(untilTimeEpochMillis)))
+      .map(p => Helpers.globPath(p, hadoopConf, Some(fromTimeEpochMillis), Some(untilTimeEpochMillis)))
       .select(explode('value).alias("simpleFileStatus"))
       .selectExpr("simpleFileStatus.*")
       .withColumnRenamed("pathString", "filename")
