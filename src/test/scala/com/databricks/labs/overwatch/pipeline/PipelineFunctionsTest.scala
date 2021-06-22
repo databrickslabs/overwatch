@@ -140,6 +140,29 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
   //    }
   //  }
 
+  describe("Tests for cleansePathURI") {
+    it("should work for DBFS") {
+      assertResult("dbfs:/12312/12332423")(
+        PipelineFunctions.cleansePathURI("dbfs://12312//12332423")
+      )
+    }
+    it("should work without schema") {
+      assertResult("dbfs:/12132/122132")(
+        PipelineFunctions.cleansePathURI("/12132/122132")
+      )
+    }
+    it("should work for ABFSS") {
+      assertResult("abfss://test2@aottlrs.dfs.core.windows.net/1235")(
+        PipelineFunctions.cleansePathURI("abfss://test2@aottlrs.dfs.core.windows.net/1235")
+      )
+    }
+    it("should work for S3") {
+      assertResult("s3a://commoncrawl/path")(
+        PipelineFunctions.cleansePathURI("s3a://commoncrawl/path")
+      )
+    }
+  }
+
   describe("Tests for setSparkOverrides") {
 
     it("should set necessary configuration params") {
