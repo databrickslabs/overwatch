@@ -177,9 +177,10 @@ abstract class PipelineTargets(config: Config) {
       autoOptimize = true,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
-        "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
+        "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString
       ),
-      shuffleFactor = 0.25
+      shuffleFactor = 0.75
     )
 
     lazy private[overwatch] val stagesTarget: PipelineTable = PipelineTable(
