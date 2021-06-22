@@ -53,6 +53,24 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   }
 
+  // The below function is supposed to fetch data about DatabricksSQLEndPoints
+  def getSqlEndPointsDF: DataFrame = {
+
+    val jobsEndpoint = "sql/endpoints"
+
+    try {
+      ApiCall(jobsEndpoint, config.apiEnv)
+        .executeGet()
+        .asDF
+        .withColumn("organization_id", lit(config.organizationId))
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.ERROR, "ERROR: Failed to execute jobs/list API call.", e)
+        spark.sql("select ERROR")
+      }
+    }
+
+  }
   /**
    * Exposed config as a public getter to enable access to config for testing. This should not be public facing
    * public function.
