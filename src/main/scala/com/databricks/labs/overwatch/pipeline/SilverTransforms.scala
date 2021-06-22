@@ -816,9 +816,13 @@ trait SilverTransforms extends SparkSessionWrapper {
           'created_time.alias("timestamp"))
     } else {
       jobsSnapshot.asDF
-        .select('organization_id, 'job_id.alias("jobId"),
-          'created_time.alias("timestamp"))
-    }.filter('clusterId.isNotNull)
+        .select(
+          'organization_id,
+          'job_id.alias("jobId"),
+          'created_time.alias("timestamp"),
+          lit(null).cast("string").alias("clusterId")
+        )
+    }
 
     // Ensure the lookups have data -- this will be improved when the module unification occurs during the next
     // scheduled refactor
