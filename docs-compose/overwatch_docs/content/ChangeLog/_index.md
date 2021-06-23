@@ -4,6 +4,13 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.4.13
+* Hotfix for [Issue 138](https://github.com/databrickslabs/overwatch/issues/138)
+
+An upgrade to this minor release is only necessary if you're experience api limits and/or seeing 429 issues. 
+Otherwise, this release can be skipped as the fix will be in 0.4.2+. New users should use this version until 
+the next release is published.
+
 ## 0.4.12
 **[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED**
 * Hotfix for [Issue 126](https://github.com/databrickslabs/overwatch/issues/126).
