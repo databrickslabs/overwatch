@@ -691,7 +691,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'date,
         'runId,
         'jobId,
-        'idInJob, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
+        'idInJob, 'clusterId, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
         'jobTriggerType,
         'requestId.alias("completionRequestID"),
         'response.alias("completionResponse"),
@@ -789,6 +789,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select(
         'organization_id, 'date,
         'runId,
+        'clusterId.alias("startClusterId"),
         'timestamp.alias("startTime"),
         'requestId.alias("startRequestID")
       )
@@ -845,7 +846,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         'runId.cast("long"), 'jobId.cast("long"), 'idInJob, 'jobRunTime, 'run_name,
         'jobClusterType, 'jobTaskType, 'jobTerminalState,
         'jobTriggerType, 'new_cluster,
-        'existing_cluster_id.alias("clusterId"),
+        when('actionName.isin("runStart", "runFailed", "runSucceeded"), coalesce('clusterId, 'startClusterId)) // notebookRuns
+          .otherwise('existing_cluster_id).alias("clusterId"), //
         'cluster_name,
         'organization_id,
         'notebook_params, 'libraries,
@@ -888,10 +890,18 @@ trait SilverTransforms extends SparkSessionWrapper {
     /**
      * ES-74247 requires hit to API for notebook jobs running on existing clusters. PR submitted and will be
      * rolled into 3.42 but until then, this is the hack around.
-     * As of Overwatch 0.4.13, the use of this API call should be minimal to none.
      */
 
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(24))
+    /**
+     * UPDATE -- as of 0.4.13, enabled fix from ES-74247 and resolved Issue_138 thus this api call is only for
+     * legacy audit logs prior to approximately April 01, 2021. If historically loading audit logs, this api call
+     * could still be necessary; otherwise, it should never be hit.
+     */
+
+    logger.log(Level.INFO, s"HISTORICAL TRICKLE LOAD: notebook job run on existing clusters have been " +
+      s"identified prior to the April 01, 2021 resolution, the historical data will be trickle loaded. Please be " +
+      s"patient as this is a one-time trickle load to back-load old data.")
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(2))
     val jrWFilledClusterIDs = jobRunsBase
       .filter('jobClusterType === "existing")
       .filter('jobTaskType === "notebook" && 'clusterId.isNull)
