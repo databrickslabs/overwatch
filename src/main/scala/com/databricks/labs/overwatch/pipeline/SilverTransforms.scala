@@ -888,6 +888,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     /**
      * ES-74247 requires hit to API for notebook jobs running on existing clusters. PR submitted and will be
      * rolled into 3.42 but until then, this is the hack around.
+     * As of Overwatch 0.4.13, the use of this API call should be minimal to none.
      */
 
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(24))
@@ -928,8 +929,16 @@ trait SilverTransforms extends SparkSessionWrapper {
         })
         .toArray
 
-      val notebookJobsWithClusterIDs = spark.read.json(Seq(runIdStrings: _*).toDS())
-        .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
+      val notebookJobsWithClusterIDs = if(runIdStrings.nonEmpty){
+        spark.read.json(Seq(runIdStrings: _*).toDS())
+          .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
+      } else { // defend against API runId calls with no result missing
+        val missingRunIDMsg = s"A cluster ID could not be determined for the following runs. ${jrWFilledClusterIDs.toArray.mkString(", ")}"
+        logger.log(Level.WARN, missingRunIDMsg)
+        spark.emptyDataFrame
+          .withColumn("runId", lit(null).cast("long"))
+          .withColumn("cluster_id_apiLookup", lit(null).cast("string"))
+      }
 
       // If batch has runs on existing clusters older than the API retention the previous DF will be empty. Only join
       // if the api lookup successfully obtained the data
