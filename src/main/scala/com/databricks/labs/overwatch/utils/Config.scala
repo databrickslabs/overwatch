@@ -224,12 +224,12 @@ class Config() {
   }
 
   private[overwatch] def setContractSQLComputeDBUPrice(value: Double): this.type = {
-    _contractAutomatedDBUPrice = value
+    _contractSQLComputeDBUPrice = value
     this
   }
 
   private[overwatch] def setContractJobsLightDBUPrice(value: Double): this.type = {
-    _contractAutomatedDBUPrice = value
+    _contractJobsLightDBUPrice = value
     this
   }
 

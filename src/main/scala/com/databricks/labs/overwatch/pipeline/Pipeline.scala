@@ -126,7 +126,7 @@ class Pipeline(
    */
   private def dbuContractPriceChange(lastRunPricing: DataFrame): Boolean = {
 
-    !lastRunPricing
+    lastRunPricing
       .filter('rnk === 1 && 'activeUntil.isNull) // most recent, active records
       .filter(
         'interactiveDBUPrice === config.contractInteractiveDBUPrice &&
@@ -202,6 +202,13 @@ class Pipeline(
       !BronzeTargets.cloudMachineDetail.exists ||
         BronzeTargets.cloudMachineDetail.asDF.isEmpty
     ) { // if not exists OR if empty for current orgID (.asDF applies global filters)
+      val logMsg = if (!BronzeTargets.cloudMachineDetail.exists) {
+        "instanceDetails table not found. Building"
+      } else if (BronzeTargets.cloudMachineDetail.asDF.isEmpty) {
+        "instanceDetails table found but is empty for this workspace. Appending compute costs for this workspace"
+      } else ""
+      logger.log(Level.INFO, logMsg)
+      if (getConfig.debugFlag) println(logMsg)
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
           InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
