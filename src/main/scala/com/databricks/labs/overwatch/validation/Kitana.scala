@@ -107,17 +107,18 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     val primordialDateString = bronzeLookupPipeline.config.primordialDateString.get
     val fromDate = Pipeline.deriveLocalDate(primordialDateString, getDateFormat)
     val fromTime = Pipeline.createTimeDetail(fromDate.atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
-    val untilTime = Pipeline.createTimeDetail(fromTime.asLocalDateTime.plusDays(bronzeLookupPipeline.config.maxDays).toLocalDate
-      .atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
+//    val untilTime = Pipeline.createTimeDetail(fromTime.asLocalDateTime.plusDays(bronzeLookupPipeline.config.maxDays).toLocalDate
+//      .atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
 //    val untilTime = Pipeline.createTimeDetail(bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
 
-
-    validateSnapPipeline(bronzeLookupPipeline, snapPipeline, fromTime, untilTime)
+//    validateSnapPipeline(bronzeLookupPipeline, snapPipeline, fromTime, untilTime)
 
     snapPipeline.clearPipelineState() // clears states such that module fromTimes == primordial date
 
     val bronzeTargetsWModule = getLinkedModuleTarget(snapPipeline).par
     bronzeTargetsWModule.tasksupport = taskSupport
+
+    val untilTime = bronzeTargetsWModule.toArray.maxBy(_.module.untilTime.asUnixTimeMilli).module.untilTime
 
     val statefulSnapsReport = snapStateTables(snapPipeline, untilTime)
     resetPipelineReportState(snapPipeline, bronzeTargetsWModule.toArray, fromTime, untilTime)
@@ -126,6 +127,16 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     val scopeSnaps = bronzeTargetsWModule
       .map(targetDetail => snapTable(targetDetail.module, targetDetail.target, untilTime))
       .toArray.toSeq
+
+    // set snapshot schema version == source schema version regardless of JAR
+    val sourceSchemaVersion = SchemaTools.getSchemaVersion(sourceWorkspace.getConfig.databaseName)
+    if (sourceSchemaVersion != snapWorkspace.getConfig.overwatchSchemaVersion) {
+      val schemaVersionRollbackMsg = s"Rolling snapshot workspace back from version ${snapWorkspace.getConfig.overwatchSchemaVersion} " +
+        s"to $sourceSchemaVersion"
+      logger.log(Level.INFO, schemaVersionRollbackMsg)
+      if (snapWorkspace.getConfig.debugFlag) println(schemaVersionRollbackMsg)
+      SchemaTools.modifySchemaVersion(snapWorkspace.getConfig.databaseName, sourceSchemaVersion)
+    }
 
     (statefulSnapsReport ++ scopeSnaps).toDS()
   }
@@ -157,9 +168,9 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     }
     val paddedWorkspace = padPrimordialAndSetMaxDays(snapLookupPipeline, primordialPadding, maxDays)
 
-    val silverPipeline = getSilverPipeline(paddedWorkspace, readOnly = false)
+    val silverPipeline = getSilverPipeline(paddedWorkspace, readOnly = false, suppressStaticDatasets = false)
     silverPipeline.run()
-    val goldPipeline = getGoldPipeline(paddedWorkspace, readOnly = false)
+    val goldPipeline = getGoldPipeline(paddedWorkspace, readOnly = false, suppressStaticDatasets = false)
     goldPipeline.run()
 
   }
@@ -369,6 +380,7 @@ object Kitana {
 
     val snapArgs = objToJson(snapWorkspaceParams).compactString
     val snapWorkspace = Initializer(snapArgs, debugFlag = origConfig.debugFlag, isSnap = true)
+
     new Kitana(workspace, snapWorkspace, sourceDBName, parallelism)
 
   }

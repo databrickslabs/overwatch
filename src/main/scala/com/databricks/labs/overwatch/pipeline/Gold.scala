@@ -227,12 +227,22 @@ object Gold {
       .loadStaticDatasets()
   }
 
-  def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Gold = {
-    new Gold(workspace, workspace.database, workspace.getConfig)
+  private[overwatch] def apply(
+                                workspace: Workspace,
+                                readOnly: Boolean = false,
+                                suppressReport: Boolean = false,
+                                suppressStaticDatasets: Boolean = false
+                              ): Gold = {
+    val goldPipeline = new Gold(workspace, workspace.database, workspace.getConfig)
       .setReadOnly(readOnly)
       .suppressRangeReport(suppressReport)
       .initPipelineRun()
-      .loadStaticDatasets()
+
+    if (suppressStaticDatasets) {
+      goldPipeline
+    } else {
+      goldPipeline.loadStaticDatasets()
+    }
   }
 
 }

@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Bronze, Pipeline, PipelineTable}
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Pipeline, PipelineTable}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -19,26 +19,21 @@ object Upgrade extends SparkSessionWrapper {
 
   import spark.implicits._
 
-  private def getSchemaVersion(dbName: String): String = {
-    val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
-    dbMeta.properties.getOrElse("SCHEMA", "UNKNOWN")
-  }
-
-  private def upgradeSchema(dbName: String, upgradeToVersion: String): Unit = {
-    val existingSchemaVersion = getSchemaVersion(dbName)
-    val upgradeStatement =
-      s"""ALTER DATABASE $dbName SET DBPROPERTIES
-         |(SCHEMA=$upgradeToVersion)""".stripMargin
-
-    val upgradeMsg = s"upgrading schema from $existingSchemaVersion --> $upgradeToVersion with STATEMENT:\n " +
-      s"$upgradeStatement"
-    logger.log(Level.INFO, upgradeMsg)
-    spark.sql(upgradeStatement)
-    val newSchemaVersion = getSchemaVersion(dbName)
-    assert(newSchemaVersion == upgradeToVersion)
-    logger.log(Level.INFO, s"UPGRADE SUCCEEDED")
-
-  }
+//  private def modifySchemaVersion(dbName: String, targetVersion: String): Unit = {
+//    val existingSchemaVersion = SchemaTools.getSchemaVersion(dbName)
+//    val upgradeStatement =
+//      s"""ALTER DATABASE $dbName SET DBPROPERTIES
+//         |(SCHEMA=$targetVersion)""".stripMargin
+//
+//    val upgradeMsg = s"upgrading schema from $existingSchemaVersion --> $targetVersion with STATEMENT:\n " +
+//      s"$upgradeStatement"
+//    logger.log(Level.INFO, upgradeMsg)
+//    spark.sql(upgradeStatement)
+//    val newSchemaVersion = SchemaTools.getSchemaVersion(dbName)
+//    assert(newSchemaVersion == targetVersion)
+//    logger.log(Level.INFO, s"UPGRADE SUCCEEDED")
+//
+//  }
 
   @throws(classOf[UpgradeException])
   private def validateSchemaUpgradeEligibility(currentVersion: String, targetVersion: String): Unit = {
@@ -48,7 +43,7 @@ object Upgrade extends SparkSessionWrapper {
     currentVersionDotArray.dropRight(1).zipWithIndex.foreach(currentV => {
       valid = currentV._1 == targetVersionDotArray(currentV._2)
     })
-    valid = valid && currentVersion.reverse.head.toInt < targetVersion.reverse.head.toInt
+    valid = valid && currentVersionDotArray.reverse.head.toInt < targetVersionDotArray.reverse.head.toInt
     require(valid,
       s"This binary produces schema version $currentVersion. The Overwatch assets are registered as " +
         s"$targetVersion. This upgrade is meant to upgrade schemas below $targetVersion to $targetVersion schema. This is not a " +
@@ -57,12 +52,12 @@ object Upgrade extends SparkSessionWrapper {
   }
 
   def upgradeTo0412(prodWorkspace: Workspace): Dataset[UpgradeReport] = {
-    val currentSchemaVersion = getSchemaVersion(prodWorkspace.getConfig.databaseName)
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(prodWorkspace.getConfig.databaseName)
     val targetSchemaVersion = prodWorkspace.getConfig.overwatchSchemaVersion
     validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
     // downscale jar schema version to current
-    prodWorkspace.getConfig.setOverwatchSchemaVersion(currentSchemaVersion)
-    val bronzePipeline = Bronze(prodWorkspace)
+//    prodWorkspace.getConfig.setOverwatchSchemaVersion(currentSchemaVersion)
+    val bronzePipeline = Bronze(prodWorkspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
     val jobsSnapshotTarget = bronzePipeline.getAllTargets.filter(_.name == "jobs_snapshot_bronze").head
     val clusterSnapshotTarget = bronzePipeline.getAllTargets.filter(_.name == "clusters_snapshot_bronze").head
     val cloudProvider = bronzePipeline.config.cloudProvider
@@ -116,7 +111,7 @@ object Upgrade extends SparkSessionWrapper {
           upgradeStatus.append(UpgradeReport(clusterSnapshotTarget.databaseName, clusterSnapshotTarget.name, Some("SUCCESS")))
         }
 
-        upgradeSchema(jobsSnapshotTarget.databaseName, targetSchemaVersion)
+        SchemaTools.modifySchemaVersion(jobsSnapshotTarget.databaseName, targetSchemaVersion)
         upgradeStatus.toDS()
       }
 
@@ -131,14 +126,14 @@ object Upgrade extends SparkSessionWrapper {
   }
 
   def upgradeTo042(workspace: Workspace, isLocalUpgrade: Boolean = false): Dataset[UpgradeReport] = {
-    val currentSchemaVersion = getSchemaVersion(workspace.getConfig.databaseName)
-    val targetSchemaVersion = workspace.getConfig.overwatchSchemaVersion
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(workspace.getConfig.databaseName)
+    val targetSchemaVersion = "0.420"
     validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
     val upgradeStatus: ArrayBuffer[UpgradeReport] = ArrayBuffer()
 
     try {
-      workspace.getConfig.setOverwatchSchemaVersion(currentSchemaVersion)
-      val bronzePipeline = Bronze(workspace)
+//      workspace.getConfig.setOverwatchSchemaVersion(currentSchemaVersion)
+      val bronzePipeline = Bronze(workspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
       val snapDate = bronzePipeline.pipelineSnapTime.asDTString
       val w = Window.partitionBy(lower(trim('API_name))).orderBy('activeFrom)
       val wKeyCheck = Window.partitionBy(lower(trim('API_name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
@@ -148,10 +143,10 @@ object Upgrade extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Upgrading ${instanceDetailsTarget.tableFullName}")
       if (instanceDetailsTarget.exists) {
         val upgradedInstanceDetails = instanceDetailsTarget.asDF(withGlobalFilters = isLocalUpgrade)
-          .withColumn("activeFrom", lit(workspace.getConfig.primordialDateString).cast("date"))
+          .withColumn("activeFrom", lit(workspace.getConfig.primordialDateString.get).cast("date"))
           .withColumn("activeUntil", lit(null).cast("date"))
-          .withColumn("sqlComputeDBUPrice", lit(0.22))
-          .withColumn("jobsLightDBUPrice", lit(0.1))
+          .withColumn("sqlComputeDBUPrice", lit(workspace.getConfig.contractSQLComputeDBUPrice))
+          .withColumn("jobsLightDBUPrice", lit(workspace.getConfig.contractJobsLightDBUPrice))
           .withColumn("activeUntil", coalesce('activeUntil, lit(snapDate)))
           .withColumn("previousUntil", lag('activeUntil, 1).over(w))
           .withColumn("rnk", rank().over(wKeyCheck))
@@ -180,7 +175,8 @@ object Upgrade extends SparkSessionWrapper {
       }
 
       // UPGRADE jrcp_gold
-      val jrcpGold = bronzePipeline.getAllTargets.filter(_.name == "jobRunCostPotentialFact_gold").head
+      val goldPipeline = Gold(workspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
+      val jrcpGold = goldPipeline.getAllTargets.filter(_.name == "jobRunCostPotentialFact_gold").head
       logger.log(Level.INFO, s"Upgrading ${jrcpGold.tableFullName}")
       if (jrcpGold.exists) {
         val upgradedJRCP = jrcpGold.asDF(withGlobalFilters = isLocalUpgrade)
@@ -192,7 +188,7 @@ object Upgrade extends SparkSessionWrapper {
           withOverwatchRunID = false
         )
 
-        bronzePipeline.database.write(upgradedJRCP, upgradeTarget, lit(null))
+        goldPipeline.database.write(upgradedJRCP, upgradeTarget, lit(null))
         upgradeStatus.append(UpgradeReport(workspace.getConfig.databaseName, jrcpGold.name, Some("SUCCESS")))
       } else {
         val errMsg = s"${jrcpGold.name} doesn't exist in the current schema and will not be upgraded. This is not " +
@@ -203,7 +199,7 @@ object Upgrade extends SparkSessionWrapper {
 
       logger.log(Level.INFO, "All upgrades Complete")
       logger.log(Level.INFO, s"Upgrading registered schema version to $targetSchemaVersion")
-      upgradeSchema(workspace.getConfig.databaseName, targetSchemaVersion)
+      SchemaTools.modifySchemaVersion(workspace.getConfig.databaseName, targetSchemaVersion)
       upgradeStatus.toDS()
     }
   }

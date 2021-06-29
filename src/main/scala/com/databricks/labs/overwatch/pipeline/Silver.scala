@@ -260,12 +260,22 @@ object Silver {
       .loadStaticDatasets()
   }
 
-  def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Silver = {
-    new Silver(workspace, workspace.database, workspace.getConfig)
-      .suppressRangeReport(suppressReport)
+  private[overwatch] def apply(
+                                workspace: Workspace,
+                                readOnly: Boolean = false,
+                                suppressReport: Boolean = false,
+                                suppressStaticDatasets: Boolean = false
+                              ): Silver = {
+    val silverPipeline = new Silver(workspace, workspace.database, workspace.getConfig)
       .setReadOnly(readOnly)
+      .suppressRangeReport(suppressReport)
       .initPipelineRun()
-      .loadStaticDatasets()
+
+    if (suppressStaticDatasets) {
+      silverPipeline
+    } else {
+      silverPipeline.loadStaticDatasets()
+    }
   }
 
 }

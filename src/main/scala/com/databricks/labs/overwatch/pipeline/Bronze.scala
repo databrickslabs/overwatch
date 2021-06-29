@@ -163,12 +163,22 @@ object Bronze {
       .loadStaticDatasets()
   }
 
-  private[overwatch] def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Bronze = {
-    new Bronze(workspace, workspace.database, workspace.getConfig)
-      .suppressRangeReport(suppressReport)
+  private[overwatch] def apply(
+                                workspace: Workspace,
+                                readOnly: Boolean = false,
+                                suppressReport: Boolean = false,
+                                suppressStaticDatasets: Boolean = false
+                              ): Bronze = {
+    val bronzePipeline = new Bronze(workspace, workspace.database, workspace.getConfig)
       .setReadOnly(readOnly)
+      .suppressRangeReport(suppressReport)
       .initPipelineRun()
-      .loadStaticDatasets()
+
+    if (suppressStaticDatasets) {
+      bronzePipeline
+    } else {
+      bronzePipeline.loadStaticDatasets()
+    }
   }
 
 }

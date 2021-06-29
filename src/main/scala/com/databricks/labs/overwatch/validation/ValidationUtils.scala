@@ -34,20 +34,23 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
   def getBronzePipeline(
                          workspace: Workspace = snapWorkspace,
                          readOnly: Boolean = true,
-                         suppressReport: Boolean = true
-                       ): Bronze = Bronze(workspace, readOnly, suppressReport)
+                         suppressReport: Boolean = true,
+                         suppressStaticDatasets: Boolean = true
+                       ): Bronze = Bronze(workspace, readOnly, suppressReport, suppressStaticDatasets)
 
   def getSilverPipeline(
                          workspace: Workspace = snapWorkspace,
                          readOnly: Boolean = true,
-                         suppressReport: Boolean = true
-                       ): Silver = Silver(workspace, readOnly, suppressReport)
+                         suppressReport: Boolean = true,
+                         suppressStaticDatasets: Boolean = true
+                       ): Silver = Silver(workspace, readOnly, suppressReport, suppressStaticDatasets)
 
   def getGoldPipeline(
                        workspace: Workspace = snapWorkspace,
                        readOnly: Boolean = true,
-                       suppressReport: Boolean = true
-                     ): Gold = Gold(workspace, readOnly, suppressReport)
+                       suppressReport: Boolean = true,
+                       suppressStaticDatasets: Boolean = true
+                     ): Gold = Gold(workspace, readOnly, suppressReport, suppressStaticDatasets)
 
   protected def getDateFormat: SimpleDateFormat = getDateFormat(None)
 
@@ -98,33 +101,33 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }
   }
 
-  @throws(classOf[BadConfigException])
-  protected def validateSnapPipeline(
-                                      bronzeLookupPipeline: Bronze,
-                                      snapPipeline: Pipeline,
-                                      snapFromTime: TimeTypes,
-                                      snapUntilTime: TimeTypes
-                                    ): Unit = {
-    validateSnapDatabase(snapPipeline)
-    if (bronzeLookupPipeline.getPipelineState.isEmpty) {
-      throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.", None)
-    } else {
-      val sourceMaxUntilTS = bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS
-      require(sourceMaxUntilTS >= snapUntilTime.asUnixTimeMilli, s"PIPELINE STATE ERROR: The maximum state of " +
-        s"any module in the source is < the specified end period of ${snapUntilTime.asDTString}. The snap window " +
-        s"must be WITHIN the timeframe of the source data.")
-    }
-
-    val sourcePrimordialDate = Pipeline.deriveLocalDate(bronzeLookupPipeline.config.primordialDateString.get, getDateFormat(None))
-    val snapPrimordialDate = snapFromTime.asLocalDateTime.toLocalDate
-
-    require(snapPrimordialDate.toEpochDay >= sourcePrimordialDate.toEpochDay, s"The specified start date of " +
-      s"$snapPrimordialDate is < the source's primordial date of $sourcePrimordialDate. The snap window must be " +
-      s"WITHIN the timeframe of the source data.")
-
-    // already validated and confirmed max days == duration
-    validateDuration(snapPipeline.config.maxDays)
-  }
+//  @throws(classOf[BadConfigException])
+//  protected def validateSnapPipeline(
+//                                      bronzeLookupPipeline: Bronze,
+//                                      snapPipeline: Pipeline,
+//                                      snapFromTime: TimeTypes,
+//                                      snapUntilTime: TimeTypes
+//                                    ): Unit = {
+//    validateSnapDatabase(snapPipeline)
+//    if (bronzeLookupPipeline.getPipelineState.isEmpty) {
+//      throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.", None)
+//    } else {
+//      val sourceMaxUntilTS = bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS
+//      require(sourceMaxUntilTS >= snapUntilTime.asUnixTimeMilli, s"PIPELINE STATE ERROR: The maximum state of " +
+//        s"any module in the source is < the specified end period of ${snapUntilTime.asDTString}. The snap window " +
+//        s"must be WITHIN the timeframe of the source data.")
+//    }
+//
+//    val sourcePrimordialDate = Pipeline.deriveLocalDate(bronzeLookupPipeline.config.primordialDateString.get, getDateFormat(None))
+//    val snapPrimordialDate = snapFromTime.asLocalDateTime.toLocalDate
+//
+//    require(snapPrimordialDate.toEpochDay >= sourcePrimordialDate.toEpochDay, s"The specified start date of " +
+//      s"$snapPrimordialDate is < the source's primordial date of $sourcePrimordialDate. The snap window must be " +
+//      s"WITHIN the timeframe of the source data.")
+//
+//    // already validated and confirmed max days == duration
+//    validateDuration(snapPipeline.config.maxDays)
+//  }
 
   /**
    * Returns ModuleTarget with each module by target for the configured scopes
@@ -140,7 +143,10 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
         bronzePipeline.getConfig.overwatchScope.flatMap {
           case OverwatchScope.audit => Seq(ModuleTarget(bronzePipeline.auditLogsModule, bronzeTargets.auditLogsTarget))
           case OverwatchScope.clusters => Seq(ModuleTarget(bronzePipeline.clustersSnapshotModule, bronzeTargets.clustersSnapshotTarget))
-          case OverwatchScope.clusterEvents => Seq(ModuleTarget(bronzePipeline.clusterEventLogsModule, bronzeTargets.clusterEventsTarget))
+          case OverwatchScope.clusterEvents => Seq(ModuleTarget(
+            bronzePipeline.clusterEventLogsModule.copy(_hardLimitMaxHistory = None), // Dont set hard max limit for snapshots
+            bronzeTargets.clusterEventsTarget)
+          )
           case OverwatchScope.jobs => Seq(ModuleTarget(bronzePipeline.jobsSnapshotModule, bronzeTargets.jobsSnapshotTarget))
           case OverwatchScope.pools => Seq(ModuleTarget(bronzePipeline.poolsSnapshotModule, bronzeTargets.poolsTarget))
           case OverwatchScope.sparkEvents => Seq(ModuleTarget(bronzePipeline.sparkEventLogsModule, bronzeTargets.sparkEventLogsTarget))
@@ -302,6 +308,20 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }).toArray.toSeq
   }
 
+  /**
+   * Overwatch data quality is much more accurate after given a few days to initialize all the Databricks
+   * workspace objects. As such, Kitana needs to validate an interior subset of the existing data; therefore,
+   * a padding is applied to the primordial date to provide more startup data so as to increase accuracy of
+   * derivations to closer of that of production.
+   *
+   * Left padding is defined by daysToPad
+   * Right padding should not be necessary as the maxDays provided should limit the number of days on the right,
+   * if it does not, 2 days are automatically applied as padding to the right side
+   * @param pipeline Snapshot pipeline to which the padding will be applied
+   * @param daysToPad Number of days to pad from the starting point
+   * @param maxDays Total number of days from starting point
+   * @return
+   */
   protected def padPrimordialAndSetMaxDays(pipeline: Pipeline, daysToPad: Int, maxDays: Option[Int]): Workspace = {
     if (pipeline.getPipelineState.isEmpty) {
       val errorMsg = "The state of the bronze snapshot cannot be determine. A bronze snapshot " +

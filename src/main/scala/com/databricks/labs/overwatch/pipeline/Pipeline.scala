@@ -247,7 +247,7 @@ class Pipeline(
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName)
     val dbProperties = dbMeta.properties
     val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
-    if (overwatchSchemaVersion != config.overwatchSchemaVersion) {
+    if (overwatchSchemaVersion != config.overwatchSchemaVersion && !readOnly) { // If schemas don't match and the pipeline is being written to
       throw new BadConfigException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
         s" version of Overwatch requires ${config.overwatchSchemaVersion}. Upgrade Overwatch Schema to proceed " +
         s"or drop existing database and allow Overwatch to recreate.")
@@ -478,11 +478,9 @@ object Pipeline {
     )
   }
 
-  def apply(workspace: Workspace, database: Database, config: Config): Pipeline = {
+  def apply(workspace: Workspace, database: Database, config: Config, suppressStaticDatasets: Boolean = false): Pipeline = {
 
     new Pipeline(workspace, database, config)
-      .initPipelineRun()
-      .loadStaticDatasets()
 
   }
 }

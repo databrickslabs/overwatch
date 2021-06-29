@@ -159,7 +159,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         'login_date,
         'login_type,
         'login_user,
-        'user_id,
         'user_email,
         'ssh_login_details,
         'sourceIPAddress.alias("from_ip_address"),
@@ -249,27 +248,42 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
 
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
+    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
 
+
+    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
     val clusterEventsBaseline = clusterEventsDF
       .selectExpr("*", "details.*")
       .drop("details")
-      .withColumn("isRunning", when('type === "TERMINATING", lit(false)).otherwise(lit(true)))
-      .withColumn("isRunning",
-        when('type === "TERMINATING" || ('type =!= "STARTING" && lag(!'isRunning, 1).over(stateUnboundW)), lit(false))
-          .otherwise(lit(true))
+      .withColumn(
+        "runningSwitch",
+        when('type === "TERMINATING", lit(false))
+          .when('type.isin("CREATING", "STARTING"), lit(true))
+          .otherwise(lit(null).cast("boolean")))
+      .withColumn(
+        "previousSwitch",
+        when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))
       )
-      .withColumn("current_num_workers",
-        when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
-          .otherwise('current_num_workers)
+      .withColumn(
+        "invalidEventChainHandler",
+        when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
       )
-      .withColumn("current_num_workers",
-        when( // bug that occasionally results in negative workers when nodes are lost
-          'current_num_workers < 0, last('target_num_workers, true).over(stateUnboundW)
-        ).otherwise('current_num_workers))
-      .withColumn("target_num_workers",
-        when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
-          .otherwise('target_num_workers)
+      .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
+      .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
+      .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
+      .withColumn("isRunning", when('imputedTerminationEvent, lit(false)).otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
+      .withColumn(
+        "current_num_workers",
+        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
+      )
+      .withColumn(
+        "target_num_workers",
+        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+          .when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
+          .otherwise(coalesce('target_num_workers, 'current_num_workers))
       )
       .select(
         'organization_id, 'cluster_id, 'isRunning,
@@ -901,7 +915,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val accountLoginViewColumnMappings: String =
     """
-      |organization_id, login_unixTimeMS, login_date, login_type, login_user, user_id, user_email, ssh_login_details
+      |organization_id, login_unixTimeMS, login_date, login_type, login_user, user_email, ssh_login_details
       |from_ip_address, user_agent, request_id, response
       |""".stripMargin
 

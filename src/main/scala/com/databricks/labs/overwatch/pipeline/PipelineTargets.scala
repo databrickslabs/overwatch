@@ -369,7 +369,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterStateFactTarget: PipelineTable = PipelineTable(
       name = "clusterStateFact_gold",
-      _keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
+      _keys = Array("cluster_id", "state", "unixTimeMS_state_end"),
       config,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("unixTimeMS_state_start"),
