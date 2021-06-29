@@ -111,6 +111,7 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
 //      .atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli)
 //    val untilTime = Pipeline.createTimeDetail(bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.fromTS).fromTS)
 
+    validateSnapDatabase(snapPipeline)
 //    validateSnapPipeline(bronzeLookupPipeline, snapPipeline, fromTime, untilTime)
 
     snapPipeline.clearPipelineState() // clears states such that module fromTimes == primordial date

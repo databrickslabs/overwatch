@@ -30,7 +30,19 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
 
   import spark.implicits._
 
+  /**
+   * The following pipeline instantiations utilize an Overwatch private constructor to instantiate the pipelines
+   * with specific attributes that enable more simplistic stateful functionality when working with Kitana
+   */
 
+  /**
+   * Instantiate bronze pipeline
+   * @param workspace
+   * @param readOnly
+   * @param suppressReport
+   * @param suppressStaticDatasets
+   * @return
+   */
   def getBronzePipeline(
                          workspace: Workspace = snapWorkspace,
                          readOnly: Boolean = true,
@@ -38,6 +50,14 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
                          suppressStaticDatasets: Boolean = true
                        ): Bronze = Bronze(workspace, readOnly, suppressReport, suppressStaticDatasets)
 
+  /**
+   * instantiate silver pipeline
+   * @param workspace
+   * @param readOnly
+   * @param suppressReport
+   * @param suppressStaticDatasets
+   * @return
+   */
   def getSilverPipeline(
                          workspace: Workspace = snapWorkspace,
                          readOnly: Boolean = true,
@@ -45,6 +65,14 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
                          suppressStaticDatasets: Boolean = true
                        ): Silver = Silver(workspace, readOnly, suppressReport, suppressStaticDatasets)
 
+  /**
+   * instantiate gold pipeline
+   * @param workspace
+   * @param readOnly
+   * @param suppressReport
+   * @param suppressStaticDatasets
+   * @return
+   */
   def getGoldPipeline(
                        workspace: Workspace = snapWorkspace,
                        readOnly: Boolean = true,
@@ -54,6 +82,12 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
 
   protected def getDateFormat: SimpleDateFormat = getDateFormat(None)
 
+  /**
+   * Disallow the usage of very destructive functions without the explicit, one-time spark config enabled and
+   * properly set. This is to protect users from accidentally blowing away their production databases.
+   * @param targetDBName
+   * @throws com.databricks.labs.overwatch.utils.BadConfigException
+   */
   @throws(classOf[BadConfigException])
   protected def validateTargetDestruction(targetDBName: String): Unit = {
     val sparkCheckValue = spark.conf.getOption("overwatch.permit.db.destruction").getOrElse("__OverwatchDBNOTSET")
@@ -63,11 +97,25 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
       s"to the name of the database to which you're point this function. 'overwatch.permit.db.destruction=$targetDBName''")
   }
 
+  /**
+   * simple getter for global default (or overridden) date format
+   * @param dtFormatString
+   * @return
+   */
   protected def getDateFormat(dtFormatString: Option[String]): SimpleDateFormat = {
     val dtFormatStringFinal = dtFormatString.getOrElse(TimeTypesConstants.dtStringFormat)
     new SimpleDateFormat(dtFormatStringFinal)
   }
 
+  /**
+   * Requires a minimum number of days (default 3) for a valid kitana test. Recommended duration is 30 days.
+   * When attempting to validate an Overwatch dataset with less than 3 days to compare, the accuracy will likely be
+   * very misleading
+   * @param actualDuration Number of days for Kitana to validate across given the state and config
+   * @param recommendedDuration default 30
+   * @param minimumDuration default 3
+   * @throws com.databricks.labs.overwatch.utils.BadConfigException
+   */
   @throws(classOf[BadConfigException])
   private def validateDuration(actualDuration: Int, recommendedDuration: Int = 30, minimumDuration: Int = 3): Unit = {
     val recommendDuration = s"It's strongly recommended to expand this window to at least $recommendedDuration days " +
@@ -83,8 +131,14 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }
   }
 
+  /**
+   * Requires that the user utilize Kitana as intended to avoid dangerous scenarios to production data.
+   * The Kitana db must be created, owned, and maintained by Overwatch
+   * @param pipeline
+   * @throws com.databricks.labs.overwatch.utils.BadConfigException
+   */
   @throws(classOf[BadConfigException])
-  private def validateSnapDatabase(pipeline: Pipeline): Unit = {
+  protected def validateSnapDatabase(pipeline: Pipeline): Unit = {
     val config = pipeline.config
     val dbProperties = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName).properties
     val isVerifiedSnap = dbProperties.getOrElse("SNAPDB", "FALSE") == "TRUE"
@@ -101,37 +155,10 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }
   }
 
-//  @throws(classOf[BadConfigException])
-//  protected def validateSnapPipeline(
-//                                      bronzeLookupPipeline: Bronze,
-//                                      snapPipeline: Pipeline,
-//                                      snapFromTime: TimeTypes,
-//                                      snapUntilTime: TimeTypes
-//                                    ): Unit = {
-//    validateSnapDatabase(snapPipeline)
-//    if (bronzeLookupPipeline.getPipelineState.isEmpty) {
-//      throw new PipelineStateException("PIPELINE STATE ERROR: The state of the source cannot be determined.", None)
-//    } else {
-//      val sourceMaxUntilTS = bronzeLookupPipeline.getPipelineState.values.toArray.maxBy(_.untilTS).untilTS
-//      require(sourceMaxUntilTS >= snapUntilTime.asUnixTimeMilli, s"PIPELINE STATE ERROR: The maximum state of " +
-//        s"any module in the source is < the specified end period of ${snapUntilTime.asDTString}. The snap window " +
-//        s"must be WITHIN the timeframe of the source data.")
-//    }
-//
-//    val sourcePrimordialDate = Pipeline.deriveLocalDate(bronzeLookupPipeline.config.primordialDateString.get, getDateFormat(None))
-//    val snapPrimordialDate = snapFromTime.asLocalDateTime.toLocalDate
-//
-//    require(snapPrimordialDate.toEpochDay >= sourcePrimordialDate.toEpochDay, s"The specified start date of " +
-//      s"$snapPrimordialDate is < the source's primordial date of $sourcePrimordialDate. The snap window must be " +
-//      s"WITHIN the timeframe of the source data.")
-//
-//    // already validated and confirmed max days == duration
-//    validateDuration(snapPipeline.config.maxDays)
-//  }
-
   /**
    * Returns ModuleTarget with each module by target for the configured scopes
-   *
+   * A ModuleTarget is essentiall a module combined with it's pipeline Target in a case class. A more formal
+   * bond between module and target will be integrated at a later date
    * @param pipeline
    * @return
    */
@@ -224,6 +251,11 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }
   }
 
+  /**
+   * Create the clone statement for bronze targets
+   * @param target
+   * @return
+   */
   private def buildCloneStatement(target: PipelineTable): String = {
     val baseStatement = s"CREATE OR REPLACE TABLE ${target.tableFullName} SHALLOW CLONE ${sourceDBName}.${target.name} "
     val locationClause = s"LOCATION '${target.tableLocation}' "
@@ -231,10 +263,10 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
   }
 
   /**
-   * Snapshots table
-   *
-   * @param snapTarget
-   * @param params
+   * Snapshot a bronze table given its state provided by a linked module derived from the config
+   * @param bronzeModule stateful module deried from the config
+   * @param snapTarget PipelineTable built out by the corresponding module
+   * @param snapUntilTime TimeType of the pipeline snapshot
    * @return
    */
   protected def snapTable(
@@ -274,6 +306,14 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }
   }
 
+  /**
+   * There are state management and status tables within the Overwatch Database that provide overall pipeline state.
+   * These tables must be handled slightly different to ensure the proper state is loaded when the pipeline is
+   * initialized
+   * @param bronzePipeline
+   * @param untilTS
+   * @return
+   */
   protected def snapStateTables(
                                  bronzePipeline: Pipeline,
                                  untilTS: TimeTypes
@@ -368,9 +408,15 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     modifiedConfig.setMaxDays(calculatedMaxDays)
     logger.log(Level.INFO, s"MAX DAYS: Updated to $calculatedMaxDays")
     logger.log(Level.INFO, s"PRIMORDIAL DATE: Set for recalculation as $primordialDatePlusPadding.")
+    validateDuration(calculatedMaxDays)
     pipeline.workspace.copy(_config = modifiedConfig)
   }
 
+  /**
+   * Helper for Overwatch pipeline state movement through time
+   * @param pipelineStateTable
+   * @param primordialDateString
+   */
   private def updateStateTable(
                                 pipelineStateTable: PipelineTable,
                                 primordialDateString: String
@@ -388,6 +434,10 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     spark.sql(updatePrimordialDateSql)
   }
 
+  /**
+   * DANGEROUS but very efficient method for dropping an array of targets
+   * @param targetsToDrop
+   */
   protected def fastDropTargets(targetsToDrop: ParSeq[PipelineTable]): Unit = {
     targetsToDrop.tasksupport = taskSupport
     targetsToDrop.map(_.databaseName).foreach(validateTargetDestruction)
@@ -454,6 +504,13 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }
   }
 
+  /**
+   * Method used to validate proper keys associated with a pipeline table. Tests include
+   * 1. uniqueness of keys
+   * 2. nonNull keys
+   * @param targetsToValidate
+   * @return
+   */
   protected def validateTargetKeys(targetsToValidate: ParArray[PipelineTable]): Dataset[KeyReport] = {
 
     targetsToValidate.map(t => {
@@ -494,6 +551,11 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     }).toArray.toSeq.toDS
   }
 
+  /**
+   * Helper method to identify duplicates within a pipeline table by its keys
+   * @param targetsToSearch
+   * @return
+   */
   protected def dupHunter(targetsToSearch: ParArray[PipelineTable]): (Dataset[DupReport], Array[TargetDupDetail]) = {
 
     val dupsDetails = targetsToSearch.filterNot(_.name.toLowerCase == "instancedetails").map(t => {
@@ -569,6 +631,12 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
     (finalDupReport, targetDupDetails)
   }
 
+  /**
+   * quick way to get all pipeline tables as "targets"
+   * @param workspace
+   * @param includePipelineStateTable
+   * @return
+   */
   protected def getAllKitanaTargets(workspace: Workspace, includePipelineStateTable: Boolean = false): Array[PipelineTable] = {
 
     val bronzePipeline = getBronzePipeline(workspace)
@@ -583,11 +651,10 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
   }
 
   /**
-   *
+   * Primary validation function for Kitana comparison
    * @param targetDetail
    * @param sourceDB
-   * @param incrementalTest
-   * @param tol
+   * @param tol tolerance of non-matching records as a percentage between 0.0 and 1.0
    * @return
    */
   protected def assertDataFrameDataEquals(
