@@ -258,9 +258,9 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
   }
 
   /**
-   * CAUTION: Very dangerous function. Permanently deletes all tables in snapshot database. To protect user from
-   * accidentally deleting data from undesired targets, an external check is made to ensure a spark config is set
-   * properly to allow removal of data from target database.
+   * CAUTION: Very dangerous function. Permanently deletes all tables and underlying data in snapshot database.
+   * To protect user from accidentally deleting data from undesired targets, an external check is made to ensure a
+   * spark config is set properly to allow removal of data from target database.
    * spark conf overwatch.permit.db.destruction MUST equal target database name where target database is the
    * kitana snapshot database
    */
@@ -294,6 +294,11 @@ class Kitana(sourceWorkspace: Workspace, val snapWorkspace: Workspace, sourceDBN
     }
   }
 
+  /**
+   * Tests to ensure that all partition, incremental, and key columns and present in the schema
+   * @param target
+   * @return
+   */
   private def validateRequiredColumns(target: PipelineTable): SchemaValidationReport = {
     try {
       val existingColumns = target.asDF.columns

@@ -19,22 +19,6 @@ object Upgrade extends SparkSessionWrapper {
 
   import spark.implicits._
 
-//  private def modifySchemaVersion(dbName: String, targetVersion: String): Unit = {
-//    val existingSchemaVersion = SchemaTools.getSchemaVersion(dbName)
-//    val upgradeStatement =
-//      s"""ALTER DATABASE $dbName SET DBPROPERTIES
-//         |(SCHEMA=$targetVersion)""".stripMargin
-//
-//    val upgradeMsg = s"upgrading schema from $existingSchemaVersion --> $targetVersion with STATEMENT:\n " +
-//      s"$upgradeStatement"
-//    logger.log(Level.INFO, upgradeMsg)
-//    spark.sql(upgradeStatement)
-//    val newSchemaVersion = SchemaTools.getSchemaVersion(dbName)
-//    assert(newSchemaVersion == targetVersion)
-//    logger.log(Level.INFO, s"UPGRADE SUCCEEDED")
-//
-//  }
-
   @throws(classOf[UpgradeException])
   private def validateSchemaUpgradeEligibility(currentVersion: String, targetVersion: String): Unit = {
     var valid = true
@@ -51,12 +35,16 @@ object Upgrade extends SparkSessionWrapper {
     )
   }
 
+  /**
+   * Upgrade to 0412 schema workspace from prior version for tables:
+   * jobs_snapshot_bronze & clusters_snapshot_bronze
+   * @param prodWorkspace production workspace defined in production pipeline run configuration
+   * @return
+   */
   def upgradeTo0412(prodWorkspace: Workspace): Dataset[UpgradeReport] = {
     val currentSchemaVersion = SchemaTools.getSchemaVersion(prodWorkspace.getConfig.databaseName)
-    val targetSchemaVersion = prodWorkspace.getConfig.overwatchSchemaVersion
+    val targetSchemaVersion = "0.412"
     validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
-    // downscale jar schema version to current
-//    prodWorkspace.getConfig.setOverwatchSchemaVersion(currentSchemaVersion)
     val bronzePipeline = Bronze(prodWorkspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
     val jobsSnapshotTarget = bronzePipeline.getAllTargets.filter(_.name == "jobs_snapshot_bronze").head
     val clusterSnapshotTarget = bronzePipeline.getAllTargets.filter(_.name == "clusters_snapshot_bronze").head
@@ -125,15 +113,21 @@ object Upgrade extends SparkSessionWrapper {
 
   }
 
-  def upgradeTo042(workspace: Workspace, isLocalUpgrade: Boolean = false): Dataset[UpgradeReport] = {
-    val currentSchemaVersion = SchemaTools.getSchemaVersion(workspace.getConfig.databaseName)
+  /**
+   * Upgrade to 0420 schema workspace from prior version for tables:
+   * instanceDetails & jobruncostpotentialfact
+   * @param prodWorkspace production workspace defined in production pipeline run configuration
+   * @param isLocalUpgrade
+   * @return
+   */
+  def upgradeTo042(prodWorkspace: Workspace, isLocalUpgrade: Boolean = false): Dataset[UpgradeReport] = {
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(prodWorkspace.getConfig.databaseName)
     val targetSchemaVersion = "0.420"
     validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
     val upgradeStatus: ArrayBuffer[UpgradeReport] = ArrayBuffer()
 
     try {
-//      workspace.getConfig.setOverwatchSchemaVersion(currentSchemaVersion)
-      val bronzePipeline = Bronze(workspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
+      val bronzePipeline = Bronze(prodWorkspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
       val snapDate = bronzePipeline.pipelineSnapTime.asDTString
       val w = Window.partitionBy(lower(trim('API_name))).orderBy('activeFrom)
       val wKeyCheck = Window.partitionBy(lower(trim('API_name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
@@ -143,10 +137,10 @@ object Upgrade extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Upgrading ${instanceDetailsTarget.tableFullName}")
       if (instanceDetailsTarget.exists) {
         val upgradedInstanceDetails = instanceDetailsTarget.asDF(withGlobalFilters = isLocalUpgrade)
-          .withColumn("activeFrom", lit(workspace.getConfig.primordialDateString.get).cast("date"))
+          .withColumn("activeFrom", lit(prodWorkspace.getConfig.primordialDateString.get).cast("date"))
           .withColumn("activeUntil", lit(null).cast("date"))
-          .withColumn("sqlComputeDBUPrice", lit(workspace.getConfig.contractSQLComputeDBUPrice))
-          .withColumn("jobsLightDBUPrice", lit(workspace.getConfig.contractJobsLightDBUPrice))
+          .withColumn("sqlComputeDBUPrice", lit(prodWorkspace.getConfig.contractSQLComputeDBUPrice))
+          .withColumn("jobsLightDBUPrice", lit(prodWorkspace.getConfig.contractJobsLightDBUPrice))
           .withColumn("activeUntil", coalesce('activeUntil, lit(snapDate)))
           .withColumn("previousUntil", lag('activeUntil, 1).over(w))
           .withColumn("rnk", rank().over(wKeyCheck))
@@ -165,17 +159,17 @@ object Upgrade extends SparkSessionWrapper {
         )
 
         bronzePipeline.database.write(upgradedInstanceDetails, upgradeTarget, lit(null))
-        upgradeStatus.append(UpgradeReport(workspace.getConfig.databaseName, upgradeTarget.name, Some("SUCCESS")))
+        upgradeStatus.append(UpgradeReport(prodWorkspace.getConfig.databaseName, upgradeTarget.name, Some("SUCCESS")))
       } else {
         val errMsg = s"${instanceDetailsTarget.tableFullName} does not exist. There's no need to upgrade this table " +
           s"since it didn't already exist. It will be created on the next run. Validate that the underlying ETL " +
           s"Data Path is empty and re-run your pipeline."
         logger.log(Level.WARN, errMsg)
-        upgradeStatus.append(UpgradeReport(workspace.getConfig.databaseName, instanceDetailsTarget.name, Some(errMsg)))
+        upgradeStatus.append(UpgradeReport(prodWorkspace.getConfig.databaseName, instanceDetailsTarget.name, Some(errMsg)))
       }
 
       // UPGRADE jrcp_gold
-      val goldPipeline = Gold(workspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
+      val goldPipeline = Gold(prodWorkspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
       val jrcpGold = goldPipeline.getAllTargets.filter(_.name == "jobRunCostPotentialFact_gold").head
       logger.log(Level.INFO, s"Upgrading ${jrcpGold.tableFullName}")
       if (jrcpGold.exists) {
@@ -189,25 +183,19 @@ object Upgrade extends SparkSessionWrapper {
         )
 
         goldPipeline.database.write(upgradedJRCP, upgradeTarget, lit(null))
-        upgradeStatus.append(UpgradeReport(workspace.getConfig.databaseName, jrcpGold.name, Some("SUCCESS")))
+        upgradeStatus.append(UpgradeReport(prodWorkspace.getConfig.databaseName, jrcpGold.name, Some("SUCCESS")))
       } else {
         val errMsg = s"${jrcpGold.name} doesn't exist in the current schema and will not be upgraded. This is not " +
           s"an error, simply a notification."
         logger.log(Level.WARN, errMsg)
-        upgradeStatus.append(UpgradeReport(workspace.getConfig.databaseName, jrcpGold.name, Some(errMsg)))
+        upgradeStatus.append(UpgradeReport(prodWorkspace.getConfig.databaseName, jrcpGold.name, Some(errMsg)))
       }
 
       logger.log(Level.INFO, "All upgrades Complete")
       logger.log(Level.INFO, s"Upgrading registered schema version to $targetSchemaVersion")
-      SchemaTools.modifySchemaVersion(workspace.getConfig.databaseName, targetSchemaVersion)
+      SchemaTools.modifySchemaVersion(prodWorkspace.getConfig.databaseName, targetSchemaVersion)
       upgradeStatus.toDS()
     }
   }
-
-  // call previous upgrades if not coming from 0412
-  // upgrade schema for jrcp_gold
-  // drop instanceDetails
-
-  // Placeholder for schema upgrade logic
 
 }
