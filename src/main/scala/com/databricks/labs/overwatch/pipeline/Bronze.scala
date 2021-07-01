@@ -105,6 +105,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private def landAzureAuditEvents(): Unit = {
     val isFirstAuditRun = !BronzeTargets.auditLogsTarget.exists
     val rawAzureAuditEvents = landAzureAuditLogDF(
+      BronzeTargets.auditLogAzureLandRaw,
       config.auditLogConfig.azureAuditLogEventhubConfig.get,
       config.etlDataPathPrefix, config.databaseLocation, config.consumerDatabaseLocation,
       isFirstAuditRun,

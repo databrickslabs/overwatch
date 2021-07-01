@@ -170,7 +170,7 @@ private[overwatch] class TokenError(s: String) extends Exception(s) {}
 
 private[overwatch] class PipelineStateException(s: String, val target: Option[PipelineTable]) extends Exception(s) {}
 
-private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
+private[overwatch] class BadConfigException(s: String, val failPipeline: Boolean = true) extends Exception(s) {}
 
 private[overwatch] class FailedModuleException(s: String, val target: PipelineTable) extends Exception(s) {}
 

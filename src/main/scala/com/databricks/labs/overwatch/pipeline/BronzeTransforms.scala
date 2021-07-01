@@ -84,6 +84,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   private def validateCleanPaths(
+                                  azureRawAuditLogTarget: PipelineTable,
                                   isFirstRun: Boolean,
                                   ehConfig: AzureAuditLogEventhubConfig,
                                   etlDataPathPrefix: String,
@@ -98,7 +99,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, s"Checkpoint paths to validate: ${pathsToValidate.mkString(",")}")
     val dataTargetPaths = Array(etlDataPathPrefix, etlDBLocation, consumerDBLocation).map(_.toLowerCase)
 
-    val baseErrMsg = "Azure Event Hub Paths are not empty on first run."
+    val baseErrMsg = "ERROR: Azure Event Hub checkpoint directory issue."
     pathsToValidate.foreach(p => {
       logger.log(Level.INFO, s"Validating: $p")
       val exists = Helpers.pathExists(p)
@@ -120,17 +121,26 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
 
       if (!exists && !isFirstRun) { // If not first run checkpoint paths must already exist.
-        val errMsg = s"$baseErrMsg\nPath: ${p} does not exist. To append new data, a checkpoint dir must " +
-          s"exist and be current."
-        logger.log(Level.ERROR, errMsg)
-        println(errMsg)
-        throw new BadConfigException(errMsg)
+        if (azureRawAuditLogTarget.exists && !azureRawAuditLogTarget.asDF().isEmpty) {
+          val warnMsg = s"$baseErrMsg\nPath: ${p} does not exist. To append new data, a checkpoint dir must " +
+            s"exist and be current. Attempting to recover state from Overwatch metadata."
+          logger.log(Level.WARN, warnMsg)
+          println(warnMsg)
+          throw new BadConfigException(warnMsg, failPipeline = false)
+        } else {
+          val errMsg = s"$baseErrMsg\nPath: ${p} does not exist. To append new data, a checkpoint dir must " +
+            s"exist and be current."
+          logger.log(Level.ERROR, errMsg)
+          println(errMsg)
+          throw new BadConfigException(errMsg)
+        }
       }
     })
   }
 
   @throws(classOf[BadConfigException])
-  protected def landAzureAuditLogDF(ehConfig: AzureAuditLogEventhubConfig,
+  protected def landAzureAuditLogDF(azureRawAuditLogTarget: PipelineTable,
+                                    ehConfig: AzureAuditLogEventhubConfig,
                                     etlDataPathPrefix: String,
                                     etlDBLocation: String,
                                     consumerDBLocation: String,
@@ -139,19 +149,32 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     runID: String
                                    ): DataFrame = {
 
-    validateCleanPaths(isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
-
     val connectionString = ConnectionStringBuilder(ehConfig.connectionString)
       .setEventHubName(ehConfig.eventHubName)
       .build
 
-    val eventHubsConf = if (isFirstRun) {
-      EventHubsConf(connectionString)
-        .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
-        .setStartingPosition(EventPosition.fromStartOfStream)
-    } else {
-      EventHubsConf(connectionString)
-        .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+    val eventHubsConf = try {
+      validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
+
+      if (isFirstRun) {
+        EventHubsConf(connectionString)
+          .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+          .setStartingPosition(EventPosition.fromStartOfStream)
+      } else {
+        EventHubsConf(connectionString)
+          .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+      }
+    } catch { // chk dir is missing BUT raw audit hist has latest enq time and can resume from there creating a new chkpoint
+      case e: BadConfigException if (!e.failPipeline) =>
+        val lastEnqTime = azureRawAuditLogTarget.asDF()
+        .select(max('enqueuedTime))
+        .as[java.sql.Timestamp]
+        .first
+        .toInstant
+
+        EventHubsConf(connectionString)
+          .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+          .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
     spark.readStream
