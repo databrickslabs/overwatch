@@ -137,11 +137,25 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   def executeGet(pageCall: Boolean = false): this.type = {
     logger.log(Level.INFO, s"Loading $req -> query: $getQueryString")
     try {
-      val result = Http(req + getQueryString)
-        .copy(headers = httpHeaders)
-        .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
-        .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
-        .asString
+      val result = try {
+        Http(req + getQueryString)
+          .copy(headers = httpHeaders)
+          .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+          .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+          .asString
+      } catch {
+        case _: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
+          val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
+            "ssl. If this is unexpected behavior, validate your ssl certs."
+          logger.log(Level.WARN, sslMSG)
+          println(sslMSG)
+          Http(req + getQueryString)
+            .copy(headers = httpHeaders)
+            .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+            .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+            .option(HttpOptions.allowUnsafeSSL)
+            .asString
+      }
       if (result.isError) {
         if (result.code == 429) {
           Thread.sleep(2000)
@@ -214,12 +228,26 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     val jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
     logger.log(Level.INFO, s"Loading $req -> query: $jsonQuery")
     try {
-      val result = Http(req)
-        .copy(headers = httpHeaders)
-        .postData(jsonQuery)
-        .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
-        .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
-        .asString
+      val result = try {
+        Http(req)
+          .copy(headers = httpHeaders)
+          .postData(jsonQuery)
+          .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+          .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+          .asString
+      } catch {
+        case _: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
+          val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
+            "ssl. If this is unexpected behavior, validate your ssl certs."
+          logger.log(Level.WARN, sslMSG)
+          println(sslMSG)
+          Http(req + getQueryString)
+            .copy(headers = httpHeaders)
+            .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+            .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+            .option(HttpOptions.allowUnsafeSSL)
+            .asString
+      }
       if (result.isError) {
         val err = mapper.readTree(result.body).get("error_code").asText()
         val msg = mapper.readTree(result.body).get("message").asText()
