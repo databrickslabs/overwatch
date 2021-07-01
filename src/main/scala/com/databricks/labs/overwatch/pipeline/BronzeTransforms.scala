@@ -13,7 +13,7 @@ import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, Event
 import org.apache.spark.sql.catalyst.expressions.Slice
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
@@ -167,10 +167,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
     } catch { // chk dir is missing BUT raw audit hist has latest enq time and can resume from there creating a new chkpoint
       case e: BadConfigException if (!e.failPipeline) =>
         val lastEnqTime = azureRawAuditLogTarget.asDF()
-        .select(max('enqueuedTime))
-        .as[java.sql.Timestamp]
-        .first
-        .toInstant
+          .select(max('enqueuedTime))
+          .as[java.sql.Timestamp]
+          .first
+          .toInstant
 
         EventHubsConf(connectionString)
           .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
@@ -342,18 +342,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def prepClusterEventLogs(filteredAuditLogDF: DataFrame,
-                                     clusterSnapshotTable: PipelineTable,
-                                     start_time: TimeTypes, end_time: TimeTypes,
-                                     apiEnv: ApiEnv,
-                                     organizationId: String): DataFrame = {
+  protected def prepClusterEventLogs(
+                                      filteredAuditLogDF: DataFrame,
+                                      start_time: TimeTypes, end_time: TimeTypes,
+                                      apiEnv: ApiEnv,
+                                      organizationId: String
+                                    )(clusterSnapshotDF: DataFrame): DataFrame = {
     val extraQuery = Map(
       "start_time" -> start_time.asUnixTimeMilli, // 1588935326000L, //
       "end_time" -> end_time.asUnixTimeMilli, //1589021726000L //
       "limit" -> 500
     )
 
-    val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotTable)
+    val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
       .as[String]
       .collect()
 
@@ -653,7 +654,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
                                       historicalAuditLookupDF: DataFrame,
-                                      clusterSnapshot: PipelineTable,
+                                      clusterSnapshotTable: PipelineTable,
                                       sparkLogClusterScaleCoefficient: Double
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
@@ -672,6 +673,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val daysToProcess = Duration.between(fromDate.atStartOfDay(), untilDate.plusDays(1L).atStartOfDay())
       .toDays.toInt
 
+    val clusterSnapshotMinSchema = StructType(
+      Seq(
+        StructField("cluster_id",StringType, nullable = true),
+        StructField("state",StringType, nullable = true),
+        StructField("cluster_log_conf",StringType, nullable = true)
+      )
+    )
+
+    val clusterSnapshot = clusterSnapshotTable.asDF
+      .verifyMinimumSchema(clusterSnapshotMinSchema)
     // Shoot for partitions coreCount < 16 partitions per day < 576
     // This forces autoscaling clusters to scale up appropriately to handle the volume
     val optimizeParCount = math.min(math.max(coreCount * 2, daysToProcess * 32), 1024)
@@ -679,6 +690,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // clusterIDs with activity identified from audit logs since last run
     val incrementalClusterWLogging = historicalAuditLookupDF
+      .verifyMinimumSchema(Schema.auditMasterSchema)
       .withColumn("global_cluster_id", cluster_idFromAudit)
       .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
       .join(incrementalClusterIDs, Seq("cluster_id"))
@@ -688,7 +700,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // This captures clusters that have not been edited/restarted since the last run and are still RUNNING with
     // log confs as they will not be in the audit logs
     val latestSnapW = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
-    val currentlyRunningClustersWithLogging = clusterSnapshot.asDF
+    val currentlyRunningClustersWithLogging = clusterSnapshot
       .withColumn("snapRnk", rank.over(latestSnapW))
       .filter('snapRnk === 1 && 'state === "RUNNING")
       .withColumn("cluster_log_conf", to_json('cluster_log_conf))

@@ -258,6 +258,7 @@ object Schema extends SparkSessionWrapper {
    * Gold Layer 3xxx
    */
   private[overwatch] val minimumSchemasByModule: Map[Int, StructType] = Map(
+    1005 -> StructType(Seq(StructField("state",StringType, nullable = true))),
     1006 -> auditMasterSchema,
     // SparkExecutors
     2003 -> sparkEventsRawMasterSchema,

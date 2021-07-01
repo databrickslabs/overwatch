@@ -433,7 +433,7 @@ object TransformFunctions {
   }
 
   def getClusterIdsWithNewEvents(filteredAuditLogDF: DataFrame,
-                                 clusterSnapshotTable: PipelineTable
+                                 clusterSnapshotTable: DataFrame
                                 ): DataFrame = {
 
     val newClustersIDs = filteredAuditLogDF
@@ -443,7 +443,7 @@ object TransformFunctions {
 
     val latestSnapW = Window.partitionBy(col("organization_id")).orderBy(col("Pipeline_SnapTS").desc)
     // capture long-running clusters not otherwise captured from audit
-    val currentlyRunningClusters = clusterSnapshotTable.asDF()
+    val currentlyRunningClusters = clusterSnapshotTable
       .withColumn("snapRnk", rank.over(latestSnapW))
       .filter(col("snapRnk") === 1)
       .filter(col("state") === "RUNNING")

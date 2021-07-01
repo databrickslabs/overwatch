@@ -11,6 +11,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   /**
    * Enable access to Bronze pipeline tables externally.
+   *
    * @return
    */
   def getAllTargets: Array[PipelineTable] = {
@@ -66,13 +67,15 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), 0.0, Some(30))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
-    prepClusterEventLogs(
-      BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
-      BronzeTargets.clustersSnapshotTarget,
-      clusterEventLogsModule.fromTime,
-      clusterEventLogsModule.untilTime,
-      config.apiEnv,
-      config.organizationId
+    BronzeTargets.clustersSnapshotTarget.asDF,
+    Seq(
+      prepClusterEventLogs(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
+        clusterEventLogsModule.fromTime,
+        clusterEventLogsModule.untilTime,
+        config.apiEnv,
+        config.organizationId
+      )
     ),
     append(BronzeTargets.clusterEventsTarget)
   )
@@ -119,7 +122,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       spark, config, "azure_audit_log_preProcessing", getTotalCores
     )
 
-    database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw,pipelineSnapTime.asColumnTS)
+    database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
 
     val rawProcessCompleteMsg = "Azure audit ingest process complete"
     if (config.debugFlag) println(rawProcessCompleteMsg)
