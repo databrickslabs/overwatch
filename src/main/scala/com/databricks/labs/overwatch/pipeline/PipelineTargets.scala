@@ -31,6 +31,15 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id")
     )
 
+    lazy private[overwatch] val databricksSqlTarget: PipelineTable = PipelineTable(
+      name = "databricks_sql_snapshot_bronze",
+      _keys = Array("id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      statsColumns = "created_time, creator_user_name, id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
+      partitionBy = Seq("organization_id")
+    )
+
     lazy private[overwatch] val clustersSnapshotTarget: PipelineTable = PipelineTable(
       name = "clusters_snapshot_bronze",
       _keys = Array("cluster_id", "Overwatch_RunID"),
