@@ -64,7 +64,11 @@ case class AzureAuditLogEventhubConfig(
                                         auditLogChk: Option[String] = None
                                       )
 
-case class AuditLogConfig(rawAuditPath: Option[String] = None, azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None)
+case class AuditLogConfig(
+                           rawAuditPath: Option[String] = None,
+                           auditLogFormat: String = "json",
+                           azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None
+                         )
 case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
 
 case class OverwatchParams(auditLogConfig: AuditLogConfig,

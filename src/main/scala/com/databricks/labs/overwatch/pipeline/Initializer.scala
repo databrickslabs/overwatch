@@ -97,6 +97,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     if (config.cloudProvider == "aws") {
 
       val auditLogPath = auditLogConfig.rawAuditPath
+      val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim
       if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
         throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
       }
@@ -107,10 +108,16 @@ class Initializer(config: Config) extends SparkSessionWrapper {
             s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
         })
 
+      val supportedAuditLogFormats = Array("json", "parquet", "delta")
+      if (!supportedAuditLogFormats.contains(auditLogFormat)) {
+        throw new BadConfigException(s"Audit Log Format: Supported formats are ${supportedAuditLogFormats.mkString(",")} " +
+          s"but $auditLogFormat was placed in teh configuration. Please select a supported audit log format.")
+      }
+
       val finalAuditLogPath = if (auditLogPath.get.endsWith("/")) auditLogPath.get.dropRight(1) else auditLogPath.get
 
       config.setAuditLogConfig(
-        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), None)
+        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
       )
 
     } else {
@@ -138,11 +145,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         auditLogChk = Some(auditLogBronzeChk)
       )
 
-      config.setAuditLogConfig(
-        auditLogConfig.copy(
-          None, Some(ehFinalConfig)
-        )
-      )
+      config.setAuditLogConfig(auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig)))
 
     }
     this

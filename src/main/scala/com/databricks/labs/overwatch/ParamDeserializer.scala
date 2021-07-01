@@ -100,6 +100,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     }
 
     val rawAuditPath = getOptionString(masterNode, "auditLogConfig.rawAuditPath")
+    val auditLogFormat = getOptionString(masterNode, "auditLogConfig.auditLogFormat").getOrElse("json")
     val azureEventHubNode = getNodeFromPath(masterNode, "auditLogConfig.azureAuditLogEventhubConfig")
 
     val azureAuditEventHubConfig = if (azureEventHubNode.nonEmpty) {
@@ -116,7 +117,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       None
     }
 
-    val auditLogConfig = AuditLogConfig(rawAuditPath, azureAuditEventHubConfig)
+    val auditLogConfig = AuditLogConfig(rawAuditPath, auditLogFormat, azureAuditEventHubConfig)
 
     val dataTarget = if (masterNode.has("dataTarget")) {
       Some(DataTarget(

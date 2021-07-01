@@ -216,6 +216,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     df.withColumn("custom_tags", SchemaTools.structToMap(df, "custom_tags"))
   }
 
+  //noinspection ScalaCustomHdfsFormat
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
                                cloudProvider: String,
                                fromTime: LocalDateTime,
@@ -267,7 +268,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(Helpers.pathExists)
 
       if (datesGlob.nonEmpty) {
-        spark.read.json(datesGlob: _*)
+        spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
           // When globbing the paths, the date must be reconstructed and re-added manually
           .withColumn("organization_id", lit(organizationId))
           .withColumn("filename", input_file_name)
@@ -285,7 +286,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                        endTSMilli: Long, clusterIDs: Array[String]): Array[Array[String]] = {
 
     case class ClusterEventBuffer(clusterId: String, batchId: Int)
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(24))
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(8))
     val clusterIdsPar = clusterIDs.par
     clusterIdsPar.tasksupport = taskSupport
 
