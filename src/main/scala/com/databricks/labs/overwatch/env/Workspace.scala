@@ -54,7 +54,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   }
 
   // The below function is supposed to fetch data about DatabricksSQLEndPoints
-  def getSqlEndPointsDF: DataFrame = {
+  def getDatabricksSqlDF: DataFrame = {
 
     val jobsEndpoint = "sql/endpoints"
 
