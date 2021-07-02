@@ -13,7 +13,7 @@ import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, Event
 import org.apache.spark.sql.catalyst.expressions.Slice
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
@@ -653,6 +653,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
+                                      cloudProvider: String,
                                       historicalAuditLookupDF: DataFrame,
                                       clusterSnapshotTable: PipelineTable,
                                       sparkLogClusterScaleCoefficient: Double
@@ -673,11 +674,33 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val daysToProcess = Duration.between(fromDate.atStartOfDay(), untilDate.plusDays(1L).atStartOfDay())
       .toDays.toInt
 
+    val dbfsLogSchema = StructType(Seq(
+      StructField("destination", StringType, true)
+    ))
+
+    val s3LogSchema = StructType(Seq(
+      StructField("canned_acl", StringType, true),
+      StructField("destination", StringType, true),
+      StructField("enable_encryption", BooleanType, true),
+      StructField("region", StringType, true)
+    ))
+
+    val logConfSchemaAWS = if (cloudProvider == "aws") {
+      StructType(Seq(
+        StructField("dbfs", dbfsLogSchema, true),
+        StructField("s3", s3LogSchema, true)
+      ))
+    } else {
+      StructType(Seq(
+        StructField("dbfs", dbfsLogSchema, true)
+      ))
+    }
+
     val clusterSnapshotMinSchema = StructType(
       Seq(
-        StructField("cluster_id",StringType, nullable = true),
-        StructField("state",StringType, nullable = true),
-        StructField("cluster_log_conf",StringType, nullable = true)
+        StructField("cluster_id", StringType, nullable = true),
+        StructField("state", StringType, nullable = true),
+        StructField("cluster_log_conf", logConfSchemaAWS, nullable = true)
       )
     )
 
@@ -694,6 +717,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("global_cluster_id", cluster_idFromAudit)
       .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
       .join(incrementalClusterIDs, Seq("cluster_id"))
+      .withColumn("cluster_log_conf", coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
+      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
       .filter('cluster_log_conf.isNotNull)
 
     // Get latest incremental snapshot of clusters running during current run
@@ -703,7 +728,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val currentlyRunningClustersWithLogging = clusterSnapshot
       .withColumn("snapRnk", rank.over(latestSnapW))
       .filter('snapRnk === 1 && 'state === "RUNNING")
-      .withColumn("cluster_log_conf", to_json('cluster_log_conf))
+      .withColumn("cluster_log_conf", coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"))
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('cluster_id, 'cluster_log_conf)
 
@@ -711,17 +736,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes = currentlyRunningClustersWithLogging
       .unionByName(incrementalClusterWLogging)
-      .withColumn("s3", get_json_object('cluster_log_conf, "$.s3"))
-      .withColumn("dbfs", get_json_object('cluster_log_conf, "$.dbfs"))
-      .withColumn("destination",
-        when('s3.isNotNull, regexp_replace(get_json_object('s3, "$.destination"), "\\/$", ""))
-          when('dbfs.isNotNull, regexp_replace(get_json_object('dbfs, "$.destination"), "\\/$", ""))
-      )
-      .withColumn("topLevelTargets",
-        array(col("destination"), col("cluster_id"),
-          lit("eventlog"))
-      ).withColumn("wildPath", concat_ws("/", 'topLevelTargets))
-      .select('wildPath)
+      .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
+      .withColumn("wildPrefix", regexp_replace(concat_ws("/", 'topLevelTargets), "//", ""))
+      .select('wildPrefix)
       .distinct()
 
     // all files considered for ingest
