@@ -206,6 +206,10 @@ object Schema extends SparkSessionWrapper {
         StructField("DiskBytesSpilled", LongType, nullable = true),
         StructField("ResultSize", LongType, nullable = true)
       )), nullable = true),
+    StructField("TaskExecutorMetrics",
+      StructType(Seq(
+        StructField("JVMHeapMemory", LongType, nullable = true)
+      )), nullable = true),
     StructField("TaskType", StringType, nullable = true),
     StructField("TaskEndReason",
       StructType(Seq(
@@ -258,7 +262,11 @@ object Schema extends SparkSessionWrapper {
    * Gold Layer 3xxx
    */
   private[overwatch] val minimumSchemasByModule: Map[Int, StructType] = Map(
-    1005 -> StructType(Seq(StructField("state",StringType, nullable = true))),
+    1005 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
+      StructField("state",StringType, nullable = true),
+      StructField("cluster_id",StringType, nullable = true)
+    )),
     1006 -> auditMasterSchema,
     // SparkExecutors
     2003 -> sparkEventsRawMasterSchema,

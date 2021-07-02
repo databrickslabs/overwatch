@@ -685,22 +685,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
       StructField("region", StringType, true)
     ))
 
-    val logConfSchemaAWS = if (cloudProvider == "aws") {
-      StructType(Seq(
+    val logConfSchema = StructType(Seq(
         StructField("dbfs", dbfsLogSchema, true),
         StructField("s3", s3LogSchema, true)
       ))
-    } else {
-      StructType(Seq(
-        StructField("dbfs", dbfsLogSchema, true)
-      ))
-    }
 
     val clusterSnapshotMinSchema = StructType(
       Seq(
         StructField("cluster_id", StringType, nullable = true),
         StructField("state", StringType, nullable = true),
-        StructField("cluster_log_conf", logConfSchemaAWS, nullable = true)
+        StructField("cluster_log_conf", logConfSchema, nullable = true)
       )
     )
 
