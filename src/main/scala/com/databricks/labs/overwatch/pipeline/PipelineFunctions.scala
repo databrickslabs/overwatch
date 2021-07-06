@@ -7,6 +7,7 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import java.net.URI
 
 object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -26,7 +27,7 @@ object PipelineFunctions {
         if (schema == "dbfs") {
           rawPathString.replaceAllLiterally("//", "/")
         } else {
-          rawPathString
+          new URI(rawPathString).normalize().toString
         }
       case None =>
         "dbfs:%s".format(rawPathString.replaceAllLiterally("//", "/"))

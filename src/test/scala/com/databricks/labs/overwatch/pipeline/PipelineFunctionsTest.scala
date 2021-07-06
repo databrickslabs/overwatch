@@ -156,6 +156,11 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
         PipelineFunctions.cleansePathURI("abfss://test2@aottlrs.dfs.core.windows.net/1235")
       )
     }
+    it("should work for ABFSS double slashes") {
+      assertResult("abfss://test2@aottlrs.dfs.core.windows.net/1235")(
+        PipelineFunctions.cleansePathURI("abfss://test2@aottlrs.dfs.core.windows.net//1235")
+      )
+    }
     it("should work for S3") {
       assertResult("s3a://commoncrawl/path")(
         PipelineFunctions.cleansePathURI("s3a://commoncrawl/path")
