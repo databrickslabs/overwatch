@@ -49,18 +49,16 @@ Hot Notebooks | Heavy User Breakdown
 
 ### Realtime / Monitoring / Alerting
 Overwatch does have a configurable, near-realtime component that allows users to retrieve metrics at a configurable
-frequency (i.e. 5s/120s/etc). This is enabled through [DropWizard]() (a default spark monitoring platform) and a 
+frequency (i.e. 5s/120s/etc). This is enabled through [DropWizard](https://spark.apache.org/docs/latest/monitoring.html) (a default spark monitoring platform) and a 
 time-series database (TSDB) called "whisper" which is wrapped by Graphite. Graphite offers many exposed APIs upon which 
 any front-end TSDB reporting tool can be used, such as Grafana. Graphite and Grafana are used by default as they do not
 require a license for basic use and Grafana is very common in the industry. Very powerful monitoring dashboards
 along with configured alerting can be enabled through Grafana.
 
 {{% notice note %}}
-The realtime modules are set to be released as part of Overwatch as soon as possible. The Dev team is targeting
-Q1 2021 for release but this is not a guarantee. Realtime is not being released as part of v1.0 as the cloud 
-infrastructure has not been enabled via one-click deploy just yet. As such, there's no reason a user cannot enable
-this but it's outside the scope of the Overwatch project at this time. Below is an example realtime architecture
-diagram to assist in the event you want to tackle this before it's packaged with Overwatch.
+The realtime architecture has been created but 1-click delivery has not yet been enabled. Currently, realtime 
+integration is up to the customer to integrate. For guidance / assistance in configuring the Overwatch real-time, 
+please reach out to your Databricks account team to set up an discovery meeting.
 {{% /notice %}}
 
 #### Example Realtime Architecture  

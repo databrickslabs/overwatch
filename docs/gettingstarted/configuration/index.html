@@ -12,21 +12,21 @@
     <title>Configuration :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1624455023" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625609729" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1624455023" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625609729" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625609729"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1624455023"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1624455023"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625609729"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625609729"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1624455023"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625609729"></script>
 
     
   </div>
@@ -491,6 +491,7 @@
         <li><a href="#datatarget">DataTarget</a></li>
         <li><a href="#azureauditlogeventhubconfig">AzureAuditLogEventhubConfig</a></li>
         <li><a href="#databrickscontractprices">DatabricksContractPrices</a></li>
+        <li><a href="#intelligentscaling">IntelligentScaling</a></li>
       </ul>
     </li>
   </ul>
@@ -578,6 +579,8 @@ can be found <a href="https://databrickslabs.github.io/overwatch/assets/GettingS
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> azureLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AzureAuditLogEventhubConfig</span><span style="color:#f92672">(</span>connectionString <span style="color:#66d9ef">=</span> ehConnString<span style="color:#f92672">,</span> eventHubName <span style="color:#66d9ef">=</span> ehName<span style="color:#f92672">,</span> auditRawEventsPrefix <span style="color:#66d9ef">=</span> ehStatePath<span style="color:#f92672">)</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.56</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.26</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> <span style="color:#a6e22e">DatabricksSQLDBUPrice</span> <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.22</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedJobsLightDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.10</span>
 
 <span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(</span>
   auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span>azureAuditLogEventhubConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>azureLogConfig<span style="color:#f92672">)),</span>
@@ -586,8 +589,9 @@ can be found <a href="https://databrickslabs.github.io/overwatch/assets/GettingS
   badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>badRecordsPath<span style="color:#f92672">),</span>
   overwatchScope <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>scopes<span style="color:#f92672">),</span>
   maxDaysToLoad <span style="color:#66d9ef">=</span> maxDaysToLoad<span style="color:#f92672">,</span>
-  databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">),</span>
-  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>primordialDateString<span style="color:#f92672">)</span>
+  databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">,</span> <span style="color:#a6e22e">DatabricksSQLDBUPrice</span><span style="color:#f92672">,</span> automatedJobsLightDBUPrice<span style="color:#f92672">),</span>
+  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>primordialDateString<span style="color:#f92672">),</span>
+  intelligentScaling <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">IntelligentScaling</span><span style="color:#f92672">(</span>enabled <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">,</span> minimumCores <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">16</span><span style="color:#f92672">,</span> maximumCores <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">64</span><span style="color:#f92672">,</span> coeff <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">1.0</span><span style="color:#f92672">)</span>
 <span style="color:#f92672">)</span>
 </code></pre></div><p><strong>NOTE</strong> The connection string stored in the <em>ehConnString</em> above is stored as a secret since it contains a key. 
 <strong>THIS IS NOT THE KEY</strong> but the actual connection string from the SAS Policy. To find this follow the path in the 
@@ -606,19 +610,22 @@ Azure portal below.</p>
 
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> dbPATKey<span style="color:#f92672">)</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/sparkEventsBadrecords&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> auditSourcePath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/raw_audit_logs&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.56</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> auditSourcePath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/path/to/my/workspaces/raw_audit_logs&#34;</span> <span style="color:#75715e">// INPUT: workspace audit log directory
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.56</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.26</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> <span style="color:#a6e22e">DatabricksSQLDBUPrice</span> <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.22</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedJobsLightDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.10</span>
 
 <span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(</span>
-  auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span>rawAuditPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>auditSourcePath<span style="color:#f92672">)),</span>
+  auditLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AuditLogConfig</span><span style="color:#f92672">(</span>rawAuditPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>auditSourcePath<span style="color:#f92672">),</span> auditLogFormat <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;json&#34;</span><span style="color:#f92672">),</span>
   dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>dataTarget<span style="color:#f92672">),</span>
   tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>tokenSecret<span style="color:#f92672">),</span>
   badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>badRecordsPath<span style="color:#f92672">),</span>
   overwatchScope <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>scopes<span style="color:#f92672">),</span>
   maxDaysToLoad <span style="color:#66d9ef">=</span> maxDaysToLoad<span style="color:#f92672">,</span>
-  databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">),</span>
-  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>primordialDateString<span style="color:#f92672">)</span>
+  databricksContractPrices <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DatabricksContractPrices</span><span style="color:#f92672">(</span>interactiveDBUPrice<span style="color:#f92672">,</span> automatedDBUPrice<span style="color:#f92672">,</span> <span style="color:#a6e22e">DatabricksSQLDBUPrice</span><span style="color:#f92672">,</span> automatedJobsLightDBUPrice<span style="color:#f92672">),</span>
+  primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>primordialDateString<span style="color:#f92672">),</span>
+  intelligentScaling <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">IntelligentScaling</span><span style="color:#f92672">(</span>enabled <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">,</span> minimumCores <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">16</span><span style="color:#f92672">,</span> maximumCores <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">64</span><span style="color:#f92672">,</span> coeff <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">1.0</span><span style="color:#f92672">)</span>
 <span style="color:#f92672">)</span>
 </code></pre></div><h3 id="overwatchparams">OverwatchParams</h3>
 <p>The configuration structure required for Overwatch</p>
@@ -685,9 +692,16 @@ Azure portal below.</p>
 <tr>
 <td style="text-align:left"><strong>databricksContractPrices</strong></td>
 <td style="text-align:left">N</td>
-<td style="text-align:left">DatabricksContractPrices(0.56, 0.26)</td>
+<td style="text-align:left">DatabricksContractPrices()</td>
 <td style="text-align:left"><a href="#databrickscontractprices">DatabricksContractPrices</a></td>
 <td style="text-align:left">Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the <em>instanceDetails</em> consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices().</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>IntelligentScaling</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">IntelligentScaling()</td>
+<td style="text-align:left"><a href="#intelligentscaling">IntelligentScaling</a></td>
+<td style="text-align:left">Allows the user to enable / disable intelligent scaling and configure min/max core counts to be used when scaling the cluster</td>
 </tr>
 </tbody>
 </table>
@@ -710,6 +724,13 @@ Azure portal below.</p>
 <td style="text-align:left">None</td>
 <td style="text-align:left">Option[String]</td>
 <td style="text-align:left">Top-level path to directory containing workspace audit logs delivered by Databricks. The Overwatch user must have read access to this path</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>auditLogFormat</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">json</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">AWS ONLY - When using AWS and audit logs are delivered in a format other than json (default) this can be changed to reflect the audit log source data type. Supported types are json, parquet, delta</td>
 </tr>
 <tr>
 <td style="text-align:left"><strong>azureAuditLogEventhubConfig</strong></td>
@@ -894,6 +915,62 @@ Eventhub streaming environment configurations</p>
 <td style="text-align:left">0.26</td>
 <td style="text-align:left">Double</td>
 <td style="text-align:left">Approximate list price of automated DBU</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>sqlComputeDBUCostUSD</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">0.22</td>
+<td style="text-align:left">Double</td>
+<td style="text-align:left">Approximate list price of DatabricksSQL DBU</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>jobsLightDBUCostUSD</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">0.10</td>
+<td style="text-align:left">Double</td>
+<td style="text-align:left">Approximate list price of JobsLight Automated DBU</td>
+</tr>
+</tbody>
+</table>
+<h3 id="intelligentscaling">IntelligentScaling</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Config</th>
+<th style="text-align:left">Required Override</th>
+<th style="text-align:left">Default Value</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>enabled</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">false</td>
+<td style="text-align:left">Double</td>
+<td style="text-align:left">Approximate list price of interactive DBU</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>minimumCores</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">4</td>
+<td style="text-align:left">Int</td>
+<td style="text-align:left">Minimum number of cores to be used during Overwatch run</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>maximumCores</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">512</td>
+<td style="text-align:left">Int</td>
+<td style="text-align:left">Maximum number of cores to be used during Overwatch run</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>coeff</strong></td>
+<td style="text-align:left">N</td>
+<td style="text-align:left">1.0</td>
+<td style="text-align:left">Double</td>
+<td style="text-align:left">Scaler, each module has a scale based on it&rsquo;s size relative to the other modules. This variable acts as a scaler to the scaler, if the modules are scaling too fast (or not fast enough), this can be tweaked to increase the variability of the scaling from the starting core count.</td>
 </tr>
 </tbody>
 </table>
@@ -1164,19 +1241,19 @@ Eventhub streaming environment configurations</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625609729"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625609729"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1624455023" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1624455023"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625609729" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625609729"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
