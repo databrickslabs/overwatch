@@ -12,21 +12,21 @@
     <title>ChangeLog :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1624455023" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625609729" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1624455023" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625609729" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625609729"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1624455023"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1624455023"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625609729"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625609729"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1624455023"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625609729"></script>
 
     
   </div>
@@ -473,6 +473,13 @@
     <div class="wrapper">
 <nav id="TableOfContents">
   <ul>
+    <li><a href="#042">0.4.2</a>
+      <ul>
+        <li><a href="#upgrading-and-required-changes">Upgrading and Required Changes</a></li>
+        <li><a href="#major-features--enhancements">Major Features &amp; Enhancements</a></li>
+        <li><a href="#minor-bug-fixes--enhancements">Minor Bug Fixes / Enhancements</a></li>
+      </ul>
+    </li>
     <li><a href="#0413">0.4.13</a></li>
     <li><a href="#0412">0.4.12</a></li>
     <li><a href="#0411">0.4.11</a></li>
@@ -503,7 +510,81 @@
 
 
 
-	<h2 id="0413">0.4.13</h2>
+	<h2 id="042">0.4.2</h2>
+<h3 id="upgrading-and-required-changes">Upgrading and Required Changes</h3>
+<ul>
+<li><strong><a href="https://databrickslabs.github.io/overwatch/dataengineer/upgrade/">SCHEMA UPGRADE</a> REQUIRED</strong> - If you are upgrading from 0.4.12+ please use <em>Upgrade.Upgrade0420</em> If upgrading from a schema 
+prior to 0.4.12, please first upgrade to 0.4.12 and then to 0.4.2. The upgrade process will be improving or going away 
+soon, please bear with us while we improve this process.</li>
+</ul>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Upgrade
+<span style="color:#66d9ef">val</span> upgradeReport <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Upgrade</span><span style="color:#f92672">.</span>upgradeTo042<span style="color:#f92672">(&lt;</span><span style="color:#a6e22e">YOUR</span> <span style="color:#a6e22e">WORKSPACE</span> <span style="color:#a6e22e">OBJECT</span><span style="color:#f92672">&gt;)</span>
+</code></pre></div><ul>
+<li><strong>Launch Config Change</strong> - Note the difference in the <em>Initializer</em> for 0.4.2. The following change is ONLY necessary when/if 
+instantiating Overwatch from a notebook, the main class does not require this change. Sorry for the breaking change 
+we will try to minimize these everywhere possible</li>
+</ul>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#75715e">// 0.4.1 (OLD)
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> workspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Initializer</span><span style="color:#f92672">(</span><span style="color:#a6e22e">Array</span><span style="color:#f92672">(</span>args<span style="color:#f92672">),</span> debugFlag <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">)</span>
+<span style="color:#75715e">// 0.4.2+ (NEW)
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> workspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Initializer</span><span style="color:#f92672">(</span>args<span style="color:#f92672">,</span> debugFlag <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">)</span>
+</code></pre></div><h3 id="major-features--enhancements">Major Features &amp; Enhancements</h3>
+<p>Below are the major feature and enhancements in 0.4.2</p>
+<ul>
+<li>Improved <a href="https://databrickslabs.github.io/overwatch/gettingstarted//#initializing-the-environment">Getting Started Example Notebooks</a></li>
+<li>Kitana
+<ul>
+<li>Testing framework, currently meant for advanced usage, documentation will roll out asap.</li>
+</ul>
+</li>
+<li><a href="https://databrickslabs.github.io/overwatch/gettingstarted/configuration//#intelligentscaling">Intelligent scaling</a></li>
+<li><a href="https://github.com/databrickslabs/overwatch/issues/151">Audit Log Formats (AWS)</a>
+<ul>
+<li>For AWS the input format of the audit logs is now configurable to json (default), delta, parquet</li>
+</ul>
+</li>
+<li><a href="https://github.com/databrickslabs/overwatch/issues/49">Contract costs through time</a>
+<ul>
+<li>Changes to the instanceDetails table now allows for the tracking of all costs through time including compute and 
+DBU. To recalcuate associated costs in the gold layer, the jobRunCostPotentialFact and clusterStateFact table will 
+need to be rolled back as per the documents in <a href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process/">ETL Process</a></li>
+</ul>
+</li>
+<li>DBU Contract Costs for DatabricksSQL and JobsLight added
+<ul>
+<li>Costing for additional SKUs were added to the configuration such that they can be tracked. Note that as of 0.4.2 
+release, no calculation changes in costing as it relates to sku have yet been incorporated. These recalculations for
+jobs light and DatabricksSQL are in progress.</li>
+</ul>
+</li>
+<li>Enabled <a href="https://databrickslabs.github.io/overwatch/gettingstarted//#executing-overwatch-via-main-class">Main class execution</a> to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily 
+enabled for future enablement with jobs pipelines and for development / testing purposes.
+<ul>
+<li>User can now pass 2 arguments to the databricks job where the first is &lsquo;bronze&rsquo;, &lsquo;silver&rsquo;, or &lsquo;gold&rsquo; and the second
+is the escaped configuration string and only that pipeline layer will execute.</li>
+</ul>
+</li>
+<li>Event Hub Checkpoint - Auto-Recovery (Azure)
+<ul>
+<li>Previously, if an EH state was to get lost or corrupted, it was very challenging to resume. Overwatch will now
+automatically identify the latest state loaded and resume.</li>
+</ul>
+</li>
+<li><a href="https://github.com/databrickslabs/overwatch/issues/133">Support non-dbfs file types</a> 
+such as abfss://, s3a://, s3n:// etc. for audit log source paths and output paths.
+All file types supported on Databricks should now be supported in Overwatch.</li>
+</ul>
+<h3 id="minor-bug-fixes--enhancements">Minor Bug Fixes / Enhancements</h3>
+<ul>
+<li>Unsafe SSL allowed <a href="https://github.com/databrickslabs/overwatch/issues/152">Issue 152</a>. 
+All API connections will first be attempted using standard SSL but will fallback on unsafe 
+if there is a SSLHandshakeException. Targeted at specific scenarios.</li>
+<li>ERD Updates for accuracy</li>
+<li>Issue resolved where not all cluster logs were being loaded thus several spark log events were missing</li>
+<li>Various schema errors in edge use cases</li>
+<li>Docs updates and ehancements</li>
+</ul>
+<h2 id="0413">0.4.13</h2>
 <ul>
 <li>Hotfix for <a href="https://github.com/databrickslabs/overwatch/issues/138">Issue 138</a></li>
 </ul>
@@ -845,19 +926,19 @@ if it didn&rsquo;t already exist for the workspace</li>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625609729"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625609729"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1624455023" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1624455023"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625609729" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625609729"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

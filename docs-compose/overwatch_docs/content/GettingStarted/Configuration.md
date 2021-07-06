@@ -75,6 +75,8 @@ private val badRecordsPath = s"${storagePrefix}/${workspaceID}/sparkEventsBadrec
 private val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = ehName, auditRawEventsPrefix = ehStatePath)
 private val interactiveDBUPrice = 0.56
 private val automatedDBUPrice = 0.26
+private val DatabricksSQLDBUPrice = 0.22
+private val automatedJobsLightDBUPrice = 0.10
 
 val params = OverwatchParams(
   auditLogConfig = AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig)),
@@ -83,8 +85,9 @@ val params = OverwatchParams(
   badRecordsPath = Some(badRecordsPath),
   overwatchScope = Some(scopes),
   maxDaysToLoad = maxDaysToLoad,
-  databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice),
-  primordialDateString = Some(primordialDateString)
+  databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice, DatabricksSQLDBUPrice, automatedJobsLightDBUPrice),
+  primordialDateString = Some(primordialDateString),
+  intelligentScaling = IntelligentScaling(enabled = true, minimumCores = 16, maximumCores = 64, coeff = 1.0)
 )
 ```
 
@@ -110,19 +113,22 @@ private val dataTarget = DataTarget(
 
 private val tokenSecret = TokenSecret(secretsScope, dbPATKey)
 private val badRecordsPath = s"${storagePrefix}/${workspaceID}/sparkEventsBadrecords"
-private val auditSourcePath = s"${storagePrefix}/${workspaceID}/raw_audit_logs"
+private val auditSourcePath = "/path/to/my/workspaces/raw_audit_logs" // INPUT: workspace audit log directory
 private val interactiveDBUPrice = 0.56
 private val automatedDBUPrice = 0.26
+private val DatabricksSQLDBUPrice = 0.22
+private val automatedJobsLightDBUPrice = 0.10
 
 val params = OverwatchParams(
-  auditLogConfig = AuditLogConfig(rawAuditPath = Some(auditSourcePath)),
+  auditLogConfig = AuditLogConfig(rawAuditPath = Some(auditSourcePath), auditLogFormat = "json"),
   dataTarget = Some(dataTarget),
   tokenSecret = Some(tokenSecret),
   badRecordsPath = Some(badRecordsPath),
   overwatchScope = Some(scopes),
   maxDaysToLoad = maxDaysToLoad,
-  databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice),
-  primordialDateString = Some(primordialDateString)
+  databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice, DatabricksSQLDBUPrice, automatedJobsLightDBUPrice),
+  primordialDateString = Some(primordialDateString),
+  intelligentScaling = IntelligentScaling(enabled = true, minimumCores = 16, maximumCores = 64, coeff = 1.0)
 )
 ```
 
@@ -138,7 +144,8 @@ Config | Required Override | Default Value | Type | Description
 **overwatchScope**|N|all|Option\[Seq\[String\]\]|List of [modules]({{%relref "GettingStarted/Modules.md"%}}) in scope for the run. It's important to note that there are many co-dependencies. When choosing a module, be sure to also enable it's requisites. If not value provided, all modules will execute.
 **maxDaysToLoad**|N|60|Int|On large, busy workspaces 60 days of data may amount in 10s of TB of raw data. This parameter allows the job to be broken out into several smaller runs.
 **primordialDateString**|N|Today's date minus 60 days, format = "yyyy-mm-dd"|String|Date from which data collection was to begin. This is the earliest date for which data should attempted to be collected.
-**databricksContractPrices**|N|DatabricksContractPrices(0.56, 0.26)|[DatabricksContractPrices](#databrickscontractprices)|Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the *instanceDetails* consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices(). 
+**databricksContractPrices**|N|DatabricksContractPrices()|[DatabricksContractPrices](#databrickscontractprices)|Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the *instanceDetails* consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices().
+**IntelligentScaling**|N|IntelligentScaling()|[IntelligentScaling](#intelligentscaling)|Allows the user to enable / disable intelligent scaling and configure min/max core counts to be used when scaling the cluster
 
 ### AuditLogConfig
 Config to point Overwatch to the location of the delivered audit logs
@@ -146,6 +153,7 @@ Config to point Overwatch to the location of the delivered audit logs
 Config | Required Override | Default Value | Type | Description
 :--------------------------|:---|:----------|:----------|:--------------------------------------------------
 **rawAuditPath**|Y|None|Option[String]|Top-level path to directory containing workspace audit logs delivered by Databricks. The Overwatch user must have read access to this path
+**auditLogFormat**|N|json|String|AWS ONLY - When using AWS and audit logs are delivered in a format other than json (default) this can be changed to reflect the audit log source data type. Supported types are json, parquet, delta
 **azureAuditLogEventhubConfig**|Y (only on Azure)|None|Option[AzureAuditLogEventhubConfig](#azureauditlogeventhubconfig)|Required configuration when using Azure as Azure must deliver audit logs via LogAnalytics via Eventhub
 
 ### TokenSecret
@@ -198,3 +206,14 @@ Config | Required Override | Default Value | Type | Description
 :--------------------------|:---|:----------|:----------|:--------------------------------------------------
 **interactiveDBUCostUSD**|N|0.56|Double|Approximate list price of interactive DBU
 **automatedDBUCostUSD**|N|0.26|Double|Approximate list price of automated DBU
+**sqlComputeDBUCostUSD**|N|0.22|Double|Approximate list price of DatabricksSQL DBU
+**jobsLightDBUCostUSD**|N|0.10|Double|Approximate list price of JobsLight Automated DBU
+
+
+### IntelligentScaling
+Config | Required Override | Default Value | Type | Description
+:--------------------------|:---|:----------|:----------|:--------------------------------------------------
+**enabled**|N|false|Double|Approximate list price of interactive DBU
+**minimumCores**|N|4|Int|Minimum number of cores to be used during Overwatch run
+**maximumCores**|N|512|Int|Maximum number of cores to be used during Overwatch run
+**coeff**|N|1.0|Double|Scaler, each module has a scale based on it's size relative to the other modules. This variable acts as a scaler to the scaler, if the modules are scaling too fast (or not fast enough), this can be tweaked to increase the variability of the scaling from the starting core count.

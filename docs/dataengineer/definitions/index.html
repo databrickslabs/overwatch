@@ -12,21 +12,21 @@
     <title>Definitions :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1624455023" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1624455023" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625609729" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625609729" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1624455023" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625609729" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625609729"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1624455023"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1624455023"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625609729"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625609729"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1624455023"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625609729"></script>
 
     
   </div>
@@ -594,6 +594,17 @@ The data in the files were generated from an Azure, test deployment created by O
 <h4 id="cluster">Cluster</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/cluster.tab"><strong>SAMPLE</strong></a></p>
 <p><strong>KEY</strong> &ndash; organization_id + cluster_id + action + unixTimeMS_state_start</p>
+
+<div class="notices warning" ><p><a href="https://github.com/databrickslabs/overwatch/issues/154">Issue 154</a>: This table is not a properly defined slow-changing
+dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action
+column and does not reference the complete state of the object at the corresponding time. Furthermore, this table
+only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will
+likely be a lot of missing data. <!-- raw HTML omitted --><!-- raw HTML omitted -->
+Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is &lt; lookup time.
+This will result in many null values that must be further filled from the corresponding snapshot table in the etl
+database.</p>
+</div>
+
 <table>
 <thead>
 <tr>
@@ -896,20 +907,28 @@ for a cluster_state combination until that state ends.</p>
 <h3 id="instancedetails">InstanceDetails</h3>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_aws.tab"><strong>AWS Sample</strong></a> | <a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_azure.tab"><strong>AZURE_Sample</strong></a></p>
 <p><strong>KEY</strong> &ndash; Organization_ID + API_name</p>
-<p>This table is unique and it&rsquo;s purpose is to enable users to identify node specific details for the relevant
-cloud provider. Defaults are loaded as an example by workspace. These defaults should closely (if not perfectly) 
+<p>This table is unique and it&rsquo;s purpose is to enable users to identify node specific contract costs associated with 
+Databricks and the Cloud Provider through time. 
+Defaults are loaded as an example by workspace. These defaults should closely (if not perfectly) 
 represent your cloud node details including costs, CPUs, etc. Everytime Overwatch runs, it validates the presence of 
 this table and whether it has any data present for the current worksapce, if it does not creates / appends the relevant
 data to it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their 
 needs by workspace. Each organization_id (workspace), should provide complete cost data for each node used in that
 region. If you decide to completely customize the table, it&rsquo;s critical to note that <strong>some columns are required</strong> for the ETL
-to function; these fields include: <strong>API_name, vCPUs, Compute_Contract_Price, Hourly_DBUs</strong>. As long as these columns exist
-this table may be dropped and recreated to suit your needs.</p>
+to function; these fields include are indicated below in the table with an asterisk.</p>
 <p>The organization_id (i.e. workspace id) is automatically generated for each workspace if that organization_id is not
 present in the table already (or the table is not present at all). Each workspace
 (i.e. organization_id) often has unique costs, this table enables you to customize compute pricing.</p>
-<p>Coming Soon: As costs change throughout time, it&rsquo;s important that this table allow for changing costs through time.
-<a href="https://github.com/databrickslabs/overwatch/issues/49">Issue 49</a> has been created to implement this functionality.</p>
+<p>This table currently tracks costs for machine AND DBUs which is confusing. <a href="https://github.com/databrickslabs/overwatch/issues/153">Issue 153</a>
+has been created to resolve this confusion. Until this issue is complete, any DBU contract price changes via the 
+Overwatch config will expire all existing compute pricing and add a new record with the updated DBU costs. This will 
+happen automagically as long as the user only changes the DBU contract prices via the Overwatch config. To simplify, 
+only manually edit this table when adjusting costs for compute and/or when historically adjusting compute/dbu costs.</p>
+<p><strong>IMPORTANT</strong> This table must be configured such that there are no overlapping costs and no gaps in costs within 
+a single organization_id between primordial date and current date. 
+This means that when one record for a node type is &ldquo;expired&rdquo;, a new one must be created 
+with the expiry date (activeUntil of the expired record) must == activeFrom of the new record and the active record must
+a null for the activeUntil date.</p>
 <p><a href="https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/">Azure VM Pricing Page</a></p>
 <p><a href="https://aws.amazon.com/ec2/pricing/on-demand/">AWS EC2 Pricing Page</a></p>
 <table>
@@ -917,6 +936,7 @@ present in the table already (or the table is not present at all). Each workspac
 <tr>
 <th style="text-align:left">Column</th>
 <th style="text-align:left">Type</th>
+<th style="text-align:left">AutoManaged</th>
 <th style="text-align:left">Description</th>
 </tr>
 </thead>
@@ -924,59 +944,103 @@ present in the table already (or the table is not present at all). Each workspac
 <tr>
 <td style="text-align:left">instance</td>
 <td style="text-align:left">string</td>
+<td style="text-align:left">NA</td>
 <td style="text-align:left">Common name of instance type</td>
 </tr>
 <tr>
-<td style="text-align:left">API_name</td>
+<td style="text-align:left">API_name*</td>
 <td style="text-align:left">string</td>
+<td style="text-align:left">NA</td>
 <td style="text-align:left">Canonical KEY name of the node type &ndash; use this to join to node_ids elsewhere</td>
 </tr>
 <tr>
-<td style="text-align:left">vCPUs</td>
+<td style="text-align:left">vCPUs*</td>
 <td style="text-align:left">int</td>
+<td style="text-align:left">NA</td>
 <td style="text-align:left">Number of virtual cpus provisioned for the node type</td>
 </tr>
 <tr>
 <td style="text-align:left">Memory_GB</td>
 <td style="text-align:left">double</td>
+<td style="text-align:left">NA</td>
 <td style="text-align:left">Gigabyes of memory provisioned for the node type</td>
 </tr>
 <tr>
-<td style="text-align:left">Compute_Contract_Price</td>
+<td style="text-align:left">Compute_Contract_Price*</td>
 <td style="text-align:left">double</td>
+<td style="text-align:left">NA</td>
 <td style="text-align:left">Contract price for the instance type as negotiated between customer and cloud vendor. This is the value used in cost functions to deliver cost estimates. It is defaulted to equal the on_demand compute price</td>
 </tr>
 <tr>
 <td style="text-align:left">On_Demand_Cost_Hourly</td>
 <td style="text-align:left">double</td>
+<td style="text-align:left">NA</td>
 <td style="text-align:left">On demand, list price for node type DISCLAIMER &ndash; cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing</td>
 </tr>
 <tr>
 <td style="text-align:left">Linux_Reserved_Cost_Hourly</td>
 <td style="text-align:left">double</td>
+<td style="text-align:left">NA</td>
 <td style="text-align:left">Reserved, list price for node type DISCLAIMER &ndash; cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing</td>
 </tr>
 <tr>
-<td style="text-align:left">Hourly_DBUs</td>
+<td style="text-align:left">Hourly_DBUs*</td>
 <td style="text-align:left">double</td>
+<td style="text-align:left">NA</td>
 <td style="text-align:left">Number of DBUs charged for the node type</td>
 </tr>
 <tr>
-<td style="text-align:left">interactiveDBUPrice</td>
+<td style="text-align:left">interactiveDBUPrice*</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">ONLY A REFERENCE to the configured interactive dbu price configured during the initialization of this table unless maintained manually</td>
+<td style="text-align:left">by Overwatch</td>
+<td style="text-align:left">DBU contract price of interactive DBUs - Change this via Overwatch Config</td>
 </tr>
 <tr>
-<td style="text-align:left">automatedDBUPrice</td>
+<td style="text-align:left">automatedDBUPrice*</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">ONLY A REFERENCE to the configured automated dbu price configured during the initialization of this table unless maintained manually</td>
+<td style="text-align:left">by Overwatch</td>
+<td style="text-align:left">DBU contract price of automated DBUs - Change this via Overwatch Config</td>
+</tr>
+<tr>
+<td style="text-align:left">sqlComputeDBUPrice*</td>
+<td style="text-align:left">double</td>
+<td style="text-align:left">by Overwatch</td>
+<td style="text-align:left">DBU contract price of DatabricksSQL DBUs - Change this via Overwatch Config</td>
+</tr>
+<tr>
+<td style="text-align:left">jobsLightDBUPrice*</td>
+<td style="text-align:left">double</td>
+<td style="text-align:left">by Overwatch</td>
+<td style="text-align:left">DBU contract price of automated DBUs that are eligible for the jobs light SKU - Change this via Overwatch Config</td>
+</tr>
+<tr>
+<td style="text-align:left">activeFrom*</td>
+<td style="text-align:left">date</td>
+<td style="text-align:left">by Overwatch</td>
+<td style="text-align:left">The start date for the costs in this record. <strong>NOTE</strong> this MUST be equal to one other record&rsquo;s activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.</td>
+</tr>
+<tr>
+<td style="text-align:left">activeUntil*</td>
+<td style="text-align:left">date</td>
+<td style="text-align:left">by Overwatch</td>
+<td style="text-align:left">The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active)</td>
 </tr>
 </tbody>
 </table>
 <h4 id="job">Job</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/job.tab"><strong>SAMPLE</strong></a></p>
 <p><strong>KEY</strong> &ndash; organization_id + job_id</p>
-<p>Slow changing dimension of Databricks Jobs. Databricks jobs that are created / edited / deleted through time</p>
+
+<div class="notices warning" ><p><a href="https://github.com/databrickslabs/overwatch/issues/154">Issue 154</a>: This table is not a properly defined slow-changing
+dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action 
+column and does not reference the complete state of the object at the corresponding time. Furthermore, this table 
+only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will 
+likely be a lot of missing data. <!-- raw HTML omitted --><!-- raw HTML omitted -->
+Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is &lt; lookup time. 
+This will result in many null values that must be further filled from the corresponding snapshot table in the etl 
+database.</p>
+</div>
+
 <table>
 <thead>
 <tr>
@@ -1394,10 +1458,17 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <h4 id="notebook">Notebook</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/notebook.tab"><strong>SAMPLE</strong></a></p>
 <p><strong>KEY</strong> &ndash; organization_id + notebook_id + action + unixTimeMS</p>
-<p>Slow changing dimension of the notebook entities through time. This table does not capture the edits of the 
-notebook contents but rather the state of the notebook itself such as location, name, etc. Primary use case for 
-this table is notebook_id lookup by path/name and/or understanding state/status of notebook entity. It&rsquo;s important
-to utilize this table as a slow-changing dimension. A notebook state should be identified AS OF a point in time.</p>
+
+<div class="notices warning" ><p><a href="https://github.com/databrickslabs/overwatch/issues/154">Issue 154</a>: This table is not a properly defined slow-changing
+dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action
+column and does not reference the complete state of the object at the corresponding time. Furthermore, this table
+only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will
+likely be a lot of missing data. <!-- raw HTML omitted --><!-- raw HTML omitted -->
+Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is &lt; lookup time.
+This will result in many null values that must be further filled from the corresponding snapshot table in the etl
+database.</p>
+</div>
+
 <table>
 <thead>
 <tr>
@@ -2542,19 +2613,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625609729"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1624455023"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1624455023"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625609729"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625609729"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1624455023" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1624455023"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625609729" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625609729"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

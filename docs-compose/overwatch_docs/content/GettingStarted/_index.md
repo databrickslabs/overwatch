@@ -16,7 +16,7 @@ and tables and manages all spark parameters and optimization requirements to ope
 and the job run setup, Overwatch runs best as a black box -- enable it and forget about it.
 
 ## Cluster Requirements
-* DBR 7.6
+* DBR 7.3+ (7.6 preferred)
 * Add the relevant [dependencies](#cluster-dependencies)
 * Azure - Spot Instances not yet tested
 
@@ -29,12 +29,12 @@ Add the following dependencies to your cluster
     * Maven Coordinate: `com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.18`
 
 ### Notes on Autoscaling
-* Auto-scaling compute -- **Not Recommended**
-  Note that autoscaling compute will not be extremely efficient due to some of the compute tails
+* Auto-scaling compute -- **Not Recommended** Use [**Intelligent Scaling**]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling)
+  * Note that autoscaling compute will not be extremely efficient due to some of the compute tails
   as a result of log file size skew and storage mediums. Additionally, some modules require thousands of API calls
   (for historical loads) and have to be throttled to protect the workspace. As such, it's recommended to not use
-  autoscaling at this time, but rather use a smaller cluster and just let Overwatch run. Until [Issue 16](https://github.com/databrickslabs/overwatch/issues/16)
-  can be implemented there will be a few inefficiencies.
+  autoscaling; use [Intelligent Scaling]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling) 
+  instead as it is Overwatch aware and will make better autoscaling decisions.
 * Auto-scaling Storage -- **Strongly Recommended** for historical loads
   * Some of the data sources can grow to be quite large and require very large shuffle stages which requires
     sufficient local disk. If you choose not to use auto-scaling storage be sure you provision sufficient local
@@ -66,10 +66,12 @@ additional details on config customization options see [**configuration**]({{%re
 **Example Notebooks:**
 The following notebooks will demonstrate a typical best practice for multi-workspace (and stand-alone) configurations. 
 Simply populate the necessary variables for your environment.
-* AWS ([HTML](/assets/GettingStarted/aws_runner_docs_example.html) / [DBC](/assets/GettingStarted/aws_runner_docs_example.dbc))
-* AZURE ([HTML](/assets/GettingStarted/azure_runner_docs_example.html) / [DBC](/assets/GettingStarted/azure_runner_docs_example.dbc))
+* AWS ([HTML 0.4.2+](/assets/GettingStarted/aws_runner_docs_example_042.html) / [DBC 0.4.2+](/assets/GettingStarted/aws_runner_docs_example_042.dbc))
+* AZURE ([HTML 0.4.2+](/assets/GettingStarted/azure_runner_docs_example_042.html) / [DBC 0.4.2+](/assets/GettingStarted/azure_runner_docs_example_042.dbc))
+* AWS ([HTML PRE 0.4.2](/assets/GettingStarted/aws_runner_docs_example_041.html) / [DBC PRE 0.4.2](/assets/GettingStarted/aws_runner_docs_example_041.dbc))
+* AZURE ([HTML PRE 0.4.2](/assets/GettingStarted/azure_runner_docs_example_041.html) / [DBC PRE 0.4.2](/assets/GettingStarted/azure_runner_docs_example_041.dbc))
 
-The code snippet below will initialize the workspace.
+The code snippet below will initialize the workspace (simple aws example).
 ```scala
 private val dataTarget = DataTarget(
   Some(etlDB), Some(s"${storagePrefix}/${workspaceID}/${etlDB}.db"), Some(s"${storagePrefix}/global_share"),
@@ -77,8 +79,8 @@ private val dataTarget = DataTarget(
 )
 
 private val tokenSecret = TokenSecret(secretsScope, dbPATKey)
-private val badRecordsPath = s"${storagePrefix}/${workspaceID}/sparkEventsBadrecords"
-private val auditSourcePath = s"${storagePrefix}/${workspaceID}/raw_audit_logs"
+private val badRecordsPath = s"${storagePrefix}/${workspaceID}/sparkEventsBadRecords"
+private val auditSourcePath = "/path/to/my/workspaces/raw_audit_logs" // INPUT: workspace audit log directory
 private val interactiveDBUPrice = 0.56
 private val automatedDBUPrice = 0.26
 
@@ -94,9 +96,8 @@ val params = OverwatchParams(
 )
 
 private val args = JsonUtils.objToJson(params).compactString
-val workspace = if (args.length != 0) {
-  Initializer(Array(args), debugFlag = true)
-} else { Initializer(Array()) }
+val workspace = Initializer(args) // 0.4.2+
+//val workspace = Initializer(Array(args)) // Deprecated - pre 0.4.2
 ```
 
 If this is the first run and you'd like to customize compute costs to mirror your region / contract price, be sure to 
@@ -122,9 +123,14 @@ time to make customizations to this table, after first init but before first pip
 There are three essential components to the cost function:
 * The node type and its associated contract price
 * The node type and its associated DBUs per hour
-* The DBU contract prices for both interactive and automated.
+* The DBU contract prices for the SKU under which your DBUs are charged such as:
+  * Interactive
+  * Automated
+  * DatabricksSQL (not automatically calculated in Gold as of 0.4.2)
+  * JobsLight (not automatically calculated in Gold as of 0.4.2)
 
-The two DBU contract costs are captured from the Overwatch run config; however, compute costs and dbu to node
+The DBU contract costs are captured from the [Overwatch run config]({{%relref "GettingStarted/Configuration.md"%}}/#databrickscontractprices); 
+however, compute costs and dbu to node
 associations are maintained in the [InstanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table.
 **IMPORTANT** This table is automatically created in the target database upon first initialization of the pipeline. 
 **DO NOT** try to manually create the target database outside of Overwatch as that will lead to database validation errors. 
@@ -137,7 +143,9 @@ default costs by node will be appended to instanceDetails table if no data is pr
 export the instanceDetails dataset to external editor (after first init), add the required metrics mentioned above 
 for each workspace, and overwrite the target table with the customized cost information. Note that the instanceDetails 
 object in the consumer database is just a view so you must edit/overwrite the table in the ETL database. The view 
-will automatically be recreated upon first pipeline run.
+will automatically be recreated upon first pipeline run. 
+
+More details available at the [InstanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table definition
 
 [Helpful Tool (AZURE_Only)](https://azureprice.net/) to get pricing by region by node.
 
@@ -170,6 +178,12 @@ simplify the creation of this string simply follow the example above [Initializi
 and use the `escapedConfigString`. Now that you have the string, setup the job with that string as the Parameters. 
 The Main Class for histoical batch is `com.databricks.labs.overwatch.BatchRunner`<br>
 
+{{% notice info %}}
+**If a single argument** passed to main class: Arg(0) is Overwatch Parameters json string (escaped if sent through API). 
+**If TWO arguments** are passed to main class: Arg(0) must be 'bronze', 'silver', or 'gold' corresponding to the 
+Overwatch Pipeline layer you want to be run. Arg(1) will be the Overwatch Parameters json string.
+{{% /notice %}}
+
 ![job_params](/images/GettingStarted/job_params.png) <br>
 ![jarSetupExample](/images/GettingStarted/jarSetupExample.png)
 
@@ -188,8 +202,17 @@ referred to as "Scope", the meaning is synonymous. To understand which modules a
 version and get more details on what's included, please refer to [Modules]({{%relref "GettingStarted/Modules.md"%}})
 
 ### Security Considerations
+
+#### Overwatch Read Requirements
+The account that owns/runs the Overwatch process must have access to read all objects that are desired to be 
+captured in the Overwatch Data Model. For example, if jobs,clusters,pools modules are enabled, it's imperative that 
+the Overwatch user have access to read the jobs, job runs, clusters, and pools and their histories and definitions to 
+properly populate the Overwatch data model. The same is true with regard to input/output paths, Overwatch must have 
+access to all configured input/output paths.
+
+#### Overwatch Output Data
 Overwatch, by default, will create a single database that, is accessible to everyone in your organization unless you
-specify a location for the database in the configuration that is secured at the storage level. Several of the modules
+specify a location for the database in the configuration that is secured. Several of the modules
 capture fairly sensitive data such as users, userIDs, etc. It is suggested that the configuration specify two
 databases in the configuration:
 * **ETL database** -- hold all raw and intermediate transform entities. This database can be secured

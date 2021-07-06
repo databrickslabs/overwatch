@@ -74,6 +74,17 @@ The data in the files were generated from an Azure, test deployment created by O
 
 **KEY** -- organization_id + cluster_id + action + unixTimeMS_state_start
 
+{{% notice warning %}}
+[Issue 154](https://github.com/databrickslabs/overwatch/issues/154): This table is not a properly defined slow-changing
+dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action
+column and does not reference the complete state of the object at the corresponding time. Furthermore, this table
+only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will
+likely be a lot of missing data. <br><br>
+Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is < lookup time.
+This will result in many null values that must be further filled from the corresponding snapshot table in the etl
+database.
+{{% /notice %}}
+
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 cluster_id                  |string           |Canonical Databricks cluster ID (more info in [Common Meta Fields](#common-meta-fields))
@@ -150,46 +161,68 @@ workerSpecs                 |struct           |Worker node details
 
 **KEY** -- Organization_ID + API_name
 
-This table is unique and it's purpose is to enable users to identify node specific details for the relevant
-cloud provider. Defaults are loaded as an example by workspace. These defaults should closely (if not perfectly) 
+This table is unique and it's purpose is to enable users to identify node specific contract costs associated with 
+Databricks and the Cloud Provider through time. 
+Defaults are loaded as an example by workspace. These defaults should closely (if not perfectly) 
 represent your cloud node details including costs, CPUs, etc. Everytime Overwatch runs, it validates the presence of 
 this table and whether it has any data present for the current worksapce, if it does not creates / appends the relevant
 data to it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their 
 needs by workspace. Each organization_id (workspace), should provide complete cost data for each node used in that
 region. If you decide to completely customize the table, it's critical to note that **some columns are required** for the ETL
-to function; these fields include: **API_name, vCPUs, Compute_Contract_Price, Hourly_DBUs**. As long as these columns exist
-this table may be dropped and recreated to suit your needs.
+to function; these fields include are indicated below in the table with an asterisk.
 
 The organization_id (i.e. workspace id) is automatically generated for each workspace if that organization_id is not
 present in the table already (or the table is not present at all). Each workspace
 (i.e. organization_id) often has unique costs, this table enables you to customize compute pricing.
 
-Coming Soon: As costs change throughout time, it's important that this table allow for changing costs through time.
-[Issue 49](https://github.com/databrickslabs/overwatch/issues/49) has been created to implement this functionality.
+This table currently tracks costs for machine AND DBUs which is confusing. [Issue 153](https://github.com/databrickslabs/overwatch/issues/153)
+has been created to resolve this confusion. Until this issue is complete, any DBU contract price changes via the 
+Overwatch config will expire all existing compute pricing and add a new record with the updated DBU costs. This will 
+happen automagically as long as the user only changes the DBU contract prices via the Overwatch config. To simplify, 
+only manually edit this table when adjusting costs for compute and/or when historically adjusting compute/dbu costs.
+
+**IMPORTANT** This table must be configured such that there are no overlapping costs and no gaps in costs within 
+a single organization_id between primordial date and current date. 
+This means that when one record for a node type is "expired", a new one must be created 
+with the expiry date (activeUntil of the expired record) must == activeFrom of the new record and the active record must
+a null for the activeUntil date.
 
 [Azure VM Pricing Page](https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/)
 
 [AWS EC2 Pricing Page](https://aws.amazon.com/ec2/pricing/on-demand/)
 
-Column | Type | Description
-:---------------------------|:----------------|:--------------------------------------------------
-instance                    |string           |Common name of instance type 
-API_name                    |string           |Canonical KEY name of the node type -- use this to join to node_ids elsewhere
-vCPUs                       |int              |Number of virtual cpus provisioned for the node type
-Memory_GB                   |double           |Gigabyes of memory provisioned for the node type
-Compute_Contract_Price      |double           |Contract price for the instance type as negotiated between customer and cloud vendor. This is the value used in cost functions to deliver cost estimates. It is defaulted to equal the on_demand compute price
-On_Demand_Cost_Hourly       |double           |On demand, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
-Linux_Reserved_Cost_Hourly  |double           |Reserved, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
-Hourly_DBUs                 |double           |Number of DBUs charged for the node type
-interactiveDBUPrice         |double           |ONLY A REFERENCE to the configured interactive dbu price configured during the initialization of this table unless maintained manually
-automatedDBUPrice           |double           |ONLY A REFERENCE to the configured automated dbu price configured during the initialization of this table unless maintained manually
+Column | Type | AutoManaged | Description
+:---------------------------|:----------------|:----------------|:--------------------------------------------------
+instance                    |string           |NA               |Common name of instance type 
+API_name*                   |string           |NA               |Canonical KEY name of the node type -- use this to join to node_ids elsewhere
+vCPUs*                      |int              |NA               |Number of virtual cpus provisioned for the node type
+Memory_GB                   |double           |NA               |Gigabyes of memory provisioned for the node type
+Compute_Contract_Price*     |double           |NA               |Contract price for the instance type as negotiated between customer and cloud vendor. This is the value used in cost functions to deliver cost estimates. It is defaulted to equal the on_demand compute price
+On_Demand_Cost_Hourly       |double           |NA               |On demand, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
+Linux_Reserved_Cost_Hourly  |double           |NA               |Reserved, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
+Hourly_DBUs*                |double           |NA               |Number of DBUs charged for the node type
+interactiveDBUPrice*        |double           |by Overwatch     |DBU contract price of interactive DBUs - Change this via Overwatch Config
+automatedDBUPrice*          |double           |by Overwatch     |DBU contract price of automated DBUs - Change this via Overwatch Config
+sqlComputeDBUPrice*         |double           |by Overwatch     |DBU contract price of DatabricksSQL DBUs - Change this via Overwatch Config
+jobsLightDBUPrice*          |double           |by Overwatch     |DBU contract price of automated DBUs that are eligible for the jobs light SKU - Change this via Overwatch Config
+activeFrom*                 |date             |by Overwatch     |The start date for the costs in this record. **NOTE** this MUST be equal to one other record's activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.
+activeUntil*                |date             |by Overwatch     |The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active) 
 
 #### Job
 [**SAMPLE**](/assets/TableSamples/job.tab)
 
 **KEY** -- organization_id + job_id
 
-Slow changing dimension of Databricks Jobs. Databricks jobs that are created / edited / deleted through time 
+{{% notice warning %}}
+[Issue 154](https://github.com/databrickslabs/overwatch/issues/154): This table is not a properly defined slow-changing
+dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action 
+column and does not reference the complete state of the object at the corresponding time. Furthermore, this table 
+only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will 
+likely be a lot of missing data. <br><br>
+Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is < lookup time. 
+This will result in many null values that must be further filled from the corresponding snapshot table in the etl 
+database.
+{{% /notice %}}
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
@@ -317,10 +350,16 @@ job_run_cluster_util        |double           |Cluster utilization: spark task e
 
 **KEY** -- organization_id + notebook_id + action + unixTimeMS
 
-Slow changing dimension of the notebook entities through time. This table does not capture the edits of the 
-notebook contents but rather the state of the notebook itself such as location, name, etc. Primary use case for 
-this table is notebook_id lookup by path/name and/or understanding state/status of notebook entity. It's important
-to utilize this table as a slow-changing dimension. A notebook state should be identified AS OF a point in time.
+{{% notice warning %}}
+[Issue 154](https://github.com/databrickslabs/overwatch/issues/154): This table is not a properly defined slow-changing
+dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action
+column and does not reference the complete state of the object at the corresponding time. Furthermore, this table
+only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will
+likely be a lot of missing data. <br><br>
+Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is < lookup time.
+This will result in many null values that must be further filled from the corresponding snapshot table in the etl
+database.
+{{% /notice %}}
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------

@@ -138,13 +138,13 @@ Steps:
 2. Delete from jobRun_silver table where Pipeline_SnapTS >= "2020-12-31"
    
 ```scala
-spark.sql("delete from overwatch_etl.jobRun_Silver where cast(Pipeline_SnapTS as date) >= '2020-12-31' ")
+spark.sql("delete from overwatch_etl.jobRun_Silver where organization_id = '<ord_id>' and cast(Pipeline_SnapTS as date) >= '2020-12-31' ")
 ```
 
 3. Delete from jobRun_gold table where Pipeline_SnapTS >= "2020-12-31"
 
 ```scala
-spark.sql("delete from overwatch_etl.jobRun_Gold where cast(Pipeline_SnapTS as date) >= '2020-12-31' ")
+spark.sql("delete from overwatch_etl.jobRun_Gold where organization_id = '<ord_id>' and cast(Pipeline_SnapTS as date) >= '2020-12-31' ")
 ```
 
 4. Update the Pipeline_Report table set Status = "ROLLED_BACK" where moduleId in (2011,3003) and status in ('SUCCESS', 'EMPTY').
@@ -152,7 +152,7 @@ spark.sql("delete from overwatch_etl.jobRun_Gold where cast(Pipeline_SnapTS as d
     * Only for Status values of 'SUCCESS' and 'EMPTY' because we want to maintain any 'FAILED' or 'ERROR' statuses that may be present from other runs
 
 ```scala
-spark.sql(s"update overwatch_etl.pipeline_report set status = 'ROLLED_BACK' where moduleID in (2011,3003) and status in ('SUCCESS', 'EMPTY') ")
+spark.sql(s"update overwatch_etl.pipeline_report set status = 'ROLLED_BACK' where organization_id = '<ord_id>' and moduleID in (2011,3003) and (status = 'SUCCESS' or status like 'EMPT%') ")
 ```
 
 After performing the steps above, the next Overwatch run will load the data from 12-31 -> current.
@@ -168,46 +168,6 @@ it is to delete records after some date. **Remember**, though, it's critical to 
 rebuilding entities with more than 60 days.
 {{% /notice %}}
 
-### Reloading Spark Data (Silver)
-For performance reasons, there's one more update that must be made when reloading Spark Silver data. This data is 
-derived from a VERY large events table, *overwatch_etl.spark_events_bronze*. To improve standard run performance,
-new data that hasn't been processed is placed into it's own partition *Downstream_Processed = false"*. 
-
-To set the *Downstream_Processed* flag to false for the correct records you must commit an update statement to the 
-spark_events_bronze table as well before attempting to reload. This table is further partitions by "Event"; thus, the 
-spark events to be reloaded can be further narrowed down with an Event filter. A map of spark entity to relevant 
-events is provided below.
-
-SparkGoldEntity             | In Clause
-:---------------------------|:-------------------------------------------------------------
-sparkExecutions             |('org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart', 'org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionEnd')
-sparkJob                    |('SparkListenerJobStart', 'SparkListenerJobEnd')
-sparkStage                  |('SparkListenerStageSubmitted', 'SparkListenerStageCompleted')
-sparkTask                   |('SparkListenerTaskStart', 'SparkListenerTaskEnd')
-sparkExecutor               |('SparkListenerExecutorAdded', 'SparkListenerExecutorRemoved')
-
-For another scenario, let's assume that the above steps have been completed but instead of jobRun, the sparkTasks
-entity must be reloaded after 12-31. Unfortunately this table (spark_events_bronze) has not yet been partitioned by date
-and the data volume for sparkTasks can be substantial. The best we can do in this scenario is to execute the statement
-below and just wait. The more filters you can apply, the more efficient the reload will be, but don't be deceived, 
-this is a raw table and many columns like "timestamp" you may expect to be populated often is not in all cases. Safe
-filter columns include:
-* Event (Must filter on this)
-* Pipeline_SnapTS
-* filenameGroup
-* clusterId
-* SparkContextId
-
-```scala
-val updateStatement =
-  """
-    |update overwatch_etl.spark_events_bronze set Downstream_Processed = false
-    | where Event in ('SparkListenerTaskStart', 'SparkListenerTaskEnd')
-    | and cast(Pipeline_SnapTS as date) >= '2020-12-31'
-    |""".stripMargin
-spark.sql(updateStatement)
-```
-
 ### Running Only Specific Layers
 As in the example above, it's common to need to rerun only a certain layer for testing or reloading data. In the 
 example above it's inefficient to run the bronze layer repeatedly to reprocess two tables in silver and gold. If 
@@ -219,6 +179,3 @@ a notebook can be used. Build the config as normal, and then following the instr
 [Getting Started - Run Via Notebook]({{%relref "GettingStarted"%}}#run-via-notebook). This example illustrates how 
 to run each of the three layers; Bronze, Silver, and Gold. In this scenario the Bronze(...) line would be commented
 out to result in only a Silver/Gold layer run.
-
-## Cloud-Specific Variations
-
