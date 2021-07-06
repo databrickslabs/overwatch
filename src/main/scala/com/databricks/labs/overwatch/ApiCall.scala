@@ -34,13 +34,13 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   )
 
   private def setQuery(value: Option[Map[String, Any]]): this.type = {
-    if (value.nonEmpty) {
+    if (value.nonEmpty && _paginate) {
       _limit = value.get.getOrElse("limit", 150).toString.toInt
       _initialQueryMap = value.get + ("limit" -> _limit) + ("offset" -> value.get.getOrElse("offset", 0))
-    } else {
+    } else if (_paginate) {
       _limit = 150
       _initialQueryMap = Map("limit" -> _limit, "offset" -> 0)
-    }
+    } else _initialQueryMap = value.getOrElse(Map[String, Any]())
     _jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
     _getQueryString = "?" + _initialQueryMap.map { case(k, v) => s"$k=$v"}.mkString("&")
     this
@@ -137,11 +137,25 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   def executeGet(pageCall: Boolean = false): this.type = {
     logger.log(Level.INFO, s"Loading $req -> query: $getQueryString")
     try {
-      val result = Http(req + getQueryString)
-        .copy(headers = httpHeaders)
-        .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
-        .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
-        .asString
+      val result = try {
+        Http(req + getQueryString)
+          .copy(headers = httpHeaders)
+          .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+          .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+          .asString
+      } catch {
+        case _: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
+          val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
+            "ssl. If this is unexpected behavior, validate your ssl certs."
+          logger.log(Level.WARN, sslMSG)
+          println(sslMSG)
+          Http(req + getQueryString)
+            .copy(headers = httpHeaders)
+            .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+            .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+            .option(HttpOptions.allowUnsafeSSL)
+            .asString
+      }
       if (result.isError) {
         if (result.code == 429) {
           Thread.sleep(2000)
@@ -154,10 +168,10 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           throw new ApiCallFailure(s"${_apiName} could not execute: ${result.code}")
         }
       }
-      if (!pageCall) {
+      if (!pageCall && _paginate) {
         // Append initial results
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
-        if (_paginate) paginate()
+        paginate()
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
@@ -214,23 +228,37 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     val jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
     logger.log(Level.INFO, s"Loading $req -> query: $jsonQuery")
     try {
-      val result = Http(req)
-        .copy(headers = httpHeaders)
-        .postData(jsonQuery)
-        .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
-        .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
-        .asString
+      val result = try {
+        Http(req)
+          .copy(headers = httpHeaders)
+          .postData(jsonQuery)
+          .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+          .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+          .asString
+      } catch {
+        case _: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
+          val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
+            "ssl. If this is unexpected behavior, validate your ssl certs."
+          logger.log(Level.WARN, sslMSG)
+          println(sslMSG)
+          Http(req + getQueryString)
+            .copy(headers = httpHeaders)
+            .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
+            .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+            .option(HttpOptions.allowUnsafeSSL)
+            .asString
+      }
       if (result.isError) {
         val err = mapper.readTree(result.body).get("error_code").asText()
         val msg = mapper.readTree(result.body).get("message").asText()
         setStatus(s"$err -> $msg", Level.WARN)
         throw new ApiCallFailure(s"$err -> $msg")
       }
-      if (!pageCall) {
+      if (!pageCall && _paginate) {
         val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
         val totalCount = mapper.readTree(result.body).get("total_count").asInt(0)
         if (totalCount > 0) results.append(jsonResult)
-        if (totalCount > limit && _paginate) paginate(totalCount)
+        if (totalCount > limit) paginate(totalCount)
       } else {
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }

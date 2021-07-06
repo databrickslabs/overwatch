@@ -14,10 +14,11 @@ class PostProcessor {
     tablesToOptimize.append(table)
   }
 
-  def optimize(): Unit = {
+  def optimize(pipeline: Pipeline, optimizeScaleCoefficient: Int): Unit = {
     logger.log(Level.INFO, s"BEGINNING OPTIMIZE & ZORDER. " +
       s"Tables in scope are: ${tablesToOptimize.map(_.tableFullName).mkString(",")}")
 
+    PipelineFunctions.scaleCluster(pipeline, optimizeScaleCoefficient)
     // TODO -- spark_events_bronze -- put in proper rules -- hot fix due to optimization issues
     Helpers.parOptimize(tablesToOptimize.toArray.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128)
     Helpers.parOptimize(tablesToOptimize.toArray.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32)

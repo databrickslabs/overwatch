@@ -1,13 +1,13 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.pipeline.Pipeline.{systemZoneId, systemZoneOffset}
-import com.databricks.labs.overwatch.utils.Layer.Layer
+import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
 import com.databricks.labs.overwatch.utils._
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{from_unixtime, lit, log, rank, row_number}
+import org.apache.spark.sql.functions._
 
 //import io.delta.tables._
 
@@ -18,8 +18,7 @@ import java.util.Date
 class Pipeline(
                 _workspace: Workspace,
                 final val database: Database,
-                _config: Config,
-                final val layer: Layer
+                _config: Config
               ) extends PipelineTargets(_config) with SparkSessionWrapper {
 
   // TODO -- Validate Targets (unique table names, ModuleIDs and names, etc)
@@ -120,6 +119,79 @@ class Pipeline(
   }
 
   /**
+   * If latest, active records contain a DBU contract price that differs from those found in the config, return
+   * true, otherwise return false
+   * @param lastRunPricing instanceDetails dataframe with rnk column
+   * @return
+   */
+  private def dbuContractPriceChange(lastRunPricing: DataFrame): Boolean = {
+
+    lastRunPricing
+      .filter('rnk === 1 && 'activeUntil.isNull) // most recent, active records
+      .filter(
+        'interactiveDBUPrice === config.contractInteractiveDBUPrice &&
+          'automatedDBUPrice === config.contractAutomatedDBUPrice &&
+          'sqlComputeDBUPrice === config.contractSQLComputeDBUPrice &&
+          'jobsLightDBUPrice === config.contractJobsLightDBUPrice
+      )
+      .isEmpty
+
+  }
+
+  /**
+   * Check for changes between last instance details contract DBU Prices and configured prices from Overwatch
+   * config. If changes are detected, rebuild the slow-changing dim appropriately.
+   * @param cloudDetailTarget PipelineTable for instanceDetails
+   */
+  private def updateDBUContractPricing(cloudDetailTarget: PipelineTable): Unit = {
+    val lastRunDBUPriceW = Window.partitionBy('API_Name).orderBy('Pipeline_SnapTS.desc)
+    val lastRunPricing = cloudDetailTarget.asDF()
+      .withColumn("rnk", rank().over(lastRunDBUPriceW))
+
+    if (dbuContractPriceChange(lastRunPricing)) {
+      val msg = "DBU Pricing differences detected in config. Updating prices."
+      logger.log(Level.INFO, msg)
+      if (config.debugFlag) println(msg)
+
+      // All active records with new DBU pricing
+      val newDBUPriceRecords = lastRunPricing
+        .filter('rnk === 1 && 'activeUntil.isNull)
+        .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
+        .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
+        .withColumn("sqlComputeDBUPrice", lit(config.contractSQLComputeDBUPrice))
+        .withColumn("jobsLightDBUPrice", lit(config.contractJobsLightDBUPrice))
+        .withColumn("activeFrom", lit(pipelineSnapTime.asDTString).cast("date"))
+        .withColumn("activeUntil", lit(null).cast("date"))
+        .withColumn("Pipeline_SnapTS", lit(pipelineSnapTime.asColumnTS))
+        .withColumn("Overwatch_RunID", lit(config.runID))
+
+      // All originally active records with expiration date of yesterday
+      val expiredRecords = lastRunPricing
+        .filter('rnk === 1)
+        .withColumn("activeUntil",
+          when('activeUntil.isNull, lit(pipelineSnapTime.asDTString).cast("date"))
+            .otherwise('activeUntil)
+        )
+
+      // New pricing records ++ expired pricing records ++ historical records
+      val newCloudDetailsDF = newDBUPriceRecords
+        .unionByName(expiredRecords)
+        .unionByName(lastRunPricing.filter('rnk > 1))
+        .drop("rnk")
+        .repartition(4)
+
+      // overwrite the target and preserve original Overwatch metadata
+      val overwriteTarget = cloudDetailTarget.copy(
+        withOverwatchRunID = false,
+        withCreateDate = false,
+        mode = "overwrite"
+      )
+      database.write(newCloudDetailsDF, overwriteTarget, lit(null))
+    }
+
+  }
+
+  /**
    * Ensure all static datasets exist in the newly initialized Database. This function must be called after
    * the database has been initialized.
    *
@@ -130,6 +202,13 @@ class Pipeline(
       !BronzeTargets.cloudMachineDetail.exists ||
         BronzeTargets.cloudMachineDetail.asDF.isEmpty
     ) { // if not exists OR if empty for current orgID (.asDF applies global filters)
+      val logMsg = if (!BronzeTargets.cloudMachineDetail.exists) {
+        "instanceDetails table not found. Building"
+      } else if (BronzeTargets.cloudMachineDetail.asDF.isEmpty) {
+        "instanceDetails table found but is empty for this workspace. Appending compute costs for this workspace"
+      } else ""
+      logger.log(Level.INFO, logMsg)
+      if (getConfig.debugFlag) println(logMsg)
       val instanceDetailsDF = config.cloudProvider match {
         case "aws" =>
           InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
@@ -143,10 +222,16 @@ class Pipeline(
         .withColumn("organization_id", lit(config.organizationId))
         .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
+        .withColumn("sqlComputeDBUPrice", lit(config.contractSQLComputeDBUPrice))
+        .withColumn("jobsLightDBUPrice", lit(config.contractJobsLightDBUPrice))
+        .withColumn("activeFrom", lit(primordialTime.asDTString).cast("date"))
+        .withColumn("activeUntil", lit(null).cast("date"))
         .coalesce(1)
 
       database.write(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
       if (config.databaseName != config.consumerDatabaseName) BronzeTargets.cloudMachineDetailViewTarget.publish("*")
+    } else {
+      updateDBUContractPricing(BronzeTargets.cloudMachineDetail)
     }
     this
   }
@@ -162,7 +247,7 @@ class Pipeline(
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName)
     val dbProperties = dbMeta.properties
     val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
-    if (overwatchSchemaVersion != config.overwatchSchemaVersion) {
+    if (overwatchSchemaVersion != config.overwatchSchemaVersion && !readOnly) { // If schemas don't match and the pipeline is being written to
       throw new BadConfigException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
         s" version of Overwatch requires ${config.overwatchSchemaVersion}. Upgrade Overwatch Schema to proceed " +
         s"or drop existing database and allow Overwatch to recreate.")
@@ -189,6 +274,8 @@ class Pipeline(
     this
   }
 
+  def primordialTime: TimeTypes = primordialTime(None)
+
   /**
    * Absolute oldest date for which to pull data. This is to help limit the stress on a cold start / gap start.
    * If primordial date is not provided in the config use now() - maxDays to derive a primordial date otherwise
@@ -201,12 +288,32 @@ class Pipeline(
    *
    * @return
    */
-  def primordialEpoch: Long = {
+  def primordialTime(hardLimitMaxHistory: Option[Int]): TimeTypes = {
 
-    LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
-      .toLocalDate.atStartOfDay
-      .toInstant(systemZoneOffset)
-      .toEpochMilli
+    val pipelineSnapDate = pipelineSnapTime.asLocalDateTime.toLocalDate
+
+    val primordialEpoch = if (config.primordialDateString.nonEmpty) { // primordialDateString is provided
+      val configuredPrimordial = deriveLocalDate(config.primordialDateString.get, TimeTypesConstants.dtFormat)
+        .atStartOfDay(Pipeline.systemZoneId)
+
+      if (hardLimitMaxHistory.nonEmpty) {
+        val minEpochDay = Math.max( // if module has max history allowed get latest date configured primordial or snap - limit
+          configuredPrimordial.toLocalDate.toEpochDay,
+          pipelineSnapDate.minusDays(hardLimitMaxHistory.get.toLong).toEpochDay
+        )
+        LocalDate.ofEpochDay(minEpochDay).atStartOfDay(Pipeline.systemZoneId).toInstant.toEpochMilli
+      } else configuredPrimordial.toInstant.toEpochMilli // no hard limit, use configured primordial
+
+    } else { // if no limit and no configured primordial, calc by max days
+
+      LocalDateTime.now(systemZoneId).minusDays(derivePrimordialDaysDiff)
+        .toLocalDate.atStartOfDay
+        .toInstant(systemZoneOffset)
+        .toEpochMilli
+    }
+
+    Pipeline.createTimeDetail(primordialEpoch)
+
   }
 
   /**
@@ -220,9 +327,7 @@ class Pipeline(
 
     if (config.primordialDateString.nonEmpty) {
       try {
-        val primordialLocalDate = TimeTypesConstants.dtFormat.parse(config.primordialDateString.get)
-          .toInstant.atZone(systemZoneId)
-          .toLocalDate
+        val primordialLocalDate = deriveLocalDate(config.primordialDateString.get, TimeTypesConstants.dtFormat)
 
         Duration.between(
           primordialLocalDate.atStartOfDay(),
@@ -251,7 +356,7 @@ class Pipeline(
 
   private[overwatch] def initiatePostProcessing(): Unit = {
 
-    postProcessor.optimize()
+    postProcessor.optimize(this, 12)
     Helpers.fastrm(Array(
       "/tmp/overwatch/bronze/clusterEventsBatches"
     ))
@@ -366,18 +471,16 @@ object Pipeline {
     TimeTypes(
       tsMilli, // asUnixTimeMilli
       lit(from_unixtime(lit(tsMilli).cast("double") / 1000).cast("timestamp")), // asColumnTS in local time,
-      Date.from(instant), // asLocalDateTime
+      Date.from(instant), // asJavadate
       instant.atZone(systemZoneId), // asSystemZonedDateTime
       localDT, // asLocalDateTime
       localDT.toLocalDate.atStartOfDay(systemZoneId).toInstant.toEpochMilli // asMidnightEpochMilli
     )
   }
 
-  def apply(workspace: Workspace, database: Database, config: Config, layer: Layer): Pipeline = {
+  def apply(workspace: Workspace, database: Database, config: Config, suppressStaticDatasets: Boolean = false): Pipeline = {
 
-    new Pipeline(workspace, database, config, layer)
-      .initPipelineRun()
-      .loadStaticDatasets()
+    new Pipeline(workspace, database, config)
 
   }
 }

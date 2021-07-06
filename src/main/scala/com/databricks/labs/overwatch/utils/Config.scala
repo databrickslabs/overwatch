@@ -14,7 +14,7 @@ class Config() {
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _debugFlag: Boolean = false
-  private var _overwatchSchemaVersion = "0.412"
+  private var _overwatchSchemaVersion = "0.420"
   private var _organizationId: String = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
@@ -29,13 +29,18 @@ class Config() {
   private var _badRecordsPath: String = _
   private var _primordialDateString: Option[String] = None
   private var _maxDays: Int = 60
+  private var _initialWorkerCount: Int = _
+  private var _intelligentScaling: IntelligentScaling = IntelligentScaling()
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
   private var _initialSparkConf: Map[String, String] = Map()
   private var _intialShuffleParts: Int = 200
-  private var _contractInteractiveDBUPrice: Double = 0.56
-  private var _contractAutomatedDBUPrice: Double = 0.26
+  private var _contractInteractiveDBUPrice: Double = _
+  private var _contractAutomatedDBUPrice: Double = _
+  private var _contractSQLComputeDBUPrice: Double = _
+  private var _contractJobsLightDBUPrice: Double = _
+
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   /**
@@ -57,6 +62,8 @@ class Config() {
   def initialShuffleParts: Int = _intialShuffleParts
 
   def maxDays: Int = _maxDays
+
+  def initialWorkerCount: Int = _initialWorkerCount
 
   def databaseName: String = _databaseName
 
@@ -83,10 +90,13 @@ class Config() {
   def runID: String = _runID
 
   def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
-
   def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
+  def contractSQLComputeDBUPrice: Double = _contractSQLComputeDBUPrice
+  def contractJobsLightDBUPrice: Double = _contractJobsLightDBUPrice
 
   def primordialDateString: Option[String] = _primordialDateString
+
+  def intelligentScaling: IntelligentScaling = _intelligentScaling
 
   def globalFilters: Seq[Column] = {
     Seq(
@@ -166,6 +176,11 @@ class Config() {
     this
   }
 
+  private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
+    _initialWorkerCount = value
+    this
+  }
+
   private[overwatch] def setPrimordialDateString(value: Option[String]): this.type = {
     if (value.nonEmpty) {
       logger.log(Level.INFO, s"CONFIG SET: Primordial Date String = ${value.get}")
@@ -205,6 +220,21 @@ class Config() {
 
   private[overwatch] def setContractAutomatedDBUPrice(value: Double): this.type = {
     _contractAutomatedDBUPrice = value
+    this
+  }
+
+  private[overwatch] def setContractSQLComputeDBUPrice(value: Double): this.type = {
+    _contractSQLComputeDBUPrice = value
+    this
+  }
+
+  private[overwatch] def setContractJobsLightDBUPrice(value: Double): this.type = {
+    _contractJobsLightDBUPrice = value
+    this
+  }
+
+  private [overwatch] def setIntelligentScaling(value: IntelligentScaling): this.type = {
+    _intelligentScaling = value
     this
   }
 

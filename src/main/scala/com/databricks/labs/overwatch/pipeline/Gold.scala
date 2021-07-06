@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.utils.{Config, Layer, OverwatchScope}
 import org.apache.log4j.Logger
 
 class Gold(_workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config, Layer.gold)
+  extends Pipeline(_workspace, _database, _config)
     with GoldTransforms {
 
   /**
@@ -41,14 +41,14 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.clusterTarget)
   )
 
-  lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(1005, 2014))
+  lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(1005, 2014), 3.0)
   lazy private val appendClusterStateFactProccess = ETLDefinition(
     BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateFactModule, "timestamp"),
     Seq(buildClusterStateFact(
       BronzeTargets.cloudMachineDetail.asDF,
       BronzeTargets.clustersSnapshotTarget,
       SilverTargets.clustersSpecTarget,
-      config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
+      pipelineSnapTime
     )),
     append(GoldTargets.clusterStateFactTarget)
   )
@@ -75,7 +75,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.jobRunTarget)
   )
 
-  lazy private[overwatch] val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact", this, Array(3001, 3003, 3005, 3010, 3012))
+  lazy private[overwatch] val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact", this, Array(3001, 3003, 3005, 3010, 3012), 3.0)
   //Incremental current spark job and tasks DFs plus 2 days for lag coverage
   lazy private val appendJobRunCostPotentialFactProcess = ETLDefinition(
     // new jobRuns to be considered are job runs completed since the last overwatch import for this module
@@ -85,8 +85,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       buildJobRunCostPotentialFact(
         GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 90, "unixTimeMS_state_start"),
         GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
-        GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
-        config.contractInteractiveDBUPrice, config.contractAutomatedDBUPrice
+        GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date")
       )),
     append(GoldTargets.jobRunCostPotentialFactTarget)
   )
@@ -112,35 +111,35 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.accountLoginTarget)
   )
 
-  lazy private[overwatch] val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006))
+  lazy private[overwatch] val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006), 6.0)
   lazy private val appendSparkJobProcess = ETLDefinition(
     SilverTargets.jobsTarget.asIncrementalDF(sparkJobModule, "startTimestamp"),
     Seq(buildSparkJob(config.cloudProvider)),
     append(GoldTargets.sparkJobTarget)
   )
 
-  lazy private[overwatch] val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007))
+  lazy private[overwatch] val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007), 6.0)
   lazy private val appendSparkStageProcess = ETLDefinition(
     SilverTargets.stagesTarget.asIncrementalDF(sparkStageModule, "startTimestamp"),
     Seq(buildSparkStage()),
     append(GoldTargets.sparkStageTarget)
   )
 
-  lazy private[overwatch] val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008))
+  lazy private[overwatch] val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008), 6.0)
   lazy private val appendSparkTaskProcess = ETLDefinition(
     SilverTargets.tasksTarget.asIncrementalDF(sparkTaskModule, "startTimestamp"),
     Seq(buildSparkTask()),
     append(GoldTargets.sparkTaskTarget)
   )
 
-  private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005))
+  private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005), 6.0)
   lazy private val appendSparkExecutionProcess = ETLDefinition(
     SilverTargets.executionsTarget.asIncrementalDF(sparkExecutionModule, "startTimestamp"),
     Seq(buildSparkExecution()),
     append(GoldTargets.sparkExecutionTarget)
   )
 
-  lazy private[overwatch] val sparkExecutorModule = Module(3014, "Gold_SparkExecutor", this, Array(2003))
+  lazy private[overwatch] val sparkExecutorModule = Module(3014, "Gold_SparkExecutor", this, Array(2003), 6.0)
   lazy private val appendSparkExecutorProcess = ETLDefinition(
     SilverTargets.executorsTarget.asIncrementalDF(sparkExecutorModule, "addedTimestamp"),
     Seq(buildSparkExecutor()),
@@ -181,14 +180,14 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         clusterModule.execute(appendClusterProccess)
         GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping)
       }
-      case OverwatchScope.sparkEvents => {
-        processSparkEvents()
-      }
       case OverwatchScope.jobs => {
         jobsModule.execute(appendJobsProcess)
         jobRunsModule.execute(appendJobRunsProcess)
         GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
         GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
+      }
+      case OverwatchScope.sparkEvents => {
+        processSparkEvents()
       }
       case _ =>
     }
@@ -228,12 +227,22 @@ object Gold {
       .loadStaticDatasets()
   }
 
-  def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Gold = {
-    new Gold(workspace, workspace.database, workspace.getConfig)
+  private[overwatch] def apply(
+                                workspace: Workspace,
+                                readOnly: Boolean = false,
+                                suppressReport: Boolean = false,
+                                suppressStaticDatasets: Boolean = false
+                              ): Gold = {
+    val goldPipeline = new Gold(workspace, workspace.database, workspace.getConfig)
       .setReadOnly(readOnly)
       .suppressRangeReport(suppressReport)
       .initPipelineRun()
-      .loadStaticDatasets()
+
+    if (suppressStaticDatasets) {
+      goldPipeline
+    } else {
+      goldPipeline.loadStaticDatasets()
+    }
   }
 
 }

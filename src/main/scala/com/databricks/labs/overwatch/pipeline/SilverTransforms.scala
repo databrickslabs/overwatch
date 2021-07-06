@@ -560,6 +560,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobs_statusCols: Array[Column] = Array(
       'organization_id, 'serviceName, 'actionName, 'timestamp,
       when('actionName === "create", get_json_object($"response.result", "$.job_id").cast("long"))
+        .when('actionName === "changeJobAcl", 'resourceId.cast("long"))
         .otherwise('job_id).cast("long").alias("jobId"),
       'job_type,
       'name.alias("jobName"),
@@ -579,10 +580,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobStatusBase = jobsBase
       .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
-      .withColumn("jobId",
-        when('actionName === "changeJobAcl", 'resourceId.cast("long"))
-          .otherwise('jobId.cast("long"))
-      )
       .select(jobs_statusCols: _*)
       .withColumn("existing_cluster_id", coalesce('existing_cluster_id, get_json_object('new_settings, "$.existing_cluster_id")))
       .withColumn("new_cluster",
@@ -820,9 +817,13 @@ trait SilverTransforms extends SparkSessionWrapper {
           'created_time.alias("timestamp"))
     } else {
       jobsSnapshot.asDF
-        .select('organization_id, 'job_id.alias("jobId"),
-          'created_time.alias("timestamp"))
-    }.filter('clusterId.isNotNull)
+        .select(
+          'organization_id,
+          'job_id.alias("jobId"),
+          'created_time.alias("timestamp"),
+          lit(null).cast("string").alias("clusterId")
+        )
+    }
 
     // Ensure the lookups have data -- this will be improved when the module unification occurs during the next
     // scheduled refactor
@@ -938,8 +939,16 @@ trait SilverTransforms extends SparkSessionWrapper {
         })
         .toArray
 
-      val notebookJobsWithClusterIDs = spark.read.json(Seq(runIdStrings: _*).toDS())
-        .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
+      val notebookJobsWithClusterIDs = if(runIdStrings.nonEmpty){
+        spark.read.json(Seq(runIdStrings: _*).toDS())
+          .select('run_id.alias("runId"), $"cluster_spec.existing_cluster_id".alias("cluster_id_apiLookup"))
+      } else { // defend against API runId calls with no result missing
+        val missingRunIDMsg = s"A cluster ID could not be determined for the following runs. ${jrWFilledClusterIDs.toArray.mkString(", ")}"
+        logger.log(Level.WARN, missingRunIDMsg)
+        spark.emptyDataFrame
+          .withColumn("runId", lit(null).cast("long"))
+          .withColumn("cluster_id_apiLookup", lit(null).cast("string"))
+      }
 
       // If batch has runs on existing clusters older than the API retention the previous DF will be empty. Only join
       // if the api lookup successfully obtained the data

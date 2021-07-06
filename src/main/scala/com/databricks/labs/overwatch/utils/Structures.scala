@@ -25,7 +25,12 @@ case class TokenSecret(scope: String, key: String)
 case class DataTarget(databaseName: Option[String], databaseLocation: Option[String], etlDataPathPrefix: Option[String],
                       consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
 
-case class DatabricksContractPrices(interactiveDBUCostUSD: Double, automatedDBUCostUSD: Double)
+case class DatabricksContractPrices(
+                                     interactiveDBUCostUSD: Double = 0.55,
+                                     automatedDBUCostUSD: Double = 0.15,
+                                     sqlComputeDBUCostUSD: Double = 0.22,
+                                     jobsLightDBUCostUSD: Double = 0.10
+                                   )
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String)
 
@@ -59,7 +64,12 @@ case class AzureAuditLogEventhubConfig(
                                         auditLogChk: Option[String] = None
                                       )
 
-case class AuditLogConfig(rawAuditPath: Option[String] = None, azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None)
+case class AuditLogConfig(
+                           rawAuditPath: Option[String] = None,
+                           auditLogFormat: String = "json",
+                           azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None
+                         )
+case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
 
 case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            tokenSecret: Option[TokenSecret] = None,
@@ -67,8 +77,9 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            badRecordsPath: Option[String] = None,
                            overwatchScope: Option[Seq[String]] = None,
                            maxDaysToLoad: Int = 60,
-                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(0.56, 0.26),
-                           primordialDateString: Option[String] = None
+                           databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(),
+                           primordialDateString: Option[String] = None,
+                           intelligentScaling: IntelligentScaling = IntelligentScaling()
                           )
 
 case class ParsedConfig(
@@ -163,7 +174,7 @@ private[overwatch] class TokenError(s: String) extends Exception(s) {}
 
 private[overwatch] class PipelineStateException(s: String, val target: Option[PipelineTable]) extends Exception(s) {}
 
-private[overwatch] class BadConfigException(s: String) extends Exception(s) {}
+private[overwatch] class BadConfigException(s: String, val failPipeline: Boolean = true) extends Exception(s) {}
 
 private[overwatch] class FailedModuleException(s: String, val target: PipelineTable) extends Exception(s) {}
 
@@ -185,7 +196,7 @@ private[overwatch] class BronzeSnapException(
   private val pipeline = module.pipeline
   private val emptyModule = pipeline.getModuleState(module.moduleId).isEmpty
   private val fromTime = if (emptyModule) {
-    new Timestamp(pipeline.primordialEpoch)
+    new Timestamp(pipeline.primordialTime.asUnixTimeMilli)
   } else {
     new Timestamp(module.fromTime.asUnixTimeMilli)
   }

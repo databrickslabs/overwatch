@@ -100,6 +100,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     }
 
     val rawAuditPath = getOptionString(masterNode, "auditLogConfig.rawAuditPath")
+    val auditLogFormat = getOptionString(masterNode, "auditLogConfig.auditLogFormat").getOrElse("json")
     val azureEventHubNode = getNodeFromPath(masterNode, "auditLogConfig.azureAuditLogEventhubConfig")
 
     val azureAuditEventHubConfig = if (azureEventHubNode.nonEmpty) {
@@ -116,7 +117,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       None
     }
 
-    val auditLogConfig = AuditLogConfig(rawAuditPath, azureAuditEventHubConfig)
+    val auditLogConfig = AuditLogConfig(rawAuditPath, auditLogFormat, azureAuditEventHubConfig)
 
     val dataTarget = if (masterNode.has("dataTarget")) {
       Some(DataTarget(
@@ -142,12 +143,21 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
 
     val maxDaysToLoad = getOptionInt(masterNode, "maxDaysToLoad").getOrElse(60)
 
+    // Defaulted to list pricing as of June 07 2021
     val dbContractPrices = DatabricksContractPrices(
-      getOptionDouble(masterNode, "databricksContractPrices.interactiveDBUCostUSD").getOrElse(0.56),
-      getOptionDouble(masterNode, "databricksContractPrices.automatedDBUCostUSD").getOrElse(0.26)
+      getOptionDouble(masterNode, "databricksContractPrices.interactiveDBUCostUSD").getOrElse(0.55),
+      getOptionDouble(masterNode, "databricksContractPrices.automatedDBUCostUSD").getOrElse(0.15),
+      getOptionDouble(masterNode, "databricksContractPrices.sqlComputeDBUCostUSD").getOrElse(0.22),
+      getOptionDouble(masterNode, "databricksContractPrices.jobsLightDBUCostUSD").getOrElse(0.10),
     )
 
     val primordialDateString = getOptionString(masterNode, "primordialDateString")
+    val intelligentScalingConfig = IntelligentScaling(
+      getOptionBoolean(masterNode, "intelligentScaling.enabled").getOrElse(false),
+      getOptionInt(masterNode, "intelligentScaling.minimumCores").getOrElse(4),
+      getOptionInt(masterNode, "intelligentScaling.maximumCores").getOrElse(512),
+      getOptionDouble(masterNode, "intelligentScaling.coeff").getOrElse(1.0)
+    )
 
     OverwatchParams(
       auditLogConfig,
@@ -157,7 +167,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       overwatchScopes,
       maxDaysToLoad,
       dbContractPrices,
-      primordialDateString
+      primordialDateString,
+      intelligentScalingConfig
     )
   }
 }

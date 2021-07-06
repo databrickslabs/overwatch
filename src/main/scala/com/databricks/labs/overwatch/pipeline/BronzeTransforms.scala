@@ -13,7 +13,7 @@ import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, Event
 import org.apache.spark.sql.catalyst.expressions.Slice
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
@@ -84,6 +84,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   private def validateCleanPaths(
+                                  azureRawAuditLogTarget: PipelineTable,
                                   isFirstRun: Boolean,
                                   ehConfig: AzureAuditLogEventhubConfig,
                                   etlDataPathPrefix: String,
@@ -98,7 +99,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, s"Checkpoint paths to validate: ${pathsToValidate.mkString(",")}")
     val dataTargetPaths = Array(etlDataPathPrefix, etlDBLocation, consumerDBLocation).map(_.toLowerCase)
 
-    val baseErrMsg = "Azure Event Hub Paths are not empty on first run."
+    val baseErrMsg = "ERROR: Azure Event Hub checkpoint directory issue."
     pathsToValidate.foreach(p => {
       logger.log(Level.INFO, s"Validating: $p")
       val exists = Helpers.pathExists(p)
@@ -120,17 +121,26 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
 
       if (!exists && !isFirstRun) { // If not first run checkpoint paths must already exist.
-        val errMsg = s"$baseErrMsg\nPath: ${p} does not exist. To append new data, a checkpoint dir must " +
-          s"exist and be current."
-        logger.log(Level.ERROR, errMsg)
-        println(errMsg)
-        throw new BadConfigException(errMsg)
+        if (azureRawAuditLogTarget.exists && !azureRawAuditLogTarget.asDF().isEmpty) {
+          val warnMsg = s"$baseErrMsg\nPath: ${p} does not exist. To append new data, a checkpoint dir must " +
+            s"exist and be current. Attempting to recover state from Overwatch metadata."
+          logger.log(Level.WARN, warnMsg)
+          println(warnMsg)
+          throw new BadConfigException(warnMsg, failPipeline = false)
+        } else {
+          val errMsg = s"$baseErrMsg\nPath: ${p} does not exist. To append new data, a checkpoint dir must " +
+            s"exist and be current."
+          logger.log(Level.ERROR, errMsg)
+          println(errMsg)
+          throw new BadConfigException(errMsg)
+        }
       }
     })
   }
 
   @throws(classOf[BadConfigException])
-  protected def landAzureAuditLogDF(ehConfig: AzureAuditLogEventhubConfig,
+  protected def landAzureAuditLogDF(azureRawAuditLogTarget: PipelineTable,
+                                    ehConfig: AzureAuditLogEventhubConfig,
                                     etlDataPathPrefix: String,
                                     etlDBLocation: String,
                                     consumerDBLocation: String,
@@ -139,19 +149,32 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     runID: String
                                    ): DataFrame = {
 
-    validateCleanPaths(isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
-
     val connectionString = ConnectionStringBuilder(ehConfig.connectionString)
       .setEventHubName(ehConfig.eventHubName)
       .build
 
-    val eventHubsConf = if (isFirstRun) {
-      EventHubsConf(connectionString)
-        .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
-        .setStartingPosition(EventPosition.fromStartOfStream)
-    } else {
-      EventHubsConf(connectionString)
-        .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+    val eventHubsConf = try {
+      validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
+
+      if (isFirstRun) {
+        EventHubsConf(connectionString)
+          .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+          .setStartingPosition(EventPosition.fromStartOfStream)
+      } else {
+        EventHubsConf(connectionString)
+          .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+      }
+    } catch { // chk dir is missing BUT raw audit hist has latest enq time and can resume from there creating a new chkpoint
+      case e: BadConfigException if (!e.failPipeline) =>
+        val lastEnqTime = azureRawAuditLogTarget.asDF()
+          .select(max('enqueuedTime))
+          .as[java.sql.Timestamp]
+          .first
+          .toInstant
+
+        EventHubsConf(connectionString)
+          .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
+          .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
     spark.readStream
@@ -193,6 +216,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     df.withColumn("custom_tags", SchemaTools.structToMap(df, "custom_tags"))
   }
 
+  //noinspection ScalaCustomHdfsFormat
   protected def getAuditLogsDF(auditLogConfig: AuditLogConfig,
                                cloudProvider: String,
                                fromTime: LocalDateTime,
@@ -244,7 +268,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(Helpers.pathExists)
 
       if (datesGlob.nonEmpty) {
-        spark.read.json(datesGlob: _*)
+        spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
           // When globbing the paths, the date must be reconstructed and re-added manually
           .withColumn("organization_id", lit(organizationId))
           .withColumn("filename", input_file_name)
@@ -262,7 +286,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                        endTSMilli: Long, clusterIDs: Array[String]): Array[Array[String]] = {
 
     case class ClusterEventBuffer(clusterId: String, batchId: Int)
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(24))
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(8))
     val clusterIdsPar = clusterIDs.par
     clusterIdsPar.tasksupport = taskSupport
 
@@ -318,18 +342,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def prepClusterEventLogs(filteredAuditLogDF: DataFrame,
-                                     clusterSnapshotTable: PipelineTable,
-                                     start_time: TimeTypes, end_time: TimeTypes,
-                                     apiEnv: ApiEnv,
-                                     organizationId: String): DataFrame = {
+  protected def prepClusterEventLogs(
+                                      filteredAuditLogDF: DataFrame,
+                                      start_time: TimeTypes, end_time: TimeTypes,
+                                      apiEnv: ApiEnv,
+                                      organizationId: String
+                                    )(clusterSnapshotDF: DataFrame): DataFrame = {
     val extraQuery = Map(
       "start_time" -> start_time.asUnixTimeMilli, // 1588935326000L, //
       "end_time" -> end_time.asUnixTimeMilli, //1589021726000L //
       "limit" -> 500
     )
 
-    val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotTable)
+    val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
       .as[String]
       .collect()
 
@@ -628,14 +653,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
+                                      cloudProvider: String,
                                       historicalAuditLookupDF: DataFrame,
-                                      clusterSnapshot: PipelineTable
+                                      clusterSnapshotTable: PipelineTable,
+                                      sparkLogClusterScaleCoefficient: Double
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
       "number of new paths.")
 
-    val coreCount = getTotalCores
+    /**
+     * Multiplying current totalCores by scaleCoeff because the cluster will not have scaled up by the time this
+     * variable is set, thus this must account for the impending scale up event by scaleCoeff
+     */
+    val coreCount = (getTotalCores * sparkLogClusterScaleCoefficient).toInt
     val fromTimeEpochMillis = fromTime.asUnixTimeMilli
     val untilTimeEpochMillis = untilTime.asUnixTimeMilli
     val fromDate = fromTime.asLocalDateTime.toLocalDate
@@ -643,6 +674,32 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val daysToProcess = Duration.between(fromDate.atStartOfDay(), untilDate.plusDays(1L).atStartOfDay())
       .toDays.toInt
 
+    val dbfsLogSchema = StructType(Seq(
+      StructField("destination", StringType, true)
+    ))
+
+    val s3LogSchema = StructType(Seq(
+      StructField("canned_acl", StringType, true),
+      StructField("destination", StringType, true),
+      StructField("enable_encryption", BooleanType, true),
+      StructField("region", StringType, true)
+    ))
+
+    val logConfSchema = StructType(Seq(
+        StructField("dbfs", dbfsLogSchema, true),
+        StructField("s3", s3LogSchema, true)
+      ))
+
+    val clusterSnapshotMinSchema = StructType(
+      Seq(
+        StructField("cluster_id", StringType, nullable = true),
+        StructField("state", StringType, nullable = true),
+        StructField("cluster_log_conf", logConfSchema, nullable = true)
+      )
+    )
+
+    val clusterSnapshot = clusterSnapshotTable.asDF
+      .verifyMinimumSchema(clusterSnapshotMinSchema)
     // Shoot for partitions coreCount < 16 partitions per day < 576
     // This forces autoscaling clusters to scale up appropriately to handle the volume
     val optimizeParCount = math.min(math.max(coreCount * 2, daysToProcess * 32), 1024)
@@ -650,19 +707,22 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // clusterIDs with activity identified from audit logs since last run
     val incrementalClusterWLogging = historicalAuditLookupDF
+      .verifyMinimumSchema(Schema.auditMasterSchema)
       .withColumn("global_cluster_id", cluster_idFromAudit)
       .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
       .join(incrementalClusterIDs, Seq("cluster_id"))
+      .withColumn("cluster_log_conf", coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
+      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
       .filter('cluster_log_conf.isNotNull)
 
     // Get latest incremental snapshot of clusters running during current run
     // This captures clusters that have not been edited/restarted since the last run and are still RUNNING with
     // log confs as they will not be in the audit logs
     val latestSnapW = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
-    val currentlyRunningClustersWithLogging = clusterSnapshot.asDF
+    val currentlyRunningClustersWithLogging = clusterSnapshot
       .withColumn("snapRnk", rank.over(latestSnapW))
       .filter('snapRnk === 1 && 'state === "RUNNING")
-      .withColumn("cluster_log_conf", to_json('cluster_log_conf))
+      .withColumn("cluster_log_conf", coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"))
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('cluster_id, 'cluster_log_conf)
 
@@ -670,17 +730,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes = currentlyRunningClustersWithLogging
       .unionByName(incrementalClusterWLogging)
-      .withColumn("s3", get_json_object('cluster_log_conf, "$.s3"))
-      .withColumn("dbfs", get_json_object('cluster_log_conf, "$.dbfs"))
-      .withColumn("destination",
-        when('s3.isNotNull, regexp_replace(get_json_object('s3, "$.destination"), "\\/$", ""))
-          when('dbfs.isNotNull, regexp_replace(get_json_object('dbfs, "$.destination"), "\\/$", ""))
-      )
-      .withColumn("topLevelTargets",
-        array(col("destination"), col("cluster_id"),
-          lit("eventlog"))
-      ).withColumn("wildPath", concat_ws("/", 'topLevelTargets))
-      .select('wildPath)
+      .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
+      .withColumn("wildPrefix", regexp_replace(concat_ws("/", 'topLevelTargets), "//", ""))
+      .select('wildPrefix)
       .distinct()
 
     // all files considered for ingest

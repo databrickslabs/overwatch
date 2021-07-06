@@ -1,32 +1,39 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.labs.overwatch.pipeline.Pipeline.deriveLocalDate
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
-import scala.collection.immutable.ListMap
+import java.time.{Instant, LocalDate}
 
 class Module(
               val moduleId: Int,
               val moduleName: String,
               private[overwatch] val pipeline: Pipeline,
-              val moduleDependencies: Array[Int]
+              val moduleDependencies: Array[Int],
+              val moduleScaleCoefficient: Double,
+              hardLimitMaxHistory: Option[Int]
             ) {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
   import pipeline.spark.implicits._
+
   private val config = pipeline.config
 
   private var _isFirstRun: Boolean = false
+
   def isFirstRun: Boolean = _isFirstRun
 
   def copy(
             _moduleID: Int = moduleId,
             _moduleName: String = moduleName,
             _pipeline: Pipeline = pipeline,
-            _moduleDependencies: Array[Int] = moduleDependencies): Module = {
-    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies)
+            _moduleDependencies: Array[Int] = moduleDependencies,
+            _hardLimitMaxHistory: Option[Int] = hardLimitMaxHistory): Module = {
+    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies, moduleScaleCoefficient, _hardLimitMaxHistory)
   }
 
   private[overwatch] def moduleState: SimplifiedModuleStatusReport = {
@@ -49,13 +56,14 @@ class Module(
    *
    * @return
    */
-  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty || isFirstRun){
-    Pipeline.createTimeDetail(pipeline.primordialEpoch)
+  def fromTime: TimeTypes = if (pipeline.getModuleState(moduleId).isEmpty || isFirstRun) {
+    Pipeline.createTimeDetail(pipeline.primordialTime(hardLimitMaxHistory).asUnixTimeMilli)
   } else Pipeline.createTimeDetail(moduleState.untilTS)
 
   /**
    * Disallow pipeline start time state + max days to exceed snapshot time. Keeps pipelines from running into
    * the future.
+   *
    * @return
    */
   private def limitUntilTimeToSnapTime: TimeTypes = {
@@ -141,7 +149,7 @@ class Module(
       organization_id = config.organizationId,
       moduleID = moduleId,
       moduleName = moduleName,
-      primordialDateString = config.primordialDateString,
+      primordialDateString = Some(pipeline.primordialTime(hardLimitMaxHistory).asDTString),
       runStartTS = 0L,
       runEndTS = 0L,
       fromTS = fromTime.asUnixTimeMilli,
@@ -250,7 +258,7 @@ class Module(
 
     if (moduleDependencies.nonEmpty) { // if dependencies present
       // If earliest untilTS of dependencies < current untilTS edit current untilTS to match
-//      if (mostLaggingDependency.untilTS < untilTime.asUnixTimeMilli) overrideUntilTS(mostLaggingDependency.untilTS)
+      //      if (mostLaggingDependency.untilTS < untilTime.asUnixTimeMilli) overrideUntilTS(mostLaggingDependency.untilTS)
       moduleDependencies.foreach(dependentModuleId => {
         val depStateOp = pipelineState.get(dependentModuleId)
         if (depStateOp.isEmpty) { // No existing state for pre-requisite
@@ -266,7 +274,7 @@ class Module(
           }
         }
       })
-    }// requirementsPassed
+    } // requirementsPassed
   }
 
   @throws(classOf[IllegalArgumentException])
@@ -279,6 +287,7 @@ class Module(
     logger.log(Level.INFO, debugMsg)
     try {
       validatePipelineState()
+      PipelineFunctions.scaleCluster(pipeline, moduleScaleCoefficient)
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
       val etlDefinition = _etlDefinition.copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
@@ -313,14 +322,18 @@ object Module {
   def apply(moduleId: Int,
             moduleName: String,
             pipeline: Pipeline,
-            moduleDependencies: Array[Int] = Array()
+            moduleDependencies: Array[Int] = Array(),
+            clusterScaleUpPercent: Double = 1.0,
+            hardLimitMaxHistory: Option[Int] = None
            ): Module = {
 
     new Module(
       moduleId,
       moduleName,
       pipeline,
-      moduleDependencies
+      moduleDependencies,
+      clusterScaleUpPercent,
+      hardLimitMaxHistory
     )
   }
 

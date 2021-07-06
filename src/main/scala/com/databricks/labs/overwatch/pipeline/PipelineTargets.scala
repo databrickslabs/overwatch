@@ -115,6 +115,7 @@ abstract class PipelineTargets(config: Config) {
       name = "instanceDetails",
       _keys = Array("API_Name"),
       config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
       partitionBy = Seq("organization_id")
     )
 
@@ -176,9 +177,10 @@ abstract class PipelineTargets(config: Config) {
       autoOptimize = true,
       sparkOverrides = Map(
         "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
-        "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
+        "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
+        "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString
       ),
-      shuffleFactor = 0.25
+      shuffleFactor = 0.75
     )
 
     lazy private[overwatch] val stagesTarget: PipelineTable = PipelineTable(
@@ -367,7 +369,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterStateFactTarget: PipelineTable = PipelineTable(
       name = "clusterStateFact_gold",
-      _keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
+      _keys = Array("cluster_id", "state", "unixTimeMS_state_end"),
       config,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("unixTimeMS_state_start"),

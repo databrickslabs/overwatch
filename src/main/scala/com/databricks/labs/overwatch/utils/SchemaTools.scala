@@ -19,6 +19,27 @@ import scala.util.Random
 object SchemaTools extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  def getSchemaVersion(dbName: String): String = {
+    val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
+    dbMeta.properties.getOrElse("SCHEMA", "UNKNOWN")
+  }
+
+  def modifySchemaVersion(dbName: String, targetVersion: String): Unit = {
+    val existingSchemaVersion = SchemaTools.getSchemaVersion(dbName)
+    val upgradeStatement =
+      s"""ALTER DATABASE $dbName SET DBPROPERTIES
+         |(SCHEMA=$targetVersion)""".stripMargin
+
+    val upgradeMsg = s"upgrading schema from $existingSchemaVersion --> $targetVersion with STATEMENT:\n " +
+      s"$upgradeStatement"
+    logger.log(Level.INFO, upgradeMsg)
+    spark.sql(upgradeStatement)
+    val newSchemaVersion = SchemaTools.getSchemaVersion(dbName)
+    assert(newSchemaVersion == targetVersion)
+    logger.log(Level.INFO, s"UPGRADE SUCCEEDED")
+
+  }
+
   def flattenSchema(df: DataFrame): Array[Column] = {
     flattenSchema(df.schema)
   }

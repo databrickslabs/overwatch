@@ -76,12 +76,28 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     Database(config)
   }
 
+  private def validateIntelligentScaling(intelligentScaling: IntelligentScaling): IntelligentScaling = {
+    if (intelligentScaling.enabled) {
+      if (intelligentScaling.minimumCores < 1)
+        throw new BadConfigException(s"Intelligent Scaling: Minimum cores must be > 0. Set to ${intelligentScaling.minimumCores}")
+      if (intelligentScaling.minimumCores > intelligentScaling.maximumCores)
+        throw new BadConfigException(s"Intelligent Scaling: Minimum cores must be > 0. \n" +
+          s"Minimum = ${intelligentScaling.minimumCores}\nMaximum = ${intelligentScaling.maximumCores}")
+      if (intelligentScaling.coeff >= 10.0 || intelligentScaling.coeff <= 0.0)
+        throw new BadConfigException(s"Intelligent Scaling: Scaling Coeff must be between 0.0 and 10.0 (exclusive). \n" +
+          s"coeff configured at = ${intelligentScaling.coeff}")
+    }
+
+    intelligentScaling
+  }
+
   @throws(classOf[BadConfigException])
   private def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): this.type = {
 
     if (config.cloudProvider == "aws") {
 
       val auditLogPath = auditLogConfig.rawAuditPath
+      val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim
       if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
         throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
       }
@@ -92,10 +108,16 @@ class Initializer(config: Config) extends SparkSessionWrapper {
             s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
         })
 
+      val supportedAuditLogFormats = Array("json", "parquet", "delta")
+      if (!supportedAuditLogFormats.contains(auditLogFormat)) {
+        throw new BadConfigException(s"Audit Log Format: Supported formats are ${supportedAuditLogFormats.mkString(",")} " +
+          s"but $auditLogFormat was placed in teh configuration. Please select a supported audit log format.")
+      }
+
       val finalAuditLogPath = if (auditLogPath.get.endsWith("/")) auditLogPath.get.dropRight(1) else auditLogPath.get
 
       config.setAuditLogConfig(
-        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), None)
+        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
       )
 
     } else {
@@ -123,11 +145,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         auditLogChk = Some(auditLogBronzeChk)
       )
 
-      config.setAuditLogConfig(
-        auditLogConfig.copy(
-          None, Some(ehFinalConfig)
-        )
-      )
+      config.setAuditLogConfig(auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig)))
 
     }
     this
@@ -137,10 +155,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
    *
-   * @param args JSON string of input args from input into main class.
+   * @param overwatchArgs JSON string of input args from input into main class.
    * @return
    */
-  private def validateAndRegisterArgs(args: Array[String]): this.type = {
+  private def validateAndRegisterArgs(overwatchArgs: String): this.type = {
 
     /**
      * Register custom deserializer to create OverwatchParams object
@@ -165,10 +183,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       //      config.buildLocalOverwatchParams()
 //      val synthArgs = config.buildLocalOverwatchParams()
 //      mapper.readValue[OverwatchParams](synthArgs)
-      mapper.readValue[OverwatchParams](args(0))
+      mapper.readValue[OverwatchParams](overwatchArgs)
     } else {
       logger.log(Level.INFO, "Validating Input Parameters")
-      mapper.readValue[OverwatchParams](args(0))
+      mapper.readValue[OverwatchParams](overwatchArgs)
     }
 
     // Now that the input parameters have been parsed -- set them in the config
@@ -220,9 +238,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
 
     // Set Databricks Contract Prices from Config
-    // Defaulted to 0.56 interactive and 0.26 automated
     config.setContractInteractiveDBUPrice(rawParams.databricksContractPrices.interactiveDBUCostUSD)
     config.setContractAutomatedDBUPrice(rawParams.databricksContractPrices.automatedDBUCostUSD)
+    config.setContractSQLComputeDBUPrice(rawParams.databricksContractPrices.sqlComputeDBUCostUSD)
+    config.setContractJobsLightDBUPrice(rawParams.databricksContractPrices.jobsLightDBUCostUSD)
 
     // Set Primordial Date
     config.setPrimordialDateString(rawParams.primordialDateString)
@@ -234,6 +253,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
     config.setMaxDays(rawParams.maxDaysToLoad)
+
+    config.setIntelligentScaling(validateIntelligentScaling(rawParams.intelligentScaling))
 
     this
   }
@@ -413,6 +434,7 @@ object Initializer extends SparkSessionWrapper {
     }
     config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
+    config.setInitialWorkerCount(getNumberOfWorkerNodes)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
     if (debugFlag) {
       envInit("DEBUG")
@@ -428,7 +450,7 @@ object Initializer extends SparkSessionWrapper {
    * and checks for avoidable issues. The initializer is also responsible for identifying any errors in the
    * configuration that can be identified before the runs begins to enable fail fast.
    *
-   * @param args      Json string of args -- When passing into args in Databricks job UI, the json string must
+   * @param overwatchArgs      Json string of args -- When passing into args in Databricks job UI, the json string must
    *                  be passed in as an escaped Json String. Use JsonUtils in Tools to build and extract the string
    *                  to be used here.
    * @param debugFlag manual Boolean setter to enable the debug flag. This is different than the log4j DEBUG Level
@@ -436,14 +458,14 @@ object Initializer extends SparkSessionWrapper {
    *                  is more robust output when debug is enabled.
    * @return
    */
-  def apply(args: Array[String], debugFlag: Boolean = false): Workspace = {
+  def apply(overwatchArgs: String, debugFlag: Boolean = false): Workspace = {
 
     val config = initConfigState(debugFlag)
 
     logger.log(Level.INFO, "Initializing Environment")
     val initializer = new Initializer(config)
     val database = initializer
-      .validateAndRegisterArgs(args)
+      .validateAndRegisterArgs(overwatchArgs)
       .initializeDatabase()
 
     logger.log(Level.INFO, "Initializing Workspace")
@@ -453,7 +475,7 @@ object Initializer extends SparkSessionWrapper {
     workspace
   }
 
-  private[overwatch] def apply(args: Array[String], debugFlag: Boolean, isSnap: Boolean): Workspace = {
+  private[overwatch] def apply(overwatchArgs: String, debugFlag: Boolean, isSnap: Boolean): Workspace = {
 
     val config = initConfigState(debugFlag)
 
@@ -461,7 +483,7 @@ object Initializer extends SparkSessionWrapper {
     val initializer = new Initializer(config)
     val database = initializer
       .setIsSnap(isSnap)
-      .validateAndRegisterArgs(args)
+      .validateAndRegisterArgs(overwatchArgs)
       .initializeDatabase()
 
     logger.log(Level.INFO, "Initializing Workspace")

@@ -6,11 +6,12 @@ import org.apache.log4j.{Level, Logger}
 
 
 class Bronze(_workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config, Layer.bronze)
+  extends Pipeline(_workspace, _database, _config)
     with BronzeTransforms {
 
   /**
    * Enable access to Bronze pipeline tables externally.
+   *
    * @return
    */
   def getAllTargets: Array[PipelineTable] = {
@@ -64,28 +65,33 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.auditLogsTarget)
   )
 
-  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004))
+  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), 0.0, Some(30))
   lazy private val appendClusterEventLogsProcess = ETLDefinition(
-    prepClusterEventLogs(
-      BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
-      BronzeTargets.clustersSnapshotTarget,
-      clusterEventLogsModule.fromTime,
-      clusterEventLogsModule.untilTime,
-      config.apiEnv,
-      config.organizationId
+    BronzeTargets.clustersSnapshotTarget.asDF,
+    Seq(
+      prepClusterEventLogs(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
+        clusterEventLogsModule.fromTime,
+        clusterEventLogsModule.untilTime,
+        config.apiEnv,
+        config.organizationId
+      )
     ),
     append(BronzeTargets.clusterEventsTarget)
   )
 
-  lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004))
+  lazy private val sparkLogClusterScaleCoefficient = 4.0
+  lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004), sparkLogClusterScaleCoefficient)
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),
     Seq(
       collectEventLogPaths(
         sparkEventLogsModule.fromTime,
         sparkEventLogsModule.untilTime,
+        config.cloudProvider,
         BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols, 30),
-        BronzeTargets.clustersSnapshotTarget
+        BronzeTargets.clustersSnapshotTarget,
+        sparkLogClusterScaleCoefficient
       ),
       generateEventLogsDF(
         database,
@@ -101,9 +107,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
-
     val isFirstAuditRun = !BronzeTargets.auditLogsTarget.exists
     val rawAzureAuditEvents = landAzureAuditLogDF(
+      BronzeTargets.auditLogAzureLandRaw,
       config.auditLogConfig.azureAuditLogEventhubConfig.get,
       config.etlDataPathPrefix, config.databaseLocation, config.consumerDatabaseLocation,
       isFirstAuditRun,
@@ -117,7 +123,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       spark, config, "azure_audit_log_preProcessing", getTotalCores
     )
 
-    database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw,pipelineSnapTime.asColumnTS)
+    database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
 
     val rawProcessCompleteMsg = "Azure audit ingest process complete"
     if (config.debugFlag) println(rawProcessCompleteMsg)
@@ -162,12 +168,22 @@ object Bronze {
       .loadStaticDatasets()
   }
 
-  private[overwatch] def apply(workspace: Workspace, readOnly: Boolean = false, suppressReport: Boolean = false): Bronze = {
-    new Bronze(workspace, workspace.database, workspace.getConfig)
-      .suppressRangeReport(suppressReport)
+  private[overwatch] def apply(
+                                workspace: Workspace,
+                                readOnly: Boolean = false,
+                                suppressReport: Boolean = false,
+                                suppressStaticDatasets: Boolean = false
+                              ): Bronze = {
+    val bronzePipeline = new Bronze(workspace, workspace.database, workspace.getConfig)
       .setReadOnly(readOnly)
+      .suppressRangeReport(suppressReport)
       .initPipelineRun()
-      .loadStaticDatasets()
+
+    if (suppressStaticDatasets) {
+      bronzePipeline
+    } else {
+      bronzePipeline.loadStaticDatasets()
+    }
   }
 
 }
