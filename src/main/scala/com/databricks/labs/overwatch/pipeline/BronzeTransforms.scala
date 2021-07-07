@@ -730,8 +730,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes = currentlyRunningClustersWithLogging
       .unionByName(incrementalClusterWLogging)
+      .withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
       .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
-      .withColumn("wildPrefix", regexp_replace(concat_ws("/", 'topLevelTargets), "//", ""))
+      .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
       .select('wildPrefix)
       .distinct()
 
