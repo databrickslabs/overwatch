@@ -90,9 +90,11 @@ object PipelineFunctions {
     val maxCoreCount = pipeline.getConfig.intelligentScaling.maximumCores
     val baseCoreCount = pipeline.getConfig.intelligentScaling.minimumCores
     val userCoeffMultiplier = pipeline.getConfig.intelligentScaling.coeff
+    val coresPerWorker = pipeline.getCoresPerWorker
     if (pipeline.getConfig.intelligentScaling.enabled) {
-      val nodeCountUpperBound = Math.floor(maxCoreCount / pipeline.getCoresPerWorker).toInt
-      val newNodeCount = Math.min(Math.max(baseCoreCount, Math.ceil(baseCoreCount * scaleCoefficient * userCoeffMultiplier).toInt), nodeCountUpperBound)
+      val nodeCountUpperBound = Math.floor(maxCoreCount / coresPerWorker).toInt
+      val newCoreCount = Math.min(Math.max(baseCoreCount, Math.ceil(baseCoreCount * scaleCoefficient * userCoeffMultiplier).toInt), maxCoreCount)
+      val newNodeCount = Math.min(Math.floor(newCoreCount / coresPerWorker), nodeCountUpperBound).toInt
       if (newNodeCount != pipeline.getNumberOfWorkerNodes) {
         logger.log(Level.INFO, s"Cluster Scaling: Max Core Count set to $maxCoreCount")
         logger.log(Level.INFO, s"Cluster Scaling: Max Nodes --> $nodeCountUpperBound")
