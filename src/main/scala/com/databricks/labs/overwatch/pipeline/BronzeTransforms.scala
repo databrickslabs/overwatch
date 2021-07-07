@@ -358,6 +358,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .as[String]
       .collect()
 
+    if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
+      s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
+      s"properly. Skipping!", Level.ERROR)
+
     /**
      * NOTE *** IMPORTANT
      * Large batches are more efficient but can result in OOM with driver.maxResultSize. To avoid this it's

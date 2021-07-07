@@ -90,21 +90,21 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   def asDF: DataFrame = {
     val apiDF = try {
-      if (dataCol == "*") spark.read.json(Seq(results: _*).toDS)
-      else spark.read.json(Seq(results: _*).toDS).select(explode(col(dataCol)).alias(dataCol))
+      val apiResultDF = spark.read.json(Seq(results: _*).toDS)
+      if (dataCol == "*") apiResultDF
+      else apiResultDF.select(explode(col(dataCol)).alias(dataCol))
         .select(col(s"$dataCol.*"))
     } catch {
       case e: Throwable =>
-        val emptyDF = sc.parallelize(Seq("")).toDF()
         if (results.isEmpty) {
           val msg = s"No data returned for api endpoint ${_apiName}"
           setStatus(msg, Level.INFO, Some(e))
-          emptyDF
+          spark.emptyDataFrame
         }
         else {
           val msg = s"Acquiring data from ${_apiName} failed."
           setStatus(msg, Level.ERROR, Some(e))
-          emptyDF
+          spark.emptyDataFrame
         }
     }
     SchemaTools.scrubSchema(apiDF)
