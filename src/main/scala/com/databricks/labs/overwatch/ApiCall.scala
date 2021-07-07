@@ -25,6 +25,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private var _maxResults: Int = _
   private var _status: String = "SUCCESS"
   private var _errorFlag: Boolean = false
+  private var _allowUnsafeSSL: Boolean = false
+
   private val mapper = JsonUtils.defaultObjectMapper
   private val httpHeaders = Seq[(String, String)](
     ("Content-Type", "application/json"),
@@ -32,6 +34,16 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     ("User-Agent",  s"databricks-labs-overwatch-${env.packageVersion}"),
     ("Authorization", s"Bearer ${env.rawToken}")
   )
+
+  private def allowUnsafeSSL = _allowUnsafeSSL
+  private def reqOptions: Seq[HttpOptions.HttpOption] = {
+    val baseOptions = Seq(
+      HttpOptions.connTimeout(ApiCall.connTimeoutMS),
+      HttpOptions.connTimeout(ApiCall.readTimeoutMS)
+    )
+    if (allowUnsafeSSL) baseOptions :+ HttpOptions.allowUnsafeSSL else baseOptions
+
+  }
 
   private def setQuery(value: Option[Map[String, Any]]): this.type = {
     if (value.nonEmpty && _paginate) {
@@ -140,8 +152,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       val result = try {
         Http(req + getQueryString)
           .copy(headers = httpHeaders)
-          .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
-          .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+          .options(reqOptions)
           .asString
       } catch {
         case _: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
@@ -149,11 +160,10 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
             "ssl. If this is unexpected behavior, validate your ssl certs."
           logger.log(Level.WARN, sslMSG)
           println(sslMSG)
+          _allowUnsafeSSL = true
           Http(req + getQueryString)
             .copy(headers = httpHeaders)
-            .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
-            .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
-            .option(HttpOptions.allowUnsafeSSL)
+            .options(reqOptions)
             .asString
       }
       if (result.isError) {
@@ -232,8 +242,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         Http(req)
           .copy(headers = httpHeaders)
           .postData(jsonQuery)
-          .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
-          .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
+          .options(reqOptions)
           .asString
       } catch {
         case _: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
@@ -241,11 +250,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
             "ssl. If this is unexpected behavior, validate your ssl certs."
           logger.log(Level.WARN, sslMSG)
           println(sslMSG)
-          Http(req + getQueryString)
+          _allowUnsafeSSL = true
+          Http(req)
             .copy(headers = httpHeaders)
-            .option(HttpOptions.connTimeout(ApiCall.connTimeoutMS))
-            .option(HttpOptions.readTimeout(ApiCall.readTimeoutMS))
-            .option(HttpOptions.allowUnsafeSSL)
+            .postData(jsonQuery)
+            .options(reqOptions)
             .asString
       }
       if (result.isError) {
