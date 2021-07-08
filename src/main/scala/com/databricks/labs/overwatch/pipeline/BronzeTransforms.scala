@@ -213,7 +213,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
-    df.withColumn("custom_tags", SchemaTools.structToMap(df, "custom_tags"))
+    val outputDF = SchemaTools.scrubSchema(df)
+    outputDF.withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
   }
 
   //noinspection ScalaCustomHdfsFormat

@@ -101,7 +101,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   def asStrings: Array[String] = results.toArray
 
   def asDF: DataFrame = {
-    val apiDF = try {
+    try {
       val apiResultDF = spark.read.json(Seq(results: _*).toDS)
       if (dataCol == "*") apiResultDF
       else apiResultDF.select(explode(col(dataCol)).alias(dataCol))
@@ -119,7 +119,6 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           spark.emptyDataFrame
         }
     }
-    SchemaTools.scrubSchema(apiDF)
   }
 
   private def dataCol: String = {

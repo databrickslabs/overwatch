@@ -208,11 +208,11 @@ object SchemaTools extends SparkSessionWrapper {
         s"${dups.mkString("\n")}"
       println(warnMsg)
       logger.log(Level.WARN, warnMsg)
-      val uniqueSuffixes = uniqueRandomStrings(Some(fields.length), Some(42L), 6)
+      val uniqueSuffixes = uniqueRandomStrings(Some(fields.length), None, 6)
       fields.zipWithIndex.map(f => {
         val fieldName = if (caseSensitive) f._1.name else f._1.name.toLowerCase
         if (dups.contains(fieldName)) {
-          val generatedUniqueName = f._1.name + "_" + uniqueSuffixes(f._2)
+          val generatedUniqueName = f._1.name + "_UNIQUESUFFIX_" + uniqueSuffixes(f._2)
           val uniqueColumnMapping = s"\n${f._1.name} --> ${generatedUniqueName}"
           println(uniqueColumnMapping)
           logger.log(Level.WARN, uniqueColumnMapping)
