@@ -445,7 +445,12 @@ object SchemaTools extends SparkSessionWrapper {
 
             case eType =>
               if (eType != requiredFieldStructure.dataType.asInstanceOf[ArrayType].elementType) { //element types don't match FAIL
-                throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
+                val warnMsg = malformedSchemaErrorMessage(fieldStructure, requiredFieldStructure, cPrefix)
+                logger.log(Level.WARN, warnMsg)
+                if (isDebug) println(warnMsg)
+                val mutatedColumn = col(getPrefixedString(cPrefix, fieldStructure.name))
+                  .cast(requiredFieldStructure.dataType).alias(fieldStructure.name)
+                validator.copy(column = mutatedColumn)
               } else { // element types match
                 validator.copy(column = col(getPrefixedString(cPrefix, fieldStructure.name)).alias(fieldStructure.name))
               }
