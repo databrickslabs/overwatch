@@ -3,6 +3,83 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+## 0.5.0
+### Upgrading and Required Changes
+* **[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED** - If you are upgrading from 0.4.12+ please 
+  use *Upgrade.UpgradeTo0420* If upgrading from a schema 
+  prior to 0.4.12, please first upgrade to 0.4.12 and then to 0.4.2. The upgrade process will be improving or going away 
+  soon, please bear with us while we improve this process.
+```scala
+import com.databricks.labs.overwatch.utils.Upgrade
+val upgradeReport = Upgrade.upgradeTo042(<YOUR WORKSPACE OBJECT>)
+```
+
+{{% notice note %}}
+The schema versions have been tied to the release versions until 0.5.0, this divergence was intentional. A schema 
+version should not == the binary release version as changes to the schema should be much more infrequent than 
+binary releases. Rest assured binary v0.5.0 requires schema version 0.4.2. Please upgrade to 0.4.2 as noted above 
+using the 0.5.0 binary but before the pipeline is executed.
+{{% /notice %}}
+
+* **Launch Config Change** - Note the difference in the *Initializer* for 0.4.2. The following change is ONLY necessary when/if 
+  instantiating Overwatch from a notebook, the main class does not require this change. Sorry for the breaking change 
+  we will try to minimize these everywhere possible
+```scala
+// 0.4.1 (OLD)
+val workspace = Initializer(Array(args), debugFlag = true)
+// 0.4.2+ (NEW)
+val workspace = Initializer(args, debugFlag = true)
+```
+
+### Major Features & Enhancements
+Below are the major feature and enhancements in 0.4.2
+* Improved [Getting Started Example Notebooks]({{%relref "GettingStarted"%}}/#initializing-the-environment)
+* Kitana
+  * Testing framework, currently meant for advanced usage, documentation will roll out asap.
+* [Intelligent scaling]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling)
+* [Audit Log Formats (AWS)](https://github.com/databrickslabs/overwatch/issues/151)
+  * For AWS the input format of the audit logs is now configurable to json (default), delta, parquet
+* [Contract costs through time](https://github.com/databrickslabs/overwatch/issues/49)
+  * Changes to the instanceDetails table now allows for the tracking of all costs through time including compute and 
+  DBU. To recalcuate associated costs in the gold layer, the jobRunCostPotentialFact and clusterStateFact table will 
+    need to be rolled back as per the documents in [ETL Process]({{%relref "DataEngineer/ETL_Process.md"%}})
+* DBU Contract Costs for DatabricksSQL and JobsLight added
+  * Costing for additional SKUs were added to the configuration such that they can be tracked. Note that as of 0.4.2 
+  release, no calculation changes in costing as it relates to sku have yet been incorporated. These recalculations for
+  jobs light and DatabricksSQL are in progress.
+* Enabled [Main class execution]({{%relref "GettingStarted"%}}/#executing-overwatch-via-main-class) to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily 
+  enabled for future enablement with jobs pipelines and for development / testing purposes.
+  * User can now pass 2 arguments to the databricks job where the first is 'bronze', 'silver', or 'gold' and the second
+  is the escaped configuration string and only that pipeline layer will execute.
+* Event Hub Checkpoint - Auto-Recovery (Azure)
+  * Previously, if an EH state was to get lost or corrupted, it was very challenging to resume. Overwatch will now
+  automatically identify the latest state loaded and resume.
+* [Support non-dbfs file types](https://github.com/databrickslabs/overwatch/issues/133) 
+  such as abfss://, s3a://, s3n:// etc. for audit log source paths and output paths.
+  All file types supported on Databricks should now be supported in Overwatch.
+
+### Minor Bug Fixes / Enhancements
+* Unsafe SSL allowed [Issue 152](https://github.com/databrickslabs/overwatch/issues/152). 
+  All API connections will first be attempted using standard SSL but will fallback on unsafe 
+if there is a SSLHandshakeException. Targeted at specific scenarios.
+* ERD Updates for accuracy
+* Issue resolved where not all cluster logs were being loaded thus several spark log events were missing
+* Various schema errors in edge use cases
+* Docs updates and ehancements
+
+### Additional Fixes
+* non-dbfs uris for cluster logs (i.e. s3a://, abfss://)
+* intelligent scaling calculation
+* improved errors for access issues with api calls
+* unsafeSSL fallback optimization and bug fix
+* elementType implicit casting to target schemas within arrays
+* aws - non-json formatted audit logs schema unification
+* api schema scrubber improvements for addtional edge cases
+
+
+## 0.4.2
+* Deprecated release - please use [0.5.0](#050)
+* The 0.4.2 can be viewed as an RC for 0.5.0. The 0.5.0 release is the 0.4.2 release with several bug fixes
 
 ## 0.4.13
 * Hotfix for [Issue 138](https://github.com/databrickslabs/overwatch/issues/138)
@@ -16,9 +93,8 @@ the next release is published.
 * Hotfix for [Issue 126](https://github.com/databrickslabs/overwatch/issues/126).
 * Hotfix for [Issue 129](https://github.com/databrickslabs/overwatch/issues/129).
 * Schema upgrade capability enabled.
-  * To upgrade your schema to 0.412, all you need to do is follow the 
-  example in the notebook below.
-    * ([HTML](/assets/ChangeLog/Upgrade_Example.html) / [DBC](/assets/ChangeLog/Upgrade_Example.dbc))
+  * Please follow the [upgrade documentation]({{%relref "DataEngineer/Upgrade.md"%}}) to complete your upgrade
+  * Upgrade function name == `Upgrade.upgradeTo0412`
 * Corrected case sensitivity issue. When failure would occur in spark_events_bronze, there were column references 
   to state tables with mismatched column name case sensitivity causing errors
 * Corrected issue with missing quotes around update statement to track failed files in 
