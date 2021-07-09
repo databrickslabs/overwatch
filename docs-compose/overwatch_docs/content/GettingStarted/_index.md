@@ -226,3 +226,10 @@ For more information on how to configure the separation of ETL and consumption d
 
 Additional steps can be taken to secure the storage location of the ETL entities as necessary. The method for
 securing access to these tables would be the same as with any set of tables in your organization.
+
+#### Accessing the Secret\[s\]
+The owner of the Overwatch Run must have access to the secret\[s\] that store the sensitive info. For example,
+if John runs a notebook, John must have access to the secrets used in the config. The same is true if John
+creates a scheduled job and sets it to run on a schedule. This changes when it goes to production though and John
+sends it through production promotion process and the job is now owned by the etl-admin principle. Since the job
+is now owned by the etl-admin principle, etl-admin must have access to the relevant secrets. 
