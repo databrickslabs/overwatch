@@ -269,14 +269,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(Helpers.pathExists)
 
       if (datesGlob.nonEmpty) {
-        val baseDF = auditLogConfig.auditLogFormat match {
-          case "json" =>
-            spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
-          case _ =>
-            val rawDF = spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
-              rawDF.withColumn("requestParams", structFromJson(rawDF, "requestParams"))
-        }
-        spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        val rawDF = spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        val baseDF = if (auditLogConfig.auditLogFormat == "json") rawDF else rawDF.withColumn("requestParams", structFromJson(rawDF, "requestParams"))
+
+        baseDF
           // When globbing the paths, the date must be reconstructed and re-added manually
           .withColumn("organization_id", lit(organizationId))
           .withColumn("filename", input_file_name)
