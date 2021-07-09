@@ -213,7 +213,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
-    df.withColumn("custom_tags", SchemaTools.structToMap(df, "custom_tags"))
+    val outputDF = SchemaTools.scrubSchema(df)
+    outputDF.withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
   }
 
   //noinspection ScalaCustomHdfsFormat
@@ -268,7 +269,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(Helpers.pathExists)
 
       if (datesGlob.nonEmpty) {
-        spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        val rawDF = spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        val baseDF = if (auditLogConfig.auditLogFormat == "json") rawDF else rawDF.withColumn("requestParams", structFromJson(rawDF, "requestParams"))
+
+        baseDF
           // When globbing the paths, the date must be reconstructed and re-added manually
           .withColumn("organization_id", lit(organizationId))
           .withColumn("filename", input_file_name)
@@ -357,6 +361,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
       .as[String]
       .collect()
+
+    if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
+      s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
+      s"properly. Skipping!", Level.ERROR)
 
     /**
      * NOTE *** IMPORTANT
@@ -730,8 +738,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes = currentlyRunningClustersWithLogging
       .unionByName(incrementalClusterWLogging)
+      .withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
       .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
-      .withColumn("wildPrefix", regexp_replace(concat_ws("/", 'topLevelTargets), "//", ""))
+      .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
       .select('wildPrefix)
       .distinct()
 

@@ -10,6 +10,7 @@ import org.apache.spark.sql.functions._
  * The Workspace class gets instantiated once per run per Databricks workspace. THe need for this class evolved
  * over time and is being restructured as part of an outstanding refactor branch which is likely not to be completed
  * until after v1.0 release.
+ *
  * @param config
  */
 class Workspace(config: Config) extends SparkSessionWrapper {
@@ -33,29 +34,24 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * Most of the jobs data comes from the audit logs but there are several edge cases that result in incomplete
    * jobs log data in the audit logs (same true for cluster specs). As such, each time the jobs module executes
    * a snapshot of actively defined jobs is captured and used to fill in the blanks in the silver+ layers.
+   *
    * @return
    */
   def getJobsDF: DataFrame = {
 
     val jobsEndpoint = "jobs/list"
 
-    try {
-      ApiCall(jobsEndpoint, config.apiEnv)
-        .executeGet()
-        .asDF
-        .withColumn("organization_id", lit(config.organizationId))
-    } catch {
-      case e: Throwable => {
-        logger.log(Level.ERROR, "ERROR: Failed to execute jobs/list API call.", e)
-        spark.sql("select ERROR")
-      }
-    }
+    ApiCall(jobsEndpoint, config.apiEnv)
+      .executeGet()
+      .asDF
+      .withColumn("organization_id", lit(config.organizationId))
 
   }
 
   /**
    * Exposed config as a public getter to enable access to config for testing. This should not be public facing
    * public function.
+   *
    * @return
    */
   def getConfig: Config = config
@@ -70,6 +66,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   /**
    * For future development
+   *
    * @param dbfsPath
    * @return
    */
@@ -86,6 +83,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   /**
    * Placeholder for future dev
+   *
    * @return
    */
   def getPoolsDF: DataFrame = {
@@ -98,6 +96,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   /**
    * Placeholder for future dev
+   *
    * @return
    */
   def getProfilesDF: DataFrame = {
@@ -110,6 +109,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   /**
    * Placeholder for future dev
+   *
    * @return
    */
   def getWorkspaceUsersDF: DataFrame = {
