@@ -5,10 +5,11 @@ weight: 3
 ---
 
 Sometimes upgrading from one version to the next requires a schema change. In these cases, the 
-[CHANGELOG]({{%relref "ChangeLog/"%}}) will be explicit. The general upgrade process is:
+[CHANGELOG]({{%relref "ChangeLog/"%}}) will be explicit. Upgrades MUST be executed WITH the **new binary** and 
+**before the pipeline is executed**. The general upgrade process is:
+* Adjust any Overwatch configurations and get the updated compactString from JsonUtils
 * Import the upgrade package
-* Retrieve your production workspace
-    * Should be done with the same parameters and method as the pipeline / environment that is being upgraded
+* Use the compactString of parameters to instantiate the workspace
 * Call the upgrade function for the version to which you're upgrading.
 
 To upgrade to version 0.4.12, the code is below. Note, the "buildWorkspace" function is just a helper function to 
@@ -20,25 +21,18 @@ When a schema upgrade is required between versions, **this step cannot be skippe
 to continue on a version that requires a newer schema.
 {{% /notice %}}
 
+A sample notebook is provided below for reference.
+
+[Upgrade.html](/assets/ChangeLog/Upgrade_Example.html) / [Upgrade.dbc](/assets/ChangeLog/Upgrade_Example.dbc)
+
 ```scala
 import com.databricks.labs.overwatch.utils.Upgrade
-val prodConfigs = Map(
-  "storagePrefix" -> "...",
-  "etlDBName" -> "overwatch_etl",
-  "consumerDBName" -> "overwatch",
-  "secretsScope" -> "...",
-  "dbPATKey" -> "...",
-  "ehKey" -> "...",
-  "ehName" -> "...",
-  "primordialDateString" -> "2021-01-01",
-  "maxDaysToLoad" -> "60",
-  "scopes" -> "all"
-)
+import com.databricks.labs.overwatch.pipeline.Initializer
+val params = OverwatchParams(...)
+val prodArgs = JsonUtils.objToJson(params).compactString
 
-val logger: Logger = Logger.getLogger("Upgrade")
-val parallelism = 24
-val prodWorkspace = buildWorkspace(prodConfigs)
-
-val upgradeReport = Upgrade.upgrade0412(prodWorkspace)
-upgradeReport.show()
+// A more in-depth example is available in the example notebooks referenced above
+val prodWorkspace = Initializer(prodArgs, debugFlag = true)
+val upgradeReport = Upgrade.upgradeTo042(prodWorkspace)
+display(upgradeReport)
 ```
