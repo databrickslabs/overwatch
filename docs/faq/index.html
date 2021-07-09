@@ -12,21 +12,21 @@
     <title>FAQ :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625041376" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625865709" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625041376" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625865709" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625865709"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625041376"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625041376"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625865709"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625865709"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625041376"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625865709"></script>
 
     
   </div>
@@ -497,11 +497,7 @@
     <div class="wrapper">
 <nav id="TableOfContents">
   <ul>
-    <li>
-      <ul>
-        <li><a href="#here-you-will-find-some-common-questions-and-their-answers-with-respect-to-the-implementation-of-overwatch">Here you will find some common questions and their answers with respect to the implementation of Overwatch</a></li>
-      </ul>
-    </li>
+    <li><a href="#using-the-faqs">Using the FAQs</a></li>
   </ul>
 </nav>
     </div>
@@ -527,27 +523,69 @@
 
 
 
-	<h3 id="here-you-will-find-some-common-questions-and-their-answers-with-respect-to-the-implementation-of-overwatch">Here you will find some common questions and their answers with respect to the implementation of Overwatch</h3>
-<h4 id="note-all-answers-assume-a-workspace-is-built-and-running">Note: All answers assume a workspace is built and running.</h4>
-<p><strong>Question 1: I&rsquo;m attempting to rebuild an environment from scratch, I have removed the tables from the database and I&rsquo;m still encountering an error</strong></p>
-<p>Answer: The tables may have been dropped, but since they are external tables, the data in the corresponding paths is still present and needs to be recursively removed
-Use the below command to remove the path:</p>
-<pre><code>dbutils.fs.rm(&quot;&lt;table_name&gt;&quot;, true) // replace table_name with the table you would like to delete
-</code></pre><p><strong>Question 2: 
-I have deployed Overwatch before but I would like to re-build it. I have cleaned up the databases but I&rsquo;m encountering
-the error &ldquo;Azure Event Hub Paths are not empty on first run&rdquo;</strong></p>
-<p>Answer: While initating the first run, the below command should be empty:</p>
-<pre><code>display(dbutils.fs.ls(s&quot;${storagePrefix}/${workspaceID}&quot;).toDF)
-</code></pre><p>If it is not empty then there is data present that was not deleted upon dropping databases.</p>
-<p>Note : Azure Databricks uses the checkpoint directory to ensure correct and consistent progress information and it
-exists in the path &lsquo;StoragePrefix/WorkspaceID/ehState/rawEventsCheckpoint&rsquo;.</p>
-<p><strong>Question 3: I have entered the incorrect cost/I would like to customise the costs, how do I go about that?</strong></p>
-<p>Answer: Please refer to the <a href="https://databrickslabs.github.io/overwatch/gettingstarted/#configuring-custom-costs">Configuring Custom Costs</a>.
-It is important to note that if you would you&rsquo;d like to customize compute costs based on your region/contract price.
-You would have to initialize the pipeline which creates the instanceDetails table, which you can alter according to your needs. 
-Use the command below - initialize the pipeline, change the costs, and then build it by adding &lsquo;.run()&rsquo; to the same command.</p>
-<pre><code>Bronze(workspace)
-</code></pre>
+	<h2 id="using-the-faqs">Using the FAQs</h2>
+<p>The answers and examples to the questions below assume that a workspace is instantiated and ready to use. 
+There are many ways to instantiate a workspace, below is a simple way but it doesn&rsquo;t matter how you create the 
+Workspace, just so long as the state of the workspace and/or pipeline can be referenced and utilized. 
+A simple example is below. There are much more verbose details in the 
+<a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics//#interacting-with-overwatch-and-its-state">Advanced Topics Section</a> 
+if you&rsquo;d like a deeper explanation.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Upgrade
+<span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Initializer
+<span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(...)</span>
+<span style="color:#66d9ef">val</span> prodArgs <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">JsonUtils</span><span style="color:#f92672">.</span>objToJson<span style="color:#f92672">(</span>params<span style="color:#f92672">).</span>compactString
+
+<span style="color:#75715e">// A more verbose example is available in the example notebooks referenced above
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> prodWorkspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Initializer</span><span style="color:#f92672">(</span>prodArgs<span style="color:#f92672">,</span> debugFlag <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">val</span> upgradeReport <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Upgrade</span><span style="color:#f92672">.</span>upgradeTo042<span style="color:#f92672">(</span>prodWorkspace<span style="color:#f92672">)</span>
+display<span style="color:#f92672">(</span>upgradeReport<span style="color:#f92672">)</span>
+</code></pre></div><p><strong>Q 1: I just deployed Overwatch and made a mistake and just want to clean up everything and re-deploy. I can&rsquo;t 
+seem to get a clean state from which to begin though.</strong></p>
+<p><strong>A 1</strong>: Overwatch tables are intentionally created as external tables. When the 
+<a href="https://databrickslabs.github.io/overwatch/gettingstarted/configuration//#datatarget">etlDataPathPrefix</a> is configured (as recommended) 
+the target data does not live underneath the database directory and as such is not deleted when the database is dropped. 
+This is considered an &ldquo;external table&rdquo; and this is done by design to protect the org from someone accidentally dropping 
+all data globally. For a FULL cleanup you may use the functions below but these are destructive, be sure that 
+you review it and fully understand it before you run it.</p>
+
+<div class="notices warning" ><p><strong>CRITICAL</strong>: <strong>CHOOSE THE CORRECT FUNCTION FOR YOUR ENVIRONMENT</strong>
+If Overwatch is configured on multiple workspaces, use the multi-workspace script otherwise, use the 
+single workspace functions. Please do not remove the safeguards as they are there to protect you and your company from 
+accidents.</p>
+</div>
+
+<p><strong>SINGLE WORKSPACE DEPLOYMENT DESTROY AND REBUILD</strong></p>
+<p><a href="https://databrickslabs.github.io/overwatch/assets/FAQ/single_workspace_cleanup.dbc">single_workspace_cleanup.dbc</a> | 
+<a href="https://databrickslabs.github.io/overwatch/assets/FAQ/single_workspace_cleanup.html">single_workspace_cleanup.html</a></p>
+<p><strong>MULTI WORKSPACE DEPLOYMENT DESTROY AND REBUILD</strong></p>
+<p>First off, don&rsquo;t practice deploy a workspace to the global Overwatch data target as it&rsquo;s challenging to clean-up; 
+nonetheless, the script below will remove the data from this workspace from the global dataset and reset this 
+workspace for a clean run.</p>
+<p><a href="https://databrickslabs.github.io/overwatch/assets/FAQ/multi_workspace_cleanup.dbc">multi_workspace_cleanup.dbc</a> |
+<a href="https://databrickslabs.github.io/overwatch/assets/FAQ/multi_workspace_cleanup.html">multi_workspace_cleanup.html</a></p>
+<p><strong>Q 2: The incorrect costs were entered for a specific time range, I&rsquo;d like to correct them, how should I do that?</strong></p>
+<p><strong>A 2</strong>: Please refer to the <a href="https://databrickslabs.github.io/overwatch/gettingstarted/#configuring-custom-costs">Configuring Custom Costs</a> 
+to baseline your understanding. Also, closely review the details of the 
+<a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions//#instancedetails">instanceDetails</a>
+table definition as that&rsquo;s where costs are stored and this is what will need to be accurate. Lastly, 
+please refer to the <a href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process/">ETL_Process</a> section of the docs as 
+you&rsquo;ll likely need to understand how to move the pipeline through time.</p>
+<p>Now that you have a good handle on the costs and the process for restoring / reloading data, note that there are 
+ultimately two options after you reconfigure the instancedetails table to be accurate. There are two tables that 
+are going to have inaccurate data in them:</p>
+<ul>
+<li>jobruncostpotentialfact_gold</li>
+<li>clusterstatefact</li>
+</ul>
+<p><strong>Options</strong></p>
+<ol>
+<li>Completely drop tables, delete their underlying data and rebuild them from the primordial date</li>
+<li>Delete all records where Pipeline_SnapTS &gt;= the time where the data became inaccurate.</li>
+</ol>
+<p>Both options will require a corresponding appropriate update to the pipeline_report table for the two modules 
+that write to those tables (3005, 3015). <a href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process//#reloading-data-example">Here are several examples</a>
+on ways to update the pipeline_report to change update the state of a module.</p>
+
 
 
 
@@ -835,19 +873,19 @@ Use the command below - initialize the pipeline, change the costs, and then buil
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625865709"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625865709"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625041376" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625041376"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625865709" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625865709"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

@@ -12,21 +12,21 @@
     <title>ETL Process :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625041376" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625865709" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625041376" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625865709" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625865709"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625041376"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625041376"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625865709"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625865709"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625041376"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625865709"></script>
 
     
   </div>
@@ -518,11 +518,9 @@
     <li><a href="#reloading-data">Reloading Data</a>
       <ul>
         <li><a href="#reloading-data-example">Reloading Data Example</a></li>
-        <li><a href="#reloading-spark-data-silver">Reloading Spark Data (Silver)</a></li>
         <li><a href="#running-only-specific-layers">Running Only Specific Layers</a></li>
       </ul>
     </li>
-    <li><a href="#cloud-specific-variations">Cloud-Specific Variations</a></li>
   </ul>
 </nav>
     </div>
@@ -896,11 +894,11 @@ without fear of losing data (In the event of an issue we could simply restore a 
 <li>Verify Overwatch isn&rsquo;t currently running and isn&rsquo;t about to kick off for this workspace.</li>
 <li>Delete from jobRun_silver table where Pipeline_SnapTS &gt;= &ldquo;2020-12-31&rdquo;</li>
 </ol>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;delete from overwatch_etl.jobRun_Silver where cast(Pipeline_SnapTS as date) &gt;= &#39;2020-12-31&#39; &#34;</span><span style="color:#f92672">)</span>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;delete from overwatch_etl.jobRun_Silver where organization_id = &#39;&lt;ord_id&gt;&#39; and cast(Pipeline_SnapTS as date) &gt;= &#39;2020-12-31&#39; &#34;</span><span style="color:#f92672">)</span>
 </code></pre></div><ol start="3">
 <li>Delete from jobRun_gold table where Pipeline_SnapTS &gt;= &ldquo;2020-12-31&rdquo;</li>
 </ol>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;delete from overwatch_etl.jobRun_Gold where cast(Pipeline_SnapTS as date) &gt;= &#39;2020-12-31&#39; &#34;</span><span style="color:#f92672">)</span>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;delete from overwatch_etl.jobRun_Gold where organization_id = &#39;&lt;ord_id&gt;&#39; and cast(Pipeline_SnapTS as date) &gt;= &#39;2020-12-31&#39; &#34;</span><span style="color:#f92672">)</span>
 </code></pre></div><ol start="4">
 <li>Update the Pipeline_Report table set Status = &ldquo;ROLLED_BACK&rdquo; where moduleId in (2011,3003) and status in (&lsquo;SUCCESS&rsquo;, &lsquo;EMPTY&rsquo;).
 <ul>
@@ -909,7 +907,7 @@ without fear of losing data (In the event of an issue we could simply restore a 
 </ul>
 </li>
 </ol>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;update overwatch_etl.pipeline_report set status = &#39;ROLLED_BACK&#39; where moduleID in (2011,3003) and status in (&#39;SUCCESS&#39;, &#39;EMPTY&#39;) &#34;</span><span style="color:#f92672">)</span>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;update overwatch_etl.pipeline_report set status = &#39;ROLLED_BACK&#39; where organization_id = &#39;&lt;ord_id&gt;&#39; and moduleID in (2011,3003) and (status = &#39;SUCCESS&#39; or status like &#39;EMPT%&#39;) &#34;</span><span style="color:#f92672">)</span>
 </code></pre></div><p>After performing the steps above, the next Overwatch run will load the data from 12-31 -&gt; current.
 
 <div class="notices warning" ><p>If back-loading more than 60 days, you must override the default primordialDateString in the config. Additionally, depending
@@ -923,65 +921,7 @@ it is to delete records after some date. <strong>Remember</strong>, though, it&r
 rebuilding entities with more than 60 days.</p>
 </div>
 
-<h3 id="reloading-spark-data-silver">Reloading Spark Data (Silver)</h3>
-<p>For performance reasons, there&rsquo;s one more update that must be made when reloading Spark Silver data. This data is 
-derived from a VERY large events table, <em>overwatch_etl.spark_events_bronze</em>. To improve standard run performance,
-new data that hasn&rsquo;t been processed is placed into it&rsquo;s own partition <em>Downstream_Processed = false&quot;</em>.</p>
-<p>To set the <em>Downstream_Processed</em> flag to false for the correct records you must commit an update statement to the 
-spark_events_bronze table as well before attempting to reload. This table is further partitions by &ldquo;Event&rdquo;; thus, the 
-spark events to be reloaded can be further narrowed down with an Event filter. A map of spark entity to relevant 
-events is provided below.</p>
-<table>
-<thead>
-<tr>
-<th style="text-align:left">SparkGoldEntity</th>
-<th style="text-align:left">In Clause</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">sparkExecutions</td>
-<td style="text-align:left">(&lsquo;org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart&rsquo;, &lsquo;org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionEnd&rsquo;)</td>
-</tr>
-<tr>
-<td style="text-align:left">sparkJob</td>
-<td style="text-align:left">(&lsquo;SparkListenerJobStart&rsquo;, &lsquo;SparkListenerJobEnd&rsquo;)</td>
-</tr>
-<tr>
-<td style="text-align:left">sparkStage</td>
-<td style="text-align:left">(&lsquo;SparkListenerStageSubmitted&rsquo;, &lsquo;SparkListenerStageCompleted&rsquo;)</td>
-</tr>
-<tr>
-<td style="text-align:left">sparkTask</td>
-<td style="text-align:left">(&lsquo;SparkListenerTaskStart&rsquo;, &lsquo;SparkListenerTaskEnd&rsquo;)</td>
-</tr>
-<tr>
-<td style="text-align:left">sparkExecutor</td>
-<td style="text-align:left">(&lsquo;SparkListenerExecutorAdded&rsquo;, &lsquo;SparkListenerExecutorRemoved&rsquo;)</td>
-</tr>
-</tbody>
-</table>
-<p>For another scenario, let&rsquo;s assume that the above steps have been completed but instead of jobRun, the sparkTasks
-entity must be reloaded after 12-31. Unfortunately this table (spark_events_bronze) has not yet been partitioned by date
-and the data volume for sparkTasks can be substantial. The best we can do in this scenario is to execute the statement
-below and just wait. The more filters you can apply, the more efficient the reload will be, but don&rsquo;t be deceived, 
-this is a raw table and many columns like &ldquo;timestamp&rdquo; you may expect to be populated often is not in all cases. Safe
-filter columns include:</p>
-<ul>
-<li>Event (Must filter on this)</li>
-<li>Pipeline_SnapTS</li>
-<li>filenameGroup</li>
-<li>clusterId</li>
-<li>SparkContextId</li>
-</ul>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">val</span> updateStatement <span style="color:#66d9ef">=</span>
-  <span style="color:#e6db74">&#34;&#34;&#34;
-</span><span style="color:#e6db74">    |update overwatch_etl.spark_events_bronze set Downstream_Processed = false
-</span><span style="color:#e6db74">    | where Event in (&#39;SparkListenerTaskStart&#39;, &#39;SparkListenerTaskEnd&#39;)
-</span><span style="color:#e6db74">    | and cast(Pipeline_SnapTS as date) &gt;= &#39;2020-12-31&#39;
-</span><span style="color:#e6db74">    |&#34;&#34;&#34;</span><span style="color:#f92672">.</span>stripMargin
-spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span>updateStatement<span style="color:#f92672">)</span>
-</code></pre></div><h3 id="running-only-specific-layers">Running Only Specific Layers</h3>
+<h3 id="running-only-specific-layers">Running Only Specific Layers</h3>
 <p>As in the example above, it&rsquo;s common to need to rerun only a certain layer for testing or reloading data. In the 
 example above it&rsquo;s inefficient to run the bronze layer repeatedly to reprocess two tables in silver and gold. If 
 no new data is ingested into bronze, no modules outside of the two we rolled_back will have any new data and thus
@@ -991,7 +931,6 @@ a notebook can be used. Build the config as normal, and then following the instr
 <a href="https://databrickslabs.github.io/overwatch/gettingstarted/#run-via-notebook">Getting Started - Run Via Notebook</a>. This example illustrates how 
 to run each of the three layers; Bronze, Silver, and Gold. In this scenario the Bronze(&hellip;) line would be commented
 out to result in only a Silver/Gold layer run.</p>
-<h2 id="cloud-specific-variations">Cloud-Specific Variations</h2>
 
 
 <footer class="footline">
@@ -1281,19 +1220,19 @@ out to result in only a Silver/Gold layer run.</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625865709"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625865709"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625041376" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625041376"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625865709" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625865709"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

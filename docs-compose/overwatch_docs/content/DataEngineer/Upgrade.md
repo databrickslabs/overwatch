@@ -31,7 +31,7 @@ import com.databricks.labs.overwatch.pipeline.Initializer
 val params = OverwatchParams(...)
 val prodArgs = JsonUtils.objToJson(params).compactString
 
-// A more in-depth example is available in the example notebooks referenced above
+// A more verbose example is available in the example notebooks referenced above
 val prodWorkspace = Initializer(prodArgs, debugFlag = true)
 val upgradeReport = Upgrade.upgradeTo042(prodWorkspace)
 display(upgradeReport)

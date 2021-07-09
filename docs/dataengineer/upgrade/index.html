@@ -12,21 +12,21 @@
     <title>Upgrade :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625041376" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625041376" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1625865709" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1625865709" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625041376" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1625865709" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1625865709"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625041376"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625041376"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1625865709"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1625865709"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625041376"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1625865709"></script>
 
     
   </div>
@@ -525,14 +525,12 @@
 
 
 <p>Sometimes upgrading from one version to the next requires a schema change. In these cases, the 
-<a href="https://databrickslabs.github.io/overwatch/changelog/">CHANGELOG</a> will be explicit. The general upgrade process is:</p>
+<a href="https://databrickslabs.github.io/overwatch/changelog/">CHANGELOG</a> will be explicit. Upgrades MUST be executed WITH the <strong>new binary</strong> and 
+<strong>before the pipeline is executed</strong>. The general upgrade process is:</p>
 <ul>
+<li>Adjust any Overwatch configurations and get the updated compactString from JsonUtils</li>
 <li>Import the upgrade package</li>
-<li>Retrieve your production workspace
-<ul>
-<li>Should be done with the same parameters and method as the pipeline / environment that is being upgraded</li>
-</ul>
-</li>
+<li>Use the compactString of parameters to instantiate the workspace</li>
 <li>Call the upgrade function for the version to which you&rsquo;re upgrading.</li>
 </ul>
 <p>To upgrade to version 0.4.12, the code is below. Note, the &ldquo;buildWorkspace&rdquo; function is just a helper function to 
@@ -543,26 +541,17 @@ builds the OverwatchParams and returns the workspace instance.</p>
 to continue on a version that requires a newer schema.</p>
 </div>
 
+<p>A sample notebook is provided below for reference.</p>
+<p><a href="https://databrickslabs.github.io/overwatch/assets/ChangeLog/Upgrade_Example.html">Upgrade.html</a> / <a href="https://databrickslabs.github.io/overwatch/assets/ChangeLog/Upgrade_Example.dbc">Upgrade.dbc</a></p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Upgrade
-<span style="color:#66d9ef">val</span> prodConfigs <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Map</span><span style="color:#f92672">(</span>
-  <span style="color:#e6db74">&#34;storagePrefix&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;etlDBName&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;overwatch_etl&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;consumerDBName&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;overwatch&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;secretsScope&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;dbPATKey&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;ehKey&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;ehName&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;...&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;primordialDateString&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;2021-01-01&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;maxDaysToLoad&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;60&#34;</span><span style="color:#f92672">,</span>
-  <span style="color:#e6db74">&#34;scopes&#34;</span> <span style="color:#f92672">-&gt;</span> <span style="color:#e6db74">&#34;all&#34;</span>
-<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Initializer
+<span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(...)</span>
+<span style="color:#66d9ef">val</span> prodArgs <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">JsonUtils</span><span style="color:#f92672">.</span>objToJson<span style="color:#f92672">(</span>params<span style="color:#f92672">).</span>compactString
 
-<span style="color:#66d9ef">val</span> logger<span style="color:#66d9ef">:</span> <span style="color:#66d9ef">Logger</span> <span style="color:#f92672">=</span> <span style="color:#a6e22e">Logger</span><span style="color:#f92672">.</span>getLogger<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;Upgrade&#34;</span><span style="color:#f92672">)</span>
-<span style="color:#66d9ef">val</span> parallelism <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">24</span>
-<span style="color:#66d9ef">val</span> prodWorkspace <span style="color:#66d9ef">=</span> buildWorkspace<span style="color:#f92672">(</span>prodConfigs<span style="color:#f92672">)</span>
-
-<span style="color:#66d9ef">val</span> upgradeReport <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Upgrade</span><span style="color:#f92672">.</span>upgrade0412<span style="color:#f92672">(</span>prodWorkspace<span style="color:#f92672">)</span>
-upgradeReport<span style="color:#f92672">.</span>show<span style="color:#f92672">()</span>
+<span style="color:#75715e">// A more verbose example is available in the example notebooks referenced above
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> prodWorkspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Initializer</span><span style="color:#f92672">(</span>prodArgs<span style="color:#f92672">,</span> debugFlag <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">)</span>
+<span style="color:#66d9ef">val</span> upgradeReport <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Upgrade</span><span style="color:#f92672">.</span>upgradeTo042<span style="color:#f92672">(</span>prodWorkspace<span style="color:#f92672">)</span>
+display<span style="color:#f92672">(</span>upgradeReport<span style="color:#f92672">)</span>
 </code></pre></div>
 
 <footer class="footline">
@@ -852,19 +841,19 @@ upgradeReport<span style="color:#f92672">.</span>show<span style="color:#f92672"
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1625865709"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625041376"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625041376"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1625865709"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1625865709"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625041376" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625041376"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1625865709" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1625865709"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
