@@ -724,7 +724,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .filter('cluster_log_conf.isNotNull)
 
     // Get latest incremental snapshot of clusters with logging dirs but not existing in audit updates
-    // This captures clusters that have not been edited/restarted since the last run and are still RUNNING with
+    // This captures clusters that have not been edited/restarted since the last run with
     // log confs as they will not be in the audit logs
     val latestSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
     val newLogDirsNotIdentifiedInAudit = clusterSnapshot

@@ -240,10 +240,15 @@ case class PipelineTable(
               module.untilTime.asColumnTS
             )
           }
-          case _: LongType => {
+          case dt: LongType => {
+            val start = if (additionalLagDays > 0) {
+              lit(module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)).cast(dt)
+            } else {
+              module.fromTime.asColumnTS
+            }
             IncrementalFilter(
               field,
-              lit(module.fromTime.asUnixTimeMilli),
+              start,
               lit(module.untilTime.asUnixTimeMilli)
             )
           }
