@@ -189,7 +189,7 @@ case class PipelineTable(
   def asIncrementalDF(
                        module: Module,
                        cronColumnsNames: Seq[String],
-                       additionalLagDays: Int = 0
+                       additionalLagDays: Long = 0
                      ): DataFrame = {
     val moduleId = module.moduleId
     val moduleName = module.moduleName
@@ -223,7 +223,7 @@ case class PipelineTable(
             }
             IncrementalFilter(
               field,
-              date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays),
+              date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
               module.untilTime.asColumnTS.cast(dt)
             )
           }
@@ -244,7 +244,7 @@ case class PipelineTable(
             val start = if (additionalLagDays > 0) {
               lit(module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)).cast(dt)
             } else {
-              module.fromTime.asColumnTS
+              lit(module.fromTime.asUnixTimeMilli)
             }
             IncrementalFilter(
               field,
