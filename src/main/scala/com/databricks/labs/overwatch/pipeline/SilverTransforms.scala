@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{ApiEnv, NoNewDataException, SchemaTools, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
@@ -20,8 +20,10 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   // TODO -- move to Transform Functions
   def structFromJson(df: DataFrame, c: String): Column = {
-    require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col $c")
-    require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
+    require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
+    require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
+//    require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col $c")
+//    require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
     val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
     if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
       println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
@@ -548,22 +550,60 @@ trait SilverTransforms extends SparkSessionWrapper {
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
 
+  /**
+   * TODO -- move to transform funcs and pass in expressions as Seq
+   *  Generalizing so it can also be used for other DFs
+   * @param colName
+   * @param w
+   * @param withSnapLookup
+   * @param path
+   * @return
+   */
+  private def fillForward(colName: String, w: WindowSpec, withSnapLookup: Boolean = true, path: Option[String] = None): Column = {
+    val settingsPath = s"'$$.${path.getOrElse(colName)}'"
+    val firstNonNullVal: Seq[Column] = Seq(
+      expr(s"get_json_object(new_settings, $settingsPath)"),
+      col(colName),
+      last(expr(s"get_json_object(lookup_settings, $settingsPath)"), true).over(w),
+      last(col(colName), true).over(w)
+    )
+
+    val firstNonNullSnapLookupVal: Seq[Column] = Seq(get_json_object('lookup_settings, settingsPath))
+    val orderedNonNullLookups = if (withSnapLookup) firstNonNullVal ++ firstNonNullSnapLookupVal else firstNonNullVal
+
+    coalesce(orderedNonNullLookups: _*)
+  }
+
   private def getJobsBase(df: DataFrame): DataFrame = {
     df.filter(col("serviceName") === "jobs")
       .selectExpr("*", "requestParams.*").drop("requestParams")
   }
 
-  protected def dbJobsStatusSummary()(df: DataFrame): DataFrame = {
+  protected def dbJobsStatusSummary(
+                                   jobsSnapshotDF: DataFrame,
+                                   cloudProvider: String
+                                   )(df: DataFrame): DataFrame = {
 
     val jobsBase = getJobsBase(df)
+
+    // Simplified DF for snapshot lookupWhen
+    val jobSnapLookup = jobsSnapshotDF
+      .withColumnRenamed("created_time", "snap_lookup_created_time")
+      .withColumnRenamed("creator_user_name", "snap_lookup_created_by")
+      .withColumnRenamed("job_id", "jobId")
+      .withColumn("lookup_settings", to_json('settings))
+      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS))
+      .drop("Overwatch_RunID", "settings")
 
     val jobs_statusCols: Array[Column] = Array(
       'organization_id, 'serviceName, 'actionName, 'timestamp,
       when('actionName === "create", get_json_object($"response.result", "$.job_id").cast("long"))
         .when('actionName === "changeJobAcl", 'resourceId.cast("long"))
         .otherwise('job_id).cast("long").alias("jobId"),
+      when('actionName === "create", 'name)
+        .when('actionName.isin("update", "reset"), get_json_object('new_settings, "$.name"))
+        .otherwise(lit(null).cast("string")).alias("jobName"),
       'job_type,
-      'name.alias("jobName"),
       'timeout_seconds.cast("long").alias("timeout_seconds"),
       'schedule,
       get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
@@ -572,47 +612,91 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     val lastJobStatus = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val lastJobStatusUnbound = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp)
-    val jobCluster = struct(
-      'existing_cluster_id.alias("existing_cluster_id"),
-      'new_cluster.alias("new_cluster")
-    )
 
     val jobStatusBase = jobsBase
       .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
       .select(jobs_statusCols: _*)
+      .toTSDF("timestamp", "organization_id", "jobId")
+      .lookupWhen(
+        jobSnapLookup.toTSDF("timestamp", "organization_id", "jobId")
+      ).df
       .withColumn("existing_cluster_id", coalesce('existing_cluster_id, get_json_object('new_settings, "$.existing_cluster_id")))
-      .withColumn("new_cluster",
-        when('actionName.isin("reset", "update"), get_json_object('new_settings, "$.new_cluster"))
-          .otherwise('new_cluster)
+      .withColumn("new_cluster", coalesce('new_cluster, get_json_object('new_settings, "$.new_cluster")))
+      // Following section builds out a "clusterSpec" as it is defined at the timestamp. existing_cluster_id
+      // and new_cluster should never both be populated as a job must be one or the other at a timestamp
+      .withColumn(
+        "x",
+        struct(
+          when('existing_cluster_id.isNotNull, struct('timestamp, 'existing_cluster_id)).otherwise(lit(null)).alias("last_existing"),
+          when('new_cluster.isNotNull, struct('timestamp, 'new_cluster)).otherwise(lit(null)).alias("last_new")
+        )
       )
+      .withColumn(
+        "x2",
+        struct(
+          last($"x.last_existing", true).over(lastJobStatus).alias("last_existing"),
+          last($"x.last_new", true).over(lastJobStatus).alias("last_new"),
+        )
+      )
+      .withColumn(
+        "cluster_spec",
+        struct(
+          when($"x2.last_existing.timestamp" > coalesce($"x2.last_new.timestamp", lit(0)), $"x2.last_existing.existing_cluster_id").otherwise(lit(null)).alias("existing_cluster_id"),
+          when($"x2.last_new.timestamp" > coalesce($"x2.last_existing.timestamp", lit(0)), $"x2.last_new.new_cluster").otherwise(lit(null)).alias("new_cluster")
+        )
+      )
+      .withColumn(
+        "cluster_spec",
+        struct(
+          when($"cluster_spec.existing_cluster_id".isNull && $"cluster_spec.new_cluster".isNull, get_json_object('lookup_settings, "$.existing_cluster_id")).otherwise($"cluster_spec.existing_cluster_id").alias("existing_cluster_id"),
+          when($"cluster_spec.existing_cluster_id".isNull && $"cluster_spec.new_cluster".isNull, get_json_object('lookup_settings, "$.new_cluster")).otherwise($"cluster_spec.new_cluster").alias("new_cluster")
+        )
+      ).drop("existing_cluster_id", "new_cluster", "x", "x2") // drop temp columns and old version of clusterSpec components
       .withColumn("job_type", when('job_type.isNull, last('job_type, true).over(lastJobStatus)).otherwise('job_type))
-      .withColumn("schedule", when('schedule.isNull, last('schedule, true).over(lastJobStatus)).otherwise('schedule))
-      .withColumn("timeout_seconds", when('timeout_seconds.isNull, last('timeout_seconds, true).over(lastJobStatus)).otherwise('timeout_seconds))
-      .withColumn("notebook_path", when('notebook_path.isNull, last('notebook_path, true).over(lastJobStatus)).otherwise('notebook_path))
-      .withColumn("jobName", when('jobName.isNull, last('jobName, true).over(lastJobStatus)).otherwise('jobName))
+      .withColumn("schedule", fillForward("schedule", lastJobStatus))
+      .withColumn("timeout_seconds", fillForward("timeout_seconds", lastJobStatus))
+      .withColumn("notebook_path", fillForward("notebook_path", lastJobStatus, path = Some("notebook_task.notebook_path")))
+      .withColumn("jobName", fillForward("jobName", lastJobStatus, path = Some("name")))
       .withColumn("created_by", when('actionName === "create", $"userIdentity.email"))
-      .withColumn("created_by", last('created_by, true).over(lastJobStatus))
+      .withColumn("created_by", coalesce(fillForward("created_by", lastJobStatus), 'snap_lookup_created_by))
       .withColumn("created_ts", when('actionName === "create", 'timestamp))
-      .withColumn("created_ts", last('created_ts, true).over(lastJobStatus))
+      .withColumn("created_ts", coalesce(fillForward("created_ts", lastJobStatus), 'snap_lookup_created_time))
       .withColumn("deleted_by", when('actionName === "delete", $"userIdentity.email"))
-      .withColumn("deleted_by", last('deleted_by, true).over(lastJobStatusUnbound))
       .withColumn("deleted_ts", when('actionName === "delete", 'timestamp))
-      .withColumn("deleted_ts", last('deleted_ts, true).over(lastJobStatusUnbound))
       .withColumn("last_edited_by", when('actionName.isin("update", "reset"), $"userIdentity.email"))
       .withColumn("last_edited_by", last('last_edited_by, true).over(lastJobStatus))
       .withColumn("last_edited_ts", when('actionName.isin("update", "reset"), 'timestamp))
       .withColumn("last_edited_ts", last('last_edited_ts, true).over(lastJobStatus))
-      .drop("userIdentity")
+      .drop("userIdentity", "snap_lookup_created_time", "snap_lookup_created_by", "lookup_settings")
 
-    jobStatusBase
-      .withColumn("jobCluster",
-        last(
-          when('existing_cluster_id.isNull && 'new_cluster.isNull, lit(null))
-            .otherwise(jobCluster),
-          true
-        ).over(lastJobStatus)
-      )
+    val changeInventory = Map(
+      "cluster_spec.new_cluster" -> structFromJson(jobStatusBase, "cluster_spec.new_cluster"),
+      "new_settings" -> structFromJson(jobStatusBase, "new_settings"),
+      "schedule" -> structFromJson(jobStatusBase, "schedule")
+    )
+
+    // create structs from json strings and cleanse schema
+    val jobStatusEnhanced = SchemaTools.scrubSchema(
+      jobStatusBase
+        .select(SchemaTools.modifyStruct(jobStatusBase.schema, changeInventory): _*)
+    )
+
+    // convert structs to maps where the structs' keys are allowed to be typed by the user to avoid
+    // bad duplicate keys
+    val structsCleaner = Map(
+      "new_settings.new_cluster.custom_tags" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.custom_tags"),
+      "new_settings.new_cluster.spark_conf" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.spark_conf"),
+      "new_settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.spark_env_vars"),
+      s"new_settings.new_cluster.${cloudProvider}_attributes" -> SchemaTools.structToMap(jobStatusEnhanced, s"new_settings.new_cluster.${cloudProvider}_attributes"),
+      "new_settings.notebook_task.base_parameters" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.notebook_task.base_parameters"),
+      "cluster_spec.new_cluster.custom_tags" -> SchemaTools.structToMap(jobStatusEnhanced, "cluster_spec.new_cluster.custom_tags"),
+      "cluster_spec.new_cluster.spark_conf" -> SchemaTools.structToMap(jobStatusEnhanced, "cluster_spec.new_cluster.spark_conf"),
+      "cluster_spec.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobStatusEnhanced, "cluster_spec.new_cluster.spark_env_vars"),
+      s"cluster_spec.new_cluster.${cloudProvider}_attributes" -> SchemaTools.structToMap(jobStatusEnhanced, s"cluster_spec.new_cluster.${cloudProvider}_attributes")
+    )
+
+    jobStatusEnhanced
+      .select(SchemaTools.modifyStruct(jobStatusEnhanced.schema, structsCleaner): _*)
   }
 
   /**

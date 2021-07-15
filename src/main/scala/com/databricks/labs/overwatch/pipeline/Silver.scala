@@ -156,8 +156,12 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val jobStatusModule = Module(2010, "Silver_JobsStatus", this, Array(1004))
   lazy private val appendJobStatusProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, auditLogsIncrementalCols),
-    Seq(dbJobsStatusSummary()),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, auditLogsIncrementalCols, 90),
+    Seq(
+      dbJobsStatusSummary(
+        BronzeTargets.jobsSnapshotTarget.asDF,
+        config.cloudProvider
+      )),
     append(SilverTargets.dbJobsStatusTarget)
   )
 

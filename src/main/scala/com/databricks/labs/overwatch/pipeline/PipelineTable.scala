@@ -56,15 +56,15 @@ case class PipelineTable(
     if (config.debugFlag) println(msg)
   }
 
-  private[overwatch] def withMinimumSchemaEnforcement: this.type = withMinimumSchemaEnforcement(true)
-  private[overwatch] def withMinimumSchemaEnforcement(value: Boolean): this.type = {
+  def withMinimumSchemaEnforcement: this.type = withMinimumSchemaEnforcement(true)
+  def withMinimumSchemaEnforcement(value: Boolean): this.type = {
     if (masterSchema.nonEmpty) withMasterMinimumSchema = value
     else emitMissingMasterSchemaMessage() // cannot enforce master schema if not defined
     this
   }
 
-  private[overwatch] def enforceNullableRequirements: this.type = enforceNullableRequirements(true)
-  private[overwatch] def enforceNullableRequirements(value: Boolean): this.type = {
+  def enforceNullableRequirements: this.type = enforceNullableRequirements(true)
+  def enforceNullableRequirements(value: Boolean): this.type = {
     if (masterSchema.nonEmpty && exists) enforceNonNullable = value
     else emitMissingMasterSchemaMessage() // cannot enforce master schema if not defined
     this

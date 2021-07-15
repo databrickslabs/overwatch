@@ -250,4 +250,20 @@ object PipelineFunctions {
       }
     }
   }
+
+  def getPipelineTarget(pipeline: Pipeline, targetName: String): PipelineTable = {
+    val pipelineTargets = pipeline match {
+      case bronze: Bronze => bronze.getAllTargets
+      case silver: Silver => silver.getAllTargets
+      case gold: Gold => gold.getAllTargets
+      case _ => throw new Exception("Pipeline type must be an Overwatch Bronze, Silver, or Gold Pipeline instance")
+    }
+
+    val filteredTarget = pipelineTargets.find(_.name.toLowerCase == targetName.toLowerCase)
+
+    filteredTarget.getOrElse(throw new Exception(s"NO TARGET FOUND: No targets exist for lower " +
+      s"case $targetName.\nPotential targets include ${pipelineTargets.map(_.name).mkString(", ")}"))
+
+  }
+
 }
