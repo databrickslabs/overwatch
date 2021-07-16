@@ -53,8 +53,20 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       _limit = 150
       _initialQueryMap = Map("limit" -> _limit, "offset" -> 0)
     } else _initialQueryMap = value.getOrElse(Map[String, Any]())
+
+    _limit = _initialQueryMap.getOrElse("limit", 150).toString.toInt
     _jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
     _getQueryString = "?" + _initialQueryMap.map { case(k, v) => s"$k=$v"}.mkString("&")
+    val debugLogMessage =
+      s"""
+         |SETTING QUERY:
+         |isPaginate: ${_paginate}
+         |limit: ${_limit}
+         |initQueryMap: ${_initialQueryMap}
+         |jsonQuery: ${_jsonQuery}
+         |queryString: ${_getQueryString}
+         |""".stripMargin
+    logger.log(Level.INFO, debugLogMessage)
     this
   }
 
@@ -217,11 +229,14 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   // Pagination for POST calls
   private def paginate(totalCount: Long): Unit = {
 
+    var debugMsg = s"Paginate call: TOTAL COUNT: $totalCount"
     val offsets = (limit to totalCount by limit).toArray
+    debugMsg += s"\nOffset: ${offsets.mkString(", ")}"
     if (!_initialQueryMap.contains("end_time")) {
       _initialQueryMap += ("end_time" -> System.currentTimeMillis().toString) // TODO -- Change this to start fromTime in config
     }
 
+    debugMsg += s"\nInitialQueryMap: ${_initialQueryMap}"
     offsets.foreach(offset => {
       _initialQueryMap += ("offset" -> offset)
       setQuery(Some(_initialQueryMap))
@@ -263,8 +278,16 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         throw new ApiCallFailure(s"$err -> $msg")
       }
       if (!pageCall && _paginate) {
+        val debugMsg =
+          s"""
+             |isPageCall: $pageCall
+             |isPaginate: ${_paginate}
+             |query: $jsonQuery
+             |""".stripMargin
+        logger.log(Level.INFO, debugMsg)
         val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
         val totalCount = mapper.readTree(result.body).get("total_count").asInt(0)
+        logger.log(Level.INFO, s"Total Count for Query: $jsonQuery is $totalCount by Limit: $limit")
         if (totalCount > 0) results.append(jsonResult)
         if (totalCount > limit) paginate(totalCount)
       } else {
@@ -281,7 +304,15 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         setStatus(msg, Level.WARN)
         this
       case e: Throwable =>
-        val msg = s"POST FAILED: Endpoint: ${_apiName} Query: $jsonQuery"
+        val msg =
+          s"""POST FAILED: Endpoint: ${_apiName}
+             |jsonQuery: $jsonQuery
+             |SETTING QUERY:
+             |isPaginate: ${_paginate}
+             |limit: ${_limit}
+             |initQueryMap: ${_initialQueryMap}
+             |queryString: ${_getQueryString}
+             |""".stripMargin
         setStatus(msg, Level.ERROR, Some(e))
         this
     }
