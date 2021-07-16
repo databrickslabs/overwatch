@@ -723,20 +723,21 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
       .filter('cluster_log_conf.isNotNull)
 
-    // Get latest incremental snapshot of clusters running during current run
-    // This captures clusters that have not been edited/restarted since the last run and are still RUNNING with
+    // Get latest incremental snapshot of clusters with logging dirs but not existing in audit updates
+    // This captures clusters that have not been edited/restarted since the last run with
     // log confs as they will not be in the audit logs
-    val latestSnapW = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
-    val currentlyRunningClustersWithLogging = clusterSnapshot
+    val latestSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
+    val newLogDirsNotIdentifiedInAudit = clusterSnapshot
+      .join(incrementalClusterIDs, Seq("cluster_id"))
       .withColumn("snapRnk", rank.over(latestSnapW))
-      .filter('snapRnk === 1 && 'state === "RUNNING")
+      .filter('snapRnk === 1)
       .withColumn("cluster_log_conf", coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"))
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('cluster_id, 'cluster_log_conf)
 
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
-    val allEventLogPrefixes = currentlyRunningClustersWithLogging
+    val allEventLogPrefixes = newLogDirsNotIdentifiedInAudit
       .unionByName(incrementalClusterWLogging)
       .withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
       .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
