@@ -156,7 +156,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val jobStatusModule = Module(2010, "Silver_JobsStatus", this, Array(1004))
   lazy private val appendJobStatusProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, auditLogsIncrementalCols, 90),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, auditLogsIncrementalCols),
     Seq(
       dbJobsStatusSummary(
         BronzeTargets.jobsSnapshotTarget.asDF,
@@ -170,7 +170,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     // TODO -- TEST NEEDED, jobs running longer than "additionalLagDays" of 2 below, are they able to get joined up
     //  with their jobStart events properly? If not, add logic to identify long running jobs and go get them
     //  from historical
-    BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, auditLogsIncrementalCols, 2),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, auditLogsIncrementalCols, 30),
     Seq(
       dbJobRunsSummary(
         BronzeTargets.auditLogsTarget.withMinimumSchemaEnforcement.asDF,
@@ -179,8 +179,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
         config.apiEnv,
-        jobRunsModule.fromTime.asColumnTS,
-        jobRunsModule.fromTime.asUnixTimeMilli
+        jobRunsModule.fromTime
       )
     ),
     append(SilverTargets.dbJobRunsTarget)

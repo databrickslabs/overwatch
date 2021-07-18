@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.{ApiEnv, NoNewDataException, SchemaTools, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{ApiEnv, NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
@@ -669,16 +669,35 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("last_edited_ts", last('last_edited_ts, true).over(lastJobStatus))
       .drop("userIdentity", "snap_lookup_created_time", "snap_lookup_created_by", "lookup_settings")
 
+    // Get as much as possible from snapshot by timestamp for long-standing jobs that haven't been edited that would
+    // otherwise be missing from the audit logs and thus missing from jobStatus
+    val missingJobIds = jobsSnapshotDF.select('organization_id, 'job_id).distinct
+      .join(jobStatusBase.select('organization_id, 'jobId.alias("job_id")).distinct, Seq("organization_id", "job_id"), "anti")
+
+    val jSnapMissingJobs = jobsSnapshotDF
+      .join(missingJobIds, Seq("organization_id", "job_id"))
+      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
+      .select(
+        'organization_id, 'timestamp, 'job_id.alias("jobId"), lit("jobs").alias("serviceName"), lit("lookup").alias("actionName"),
+        $"settings.name".alias("jobName"), $"settings.timeout_seconds", to_json($"settings.schedule").alias("schedule"),
+        $"settings.notebook_task.notebook_path",
+        when($"settings.existing_cluster_id".isNotNull, struct($"settings.existing_cluster_id", lit(null).alias("new_cluster")))
+          .otherwise(struct(lit(null).alias("existing_cluster_id"), to_json($"settings.new_cluster").alias("new_cluster"))).alias("cluster_spec"),
+        'creator_user_name.alias("created_by"), 'created_time.alias("created_ts")
+      )
+
+    val jobStatusBaseFilled = unionWithMissingAsNull(jobStatusBase, jSnapMissingJobs)
+
     val changeInventory = Map(
-      "cluster_spec.new_cluster" -> structFromJson(jobStatusBase, "cluster_spec.new_cluster"),
-      "new_settings" -> structFromJson(jobStatusBase, "new_settings"),
-      "schedule" -> structFromJson(jobStatusBase, "schedule")
+      "cluster_spec.new_cluster" -> structFromJson(jobStatusBaseFilled, "cluster_spec.new_cluster"),
+      "new_settings" -> structFromJson(jobStatusBaseFilled, "new_settings"),
+      "schedule" -> structFromJson(jobStatusBaseFilled, "schedule")
     )
 
     // create structs from json strings and cleanse schema
     val jobStatusEnhanced = SchemaTools.scrubSchema(
-      jobStatusBase
-        .select(SchemaTools.modifyStruct(jobStatusBase.schema, changeInventory): _*)
+      jobStatusBaseFilled
+        .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
     )
 
     // convert structs to maps where the structs' keys are allowed to be typed by the user to avoid
@@ -728,8 +747,7 @@ trait SilverTransforms extends SparkSessionWrapper {
                                  jobsStatus: PipelineTable,
                                  jobsSnapshot: PipelineTable,
                                  apiEnv: ApiEnv,
-                                 etlStartTime: Column,
-                                 etlStartEpochMS: Long)(df: DataFrame): DataFrame = {
+                                 etlStartTime: TimeTypes)(df: DataFrame): DataFrame = {
 
     val repartitionCount = spark.conf.get("spark.sql.shuffle.partitions").toInt * 2
 
@@ -755,16 +773,16 @@ trait SilverTransforms extends SparkSessionWrapper {
      * but for now, this is required or multiple records will be created in the fact due to the multiple events.
      * Confirmed that the first event emitted is the correct event as per ES-65402
      */
-    val firstRunSubmitW = Window.partitionBy('runId).orderBy('timestamp)
-    val firstCompletionW = Window.partitionBy('runId).orderBy('timestamp)
-    val firstRunStartW = Window.partitionBy('runId).orderBy('timestamp)
-    val firstCancellationW = Window.partitionBy('run_id).orderBy('timestamp)
+    val firstRunSubmitW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
+    val firstCompletionW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
+    val firstRunStartW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
+    val firstCancellationW = Window.partitionBy('organization_id, 'run_id).orderBy('timestamp)
 
     // Completes must be >= etlStartTime as it is the driver endpoint
     // All joiners to Completes may be from the past up to N days as defined in the incremental df
     // Identify all completed jobs in scope for this overwatch run
     val allCompletes = jobsAuditIncremental
-      .filter('date >= etlStartTime.cast("date") && 'timestamp >= lit(etlStartEpochMS))
+      .filter('date >= etlStartTime.asColumnTS.cast("date") && 'timestamp >= lit(etlStartTime.asUnixTimeMilli))
       .filter('actionName.isin("runSucceeded", "runFailed"))
       .withColumn("rnk", rank().over(firstCompletionW))
       .withColumn("rn", row_number().over(firstCompletionW))
@@ -786,6 +804,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     // results in a runFailed after the cancellation
     // Identify all cancelled jobs in scope for this overwatch run
     val allCancellations = jobsAuditIncremental
+      .filter('date >= etlStartTime.asColumnTS.cast("date") && 'timestamp >= lit(etlStartTime.asUnixTimeMilli))
       .filter('actionName.isin("cancel"))
       .withColumn("rnk", rank().over(firstCancellationW))
       .withColumn("rn", row_number().over(firstCancellationW))
@@ -891,23 +910,24 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
     lazy val existingClusterLookup = jobsStatus.asDF
-      .select('organization_id, 'timestamp, 'jobId, 'existing_cluster_id.alias("clusterId"))
+//      .select('organization_id, 'timestamp, 'jobId, 'existing_cluster_id.alias("clusterId"))
+      .select('organization_id, 'timestamp, 'jobId, $"cluster_spec.existing_cluster_id".alias("clusterId"))
       .filter('clusterId.isNotNull)
 
-    // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    lazy val existingClusterLookup2 = if (SchemaTools.nestedColExists(jobsSnapshot.asDF, "settings.existing_cluster_id")) {
-      jobsSnapshot.asDF
-        .select('organization_id, 'job_id.alias("jobId"), $"settings.existing_cluster_id".alias("clusterId"),
-          'created_time.alias("timestamp"))
-    } else {
-      jobsSnapshot.asDF
-        .select(
-          'organization_id,
-          'job_id.alias("jobId"),
-          'created_time.alias("timestamp"),
-          lit(null).cast("string").alias("clusterId")
-        )
-    }
+//    // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
+//    lazy val existingClusterLookup2 = if (SchemaTools.nestedColExists(jobsSnapshot.asDF, "settings.existing_cluster_id")) {
+//      jobsSnapshot.asDF
+//        .select('organization_id, 'job_id.alias("jobId"), $"settings.existing_cluster_id".alias("clusterId"),
+//          'created_time.alias("timestamp"))
+//    } else {
+//      jobsSnapshot.asDF
+//        .select(
+//          'organization_id,
+//          'job_id.alias("jobId"),
+//          'created_time.alias("timestamp"),
+//          lit(null).cast("string").alias("clusterId")
+//        )
+//    }
 
     // Ensure the lookups have data -- this will be improved when the module unification occurs during the next
     // scheduled refactor
@@ -917,7 +937,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     if (clusterSpec.exists) clusterLookups.put("clusterSpecLookup", clusterSpecLookup)
     if (clusterSnapshot.exists) clusterLookups.put("clusterSnapLookup", clusterSnapLookup)
     if (jobsStatus.exists) jobStatusClusterLookups.put("jobStatusLookup", existingClusterLookup)
-    if (jobsSnapshot.exists) jobStatusClusterLookups.put("jobSnapshotLookup", existingClusterLookup2)
+//    if (jobsSnapshot.exists) jobStatusClusterLookups.put("jobSnapshotLookup", existingClusterLookup2)
 
     val jobRunsBase = allCompletes
       .join(allSubmissions, Seq("runId", "organization_id"), "left")
@@ -1067,14 +1087,14 @@ trait SilverTransforms extends SparkSessionWrapper {
           ).df
       }
 
-      if (jobStatusClusterLookups.contains("jobSnapshotLookup")) {
-        jrBaseExistingBuilder = jrBaseExistingBuilder
-          .toTSDF("timestamp", "organization_id", "jobId")
-          .lookupWhen(
-            jobStatusClusterLookups("jobSnapshotLookup")
-              .toTSDF("timestamp", "organization_id", "jobId")
-          ).df
-      }
+//      if (jobStatusClusterLookups.contains("jobSnapshotLookup")) {
+//        jrBaseExistingBuilder = jrBaseExistingBuilder
+//          .toTSDF("timestamp", "organization_id", "jobId")
+//          .lookupWhen(
+//            jobStatusClusterLookups("jobSnapshotLookup")
+//              .toTSDF("timestamp", "organization_id", "jobId")
+//          ).df
+//      }
       jrBaseExistingBuilder
 
     } else jrBaseExisting
@@ -1088,21 +1108,25 @@ trait SilverTransforms extends SparkSessionWrapper {
     val newJobsNameLookup = jobsAuditComplete
       .select(
         'organization_id, 'timestamp,
-        get_json_object($"response.result", "$.job_id").alias("jobId"),
+        get_json_object($"response.result", "$.job_id").cast("long").alias("jobId"),
         'name.alias("jobName")
       )
 
     val editJobsNameLookup = jobsAuditComplete
       .filter('actionName.isin("reset", "update"))
-      .select('organization_id, 'timestamp, 'job_id.alias("jobId"), get_json_object('new_settings, "$.name").alias("jobName"))
+      .select('organization_id, 'timestamp, 'job_id.alias("jobId").cast("long"), get_json_object('new_settings, "$.name").alias("jobName"))
       .withColumn("jobName", when('jobName.isNull, last('jobName, true).over(previousJobNameW)).otherwise('jobName))
 
     val jobNameLookupFromAudit = newJobsNameLookup.unionByName(editJobsNameLookup)
 
-    val jobNameLookupFromSnap = jobsSnapshot.asDF
-      .select('organization_id, (unix_timestamp('Pipeline_SnapTS) * lit(1000)).alias("timestamp"),
-        'job_id.alias("jobId"),
-        $"settings.name".alias("jobName")
+//    val jobNameLookupFromSnap = jobsSnapshot.asDF
+//      .select('organization_id, (unix_timestamp('Pipeline_SnapTS) * lit(1000)).alias("timestamp"),
+//        'job_id.alias("jobId"),
+//        $"settings.name".alias("jobName")
+//      )
+
+    val jobNameLookupFromStatus = jobsStatus.asDF
+      .select('organization_id, 'timestamp, 'jobId, 'jobName
       )
 
     // jobNames from MLFlow Runs
@@ -1110,10 +1134,11 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobRunsWIdsAndNames = jobRunsBaseWIDs
       .toTSDF("timestamp", "organization_id", "jobId")
+//      .lookupWhen(
+//        jobNameLookupFromAudit.toTSDF("timestamp", "organization_id", "jobId")
+//      )
       .lookupWhen(
-        jobNameLookupFromAudit.toTSDF("timestamp", "organization_id", "jobId")
-      ).lookupWhen(
-      jobNameLookupFromSnap.toTSDF("timestamp", "organization_id", "jobId")
+        jobNameLookupFromStatus.toTSDF("timestamp", "organization_id", "jobId")
     ).df
       .withColumn("jobName", when('jobName.isNull && experimentName.isNotNull, experimentName).otherwise('jobName))
       .withColumn("jobName", when('jobName.isNull && 'run_name.isNotNull, 'run_name).otherwise('jobName))
@@ -1184,7 +1209,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val childRunsForNesting = childJobRuns
       .withColumn("child", struct(childJobRuns.schema.fieldNames map col: _*))
       .select(
-        get_json_object('workflow_context, "$.root_run_id").alias("runId"), 'child
+        get_json_object('workflow_context, "$.root_run_id").cast("long").alias("runId"), 'child
       )
       .groupBy('runId)
       .agg(collect_list('child).alias("children"))

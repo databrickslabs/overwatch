@@ -59,10 +59,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'schedule,
       'notebook_path,
       'new_settings,
-      struct(
-        'existing_cluster_id,
-        'new_cluster
-      ).alias("cluster"),
+      'cluster_spec.alias("cluster"),
       'aclPermissionSet,
       'grants,
       'targetUserId,

@@ -312,8 +312,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       s"END TIMESTAMP: ${endTSMilli} \n" +
       s"CLUSTERIDs: ${clusterIDs.mkString(", ")}")
 
-//    clusterIdsPar
-    clusterIDs.map(clusterId => {
+    clusterIdsPar.map(clusterId => {
 
       try {
 
