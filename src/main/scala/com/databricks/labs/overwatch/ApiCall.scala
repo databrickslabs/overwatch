@@ -53,6 +53,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       _limit = 150
       _initialQueryMap = Map("limit" -> _limit, "offset" -> 0)
     } else _initialQueryMap = value.getOrElse(Map[String, Any]())
+    _limit = _initialQueryMap.getOrElse("limit", 150).toString.toInt
     _jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
     _getQueryString = "?" + _initialQueryMap.map { case(k, v) => s"$k=$v"}.mkString("&")
     this
