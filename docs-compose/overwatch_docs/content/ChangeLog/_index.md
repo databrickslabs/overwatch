@@ -4,6 +4,12 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.5.0.2
+**If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
+* Hotfix release to resolve [Issue 179](https://github.com/databrickslabs/overwatch/issues/179).
+  * clusterstatefact_gold incremental column was start_timestamp instead of end_timestamp. Meant to roll this into
+  0.5.0.1 but it got missed, sorry for the double release.
+
 ## 0.5.0.1
 **If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
 * Hotfix release to resolve [Issue 170](https://github.com/databrickslabs/overwatch/issues/170).
