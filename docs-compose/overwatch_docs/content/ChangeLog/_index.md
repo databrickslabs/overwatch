@@ -3,6 +3,14 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+
+## 0.5.0.1
+**If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
+* Hotfix release to resolve [Issue 170](https://github.com/databrickslabs/overwatch/issues/170).
+* Hotfix to resolve laggard DF lookups required to join across pipeline runs.
+  * Caused some events to not be joined with their lagging start events in the data model.
+* Hotfix to enable non-json formatted audit logs (AWS) primarily for PVC edge cases
+
 ## 0.5.0
 ### Upgrading and Required Changes
 * **[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED** - If you are upgrading from 0.4.12+ please 
