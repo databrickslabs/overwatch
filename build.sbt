@@ -1,8 +1,10 @@
+import ReleaseTransformations._
+
+parallelExecution in ThisBuild := false
+
 name := "overwatch"
 
 organization := "com.databricks.labs"
-
-version := "0.5.0.1"
 
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
@@ -64,3 +66,18 @@ assemblyExcludedJars in assembly := {
       f.data.getName.contains("com.amazonaws")
   }
 }
+
+releasePublishArtifactsAction := PgpKeys.publishSigned.value
+
+releaseProcess := Seq[ReleaseStep](
+    checkSnapshotDependencies,
+    inquireVersions,
+    runClean,
+    runTest,
+    setReleaseVersion,
+    commitReleaseVersion,
+    tagRelease,
+    publishArtifacts,
+    setNextVersion,
+    commitNextVersion
+)
