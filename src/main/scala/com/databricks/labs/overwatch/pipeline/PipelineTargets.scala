@@ -372,8 +372,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("cluster_id", "state", "unixTimeMS_state_end"),
       config,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
-      incrementalColumns = Array("unixTimeMS_state_start"),
-      zOrderBy = Array("unixTimeMS_state_start", "cluster_id")
+      incrementalColumns = Array("unixTimeMS_state_end"),
+      zOrderBy = Array("unixTimeMS_state_end", "timestamp_state_end", "timestamp_state_start", "cluster_id")
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(
