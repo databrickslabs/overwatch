@@ -215,16 +215,24 @@ case class PipelineTable(
         field.dataType match {
           case dt: DateType => {
             if (!partitionBy.map(_.toLowerCase).contains(field.name.toLowerCase)) {
-              val errmsg = s"Date filters are inclusive on both sides and are used for paritioning. Date filters " +
+              val errmsg = s"Date filters are inclusive on both sides and are used for partitioning. Date filters " +
                 s"should not be used in the Overwatch package alone. Date filters must be accompanied by a more " +
                 s"granular filter to utilize df.asIncrementalDF.\nERROR: ${field.name} not in partition columns: " +
                 s"${partitionBy.mkString(", ")}"
               throw new IncompleteFilterException(errmsg)
             }
+            // If Overwatch runs > 1X / day the date filter must be inclusive or filter will omit all data since
+            // the following cannot be true
+            // date >= today && date < today
+            // The above right-side exclusive filter is created from the filter generator thus one tick must be
+            // added to the right (end) date
+            val untilDate = if (module.fromTime.asLocalDateTime.toLocalDate == module.untilTime.asLocalDateTime.toLocalDate) {
+              PipelineFunctions.addNTicks(module.untilTime.asColumnTS, 1, DateType)
+            } else module.untilTime.asColumnTS
             IncrementalFilter(
               field,
               date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
-              module.untilTime.asColumnTS.cast(dt)
+              untilDate.cast(dt)
             )
           }
           case dt: TimestampType => {
