@@ -76,3 +76,48 @@ are going to have inaccurate data in them:
 Both options will require a corresponding appropriate update to the pipeline_report table for the two modules 
 that write to those tables (3005, 3015). [Here are several examples]({{%relref "DataEngineer/ETL_Process.md"%}}/#reloading-data-example)
 on ways to update the pipeline_report to change update the state of a module.
+
+**Q 3: What is the current guidance / state of customers who want to capture EC2 spot pricing?**
+
+**A 3**: The easiest way is to identify an "average" SPOT price and apply it to all compute cost calcuations. Going a bit further, calculate average spot price by region, average spot price by region by node type and lastly down to a time resolution like hour of day. Use the AWS APIs to get the historical spot price at by these dims.This can be automated via a little script they build but it require proper access to the AWS account.
+
+```scala
+display(
+  spark.table("overwatch.clusterstatefact")
+    .withColumn("compute_cost", applySpotDiscount('awsRegion, 'nodeTypeID)
+)
+```
+where **applySpotDiscount** is the lookup function that either hits a static table of estimates or a live API endpoint from AWS.
+
+It's a very simple API call,just need the token to do it.It's extremely powerful for shaping/optimizing job run timing, node types, AZs, etc
+
+Sample Request:
+```https://ec2.amazonaws.com/?Action=DescribeSpotPriceHistory
+&StartTime=2020-11-01T00:00:00.000Z
+&EndTime=2020-11-01T23:59:59.000Z
+&AvailabilityZone=us-west-2a
+&AUTHPARAMS
+```
+Sample Response:
+```<DescribeSpotPriceHistoryResponse xmlns="http://ec2.amazonaws.com/doc/2020-11-15/">
+  <requestId>59dbff89-35bd-4eac-99ed-be587EXAMPLE</requestId> 
+  <spotPriceHistorySet>
+    <item>
+      <instanceType>m3.medium</instanceType>
+      <productDescription>Linux/UNIX</productDescription>
+      <spotPrice>0.287</spotPrice>
+      <timestamp>2020-11-01T20:56:05.000Z</timestamp>
+      <availabilityZone>us-west-2a</availabilityZone>
+    </item>
+    <item>
+      <instanceType>m3.medium</instanceType>
+      <productDescription>Windows</productDescription>
+      <spotPrice>0.033</spotPrice>
+      <timestamp>2020-11-01T22:33:47.000Z</timestamp>
+      <availabilityZone>us-west-2a</availabilityZone>
+    </item>
+  </spotPriceHistorySet>
+  <nextToken/>
+</DescribeSpotPriceHistoryResponse>
+```
+More Details: [https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSpotPriceHistory.html](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSpotPriceHistory.html)
