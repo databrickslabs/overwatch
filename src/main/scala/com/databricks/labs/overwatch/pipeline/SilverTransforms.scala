@@ -404,17 +404,15 @@ trait SilverTransforms extends SparkSessionWrapper {
   private def clusterBase(auditRawDF: DataFrame): DataFrame = {
     val cluster_id_gen_w = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
     val cluster_name_gen_w = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
-    val cluster_state_gen_w = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
     val cluster_id_gen = first('cluster_id, true).over(cluster_id_gen_w)
     val cluster_name_gen = first('cluster_name, true).over(cluster_name_gen_w)
-    val cluster_state_gen = last('cluster_state, true).over(cluster_state_gen_w)
 
     val clusterSummaryCols = auditBaseCols ++ Array[Column](
       when('actionName === "create", get_json_object($"response.result", "$.cluster_id"))
         .when('actionName =!= "create" && 'cluster_id.isNull, 'clusterId)
         .otherwise('cluster_id).alias("cluster_id"),
       when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
-      'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
+      'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
       'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
       'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'ssh_public_keys,
       'cluster_source, 'spark_env_vars, 'spark_conf,
@@ -428,7 +426,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select(clusterSummaryCols: _*)
       .withColumn("cluster_id", cluster_id_gen)
       .withColumn("cluster_name", cluster_name_gen)
-      .withColumn("cluster_state", cluster_state_gen)
   }
 
   protected def buildClusterSpec(
@@ -460,9 +457,10 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"requestParams.node_type_id".alias("pool_node_type")
       )
 
-    val filledDriverType = when('cluster_name.like("job-%-run-%"), coalesce('driver_node_type_id, 'node_type_id))
-      .when('instance_pool_id.isNotNull, 'pool_node_type)
-      .when(isSingleNode, 'node_type_id)
+    val filledDriverType =
+      when('instance_pool_id.isNotNull, 'pool_node_type) // both driver and worker nodes are same when using pool
+      .when('cluster_name.like("job-%-run-%"), coalesce('driver_node_type_id, 'node_type_id)) // when jobs clusters workers == driver driver node type is not defined
+      .when(isSingleNode, 'node_type_id) // null
       .otherwise(coalesce('driver_node_type_id, first('driver_node_type_id, true).over(clusterBefore), 'node_type_id))
 
     val filledWorkerType = when('instance_pool_id.isNotNull, 'pool_node_type)
@@ -481,7 +479,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       'organization_id,
       'cluster_id,
       when(isSQLAnalytics, lit("SQLAnalytics")).otherwise('cluster_name).alias("cluster_name"),
-      'cluster_state,
       filledDriverType.alias("driver_node_type_id"),
       filledWorkerType.alias("node_type_id"),
       numWorkers.alias("num_workers"),
@@ -510,7 +507,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'userEmail)
 
     val clustersRemoved = clusterBaseDF
-      .filter($"response.statusCode" === 200) //?
+      .filter($"response.statusCode" === 200) // only successful delete statements get applied
       .filter('actionName.isin("permanentDelete"))
       .select('organization_id, 'cluster_id, 'userEmail.alias("deleted_by"))
 
@@ -522,7 +519,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     clusterBaseDF
       .filter('actionName.isin("create", "edit"))
-      .filter($"response.statusCode" === 200) //?
+      .filter('cluster_source =!= "SQL") // not SQL Endpoints
       .join(instancePoolLookup, Seq("organization_id", "instance_pool_id"), "left") //node_type must be derived from pool when cluster is pooled
       // TODO -- Issue_37 -- this will need to be reviewed for mixed pools (i.e. driver of different type)
       .select(clusterSpecBaseCols: _*)
