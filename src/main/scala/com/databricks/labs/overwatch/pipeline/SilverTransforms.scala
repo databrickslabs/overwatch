@@ -458,10 +458,11 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"requestParams.node_type_id".alias("pool_node_type")
       )
 
-    val filledDriverType = when('cluster_name.like("job-%-run-%"), coalesce('driver_node_type_id, 'node_type_id))
-      .when('instance_pool_id.isNotNull, 'pool_node_type)
-      .when(isSingleNode, 'node_type_id)
-      .otherwise(coalesce('driver_node_type_id, first('driver_node_type_id, true).over(clusterBefore), 'node_type_id))
+    val filledDriverType =
+      when('instance_pool_id.isNotNull, 'pool_node_type) // both driver and worker nodes are same when using pool
+        .when('cluster_name.like("job-%-run-%"), coalesce('driver_node_type_id, 'node_type_id)) // when jobs clusters workers == driver driver node type is not defined
+        .when(isSingleNode, 'node_type_id) // null
+        .otherwise(coalesce('driver_node_type_id, first('driver_node_type_id, true).over(clusterBefore), 'node_type_id))
 
     val filledWorkerType = when('instance_pool_id.isNotNull, 'pool_node_type)
       .when(isSingleNode, lit(null).cast("string")) // singleNode clusters don't have worker nodes
