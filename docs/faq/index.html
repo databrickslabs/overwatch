@@ -12,21 +12,21 @@
     <title>FAQ :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1627030696" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1627030696" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1627030696" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1627030696" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1627030696" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1627030696" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1627030696" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1627030696" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1627030696" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1627566693" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1627566693" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1627566693" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1627566693" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1627566693" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1627566693" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1627566693" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1627566693" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1627566693" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1627030696" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1627566693" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1627030696"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1627566693"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1627030696"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1627030696"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1627566693"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1627566693"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1627030696"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1627566693"></script>
 
     
   </div>
@@ -585,6 +585,40 @@ are going to have inaccurate data in them:</p>
 <p>Both options will require a corresponding appropriate update to the pipeline_report table for the two modules 
 that write to those tables (3005, 3015). <a href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process//#reloading-data-example">Here are several examples</a>
 on ways to update the pipeline_report to change update the state of a module.</p>
+<p><strong>Q 3: What is the current guidance / state of customers who want to capture EC2 spot pricing?</strong></p>
+<p><strong>A 3</strong>: The easiest way is to identify an &ldquo;average&rdquo; SPOT price and apply it to all compute cost calcuations. Going a bit further, calculate average spot price by region, average spot price by region by node type and lastly down to a time resolution like hour of day. Use the AWS APIs to get the historical spot price at by these dims.This can be automated via a little script they build but it require proper access to the AWS account.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">display<span style="color:#f92672">(</span>
+  spark<span style="color:#f92672">.</span>table<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;overwatch.clusterstatefact&#34;</span><span style="color:#f92672">)</span>
+    <span style="color:#f92672">.</span>withColumn<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;compute_cost&#34;</span><span style="color:#f92672">,</span> applySpotDiscount<span style="color:#f92672">(</span>&#39;awsRegion<span style="color:#f92672">,</span> &#39;nodeTypeID<span style="color:#f92672">)</span>
+<span style="color:#f92672">)</span>
+</code></pre></div><p>where <strong>applySpotDiscount</strong> is the lookup function that either hits a static table of estimates or a live API endpoint from AWS.</p>
+<p>It&rsquo;s a very simple API call,just need the token to do it.It&rsquo;s extremely powerful for shaping/optimizing job run timing, node types, AZs, etc</p>
+<p>Sample Request:</p>
+<pre><code class="language-https://ec2.amazonaws.com/?Action=DescribeSpotPriceHistory" data-lang="https://ec2.amazonaws.com/?Action=DescribeSpotPriceHistory">&amp;StartTime=2020-11-01T00:00:00.000Z
+&amp;EndTime=2020-11-01T23:59:59.000Z
+&amp;AvailabilityZone=us-west-2a
+&amp;AUTHPARAMS
+</code></pre><p>Sample Response:</p>
+<pre><code class="language-<DescribeSpotPriceHistoryResponse" data-lang="<DescribeSpotPriceHistoryResponse">  &lt;requestId&gt;59dbff89-35bd-4eac-99ed-be587EXAMPLE&lt;/requestId&gt; 
+  &lt;spotPriceHistorySet&gt;
+    &lt;item&gt;
+      &lt;instanceType&gt;m3.medium&lt;/instanceType&gt;
+      &lt;productDescription&gt;Linux/UNIX&lt;/productDescription&gt;
+      &lt;spotPrice&gt;0.287&lt;/spotPrice&gt;
+      &lt;timestamp&gt;2020-11-01T20:56:05.000Z&lt;/timestamp&gt;
+      &lt;availabilityZone&gt;us-west-2a&lt;/availabilityZone&gt;
+    &lt;/item&gt;
+    &lt;item&gt;
+      &lt;instanceType&gt;m3.medium&lt;/instanceType&gt;
+      &lt;productDescription&gt;Windows&lt;/productDescription&gt;
+      &lt;spotPrice&gt;0.033&lt;/spotPrice&gt;
+      &lt;timestamp&gt;2020-11-01T22:33:47.000Z&lt;/timestamp&gt;
+      &lt;availabilityZone&gt;us-west-2a&lt;/availabilityZone&gt;
+    &lt;/item&gt;
+  &lt;/spotPriceHistorySet&gt;
+  &lt;nextToken/&gt;
+&lt;/DescribeSpotPriceHistoryResponse&gt;
+</code></pre><p>More Details: <a href="https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSpotPriceHistory.html">https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSpotPriceHistory.html</a></p>
 
 
 
@@ -873,19 +907,19 @@ on ways to update the pipeline_report to change update the state of a module.</p
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1627030696"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1627030696"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1627030696"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1627030696"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1627030696"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1627030696"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1627566694"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1627566694"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1627566694"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1627566694"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1627566694"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1627566694"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1627030696"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1627030696"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1627030696"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1627566694"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1627566694"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1627566694"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1627030696" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1627030696"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1627566694" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1627566694"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
