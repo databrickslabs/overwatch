@@ -431,6 +431,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def buildClusterSpec(
                                   bronze_cluster_snap: PipelineTable,
+                                  pools_snapshot: PipelineTable,
                                   auditRawTable: PipelineTable
                                 )(df: DataFrame): DataFrame = {
     val lastClusterSnap = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
@@ -450,22 +451,26 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val clusterBaseDF = clusterBase(df)
 
-    // TODO -- Issue_37 -- instance pool lookup pass in from bronze
+    val poolSnapLookup =  pools_snapshot.asDF
+      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
+      .select('timestamp, 'organization_id, 'instance_pool_id, 'node_type_id.alias("pool_snap_node_type"))
+
     val instancePoolLookup = auditRawTable.asDF
       .filter('serviceName === "instancePools" && 'actionName === "create")
       .select(
-        'organization_id, get_json_object($"response.result", "$.instance_pool_id").alias("instance_pool_id"),
+        'timestamp, 'organization_id, get_json_object($"response.result", "$.instance_pool_id").alias("instance_pool_id"),
         $"requestParams.node_type_id".alias("pool_node_type")
       )
 
+    // Issue_37 -- this will need to be reviewed for mixed pools (i.e. driver of different type)
     val filledDriverType =
-      when('instance_pool_id.isNotNull, 'pool_node_type) // both driver and worker nodes are same when using pool
+      when('instance_pool_id.isNotNull, coalesce('pool_node_type, 'pool_snap_node_type)) // both driver and worker nodes are same when using pool
         .when('cluster_name.like("job-%-run-%"), coalesce('driver_node_type_id, 'node_type_id)) // when jobs clusters workers == driver driver node type is not defined
         .when(isSingleNode, 'node_type_id) // null
         .otherwise(coalesce('driver_node_type_id, first('driver_node_type_id, true).over(clusterBefore), 'node_type_id))
 
-    val filledWorkerType = when('instance_pool_id.isNotNull, 'pool_node_type)
-      .when(isSingleNode, lit(null).cast("string")) // singleNode clusters don't have worker nodes
+    val filledWorkerType = when(isSingleNode, lit(null).cast("string")) // singleNode clusters don't have worker nodes
+      .when('instance_pool_id.isNotNull, coalesce('pool_node_type, 'pool_snap_node_type))
       .otherwise('node_type_id)
 
     val numWorkers = when(isSingleNode, lit(0).cast("int")).otherwise('num_workers.cast("int"))
@@ -509,7 +514,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'userEmail)
 
     val clustersRemoved = clusterBaseDF
-      .filter($"response.statusCode" === 200) //?
+      .filter($"response.statusCode" === 200) // only show successful delete requests
       .filter('actionName.isin("permanentDelete"))
       .select('organization_id, 'cluster_id, 'userEmail.alias("deleted_by"))
 
@@ -521,9 +526,15 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     clusterBaseDF
       .filter('actionName.isin("create", "edit"))
-      .filter($"response.statusCode" === 200) //?
-      .join(instancePoolLookup, Seq("organization_id", "instance_pool_id"), "left") //node_type must be derived from pool when cluster is pooled
-      // TODO -- Issue_37 -- this will need to be reviewed for mixed pools (i.e. driver of different type)
+      .toTSDF("timestamp", "organization_id", "instance_pool_id")
+      .lookupWhen(
+        instancePoolLookup
+          .toTSDF("timestamp", "organization_id", "instance_pool_id"), tsPartitionVal = 12
+      )
+      .lookupWhen(
+        poolSnapLookup
+          .toTSDF("timestamp", "organization_id", "instance_pool_id"), tsPartitionVal = 12
+      ).df
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("organization_id", "cluster_id"), "left")
       .join(clustersRemoved, Seq("organization_id", "cluster_id"), "left")
