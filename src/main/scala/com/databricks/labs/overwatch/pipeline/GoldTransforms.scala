@@ -165,131 +165,34 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
   }
 
-  /**
-   * The instanceDetails costing lookup table is often edited direclty by users. Thus, each time this module runs
-   * the instanceDetails table is validated before continuing to guard against erroneous/missing cost data.
-   * As of Overwatch v 0.4.2, the instanceDetails table is a type-2 table. The record with and activeUntil column
-   * with a value of null will be considered the active record. There must be only one active record per key and
-   * there must be no gaps between dates. ActiveUntil expires on 06-01-2021 for node type X then there must be
-   * another record with activeUntil beginning on 06-01-2021 and a null activeUntil for this validation to pass.
-   * @param instanceDetails ETL table named instanceDetails referenced by the cloudDetail Target
-   * @param snapDate snapshot date of the pipeline "yyyy-MM-dd" format
-   */
-  private def validateInstanceDetails(
-                                       instanceDetails: DataFrame,
-                                       snapDate: String
-                                     ): Unit = {
-    val w = Window.partitionBy(lower(trim('API_name))).orderBy('activeFrom)
-    val wKeyCheck = Window.partitionBy(lower(trim('API_name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
-    val dfCheck = instanceDetails
-      .withColumn("activeUntil", coalesce('activeUntil, lit(snapDate)))
-      .withColumn("previousUntil", lag('activeUntil, 1).over(w))
-      .withColumn("rnk", rank().over(wKeyCheck))
-      .withColumn("rn", row_number().over(wKeyCheck))
-      .withColumn("isValid", when('previousUntil.isNull, lit(true)).otherwise(
-        'activeFrom === 'previousUntil
-      ))
-      .filter(!'isValid || 'rnk > 1 || 'rn > 1)
-
-    if (!dfCheck.isEmpty) {
-      val erroredRecordsReport = instanceDetails
-        .withColumn("API_name", lower(trim('API_name)))
-        .join(
-          dfCheck
-            .select(
-              lower(trim('API_name)).alias("API_name"),
-              'rnk, 'rn, 'previousUntil,
-              datediff('activeFrom, 'previousUntil).alias("daysBetweenCurrentAndPrevious")
-            ),
-          Seq("API_name")
-        )
-        .orderBy('API_name, 'activeFrom, 'activeUntil)
-
-      println("InstanceDetails Error Report: ")
-      erroredRecordsReport.show(numRows = 1000, false)
-
-      val badRecords = dfCheck.count()
-      val badRawKeys = dfCheck.select('API_name).as[String].collect().mkString(", ")
-      val errMsg = s"instanceDetails Invalid: Each key (API_name) must be unique for a given time period " +
-        s"(activeFrom --> activeUntil) AND the previous costs activeUntil must run through the previous date " +
-        s"such that the function 'datediff' returns 1. Please correct the instanceDetails table before continuing " +
-        s"with this module.\nThe API_name keys with errors are: $badRawKeys. A total of $badRecords records were " +
-        s"found in conflict."
-      throw new BadConfigException(errMsg)
-    }
-  }
-
   protected def buildClusterStateFact(
                                        instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
                                        pipelineSnapTime: TimeTypes
-                                     )(clusterEventsDF: DataFrame): DataFrame = {
-    validateInstanceDetails(instanceDetails, pipelineSnapTime.asDTString)
+                                     )(clusterStateDetail: DataFrame): DataFrame = {
+    PipelineFunctions.validateInstanceDetails(instanceDetails, pipelineSnapTime.asDTString)
 
     val driverNodeDetails = instanceDetails
-      .select('organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil,
+      .select(
+        'organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil,
         'API_Name.alias("driver_node_type_id_lookup"),
-        struct(instanceDetails.columns map col: _*).alias("driverSpecs")
+        struct(instanceDetails.columns map col: _*).alias("driverSpecs"),
+        (unix_timestamp('activeFrom.cast("timestamp")) * 1000).alias("activeFromEpochMillis"),
+        (unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000).alias("activeUntilEpochMillis"),
+        'activeFrom.alias("activeFromDate"), coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).alias("activeUntilDate")
       )
-      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
-      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
 
     val workerNodeDetails = instanceDetails
-      .select('organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil,
+      .select(
+        'organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil,
         'API_Name.alias("node_type_id_lookup"),
         'automatedDBUPrice, 'interactiveDBUPrice, 'sqlComputeDBUPrice, 'jobsLightDBUPrice,
-        struct(instanceDetails.columns map col: _*).alias("workerSpecs")
+        struct(instanceDetails.columns map col: _*).alias("workerSpecs"),
+        (unix_timestamp('activeFrom.cast("timestamp")) * 1000).alias("activeFromEpochMillis"),
+        (unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000).alias("activeUntilEpochMillis"),
+        'activeFrom.alias("activeFromDate"), coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).alias("activeUntilDate")
       )
-      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
-      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
-
-    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
-    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
-    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
-
-
-    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
-    val clusterEventsBaseline = clusterEventsDF
-      .selectExpr("*", "details.*")
-      .drop("details")
-      .withColumn(
-        "runningSwitch",
-        when('type === "TERMINATING", lit(false))
-          .when('type.isin("CREATING", "STARTING"), lit(true))
-          .otherwise(lit(null).cast("boolean")))
-      .withColumn(
-        "previousSwitch",
-        when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))
-      )
-      .withColumn(
-        "invalidEventChainHandler",
-        when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
-      )
-      .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
-      .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
-      .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
-      .withColumn("isRunning", when('imputedTerminationEvent, lit(false)).otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
-      .withColumn(
-        "current_num_workers",
-        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
-      )
-      .withColumn(
-        "target_num_workers",
-        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
-          .otherwise(coalesce('target_num_workers, 'current_num_workers))
-      )
-      .select(
-        'organization_id, 'cluster_id, 'isRunning,
-        'timestamp, 'type, 'current_num_workers, 'target_num_workers
-      )
-
-    val nonBillableTypes = Array(
-      "STARTING", "TERMINATING", "CREATING", "RESTARTING"
-    )
 
     val nodeTypeLookup = clusterSpec.asDF
       .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
@@ -298,7 +201,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
       .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
 
-    val clusterPotential = clusterEventsBaseline
+    val clusterPotential = clusterStateDetail
+      .withColumn("timestamp", 'unixTimeMS_state_start) // time control temporary column
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         nodeTypeLookup.toTSDF("timestamp", "organization_id", "cluster_id"),
@@ -308,61 +212,38 @@ trait GoldTransforms extends SparkSessionWrapper {
       nodeTypeLookup2.toTSDF("timestamp", "organization_id", "cluster_id"),
       maxLookAhead = 1,
       tsPartitionVal = 64
-    ).df
-      .withColumn("ts", from_unixtime('timestamp.cast("double") / lit(1000)).cast("timestamp"))
-      .withColumn("date", 'ts.cast("date"))
-      .withColumn("counter_reset",
-        when(
-          lag('type, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING", "EDITED") ||
-            !'isRunning, lit(1)
-        ).otherwise(lit(0))
-      )
-      .withColumn("reset_partition", sum('counter_reset).over(stateUnboundW))
-      .withColumn("target_num_workers", last('target_num_workers, true).over(stateUnboundW))
-      .withColumn("current_num_workers", last('current_num_workers, true).over(stateUnboundW))
-      .withColumn("unixTimeMS_state_start", 'timestamp)
-      .withColumn("unixTimeMS_state_end", (lead('timestamp, 1).over(stateUnboundW) - lit(1))) // subtract 1 millis
-      .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
-      .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
-      .withColumn("uptime_in_state_S", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000))
-      .withColumn("uptime_since_restart_S",
-        coalesce(
-          when('counter_reset === 1, lit(0))
-            .otherwise(sum('uptime_in_state_S).over(uptimeW)),
-          lit(0)
-        )
-      )
-      .withColumn("cloud_billable", 'isRunning)
-      .withColumn("databricks_billable", 'isRunning && !'type.isin(nonBillableTypes: _*))
+    ).df.drop("timestamp")
       .alias("clusterPotential")
-      .join(
+      .join( // estimated node type details at start time of run. If contract changes during state, not handled but very infrequent and negligible impact
         driverNodeDetails.alias("driverNodeDetails"),
         $"clusterPotential.organization_id" === $"driverNodeDetails.driver_orgid" &&
           trim(lower($"clusterPotential.driver_node_type_id")) === trim(lower($"driverNodeDetails.driver_node_type_id_lookup")) &&
-          $"clusterPotential.timestamp" >= $"driverNodeDetails.activeFromEpochMillis" &&
-          $"clusterPotential.timestamp" < $"driverNodeDetails.activeUntilEpochMillis",
+          $"clusterPotential.unixTimeMS_state_start" >= $"driverNodeDetails.activeFromEpochMillis" &&
+          $"clusterPotential.unixTimeMS_state_start" < $"driverNodeDetails.activeUntilEpochMillis" &&
+          $"clusterPotential.state_start_date" >= $"driverNodeDetails.activeFromDate" &&
+          $"clusterPotential.state_start_date" < $"driverNodeDetails.activeUntilDate",
         "left"
       )
-      .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "driver_orgid", "driver_node_type_id_lookup")
+      .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "driver_orgid", "driver_node_type_id_lookup")
       .alias("clusterPotential")
-      .join(
+      .join( // estimated node type details at start time of run. If contract changes during state, not handled but very infrequent and negligible impact
         workerNodeDetails.alias("workerNodeDetails"),
         $"clusterPotential.organization_id" === $"workerNodeDetails.worker_orgid" &&
           trim(lower($"clusterPotential.node_type_id")) === trim(lower($"workerNodeDetails.node_type_id_lookup")) &&
-          $"clusterPotential.timestamp" >= $"workerNodeDetails.activeFromEpochMillis" &&
-          $"clusterPotential.timestamp" < $"workerNodeDetails.activeUntilEpochMillis",
+          $"clusterPotential.unixTimeMS_state_start" >= $"workerNodeDetails.activeFromEpochMillis" &&
+          $"clusterPotential.unixTimeMS_state_start" < $"workerNodeDetails.activeUntilEpochMillis" &&
+          $"clusterPotential.state_start_date" >= $"workerNodeDetails.activeFromDate" &&
+          $"clusterPotential.state_start_date" < $"workerNodeDetails.activeUntilDate",
         "left")
-      .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "worker_orgid", "node_type_id_lookup")
+      .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup")
       .withColumn("worker_potential_core_S", when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0)))
       .withColumn("core_hours", when('isRunning,
         round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
           round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
       ))
-      .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
       .withColumn("isAutomated", isAutomated('cluster_name))
       // TODO -- add additional skus
       .withColumn("dbu_rate", when('isAutomated, 'automatedDBUPrice).otherwise('interactiveDBUPrice))
-      .withColumn("days_in_state", size(sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date"))))
       .withColumn("worker_potential_core_H", 'worker_potential_core_S / lit(3600))
       .withColumn("driver_compute_cost", Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H))
       .withColumn("worker_compute_cost", Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H))
@@ -375,8 +256,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
 
     // TODO - finish this logic for pricing compute by sku for a final dbuRate
-//    val derivedDBURate = when('isAutomated && 'spark_version.like("apache-spark-%"), 'jobsLightDBUPrice)
-//      .when('isAutomated && !'spark_version.like("apache-spark-%"), 'automatedDBUPrice)
+    //    val derivedDBURate = when('isAutomated && 'spark_version.like("apache-spark-%"), 'jobsLightDBUPrice)
+    //      .when('isAutomated && !'spark_version.like("apache-spark-%"), 'automatedDBUPrice)
 
 
     val clusterStateFactCols: Array[Column] = Array(
@@ -438,7 +319,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       val lookupCols: Array[Column] = Array(
         'cluster_name, 'custom_tags, 'unixTimeMS_state_start, 'unixTimeMS_state_end, 'timestamp_state_start,
         'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
-//        lit(interactiveDBUPrice).alias("interactiveDBUPrice"), lit(automatedDBUPrice).alias("automatedDBUPrice"),
+        //        lit(interactiveDBUPrice).alias("interactiveDBUPrice"), lit(automatedDBUPrice).alias("automatedDBUPrice"),
         $"driverSpecs.API_name".alias("driver_node_type_id"),
         $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
         $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
@@ -594,14 +475,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       val runStateWithUtilizationAndCosts = jobRunByClusterState
         .join(cumulativeRunStateRunTimeByRunState, Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start", "unixTimeMS_state_end"), "left")
         .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
-//        .withColumn("dbu_rate", when('cluster_type === "automated", 'automatedDBUPrice).otherwise('interactiveDBUPrice)) // removed 4.2
+        //        .withColumn("dbu_rate", when('cluster_type === "automated", 'automatedDBUPrice).otherwise('interactiveDBUPrice)) // removed 4.2
         .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time
         .withColumn("run_state_utilization",
           when('cluster_type === "interactive", least('runtime_in_cluster_state / 'cum_runtime_in_cluster_state, lit(1.0)))
             .otherwise(lit(1.0))
         ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
         .withColumn("overlapping_run_states", when('cluster_type === "interactive", 'overlapping_run_states).otherwise(lit(0)))
-//        .withColumn("overlapping_run_states", when('cluster_type === "automated", lit(0)).otherwise('overlapping_run_states)) // removed 4.2
+        //        .withColumn("overlapping_run_states", when('cluster_type === "automated", lit(0)).otherwise('overlapping_run_states)) // removed 4.2
         .withColumn("running_days", sequence($"job_runtime.startTS".cast("date"), $"job_runtime.endTS".cast("date")))
         .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
         .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'state_utilization_percent * 'run_state_utilization)

@@ -4,14 +4,15 @@ import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.log4j.Level
-import org.apache.spark.sql.Column
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.catalyst.ScalaReflection
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StructField, StructType}
+
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
 import java.sql.Timestamp
-
 import com.databricks.labs.overwatch.validation.SnapReport
 
 case class DBDetail()
@@ -171,6 +172,38 @@ private[overwatch] class IncompleteFilterException(s: String) extends Exception(
 private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
 
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
+
+private[overwatch] class InvalidInstanceDetailsException(
+                                                          instanceDetails: DataFrame,
+                                                          dfCheck: DataFrame)
+  extends Exception() with SparkSessionWrapper {
+
+  import spark.implicits._
+  private val erroredRecordsReport = instanceDetails
+    .withColumn("API_name", lower(trim('API_name)))
+    .join(
+      dfCheck
+        .select(
+          lower(trim('API_name)).alias("API_name"),
+          'rnk, 'rn, 'previousUntil,
+          datediff('activeFrom, 'previousUntil).alias("daysBetweenCurrentAndPrevious")
+        ),
+      Seq("API_name")
+    )
+    .orderBy('API_name, 'activeFrom, 'activeUntil)
+
+  println("InstanceDetails Error Report: ")
+  erroredRecordsReport.show(numRows = 1000, false)
+
+  private val badRecords = dfCheck.count()
+  private val badRawKeys = dfCheck.select('API_name).as[String].collect().mkString(", ")
+  private val errMsg = s"InstanceDetails Invalid: API_name keys with errors are: $badRawKeys. " +
+    s"A total of $badRecords records were found in conflict. Each key (API_name) must be unique for a given time period " +
+    s"(activeFrom --> activeUntil) AND the previous costs activeUntil must run through the previous date " +
+    s"such that the function 'datediff' returns 1. Please correct the instanceDetails table before continuing " +
+    s"with this module. "
+  throw new BadConfigException(errMsg)
+}
 
 private[overwatch] class PipelineStateException(s: String, val target: Option[PipelineTable]) extends Exception(s) {}
 

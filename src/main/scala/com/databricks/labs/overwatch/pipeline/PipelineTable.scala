@@ -122,8 +122,8 @@ case class PipelineTable(
   }
 
   def keys: Array[String] = keys()
-  def keys(withOveratchMeta: Boolean = false): Array[String] = {
-    if (withOveratchMeta) {
+  def keys(withOverwatchMeta: Boolean = false): Array[String] = {
+    if (withOverwatchMeta) {
       (_keys :+ "organization_id") ++ Array("Overwatch_RunID", "Pipeline_SnapTS")
     } else {
       _keys :+ "organization_id"

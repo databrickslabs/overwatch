@@ -2,8 +2,9 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.streaming.StreamingQueryListener._
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
@@ -160,6 +161,16 @@ class Database(config: Config) extends SparkSessionWrapper {
     }
     logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
     true
+  }
+
+  def upsert(df: DataFrame, target: PipelineTable): Unit = {
+    val mergeCondition: String = target.keys.map(k => s"source.$k = target.$k").mkString(" AND ")
+    val deltaTarget = DeltaTable.forPath(target.tableLocation)
+
+    deltaTarget
+      .as("target")
+      .merge(df.as("source"), mergeCondition)
+
   }
 
   def readTable(tableName: String): DataFrame = {

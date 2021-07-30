@@ -547,6 +547,88 @@ trait SilverTransforms extends SparkSessionWrapper {
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
 
+  def buildClusterStateDetail(
+                             pipelineSnapTime: TimeTypes
+                             )(clusterEventsDF: DataFrame): DataFrame = {
+    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
+    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
+    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
+
+    val nonBillableTypes = Array(
+      "STARTING", "TERMINATING", "CREATING", "RESTARTING"
+    )
+
+    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
+    val clusterEventsBaseline = clusterEventsDF
+      .selectExpr("*", "details.*")
+      .drop("details")
+      .withColumn(
+        "runningSwitch",
+        when('type === "TERMINATING", lit(false))
+          .when('type.isin("CREATING", "STARTING"), lit(true))
+          .otherwise(lit(null).cast("boolean")))
+      .withColumn(
+        "previousSwitch",
+        when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))
+      )
+      .withColumn(
+        "invalidEventChainHandler",
+        when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
+      )
+      .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
+      .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
+      .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
+      .withColumn("isRunning", when('imputedTerminationEvent, lit(false)).otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
+      .withColumn(
+        "current_num_workers",
+        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
+      )
+      .withColumn(
+        "target_num_workers",
+        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+          .when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
+          .otherwise(coalesce('target_num_workers, 'current_num_workers))
+      )
+      .select(
+        'organization_id, 'cluster_id, 'isRunning,
+        'timestamp, 'type, 'current_num_workers, 'target_num_workers
+      )
+
+    clusterEventsBaseline
+      .withColumn("counter_reset",
+        when(
+          lag('type, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING", "EDITED") ||
+            !'isRunning, lit(1)
+        ).otherwise(lit(0))
+      )
+      .withColumn("reset_partition", sum('counter_reset).over(stateUnboundW))
+      .withColumn("target_num_workers", last('target_num_workers, true).over(stateUnboundW))
+      .withColumn("current_num_workers", last('current_num_workers, true).over(stateUnboundW))
+      .withColumn("unixTimeMS_state_start", 'timestamp)
+      .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
+        lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
+        lit(pipelineSnapTime.asUnixTimeMilli)
+      ))
+      .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
+      .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
+      .withColumn("uptime_in_state_S", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000))
+      .withColumn("uptime_since_restart_S",
+        coalesce(
+          when('counter_reset === 1, lit(0))
+            .otherwise(sum('uptime_in_state_S).over(uptimeW)),
+          lit(0)
+        )
+      )
+      .withColumn("cloud_billable", 'isRunning)
+      .withColumn("databricks_billable", 'isRunning && !'type.isin(nonBillableTypes: _*))
+      .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
+      .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
+      .withColumn("days_in_state", size('state_dates))
+
+  }
+
   /**
    * TODO -- move to transform funcs and pass in expressions as Seq
    *  Generalizing so it can also be used for other DFs

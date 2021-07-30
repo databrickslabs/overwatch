@@ -196,6 +196,13 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.clustersSpecTarget)
   )
 
+  lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005))
+  lazy private val appendClusterStateDetailProcess = ETLDefinition(
+    BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateDetailModule, "timestamp"),
+    Seq(buildClusterStateDetail(pipelineSnapTime)),
+    append(SilverTargets.clusterStateDetailTarget)
+  )
+
   lazy private[overwatch] val accountLoginsModule = Module(2016, "Silver_AccountLogins", this, Array(1004))
   lazy private val appendAccountLoginsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(accountLoginsModule, auditLogsIncrementalCols),
@@ -235,6 +242,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       }
       case OverwatchScope.notebooks => notebookSummaryModule.execute(appendNotebookSummaryProcess)
       case OverwatchScope.clusters => clusterSpecModule.execute(appendClusterSpecProcess)
+      case OverwatchScope.clusterEvents => clusterStateDetailModule.execute(appendClusterStateDetailProcess)
       case OverwatchScope.sparkEvents => {
         processSparkEvents()
       }

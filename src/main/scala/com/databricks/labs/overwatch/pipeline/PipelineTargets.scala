@@ -244,6 +244,14 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
+    lazy private[overwatch] val clusterStateDetailTarget: PipelineTable = PipelineTable(
+      name = "cluster_state_detail_silver",
+      _keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
+      config,
+      incrementalColumns = Array("unixTimeMS_state_start"),
+      partitionBy = Seq("organization_id", "state_start_date")
+    )
+
     lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable(
       name = "job_status_silver",
       _keys = Array("timestamp", "jobId"),
