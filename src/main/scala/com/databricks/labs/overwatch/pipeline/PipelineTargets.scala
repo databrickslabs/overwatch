@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, Frequency}
+import com.databricks.labs.overwatch.utils.{Config, WriteMode}
 
 abstract class PipelineTargets(config: Config) {
 
@@ -59,7 +59,6 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "date"),
       statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "),
-      dataFrequency = if (config.cloudProvider == "azure") Frequency.milliSecond else Frequency.daily,
       masterSchema = Some(Schema.auditMasterSchema)
     )
 
@@ -248,6 +247,7 @@ abstract class PipelineTargets(config: Config) {
       name = "cluster_state_detail_silver",
       _keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
       config,
+      mode = WriteMode.merge,
       incrementalColumns = Array("unixTimeMS_state_start"),
       partitionBy = Seq("organization_id", "state_start_date")
     )

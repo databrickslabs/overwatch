@@ -1,7 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{BadConfigException, Config, Frequency, IncrementalFilter, InvalidInstanceDetailsException}
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config, IncrementalFilter, InvalidInstanceDetailsException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -214,7 +213,6 @@ object PipelineFunctions {
                               module: Option[Module],
                               filters: Seq[IncrementalFilter],
                               globalFilters: Seq[Column] = Seq(),
-                              dataFrequency: Frequency,
                               debugFlag: Boolean
                             ): DataFrame = {
     val parsedFilters = filters.map(filter => {

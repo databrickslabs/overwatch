@@ -184,7 +184,7 @@ class Pipeline(
       val overwriteTarget = cloudDetailTarget.copy(
         withOverwatchRunID = false,
         withCreateDate = false,
-        mode = "overwrite"
+        mode = WriteMode.overwrite
       )
       database.write(newCloudDetailsDF, overwriteTarget, lit(null))
     }
@@ -385,6 +385,7 @@ class Pipeline(
   }
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
+    target.setSparkOverrides()
     val startTime = System.currentTimeMillis()
 
     //      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
@@ -436,7 +437,6 @@ class Pipeline(
       runEndTS = endTime,
       fromTS = module.fromTime.asUnixTimeMilli,
       untilTS = module.untilTime.asUnixTimeMilli,
-      dataFrequency = target.dataFrequency.toString,
       status = "SUCCESS",
       recordsAppended = dfCount,
       lastOptimizedTS = lastOptimizedTS,

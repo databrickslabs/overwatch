@@ -1,8 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
-import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Frequency, IncrementalFilter}
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.internal.StaticSQLConf

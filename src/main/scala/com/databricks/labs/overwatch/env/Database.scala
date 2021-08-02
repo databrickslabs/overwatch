@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.PipelineTable
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.{col, lit}
@@ -123,43 +123,77 @@ class Database(config: Config) extends SparkSessionWrapper {
     streamManager
   }
 
+  // TODO - refactor this write function and the writer from the target
+  //  write function has gotten overly complex
   def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column): Boolean = {
 
     var finalDF: DataFrame = df
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
 
-    logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
-    if (target.checkpointPath.nonEmpty) {
+    if (target.mode == WriteMode.merge) { // DELTA MERGE / UPSERT
+      val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
+      val updatesDF = finalDF.alias("updates")
+      val targetColumns = deltaTarget.toDF.columns
+      val immutableColumns = target.keys ++ target.partitionBy ++ target.incrementalColumns
+      val columnsToUpdateOnMatch = targetColumns.filterNot(c => immutableColumns.contains(c))
 
-      val msg = s"Checkpoint Path Set: ${target.checkpointPath.get} - proceeding with streaming write"
-      logger.log(Level.INFO, msg)
-      if (config.debugFlag) println(msg)
+      val mergeCondition: String = target.keys.map(k => s"updates.$k = target.$k").mkString(" AND ")
+      val updateExpr: Map[String, String] = columnsToUpdateOnMatch.map(updateCol => {
+        s"target.$updateCol" -> s"updates.$updateCol"
+      }).toMap
+//      val insertExpr: Map[String, String] = targetColumns.map(insertCol => {
+//        s"target.$insertCol" -> s"updates.$insertCol"
+//      }).toMap
 
-      val beginMsg = s"Stream to ${target.tableFullName} beginning."
-      if (config.debugFlag) println(beginMsg)
-      logger.log(Level.INFO, beginMsg)
-      if (!spark.catalog.tableExists(config.databaseName, target.name)) {
-        initializeStreamTarget(finalDF, target)
-      }
-      val streamWriter = target.writer(finalDF)
-        .asInstanceOf[DataStreamWriter[Row]]
-        .option("path", target.tableLocation)
-        .start()
-      val streamManager = getQueryListener(streamWriter)
-      spark.streams.addListener(streamManager)
-      val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
-      if (config.debugFlag) println(listenerAddedMsg)
-      logger.log(Level.INFO, listenerAddedMsg)
-
-      streamWriter.awaitTermination()
-      spark.streams.removeListener(streamManager)
+      val mergeDetailMsg =
+        s"""
+           |Beginning upsert to ${target.tableFullName}.
+           |MERGE CONDITION: $mergeCondition
+           |UPDATE EXPR (when matched): ${updateExpr.mkString(", ")}
+           |""".stripMargin
+      logger.log(Level.INFO, mergeDetailMsg)
+      deltaTarget
+        .merge(updatesDF, mergeCondition)
+        .whenMatched
+        .updateExpr(updateExpr)
+        .whenNotMatched
+        .insertAll()
+        .execute()
 
     } else {
-      target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
-      registerTarget(target)
+      logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
+      if (target.checkpointPath.nonEmpty) { // STREAMING WRITER
+
+        val msg = s"Checkpoint Path Set: ${target.checkpointPath.get} - proceeding with streaming write"
+        logger.log(Level.INFO, msg)
+        if (config.debugFlag) println(msg)
+
+        val beginMsg = s"Stream to ${target.tableFullName} beginning."
+        if (config.debugFlag) println(beginMsg)
+        logger.log(Level.INFO, beginMsg)
+        if (!spark.catalog.tableExists(config.databaseName, target.name)) {
+          initializeStreamTarget(finalDF, target)
+        }
+        val streamWriter = target.writer(finalDF)
+          .asInstanceOf[DataStreamWriter[Row]]
+          .option("path", target.tableLocation)
+          .start()
+        val streamManager = getQueryListener(streamWriter)
+        spark.streams.addListener(streamManager)
+        val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
+        if (config.debugFlag) println(listenerAddedMsg)
+        logger.log(Level.INFO, listenerAddedMsg)
+
+        streamWriter.awaitTermination()
+        spark.streams.removeListener(streamManager)
+
+      } else { // DF Standard Writer append/overwrite
+        target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
+      }
+      logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
     }
-    logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
+    registerTarget(target)
     true
   }
 

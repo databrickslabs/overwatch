@@ -1,7 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
-import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import org.apache.log4j.Level
 import org.apache.spark.sql.{Column, DataFrame}
@@ -101,7 +100,6 @@ case class ModuleStatusReport(
                                runEndTS: Long,
                                fromTS: Long,
                                untilTS: Long,
-                               dataFrequency: String,
                                status: String,
                                recordsAppended: Long,
                                lastOptimizedTS: Long,
@@ -119,7 +117,6 @@ case class ModuleStatusReport(
       runEndTS,
       fromTS,
       untilTS,
-      dataFrequency,
       status,
       recordsAppended,
       lastOptimizedTS,
@@ -137,7 +134,6 @@ case class SimplifiedModuleStatusReport(
                                          runEndTS: Long,
                                          fromTS: Long,
                                          untilTS: Long,
-                                         dataFrequency: String,
                                          status: String,
                                          recordsAppended: Long,
                                          lastOptimizedTS: Long,
@@ -152,14 +148,11 @@ object OverwatchScope extends Enumeration {
   // Todo Issue_77
 }
 
-object Layer extends Enumeration {
-  type Layer = Value
-  val bronze, silver, gold, consumption = Value
-}
-
-object Frequency extends Enumeration {
-  type Frequency = Value
-  val milliSecond, daily = Value
+object WriteMode extends Enumeration {
+  type WriteMode = Value
+  val append: Value = Value("append")
+  val overwrite: Value = Value("overwrite")
+  val merge: Value = Value("merge")
 }
 
 // Todo Issue_56
@@ -267,9 +260,6 @@ object OverwatchEncoders {
 
   implicit def overwatchParams: org.apache.spark.sql.Encoder[OverwatchParams] =
     org.apache.spark.sql.Encoders.kryo[OverwatchParams]
-
-  implicit def frequency: org.apache.spark.sql.Encoder[Frequency] =
-    org.apache.spark.sql.Encoders.kryo[Frequency]
 
   implicit def moduleStatusReport: org.apache.spark.sql.Encoder[ModuleStatusReport] =
     org.apache.spark.sql.Encoders.kryo[ModuleStatusReport]
