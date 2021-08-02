@@ -76,7 +76,7 @@ case class PipelineTable(
    *
    * @param updates spark conf updates
    */
-  private[overwatch] def setSparkOverrides(updates: Map[String, String] = Map()): Unit = {
+  private[overwatch] def applySparkOverrides(updates: Map[String, String] = Map()): Unit = {
 
     if (autoOptimize) {
       spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
@@ -93,9 +93,8 @@ case class PipelineTable(
     if (updates.nonEmpty) {
       currentSparkOverrides = currentSparkOverrides ++ updates
     }
-    if (sparkOverrides.nonEmpty && updates.isEmpty) {
-      PipelineFunctions.setSparkOverrides(spark, currentSparkOverrides, config.debugFlag)
-    }
+
+    if (currentSparkOverrides.nonEmpty) PipelineFunctions.setSparkOverrides(spark, currentSparkOverrides, config.debugFlag)
   }
 
   def tableIdentifier: Option[TableIdentifier] = {
@@ -274,7 +273,6 @@ case class PipelineTable(
   }
 
   def writer(df: DataFrame): Any = {
-    setSparkOverrides()
     if (checkpointPath.nonEmpty) {
       val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
       if (config.debugFlag) println(streamWriterMessage)

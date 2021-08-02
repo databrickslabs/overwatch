@@ -232,6 +232,7 @@ object PipelineFunctions {
 
   def setSparkOverrides(spark: SparkSession, sparkOverrides: Map[String, String],
                         debugFlag: Boolean = false): Unit = {
+    logger.log(Level.INFO, s"SETTING SPARK OVERRIDES:\n${sparkOverrides.mkString(", ")}")
     sparkOverrides foreach { case (k, v) =>
       try {
         val opt = spark.conf.getOption(k)

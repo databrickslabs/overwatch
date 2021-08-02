@@ -385,6 +385,7 @@ class Pipeline(
   }
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
+    target.applySparkOverrides()
     val startTime = System.currentTimeMillis()
 
     //      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
@@ -397,8 +398,8 @@ class Pipeline(
     val startLogMsg = s"Beginning append to ${target.tableFullName}"
     logger.log(Level.INFO, startLogMsg)
 
-    // Append the output
-    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
+    // Append the output -- don't apply spark overrides, applied at top of function
+    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS, applySparkOverrides = false)
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
       println(readOnlyMsg)
