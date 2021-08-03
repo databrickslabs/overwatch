@@ -238,7 +238,9 @@ object PipelineFunctions {
         val opt = spark.conf.getOption(k)
         if (debugFlag) { // if debug write out the override
           if (opt.isEmpty || opt.get != v) {
-            println(s"Overriding $k from ${opt.getOrElse("UNDEFINED")} --> $v")
+            val sparkConfSetMsg = s"Overriding $k from ${opt.getOrElse("UNDEFINED")} --> $v"
+            println(sparkConfSetMsg)
+            logger.log(Level.INFO, sparkConfSetMsg)
           }
         }
         // if sparkConf can be modified OR is unset, set spark conf
