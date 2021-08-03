@@ -563,10 +563,11 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterEventsBaseline = clusterEventsDF
       .selectExpr("*", "details.*")
       .drop("details")
+      .withColumnRenamed("type", "state")
       .withColumn(
         "runningSwitch",
-        when('type === "TERMINATING", lit(false))
-          .when('type.isin("CREATING", "STARTING"), lit(true))
+        when('state === "TERMINATING", lit(false))
+          .when('state.isin("CREATING", "STARTING"), lit(true))
           .otherwise(lit(null).cast("boolean")))
       .withColumn(
         "previousSwitch",
@@ -577,7 +578,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
       )
       .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
-      .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
+      .withColumn("state", when('imputedTerminationEvent, "TERMINATING").otherwise('state))
       .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
       .withColumn("isRunning", when('imputedTerminationEvent, lit(false)).otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
       .withColumn(
@@ -588,18 +589,18 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn(
         "target_num_workers",
         when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
+          .when('state === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
           .otherwise(coalesce('target_num_workers, 'current_num_workers))
       )
       .select(
         'organization_id, 'cluster_id, 'isRunning,
-        'timestamp, 'type, 'current_num_workers, 'target_num_workers
+        'timestamp, 'state, 'current_num_workers, 'target_num_workers
       )
 
     clusterEventsBaseline
       .withColumn("counter_reset",
         when(
-          lag('type, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING", "EDITED") ||
+          lag('state, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING", "EDITED") ||
             !'isRunning, lit(1)
         ).otherwise(lit(0))
       )
@@ -613,6 +614,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       ))
       .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
       .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
+      .withColumn("state_start_date", 'timestamp_state_start.cast("date"))
       .withColumn("uptime_in_state_S", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000))
       .withColumn("uptime_since_restart_S",
         coalesce(
@@ -622,7 +624,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         )
       )
       .withColumn("cloud_billable", 'isRunning)
-      .withColumn("databricks_billable", 'isRunning && !'type.isin(nonBillableTypes: _*))
+      .withColumn("databricks_billable", 'isRunning && !'state.isin(nonBillableTypes: _*))
       .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
       .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
       .withColumn("days_in_state", size('state_dates))

@@ -92,7 +92,7 @@ object Upgrade extends SparkSessionWrapper {
 
         val upgradedDF = outputDF.select(SchemaTools.modifyStruct(outputDF.schema, changeInventory): _*)
         val upgradedJobsSnapTarget = jobsSnapshotTarget.copy(
-          mode = WriteMode.overwrite,
+          _mode = WriteMode.overwrite,
           withCreateDate = false,
           withOverwatchRunID = false
         )
@@ -109,7 +109,7 @@ object Upgrade extends SparkSessionWrapper {
           val newClusterSnap = clusterSnapshotDF
             .withColumn("azure_attributes", SchemaTools.structToMap(clusterSnapshotDF, "azure_attributes"))
           val upgradeClusterSnapTarget = clusterSnapshotTarget.copy(
-            mode = WriteMode.overwrite,
+            _mode = WriteMode.overwrite,
             withCreateDate = false,
             withOverwatchRunID = false
           )
@@ -178,7 +178,7 @@ object Upgrade extends SparkSessionWrapper {
           .drop("previousUntil", "isValid", "rnk", "rn")
 
         val upgradeTarget = instanceDetailsTarget.copy(
-          mode = WriteMode.overwrite,
+          _mode = WriteMode.overwrite,
           withCreateDate = false,
           withOverwatchRunID = false
         )
@@ -202,7 +202,7 @@ object Upgrade extends SparkSessionWrapper {
           .withColumn("endEpochMS", $"job_runtime.endEpochMS")
 
         val upgradeTarget = jrcpGold.copy(
-          mode = WriteMode.overwrite,
+          _mode = WriteMode.overwrite,
           withCreateDate = false,
           withOverwatchRunID = false
         )

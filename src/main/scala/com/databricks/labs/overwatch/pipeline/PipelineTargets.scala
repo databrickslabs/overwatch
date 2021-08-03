@@ -247,7 +247,7 @@ abstract class PipelineTargets(config: Config) {
       name = "cluster_state_detail_silver",
       _keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
       config,
-      mode = WriteMode.merge,
+      _mode = WriteMode.merge,
       incrementalColumns = Array("unixTimeMS_state_start"),
       partitionBy = Seq("organization_id", "state_start_date")
     )
@@ -377,11 +377,12 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterStateFactTarget: PipelineTable = PipelineTable(
       name = "clusterStateFact_gold",
-      _keys = Array("cluster_id", "state", "unixTimeMS_state_end"),
+      _keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
       config,
+      _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
-      incrementalColumns = Array("unixTimeMS_state_end"),
-      zOrderBy = Array("unixTimeMS_state_end", "timestamp_state_end", "timestamp_state_start", "cluster_id")
+      incrementalColumns = Array("unixTimeMS_state_start"),
+      zOrderBy = Array("cluster_id", "unixTimeMS_state_start", "timestamp_state_start", "timestamp_state_end")
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(

@@ -184,7 +184,7 @@ class Pipeline(
       val overwriteTarget = cloudDetailTarget.copy(
         withOverwatchRunID = false,
         withCreateDate = false,
-        mode = WriteMode.overwrite
+        _mode = WriteMode.overwrite
       )
       database.write(newCloudDetailsDF, overwriteTarget, lit(null))
     }

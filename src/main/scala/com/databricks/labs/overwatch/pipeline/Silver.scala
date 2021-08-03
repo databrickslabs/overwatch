@@ -19,6 +19,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.jobsTarget,
       SilverTargets.stagesTarget,
       SilverTargets.tasksTarget,
+      SilverTargets.clusterStateDetailTarget,
       SilverTargets.dbJobRunsTarget,
       SilverTargets.accountLoginTarget,
       SilverTargets.accountModTarget,

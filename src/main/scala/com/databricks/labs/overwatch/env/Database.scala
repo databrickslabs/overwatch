@@ -139,9 +139,9 @@ class Database(config: Config) extends SparkSessionWrapper {
       val columnsToUpdateOnMatch = targetColumns.filterNot(c => immutableColumns.contains(c))
 
       val mergeCondition: String = target.keys.map(k => s"updates.$k = target.$k").mkString(" AND ")
-      val updateExpr: Map[String, String] = columnsToUpdateOnMatch.map(updateCol => {
-        s"target.$updateCol" -> s"updates.$updateCol"
-      }).toMap
+//      val updateExpr: Map[String, String] = columnsToUpdateOnMatch.map(updateCol => {
+//        s"target.$updateCol" -> s"updates.$updateCol"
+//      }).toMap
 //      val insertExpr: Map[String, String] = targetColumns.map(insertCol => {
 //        s"target.$insertCol" -> s"updates.$insertCol"
 //      }).toMap
@@ -150,13 +150,12 @@ class Database(config: Config) extends SparkSessionWrapper {
         s"""
            |Beginning upsert to ${target.tableFullName}.
            |MERGE CONDITION: $mergeCondition
-           |UPDATE EXPR (when matched): ${updateExpr.mkString(", ")}
            |""".stripMargin
       logger.log(Level.INFO, mergeDetailMsg)
       deltaTarget
         .merge(updatesDF, mergeCondition)
         .whenMatched
-        .updateExpr(updateExpr)
+        .updateAll()
         .whenNotMatched
         .insertAll()
         .execute()
@@ -195,16 +194,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     }
     registerTarget(target)
     true
-  }
-
-  def upsert(df: DataFrame, target: PipelineTable): Unit = {
-    val mergeCondition: String = target.keys.map(k => s"source.$k = target.$k").mkString(" AND ")
-    val deltaTarget = DeltaTable.forPath(target.tableLocation)
-
-    deltaTarget
-      .as("target")
-      .merge(df.as("source"), mergeCondition)
-
   }
 
   def readTable(tableName: String): DataFrame = {
