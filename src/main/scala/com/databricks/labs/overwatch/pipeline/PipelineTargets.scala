@@ -245,10 +245,10 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterStateDetailTarget: PipelineTable = PipelineTable(
       name = "cluster_state_detail_silver",
-      _keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
+      _keys = Array("cluster_id", "state", "state_start_date", "unixTimeMS_state_start"),
       config,
       _mode = WriteMode.merge,
-      incrementalColumns = Array("unixTimeMS_state_start"),
+      incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
       partitionBy = Seq("organization_id", "state_start_date")
     )
 
@@ -377,12 +377,12 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val clusterStateFactTarget: PipelineTable = PipelineTable(
       name = "clusterStateFact_gold",
-      _keys = Array("cluster_id", "state", "unixTimeMS_state_start"),
+      _keys = Array("cluster_id", "state", "state_start_date", "unixTimeMS_state_start"),
       config,
       _mode = WriteMode.merge,
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
-      incrementalColumns = Array("unixTimeMS_state_start"),
-      zOrderBy = Array("cluster_id", "unixTimeMS_state_start", "timestamp_state_start", "timestamp_state_end")
+      partitionBy = Seq("organization_id", "state_start_date", "__overwatch_ctrl_noise"),
+      incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
+      zOrderBy = Array("cluster_id", "unixTimeMS_state_start")
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(

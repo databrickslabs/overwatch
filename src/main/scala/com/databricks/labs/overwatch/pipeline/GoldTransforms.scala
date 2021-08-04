@@ -219,9 +219,9 @@ trait GoldTransforms extends SparkSessionWrapper {
         $"clusterPotential.organization_id" === $"driverNodeDetails.driver_orgid" &&
           trim(lower($"clusterPotential.driver_node_type_id")) === trim(lower($"driverNodeDetails.driver_node_type_id_lookup")) &&
           $"clusterPotential.unixTimeMS_state_start" >= $"driverNodeDetails.activeFromEpochMillis" &&
-          $"clusterPotential.unixTimeMS_state_start" < $"driverNodeDetails.activeUntilEpochMillis" &&
+          $"clusterPotential.unixTimeMS_state_start" <= $"driverNodeDetails.activeUntilEpochMillis" &&
           $"clusterPotential.state_start_date" >= $"driverNodeDetails.activeFromDate" &&
-          $"clusterPotential.state_start_date" < $"driverNodeDetails.activeUntilDate",
+          $"clusterPotential.state_start_date" <= $"driverNodeDetails.activeUntilDate",
         "left"
       )
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "driver_orgid", "driver_node_type_id_lookup")
@@ -231,9 +231,9 @@ trait GoldTransforms extends SparkSessionWrapper {
         $"clusterPotential.organization_id" === $"workerNodeDetails.worker_orgid" &&
           trim(lower($"clusterPotential.node_type_id")) === trim(lower($"workerNodeDetails.node_type_id_lookup")) &&
           $"clusterPotential.unixTimeMS_state_start" >= $"workerNodeDetails.activeFromEpochMillis" &&
-          $"clusterPotential.unixTimeMS_state_start" < $"workerNodeDetails.activeUntilEpochMillis" &&
+          $"clusterPotential.unixTimeMS_state_start" <= $"workerNodeDetails.activeUntilEpochMillis" &&
           $"clusterPotential.state_start_date" >= $"workerNodeDetails.activeFromDate" &&
-          $"clusterPotential.state_start_date" < $"workerNodeDetails.activeUntilDate",
+          $"clusterPotential.state_start_date" <= $"workerNodeDetails.activeUntilDate",
         "left")
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup")
       .withColumn("worker_potential_core_S", when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0)))
@@ -265,6 +265,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'cluster_id,
       'cluster_name,
       'custom_tags,
+      'state_start_date,
       'unixTimeMS_state_start,
       'unixTimeMS_state_end,
       'timestamp_state_start,
@@ -281,6 +282,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'databricks_billable,
       'isAutomated,
       'dbu_rate,
+      'state_dates,
       'days_in_state,
       'worker_potential_core_H,
       'core_hours,
@@ -799,11 +801,11 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val clusterStateFactViewColumnMappings: String =
     """
-      |organization_id, cluster_id, cluster_name, custom_tags, unixTimeMS_state_start, unixTimeMS_state_end,
+      |organization_id, cluster_id, cluster_name, custom_tags, state_start_date, unixTimeMS_state_start, unixTimeMS_state_end,
       |timestamp_state_start, timestamp_state_end, state, driver_node_type_id, node_type_id, current_num_workers,
       |target_num_workers, uptime_since_restart_S, uptime_in_state_S, uptime_in_state_H, cloud_billable,
-      |databricks_billable, isAutomated, dbu_rate, days_in_state, worker_potential_core_H, core_hours, driver_compute_cost,
-      |worker_compute_cost, driver_dbu_cost, worker_dbu_cost, total_compute_cost, total_DBU_cost,
+      |databricks_billable, isAutomated, dbu_rate, state_dates, days_in_state, worker_potential_core_H, core_hours,
+      |driver_compute_cost, worker_compute_cost, driver_dbu_cost, worker_dbu_cost, total_compute_cost, total_DBU_cost,
       |total_driver_cost, total_worker_cost, total_cost, driverSpecs, workerSpecs
       |""".stripMargin
 
