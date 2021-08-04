@@ -236,11 +236,11 @@ trait GoldTransforms extends SparkSessionWrapper {
         'API_Name.alias("driver_node_type_id_lookup"),
         struct(instanceDetails.columns map col: _*).alias("driverSpecs")
       )
-      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
-      .withColumn("activeUntilEpochMillis", // add one day to satisfy join condition when current row
-        when('activeUntil.isNull, unix_timestamp(
-          PipelineFunctions.addNTicks(pipelineSnapTime.asColumnTS.cast("date"), 1, DateType)) * 1000)
-          .otherwise(unix_timestamp('activeUntil) * 1000))
+      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
+      .withColumn("activeUntilEpochMillis",
+        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS.cast("date")) * 1000)
+          .otherwise(unix_timestamp('activeUntil) * 1000)
+      )
 
     val workerNodeDetails = instanceDetails
       .select('organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil,
@@ -248,11 +248,11 @@ trait GoldTransforms extends SparkSessionWrapper {
         'automatedDBUPrice, 'interactiveDBUPrice, 'sqlComputeDBUPrice, 'jobsLightDBUPrice,
         struct(instanceDetails.columns map col: _*).alias("workerSpecs")
       )
-      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
-      .withColumn("activeUntilEpochMillis", // add one day to satisfy join condition when current row
-        when('activeUntil.isNull, unix_timestamp(
-          PipelineFunctions.addNTicks(pipelineSnapTime.asColumnTS.cast("date"), 1, DateType)) * 1000)
-          .otherwise(unix_timestamp('activeUntil) * 1000))
+      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
+      .withColumn("activeUntilEpochMillis",
+        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS.cast("date")) * 1000)
+          .otherwise(unix_timestamp('activeUntil) * 1000)
+      )
 
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
@@ -349,8 +349,8 @@ trait GoldTransforms extends SparkSessionWrapper {
         driverNodeDetails.alias("driverNodeDetails"),
         $"clusterPotential.organization_id" === $"driverNodeDetails.driver_orgid" &&
           trim(lower($"clusterPotential.driver_node_type_id")) === trim(lower($"driverNodeDetails.driver_node_type_id_lookup")) &&
-          $"clusterPotential.timestamp" >= $"driverNodeDetails.activeFromEpochMillis" &&
-          $"clusterPotential.timestamp" < $"driverNodeDetails.activeUntilEpochMillis",
+          $"clusterPotential.unixTimeMS_state_start"
+            .between($"driverNodeDetails.activeFromEpochMillis", $"driverNodeDetails.activeUntilEpochMillis"),
         "left"
       )
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "driver_orgid", "driver_node_type_id_lookup")
@@ -359,8 +359,8 @@ trait GoldTransforms extends SparkSessionWrapper {
         workerNodeDetails.alias("workerNodeDetails"),
         $"clusterPotential.organization_id" === $"workerNodeDetails.worker_orgid" &&
           trim(lower($"clusterPotential.node_type_id")) === trim(lower($"workerNodeDetails.node_type_id_lookup")) &&
-          $"clusterPotential.timestamp" >= $"workerNodeDetails.activeFromEpochMillis" &&
-          $"clusterPotential.timestamp" < $"workerNodeDetails.activeUntilEpochMillis",
+          $"clusterPotential.unixTimeMS_state_start"
+            .between($"workerNodeDetails.activeFromEpochMillis", $"workerNodeDetails.activeUntilEpochMillis"),
         "left")
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "worker_orgid", "node_type_id_lookup")
       .withColumn("worker_potential_core_S", when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0)))
