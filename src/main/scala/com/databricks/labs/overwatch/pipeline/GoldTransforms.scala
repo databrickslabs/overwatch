@@ -4,6 +4,7 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{BadConfigException, SparkSessionWrapper, TimeTypes}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.DateType
 import org.apache.spark.sql.{Column, DataFrame}
 
 trait GoldTransforms extends SparkSessionWrapper {
@@ -236,7 +237,10 @@ trait GoldTransforms extends SparkSessionWrapper {
         struct(instanceDetails.columns map col: _*).alias("driverSpecs")
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
-      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
+      .withColumn("activeUntilEpochMillis", // add one day to satisfy join condition when current row
+        when('activeUntil.isNull, unix_timestamp(
+          PipelineFunctions.addNTicks(pipelineSnapTime.asColumnTS.cast("date"), 1, DateType)) * 1000)
+          .otherwise(unix_timestamp('activeUntil) * 1000))
 
     val workerNodeDetails = instanceDetails
       .select('organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil,
@@ -245,7 +249,10 @@ trait GoldTransforms extends SparkSessionWrapper {
         struct(instanceDetails.columns map col: _*).alias("workerSpecs")
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom.cast("timestamp")) * 1000)
-      .withColumn("activeUntilEpochMillis", unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000)
+      .withColumn("activeUntilEpochMillis", // add one day to satisfy join condition when current row
+        when('activeUntil.isNull, unix_timestamp(
+          PipelineFunctions.addNTicks(pipelineSnapTime.asColumnTS.cast("date"), 1, DateType)) * 1000)
+          .otherwise(unix_timestamp('activeUntil) * 1000))
 
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
