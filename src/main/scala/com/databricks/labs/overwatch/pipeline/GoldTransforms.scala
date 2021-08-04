@@ -4,6 +4,7 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{BadConfigException, SparkSessionWrapper, TimeTypes}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.DateType
 import org.apache.spark.sql.{Column, DataFrame}
 
 trait GoldTransforms extends SparkSessionWrapper {
@@ -178,8 +179,9 @@ trait GoldTransforms extends SparkSessionWrapper {
         'organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil,
         'API_Name.alias("driver_node_type_id_lookup"),
         struct(instanceDetails.columns map col: _*).alias("driverSpecs"),
-        (unix_timestamp('activeFrom.cast("timestamp")) * 1000).alias("activeFromEpochMillis"),
-        (unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000).alias("activeUntilEpochMillis"),
+        (unix_timestamp('activeFrom) * 1000).alias("activeFromEpochMillis"),
+        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS.cast("date")) * 1000)
+          .otherwise(unix_timestamp('activeUntil) * 1000).alias("activeUntilEpochMillis"),
         'activeFrom.alias("activeFromDate"), coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).alias("activeUntilDate")
       )
 
@@ -189,8 +191,9 @@ trait GoldTransforms extends SparkSessionWrapper {
         'API_Name.alias("node_type_id_lookup"),
         'automatedDBUPrice, 'interactiveDBUPrice, 'sqlComputeDBUPrice, 'jobsLightDBUPrice,
         struct(instanceDetails.columns map col: _*).alias("workerSpecs"),
-        (unix_timestamp('activeFrom.cast("timestamp")) * 1000).alias("activeFromEpochMillis"),
-        (unix_timestamp(coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).cast("timestamp")) * 1000).alias("activeUntilEpochMillis"),
+        (unix_timestamp('activeFrom) * 1000).alias("activeFromEpochMillis"),
+        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS.cast("date")) * 1000)
+          .otherwise(unix_timestamp('activeUntil) * 1000).alias("activeUntilEpochMillis"),
         'activeFrom.alias("activeFromDate"), coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).alias("activeUntilDate")
       )
 
@@ -218,10 +221,8 @@ trait GoldTransforms extends SparkSessionWrapper {
         driverNodeDetails.alias("driverNodeDetails"),
         $"clusterPotential.organization_id" === $"driverNodeDetails.driver_orgid" &&
           trim(lower($"clusterPotential.driver_node_type_id")) === trim(lower($"driverNodeDetails.driver_node_type_id_lookup")) &&
-          $"clusterPotential.unixTimeMS_state_start" >= $"driverNodeDetails.activeFromEpochMillis" &&
-          $"clusterPotential.unixTimeMS_state_start" <= $"driverNodeDetails.activeUntilEpochMillis" &&
-          $"clusterPotential.state_start_date" >= $"driverNodeDetails.activeFromDate" &&
-          $"clusterPotential.state_start_date" <= $"driverNodeDetails.activeUntilDate",
+          $"clusterPotential.unixTimeMS_state_start"
+            .between($"driverNodeDetails.activeFromEpochMillis", $"driverNodeDetails.activeUntilEpochMillis"),
         "left"
       )
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "driver_orgid", "driver_node_type_id_lookup")
@@ -230,10 +231,8 @@ trait GoldTransforms extends SparkSessionWrapper {
         workerNodeDetails.alias("workerNodeDetails"),
         $"clusterPotential.organization_id" === $"workerNodeDetails.worker_orgid" &&
           trim(lower($"clusterPotential.node_type_id")) === trim(lower($"workerNodeDetails.node_type_id_lookup")) &&
-          $"clusterPotential.unixTimeMS_state_start" >= $"workerNodeDetails.activeFromEpochMillis" &&
-          $"clusterPotential.unixTimeMS_state_start" <= $"workerNodeDetails.activeUntilEpochMillis" &&
-          $"clusterPotential.state_start_date" >= $"workerNodeDetails.activeFromDate" &&
-          $"clusterPotential.state_start_date" <= $"workerNodeDetails.activeUntilDate",
+          $"clusterPotential.unixTimeMS_state_start"
+            .between($"workerNodeDetails.activeFromEpochMillis", $"workerNodeDetails.activeUntilEpochMillis"),
         "left")
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup")
       .withColumn("worker_potential_core_S", when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0)))

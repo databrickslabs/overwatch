@@ -192,6 +192,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     Seq(
       buildClusterSpec(
         BronzeTargets.clustersSnapshotTarget,
+        BronzeTargets.poolsTarget,
         BronzeTargets.auditLogsTarget
       )),
     append(SilverTargets.clustersSpecTarget)

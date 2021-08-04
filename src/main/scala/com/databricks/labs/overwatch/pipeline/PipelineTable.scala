@@ -40,6 +40,7 @@ case class PipelineTable(
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var currentSparkOverrides: Map[String, String] = sparkOverrides
+  logger.log(Level.INFO, s"Spark Overrides Initialized for target: ${_databaseName}.${name} to\n${currentSparkOverrides.mkString(", ")}")
 
   import spark.implicits._
 
@@ -85,15 +86,17 @@ case class PipelineTable(
    *
    * @param updates spark conf updates
    */
-  private[overwatch] def setSparkOverrides(updates: Map[String, String] = Map()): Unit = {
+  private[overwatch] def applySparkOverrides(updates: Map[String, String] = Map()): Unit = {
 
     if (autoOptimize) {
+      logger.log(Level.INFO, s"enabling optimizeWrite on $tableFullName")
       spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
       if (config.debugFlag) println(s"Setting Auto Optimize for ${name}")
     }
     else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
 
     if (autoCompact) {
+      logger.log(Level.INFO, s"enabling autoCompact on $tableFullName")
       spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
       if (config.debugFlag) println(s"Setting Auto Compact for ${name}")
     }
@@ -102,8 +105,11 @@ case class PipelineTable(
     if (updates.nonEmpty) {
       currentSparkOverrides = currentSparkOverrides ++ updates
     }
-    if (sparkOverrides.nonEmpty && updates.isEmpty) {
+
+    if (currentSparkOverrides.nonEmpty) {
       PipelineFunctions.setSparkOverrides(spark, currentSparkOverrides, config.debugFlag)
+    } else {
+      logger.log(Level.INFO, s"USING spark conf defaults for $tableFullName")
     }
   }
 
@@ -283,7 +289,6 @@ case class PipelineTable(
   }
 
   def writer(df: DataFrame): Any = { // TODO -- don't return any, return instance of trait
-    setSparkOverrides()
     if (mode != WriteMode.merge) { // DELTA Writer Built at write time
       if (checkpointPath.nonEmpty) { // IS STREAMING
         val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
