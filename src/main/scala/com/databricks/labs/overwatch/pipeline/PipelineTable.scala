@@ -30,7 +30,7 @@ case class PipelineTable(
                           zOrderBy: Array[String] = Array(),
                           vacuum_H: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
                           enableSchemaMerge: Boolean = true,
-                          sparkOverrides: Map[String, String] = Map[String, String](),
+//                          sparkOverrides: Map[String, String] = Map[String, String](),
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true,
                           isTemp: Boolean = false,
@@ -39,8 +39,6 @@ case class PipelineTable(
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private var currentSparkOverrides: Map[String, String] = sparkOverrides
-  logger.log(Level.INFO, s"Spark Overrides Initialized for target: ${_databaseName}.${name} to\n${currentSparkOverrides.mkString(", ")}")
 
   import spark.implicits._
 
@@ -80,13 +78,7 @@ case class PipelineTable(
     } else _mode
   }
 
-  /**
-   * This EITHER appends/changes the spark overrides OR sets them. This can only set spark params if updates
-   * are not passed --> setting the spark conf is really mean to be private action
-   *
-   * @param updates spark conf updates
-   */
-  private[overwatch] def applySparkOverrides(updates: Map[String, String] = Map()): Unit = {
+  private def enableDeltaOptimizers: Unit = {
 
     if (autoOptimize) {
       logger.log(Level.INFO, s"enabling optimizeWrite on $tableFullName")
@@ -102,15 +94,6 @@ case class PipelineTable(
     }
     else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
 
-    if (updates.nonEmpty) {
-      currentSparkOverrides = currentSparkOverrides ++ updates
-    }
-
-    if (currentSparkOverrides.nonEmpty) {
-      PipelineFunctions.setSparkOverrides(spark, currentSparkOverrides, config.debugFlag)
-    } else {
-      logger.log(Level.INFO, s"USING spark conf defaults for $tableFullName")
-    }
   }
 
   def tableIdentifier: Option[TableIdentifier] = {
@@ -289,6 +272,8 @@ case class PipelineTable(
   }
 
   def writer(df: DataFrame): Any = { // TODO -- don't return any, return instance of trait
+    enableDeltaOptimizers
+
     if (mode != WriteMode.merge) { // DELTA Writer Built at write time
       if (checkpointPath.nonEmpty) { // IS STREAMING
         val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"

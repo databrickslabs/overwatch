@@ -385,7 +385,6 @@ class Pipeline(
   }
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
-    target.applySparkOverrides()
     val startTime = System.currentTimeMillis()
 
     //      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +

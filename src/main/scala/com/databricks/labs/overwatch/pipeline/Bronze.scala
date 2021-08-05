@@ -80,8 +80,16 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clusterEventsTarget)
   )
 
+  private val sparkEventLogsSparkOverrides = Map(
+    "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+    "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
+    "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString
+    // very large schema to imply, too much parallelism and schema result size is too large to
+    // serialize, 64m seems to be a good middle ground.
+  )
   lazy private val sparkLogClusterScaleCoefficient = 2.4
   lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004), sparkLogClusterScaleCoefficient)
+    .withSparkOverrides(sparkEventLogsSparkOverrides)
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),
     Seq(
