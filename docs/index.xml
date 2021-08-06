@@ -72,7 +72,8 @@ Below is an example of getting the compact string. You may also refer to the exa
       <pubDate>Wed, 28 Oct 2020 09:12:32 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/environmentsetup/azure/</guid>
-      <description>Configuring Overwatch on Azure Databricks Basic Architecture on Single &amp;amp; Multiple-Region Deployment Configuring the Event Hub For Audit Log Delivery Setting up Storage Accounts Mount Storage Accounts  Configuring Overwatch on Azure Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.</description>
+      <description>Configuring Overwatch on Azure Databricks Reference Architecture Configuring Audit Log Delivery Through Event Hub Setting up Storage Accounts Mount Storage Accounts  Configuring Overwatch on Azure Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+There are two primary sources of data that need to be configured:</description>
     </item>
     
     <item>
