@@ -238,7 +238,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
       .withColumn("activeUntilEpochMillis",
-        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS.cast("date")) * 1000)
+        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
           .otherwise(unix_timestamp('activeUntil) * 1000)
       )
 
@@ -250,7 +250,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
       .withColumn("activeUntilEpochMillis",
-        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS.cast("date")) * 1000)
+        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
           .otherwise(unix_timestamp('activeUntil) * 1000)
       )
 
