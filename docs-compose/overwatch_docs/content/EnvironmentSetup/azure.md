@@ -2,6 +2,11 @@
 title: "Azure"
 date: 2020-10-28T09:12:32-04:00
 ---
+- [Configuring Overwatch on Azure Databricks](#configuring-overwatch-on-azure-databricks)
+- [Basic Architecture on Single & Multiple-Region Deployment](#architecture)
+- [Configuring the Event Hub For Audit Log Delivery](#configuring-the-event-hub-for-audit-log-delivery)
+- [Setting up Storage Accounts](#setting-up-storage-accounts)
+- [Mount Storage Accounts](https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html)
 
 ## Configuring Overwatch on Azure Databricks
 Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
@@ -26,6 +31,7 @@ There are two primary sources of data that need to be configured:
     
 ![AzureClusterLogging](/images/EnvironmentSetup/Cluster_Logs_Azure.png)
 
+## Architecture
 | Basic Deployment       | Multi-Region Deployment |
 | ---------------------- | ----------------------  |
 | ![BasicAzureArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_Azure.png)| ![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure.png)|
@@ -97,3 +103,25 @@ event hub underneath the event hub namespace and give it a name. Reference the n
 {{% /notice %}}
 
 ![EH_Base_Setup](/images/EnvironmentSetup/EH_BaseConfig.png)
+
+## Setting up Storage Accounts
+#### Step 1
+Select Storage Account from your Azure Portal and hit create
+#### Step 2
+Enter your Subscription and Resource Group in Basics Tab
+![storage1](/images/EnvironmentSetup/storage_acc_1.png)
+![storage2](/images/EnvironmentSetup/storage_acc_2.png)
+#### Step 3
+Enable Hot access tier, Hierarchical namespace in Advanced Tab
+![storage3](/images/EnvironmentSetup/storage_acc_3.png)
+![storage4](/images/EnvironmentSetup/storage_acc_4.png)
+#### Step 4
+Default changes in the Networking Tab
+In Data Protection Tab, Under Recovery section,Enable soft delete for containers and ensure retention period for deleted containers is 7 and Disable soft delete for files shares.
+![storage5](/images/EnvironmentSetup/storage_acc_5.png)
+#### Step 5
+Under Tags tab, enter name == Owner (case sensitive) value == your databircks email address
+![storage6](/images/EnvironmentSetup/storage_acc_6.png)
+#### Step 6
+Review and create
+![storage7](/images/EnvironmentSetup/storage_acc_7.png)
