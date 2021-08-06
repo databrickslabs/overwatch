@@ -12,21 +12,21 @@
     <title>Azure :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1628276979" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1628276979" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1628276979" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1628276979" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1628276979" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1628276979" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1628276979" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1628276979" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1628276979" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1628279341" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1628279341" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1628279341" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1628279341" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1628279341" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1628279341" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1628279341" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1628279341" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1628279341" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1628276979" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1628279341" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1628276979"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1628279341"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1628276979"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1628276979"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1628279341"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1628279341"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1628276979"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1628279341"></script>
 
     
   </div>
@@ -503,10 +503,22 @@
     <div class="wrapper">
 <nav id="TableOfContents">
   <ul>
-    <li><a href="#configuring-overwatch-on-azure-databricks">Configuring Overwatch on Azure Databricks</a>
+    <li><a href="#configuring-overwatch-on-azure-databricks">Configuring Overwatch on Azure Databricks</a></li>
+    <li><a href="#reference-architecture">Reference Architecture</a>
       <ul>
-        <li><a href="#configuring-the-event-hub-for-audit-log-delivery">Configuring the Event Hub For Audit Log Delivery</a></li>
-        <li><a href="#configuing-the-event-hub">Configuing The Event Hub</a></li>
+        <li><a href="#audit-log-delivery-via-event-hub">Audit Log Delivery via Event Hub</a></li>
+        <li><a href="#configuring-event-hub">Configuring Event Hub</a></li>
+      </ul>
+    </li>
+    <li><a href="#setting-up-storage-accounts">Setting up Storage Accounts</a>
+      <ul>
+        <li><a href="#overview">OVERVIEW</a></li>
+        <li><a href="#step-1-1">Step 1</a></li>
+        <li><a href="#step-2-1">Step 2</a></li>
+        <li><a href="#step-3-1">Step 3</a></li>
+        <li><a href="#step-4">Step 4</a></li>
+        <li><a href="#step-5">Step 5</a></li>
+        <li><a href="#using-the-storage-account">Using the Storage Account</a></li>
       </ul>
     </li>
   </ul>
@@ -533,6 +545,13 @@
         
 
 
+<ul>
+<li><a href="#configuring-overwatch-on-azure-databricks">Configuring Overwatch on Azure Databricks</a></li>
+<li><a href="#reference-architecture">Reference Architecture</a></li>
+<li><a href="#audit-log-delivery-via-event-hub">Configuring Audit Log Delivery Through Event Hub</a></li>
+<li><a href="#setting-up-storage-accounts">Setting up Storage Accounts</a></li>
+<li><a href="https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html">Mount Storage Accounts</a></li>
+</ul>
 <h2 id="configuring-overwatch-on-azure-databricks">Configuring Overwatch on Azure Databricks</h2>
 <p>Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
 <!-- raw HTML omitted -->
@@ -561,6 +580,7 @@ be created to increase read IOPS throughput (rarely necessary) intra-region.</li
 </li>
 </ul>
 <p><img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/Cluster_Logs_Azure.png" alt="AzureClusterLogging"></p>
+<h2 id="reference-architecture">Reference Architecture</h2>
 <table>
 <thead>
 <tr>
@@ -575,7 +595,7 @@ be created to increase read IOPS throughput (rarely necessary) intra-region.</li
 </tr>
 </tbody>
 </table>
-<h3 id="configuring-the-event-hub-for-audit-log-delivery">Configuring the Event Hub For Audit Log Delivery</h3>
+<h3 id="audit-log-delivery-via-event-hub">Audit Log Delivery via Event Hub</h3>
 <ul>
 <li>Audit Log Delivery
 <ul>
@@ -585,7 +605,7 @@ Eventhub to deliver these logs, follow the steps below.</li>
 </ul>
 </li>
 </ul>
-<h3 id="configuing-the-event-hub">Configuing The Event Hub</h3>
+<h3 id="configuring-event-hub">Configuring Event Hub</h3>
 <h4 id="step-1">Step 1</h4>
 <p><a href="https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-create">Create or reuse an Event Hub namespace.</a>
 
@@ -644,6 +664,70 @@ event hub underneath the event hub namespace and give it a name. Reference the n
 </div>
 
 <p><img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/EH_BaseConfig.png" alt="EH_Base_Setup"></p>
+<h2 id="setting-up-storage-accounts">Setting up Storage Accounts</h2>
+<p>The following steps are meant to be a baseline reference for setting up the storage accounts for Overwatch targets.
+With regard to security, we cannot make recommendations as to what is best for your organization in a global 
+forum like this. For specifics regarding security implications of your storage account, please contact your
+Databricks sales representative or talk with your Databricks / Cloud administrators.</p>
+<p>That said, the minimum technical requirement for Overwatch to function is that the storage account exist and 
+be able to be access (read/write for Overwatch output, read for cluster logs) the storage from the 
+Databricks workspace. All security consideration above this basic technical requirement should be commensurate with 
+your organizational policies/standards.</p>
+
+<div class="notices note" ><p><strong>Data locality</strong> is important for cluster logs. Cluster logs can be large and plentiful and as such, sending these to a 
+storage account in a different geographical location can have significant performance impact. Keep this in mind and 
+note that the reference architecture recommends at least one storage account per region to minimize latency and 
+maximize bandwidth.</p>
+</div>
+
+<h3 id="overview">OVERVIEW</h3>
+<p>Barring the security and networking sections, once you&rsquo;re setup is complete, your configuration should look similar 
+the the image below.
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/storage_acc_7.png" alt="Storage Overview"></p>
+<h3 id="step-1-1">Step 1</h3>
+<p>Select Storage Account from your Azure Portal and hit create</p>
+<h3 id="step-2-1">Step 2</h3>
+<p>Enter your Subscription and Resource Group in Basics Tab
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/storage_acc_1.png" alt="storage1">
+Locally-Redundant Storage specified here but choose which is right for your organization. Standard storage is fine,
+the required IOPS here are relatively low and, while premium storage will work, it&rsquo;s at an added, unnecessary cost.
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/storage_acc_2.png" alt="storage2"></p>
+<h3 id="step-3-1">Step 3</h3>
+<p><strong>Recommendations</strong></p>
+<ul>
+<li>Security &ndash; commensurate with your organization policies but must be accessible from the Databricks Workspace.</li>
+<li>Hot access tier
+<ul>
+<li>Not tested on cold and cold will suffer significant performance loss</li>
+</ul>
+</li>
+<li>Hierarchical namespace
+<ul>
+<li>While hierarchical namespace is technically option, it&rsquo;s STRONGLY recommended that this be enabled.</li>
+</ul>
+</li>
+<li>Networking, similar to security, this should be configured commensurate with your corporate policies. The only 
+technical requirement is that the data in the storage account is accessible from the Databricks workspace.
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/storage_acc_3.png" alt="storage3">
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/storage_acc_4.png" alt="storage4"></li>
+</ul>
+<h3 id="step-4">Step 4</h3>
+<p>You may choose any options you prefer here. Note that soft-deletion of BLOBs may have a negative performance impact. 
+Moreover, it may result in job failures depending on eventual consistency rules and timeframe between Overwatch actions.
+It&rsquo;s recommended that you do not enable soft deletes for Hierarchical namespace at this time for the Overwatch 
+storage account as it has not been fully tested. Container soft deletes are fine you you desire them.
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/storage_acc_5.png" alt="storage5"></p>
+<h3 id="step-5">Step 5</h3>
+<p>Add relevant tags and create
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/storage_acc_6.png" alt="storage6"></p>
+<h3 id="using-the-storage-account">Using the Storage Account</h3>
+<p>The overwatch output storage account may be accessed directly via:</p>
+<ul>
+<li>abfss://</li>
+<li>wasbs:// (not recommended)</li>
+<li>A mounted filed system within Databricks. More information on mounting storage accounts can be found 
+<a href="https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html#access-azure-data-lake-storage-gen2-using-oauth-20-with-an-azure-service-principal">here</a>.</li>
+</ul>
 
 
 <footer class="footline">
@@ -930,19 +1014,19 @@ event hub underneath the event hub namespace and give it a name. Reference the n
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1628276979"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1628276979"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1628276979"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1628276979"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1628276979"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1628276979"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1628279341"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1628279341"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1628279341"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1628279341"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1628279341"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1628279341"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1628276979"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1628276979"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1628276979"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1628279341"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1628279341"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1628279341"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1628276979" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1628276979"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1628279341" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1628279341"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

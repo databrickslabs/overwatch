@@ -2,6 +2,11 @@
 title: "Azure"
 date: 2020-10-28T09:12:32-04:00
 ---
+* [Configuring Overwatch on Azure Databricks](#configuring-overwatch-on-azure-databricks)
+* [Reference Architecture](#reference-architecture)
+* [Configuring Audit Log Delivery Through Event Hub](#audit-log-delivery-via-event-hub)
+* [Setting up Storage Accounts](#setting-up-storage-accounts)
+* [Mount Storage Accounts](https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html)
 
 ## Configuring Overwatch on Azure Databricks
 Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
@@ -26,17 +31,18 @@ There are two primary sources of data that need to be configured:
     
 ![AzureClusterLogging](/images/EnvironmentSetup/Cluster_Logs_Azure.png)
 
+## Reference Architecture
 | Basic Deployment       | Multi-Region Deployment |
 | ---------------------- | ----------------------  |
 | ![BasicAzureArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_Azure.png)| ![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure.png)|
 
-### Configuring the Event Hub For Audit Log Delivery
+### Audit Log Delivery via Event Hub
 * Audit Log Delivery
     * At present the only supported method for audit log delivery is through Eventhub delivery via Azure Diagnostic Logging. 
     Overwatch will consume the events as a batch stream (Trigger.Once) once/period when the job runs. To configure 
     Eventhub to deliver these logs, follow the steps below.
 
-### Configuing The Event Hub
+### Configuring Event Hub
 #### Step 1
 [Create or reuse an Event Hub namespace.](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-create)
 {{% notice warning %}}
@@ -97,3 +103,64 @@ event hub underneath the event hub namespace and give it a name. Reference the n
 {{% /notice %}}
 
 ![EH_Base_Setup](/images/EnvironmentSetup/EH_BaseConfig.png)
+
+## Setting up Storage Accounts
+The following steps are meant to be a baseline reference for setting up the storage accounts for Overwatch targets.
+With regard to security, we cannot make recommendations as to what is best for your organization in a global 
+forum like this. For specifics regarding security implications of your storage account, please contact your
+Databricks sales representative or talk with your Databricks / Cloud administrators.
+
+That said, the minimum technical requirement for Overwatch to function is that the storage account exist and 
+be able to be access (read/write for Overwatch output, read for cluster logs) the storage from the 
+Databricks workspace. All security consideration above this basic technical requirement should be commensurate with 
+your organizational policies/standards.
+
+{{% notice note %}}
+**Data locality** is important for cluster logs. Cluster logs can be large and plentiful and as such, sending these to a 
+storage account in a different geographical location can have significant performance impact. Keep this in mind and 
+note that the reference architecture recommends at least one storage account per region to minimize latency and 
+maximize bandwidth.
+{{% /notice %}}
+
+### OVERVIEW
+Barring the security and networking sections, once you're setup is complete, your configuration should look similar 
+the the image below.
+![Storage Overview](/images/EnvironmentSetup/storage_acc_7.png)
+### Step 1
+Select Storage Account from your Azure Portal and hit create
+### Step 2
+Enter your Subscription and Resource Group in Basics Tab
+![storage1](/images/EnvironmentSetup/storage_acc_1.png)
+Locally-Redundant Storage specified here but choose which is right for your organization. Standard storage is fine,
+the required IOPS here are relatively low and, while premium storage will work, it's at an added, unnecessary cost.
+![storage2](/images/EnvironmentSetup/storage_acc_2.png)
+### Step 3
+**Recommendations**
+* Security -- commensurate with your organization policies but must be accessible from the Databricks Workspace.
+* Hot access tier
+  * Not tested on cold and cold will suffer significant performance loss
+* Hierarchical namespace
+  * While hierarchical namespace is technically option, it's STRONGLY recommended that this be enabled.
+* Networking, similar to security, this should be configured commensurate with your corporate policies. The only 
+technical requirement is that the data in the storage account is accessible from the Databricks workspace.
+![storage3](/images/EnvironmentSetup/storage_acc_3.png)
+![storage4](/images/EnvironmentSetup/storage_acc_4.png)
+### Step 4
+You may choose any options you prefer here. Note that soft-deletion of BLOBs may have a negative performance impact. 
+Moreover, it may result in job failures depending on eventual consistency rules and timeframe between Overwatch actions.
+It's recommended that you do not enable soft deletes for Hierarchical namespace at this time for the Overwatch 
+storage account as it has not been fully tested. Container soft deletes are fine you you desire them.
+![storage5](/images/EnvironmentSetup/storage_acc_5.png)
+### Step 5
+Add relevant tags and create
+![storage6](/images/EnvironmentSetup/storage_acc_6.png)
+
+### Using the Storage Account
+The overwatch output storage account may be accessed directly via:
+* abfss:// 
+* wasbs:// (not recommended)
+* A mounted filed system within Databricks. More information on mounting storage accounts can be found 
+  [here](https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html#access-azure-data-lake-storage-gen2-using-oauth-20-with-an-azure-service-principal).
+  
+
+
