@@ -438,6 +438,44 @@ object Schema extends SparkSessionWrapper {
     ))
   )
 
+  val poolSnapMinSchema: StructType = StructType(Seq(
+    StructField("azure_attributes",
+      StructType(Seq(
+        StructField("availability",StringType,true),
+        StructField("spot_bid_max_price",DoubleType,true)
+      )),true),
+    StructField("default_tags",
+      StructType(Seq(
+        StructField("DatabricksInstanceGroupId",StringType,true),
+        StructField("DatabricksInstancePoolCreatorId",StringType,true),
+        StructField("DatabricksInstancePoolId",StringType,true),
+        StructField("MLWorkspaceLinkUpdateTime",StringType,true),
+        StructField("Vendor",StringType,true),
+        StructField("MLWorkspaceUnlinkUpdateTime",StringType,true)
+      )),true),
+    StructField("enable_elastic_disk",BooleanType,true),
+    StructField("idle_instance_autotermination_minutes",LongType,true),
+    StructField("instance_pool_id",StringType,true),
+    StructField("instance_pool_name",StringType,true),
+    StructField("max_capacity",LongType,true),
+    StructField("min_idle_instances",LongType,true),
+    StructField("node_type_id",StringType,true),
+    StructField("preloaded_spark_versions",StringType,true),
+    //   StructField("preloaded_docker_images",ArrayType(StringType,true),true), // SEC-6198 - DO NOT populate or test until closed
+    StructField("state",StringType,true),
+    StructField("stats",
+      StructType(Seq(
+        StructField("idle_count",LongType,true),
+        StructField("pending_idle_count",LongType,true),
+        StructField("pending_used_count",LongType,true),
+        StructField("used_count",LongType,true)
+      )),true),
+    StructField("organization_id",StringType,true),
+    StructField("custom_tags",MapType(StringType,StringType,true),true),
+    StructField("Pipeline_SnapTS",TimestampType,true),
+    StructField("Overwatch_RunID",StringType,true)
+  ))
+
   def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleId)
 
   def get(moduleId: Int): Option[StructType] = minimumSchemasByModule.get(moduleId)

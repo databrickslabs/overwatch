@@ -643,6 +643,19 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
+  def fillForwardx(colToFillName: String, w: WindowSpec, orderedLookups: Seq[String] = Seq()) : Column = {
+    val colToFill = col(colToFillName)
+    if (orderedLookups.nonEmpty){
+      val coalescedLookup = colToFill +: orderedLookups.map(lookupColName => {
+        val lookupCol = col(lookupColName)
+        last(lookupCol, true).over(w)
+      })
+      coalesce(coalescedLookup: _*).alias(colToFillName)
+    } else {
+      coalesce(colToFill, last(colToFill, true).over(w)).alias(colToFillName)
+    }
+  }
+
   /**
    * TODO -- move to transform funcs and pass in expressions as Seq
    *  Generalizing so it can also be used for other DFs

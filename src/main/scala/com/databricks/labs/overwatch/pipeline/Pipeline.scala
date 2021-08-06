@@ -219,6 +219,7 @@ class Pipeline(
       }
 
       val finalInstanceDetailsDF = instanceDetailsDF
+        .withColumn("Memory_GB", 'Memory_GB.cast("double")) // ensure static load is in double format
         .withColumn("organization_id", lit(config.organizationId))
         .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
