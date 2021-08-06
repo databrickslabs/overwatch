@@ -23,10 +23,8 @@ val upgradeReport = Upgrade.upgradeTo042(prodWorkspace)
 display(upgradeReport)
 ```
 
-**Q 1: I just deployed Overwatch and made a mistake and just want to clean up everything and re-deploy. I can't 
-seem to get a clean state from which to begin though.**
-
-**A 1**: Overwatch tables are intentionally created as external tables. When the 
+## Q 1: I just deployed Overwatch and made a mistake and want to clean up everything and re-deploy. I can't seem to get a clean state from which to begin though.
+Overwatch tables are intentionally created as external tables. When the 
 [etlDataPathPrefix]({{%relref "GettingStarted/Configuration.md"%}}/#datatarget) is configured (as recommended) 
 the target data does not live underneath the database directory and as such is not deleted when the database is dropped. 
 This is considered an "external table" and this is done by design to protect the org from someone accidentally dropping 
@@ -54,9 +52,8 @@ workspace for a clean run.
 [multi_workspace_cleanup.dbc](/assets/FAQ/multi_workspace_cleanup.dbc) |
 [multi_workspace_cleanup.html](/assets/FAQ/multi_workspace_cleanup.html)
 
-**Q 2: The incorrect costs were entered for a specific time range, I'd like to correct them, how should I do that?**
-
-**A 2**: Please refer to the [Configuring Custom Costs]({{%relref "GettingStarted"%}}#configuring-custom-costs) 
+## Q 2: The incorrect costs were entered for a specific time range, I'd like to correct them, how should I do that?
+Please refer to the [Configuring Custom Costs]({{%relref "GettingStarted"%}}#configuring-custom-costs) 
 to baseline your understanding. Also, closely review the details of the 
 [instanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails)
 table definition as that's where costs are stored and this is what will need to be accurate. Lastly, 
@@ -77,9 +74,9 @@ Both options will require a corresponding appropriate update to the pipeline_rep
 that write to those tables (3005, 3015). [Here are several examples]({{%relref "DataEngineer/ETL_Process.md"%}}/#reloading-data-example)
 on ways to update the pipeline_report to change update the state of a module.
 
-**Q 3: What is the current guidance / state of customers who want to capture EC2 spot pricing?**
+## Q 3: What is the current guidance / state of customers who want to capture EC2 spot pricing?
 
-**A 3**: The easiest way is to identify an "average" SPOT price and apply it to all compute cost calcuations. Going a bit further, calculate average spot price by region, average spot price by region by node type and lastly down to a time resolution like hour of day. Use the AWS APIs to get the historical spot price at by these dims.This can be automated via a little script they build but it require proper access to the AWS account.
+The easiest way is to identify an "average" SPOT price and apply it to all compute cost calcuations. Going a bit further, calculate average spot price by region, average spot price by region by node type and lastly down to a time resolution like hour of day. Use the AWS APIs to get the historical spot price at by these dims.This can be automated via a little script they build but it require proper access to the AWS account.
 
 ```scala
 display(
