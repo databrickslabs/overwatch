@@ -226,7 +226,14 @@ trait GoldTransforms extends SparkSessionWrapper {
     }
   }
 
+  private def getRunningSwitch(c: Column): Column = {
+    when(c === "TERMINATING", lit(false))
+      .when(c.isin("CREATING", "STARTING"), lit(true))
+      .otherwise(lit(null).cast("boolean"))
+  }
+
   protected def buildClusterStateFact(
+                                      clusterEventsFullDF: DataFrame,
                                        instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
@@ -262,16 +269,26 @@ trait GoldTransforms extends SparkSessionWrapper {
     val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
 
+    // get state before current run to init the running switch
+    // Temporary fix until 0.5.1 when merges are enabled
+    val clusterStateBeforeRun = clusterEventsFullDF
+      .select(
+        'organization_id, 'cluster_id,
+        last('type, true).over(stateUnboundW).alias("last_state_previous_run")
+      )
 
-    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
+    // don't allow cluster to change state from running to running or vice-versa. When this occurs just set cluster
+    // to terminated and reset / restart.
+    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull &&
+      lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
     val clusterEventsBaseline = clusterEventsDF
       .selectExpr("*", "details.*")
       .drop("details")
-      .withColumn(
+      .join(clusterStateBeforeRun, Seq("organization_id", "cluster_id"), "left")
+      .withColumn( // if incremental df doesn't have a running switch get it from latest previous state
         "runningSwitch",
-        when('type === "TERMINATING", lit(false))
-          .when('type.isin("CREATING", "STARTING"), lit(true))
-          .otherwise(lit(null).cast("boolean")))
+        coalesce(getRunningSwitch('type), getRunningSwitch('last_state_previous_run))
+      )
       .withColumn(
         "previousSwitch",
         when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))

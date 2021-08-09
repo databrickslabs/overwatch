@@ -45,6 +45,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClusterStateFactProccess = ETLDefinition(
     BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateFactModule, "timestamp"),
     Seq(buildClusterStateFact(
+      BronzeTargets.clusterEventsTarget.asDF, // temp fix until 0.5.1 to capture previous states between Overwatch runs
       BronzeTargets.cloudMachineDetail.asDF,
       BronzeTargets.clustersSnapshotTarget,
       SilverTargets.clustersSpecTarget,
