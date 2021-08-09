@@ -35,7 +35,10 @@ trait GoldTransforms extends SparkSessionWrapper {
       'spark_env_vars,
       'spark_conf,
       'acl_path_prefix,
+      'driver_instance_pool_id,
       'instance_pool_id,
+      'driver_instance_pool_name,
+      'instance_pool_name,
       'spark_version,
       'idempotency_token,
       'organization_id,
@@ -178,11 +181,12 @@ trait GoldTransforms extends SparkSessionWrapper {
       .select(
         'organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil,
         'API_Name.alias("driver_node_type_id_lookup"),
-        struct(instanceDetails.columns map col: _*).alias("driverSpecs"),
-        (unix_timestamp('activeFrom) * 1000).alias("activeFromEpochMillis"),
-        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS.cast("date")) * 1000)
-          .otherwise(unix_timestamp('activeUntil) * 1000).alias("activeUntilEpochMillis"),
-        'activeFrom.alias("activeFromDate"), coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).alias("activeUntilDate")
+        struct(instanceDetails.columns map col: _*).alias("driverSpecs")
+      )
+      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
+      .withColumn("activeUntilEpochMillis",
+        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
+          .otherwise(unix_timestamp('activeUntil) * 1000)
       )
 
     val workerNodeDetails = instanceDetails
@@ -190,11 +194,12 @@ trait GoldTransforms extends SparkSessionWrapper {
         'organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil,
         'API_Name.alias("node_type_id_lookup"),
         'automatedDBUPrice, 'interactiveDBUPrice, 'sqlComputeDBUPrice, 'jobsLightDBUPrice,
-        struct(instanceDetails.columns map col: _*).alias("workerSpecs"),
-        (unix_timestamp('activeFrom) * 1000).alias("activeFromEpochMillis"),
-        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS.cast("date")) * 1000)
-          .otherwise(unix_timestamp('activeUntil) * 1000).alias("activeUntilEpochMillis"),
-        'activeFrom.alias("activeFromDate"), coalesce('activeUntil, lit(pipelineSnapTime.asDTString)).alias("activeUntilDate")
+        struct(instanceDetails.columns map col: _*).alias("workerSpecs")
+      )
+      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
+      .withColumn("activeUntilEpochMillis",
+        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
+          .otherwise(unix_timestamp('activeUntil) * 1000)
       )
 
     val nodeTypeLookup = clusterSpec.asDF
@@ -753,7 +758,8 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
       |autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type, security_profile, cluster_log_conf,
-      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, instance_pool_id,
+      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix,
+      |driver_instance_pool_id, instance_pool_id, driver_instance_pool_name, instance_pool_name,
       |spark_version, idempotency_token, deleted_by, created_by, last_edited_by
       |""".stripMargin
 
