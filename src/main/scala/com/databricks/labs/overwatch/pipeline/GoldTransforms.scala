@@ -214,11 +214,11 @@ trait GoldTransforms extends SparkSessionWrapper {
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         nodeTypeLookup.toTSDF("timestamp", "organization_id", "cluster_id"),
-        maxLookAhead = 1,
+        maxLookAhead = Long.MaxValue,
         tsPartitionVal = 64
       ).lookupWhen(
       nodeTypeLookup2.toTSDF("timestamp", "organization_id", "cluster_id"),
-      maxLookAhead = 1,
+      maxLookAhead = Long.MaxValue,
       tsPartitionVal = 64
     ).df.drop("timestamp")
       .alias("clusterPotential")
@@ -373,7 +373,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .lookupWhen(
           clusterPotentialInitialState
             .toTSDF("timestamp", "organization_id", "cluster_id"),
-          tsPartitionVal = 64, maxLookAhead = 1L
+          tsPartitionVal = 64, maxLookAhead = Long.MaxValue
         ).df
         .drop("timestamp")
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
@@ -388,7 +388,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .lookupWhen(
           clusterPotentialTerminalState
             .toTSDF("timestamp", "organization_id", "cluster_id"),
-          tsPartitionVal = 64, maxLookback = 0L, maxLookAhead = 1L
+          tsPartitionVal = 64, maxLookback = 0L, maxLookAhead = Long.MaxValue
         ).df
         .drop("timestamp")
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull && 'unixTimeMS_state_end > $"job_runtime.endEpochMS")

@@ -308,7 +308,7 @@ object Scenarios extends SparkSessionWrapper {
       .lookupWhen(
         clusterPotentialInitialState
           .toTSDF("timestamp", "organization_id", "cluster_id"),
-        tsPartitionVal = 64, maxLookAhead = 1L
+        tsPartitionVal = 64, maxLookAhead = Long.MaxValue
       ).df
       .drop("timestamp")
       .withColumn("job_runtime_in_state",

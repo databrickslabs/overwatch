@@ -688,7 +688,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
-  def fillForwardx(colToFillName: String, w: WindowSpec, orderedLookups: Seq[String] = Seq()) : Column = {
+  def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[String] = Seq()) : Column = {
     val colToFill = col(colToFillName)
     if (orderedLookups.nonEmpty){
       val coalescedLookup = colToFill +: orderedLookups.map(lookupColName => {
@@ -710,7 +710,7 @@ trait SilverTransforms extends SparkSessionWrapper {
    * @param path
    * @return
    */
-  private def fillForward(colName: String, w: WindowSpec, withSnapLookup: Boolean = true, path: Option[String] = None): Column = {
+  private def fillForward_deprecated(colName: String, w: WindowSpec, withSnapLookup: Boolean = true, path: Option[String] = None): Column = {
     val settingsPath = s"'$$.${path.getOrElse(colName)}'"
     val firstNonNullVal: Seq[Column] = Seq(
       expr(s"get_json_object(new_settings, $settingsPath)"),
@@ -804,14 +804,14 @@ trait SilverTransforms extends SparkSessionWrapper {
         )
       ).drop("existing_cluster_id", "new_cluster", "x", "x2") // drop temp columns and old version of clusterSpec components
       .withColumn("job_type", when('job_type.isNull, last('job_type, true).over(lastJobStatus)).otherwise('job_type))
-      .withColumn("schedule", fillForward("schedule", lastJobStatus))
-      .withColumn("timeout_seconds", fillForward("timeout_seconds", lastJobStatus))
-      .withColumn("notebook_path", fillForward("notebook_path", lastJobStatus, path = Some("notebook_task.notebook_path")))
-      .withColumn("jobName", fillForward("jobName", lastJobStatus, path = Some("name")))
+      .withColumn("schedule", fillForward_deprecated("schedule", lastJobStatus))
+      .withColumn("timeout_seconds", fillForward_deprecated("timeout_seconds", lastJobStatus))
+      .withColumn("notebook_path", fillForward_deprecated("notebook_path", lastJobStatus, path = Some("notebook_task.notebook_path")))
+      .withColumn("jobName", fillForward_deprecated("jobName", lastJobStatus, path = Some("name")))
       .withColumn("created_by", when('actionName === "create", $"userIdentity.email"))
-      .withColumn("created_by", coalesce(fillForward("created_by", lastJobStatus), 'snap_lookup_created_by))
+      .withColumn("created_by", coalesce(fillForward_deprecated("created_by", lastJobStatus), 'snap_lookup_created_by))
       .withColumn("created_ts", when('actionName === "create", 'timestamp))
-      .withColumn("created_ts", coalesce(fillForward("created_ts", lastJobStatus), 'snap_lookup_created_time))
+      .withColumn("created_ts", coalesce(fillForward_deprecated("created_ts", lastJobStatus), 'snap_lookup_created_time))
       .withColumn("deleted_by", when('actionName === "delete", $"userIdentity.email"))
       .withColumn("deleted_ts", when('actionName === "delete", 'timestamp))
       .withColumn("last_edited_by", when('actionName.isin("update", "reset"), $"userIdentity.email"))
