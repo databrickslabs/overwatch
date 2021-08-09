@@ -451,20 +451,50 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val clusterBaseDF = clusterBase(df)
 
-    val poolSnapLookup =  pools_snapshot.asDF
+    val driverSnapLookup =  pools_snapshot.asDF
       .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
-      .select('timestamp, 'organization_id, 'instance_pool_id, 'node_type_id.alias("pool_snap_node_type"))
-
-    val instancePoolLookup = auditRawTable.asDF
-      .filter('serviceName === "instancePools" && 'actionName === "create")
       .select(
-        'timestamp, 'organization_id, get_json_object($"response.result", "$.instance_pool_id").alias("instance_pool_id"),
+        'timestamp, 'organization_id,
+        'instance_pool_id.alias("driver_instance_pool_id"),
+        'instance_pool_name.alias("pool_snap_driver_instance_pool_name"),
+        'node_type_id.alias("pool_snap_driver_node_type")
+      )
+
+    val workerSnapLookup =  pools_snapshot.asDF
+      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
+      .select(
+        'timestamp, 'organization_id,
+        'instance_pool_id,
+        'instance_pool_name.alias("pool_snap_instance_pool_name"),
+        'node_type_id.alias("pool_snap_node_type")
+      )
+
+    val driverPoolLookup = auditRawTable.asDF
+      .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
+      .select(
+        'timestamp, 'organization_id,
+        when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id"))
+          .otherwise($"requestParams.instance_pool_id") // actionName == edit
+          .alias("driver_instance_pool_id"),
+        $"requestParams.instance_pool_name".alias("driver_instance_pool_name"),
+        $"requestParams.node_type_id".alias("pool_driver_node_type")
+      )
+
+    val workerPoolLookup = auditRawTable.asDF
+      .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
+      .select(
+        'timestamp, 'organization_id,
+        when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id"))
+          .otherwise($"requestParams.instance_pool_id") // actionName == edit
+          .alias("instance_pool_id"),
+        $"requestParams.instance_pool_name",
         $"requestParams.node_type_id".alias("pool_node_type")
       )
 
     // Issue_37 -- this will need to be reviewed for mixed pools (i.e. driver of different type)
     val filledDriverType =
-      when('instance_pool_id.isNotNull, coalesce('pool_node_type, 'pool_snap_node_type)) // both driver and worker nodes are same when using pool
+      when('driver_instance_pool_id.isNotNull, coalesce('pool_driver_node_type, 'pool_snap_driver_node_type))
+        .when('instance_pool_id.isNotNull && 'driver_instance_pool_id.isNull, coalesce('pool_node_type, 'pool_snap_node_type))
         .when('cluster_name.like("job-%-run-%"), coalesce('driver_node_type_id, 'node_type_id)) // when jobs clusters workers == driver driver node type is not defined
         .when(isSingleNode, 'node_type_id) // null
         .otherwise(coalesce('driver_node_type_id, first('driver_node_type_id, true).over(clusterBefore), 'node_type_id))
@@ -506,8 +536,14 @@ trait SilverTransforms extends SparkSessionWrapper {
       'spark_env_vars,
       'spark_conf,
       'acl_path_prefix,
+      'driver_instance_pool_id,
       'instance_pool_id,
-      'instance_pool_name,
+      when('instance_pool_id.isNotNull, coalesce('instance_pool_name, 'pool_snap_instance_pool_name))
+        .otherwise(lit(null).cast("string"))
+        .alias("instance_pool_name"),
+      when('driver_instance_pool_id.isNotNull, coalesce('driver_instance_pool_name, 'pool_snap_driver_instance_pool_name))
+        .otherwise(lit(null).cast("string"))
+        .alias("driver_instance_pool_name"),
       'spark_version,
       'idempotency_token,
       'timestamp,
@@ -528,12 +564,21 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('actionName.isin("create", "edit"))
       .toTSDF("timestamp", "organization_id", "instance_pool_id")
       .lookupWhen(
-        instancePoolLookup
-          .toTSDF("timestamp", "organization_id", "instance_pool_id"), tsPartitionVal = 12
+        workerPoolLookup
+          .toTSDF("timestamp", "organization_id", "instance_pool_id"), tsPartitionVal = 6
       )
       .lookupWhen(
-        poolSnapLookup
-          .toTSDF("timestamp", "organization_id", "instance_pool_id"), tsPartitionVal = 12
+        workerSnapLookup
+          .toTSDF("timestamp", "organization_id", "instance_pool_id"), tsPartitionVal = 6
+      ).df
+      .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
+      .lookupWhen(
+        driverPoolLookup
+          .toTSDF("timestamp", "organization_id", "driver_instance_pool_id"), tsPartitionVal = 6
+      )
+      .lookupWhen(
+        driverSnapLookup
+          .toTSDF("timestamp", "organization_id", "driver_instance_pool_id"), tsPartitionVal = 6
       ).df
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("organization_id", "cluster_id"), "left")
