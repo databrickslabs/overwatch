@@ -175,7 +175,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
             bronzeTargets.clusterEventsTarget)
           )
           case OverwatchScope.jobs => Seq(ModuleTarget(bronzePipeline.jobsSnapshotModule, bronzeTargets.jobsSnapshotTarget))
-          case OverwatchScope.pools => Seq(ModuleTarget(bronzePipeline.poolsSnapshotModule, bronzeTargets.poolsTarget))
+          case OverwatchScope.pools => Seq(ModuleTarget(bronzePipeline.poolsSnapshotModule, bronzeTargets.poolsSnapshotTarget))
           case OverwatchScope.sparkEvents => Seq(ModuleTarget(bronzePipeline.sparkEventLogsModule, bronzeTargets.sparkEventLogsTarget))
           case _ => Seq[ModuleTarget]()
         }

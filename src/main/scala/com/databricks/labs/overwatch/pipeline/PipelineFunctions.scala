@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.{BadConfigException, Config, IncrementalFilter, InvalidInstanceDetailsException}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -300,6 +300,18 @@ object PipelineFunctions {
     filteredTarget.getOrElse(throw new Exception(s"NO TARGET FOUND: No targets exist for lower " +
       s"case $targetName.\nPotential targets include ${pipelineTargets.map(_.name).mkString(", ")}"))
 
+  }
+
+  def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+    val colToFill = col(colToFillName)
+    if (orderedLookups.nonEmpty){
+      val coalescedLookup = colToFill +: orderedLookups.map(lookupCol => {
+        last(lookupCol, true).over(w)
+      })
+      coalesce(coalescedLookup: _*).alias(colToFillName)
+    } else {
+      coalesce(colToFill, last(colToFill, true).over(w)).alias(colToFillName)
+    }
   }
 
 }

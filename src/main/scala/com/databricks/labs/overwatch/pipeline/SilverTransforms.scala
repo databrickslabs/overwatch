@@ -428,6 +428,95 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("cluster_name", cluster_name_gen)
   }
 
+  protected def buildPoolsSpec(
+                                poolsSnapTarget: PipelineTable,
+                                cloudProvider: String
+                              )(auditIncrementalDF: DataFrame): DataFrame = {
+
+    val lastPoolValue = Window.partitionBy('instance_pool_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+    val poolSnapDF = poolsSnapTarget.asDF
+      .withColumn("preloaded_spark_versions", to_json('preloaded_spark_versions))
+      .verifyMinimumSchema(Schema.poolSnapMinSchema)
+
+    val poolSnapLookup = poolSnapDF
+    .select(
+      'organization_id,
+      (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
+      'instance_pool_id,
+      struct(poolSnapDF.columns map col: _*).alias("poolSnapDetails")
+    )
+
+    val deleteCol = when('actionName === "delete" && $"response.statusCode" === 200,
+      struct(
+        $"userIdentity.email".alias("deleted_by"),
+        'timestamp.alias("deleted_at_epochMillis"),
+        from_unixtime('timestamp / 1000).cast("timestamp").alias("deleted_at")
+      )).otherwise(null).alias("delete_details")
+
+    val createCol = when('actionName === "create" && $"response.statusCode" === 200,
+      struct(
+        $"userIdentity.email".alias("created_by"),
+        'timestamp.alias("created_at_epochMillis"),
+        from_unixtime('timestamp / 1000).cast("timestamp").alias("created_at")
+      )).otherwise(null).alias("create_details")
+
+    val poolsSelects = Array[Column](
+      'serviceName,
+      'actionName,
+      'organization_id,
+      'timestamp,
+      'date,
+      'instance_pool_id,
+      PipelineFunctions.fillForward("instance_pool_name", lastPoolValue, Seq($"poolSnapDetails.instance_pool_name")),
+      PipelineFunctions.fillForward("node_type_id", lastPoolValue, Seq($"poolSnapDetails.node_type_id")),
+      PipelineFunctions.fillForward("idle_instance_autotermination_minutes", lastPoolValue, Seq($"poolSnapDetails.idle_instance_autotermination_minutes")),
+      PipelineFunctions.fillForward("min_idle_instances", lastPoolValue, Seq($"poolSnapDetails.min_idle_instances")),
+      PipelineFunctions.fillForward("max_capacity", lastPoolValue, Seq($"poolSnapDetails.max_capacity")),
+      PipelineFunctions.fillForward("preloaded_spark_versions", lastPoolValue, Seq($"poolSnapDetails.preloaded_spark_versions")),
+      //   fillForward("preloaded_docker_images", lastPoolValue, Seq($"poolSnapDetails.preloaded_docker_images")), // SEC-6198 - DO NOT populate or test until closed
+      PipelineFunctions.fillForward(s"${cloudProvider}_attributes", lastPoolValue, Seq(col(s"${cloudProvider}_attributes"))),
+      createCol,
+      deleteCol,
+      struct(
+        'requestId,
+        'response,
+        'sessionId,
+        'sourceIPAddress,
+        'userAgent
+      ).alias("request_details"),
+      'poolSnapDetails
+    )
+
+    val poolsBase = auditIncrementalDF
+      .filter('serviceName === "instancePools")
+      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+
+    val poolRemoved = poolsBase.filter('actionName === "delete")
+      .filter($"response.statusCode" === 200) // only successful deletes
+      .select(
+        'organization_id.alias("d_organization_id"),
+        'instance_pool_id.alias("d_instance_pool_id"),
+        struct(
+          $"userIdentity.email".alias("deleted_by"),
+          'timestamp.alias("deleted_at")
+        ).alias("delete_details")
+      )
+
+    poolsBase
+      .filter('actionName.isin("create", "edit", "delete"))
+      .withColumn("instance_pool_id", when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id")).otherwise('instance_pool_id))
+      .withColumn("preloaded_spark_versions", get_json_object('preloaded_spark_versions, "$."))
+      .toTSDF("timestamp", "organization_id", "instance_pool_id")
+      .lookupWhen(
+        poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
+        maxLookAhead = Long.MaxValue, tsPartitionVal = 4
+      ).df
+      .select(poolsSelects: _*)
+      .withColumn("create_details", PipelineFunctions.fillForward("create_details", lastPoolValue))
+
+  }
+
   protected def buildClusterSpec(
                                   bronze_cluster_snap: PipelineTable,
                                   pools_snapshot: PipelineTable,
@@ -686,19 +775,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
       .withColumn("days_in_state", size('state_dates))
 
-  }
-
-  def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[String] = Seq()) : Column = {
-    val colToFill = col(colToFillName)
-    if (orderedLookups.nonEmpty){
-      val coalescedLookup = colToFill +: orderedLookups.map(lookupColName => {
-        val lookupCol = col(lookupColName)
-        last(lookupCol, true).over(w)
-      })
-      coalesce(coalescedLookup: _*).alias(colToFillName)
-    } else {
-      coalesce(colToFill, last(colToFill, true).over(w)).alias(colToFillName)
-    }
   }
 
   /**

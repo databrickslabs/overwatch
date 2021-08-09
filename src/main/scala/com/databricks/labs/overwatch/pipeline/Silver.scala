@@ -20,6 +20,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.stagesTarget,
       SilverTargets.tasksTarget,
       SilverTargets.clusterStateDetailTarget,
+      SilverTargets.poolsSpecTarget,
       SilverTargets.dbJobRunsTarget,
       SilverTargets.accountLoginTarget,
       SilverTargets.accountModTarget,
@@ -212,13 +213,20 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.dbJobRunsTarget)
   )
 
+  lazy private[overwatch] val poolsSpecModule = Module(2014, "Silver_PoolsSpec", this, Array(1004))
+  lazy private val appendPoolsSpecProcess = ETLDefinition(
+    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, auditLogsIncrementalCols),
+    Seq(),
+    append(SilverTargets.poolsSpecTarget)
+  )
+
   lazy private[overwatch] val clusterSpecModule = Module(2014, "Silver_ClusterSpec", this, Array(1004))
   lazy private val appendClusterSpecProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, auditLogsIncrementalCols),
     Seq(
       buildClusterSpec(
         BronzeTargets.clustersSnapshotTarget,
-        BronzeTargets.poolsTarget,
+        BronzeTargets.poolsSnapshotTarget,
         BronzeTargets.auditLogsTarget
       )),
     append(SilverTargets.clustersSpecTarget)
@@ -269,6 +277,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         modifiedAccountsModule.execute(appendModifiedAccountsProcess)
       }
       case OverwatchScope.notebooks => notebookSummaryModule.execute(appendNotebookSummaryProcess)
+      case OverwatchScope.pools => ???
       case OverwatchScope.clusters => clusterSpecModule.execute(appendClusterSpecProcess)
       case OverwatchScope.clusterEvents => clusterStateDetailModule.execute(appendClusterStateDetailProcess)
       case OverwatchScope.sparkEvents => {

@@ -18,7 +18,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     Array(
       BronzeTargets.jobsSnapshotTarget,
       BronzeTargets.clustersSnapshotTarget,
-      BronzeTargets.poolsTarget,
+      BronzeTargets.poolsSnapshotTarget,
       BronzeTargets.auditLogsTarget,
       BronzeTargets.auditLogAzureLandRaw,
       BronzeTargets.clusterEventsTarget,
@@ -48,7 +48,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendPoolsProcess = ETLDefinition(
     workspace.getPoolsDF,
     Seq(cleanseRawPoolsDF()),
-    append(BronzeTargets.poolsTarget)
+    append(BronzeTargets.poolsSnapshotTarget)
   )
 
   lazy private[overwatch] val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)

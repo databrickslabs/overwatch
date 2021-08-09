@@ -41,7 +41,7 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id")
     )
 
-    lazy private[overwatch] val poolsTarget: PipelineTable = PipelineTable(
+    lazy private[overwatch] val poolsSnapshotTarget: PipelineTable = PipelineTable(
       name = "pools_snapshot_bronze",
       _keys = Array("instance_pool_id", "Overwatch_RunID"),
       config,
@@ -222,6 +222,15 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
       partitionBy = Seq("organization_id", "state_start_date")
+    )
+
+    lazy private[overwatch] val poolsSpecTarget: PipelineTable = PipelineTable(
+      name = "pools_silver",
+      _keys = Array("instance_pool_id"),
+      config,
+      incrementalColumns = Array("timestamp"),
+      statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
+      partitionBy = Seq("organization_id")
     )
 
     lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable(
