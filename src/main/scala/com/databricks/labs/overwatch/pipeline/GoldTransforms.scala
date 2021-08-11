@@ -179,8 +179,9 @@ trait GoldTransforms extends SparkSessionWrapper {
    * with a value of null will be considered the active record. There must be only one active record per key and
    * there must be no gaps between dates. ActiveUntil expires on 06-01-2021 for node type X then there must be
    * another record with activeUntil beginning on 06-01-2021 and a null activeUntil for this validation to pass.
+   *
    * @param instanceDetails ETL table named instanceDetails referenced by the cloudDetail Target
-   * @param snapDate snapshot date of the pipeline "yyyy-MM-dd" format
+   * @param snapDate        snapshot date of the pipeline "yyyy-MM-dd" format
    */
   private def validateInstanceDetails(
                                        instanceDetails: DataFrame,
@@ -232,12 +233,65 @@ trait GoldTransforms extends SparkSessionWrapper {
       .otherwise(lit(null).cast("boolean"))
   }
 
+  /**
+   * Temporary nastiness necessary to handle edge cases of states between runs. This will go away in 0.5.1
+   * @param df
+   * @param timeFilter
+   * @return
+   */
+  private def getEventStates(df: DataFrame, timeFilter: Column): DataFrame = {
+    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+    val stateUnboundReverse = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
+    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
+    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
+    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull &&
+      lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
+
+    df
+      .selectExpr("*", "details.*")
+      .drop("details")
+      .filter(timeFilter)
+      .withColumn("rnk", rank().over(stateUnboundReverse))
+      .withColumn("rn", row_number().over(stateUnboundReverse))
+      .withColumn( // if incremental df doesn't have a running switch get it from latest previous state
+        "runningSwitch",
+        coalesce(getRunningSwitch('type))//, getRunningSwitch('last_state_previous_run))
+      )
+      .withColumn(
+        "previousSwitch",
+        when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))
+      )
+      // pull values forward to populate final state
+      // temp workaround until 0.5.1
+      .withColumn(
+        "invalidEventChainHandler",
+        when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
+      )
+      .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
+      .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
+      .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
+      .withColumn("isRunning",
+        when('imputedTerminationEvent, lit(false))
+          .otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
+      .withColumn(
+        "current_num_workers",
+        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
+      )
+      .withColumn(
+        "target_num_workers",
+        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+          .when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
+          .otherwise(coalesce('target_num_workers, 'current_num_workers))
+      )
+  }
+
   protected def buildClusterStateFact(
-                                      clusterEventsFullDF: DataFrame,
                                        instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
-                                       pipelineSnapTime: TimeTypes
+                                       pipelineSnapTime: TimeTypes,
+                                       fromTime: TimeTypes
                                      )(clusterEventsDF: DataFrame): DataFrame = {
     validateInstanceDetails(instanceDetails, pipelineSnapTime.asDTString)
 
@@ -265,57 +319,34 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
 
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
-    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
+    val stateUnboundReverse = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
 
     // get state before current run to init the running switch
     // Temporary fix until 0.5.1 when merges are enabled
-    val clusterStateBeforeRun = clusterEventsFullDF
-      .select(
-        'organization_id, 'cluster_id,
-        last('type, true).over(stateUnboundW).alias("last_state_previous_run")
+    val clusterStateBeforeRun = getEventStates(clusterEventsDF, 'timestamp < fromTime.asUnixTimeMilli)
+      .filter('rnk === 1) // get the latest state for each cluster
+      .withColumn("types", collect_set('type).over(stateUnboundReverse))
+      .withColumn("type",
+        // sometimes two events such as UPSIZE_COMPLETED and TERMINATING come with same timestamp
+        when(size('types) > 1 && array_contains('types, "TERMINATING"), lit("TERMINATING")) // when terminating state at same timestamp as other, capture terminating
+          .when(size('types) > 1 && !array_contains('types, "TERMINATING"), first('type).over(stateUnboundReverse)) // when other states do not include terminating, grab the latest value as best as possible
+          .otherwise('type) // when only single state, grab it
       )
-
-    // don't allow cluster to change state from running to running or vice-versa. When this occurs just set cluster
-    // to terminated and reset / restart.
-    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull &&
-      lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
-    val clusterEventsBaseline = clusterEventsDF
-      .selectExpr("*", "details.*")
-      .drop("details")
-      .join(clusterStateBeforeRun, Seq("organization_id", "cluster_id"), "left")
-      .withColumn( // if incremental df doesn't have a running switch get it from latest previous state
-        "runningSwitch",
-        coalesce(getRunningSwitch('type), getRunningSwitch('last_state_previous_run))
-      )
-      .withColumn(
-        "previousSwitch",
-        when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))
-      )
-      .withColumn(
-        "invalidEventChainHandler",
-        when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
-      )
-      .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
-      .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
-      .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
-      .withColumn("isRunning", when('imputedTerminationEvent, lit(false)).otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
-      .withColumn(
-        "current_num_workers",
-        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
-      )
-      .withColumn(
-        "target_num_workers",
-        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
-          .otherwise(coalesce('target_num_workers, 'current_num_workers))
-      )
+      .filter('rn === 1) // get the final state prior to this run
+      .filter('type =!= "TERMINATING") // if previous final state was terminating it was not removed from previous run so don't get it again
       .select(
         'organization_id, 'cluster_id, 'isRunning,
         'timestamp, 'type, 'current_num_workers, 'target_num_workers
       )
+
+    val clusterEventsForCurrentRun = getEventStates(clusterEventsDF, 'timestamp >= fromTime.asUnixTimeMilli)
+      .select(
+        'organization_id, 'cluster_id, 'isRunning,
+        'timestamp, 'type, 'current_num_workers, 'target_num_workers
+      )
+
+    val allClusterEventsInScope = clusterStateBeforeRun.unionByName(clusterEventsForCurrentRun)
 
     val nonBillableTypes = Array(
       "STARTING", "TERMINATING", "CREATING", "RESTARTING"
@@ -328,7 +359,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
       .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
 
-    val clusterPotential = clusterEventsBaseline
+    val clusterPotential = allClusterEventsInScope
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         nodeTypeLookup.toTSDF("timestamp", "organization_id", "cluster_id"),
@@ -354,6 +385,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("unixTimeMS_state_end", (lead('timestamp, 1).over(stateUnboundW) - lit(1))) // subtract 1 millis
       .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
       .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
+      .filter('unixTimeMS_state_end.isNotNull && 'type =!= "TERMINATING") // don't pull the last state for the cluster unless it's terminating
       .withColumn("uptime_in_state_S", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000))
       .withColumn("uptime_since_restart_S",
         coalesce(
@@ -405,8 +437,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
 
     // TODO - finish this logic for pricing compute by sku for a final dbuRate
-//    val derivedDBURate = when('isAutomated && 'spark_version.like("apache-spark-%"), 'jobsLightDBUPrice)
-//      .when('isAutomated && !'spark_version.like("apache-spark-%"), 'automatedDBUPrice)
+    //    val derivedDBURate = when('isAutomated && 'spark_version.like("apache-spark-%"), 'jobsLightDBUPrice)
+    //      .when('isAutomated && !'spark_version.like("apache-spark-%"), 'automatedDBUPrice)
 
 
     val clusterStateFactCols: Array[Column] = Array(
@@ -468,7 +500,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       val lookupCols: Array[Column] = Array(
         'cluster_name, 'custom_tags, 'unixTimeMS_state_start, 'unixTimeMS_state_end, 'timestamp_state_start,
         'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
-//        lit(interactiveDBUPrice).alias("interactiveDBUPrice"), lit(automatedDBUPrice).alias("automatedDBUPrice"),
+        //        lit(interactiveDBUPrice).alias("interactiveDBUPrice"), lit(automatedDBUPrice).alias("automatedDBUPrice"),
         $"driverSpecs.API_name".alias("driver_node_type_id"),
         $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
         $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
@@ -624,14 +656,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       val runStateWithUtilizationAndCosts = jobRunByClusterState
         .join(cumulativeRunStateRunTimeByRunState, Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start", "unixTimeMS_state_end"), "left")
         .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
-//        .withColumn("dbu_rate", when('cluster_type === "automated", 'automatedDBUPrice).otherwise('interactiveDBUPrice)) // removed 4.2
+        //        .withColumn("dbu_rate", when('cluster_type === "automated", 'automatedDBUPrice).otherwise('interactiveDBUPrice)) // removed 4.2
         .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time
         .withColumn("run_state_utilization",
           when('cluster_type === "interactive", least('runtime_in_cluster_state / 'cum_runtime_in_cluster_state, lit(1.0)))
             .otherwise(lit(1.0))
         ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
         .withColumn("overlapping_run_states", when('cluster_type === "interactive", 'overlapping_run_states).otherwise(lit(0)))
-//        .withColumn("overlapping_run_states", when('cluster_type === "automated", lit(0)).otherwise('overlapping_run_states)) // removed 4.2
+        //        .withColumn("overlapping_run_states", when('cluster_type === "automated", lit(0)).otherwise('overlapping_run_states)) // removed 4.2
         .withColumn("running_days", sequence($"job_runtime.startTS".cast("date"), $"job_runtime.endTS".cast("date")))
         .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
         .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'state_utilization_percent * 'run_state_utilization)
