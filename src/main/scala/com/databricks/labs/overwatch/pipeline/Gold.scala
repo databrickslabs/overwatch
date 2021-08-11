@@ -48,7 +48,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.cloudMachineDetail.asDF,
       BronzeTargets.clustersSnapshotTarget,
       SilverTargets.clustersSpecTarget,
-      pipelineSnapTime,
+      clusterStateFactModule.untilTime,
       clusterStateFactModule.fromTime
     )),
     append(GoldTargets.clusterStateFactTarget)

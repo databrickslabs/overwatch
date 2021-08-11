@@ -290,10 +290,10 @@ trait GoldTransforms extends SparkSessionWrapper {
                                        instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
-                                       pipelineSnapTime: TimeTypes,
+                                       untilTime: TimeTypes,
                                        fromTime: TimeTypes
                                      )(clusterEventsDF: DataFrame): DataFrame = {
-    validateInstanceDetails(instanceDetails, pipelineSnapTime.asDTString)
+    validateInstanceDetails(instanceDetails, untilTime.asDTString)
 
     val driverNodeDetails = instanceDetails
       .select('organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil,
@@ -302,7 +302,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
       .withColumn("activeUntilEpochMillis",
-        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
+        when('activeUntil.isNull, unix_timestamp(untilTime.asColumnTS) * 1000)
           .otherwise(unix_timestamp('activeUntil) * 1000)
       )
 
@@ -314,7 +314,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
       .withColumn("activeUntilEpochMillis",
-        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
+        when('activeUntil.isNull, unix_timestamp(untilTime.asColumnTS) * 1000)
           .otherwise(unix_timestamp('activeUntil) * 1000)
       )
 
