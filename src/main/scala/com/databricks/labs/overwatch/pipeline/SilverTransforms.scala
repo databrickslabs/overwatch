@@ -417,7 +417,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'ssh_public_keys,
       'cluster_source, 'spark_env_vars, 'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
-      'acl_path_prefix, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
+      'acl_path_prefix, 'driver_instance_pool_id, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
       'user_id, 'sourceIPAddress, 'single_user_name)
 
     auditRawDF
