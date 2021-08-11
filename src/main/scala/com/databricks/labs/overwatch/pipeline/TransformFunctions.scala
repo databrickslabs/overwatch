@@ -48,6 +48,33 @@ object TransformFunctions {
         .dropDupColumnByAlias("laggard", usingColumns: _*)
     }
 
+    def requireFields(fieldName: Seq[String]): DataFrame = requireFields(false, fieldName: _*)
+    def requireFields(fieldName: String*): DataFrame = requireFields(false, fieldName: _*)
+    def requireFields(caseSensitive: Boolean, fieldName: String*): DataFrame = {
+      fieldName.map(f => {
+        val fWithCase = if (caseSensitive) f else f.toLowerCase
+        try {
+          if (caseSensitive) {
+            df.schema.fields.map(_.name).find(_ == fWithCase).get
+          } else {
+            df.schema.fields.map(_.name.toLowerCase).find(_ == fWithCase).get
+          }
+        } catch {
+          case e: NoSuchElementException =>
+            val errMsg = s"MISSING REQUIRED FIELD: $fWithCase."
+            println(errMsg)
+            logger.log(Level.ERROR, errMsg, e)
+            throw new Exception(errMsg)
+          case e: _ =>
+            val errMsg = s"REQUIRED COLUMN FAILURE FOR: $fWithCase"
+            println(errMsg)
+            logger.log(Level.ERROR, errMsg, e)
+            throw new Exception(errMsg)
+        }
+      })
+      df
+    }
+
     def toTSDF(
                 timeSeriesColumnName: String,
                 partitionByColumnNames: String*

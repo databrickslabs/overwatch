@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.utils.asofJoin._
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
@@ -186,6 +187,7 @@ object TSDF {
              tsColumnName: String,
              partitionColNames: String*): TSDF = {
 
+    df.requireFields(tsColumnName +: partitionColNames)
     val colFinder = colByName(df) _
     val tsColumn = colFinder(tsColumnName)
     val partitionCols = partitionColNames.map(colFinder)
