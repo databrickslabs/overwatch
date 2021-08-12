@@ -122,8 +122,8 @@ class Database(config: Config) extends SparkSessionWrapper {
     streamManager
   }
 
-  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column): Boolean = {
-
+  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, applySparkOverrides: Boolean = true): Boolean = {
+    if (applySparkOverrides) target.applySparkOverrides()
     var finalDF: DataFrame = df
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF

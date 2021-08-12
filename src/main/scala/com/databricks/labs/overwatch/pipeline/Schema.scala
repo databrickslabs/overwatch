@@ -157,6 +157,7 @@ object Schema extends SparkSessionWrapper {
         StructField("spark_env_vars", StringType, nullable = true),
         StructField("spark_conf", StringType, nullable = true),
         StructField("acl_path_prefix", StringType, nullable = true),
+        StructField("driver_instance_pool_id", StringType, nullable = true),
         StructField("instance_pool_id", StringType, nullable = true),
         StructField("instance_pool_name", StringType, nullable = true),
         StructField("spark_version", StringType, nullable = true),
