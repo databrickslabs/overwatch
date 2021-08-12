@@ -16,7 +16,7 @@ and tables and manages all spark parameters and optimization requirements to ope
 and the job run setup, Overwatch runs best as a black box -- enable it and forget about it.
 
 ## Cluster Requirements
-* DBR 7.3+ (7.6 preferred)
+* DBR 7.3 - 7.x (7.6 preferred) not regularly tested on DBR 8+ until next LTS release.
 * Add the relevant [dependencies](#cluster-dependencies)
 * Azure - Spot Instances not yet tested
 

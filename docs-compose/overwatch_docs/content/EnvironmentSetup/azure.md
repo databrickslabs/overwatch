@@ -146,10 +146,10 @@ technical requirement is that the data in the storage account is accessible from
 ![storage3](/images/EnvironmentSetup/storage_acc_3.png)
 ![storage4](/images/EnvironmentSetup/storage_acc_4.png)
 ### Step 4
-You may choose any options you prefer here. Note that soft-deletion of BLOBs may have a negative performance impact. 
-Moreover, it may result in job failures depending on eventual consistency rules and timeframe between Overwatch actions.
-It's recommended that you do not enable soft deletes for Hierarchical namespace at this time for the Overwatch 
-storage account as it has not been fully tested. Container soft deletes are fine you you desire them.
+You may choose any options you prefer here. Note that soft-deletion of BLOBs cannot be mounted to the Databricks 
+workspace and is considered an experimental feature.
+It's recommended that you do NOT enable BlOB soft deletes at this time for the Overwatch 
+storage account as it has not been fully tested. Container soft deletes are fine.
 ![storage5](/images/EnvironmentSetup/storage_acc_5.png)
 ### Step 5
 Add relevant tags and create

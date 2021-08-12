@@ -4,6 +4,17 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.5.0.3
+Bug Fixes
+* Incremental input sources returning 0 rows when users run Overwatch multiple times in the same day
+* Incremental clusterStateFactGold -- addresses orphaned events for long-running states across Overwatch Runs.
+* null driver node types for pooled drivers
+* Improved instance pool lookup logic
+* Mixed instance pools enabled
+* basic refactoring for sparkOverrides -- full refactor in 0.5.1
+* Improved logging
+* Costing - node details lookups for edge cases -- there was a bug in the join condition for users running Overwatch multiple times per day in the same workspace
+
 ## 0.5.0.2
 **If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
 * Hotfix release to resolve [Issue 179](https://github.com/databrickslabs/overwatch/issues/179).
