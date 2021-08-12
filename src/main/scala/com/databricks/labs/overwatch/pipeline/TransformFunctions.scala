@@ -49,7 +49,6 @@ object TransformFunctions {
     }
 
     def requireFields(fieldName: Seq[String]): DataFrame = requireFields(false, fieldName: _*)
-    def requireFields(fieldName: String*): DataFrame = requireFields(false, fieldName: _*)
     def requireFields(caseSensitive: Boolean, fieldName: String*): DataFrame = {
       fieldName.map(f => {
         val fWithCase = if (caseSensitive) f else f.toLowerCase
@@ -65,7 +64,7 @@ object TransformFunctions {
             println(errMsg)
             logger.log(Level.ERROR, errMsg, e)
             throw new Exception(errMsg)
-          case e: _ =>
+          case e =>
             val errMsg = s"REQUIRED COLUMN FAILURE FOR: $fWithCase"
             println(errMsg)
             logger.log(Level.ERROR, errMsg, e)
