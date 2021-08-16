@@ -41,6 +41,7 @@ case class PipelineTable(
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var currentSparkOverrides: Map[String, String] = sparkOverrides
+  logger.log(Level.INFO, s"Spark Overrides Initialized for target: ${_databaseName}.${name} to\n${currentSparkOverrides.mkString(", ")}")
 
   import spark.implicits._
 
@@ -76,15 +77,17 @@ case class PipelineTable(
    *
    * @param updates spark conf updates
    */
-  private[overwatch] def setSparkOverrides(updates: Map[String, String] = Map()): Unit = {
+  private[overwatch] def applySparkOverrides(updates: Map[String, String] = Map()): Unit = {
 
     if (autoOptimize) {
+      logger.log(Level.INFO, s"enabling optimizeWrite on $tableFullName")
       spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
       if (config.debugFlag) println(s"Setting Auto Optimize for ${name}")
     }
     else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
 
     if (autoCompact) {
+      logger.log(Level.INFO, s"enabling autoCompact on $tableFullName")
       spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
       if (config.debugFlag) println(s"Setting Auto Compact for ${name}")
     }
@@ -93,8 +96,11 @@ case class PipelineTable(
     if (updates.nonEmpty) {
       currentSparkOverrides = currentSparkOverrides ++ updates
     }
-    if (sparkOverrides.nonEmpty && updates.isEmpty) {
+
+    if (currentSparkOverrides.nonEmpty) {
       PipelineFunctions.setSparkOverrides(spark, currentSparkOverrides, config.debugFlag)
+    } else {
+      logger.log(Level.INFO, s"USING spark conf defaults for $tableFullName")
     }
   }
 
@@ -215,16 +221,24 @@ case class PipelineTable(
         field.dataType match {
           case dt: DateType => {
             if (!partitionBy.map(_.toLowerCase).contains(field.name.toLowerCase)) {
-              val errmsg = s"Date filters are inclusive on both sides and are used for paritioning. Date filters " +
+              val errmsg = s"Date filters are inclusive on both sides and are used for partitioning. Date filters " +
                 s"should not be used in the Overwatch package alone. Date filters must be accompanied by a more " +
                 s"granular filter to utilize df.asIncrementalDF.\nERROR: ${field.name} not in partition columns: " +
                 s"${partitionBy.mkString(", ")}"
               throw new IncompleteFilterException(errmsg)
             }
+            // If Overwatch runs > 1X / day the date filter must be inclusive or filter will omit all data since
+            // the following cannot be true
+            // date >= today && date < today
+            // The above right-side exclusive filter is created from the filter generator thus one tick must be
+            // added to the right (end) date
+            val untilDate = if (module.fromTime.asLocalDateTime.toLocalDate == module.untilTime.asLocalDateTime.toLocalDate) {
+              PipelineFunctions.addNTicks(module.untilTime.asColumnTS, 1, DateType)
+            } else module.untilTime.asColumnTS
             IncrementalFilter(
               field,
               date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
-              module.untilTime.asColumnTS.cast(dt)
+              untilDate.cast(dt)
             )
           }
           case dt: TimestampType => {
@@ -266,7 +280,6 @@ case class PipelineTable(
   }
 
   def writer(df: DataFrame): Any = {
-    setSparkOverrides()
     if (checkpointPath.nonEmpty) {
       val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
       if (config.debugFlag) println(streamWriterMessage)
