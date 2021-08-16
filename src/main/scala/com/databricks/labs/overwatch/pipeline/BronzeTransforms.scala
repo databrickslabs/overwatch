@@ -149,7 +149,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     runID: String
                                    ): DataFrame = {
 
-    val connectionString = ConnectionStringBuilder(ehConfig.getConnectionString)
+    val connectionString = ConnectionStringBuilder(PipelineFunctions.parseEHConnectionString(ehConfig.connectionString))
       .setEventHubName(ehConfig.eventHubName)
       .build
 

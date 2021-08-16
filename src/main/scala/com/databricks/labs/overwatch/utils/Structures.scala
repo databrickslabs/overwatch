@@ -63,20 +63,7 @@ case class AzureAuditLogEventhubConfig(
                                         maxEventsPerTrigger: Int = 10000,
                                         auditRawEventsChk: Option[String] = None,
                                         auditLogChk: Option[String] = None
-                                      ) {
-  //  the secret specification has a form of {{secrets/scope/key}}
-  //  https://docs.databricks.com/security/secrets/secrets.html#store-the-path-to-a-secret-in-a-spark-configuration-property
-  def getConnectionString: String = {
-    val secretsRE = "\\{\\{secrets/([^/]+)/([^}]+)\\}\\}".r
-
-    secretsRE.findFirstMatchIn(connectionString) match {
-      case Some(i) =>
-        dbutils.secrets.get(i.group(1), i.group(2))
-      case None =>
-        connectionString
-    }
-  }
-}
+                                      )
 
 case class AuditLogConfig(
                            rawAuditPath: Option[String] = None,
