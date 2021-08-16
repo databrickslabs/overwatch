@@ -66,6 +66,7 @@ additional details on config customization options see [**configuration**]({{%re
 **Example Notebooks:**
 The following notebooks will demonstrate a typical best practice for multi-workspace (and stand-alone) configurations. 
 Simply populate the necessary variables for your environment.
+* AZURE ([HTML 0.5.0.4+](/assets/GettingStarted/azure_runner_docs_example_0504.html) / [DBC 0.5.0.4+](/assets/GettingStarted/azure_runner_docs_example_0504.dbc))
 * AWS ([HTML 0.4.2+](/assets/GettingStarted/aws_runner_docs_example_042.html) / [DBC 0.4.2+](/assets/GettingStarted/aws_runner_docs_example_042.dbc))
 * AZURE ([HTML 0.4.2+](/assets/GettingStarted/azure_runner_docs_example_042.html) / [DBC 0.4.2+](/assets/GettingStarted/azure_runner_docs_example_042.dbc))
 * AWS ([HTML PRE 0.4.2](/assets/GettingStarted/aws_runner_docs_example_041.html) / [DBC PRE 0.4.2](/assets/GettingStarted/aws_runner_docs_example_041.dbc))
@@ -171,6 +172,10 @@ Gold(workspace).run()
 ```
 
 ### Executing Overwatch via Main Class
+{{% notice note %}}
+**AZURE** Must use version 0.5.0.4 or later so as not to pass EH connection string credentials into arguments in 
+clear text.
+{{% /notice %}}
 The Main class version does the same thing as the notebook version the difference is just how it's kicked off and
 configured. The tricky party about the main class is that the parameters must be passed in as a json array of a strings 
 with one length and escaped. The "OverwatchParams" object gets serialized and passed into the args of the Main Class. To

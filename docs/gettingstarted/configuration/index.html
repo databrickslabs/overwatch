@@ -12,21 +12,21 @@
     <title>Configuration :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1629117256" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1629117256" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1629117256" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1629117256" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1629117256" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1629117256" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1629117256" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1629117256" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1629117256" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1629136183" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1629136183" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1629136183" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1629136183" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1629136183" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1629136183" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1629136183" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1629136183" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1629136183" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1629117256" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1629136183" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1629117256"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1629136183"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1629117256"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1629117256"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1629136183"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1629136183"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1629117256"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1629136183"></script>
 
     
   </div>
@@ -596,11 +596,14 @@ can be found <a href="https://databrickslabs.github.io/overwatch/assets/GettingS
 <span style="color:#f92672">)</span>
 
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> tokenSecret <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">TokenSecret</span><span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> dbPATKey<span style="color:#f92672">)</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> ehConnString <span style="color:#66d9ef">=</span> dbutils<span style="color:#f92672">.</span>secrets<span style="color:#f92672">.</span>get<span style="color:#f92672">(</span>secretsScope<span style="color:#f92672">,</span> ehKey<span style="color:#f92672">)</span>
+<span style="color:#75715e">// as of 0.5.0.4 -- previous methods still functional but not recommended
+</span><span style="color:#75715e">// use the format exactly replacing &#34;scope&#34; and &#34;key&#34; with the names of the scope and key where your 
+</span><span style="color:#75715e">// Event Hub connection string is stored.
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> ehConnScopeKeyString <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;{{secrets/scope/key}}&#34;</span>
 
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> ehStatePath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/ehState&#34;</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> badRecordsPath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/sparkEventsBadrecords&#34;</span>
-<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> azureLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AzureAuditLogEventhubConfig</span><span style="color:#f92672">(</span>connectionString <span style="color:#66d9ef">=</span> ehConnString<span style="color:#f92672">,</span> eventHubName <span style="color:#66d9ef">=</span> ehName<span style="color:#f92672">,</span> auditRawEventsPrefix <span style="color:#66d9ef">=</span> ehStatePath<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> azureLogConfig <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">AzureAuditLogEventhubConfig</span><span style="color:#f92672">(</span>connectionString <span style="color:#66d9ef">=</span> ehConnScopeKeyString<span style="color:#f92672">,</span> eventHubName <span style="color:#66d9ef">=</span> ehName<span style="color:#f92672">,</span> auditRawEventsPrefix <span style="color:#66d9ef">=</span> ehStatePath<span style="color:#f92672">)</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> interactiveDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.56</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> automatedDBUPrice <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.26</span>
 <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> <span style="color:#a6e22e">DatabricksSQLDBUPrice</span> <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">0.22</span>
@@ -617,8 +620,8 @@ can be found <a href="https://databrickslabs.github.io/overwatch/assets/GettingS
   primordialDateString <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>primordialDateString<span style="color:#f92672">),</span>
   intelligentScaling <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">IntelligentScaling</span><span style="color:#f92672">(</span>enabled <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">,</span> minimumCores <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">16</span><span style="color:#f92672">,</span> maximumCores <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">64</span><span style="color:#f92672">,</span> coeff <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">1.0</span><span style="color:#f92672">)</span>
 <span style="color:#f92672">)</span>
-</code></pre></div><p><strong>NOTE</strong> The connection string stored in the <em>ehConnString</em> above is stored as a secret since it contains a key. 
-<strong>THIS IS NOT THE KEY</strong> but the actual connection string from the SAS Policy. To find this follow the path in the 
+</code></pre></div><p><strong>NOTE</strong> The connection string stored in the <em>ehConnScopeKeyString</em> above is stored as a secret since it contains a key.</p>
+<p><strong>THIS IS NOT THE KEY</strong> but the actual connection string from the SAS Policy. To find this follow the path in the 
 Azure portal below.</p>
 <p>eh-namespace &ndash;&gt; eventhub &ndash;&gt; shared access policies &ndash;&gt; Connection String-primary key</p>
 <p>The connection string should begin with <code>Endpoing=sb://</code>. Note that the policy only needs the Listen permission</p>
@@ -875,7 +878,7 @@ Eventhub streaming environment configurations</p>
 <td style="text-align:left">Y</td>
 <td style="text-align:left">NA</td>
 <td style="text-align:left">String</td>
-<td style="text-align:left">Retrieve from Azure Portal Event Hub</td>
+<td style="text-align:left">Should be stored in a secret. The value format here should be {{secrets/scope/key}}. Replace <em>scope</em> and <em>key</em> with the names of the scope and key where the EventHub connection string with primary key is stored.</td>
 </tr>
 <tr>
 <td style="text-align:left"><strong>eventHubName</strong></td>
@@ -1281,19 +1284,19 @@ Eventhub streaming environment configurations</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1629117256"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1629117256"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1629117256"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1629117256"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1629117256"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1629117256"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1629136183"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1629136183"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1629136183"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1629136183"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1629136183"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1629136183"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1629117256"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1629117256"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1629117256"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1629136183"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1629136183"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1629136183"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1629117256" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1629117256"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1629136183" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1629136183"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
