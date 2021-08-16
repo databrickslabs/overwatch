@@ -68,11 +68,14 @@ private val dataTarget = DataTarget(
 )
 
 private val tokenSecret = TokenSecret(secretsScope, dbPATKey)
-private val ehConnString = dbutils.secrets.get(secretsScope, ehKey)
+// as of 0.5.0.4 -- previous methods still functional but not recommended
+// use the format exactly replacing "scope" and "key" with the names of the scope and key where your 
+// Event Hub connection string is stored.
+private val ehConnScopeKeyString = "{{secrets/scope/key}}"
 
 private val ehStatePath = s"${storagePrefix}/${workspaceID}/ehState"
 private val badRecordsPath = s"${storagePrefix}/${workspaceID}/sparkEventsBadrecords"
-private val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = ehName, auditRawEventsPrefix = ehStatePath)
+private val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnScopeKeyString, eventHubName = ehName, auditRawEventsPrefix = ehStatePath)
 private val interactiveDBUPrice = 0.56
 private val automatedDBUPrice = 0.26
 private val DatabricksSQLDBUPrice = 0.22
@@ -91,7 +94,8 @@ val params = OverwatchParams(
 )
 ```
 
-**NOTE** The connection string stored in the *ehConnString* above is stored as a secret since it contains a key. 
+**NOTE** The connection string stored in the *ehConnScopeKeyString* above is stored as a secret since it contains a key. 
+
 **THIS IS NOT THE KEY** but the actual connection string from the SAS Policy. To find this follow the path in the 
 Azure portal below.
 
@@ -194,7 +198,7 @@ Eventhub streaming environment configurations
 
 Config | Required Override | Default Value | Type | Description
 :--------------------------|:---|:----------|:----------|:--------------------------------------------------
-**connectionString**|Y|NA|String|Retrieve from Azure Portal Event Hub
+**connectionString**|Y|NA|String|Should be stored in a secret. The value format here should be {{secrets/scope/key}}. Replace *scope* and *key* with the names of the scope and key where the EventHub connection string with primary key is stored.
 **eventHubName**|Y|NA|String|Retrieve from Azure Portal Event Hub
 **auditRawEventsPrefix**|Y|NA|String|Path prefix for checkpoint directories
 **maxEventsPerTrigger**|N|10000|Int|Events to pull for each trigger, this should be increased during initial cold runs or runs that have very large numbers of audit log events.

@@ -94,7 +94,8 @@ your log delivery similar to the example in the image below.
 
 Additionally, ensure that the Overwatch account has sufficient privileges to read data from the Event Hub\[s\] created
 above. A common method for providing Overwatch access to the Event Hub is to simply capture the connection string 
-and store it as a [secret](https://docs.databricks.com/security/secrets/index.html). 
+and store it as a [secret](https://docs.databricks.com/security/secrets/index.html). Proper ways for accessing this 
+will be in the getting started and configuration sections.
 There are many methods through which to authorize Overwatch, just ensure it has the access to read from the Event Hub Stream.
 
 {{% notice warning %}}
