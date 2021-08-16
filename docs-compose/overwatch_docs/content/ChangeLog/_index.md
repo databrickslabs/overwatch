@@ -5,7 +5,25 @@ weight: 4
 ---
 
 ## 0.5.0.3
-Bug Fixes
+{{% notice warning %}}
+**BUG FOR NEW DEPLOYMENTS**
+When using 0.5.0.3 for a brand new deployment, a duplicate key was left in a static
+table causing a couple of gold layer costing tables to error out. If this is your first run, the following is
+a fix until 0.5.0.4 comes out with the fix.
+{{% /notice %}}
+
+* [Initialize the Environment]({{%relref "GettingStarted/"%}}#initializing-the-environment) -- note this is the standard
+  getting started process. The only difference is to stop after Bronze(workspace) and not continue.
+  * Execute through "Bronze(workspace)" **DO NOT RUN THE PIPELINE** (i.e. Don't use Bronze(workspace).run()), just 
+  initialize it.
+* Execute the following command in SQL to delete the single offending row. Remember to replace <overwatch_etl> with your
+  configured ETL database
+```sql
+delete from <overwatch_etl>.instancedetails where API_Name = 'Standard_E4as_v4' and On_Demand_Cost_Hourly = 0.1482
+```
+* Resume standard workflow
+
+**Bug Fixes**
 * Incremental input sources returning 0 rows when users run Overwatch multiple times in the same day
 * Incremental clusterStateFactGold -- addresses orphaned events for long-running states across Overwatch Runs.
 * null driver node types for pooled drivers
