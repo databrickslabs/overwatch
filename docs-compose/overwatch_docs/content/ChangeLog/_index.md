@@ -4,6 +4,11 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.5.0.4
+* Patch fix for [Issue_196](https://github.com/databrickslabs/overwatch/issues/196)
+* AZURE - Enhancement - Enable full EH configuration to be passed through the job arguments to the main class using 
+secrets / scopes -- [Issue_197](https://github.com/databrickslabs/overwatch/issues/197)
+
 ## 0.5.0.3
 {{% notice warning %}}
 **BUG FOR NEW DEPLOYMENTS**
