@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.utils.{AuditLogConfig, AzureAuditLogEventhubConfig, DatabricksContractPrices, IntelligentScaling, OverwatchParams}
+import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule

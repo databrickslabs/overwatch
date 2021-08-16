@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.utils.{ApiEnv, Config, SparkSessionWrapper}
-import org.apache.log4j.{Level, Logger}
+import org.apache.log4j.Logger
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 

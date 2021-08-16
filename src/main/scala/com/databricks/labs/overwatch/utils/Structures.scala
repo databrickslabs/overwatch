@@ -3,17 +3,16 @@ package com.databricks.labs.overwatch.utils
 import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.validation.SnapReport
 import org.apache.log4j.Level
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types.{StructField, StructType}
+
+import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
-import java.sql.Timestamp
-
-import com.databricks.labs.overwatch.validation.SnapReport
 
 case class DBDetail()
 

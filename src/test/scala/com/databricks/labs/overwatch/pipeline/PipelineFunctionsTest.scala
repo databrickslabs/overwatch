@@ -1,16 +1,13 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
-import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Frequency, IncrementalFilter}
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.{Column, SQLContext}
+import org.apache.spark.sql.execution.streaming.MemoryStream
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
 import org.scalatest.funspec.AnyFunSpec
-import org.apache.spark.sql.execution.streaming.MemoryStream
-import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.Column
 
 class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
 
