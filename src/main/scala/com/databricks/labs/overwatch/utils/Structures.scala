@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.utils
 import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.Level
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.ScalaReflection
@@ -62,13 +63,27 @@ case class AzureAuditLogEventhubConfig(
                                         maxEventsPerTrigger: Int = 10000,
                                         auditRawEventsChk: Option[String] = None,
                                         auditLogChk: Option[String] = None
-                                      )
+                                      ) {
+  //  the secret specification has a form of {{secrets/scope/key}}
+  //  https://docs.databricks.com/security/secrets/secrets.html#store-the-path-to-a-secret-in-a-spark-configuration-property
+  def getConnectionString: String = {
+    val secretsRE = "\\{\\{secrets/([^/]+)/([^}]+)\\}\\}".r
+
+    secretsRE.findFirstMatchIn(connectionString) match {
+      case Some(i) =>
+        dbutils.secrets.get(i.group(1), i.group(2))
+      case None =>
+        connectionString
+    }
+  }
+}
 
 case class AuditLogConfig(
                            rawAuditPath: Option[String] = None,
                            auditLogFormat: String = "json",
                            azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None
                          )
+
 case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
 
 case class OverwatchParams(auditLogConfig: AuditLogConfig,
@@ -144,7 +159,9 @@ case class SimplifiedModuleStatusReport(
                                        )
 
 case class IncrementalFilter(cronField: StructField, low: Column, high: Column)
+
 case class UpgradeReport(db: String, tbl: String, errorMsg: Option[String])
+
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
   val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value
