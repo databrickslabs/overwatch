@@ -1,7 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
 import org.scalatest.funspec.AnyFunSpec
-import org.scalatest.PrivateMethodTester._
 
 class ConfigTest extends AnyFunSpec {
 

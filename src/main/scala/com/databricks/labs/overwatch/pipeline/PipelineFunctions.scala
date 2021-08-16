@@ -1,18 +1,37 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, Frequency, IncrementalFilter}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+
 import java.net.URI
 
 object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   private val uriSchemeRegex = "^([a-zA-Z][-.+a-zA-Z0-9]*):/.*".r
+
+  /**
+   * parses the value for the connection string from the scope/key defined if the pattern matches {{secrets/scope/key}}
+   * otherwise return the true string value
+   * https://docs.databricks.com/security/secrets/secrets.html#store-the-path-to-a-secret-in-a-spark-configuration-property
+   * @param connectionString
+   * @return
+   */
+  def parseEHConnectionString(connectionString: String): String = {
+    val secretsRE = "\\{\\{secrets/([^/]+)/([^}]+)\\}\\}".r
+
+    secretsRE.findFirstMatchIn(connectionString) match {
+      case Some(i) =>
+        dbutils.secrets.get(i.group(1), i.group(2))
+      case None =>
+        connectionString
+    }
+  }
 
   /**
    * Ensure no duplicate slashes in path and default to dbfs:/ URI prefix where no uri specified to result in

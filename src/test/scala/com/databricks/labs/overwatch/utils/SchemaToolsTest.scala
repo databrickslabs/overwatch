@@ -1,7 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
-import org.apache.spark.sql.functions.col
 import org.scalatest.funspec.AnyFunSpec
 
 class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper {

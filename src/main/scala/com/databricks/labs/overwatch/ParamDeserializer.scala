@@ -7,9 +7,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode}
 
 import java.io.IOException
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
-import collection.JavaConverters._
 
 /**
  * Custom deserializer to convert json string coming from jobs main class into validated, strongly typed object

@@ -3,16 +3,16 @@ package com.databricks.labs.overwatch.utils
 import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
+import com.databricks.labs.overwatch.validation.SnapReport
 import org.apache.log4j.Level
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types.{StructField, StructType}
+
+import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.Date
-import java.sql.Timestamp
-
-import com.databricks.labs.overwatch.validation.SnapReport
 
 case class DBDetail()
 
@@ -69,6 +69,7 @@ case class AuditLogConfig(
                            auditLogFormat: String = "json",
                            azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None
                          )
+
 case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
 
 case class OverwatchParams(auditLogConfig: AuditLogConfig,
@@ -144,7 +145,9 @@ case class SimplifiedModuleStatusReport(
                                        )
 
 case class IncrementalFilter(cronField: StructField, low: Column, high: Column)
+
 case class UpgradeReport(db: String, tbl: String, errorMsg: Option[String])
+
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
   val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value
