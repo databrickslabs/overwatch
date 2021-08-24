@@ -412,13 +412,35 @@ trait SilverTransforms extends SparkSessionWrapper {
         .when('actionName =!= "create" && 'cluster_id.isNull, 'clusterId)
         .otherwise('cluster_id).alias("cluster_id"),
       when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
-      'clusterState.alias("cluster_state"), 'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
-      'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
-      'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'ssh_public_keys,
-      'cluster_source, 'spark_env_vars, 'spark_conf,
+      'clusterState.alias("cluster_state"),
+      'driver_node_type_id,
+      'node_type_id,
+      'num_workers,
+      'autoscale,
+      'clusterWorkers.alias("actual_workers"),
+      'autotermination_minutes,
+      'enable_elastic_disk,
+      'start_cluster,
+      'clusterOwnerUserId,
+      'cluster_log_conf,
+      'init_scripts,
+      'custom_tags,
+      'ssh_public_keys,
+      'cluster_source,
+      'spark_env_vars,
+      'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
-      'acl_path_prefix, 'driver_instance_pool_id, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
-      'user_id, 'sourceIPAddress, 'single_user_name)
+      'acl_path_prefix,
+      'driver_instance_pool_id,
+      'instance_pool_id,
+      'instance_pool_name,
+      'spark_version,
+      'cluster_creator,
+      'idempotency_token,
+      'user_id,
+      'sourceIPAddress,
+      'single_user_name
+    )
 
     auditRawDF
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
@@ -451,45 +473,46 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val clusterBaseDF = clusterBase(df)
 
-    val driverPoolSnapLookup, workerPoolSnapLookup: Option[DataFrame] = if (pools_snapshot.exists) {
+    val (driverPoolSnapLookup: Option[DataFrame], workerPoolSnapLookup: Option[DataFrame]) = if (pools_snapshot.exists) {
       val poolSnapBase = pools_snapshot.asDF
         .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
       (
-        poolSnapBase.select(
+        Some(poolSnapBase.select(
           'timestamp, 'organization_id,
           'instance_pool_id.alias("driver_instance_pool_id"),
           'instance_pool_name.alias("pool_snap_driver_instance_pool_name"),
-          'node_type_id.alias("pool_snap_driver_node_type")),
-        poolSnapBase.select(
+          'node_type_id.alias("pool_snap_driver_node_type"))),
+        Some(poolSnapBase.select(
           'timestamp, 'organization_id,
           'instance_pool_id,
           'instance_pool_name.alias("pool_snap_instance_pool_name"),
           'node_type_id.alias("pool_snap_node_type"))
-      )
+      ))
     }  else (None, None)
 
-    val driverPoolLookup, workerPoolLookup: Option[DataFrame] = if ( // if instance pools found in audit logs
+
+    val (driverPoolLookup: Option[DataFrame], workerPoolLookup: Option[DataFrame]) = if ( // if instance pools found in audit logs
       !auditRawTable.asDF
         .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit")).isEmpty) {
       val basePoolsDF = auditRawTable.asDF
         .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
       (
-        basePoolsDF.select(
+        Some(basePoolsDF.select(
           'timestamp, 'organization_id,
           when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id"))
             .otherwise($"requestParams.instance_pool_id") // actionName == edit
             .alias("driver_instance_pool_id"),
           $"requestParams.instance_pool_name".alias("driver_instance_pool_name"),
           $"requestParams.node_type_id".alias("pool_driver_node_type")
-        ),
-        basePoolsDF.select(
+        )),
+        Some(basePoolsDF.select(
           'timestamp, 'organization_id,
           when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id"))
             .otherwise($"requestParams.instance_pool_id") // actionName == edit
             .alias("instance_pool_id"),
           $"requestParams.instance_pool_name",
           $"requestParams.node_type_id".alias("pool_node_type")
-        )
+        ))
       )
     } else (None, None)
 
@@ -575,7 +598,13 @@ trait SilverTransforms extends SparkSessionWrapper {
           driverPoolLookup.get
             .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         ).df
-    } else clusterBaseDF.filter('actionName.isin("create", "edit"))
+    } else { // driver pool does not exist -- filter and add null lookup cols
+      clusterBaseDF.filter('actionName.isin("create", "edit"))
+        .withColumn("driver_instance_pool_id", lit(null))
+        .withColumn("driver_instance_pool_name", lit(null))
+        .withColumn("pool_driver_node_type", lit(null))
+        .withColumn("pool_node_type", lit(null))
+    }
 
     // lookup pools node types from pools snapshots when snapshots exist
     val clusterBaseWithPoolsAndSnapPools = if (driverPoolSnapLookup.nonEmpty) {
@@ -590,7 +619,13 @@ trait SilverTransforms extends SparkSessionWrapper {
           driverPoolSnapLookup.get
             .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         ).df
-    } else clusterBaseWithPools
+    } else {
+      clusterBaseWithPools
+        .withColumn("pool_snap_driver_instance_pool_name", lit(null))
+        .withColumn("pool_snap_driver_node_type", lit(null))
+        .withColumn("pool_snap_instance_pool_name", lit(null))
+        .withColumn("pool_snap_node_type", lit(null))
+    }
 
 
     clusterBaseWithPoolsAndSnapPools
