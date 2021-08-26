@@ -777,10 +777,7 @@ trait SilverTransforms extends SparkSessionWrapper {
      * but for now, this is required or multiple records will be created in the fact due to the multiple events.
      * Confirmed that the first event emitted is the correct event as per ES-65402
      */
-    val firstRunSubmitW = Window.partitionBy('runId).orderBy('timestamp)
-    val firstCompletionW = Window.partitionBy('runId).orderBy('timestamp)
-    val firstRunStartW = Window.partitionBy('runId).orderBy('timestamp)
-    val firstCancellationW = Window.partitionBy('run_id).orderBy('timestamp)
+    val firstRunSemanticsW = Window.partitionBy('runId).orderBy('timestamp)
 
     // Completes must be >= etlStartTime as it is the driver endpoint
     // All joiners to Completes may be from the past up to N days as defined in the incremental df
@@ -788,8 +785,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     val allCompletes = jobsAuditIncremental
       .filter('date >= etlStartTime.cast("date") && 'timestamp >= lit(etlStartEpochMS))
       .filter('actionName.isin("runSucceeded", "runFailed"))
-      .withColumn("rnk", rank().over(firstCompletionW))
-      .withColumn("rn", row_number().over(firstCompletionW))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .select(
         'serviceName, 'actionName,
@@ -809,8 +806,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Identify all cancelled jobs in scope for this overwatch run
     val allCancellations = jobsAuditIncremental
       .filter('actionName.isin("cancel"))
-      .withColumn("rnk", rank().over(firstCancellationW))
-      .withColumn("rn", row_number().over(firstCancellationW))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
@@ -827,6 +824,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     // DF for jobs launched with actionName == "runNow"
     val runNowStart = jobsAuditIncremental
       .filter('actionName.isin("runNow"))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
+      .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
         get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
@@ -855,8 +855,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     val runSubmitStart = jobsAuditIncremental
       .filter('actionName.isin("submitRun"))
       .withColumn("runId", get_json_object($"response.result", "$.run_id").cast("long"))
-      .withColumn("rnk", rank().over(firstRunSubmitW))
-      .withColumn("rn", row_number().over(firstRunSubmitW))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
@@ -889,8 +889,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Find the corresponding runStart action for the completed jobs
     val runStarts = jobsAuditIncremental
       .filter('actionName.isin("runStart"))
-      .withColumn("rnk", rank().over(firstRunStartW))
-      .withColumn("rn", row_number().over(firstRunStartW))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
