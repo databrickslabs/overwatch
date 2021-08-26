@@ -10,6 +10,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, DataFrame}
 
+//noinspection ScalaCustomHdfsFormat
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
 //  also add ruleStrategy: Enum(Kill, Quarantine, Ignore) to determine when to require them
 //  Perhaps add the strategy into the Rule definition in the Rules Engine
@@ -123,8 +124,33 @@ case class PipelineTable(
 //  DeltaTable.forName(tableFullName).
   val tableLocation: String = s"${config.etlDataPathPrefix}/$name".toLowerCase
 
+  /**
+   * default catalog only validation
+   * @return
+   */
   def exists: Boolean = {
-    spark.catalog.tableExists(tableFullName)
+//    spark.catalog.tableExists(tableFullName)
+    exists(pathValidation = true)
+  }
+
+  /**
+   * Does a table exists as defined by
+   * @param pathValidation does the path exist for the source -- even if the catalog table does not
+   * @param dataValidation is data present for this organizationId (workspaceId) in the source
+   * @param catalogValidation does the catalog table exist for this source -- even if the path does not or is empty
+   * @return
+   */
+  def exists(pathValidation: Boolean = false, dataValidation: Boolean = false, catalogValidation: Boolean = false): Boolean = {
+    var entityExists = true
+    if (pathValidation || dataValidation) entityExists = Helpers.pathExists(tableLocation)
+    if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)
+    if (dataValidation && entityExists) { // if other validation is enabled it must first pass those for this test to be attempted
+      // opposite -- when result is empty source data does not exist
+      entityExists = !spark.read.format("delta").load(tableLocation)
+        .filter(col("organization_id") === config.organizationId)
+        .isEmpty
+    } else entityExists = false
+    entityExists
   }
 
   def keys: Array[String] = keys()
@@ -141,20 +167,23 @@ case class PipelineTable(
   }
 
   def asDF(withGlobalFilters: Boolean = true): DataFrame = {
+    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters. Will attempt to continue"
     try {
       if (exists) {
         val fullDF = if (withMasterMinimumSchema) { // infer master schema if true and available
           logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for $tableFullName")
-          spark.table(tableFullName).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
-        } else spark.table(tableFullName)
+          spark.read.format(format).load(tableLocation).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
+        } else spark.read.format(format).load(tableLocation)
         if (withGlobalFilters && config.globalFilters.nonEmpty)
           PipelineFunctions.applyFilters(fullDF, config.globalFilters, config.debugFlag)
         else fullDF
-      } else spark.emptyDataFrame
+      } else {
+        logger.log(Level.WARN, noExistsMsg)
+        spark.emptyDataFrame
+      }
     } catch {
       case e: AnalysisException =>
-        logger.log(Level.WARN, s"WARN: ${tableFullName} does not exist or cannot apply global filters. " +
-          s"Will attempt to continue", e)
+        logger.log(Level.WARN, noExistsMsg, e)
         Array(s"Could not retrieve ${tableFullName}").toSeq.toDF("ERROR")
     }
   }
@@ -199,13 +228,14 @@ case class PipelineTable(
                      ): DataFrame = {
     val moduleId = module.moduleId
     val moduleName = module.moduleName
+    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters. Will attempt to continue"
 
     if (exists) {
       val instanceDF = if (withMasterMinimumSchema) { // infer master schema if true and available
         logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for Module: " +
           s"$moduleId --> $moduleName for Table: $tableFullName")
-        spark.table(tableFullName).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
-      } else spark.table(tableFullName)
+        spark.read.format(format).load(tableLocation).verifyMinimumSchema(masterSchema,enforceNonNullable, config.debugFlag)
+      } else spark.read.format(format).load(tableLocation)
       val dfFields = instanceDF.schema.fields
       val cronFields = dfFields.filter(f => casedSeqCompare(cronColumnsNames, f.name))
 
@@ -275,6 +305,7 @@ case class PipelineTable(
         instanceDF, Some(module), incrementalFilters, config.globalFilters, dataFrequency, config.debugFlag
       )
     } else { // Source doesn't exist
+      logger.log(Level.WARN, noExistsMsg)
       spark.emptyDataFrame
     }
   }

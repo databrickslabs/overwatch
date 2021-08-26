@@ -157,8 +157,8 @@ object PipelineFunctions {
       // TODO -- handle streaming until Module refactor with source -> target mappings
       val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
         target.name match {
-          case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
-            .rdd.partitions.length * target.shuffleFactor
+          case "audit_log_bronze" =>
+            target.asDF.rdd.partitions.length * target.shuffleFactor
           case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
         }
       } else {
