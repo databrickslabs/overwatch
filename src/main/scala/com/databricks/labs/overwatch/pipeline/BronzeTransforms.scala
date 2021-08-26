@@ -464,7 +464,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                                processedLogFiles: PipelineTable): DataFrame = {
     val validNewFiles = if (processedLogFiles.exists) {
       val alreadyProcessed = processedLogFiles.asDF
-        .filter(!'failed)
+        .filter(!'failed && 'withinSpecifiedTimeRange)
         .select('filename)
         .distinct
 
