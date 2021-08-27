@@ -600,10 +600,10 @@ trait SilverTransforms extends SparkSessionWrapper {
         ).df
     } else { // driver pool does not exist -- filter and add null lookup cols
       clusterBaseDF.filter('actionName.isin("create", "edit"))
-        .withColumn("driver_instance_pool_id", lit(null))
-        .withColumn("driver_instance_pool_name", lit(null))
-        .withColumn("pool_driver_node_type", lit(null))
-        .withColumn("pool_node_type", lit(null))
+        .withColumn("driver_instance_pool_id", lit(null).cast("string"))
+        .withColumn("driver_instance_pool_name", lit(null).cast("string"))
+        .withColumn("pool_driver_node_type", lit(null).cast("string"))
+        .withColumn("pool_node_type", lit(null).cast("string"))
     }
 
     // lookup pools node types from pools snapshots when snapshots exist
@@ -621,10 +621,10 @@ trait SilverTransforms extends SparkSessionWrapper {
         ).df
     } else {
       clusterBaseWithPools
-        .withColumn("pool_snap_driver_instance_pool_name", lit(null))
-        .withColumn("pool_snap_driver_node_type", lit(null))
-        .withColumn("pool_snap_instance_pool_name", lit(null))
-        .withColumn("pool_snap_node_type", lit(null))
+        .withColumn("pool_snap_driver_instance_pool_name", lit(null).cast("string"))
+        .withColumn("pool_snap_driver_node_type", lit(null).cast("string"))
+        .withColumn("pool_snap_instance_pool_name", lit(null).cast("string"))
+        .withColumn("pool_snap_node_type", lit(null).cast("string"))
     }
 
 
@@ -683,6 +683,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       'existing_cluster_id.alias("existing_cluster_id"),
       'new_cluster.alias("new_cluster")
     )
+    val jobClusterSchema = StructType(
+      Seq(
+        StructField("existing_cluster_id", StringType, nullable = true),
+        StructField("new_cluster", StringType, nullable = true)
+      )
+    )
 
     val jobStatusBase = jobsBase
       .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
@@ -714,7 +720,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     jobStatusBase
       .withColumn("jobCluster",
         last(
-          when('existing_cluster_id.isNull && 'new_cluster.isNull, lit(null))
+          when('existing_cluster_id.isNull && 'new_cluster.isNull, lit(null).cast(jobClusterSchema))
             .otherwise(jobCluster),
           true
         ).over(lastJobStatus)
@@ -947,7 +953,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .join(runStarts, Seq("runId", "organization_id"), "left")
       .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
       .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
-      .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
+      .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null).cast("string")))
       .select(
         'runId.cast("long"), 'jobId.cast("long"), 'idInJob, 'jobRunTime, 'run_name,
         'jobClusterType, 'jobTaskType, 'jobTerminalState,
@@ -1163,7 +1169,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSpecLookup")
               .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 64
+            tsPartitionVal = 16
           ).df
 
         // get cluster_id by cluster_name (derived)
@@ -1182,7 +1188,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSnapLookup")
               .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 64
+            tsPartitionVal = 16
           ).df
 
         automatedClusterMetaLookupBuilder = automatedClusterMetaLookupBuilder

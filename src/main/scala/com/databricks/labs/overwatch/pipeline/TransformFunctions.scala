@@ -313,47 +313,20 @@ object TransformFunctions {
    * @return
    */
   def unionWithMissingAsNull(baseDF: DataFrame, lookupDF: DataFrame): DataFrame = {
-    val baseCols = baseDF.columns
-    val lookupCols = lookupDF.columns
-    val missingBaseCols = lookupCols.diff(baseCols)
-    val missingLookupCols = baseCols.diff(lookupCols)
-    val df1Complete = missingBaseCols.foldLeft(baseDF) {
-      case (df, c) =>
-        df.withColumn(c, lit(null))
+    val baseFields = baseDF.schema
+    val lookupFields = lookupDF.schema
+    val missingBaseFields = lookupFields.filterNot(f => baseFields.map(_.name).contains(f.name))
+    val missingLookupFields = baseFields.filterNot(f => lookupFields.map(_.name).contains(f.name))
+    val df1Complete = missingBaseFields.foldLeft(baseDF) {
+      case (df, f) =>
+        df.withColumn(f.name, lit(null).cast(f.dataType))
     }
-    val df2Complete = missingLookupCols.foldLeft(lookupDF) {
-      case (df, c) =>
-        df.withColumn(c, lit(null))
+    val df2Complete = missingLookupFields.foldLeft(lookupDF) {
+      case (df, f) =>
+        df.withColumn(f.name, lit(null).cast(f.dataType))
     }
 
     df1Complete.unionByName(df2Complete)
-  }
-
-  /**
-   * This is an AS OF lookup function -- return the most recent slow-changing dim as of some timestamp. The window
-   * partition column[s] act like the join keys. The Window partition column must be present in driving and lookup DF.
-   * EX: Get latest columnsToLookup by Window's Partition column[s] as of latest Window's OrderByColumn
-   *
-   * @param primaryDF          Driving dataframe to which the lookup values are to be added
-   * @param primaryOnlyNoNulls Non-null column present only in the primary DF, not the lookup[s]
-   * @param columnsToLookup    Column names to be looked up -- must be in driving DF AND all lookup DFs from which the value is to be looked up
-   * @param w                  Window spec to partition/sort the lookups. The partition and sort columns must be present in all DFs
-   * @param lookupDF           One more more dataframes from which to lookup the values
-   * @return
-   */
-  def fillFromLookupsByTS(primaryDF: DataFrame, primaryOnlyNoNulls: String,
-                          columnsToLookup: Array[String], w: WindowSpec,
-                          lookupDF: DataFrame*): DataFrame = {
-    val finalDFWNulls = lookupDF.foldLeft(primaryDF) {
-      case (primaryDF, lookup) =>
-        unionWithMissingAsNull(primaryDF, lookup)
-    }
-
-    columnsToLookup.foldLeft(finalDFWNulls) {
-      case (df, c) =>
-        val dt = df.schema.fields.filter(_.name == c).head.dataType
-        df.withColumn(c, coalesce(last(col(c), ignoreNulls = true).over(w), lit(null).cast(dt)))
-    }.filter(col(primaryOnlyNoNulls).isNotNull)
   }
 
   /**
