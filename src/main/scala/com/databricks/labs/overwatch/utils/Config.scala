@@ -150,7 +150,8 @@ class Config() {
       tokenUsed = _tokenType,
       targetDatabase = databaseName,
       targetDatabaseLocation = databaseLocation,
-      passthroughLogPath = passthroughLogPath
+      passthroughLogPath = passthroughLogPath,
+      packageVersion = packageVersion
     )
   }
 
