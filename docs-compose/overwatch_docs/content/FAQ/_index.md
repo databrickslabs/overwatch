@@ -122,5 +122,5 @@ More Details: [https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Descri
 
 
 ## Q 4: How to config the cluster logs path?
-The cluster logging paths are automatically acquired within Overwatch. Don't need to tell Overwatch where to load those from. For more [details](http://localhost:1313/overwatch/environmentsetup/azure/#configuring-overwatch-on-azure-databricks).
+The cluster logging paths are automatically acquired within Overwatch. Don't need to tell Overwatch where to load those from. For more [details]({{%relref "EnvironmentSetup/azure.md"%}}/#configuring-overwatch-on-azure-databricks).
 ![FAQ4](/images/_index/faq4.png)
