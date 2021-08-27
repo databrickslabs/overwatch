@@ -297,8 +297,7 @@ object asofJoin {
     // TODO - DEBUG
 //    asofTSDF.df.orderBy(asofTSDF.partitionCols.map(f => col(f.name)) :+ col(asofTSDF.tsColumn.name): _*).show()
 
-        val lookupDF = dupColNames.foldLeft(asofTSDF.df)((df, c) => df
-          .withColumn(c, coalesce(col(leftPrefix.getOrElse("") + c), col(rightPrefix + c))))
+        val lookupDF = asofTSDF.df
           .filter(col("__driving_df__") === 1) // for lookup, get only the original rows with the lookup value
           .select(slimSelects: _*)
 
