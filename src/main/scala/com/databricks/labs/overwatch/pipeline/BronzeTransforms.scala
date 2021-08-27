@@ -118,7 +118,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
 
       if (!exists && !isFirstRun) { // If not first run checkpoint paths must already exist.
-        if (azureRawAuditLogTarget.exists && !azureRawAuditLogTarget.asDF().isEmpty) {
+        if (azureRawAuditLogTarget.exists(dataValidation = true)) {
           val warnMsg = s"$baseErrMsg\nPath: ${p} does not exist. To append new data, a checkpoint dir must " +
             s"exist and be current. Attempting to recover state from Overwatch metadata."
           logger.log(Level.WARN, warnMsg)
@@ -227,9 +227,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val untilDT = untilTime.toLocalDate
     if (cloudProvider == "azure") {
       val azureAuditSourceFilters = 'Overwatch_RunID === lit(overwatchRunID) && 'organization_id === organizationId
-      val rawBodyLookup = spark.table(auditRawLand.tableFullName)
+      val rawBodyLookup = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
-      val schemaBuilders = spark.table(auditRawLand.tableFullName)
+      val schemaBuilders = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
@@ -242,7 +242,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .selectExpr("*", "properties.*").drop("properties")
 
 
-      spark.table(auditRawLand.tableFullName)
+      auditRawLand.asDF
         .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
@@ -462,9 +462,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private def retrieveNewValidSparkEventsWMeta(badRecordsPath: String,
                                                eventLogsDF: DataFrame,
                                                processedLogFiles: PipelineTable): DataFrame = {
-    val validNewFiles = if (processedLogFiles.exists) {
+    val validNewFiles = if (processedLogFiles.exists(dataValidation = true)) {
       val alreadyProcessed = processedLogFiles.asDF
-        .filter(!'failed)
+        .filter(!'failed && 'withinSpecifiedTimeRange)
         .select('filename)
         .distinct
 
