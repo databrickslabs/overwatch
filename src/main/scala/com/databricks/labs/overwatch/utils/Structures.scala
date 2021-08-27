@@ -89,7 +89,8 @@ case class ParsedConfig(
                          tokenUsed: String, //TODO - Convert to enum
                          targetDatabase: String,
                          targetDatabaseLocation: String,
-                         passthroughLogPath: Option[String]
+                         passthroughLogPath: Option[String],
+                         packageVersion: String
                        )
 
 case class ModuleStatusReport(
