@@ -778,9 +778,10 @@ trait GoldTransforms extends SparkSessionWrapper {
       .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     val cloudSpecificUserImputations = if (cloudProvider == "azure") {
-      df.withColumn("user_email",
-        when('user_email.isNull,
-          first('user_email, ignoreNulls = true).over(principalObjectIDW)).otherwise('user_email))
+      df.withColumn("user_email", $"PowerProperties.UserEmail")
+        .withColumn("user_email",
+          when('user_email.isNull,
+            first('user_email, ignoreNulls = true).over(principalObjectIDW)).otherwise('user_email))
     } else {
       df.withColumn("user_email", $"PowerProperties.UserEmail")
     }
