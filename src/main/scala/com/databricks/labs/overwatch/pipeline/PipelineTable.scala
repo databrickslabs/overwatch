@@ -144,12 +144,14 @@ case class PipelineTable(
     var entityExists = true
     if (pathValidation || dataValidation) entityExists = Helpers.pathExists(tableLocation)
     if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)
-    if (dataValidation && entityExists) { // if other validation is enabled it must first pass those for this test to be attempted
-      // opposite -- when result is empty source data does not exist
-      entityExists = !spark.read.format("delta").load(tableLocation)
-        .filter(col("organization_id") === config.organizationId)
-        .isEmpty
-    } else entityExists = false
+    if (dataValidation) {
+      if (entityExists) { // if other validation is enabled it must first pass those for this test to be attempted
+        // opposite -- when result is empty source data does not exist
+        entityExists = !spark.read.format("delta").load(tableLocation)
+          .filter(col("organization_id") === config.organizationId)
+          .isEmpty
+      } else entityExists = false
+    }
     entityExists
   }
 
@@ -179,6 +181,7 @@ case class PipelineTable(
         else fullDF
       } else {
         logger.log(Level.WARN, noExistsMsg)
+        if (config.debugFlag) println(noExistsMsg)
         spark.emptyDataFrame
       }
     } catch {
@@ -306,6 +309,7 @@ case class PipelineTable(
       )
     } else { // Source doesn't exist
       logger.log(Level.WARN, noExistsMsg)
+      if (config.debugFlag) println(noExistsMsg)
       spark.emptyDataFrame
     }
   }

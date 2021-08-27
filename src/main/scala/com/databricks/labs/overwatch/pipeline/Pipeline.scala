@@ -197,7 +197,7 @@ class Pipeline(
    * @return
    */
   protected def loadStaticDatasets(): this.type = {
-    val instanceDetailsExistsForWorkspace = !BronzeTargets.cloudMachineDetail.exists(dataValidation = true)
+    val instanceDetailsExistsForWorkspace = BronzeTargets.cloudMachineDetail.exists(dataValidation = true)
     if (!instanceDetailsExistsForWorkspace) { // if target dir doesn't exist or no data for this workspace
       val logMsg = "instanceDetails does not exist and/or does not contain data for this workspace. BUILDING/APPENDING"
       logger.log(Level.INFO, logMsg)
@@ -246,8 +246,7 @@ class Pipeline(
         s"or drop existing database and allow Overwatch to recreate.")
     }
 
-    if (spark.catalog.databaseExists(config.databaseName) &&
-      spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
+    if (pipelineStateTarget.exists(dataValidation = true)) { // data must exist for this workspace or this is fresh start
       val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
       pipelineStateTarget.asDF
         .filter('status === "SUCCESS" || 'status.startsWith("EMPTY"))
