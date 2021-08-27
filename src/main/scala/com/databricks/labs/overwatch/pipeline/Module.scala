@@ -12,7 +12,7 @@ class Module(
               val moduleDependencies: Array[Int],
               val moduleScaleCoefficient: Double,
               hardLimitMaxHistory: Option[Int]
-            ) {
+            ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
@@ -21,6 +21,7 @@ class Module(
   private val config = pipeline.config
 
   private var _isFirstRun: Boolean = false
+  private var sparkOverrides: Map[String, String] = Map[String, String]()
 
   def isFirstRun: Boolean = _isFirstRun
 
@@ -31,6 +32,11 @@ class Module(
             _moduleDependencies: Array[Int] = moduleDependencies,
             _hardLimitMaxHistory: Option[Int] = hardLimitMaxHistory): Module = {
     new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies, moduleScaleCoefficient, _hardLimitMaxHistory)
+  }
+
+  def withSparkOverrides(overrides: Map[String, String]): this.type = {
+    sparkOverrides = sparkOverrides ++ overrides
+    this
   }
 
   private[overwatch] def moduleState: SimplifiedModuleStatusReport = {
@@ -276,6 +282,9 @@ class Module(
 
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
+    logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
+    PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
+
     println(s"Beginning: $moduleName")
 
     val debugMsg = s"MODULE: $moduleId-$moduleName\nTIME RANGE: " +

@@ -76,7 +76,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.jobRunTarget)
   )
 
+  val jrcpSparkOverrides = Map(
+    "spark.sql.autoBroadcastJoinThreshold" -> "-1"
+  )
   lazy private[overwatch] val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact", this, Array(3001, 3003, 3005, 3010, 3012), 3.0)
+    .withSparkOverrides(jrcpSparkOverrides)
   //Incremental current spark job and tasks DFs plus 2 days for lag coverage
   lazy private val appendJobRunCostPotentialFactProcess = ETLDefinition(
     // new jobRuns to be considered are job runs completed since the last overwatch import for this module
@@ -112,7 +116,13 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.accountLoginTarget)
   )
 
+  private val sparkBaseSparkOverrides = Map(
+    "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
+    "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
+  )
+
   lazy private[overwatch] val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006), 6.0)
+    .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkJobProcess = ETLDefinition(
     SilverTargets.jobsTarget.asIncrementalDF(sparkJobModule, "startTimestamp"),
     Seq(buildSparkJob(config.cloudProvider)),
@@ -120,6 +130,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   lazy private[overwatch] val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007), 6.0)
+    .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkStageProcess = ETLDefinition(
     SilverTargets.stagesTarget.asIncrementalDF(sparkStageModule, "startTimestamp"),
     Seq(buildSparkStage()),
@@ -127,6 +138,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   lazy private[overwatch] val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008), 6.0)
+    .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkTaskProcess = ETLDefinition(
     SilverTargets.tasksTarget.asIncrementalDF(sparkTaskModule, "startTimestamp"),
     Seq(buildSparkTask()),
@@ -134,6 +146,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005), 6.0)
+    .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkExecutionProcess = ETLDefinition(
     SilverTargets.executionsTarget.asIncrementalDF(sparkExecutionModule, "startTimestamp"),
     Seq(buildSparkExecution()),
@@ -141,6 +154,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   lazy private[overwatch] val sparkExecutorModule = Module(3014, "Gold_SparkExecutor", this, Array(2003), 6.0)
+    .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkExecutorProcess = ETLDefinition(
     SilverTargets.executorsTarget.asIncrementalDF(sparkExecutorModule, "addedTimestamp"),
     Seq(buildSparkExecutor()),

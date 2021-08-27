@@ -151,7 +151,7 @@ object Scenarios extends SparkSessionWrapper {
     CostComputeCalculation: Checks if the driver and worker costs add correctly to the total: driver_compute_cost + worker_compute_cost = total_compute_cost, check absolute difference < 0.000002
     CostDBUCalculation: Checks if the driver and worker DBUs add correctly to the total: driver_dbu_cost + worker_dbu_cost = total_dbu_cost, , check absolute difference < 0.000002
     CostTotalCalculation: Checks if the DBU and compute costs add correctly to the total: total_compute_cost + total_dbu_cost = total_cost, , check absolute difference < 0.000002
-    JobRunningDaysInvalid: Checks if list of running days is sane: date(startTS) = min(running_days) and date(endTS) = max(running_days)
+    JobRunningDaysInvalid: Checks if list of running days is sane: date(startTS) := min(running_days) and date(endTS) = max(running_days)
     * @param dbName
     */
   def jobruncostpotentialfact(dbName: String): DataFrame = {
