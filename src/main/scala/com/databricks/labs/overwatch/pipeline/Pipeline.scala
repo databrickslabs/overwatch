@@ -168,7 +168,7 @@ class Pipeline(
       val expiredRecords = lastRunPricing
         .filter('rnk === 1)
         .withColumn("activeUntil",
-          when('activeUntil.isNull, lit(pipelineSnapTime.asDTString).cast("date"))
+          when('activeUntil.isNull, date_sub(lit(pipelineSnapTime.asDTString).cast("date"), 1))
             .otherwise('activeUntil)
         )
 
@@ -197,15 +197,9 @@ class Pipeline(
    * @return
    */
   protected def loadStaticDatasets(): this.type = {
-    if (
-      !BronzeTargets.cloudMachineDetail.exists ||
-        BronzeTargets.cloudMachineDetail.asDF.isEmpty
-    ) { // if not exists OR if empty for current orgID (.asDF applies global filters)
-      val logMsg = if (!BronzeTargets.cloudMachineDetail.exists) {
-        "instanceDetails table not found. Building"
-      } else if (BronzeTargets.cloudMachineDetail.asDF.isEmpty) {
-        "instanceDetails table found but is empty for this workspace. Appending compute costs for this workspace"
-      } else ""
+    val instanceDetailsExistsForWorkspace = BronzeTargets.cloudMachineDetail.exists(dataValidation = true)
+    if (!instanceDetailsExistsForWorkspace) { // if target dir doesn't exist or no data for this workspace
+      val logMsg = "instanceDetails does not exist and/or does not contain data for this workspace. BUILDING/APPENDING"
       logger.log(Level.INFO, logMsg)
       if (getConfig.debugFlag) println(logMsg)
       val instanceDetailsDF = config.cloudProvider match {
@@ -252,12 +246,10 @@ class Pipeline(
         s"or drop existing database and allow Overwatch to recreate.")
     }
 
-    if (spark.catalog.databaseExists(config.databaseName) &&
-      spark.catalog.tableExists(config.databaseName, "pipeline_report")) {
+    if (pipelineStateTarget.exists(dataValidation = true)) { // data must exist for this workspace or this is fresh start
       val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
-      spark.table(s"${config.databaseName}.pipeline_report")
+      pipelineStateTarget.asDF
         .filter('status === "SUCCESS" || 'status.startsWith("EMPTY"))
-        .filter('organization_id === config.organizationId)
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter('rnk === 1 && 'rn === 1)
