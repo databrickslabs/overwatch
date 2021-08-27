@@ -28,8 +28,6 @@ object asofJoin {
     val baseSelects = tsdf.df.schema.fields.map(_.name).diff(col_list.map(_.name)) map col
     val prefixedSelects = col_list.map(f => col(f.name).alias(prefix + f.name))
     val prefixedDF = tsdf.df.select(baseSelects ++ prefixedSelects: _*)
-//    val prefixedDF = col_list.foldLeft(tsdf.df)((df, colStruct) => df
-//      .withColumnRenamed(colStruct.name, prefix + colStruct.name))
 
     // update ts_colName if it is in col_list
     val ts_colName = if (col_list.contains(tsdf.tsColumn)) prefix + tsdf.tsColumn.name else tsdf.tsColumn.name
@@ -50,8 +48,6 @@ object asofJoin {
     val nulledOtherCols = other_cols.map(f => lit(null).alias(f.name))
 
     val newDF = tsdf.df.select(baseSelects ++ nulledOtherCols: _*)
-    //    val newDF = other_cols.foldLeft(tsdf.df)((df, colStruct) => df
-    //      .withColumn(colStruct.name, lit(null)))
 
     // TODO: fix partition column names, it's not nice this way
     TSDF(newDF, tsdf.tsColumn.name, tsdf.partitionCols.map(_.name): _*)
@@ -127,25 +123,11 @@ object asofJoin {
     val fillBackwardSelects = originalColsLessRightCols ++ lookAheadSelects
 
     val fillForwardDF = tsdf.df.select(fillForwardSelects: _*)
-//    fillForwardDF.orderBy(col("key"), col("ts_partition"), col("ts")).show(20, false)
-//    fillForwardDF.orderBy(col("key"), col("ts")).show(20, false)
     val filledDF = if (maxLookAhead > 0L) {
       fillForwardDF.select(fillBackwardSelects: _*)
     } else {
       fillForwardDF
     }
-
-    //    val df = rightCols.foldLeft(tsdf.df) {
-    //      case (dfBuilder, rightCol) =>
-    //        val asofDF = dfBuilder.withColumn(rightCol.name,
-    //          coalesce(last(col(rightCol.name), true).over(beforeW), lit(null).cast(rightCol.dataType))
-    //        )
-    //        if (maxLookAhead > 0L) {
-    //          asofDF.withColumn(rightCol.name,
-    //            coalesce(col(rightCol.name), first(col(rightCol.name), true).over(afterW), lit(null).cast(rightCol.dataType))
-    //          )
-    //        } else asofDF
-    //    }
 
     TSDF(filledDF, left_ts_col.name, tsdf.partitionCols.map(_.name): _*)
   }
