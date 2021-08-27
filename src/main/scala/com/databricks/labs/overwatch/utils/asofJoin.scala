@@ -45,7 +45,7 @@ object asofJoin {
   def addColumnsFromOtherDF(tsdf: TSDF, other_cols: Seq[StructField]): TSDF = {
 
     val baseSelects = tsdf.df.schema.fields.map(_.name).diff(other_cols.map(_.name)) map col
-    val nulledOtherCols = other_cols.map(f => lit(null).alias(f.name))
+    val nulledOtherCols = other_cols.map(f => lit(null).cast(f.dataType).alias(f.name))
 
     val newDF = tsdf.df.select(baseSelects ++ nulledOtherCols: _*)
 

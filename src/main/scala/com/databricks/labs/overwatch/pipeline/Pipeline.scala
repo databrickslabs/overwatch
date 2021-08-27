@@ -185,7 +185,7 @@ class Pipeline(
         withCreateDate = false,
         mode = "overwrite"
       )
-      database.write(newCloudDetailsDF, overwriteTarget, lit(null))
+      database.write(newCloudDetailsDF, overwriteTarget, lit(null).cast("timestamp"))
     }
 
   }
