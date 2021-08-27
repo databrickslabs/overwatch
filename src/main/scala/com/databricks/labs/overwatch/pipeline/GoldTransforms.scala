@@ -770,40 +770,37 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val jobGroupW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.JobGroupID")
     val executionW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.ExecutionID")
+    val principalObjectIDW = Window.partitionBy($"PowerProperties.principalIdpObjectId")
     val isolationIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBIsolationID")
-    val oAuthIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.AzureOAuth2ClientID")
-    val rddScopeW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.RDDScope")
     val replIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBREPLID")
+      .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
     val notebookW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.NotebookID")
       .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     val cloudSpecificUserImputations = if (cloudProvider == "azure") {
       df.withColumn("user_email", $"PowerProperties.UserEmail")
         .withColumn("user_email",
-          when('user_email.isNull && $"PowerProperties.AzureOAuth2ClientID".isNotNull,
-            first('user_email, ignoreNulls = true).over(oAuthIDW)).otherwise('user_email))
+          when('user_email.isNull,
+            first('user_email, ignoreNulls = true).over(principalObjectIDW)).otherwise('user_email))
     } else {
       df.withColumn("user_email", $"PowerProperties.UserEmail")
     }
 
     val sparkJobsWImputedUser = cloudSpecificUserImputations
       .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.SparkDBIsolationID".isNotNull,
+        when('user_email.isNull,
           first('user_email, ignoreNulls = true).over(isolationIDW)).otherwise('user_email))
       .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.SparkDBREPLID".isNotNull,
-          first('user_email, ignoreNulls = true).over(replIDW)).otherwise('user_email))
-      .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.RDDScope".isNotNull,
-          first('user_email, ignoreNulls = true).over(rddScopeW)).otherwise('user_email))
-      .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.JobGroupID".isNotNull,
+        when('user_email.isNull,
           first('user_email, ignoreNulls = true).over(jobGroupW)).otherwise('user_email))
       .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.ExecutionID".isNotNull,
+        when('user_email.isNull,
           first('user_email, ignoreNulls = true).over(executionW)).otherwise('user_email))
       .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.NotebookID".isNotNull,
+        when('user_email.isNull,
+          last('user_email, ignoreNulls = true).over(replIDW)).otherwise('user_email))
+      .withColumn("user_email",
+        when('user_email.isNull,
           last('user_email, ignoreNulls = true).over(notebookW)).otherwise('user_email))
 
     val sparkJobCols: Array[Column] = Array(

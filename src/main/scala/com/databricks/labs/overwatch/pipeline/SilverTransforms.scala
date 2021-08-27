@@ -53,6 +53,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       element_at('Properties, "sparkdatabricksapiurl").alias("WorkspaceURL"),
       element_at('Properties, "sparkjobGroupid").alias("JobGroupID"),
       element_at('Properties, "sparkdatabrickscloudProvider").alias("CloudProvider"),
+      element_at('Properties, "principalIdpObjectId").alias("principalIdpObjectId"),
       struct(
         element_at('Properties, "sparkdatabricksclusterSource").alias("ClusterSource"),
         element_at('Properties, "sparkdatabricksclusterUsageTagsautoTerminationMinutes").alias("AutoTerminationMinutes"),
