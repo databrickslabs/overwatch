@@ -246,17 +246,10 @@ object asofJoin {
       addColumnsFromOtherDF(prefixedLeftTSDF, rightCols),
       addColumnsFromOtherDF(prefixedRightTSDF, leftCols))
 
-    // TODO - debug
-//    combinedTSDF.df.show(20, false)
-
-    // build left-driving unified output columns
-    val structuralFields = combinedTSDF.structuralColumns
     val structuralCols = combinedTSDF.structuralColumns.map(f => col(f.name).alias(f.name))
 
-    // dup cols - coalesce
     val dupColNames = leftTSDF.observationColumns.map(_.name).intersect(rightTSDF.observationColumns.map(_.name))
 
-    // outerCols -- leftOnly + rightOnly -- rename
     val leftOnlyColNames = leftTSDF.observationColumns.map(_.name).diff(rightTSDF.observationColumns.map(_.name))
     val rightOnlyColNames = rightTSDF.observationColumns.map(_.name).diff(leftTSDF.observationColumns.map(_.name))
     val outerColNames = leftOnlyColNames.map(cName => col(leftPrefix.getOrElse("") + cName).alias(cName)) ++
@@ -289,13 +282,6 @@ object asofJoin {
         rightCols
       )
     }
-
-//    val lookupDF = asofTSDF.df
-//      .filter(col("__driving_df__") === 1) // for lookup, get only the original rows with the lookup value
-//      .select(slimSelects: _*)
-
-    // TODO - DEBUG
-//    asofTSDF.df.orderBy(asofTSDF.partitionCols.map(f => col(f.name)) :+ col(asofTSDF.tsColumn.name): _*).show()
 
         val lookupDF = asofTSDF.df
           .filter(col("__driving_df__") === 1) // for lookup, get only the original rows with the lookup value

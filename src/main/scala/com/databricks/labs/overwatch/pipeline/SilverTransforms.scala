@@ -1163,7 +1163,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSpecLookup")
               .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 64
+            tsPartitionVal = 16
           ).df
 
         // get cluster_id by cluster_name (derived)
@@ -1182,7 +1182,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSnapLookup")
               .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 64
+            tsPartitionVal = 16
           ).df
 
         automatedClusterMetaLookupBuilder = automatedClusterMetaLookupBuilder
