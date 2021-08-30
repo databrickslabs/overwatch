@@ -4,6 +4,24 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.5.0.5
+* Feature [Feature_223](https://github.com/databrickslabs/overwatch/issues/223)
+  * Adds package version to parsed config in pipeline_report
+* Patch fix for [Issue_210](https://github.com/databrickslabs/overwatch/issues/210)
+* Patch fix for [Issue_214](https://github.com/databrickslabs/overwatch/issues/214)
+  * Important fix for Spark Users -- this bug resulted in several spark logs not getting ingested
+* Patch fix for [Issue_218](https://github.com/databrickslabs/overwatch/issues/218)
+  * Potential duplicates for api call "RunNow"
+* Patch fix for [Issue_221](https://github.com/databrickslabs/overwatch/issues/221)
+  * Multi-workspace enhancements for validations
+  * Altered DBU Costs fix
+* Patch fix for [Issue_213](https://github.com/databrickslabs/overwatch/issues/213)
+  * Reduced plan size for jobRunCostPotentialFact table build
+* Patch fix for [Issue_192](https://github.com/databrickslabs/overwatch/issues/192)
+  * Some spark overrides in the Overwatch pipeline were not getting applied 
+* Patch fix for [Issue_206](https://github.com/databrickslabs/overwatch/issues/206)
+  * Incorrect default prices for several node types
+
 ## 0.5.0.4
 * Patch fix for [Issue_196](https://github.com/databrickslabs/overwatch/issues/196)
 * AZURE - Enhancement - Enable full EH configuration to be passed through the job arguments to the main class using 
