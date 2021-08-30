@@ -118,3 +118,10 @@ Sample Response:
 </DescribeSpotPriceHistoryResponse>
 ```
 More Details: [https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSpotPriceHistory.html](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSpotPriceHistory.html)
+
+
+
+## Q 4: How to config the cluster logs path?
+The cluster logging paths are automatically acquired within Overwatch. There's no need to tell Overwatch where to load those from. 
+[Click here]({{%relref "EnvironmentSetup/azure.md"%}}/#configuring-overwatch-on-azure-databricks) for more details.
+![FAQ4](/images/_index/faq4.png)
