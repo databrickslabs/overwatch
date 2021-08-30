@@ -12,21 +12,21 @@
     <title>ChangeLog :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1630349339" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1630349339" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1630349339" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1630349339" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1630349339" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1630349339" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1630349339" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1630349339" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1630349339" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1630353058" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1630349339" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1630353058" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1630349339"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1630353058"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1630349339"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1630349339"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1630353058"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1630353058"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1630349339"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1630353058"></script>
 
     
   </div>
@@ -497,6 +497,7 @@
     <div class="wrapper">
 <nav id="TableOfContents">
   <ul>
+    <li><a href="#0505">0.5.0.5</a></li>
     <li><a href="#0504">0.5.0.4</a></li>
     <li><a href="#0503">0.5.0.3</a></li>
     <li><a href="#0502">0.5.0.2</a></li>
@@ -540,7 +541,47 @@
 
 
 
-	<h2 id="0504">0.5.0.4</h2>
+	<h2 id="0505">0.5.0.5</h2>
+<ul>
+<li>Feature <a href="https://github.com/databrickslabs/overwatch/issues/223">Feature_223</a>
+<ul>
+<li>Adds package version to parsed config in pipeline_report</li>
+</ul>
+</li>
+<li>Patch fix for <a href="https://github.com/databrickslabs/overwatch/issues/210">Issue_210</a></li>
+<li>Patch fix for <a href="https://github.com/databrickslabs/overwatch/issues/214">Issue_214</a>
+<ul>
+<li>Important fix for Spark Users &ndash; this bug resulted in several spark logs not getting ingested</li>
+</ul>
+</li>
+<li>Patch fix for <a href="https://github.com/databrickslabs/overwatch/issues/218">Issue_218</a>
+<ul>
+<li>Potential duplicates for api call &ldquo;RunNow&rdquo;</li>
+</ul>
+</li>
+<li>Patch fix for <a href="https://github.com/databrickslabs/overwatch/issues/221">Issue_221</a>
+<ul>
+<li>Multi-workspace enhancements for validations</li>
+<li>Altered DBU Costs fix</li>
+</ul>
+</li>
+<li>Patch fix for <a href="https://github.com/databrickslabs/overwatch/issues/213">Issue_213</a>
+<ul>
+<li>Reduced plan size for jobRunCostPotentialFact table build</li>
+</ul>
+</li>
+<li>Patch fix for <a href="https://github.com/databrickslabs/overwatch/issues/192">Issue_192</a>
+<ul>
+<li>Some spark overrides in the Overwatch pipeline were not getting applied</li>
+</ul>
+</li>
+<li>Patch fix for <a href="https://github.com/databrickslabs/overwatch/issues/206">Issue_206</a>
+<ul>
+<li>Incorrect default prices for several node types</li>
+</ul>
+</li>
+</ul>
+<h2 id="0504">0.5.0.4</h2>
 <ul>
 <li>Patch fix for <a href="https://github.com/databrickslabs/overwatch/issues/196">Issue_196</a></li>
 <li>AZURE - Enhancement - Enable full EH configuration to be passed through the job arguments to the main class using 
@@ -1052,19 +1093,19 @@ if it didn&rsquo;t already exist for the workspace</li>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1630349339"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1630349339"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1630349339"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1630349339"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1630349339"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1630349339"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1630353058"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1630349339"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1630349339"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1630349339"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1630353058"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1630349339" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1630349339"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1630353058" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1630353058"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
