@@ -29,13 +29,13 @@ Use the Overwatch parameters string to instantiate the workspace
 #### Azure
 {{% notice warning %}}
 **IMPORTANT**: The EventHub connection string needs to be input as a string but it contains sensitive information
-thus we want to reference the secret. The extra step below is REQUIRED to save the EHConnString as a variable
-and reference it in the string, if you do not the connection string will see `[REDACTED]` instead of
-the actual connection string.
+thus we want to reference the secret. To do so, simply use the format {{secrets/scope/key}} and replace words 
+"scope" and "key" with the names of the scope and key where the EH connection string is stored. This will be parsed 
+within Overwatch and never stored in clear text. Note, this is a [standard created and supported by Databricks](https://docs.databricks.com/security/secrets/secrets.html#path-value)
 {{% /notice %}}
 
 ```scala
-val ehConString = dbutils.secrets.get("mySecretScope", "myEHConnStringKeyName")
+val ehConString = "{{secrets/mySecretScope/myEHConnStringKeyName}}"
 
 val prodArgs = s"""{"auditLogConfig":{"auditLogFormat":"json","azureAuditLogEventhubConfig":{"connectionString":"${ehConString}","eventHubName":"EHName","auditRawEventsPrefix":"EHChkDir","maxEventsPerTrigger":10000}},"tokenSecret":{"scope":"mySecretScope","key":"PATKeyName"},"dataTarget":{"databaseName":"overwatch_etl","databaseLocation":"/path/to/etl.db","etlDataPathPrefix":"/path/to/global_share","consumerDatabaseName":"overwatch","consumerDatabaseLocation":"/path/to/consumer.db"},"badRecordsPath":"/path/to/bad/recordsTracker","overwatchScope":["audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools"],"maxDaysToLoad":60,"databricksContractPrices":{"interactiveDBUCostUSD":0.55,"automatedDBUCostUSD":0.15,"sqlComputeDBUCostUSD":0.22,"jobsLightDBUCostUSD":0.1},"primordialDateString":"2021-01-01","intelligentScaling":{"enabled":true,"minimumCores":8,"maximumCores":64,"coeff":1.0}}"""
 ```

@@ -4,6 +4,40 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.5.0.4
+* Patch fix for [Issue_196](https://github.com/databrickslabs/overwatch/issues/196)
+* AZURE - Enhancement - Enable full EH configuration to be passed through the job arguments to the main class using 
+secrets / scopes -- [Issue_197](https://github.com/databrickslabs/overwatch/issues/197)
+
+## 0.5.0.3
+{{% notice warning %}}
+**BUG FOR NEW DEPLOYMENTS**
+When using 0.5.0.3 for a brand new deployment, a duplicate key was left in a static
+table causing a couple of gold layer costing tables to error out. If this is your first run, the following is
+a fix until 0.5.0.4 comes out with the fix.
+{{% /notice %}}
+
+* [Initialize the Environment]({{%relref "GettingStarted/"%}}#initializing-the-environment) -- note this is the standard
+  getting started process. The only difference is to stop after Bronze(workspace) and not continue.
+  * Execute through "Bronze(workspace)" **DO NOT RUN THE PIPELINE** (i.e. Don't use Bronze(workspace).run()), just 
+  initialize it.
+* Execute the following command in SQL to delete the single offending row. Remember to replace <overwatch_etl> with your
+  configured ETL database
+```sql
+delete from <overwatch_etl>.instancedetails where API_Name = 'Standard_E4as_v4' and On_Demand_Cost_Hourly = 0.1482
+```
+* Resume standard workflow
+
+**Bug Fixes**
+* Incremental input sources returning 0 rows when users run Overwatch multiple times in the same day
+* Incremental clusterStateFactGold -- addresses orphaned events for long-running states across Overwatch Runs.
+* null driver node types for pooled drivers
+* Improved instance pool lookup logic
+* Mixed instance pools enabled
+* basic refactoring for sparkOverrides -- full refactor in 0.5.1
+* Improved logging
+* Costing - node details lookups for edge cases -- there was a bug in the join condition for users running Overwatch multiple times per day in the same workspace
+
 ## 0.5.0.2
 **If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
 * Hotfix release to resolve [Issue 179](https://github.com/databrickslabs/overwatch/issues/179).
