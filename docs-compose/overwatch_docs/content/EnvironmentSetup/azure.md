@@ -42,6 +42,11 @@ There are two primary sources of data that need to be configured:
     Overwatch will consume the events as a batch stream (Trigger.Once) once/period when the job runs. To configure 
     Eventhub to deliver these logs, follow the steps below.
 
+{{% notice note%}}
+**LIMIT** Max of 10 Event Hubs per Event Hub Namespace. If more than 10 workspaces are deployed in the same region plan to 
+distribute your Event Hubs and Namespaces appropriately.
+{{% /notice %}}
+
 ### Configuring Event Hub
 #### Step 1
 [Create or reuse an Event Hub namespace.](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-create)

@@ -16,16 +16,14 @@ and tables and manages all spark parameters and optimization requirements to ope
 and the job run setup, Overwatch runs best as a black box -- enable it and forget about it.
 
 ## Cluster Requirements
-* DBR 7.3 - 7.x (7.6 preferred) not regularly tested on DBR 8+ until next LTS release.
+* DBR 7.3+ tests completed on latest LTS version.
 * Add the relevant [dependencies](#cluster-dependencies)
 * Azure - Spot Instances not yet tested
 
 ### Cluster Dependencies
 Add the following dependencies to your cluster
 * Overwatch Assembly (fat jar): `com.databricks.labs:overwatch_2.12:<latest>`
-  * Note if using a custom Jar, one not in Maven, it may not have the scalaj dependency so be sure to add it as well
-  or the API calls will fail `org.scalaj:scalaj-http_2.12:2.4.2`
-* (Azure Only) azure-eventhubs-spark - integration with Azure EventHubs
+* **(Azure Only)** azure-eventhubs-spark - integration with Azure EventHubs
     * Maven Coordinate: `com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.18`
 
 ### Notes on Autoscaling

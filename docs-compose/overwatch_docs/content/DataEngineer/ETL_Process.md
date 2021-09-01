@@ -156,10 +156,13 @@ spark.sql(s"update overwatch_etl.pipeline_report set status = 'ROLLED_BACK' wher
 ```
 
 After performing the steps above, the next Overwatch run will load the data from 12-31 -> current.
-{{% notice warning%}}
-If back-loading more than 60 days, you must override the default primordialDateString in the config. Additionally, depending
-on data volume and cluster size, it may be best to only load 60 days at a time using the *maxDaysToLoad* config. This
-allows for the data to be loaded in chunks. Not necessary, but may have benefits depending on the situation.
+{{% notice note%}}
+**Rebuilding Spark Bronze** -- If you want to reprocess data in the spark modules, it's strongly recommended that you 
+**never truncate / rebuild spark_events_bronze** as the data is quite large and the source log files have probably been 
+removed from source due to retention policies. If you must spark bronze 
+you must also update one other table; *spark_events_processedfiles* in the etl database. If you're rolling back the
+spark modules from Feb 02, 2021 to Dec 31, 2020, you would need to delete the tracked files where Pipeline_SnapTS >= 
+Dec 31, 2020 and failed = false and withinSpecifiedTimeRange = true.
 {{% /notice %}}
 
 {{% notice note%}}
@@ -174,8 +177,7 @@ example above it's inefficient to run the bronze layer repeatedly to reprocess t
 no new data is ingested into bronze, no modules outside of the two we rolled_back will have any new data and thus
 will essentially be skipped resulting in the re-processing of only the two tables we're working on. 
 
-The main class entrypoint for Overwatch runs all layers and there's no way around this. To run only specific layers
-a notebook can be used. Build the config as normal, and then following the instructions in 
-[Getting Started - Run Via Notebook]({{%relref "GettingStarted"%}}#run-via-notebook). This example illustrates how 
-to run each of the three layers; Bronze, Silver, and Gold. In this scenario the Bronze(...) line would be commented
-out to result in only a Silver/Gold layer run.
+The main class parameters allows for a single pipeline (bronze, silver, or gold) or all to be run. Refer to the 
+[Getting Started - Run Via Main Class]({{%relref "GettingStarted"%}}#executing-overwatch-via-main-class) for more 
+information on how to run a single pipeline from main class. The same can also be done via a notebook run, refer to 
+[Getting Started - Run Via Notebook]({{%relref "GettingStarted"%}}#run-via-notebook) for more information on this.

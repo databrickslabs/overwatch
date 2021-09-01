@@ -12,21 +12,21 @@
     <title>ETL Process :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1630353058" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1630353058" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1630353058" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1630353058" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1630353058" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1630353058" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1630353058" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1630353058" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1630533868" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1630353058" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1630533868" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1630533868"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1630353058"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1630353058"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1630533868"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1630533868"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1630353058"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1630533868"></script>
 
     
   </div>
@@ -910,9 +910,12 @@ without fear of losing data (In the event of an issue we could simply restore a 
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;update overwatch_etl.pipeline_report set status = &#39;ROLLED_BACK&#39; where organization_id = &#39;&lt;ord_id&gt;&#39; and moduleID in (2011,3003) and (status = &#39;SUCCESS&#39; or status like &#39;EMPT%&#39;) &#34;</span><span style="color:#f92672">)</span>
 </code></pre></div><p>After performing the steps above, the next Overwatch run will load the data from 12-31 -&gt; current.
 
-<div class="notices warning" ><p>If back-loading more than 60 days, you must override the default primordialDateString in the config. Additionally, depending
-on data volume and cluster size, it may be best to only load 60 days at a time using the <em>maxDaysToLoad</em> config. This
-allows for the data to be loaded in chunks. Not necessary, but may have benefits depending on the situation.</p>
+<div class="notices note" ><p><strong>Rebuilding Spark Bronze</strong> &ndash; If you want to reprocess data in the spark modules, it&rsquo;s strongly recommended that you 
+<strong>never truncate / rebuild spark_events_bronze</strong> as the data is quite large and the source log files have probably been 
+removed from source due to retention policies. If you must spark bronze 
+you must also update one other table; <em>spark_events_processedfiles</em> in the etl database. If you&rsquo;re rolling back the
+spark modules from Feb 02, 2021 to Dec 31, 2020, you would need to delete the tracked files where Pipeline_SnapTS &gt;= 
+Dec 31, 2020 and failed = false and withinSpecifiedTimeRange = true.</p>
 </div>
 </p>
 
@@ -926,11 +929,10 @@ rebuilding entities with more than 60 days.</p>
 example above it&rsquo;s inefficient to run the bronze layer repeatedly to reprocess two tables in silver and gold. If 
 no new data is ingested into bronze, no modules outside of the two we rolled_back will have any new data and thus
 will essentially be skipped resulting in the re-processing of only the two tables we&rsquo;re working on.</p>
-<p>The main class entrypoint for Overwatch runs all layers and there&rsquo;s no way around this. To run only specific layers
-a notebook can be used. Build the config as normal, and then following the instructions in 
-<a href="https://databrickslabs.github.io/overwatch/gettingstarted/#run-via-notebook">Getting Started - Run Via Notebook</a>. This example illustrates how 
-to run each of the three layers; Bronze, Silver, and Gold. In this scenario the Bronze(&hellip;) line would be commented
-out to result in only a Silver/Gold layer run.</p>
+<p>The main class parameters allows for a single pipeline (bronze, silver, or gold) or all to be run. Refer to the 
+<a href="https://databrickslabs.github.io/overwatch/gettingstarted/#executing-overwatch-via-main-class">Getting Started - Run Via Main Class</a> for more 
+information on how to run a single pipeline from main class. The same can also be done via a notebook run, refer to 
+<a href="https://databrickslabs.github.io/overwatch/gettingstarted/#run-via-notebook">Getting Started - Run Via Notebook</a> for more information on this.</p>
 
 
 <footer class="footline">
@@ -1220,19 +1222,19 @@ out to result in only a Silver/Gold layer run.</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1630353058"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1630353058"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1630353058"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1630353058"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1630353058"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1630533868"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1630353058"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1630353058"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1630353058"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1630533868"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1630353058" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1630353058"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1630533868" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1630533868"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
