@@ -46,7 +46,7 @@ There are two primary sources of data that need to be configured:
 #### Step 1
 [Create or reuse an Event Hub namespace.](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-create)
 {{% notice warning %}}
-**Tht Event Hub Namespace MUST be in the same location as your control plane** 
+**The Event Hub Namespace MUST be in the same location as your control plane** 
 {{% /notice %}}
 
 {{% notice info %}}
@@ -81,7 +81,7 @@ Once created, get the connection string from the SAS Policy for the Event Hub, f
 
 eh-namespace --> eventhub --> shared access policies --> Connection String-primary key
 
-The connection string should begin with `Endpoing=sb://`. Note that the policy only needs the Listen permission
+The connection string should begin with `Endpoint=sb://`. Note that the policy only needs the Listen permission
 
 Click Add button and select Listen option for generate policies
 ![sas1](/images/EnvironmentSetup/sas1.png)
