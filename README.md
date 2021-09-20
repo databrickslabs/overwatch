@@ -1,3 +1,10 @@
+# ALERT -- GLOBAL AZURE OUTAGE
+Please note that there is a global Databricks Outage in Azure that is causing Overwatch to fail in all regions. The fix should be mitigated soon, please stand by.
+Error:
+```
+org.apache.spark.sql.AnalysisException: No such struct field records in ;
+```
+
 # Overwatch
 Calibrated Precision for your Databricks Unified Analytics Platform enabling governance and actionable intelligence.
 
