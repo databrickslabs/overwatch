@@ -55,6 +55,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       element_at('Properties, "sparkdatabricksapiurl").alias("WorkspaceURL"),
       element_at('Properties, "sparkjobGroupid").alias("JobGroupID"),
       element_at('Properties, "sparkdatabrickscloudProvider").alias("CloudProvider"),
+      element_at('Properties, "principalIdpObjectId").alias("principalIdpObjectId"),
       struct(
         element_at('Properties, "sparkdatabricksclusterSource").alias("ClusterSource"),
         element_at('Properties, "sparkdatabricksclusterUsageTagsautoTerminationMinutes").alias("AutoTerminationMinutes"),
@@ -412,13 +413,35 @@ trait SilverTransforms extends SparkSessionWrapper {
         .when('actionName =!= "create" && 'cluster_id.isNull, 'clusterId)
         .otherwise('cluster_id).alias("cluster_id"),
       when('cluster_name.isNull, 'clusterName).otherwise('cluster_name).alias("cluster_name"),
-      'driver_node_type_id, 'node_type_id, 'num_workers, 'autoscale,
-      'clusterWorkers.alias("actual_workers"), 'autotermination_minutes, 'enable_elastic_disk, 'start_cluster,
-      'clusterOwnerUserId, 'cluster_log_conf, 'init_scripts, 'custom_tags, 'ssh_public_keys,
-      'cluster_source, 'spark_env_vars, 'spark_conf,
+      'clusterState.alias("cluster_state"),
+      'driver_node_type_id,
+      'node_type_id,
+      'num_workers,
+      'autoscale,
+      'clusterWorkers.alias("actual_workers"),
+      'autotermination_minutes,
+      'enable_elastic_disk,
+      'start_cluster,
+      'clusterOwnerUserId,
+      'cluster_log_conf,
+      'init_scripts,
+      'custom_tags,
+      'ssh_public_keys,
+      'cluster_source,
+      'spark_env_vars,
+      'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
-      'acl_path_prefix, 'driver_instance_pool_id, 'instance_pool_id, 'instance_pool_name, 'spark_version, 'cluster_creator, 'idempotency_token,
-      'user_id, 'sourceIPAddress, 'single_user_name)
+      'acl_path_prefix,
+      'driver_instance_pool_id,
+      'instance_pool_id,
+      'instance_pool_name,
+      'spark_version,
+      'cluster_creator,
+      'idempotency_token,
+      'user_id,
+      'sourceIPAddress,
+      'single_user_name
+    )
 
     auditRawDF
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
@@ -539,47 +562,49 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val clusterBaseDF = clusterBase(df)
 
-    val driverSnapLookup =  pools_snapshot.asDF
-      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
-      .select(
-        'timestamp, 'organization_id,
-        'instance_pool_id.alias("driver_instance_pool_id"),
-        'instance_pool_name.alias("pool_snap_driver_instance_pool_name"),
-        'node_type_id.alias("pool_snap_driver_node_type")
-      )
+    val (driverPoolSnapLookup: Option[DataFrame], workerPoolSnapLookup: Option[DataFrame]) = if (pools_snapshot.exists) {
+      val poolSnapBase = pools_snapshot.asDF
+        .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
+      (
+        Some(poolSnapBase.select(
+          'timestamp, 'organization_id,
+          'instance_pool_id.alias("driver_instance_pool_id"),
+          'instance_pool_name.alias("pool_snap_driver_instance_pool_name"),
+          'node_type_id.alias("pool_snap_driver_node_type"))),
+        Some(poolSnapBase.select(
+          'timestamp, 'organization_id,
+          'instance_pool_id,
+          'instance_pool_name.alias("pool_snap_instance_pool_name"),
+          'node_type_id.alias("pool_snap_node_type"))
+      ))
+    }  else (None, None)
 
-    val workerSnapLookup =  pools_snapshot.asDF
-      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
-      .select(
-        'timestamp, 'organization_id,
-        'instance_pool_id,
-        'instance_pool_name.alias("pool_snap_instance_pool_name"),
-        'node_type_id.alias("pool_snap_node_type")
-      )
 
-    val driverPoolLookup = auditRawTable.asDF
-      .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
-      .select(
-        'timestamp, 'organization_id,
-        when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id"))
-          .otherwise($"requestParams.instance_pool_id") // actionName == edit
-          .alias("driver_instance_pool_id"),
-        $"requestParams.instance_pool_name".alias("driver_instance_pool_name"),
-        $"requestParams.node_type_id".alias("pool_driver_node_type")
+    val (driverPoolLookup: Option[DataFrame], workerPoolLookup: Option[DataFrame]) = if ( // if instance pools found in audit logs
+      !auditRawTable.asDF
+        .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit")).isEmpty) {
+      val basePoolsDF = auditRawTable.asDF
+        .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
+      (
+        Some(basePoolsDF.select(
+          'timestamp, 'organization_id,
+          when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id"))
+            .otherwise($"requestParams.instance_pool_id") // actionName == edit
+            .alias("driver_instance_pool_id"),
+          $"requestParams.instance_pool_name".alias("driver_instance_pool_name"),
+          $"requestParams.node_type_id".alias("pool_driver_node_type")
+        )),
+        Some(basePoolsDF.select(
+          'timestamp, 'organization_id,
+          when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id"))
+            .otherwise($"requestParams.instance_pool_id") // actionName == edit
+            .alias("instance_pool_id"),
+          $"requestParams.instance_pool_name",
+          $"requestParams.node_type_id".alias("pool_node_type")
+        ))
       )
+    } else (None, None)
 
-    val workerPoolLookup = auditRawTable.asDF
-      .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
-      .select(
-        'timestamp, 'organization_id,
-        when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id"))
-          .otherwise($"requestParams.instance_pool_id") // actionName == edit
-          .alias("instance_pool_id"),
-        $"requestParams.instance_pool_name",
-        $"requestParams.node_type_id".alias("pool_node_type")
-      )
-
-    // Issue_37 -- this will need to be reviewed for mixed pools (i.e. driver of different type)
     val filledDriverType =
       when('driver_instance_pool_id.isNotNull, coalesce('pool_driver_node_type, 'pool_snap_driver_node_type))
         .when('instance_pool_id.isNotNull && 'driver_instance_pool_id.isNull, coalesce('pool_node_type, 'pool_snap_node_type))
@@ -647,27 +672,51 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('rnk === 1 && 'rn === 1)
       .select('organization_id, 'cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
 
-    clusterBaseDF
-      .filter('actionName.isin("create", "edit"))
-      .filter('cluster_source =!= "SQL") // not SQL Endpoints
-      .toTSDF("timestamp", "organization_id", "instance_pool_id")
-      .lookupWhen(
-        workerPoolLookup
-          .toTSDF("timestamp", "organization_id", "instance_pool_id"), tsPartitionVal = 6
-      )
-      .lookupWhen(
-        workerSnapLookup
-          .toTSDF("timestamp", "organization_id", "instance_pool_id"), tsPartitionVal = 6
-      ).df
-      .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
-      .lookupWhen(
-        driverPoolLookup
-          .toTSDF("timestamp", "organization_id", "driver_instance_pool_id"), tsPartitionVal = 6
-      )
-      .lookupWhen(
-        driverSnapLookup
-          .toTSDF("timestamp", "organization_id", "driver_instance_pool_id"), tsPartitionVal = 6
-      ).df
+    // lookup pools node types from audit logs if records present
+    val clusterBaseWithPools = if (driverPoolLookup.nonEmpty) {
+      clusterBaseDF
+        .filter('actionName.isin("create", "edit"))
+        .toTSDF("timestamp", "organization_id", "instance_pool_id")
+        .lookupWhen(
+          workerPoolLookup.get
+            .toTSDF("timestamp", "organization_id", "instance_pool_id")
+        ).df
+        .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
+        .lookupWhen(
+          driverPoolLookup.get
+            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
+        ).df
+    } else { // driver pool does not exist -- filter and add null lookup cols
+      clusterBaseDF.filter('actionName.isin("create", "edit"))
+        .withColumn("driver_instance_pool_id", lit(null).cast("string"))
+        .withColumn("driver_instance_pool_name", lit(null).cast("string"))
+        .withColumn("pool_driver_node_type", lit(null).cast("string"))
+        .withColumn("pool_node_type", lit(null).cast("string"))
+    }
+
+    // lookup pools node types from pools snapshots when snapshots exist
+    val clusterBaseWithPoolsAndSnapPools = if (driverPoolSnapLookup.nonEmpty) {
+      clusterBaseWithPools
+        .toTSDF("timestamp", "organization_id", "instance_pool_id")
+        .lookupWhen(
+          workerPoolSnapLookup.get
+            .toTSDF("timestamp", "organization_id", "instance_pool_id")
+        ).df
+        .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
+        .lookupWhen(
+          driverPoolSnapLookup.get
+            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
+        ).df
+    } else {
+      clusterBaseWithPools
+        .withColumn("pool_snap_driver_instance_pool_name", lit(null).cast("string"))
+        .withColumn("pool_snap_driver_node_type", lit(null).cast("string"))
+        .withColumn("pool_snap_instance_pool_name", lit(null).cast("string"))
+        .withColumn("pool_snap_node_type", lit(null).cast("string"))
+    }
+
+
+    clusterBaseWithPoolsAndSnapPools
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("organization_id", "cluster_id"), "left")
       .join(clustersRemoved, Seq("organization_id", "cluster_id"), "left")
@@ -839,6 +888,17 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     val lastJobStatus = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val lastJobStatusUnbound = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp)
+    val jobCluster = struct(
+      'existing_cluster_id.alias("existing_cluster_id"),
+      'new_cluster.alias("new_cluster")
+    )
+    val jobClusterSchema = StructType(
+      Seq(
+        StructField("existing_cluster_id", StringType, nullable = true),
+        StructField("new_cluster", StringType, nullable = true)
+      )
+    )
 
     val jobStatusBase = jobsBase
       .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
@@ -879,6 +939,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           when($"cluster_spec.existing_cluster_id".isNull && $"cluster_spec.new_cluster".isNull, get_json_object('lookup_settings, "$.new_cluster")).otherwise($"cluster_spec.new_cluster").alias("new_cluster")
         )
       ).drop("existing_cluster_id", "new_cluster", "x", "x2") // drop temp columns and old version of clusterSpec components
+      // TODO -- test/validate this section below fillForward_deprecated
       .withColumn("job_type", when('job_type.isNull, last('job_type, true).over(lastJobStatus)).otherwise('job_type))
       .withColumn("schedule", fillForward_deprecated("schedule", lastJobStatus))
       .withColumn("timeout_seconds", fillForward_deprecated("timeout_seconds", lastJobStatus))
@@ -1000,10 +1061,7 @@ trait SilverTransforms extends SparkSessionWrapper {
      * but for now, this is required or multiple records will be created in the fact due to the multiple events.
      * Confirmed that the first event emitted is the correct event as per ES-65402
      */
-    val firstRunSubmitW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
-    val firstCompletionW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
-    val firstRunStartW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
-    val firstCancellationW = Window.partitionBy('organization_id, 'run_id).orderBy('timestamp)
+    val firstRunSemanticsW = Window.partitionBy('runId).orderBy('timestamp)
 
     // Completes must be >= etlStartTime as it is the driver endpoint
     // All joiners to Completes may be from the past up to N days as defined in the incremental df
@@ -1011,8 +1069,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     val allCompletes = jobsAuditIncremental
       .filter('date >= etlStartTime.asColumnTS.cast("date") && 'timestamp >= lit(etlStartTime.asUnixTimeMilli))
       .filter('actionName.isin("runSucceeded", "runFailed"))
-      .withColumn("rnk", rank().over(firstCompletionW))
-      .withColumn("rn", row_number().over(firstCompletionW))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .select(
         'serviceName, 'actionName,
@@ -1033,8 +1091,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     val allCancellations = jobsAuditIncremental
       .filter('date >= etlStartTime.asColumnTS.cast("date") && 'timestamp >= lit(etlStartTime.asUnixTimeMilli))
       .filter('actionName.isin("cancel"))
-      .withColumn("rnk", rank().over(firstCancellationW))
-      .withColumn("rn", row_number().over(firstCancellationW))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
@@ -1051,6 +1109,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     // DF for jobs launched with actionName == "runNow"
     val runNowStart = jobsAuditIncremental
       .filter('actionName.isin("runNow"))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
+      .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
         get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
@@ -1079,8 +1140,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     val runSubmitStart = jobsAuditIncremental
       .filter('actionName.isin("submitRun"))
       .withColumn("runId", get_json_object($"response.result", "$.run_id").cast("long"))
-      .withColumn("rnk", rank().over(firstRunSubmitW))
-      .withColumn("rn", row_number().over(firstRunSubmitW))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
@@ -1113,8 +1174,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Find the corresponding runStart action for the completed jobs
     val runStarts = jobsAuditIncremental
       .filter('actionName.isin("runStart"))
-      .withColumn("rnk", rank().over(firstRunStartW))
-      .withColumn("rn", row_number().over(firstRunStartW))
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .select(
         'organization_id, 'date,
@@ -1172,7 +1233,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .join(runStarts, Seq("runId", "organization_id"), "left")
       .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
       .withColumn("jobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
-      .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null)))
+      .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null).cast("string")))
       .select(
         'runId.cast("long"), 'jobId.cast("long"), 'idInJob, 'jobRunTime, 'run_name,
         'jobClusterType, 'jobTaskType, 'jobTerminalState,
@@ -1393,7 +1454,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSpecLookup")
               .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 64
+            tsPartitionVal = 16
           ).df
 
         // get cluster_id by cluster_name (derived)
@@ -1412,7 +1473,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .lookupWhen(
             clusterLookups("clusterSnapLookup")
               .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 64
+            tsPartitionVal = 16
           ).df
 
         automatedClusterMetaLookupBuilder = automatedClusterMetaLookupBuilder

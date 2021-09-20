@@ -23,7 +23,7 @@ class Database(config: Config) extends SparkSessionWrapper {
   }
 
   private def registerTarget(table: PipelineTable): Unit = {
-    if (!table.exists) {
+    if (!table.exists(catalogValidation = true) && table.exists(pathValidation = true)) {
       val createStatement = s"create table ${table.tableFullName} " +
         s"USING DELTA location '${table.tableLocation}'"
       val logMessage = s"CREATING TABLE: ${table.tableFullName} at ${table.tableLocation}\n\n$createStatement"
@@ -193,22 +193,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     }
     registerTarget(target)
     true
-  }
-
-  def readTable(tableName: String): DataFrame = {
-    spark.table(s"${_databaseName}.${tableName}")
-  }
-
-  def readPath(path: String, format: String = "delta"): DataFrame = {
-    spark.read.format(format).load(path)
-  }
-
-  def tableExists(tableName: String): Boolean = {
-    spark.catalog.tableExists(_databaseName, tableName)
-  }
-
-  def exists: Boolean = {
-    spark.catalog.databaseExists(_databaseName)
   }
 
 }

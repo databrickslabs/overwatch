@@ -140,7 +140,8 @@ object SchemaTools extends SparkSessionWrapper {
       })
       val newRawMap = map(mapCols.toSeq: _*)
       if (dropEmptyKeys) {
-        when(newRawMap.isNull, lit(null)).otherwise(removeEmptyKeys(newRawMap)).alias(mapColName)
+        when(newRawMap.isNull, lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)))
+          .otherwise(removeEmptyKeys(newRawMap)).alias(mapColName)
       } else newRawMap.alias(mapColName)
     } else {
       lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)

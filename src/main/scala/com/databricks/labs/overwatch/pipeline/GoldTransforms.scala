@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, TimeTypes}
+import com.databricks.labs.overwatch.utils.{BadConfigException, SparkSessionWrapper, TimeTypes}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
@@ -168,6 +168,119 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
   }
 
+  /**
+   * The instanceDetails costing lookup table is often edited direclty by users. Thus, each time this module runs
+   * the instanceDetails table is validated before continuing to guard against erroneous/missing cost data.
+   * As of Overwatch v 0.4.2, the instanceDetails table is a type-2 table. The record with and activeUntil column
+   * with a value of null will be considered the active record. There must be only one active record per key and
+   * there must be no gaps between dates. ActiveUntil expires on 06-01-2021 for node type X then there must be
+   * another record with activeUntil beginning on 06-01-2021 and a null activeUntil for this validation to pass.
+   *
+   * @param instanceDetails ETL table named instanceDetails referenced by the cloudDetail Target
+   * @param snapDate        snapshot date of the pipeline "yyyy-MM-dd" format
+   */
+  private def validateInstanceDetails(
+                                       instanceDetails: DataFrame,
+                                       snapDate: String
+                                     ): Unit = {
+    val w = Window.partitionBy(lower(trim('API_name))).orderBy('activeFrom)
+    val wKeyCheck = Window.partitionBy(lower(trim('API_name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
+    val dfCheck = instanceDetails
+      .withColumn("activeUntil", coalesce('activeUntil, lit(snapDate)))
+      .withColumn("previousUntil", lag('activeUntil, 1).over(w))
+      .withColumn("rnk", rank().over(wKeyCheck))
+      .withColumn("rn", row_number().over(wKeyCheck))
+      .withColumn("isValid", when('previousUntil.isNull, lit(true)).otherwise(
+        'activeFrom === 'previousUntil
+      ))
+      .filter(!'isValid || 'rnk > 1 || 'rn > 1)
+
+    if (!dfCheck.isEmpty) {
+      val erroredRecordsReport = instanceDetails
+        .withColumn("API_name", lower(trim('API_name)))
+        .join(
+          dfCheck
+            .select(
+              lower(trim('API_name)).alias("API_name"),
+              'rnk, 'rn, 'previousUntil,
+              datediff('activeFrom, 'previousUntil).alias("daysBetweenCurrentAndPrevious")
+            ),
+          Seq("API_name")
+        )
+        .orderBy('API_name, 'activeFrom, 'activeUntil)
+
+      println("InstanceDetails Error Report: ")
+      erroredRecordsReport.show(numRows = 1000, false)
+
+      val badRecords = dfCheck.count()
+      val badRawKeys = dfCheck.select('API_name).as[String].collect().mkString(", ")
+      val errMsg = s"instanceDetails Invalid: Each key (API_name) must be unique for a given time period " +
+        s"(activeFrom --> activeUntil) AND the previous costs activeUntil must run through the previous date " +
+        s"such that the function 'datediff' returns 1. Please correct the instanceDetails table before continuing " +
+        s"with this module.\nThe API_name keys with errors are: $badRawKeys. A total of $badRecords records were " +
+        s"found in conflict."
+      throw new BadConfigException(errMsg)
+    }
+  }
+
+  private def getRunningSwitch(c: Column): Column = {
+    when(c === "TERMINATING", lit(false))
+      .when(c.isin("CREATING", "STARTING"), lit(true))
+      .otherwise(lit(null).cast("boolean"))
+  }
+  /**
+   * Temporary nastiness necessary to handle edge cases of states between runs. This will go away in 0.5.1
+   * @param df
+   * @param timeFilter
+   * @return
+   */
+  private def getEventStates(df: DataFrame, timeFilter: Column): DataFrame = {
+    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+    val stateUnboundReverse = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
+    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
+    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
+    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull &&
+      lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
+
+    df
+      .selectExpr("*", "details.*")
+      .drop("details")
+      .filter(timeFilter)
+      .withColumn("rnk", rank().over(stateUnboundReverse))
+      .withColumn("rn", row_number().over(stateUnboundReverse))
+      .withColumn( // if incremental df doesn't have a running switch get it from latest previous state
+        "runningSwitch",
+        coalesce(getRunningSwitch('type))//, getRunningSwitch('last_state_previous_run))
+      )
+      .withColumn(
+        "previousSwitch",
+        when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))
+      )
+      // pull values forward to populate final state
+      // temp workaround until 0.5.1
+      .withColumn(
+        "invalidEventChainHandler",
+        when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
+      )
+      .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
+      .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
+      .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
+      .withColumn("isRunning",
+        when('imputedTerminationEvent, lit(false))
+          .otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
+      .withColumn(
+        "current_num_workers",
+        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
+      )
+      .withColumn(
+        "target_num_workers",
+        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+          .when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
+          .otherwise(coalesce('target_num_workers, 'current_num_workers))
+      )
+  }
+
   protected def buildClusterStateFact(
                                        instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
@@ -213,12 +326,12 @@ trait GoldTransforms extends SparkSessionWrapper {
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         nodeTypeLookup.toTSDF("timestamp", "organization_id", "cluster_id"),
-        maxLookAhead = Long.MaxValue,
-        tsPartitionVal = 64
+        maxLookAhead = 1,
+        tsPartitionVal = 16
       ).lookupWhen(
       nodeTypeLookup2.toTSDF("timestamp", "organization_id", "cluster_id"),
-      maxLookAhead = Long.MaxValue,
-      tsPartitionVal = 64
+      maxLookAhead = 1,
+      tsPartitionVal = 16
     ).df.drop("timestamp")
       .alias("clusterPotential")
       .join( // estimated node type details at start time of run. If contract changes during state, not handled but very infrequent and negligible impact
@@ -372,7 +485,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .lookupWhen(
           clusterPotentialInitialState
             .toTSDF("timestamp", "organization_id", "cluster_id"),
-          tsPartitionVal = 64, maxLookAhead = Long.MaxValue
+          tsPartitionVal = 16, maxLookAhead = 1L
         ).df
         .drop("timestamp")
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
@@ -387,7 +500,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .lookupWhen(
           clusterPotentialTerminalState
             .toTSDF("timestamp", "organization_id", "cluster_id"),
-          tsPartitionVal = 64, maxLookback = 0L, maxLookAhead = Long.MaxValue
+          tsPartitionVal = 8, maxLookback = 0L, maxLookAhead = 1L
         ).df
         .drop("timestamp")
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull && 'unixTimeMS_state_end > $"job_runtime.endEpochMS")
@@ -595,40 +708,37 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val jobGroupW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.JobGroupID")
     val executionW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.ExecutionID")
+    val principalObjectIDW = Window.partitionBy($"PowerProperties.principalIdpObjectId")
     val isolationIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBIsolationID")
-    val oAuthIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.AzureOAuth2ClientID")
-    val rddScopeW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.RDDScope")
     val replIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBREPLID")
+      .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
     val notebookW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.NotebookID")
       .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     val cloudSpecificUserImputations = if (cloudProvider == "azure") {
       df.withColumn("user_email", $"PowerProperties.UserEmail")
         .withColumn("user_email",
-          when('user_email.isNull && $"PowerProperties.AzureOAuth2ClientID".isNotNull,
-            first('user_email, ignoreNulls = true).over(oAuthIDW)).otherwise('user_email))
+          when('user_email.isNull,
+            first('user_email, ignoreNulls = true).over(principalObjectIDW)).otherwise('user_email))
     } else {
       df.withColumn("user_email", $"PowerProperties.UserEmail")
     }
 
     val sparkJobsWImputedUser = cloudSpecificUserImputations
       .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.SparkDBIsolationID".isNotNull,
+        when('user_email.isNull,
           first('user_email, ignoreNulls = true).over(isolationIDW)).otherwise('user_email))
       .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.SparkDBREPLID".isNotNull,
-          first('user_email, ignoreNulls = true).over(replIDW)).otherwise('user_email))
-      .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.RDDScope".isNotNull,
-          first('user_email, ignoreNulls = true).over(rddScopeW)).otherwise('user_email))
-      .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.JobGroupID".isNotNull,
+        when('user_email.isNull,
           first('user_email, ignoreNulls = true).over(jobGroupW)).otherwise('user_email))
       .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.ExecutionID".isNotNull,
+        when('user_email.isNull,
           first('user_email, ignoreNulls = true).over(executionW)).otherwise('user_email))
       .withColumn("user_email",
-        when('user_email.isNull && $"PowerProperties.NotebookID".isNotNull,
+        when('user_email.isNull,
+          last('user_email, ignoreNulls = true).over(replIDW)).otherwise('user_email))
+      .withColumn("user_email",
+        when('user_email.isNull,
           last('user_email, ignoreNulls = true).over(notebookW)).otherwise('user_email))
 
     val sparkJobCols: Array[Column] = Array(

@@ -92,7 +92,7 @@ object Upgrade extends SparkSessionWrapper {
           withCreateDate = false,
           withOverwatchRunID = false
         )
-        prodWorkspace.database.write(upgradedDF, upgradedJobsSnapTarget, lit(null))
+        prodWorkspace.database.write(upgradedDF, upgradedJobsSnapTarget, lit(null).cast("timestamp"))
         upgradeStatus.append(UpgradeReport(jobsSnapshotTarget.databaseName, jobsSnapshotTarget.name, Some("SUCCESS")))
 
         // clusters table
@@ -109,7 +109,7 @@ object Upgrade extends SparkSessionWrapper {
             withCreateDate = false,
             withOverwatchRunID = false
           )
-          prodWorkspace.database.write(newClusterSnap, upgradeClusterSnapTarget, lit(null))
+          prodWorkspace.database.write(newClusterSnap, upgradeClusterSnapTarget, lit(null).cast("timestamp"))
           upgradeStatus.append(UpgradeReport(clusterSnapshotTarget.databaseName, clusterSnapshotTarget.name, Some("SUCCESS")))
         }
 
@@ -179,7 +179,7 @@ object Upgrade extends SparkSessionWrapper {
           withOverwatchRunID = false
         )
 
-        bronzePipeline.database.write(upgradedInstanceDetails, upgradeTarget, lit(null))
+        bronzePipeline.database.write(upgradedInstanceDetails, upgradeTarget, lit(null).cast("timestamp"))
         upgradeStatus.append(UpgradeReport(prodWorkspace.getConfig.databaseName, upgradeTarget.name, Some("SUCCESS")))
       } else {
         val errMsg = s"${instanceDetailsTarget.tableFullName} does not exist. There's no need to upgrade this table " +
@@ -203,7 +203,7 @@ object Upgrade extends SparkSessionWrapper {
           withOverwatchRunID = false
         )
 
-        goldPipeline.database.write(upgradedJRCP, upgradeTarget, lit(null))
+        goldPipeline.database.write(upgradedJRCP, upgradeTarget, lit(null).cast("timestamp"))
         upgradeStatus.append(UpgradeReport(prodWorkspace.getConfig.databaseName, jrcpGold.name, Some("SUCCESS")))
       } else {
         val errMsg = s"${jrcpGold.name} doesn't exist in the current schema and will not be upgraded. This is not " +

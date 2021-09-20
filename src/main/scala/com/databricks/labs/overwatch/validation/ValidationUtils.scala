@@ -462,7 +462,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
       val modulesToBeReset = moduleTargets.map(_.module.moduleId)
       val w = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
 
-      val latestMatchedModules = spark.table(pipelineStateTable.tableFullName)
+      val latestMatchedModules = pipelineStateTable.asDF
         .filter('status === "SUCCESS" || 'status.startsWith("EMPTY"))
         .filter('moduleId.isin(modulesToBeReset: _*)) // limit to the modules identified from the scope
         .withColumn("rnk", rank().over(w))

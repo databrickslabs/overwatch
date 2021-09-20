@@ -69,6 +69,7 @@ case class AuditLogConfig(
                            auditLogFormat: String = "json",
                            azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None
                          )
+
 case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
 
 case class OverwatchParams(auditLogConfig: AuditLogConfig,
@@ -88,7 +89,8 @@ case class ParsedConfig(
                          tokenUsed: String, //TODO - Convert to enum
                          targetDatabase: String,
                          targetDatabaseLocation: String,
-                         passthroughLogPath: Option[String]
+                         passthroughLogPath: Option[String],
+                         packageVersion: String
                        )
 
 case class ModuleStatusReport(
@@ -141,7 +143,9 @@ case class SimplifiedModuleStatusReport(
                                        )
 
 case class IncrementalFilter(cronField: StructField, low: Column, high: Column)
+
 case class UpgradeReport(db: String, tbl: String, errorMsg: Option[String])
+
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
   val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value

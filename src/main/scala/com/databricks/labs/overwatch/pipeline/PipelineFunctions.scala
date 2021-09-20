@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, InvalidInstanceDetailsException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
@@ -13,6 +14,24 @@ object PipelineFunctions {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   private val uriSchemeRegex = "^([a-zA-Z][-.+a-zA-Z0-9]*):/.*".r
+
+  /**
+   * parses the value for the connection string from the scope/key defined if the pattern matches {{secrets/scope/key}}
+   * otherwise return the true string value
+   * https://docs.databricks.com/security/secrets/secrets.html#store-the-path-to-a-secret-in-a-spark-configuration-property
+   * @param connectionString
+   * @return
+   */
+  def parseEHConnectionString(connectionString: String): String = {
+    val secretsRE = "\\{\\{secrets/([^/]+)/([^}]+)\\}\\}".r
+
+    secretsRE.findFirstMatchIn(connectionString) match {
+      case Some(i) =>
+        dbutils.secrets.get(i.group(1), i.group(2))
+      case None =>
+        connectionString
+    }
+  }
 
   /**
    * Ensure no duplicate slashes in path and default to dbfs:/ URI prefix where no uri specified to result in
@@ -138,8 +157,8 @@ object PipelineFunctions {
       // TODO -- handle streaming until Module refactor with source -> target mappings
       val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
         target.name match {
-          case "audit_log_bronze" => spark.table(s"${config.databaseName}.audit_log_raw_events")
-            .rdd.partitions.length * target.shuffleFactor
+          case "audit_log_bronze" =>
+            target.asDF.rdd.partitions.length * target.shuffleFactor
           case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
         }
       } else {
