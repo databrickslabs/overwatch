@@ -1,4 +1,4 @@
-# ALERT -- GLOBAL AZURE OUTAGE
+# ALERT -- GLOBAL AZURE OUTAGE September 20, 2021 7:27 Easter Daylight Time
 Please note that there is a global Databricks Outage in Azure that is causing Overwatch to fail in all regions. The fix should be mitigated soon, please stand by.
 Error:
 ```
