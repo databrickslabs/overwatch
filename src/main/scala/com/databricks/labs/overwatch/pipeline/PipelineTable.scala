@@ -5,10 +5,10 @@ import com.databricks.labs.overwatch.utils.WriteMode.WriteMode
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, DataFrame}
-import org.apache.spark.sql.catalyst.catalog.CatalogTable
 
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
 //  also add ruleStrategy: Enum(Kill, Quarantine, Ignore) to determine when to require them

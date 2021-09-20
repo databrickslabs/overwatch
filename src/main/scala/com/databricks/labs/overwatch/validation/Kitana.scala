@@ -1,21 +1,13 @@
 package com.databricks.labs.overwatch.validation
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Module, Pipeline, PipelineTable, Silver}
+import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline.{Initializer, Module, Pipeline, PipelineTable}
 import com.databricks.labs.overwatch.utils.JsonUtils.objToJson
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
-import org.apache.spark.sql.functions._
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.expressions.Window
-
-import java.sql.Timestamp
-import java.text.SimpleDateFormat
-import java.time.{Duration, LocalDate}
-import scala.collection.parallel.ForkJoinTaskSupport
-import java.util.concurrent.ForkJoinPool
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, Dataset}
 
 case class SnapReport(tableFullName: String,
                       from: java.sql.Timestamp,

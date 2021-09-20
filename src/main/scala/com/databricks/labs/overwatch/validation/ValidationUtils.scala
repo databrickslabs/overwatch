@@ -1,24 +1,21 @@
 package com.databricks.labs.overwatch.validation
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
-import io.delta.tables.{DeltaMergeBuilder, DeltaTable}
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
-import java.time.{Duration, LocalDate}
+import java.time.Duration
 import java.util.concurrent.ForkJoinPool
-import scala.collection.parallel.{ForkJoinTaskSupport, ParSeq}
 import scala.collection.parallel.mutable.ParArray
+import scala.collection.parallel.{ForkJoinTaskSupport, ParSeq}
 
 
 class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralellism: Option[Int]) extends SparkSessionWrapper {

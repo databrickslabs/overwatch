@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.streaming.StreamingQueryListener._
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}

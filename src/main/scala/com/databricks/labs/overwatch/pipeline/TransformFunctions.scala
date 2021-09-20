@@ -6,7 +6,7 @@ import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 
 import java.time.LocalDate
 

@@ -1,12 +1,9 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.pipeline.Pipeline.deriveLocalDate
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-
-import java.time.{Instant, LocalDate}
 
 class Module(
               val moduleId: Int,

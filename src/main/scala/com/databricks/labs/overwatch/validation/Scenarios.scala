@@ -1,12 +1,12 @@
 package com.databricks.labs.overwatch.validation
 
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper
-import com.databricks.labs.validation.utils.Structures._
-import com.databricks.labs.validation._
-import org.apache.spark.sql.{Column, DataFrame}
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.expressions.Window
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper
+import com.databricks.labs.validation._
+import com.databricks.labs.validation.utils.Structures._
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{Column, DataFrame}
 
 object Scenarios extends SparkSessionWrapper {
 

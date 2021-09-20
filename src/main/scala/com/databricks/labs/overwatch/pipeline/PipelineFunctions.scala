@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{BadConfigException, Config, IncrementalFilter, InvalidInstanceDetailsException}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, InvalidInstanceDetailsException}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
