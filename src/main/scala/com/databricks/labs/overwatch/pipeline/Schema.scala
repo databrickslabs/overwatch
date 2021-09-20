@@ -295,22 +295,27 @@ object Schema extends SparkSessionWrapper {
     3005 -> StructType(Seq(
       StructField("organization_id", StringType, nullable = false),
       StructField("cluster_id", StringType, nullable = true),
-      StructField("details", StructType(Seq(
-        StructField("cluster_size",
-          StructType(Seq(
-            StructField("autoscale",
-              StructType(Seq(
-                StructField("max_workers", LongType, nullable = true),
-                StructField("min_workers", LongType, nullable = true)
-              )), nullable = true),
-            StructField("num_workers", LongType, nullable = true)
-          )), nullable = true),
-        StructField("current_num_workers", LongType, nullable = true)
-      )), nullable = true),
+      StructField("isRunning", BooleanType, nullable = true),
       StructField("timestamp", LongType, nullable = true),
-      StructField("type", StringType, nullable = true)
+      StructField("state", StringType, nullable = true),
+      StructField("current_num_workers", LongType, nullable = true),
+      StructField("target_num_workers", LongType, nullable = true),
+      StructField("counter_reset", IntegerType, nullable = true),
+      StructField("reset_partition", LongType, nullable = true),
+      StructField("unixTimeMS_state_start", LongType, nullable = true),
+      StructField("unixTimeMS_state_end", LongType, nullable = true),
+      StructField("timestamp_state_start", TimestampType, nullable = true),
+      StructField("timestamp_state_end", TimestampType, nullable = true),
+      StructField("state_start_date", DateType, nullable = true),
+      StructField("uptime_in_state_S", DoubleType, nullable = true),
+      StructField("uptime_since_restart_S", DoubleType, nullable = true),
+      StructField("cloud_billable", BooleanType, nullable = true),
+      StructField("databricks_billable", BooleanType, nullable = true),
+      StructField("uptime_in_state_H", DoubleType, nullable = true),
+      StructField("state_dates", ArrayType(DateType, containsNull = true), nullable = true),
+      StructField("days_in_state", IntegerType, nullable = true)
     )),
-    // Account Mod Gold
+  // Account Mod Gold
     3007 -> StructType(Seq(
       StructField("organization_id", StringType, nullable = false),
       StructField("timestamp", LongType, nullable = true),

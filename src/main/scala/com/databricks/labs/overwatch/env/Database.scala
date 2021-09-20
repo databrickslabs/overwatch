@@ -133,11 +133,11 @@ class Database(config: Config) extends SparkSessionWrapper {
     if (target.mode == WriteMode.merge) { // DELTA MERGE / UPSERT
       val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")
-      val targetColumns = deltaTarget.toDF.columns
-      val immutableColumns = target.keys ++ target.partitionBy ++ target.incrementalColumns
-      val columnsToUpdateOnMatch = targetColumns.filterNot(c => immutableColumns.contains(c))
+//      val targetColumns = deltaTarget.toDF.columns
+      val immutableColumns = (target.keys ++ target.partitionBy ++ target.incrementalColumns).distinct
+//      val columnsToUpdateOnMatch = targetColumns.filterNot(c => immutableColumns.contains(c))
 
-      val mergeCondition: String = target.keys.map(k => s"updates.$k = target.$k").mkString(" AND ")
+      val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")
 //      val updateExpr: Map[String, String] = columnsToUpdateOnMatch.map(updateCol => {
 //        s"target.$updateCol" -> s"updates.$updateCol"
 //      }).toMap

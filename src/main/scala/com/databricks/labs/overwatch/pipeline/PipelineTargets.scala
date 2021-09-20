@@ -134,8 +134,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val executorsTarget: PipelineTable = PipelineTable(
       name = "spark_executors_silver",
-      _keys = Array("SparkContextID", "ExecutorID"),
+      _keys = Array("SparkContextID", "ExecutorID", "addedTimestamp"),
       config,
+      _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("addedTimestamp"),
       autoOptimize = true,
@@ -144,8 +145,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val executionsTarget: PipelineTable = PipelineTable(
       name = "spark_Executions_silver",
-      _keys = Array("SparkContextID", "ExecutionID"),
+      _keys = Array("SparkContextID", "ExecutionID", "startTimestamp"),
       config,
+      _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("startTimestamp"),
       autoOptimize = true,
@@ -154,8 +156,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val jobsTarget: PipelineTable = PipelineTable(
       name = "spark_jobs_silver",
-      _keys = Array("SparkContextID", "JobID"),
+      _keys = Array("SparkContextID", "JobID", "startDate", "startTimestamp"),
       config,
+      _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
       autoOptimize = true,
@@ -164,8 +167,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val stagesTarget: PipelineTable = PipelineTable(
       name = "spark_stages_silver",
-      _keys = Array("SparkContextID", "StageID", "StageAttemptID"),
+      _keys = Array("SparkContextID", "StageID", "StageAttemptID", "startDate", "startTimestamp"),
       config,
+      _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
       autoOptimize = true,
@@ -174,8 +178,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val tasksTarget: PipelineTable = PipelineTable(
       name = "spark_tasks_silver",
-      _keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID", "TaskAttempt", "ExecutorID", "Host"),
+      _keys = Array("SparkContextID", "StageID", "StageAttemptID", "TaskID", "TaskAttempt", "ExecutorID", "Host", "startDate", "startTimestamp"),
       config,
+      _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
       shuffleFactor = 5,

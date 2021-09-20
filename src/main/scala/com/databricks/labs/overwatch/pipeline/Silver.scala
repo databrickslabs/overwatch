@@ -112,12 +112,15 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
   )
+  private val sparkEventsTarget = BronzeTargets.sparkEventLogsTarget
   lazy private[overwatch] val executorsModule = Module(2003, "Silver_SPARK_Executors", this, Array(1006))
     .withSparkOverrides(sparkExecutorsSparkOverrides)
   lazy private val appendExecutorsProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(executorsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(executor()),
+    sparkEventsTarget.asIncrementalDF(executorsModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(executor(
+      sparkEventsTarget.asIncrementalDF(executorsModule, 30, sparkEventsTarget.incrementalColumns: _*),
+      executorsModule.fromTime, executorsModule.untilTime
+    )),
     append(SilverTargets.executorsTarget)
   )
 
@@ -136,9 +139,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val executionsModule = Module(2005, "Silver_SPARK_Executions", this, Array(1006), 8.0)
     .withSparkOverrides(sparkExecutionsSparkOverrides)
   lazy private val appendExecutionsProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(executionsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(sqlExecutions()),
+    sparkEventsTarget.asIncrementalDF(executionsModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(sqlExecutions(
+      sparkEventsTarget.asIncrementalDF(executionsModule, 3, sparkEventsTarget.incrementalColumns: _*),
+      executionsModule.fromTime, executionsModule.untilTime
+    )),
     append(SilverTargets.executionsTarget)
   )
 
@@ -150,9 +155,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sparkJobsModule = Module(2006, "Silver_SPARK_Jobs", this, Array(1006), 8.0)
     .withSparkOverrides(sparkJobsSparkOverrides)
   lazy private val appendSparkJobsProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(sparkJobsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(sparkJobs()),
+    sparkEventsTarget.asIncrementalDF(sparkJobsModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(sparkJobs(
+      sparkEventsTarget.asIncrementalDF(sparkJobsModule, 3, sparkEventsTarget.incrementalColumns: _*),
+      sparkJobsModule.fromTime, sparkJobsModule.untilTime
+    )),
     append(SilverTargets.jobsTarget)
   )
 
@@ -163,9 +170,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sparkStagesModule = Module(2007, "Silver_SPARK_Stages", this, Array(1006), 8.0)
     .withSparkOverrides(sparkStagesSparkOverrides)
   lazy private val appendSparkStagesProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(sparkStagesModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(sparkStages()),
+    sparkEventsTarget.asIncrementalDF(sparkStagesModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(sparkStages(
+      sparkEventsTarget.asIncrementalDF(sparkStagesModule, 3, sparkEventsTarget.incrementalColumns: _*),
+      sparkStagesModule.fromTime, sparkStagesModule.untilTime
+    )),
     append(SilverTargets.stagesTarget)
   )
 
@@ -176,9 +185,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sparkTasksModule = Module(2008, "Silver_SPARK_Tasks", this, Array(1006), 8.0)
     .withSparkOverrides(sparkTasksSparkOverrides)
   lazy private val appendSparkTasksProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(sparkTasksModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(sparkTasks()),
+    sparkEventsTarget.asIncrementalDF(sparkTasksModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(sparkTasks(
+      sparkEventsTarget.asIncrementalDF(sparkTasksModule, 3, sparkEventsTarget.incrementalColumns: _*),
+      sparkTasksModule.fromTime, sparkTasksModule.untilTime
+    )),
     append(SilverTargets.tasksTarget)
   )
 

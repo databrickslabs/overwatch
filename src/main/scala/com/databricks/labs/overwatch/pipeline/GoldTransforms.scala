@@ -223,64 +223,6 @@ trait GoldTransforms extends SparkSessionWrapper {
     }
   }
 
-  private def getRunningSwitch(c: Column): Column = {
-    when(c === "TERMINATING", lit(false))
-      .when(c.isin("CREATING", "STARTING"), lit(true))
-      .otherwise(lit(null).cast("boolean"))
-  }
-  /**
-   * Temporary nastiness necessary to handle edge cases of states between runs. This will go away in 0.5.1
-   * @param df
-   * @param timeFilter
-   * @return
-   */
-  private def getEventStates(df: DataFrame, timeFilter: Column): DataFrame = {
-    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-    val stateUnboundReverse = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
-    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
-    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
-    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull &&
-      lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
-
-    df
-      .selectExpr("*", "details.*")
-      .drop("details")
-      .filter(timeFilter)
-      .withColumn("rnk", rank().over(stateUnboundReverse))
-      .withColumn("rn", row_number().over(stateUnboundReverse))
-      .withColumn( // if incremental df doesn't have a running switch get it from latest previous state
-        "runningSwitch",
-        coalesce(getRunningSwitch('type))//, getRunningSwitch('last_state_previous_run))
-      )
-      .withColumn(
-        "previousSwitch",
-        when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))
-      )
-      // pull values forward to populate final state
-      // temp workaround until 0.5.1
-      .withColumn(
-        "invalidEventChainHandler",
-        when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
-      )
-      .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
-      .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
-      .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
-      .withColumn("isRunning",
-        when('imputedTerminationEvent, lit(false))
-          .otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
-      .withColumn(
-        "current_num_workers",
-        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
-      )
-      .withColumn(
-        "target_num_workers",
-        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .when('type === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
-          .otherwise(coalesce('target_num_workers, 'current_num_workers))
-      )
-  }
-
   protected def buildClusterStateFact(
                                        instanceDetails: DataFrame,
                                        clusterSnapshot: PipelineTable,
@@ -356,7 +298,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("core_hours", when('isRunning,
         round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
           round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
-      ))
+      ).otherwise(lit(0.0)))
       .withColumn("isAutomated", isAutomated('cluster_name))
       // TODO -- add additional skus
       .withColumn("dbu_rate", when('isAutomated, 'automatedDBUPrice).otherwise('interactiveDBUPrice))
@@ -386,7 +328,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'unixTimeMS_state_end,
       'timestamp_state_start,
       'timestamp_state_end,
-      'type.alias("state"),
+      'state,
       'driver_node_type_id,
       'node_type_id,
       'current_num_workers,
