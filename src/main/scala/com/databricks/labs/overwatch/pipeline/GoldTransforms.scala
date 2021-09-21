@@ -81,11 +81,11 @@ trait GoldTransforms extends SparkSessionWrapper {
     df.select(jobCols: _*)
   }
 
-  protected def buildJobRuns()(df: DataFrame): DataFrame = {
+  protected def buildJobRuns()(jobRunsLag30D: DataFrame): DataFrame = {
     val jobRunCols: Array[Column] = Array(
       'runId.alias("run_id"),
       'run_name,
-      $"JobRunTime.endEpochMS".alias("endEpochMS"),
+      $"JobRunTime.startEpochMS".alias("startEpochMS"),
       'jobRunTime.alias("job_runtime"),
       'jobId.alias("job_id"),
       'idInJob.alias("id_in_job"),
@@ -103,7 +103,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'requestDetails.alias("request_detail"),
       'timeDetails.alias("time_detail")
     )
-    df.select(jobRunCols: _*)
+    jobRunsLag30D.select(jobRunCols: _*)
   }
 
   protected def buildNotebook()(df: DataFrame): DataFrame = {

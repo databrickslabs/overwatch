@@ -151,6 +151,7 @@ class Database(config: Config) extends SparkSessionWrapper {
            |MERGE CONDITION: $mergeCondition
            |""".stripMargin
       logger.log(Level.INFO, mergeDetailMsg)
+      // TODO -- when DBR 9.1 LTS GA, use LSM (low-shuffle-merge) to improve pipeline
       deltaTarget
         .merge(updatesDF, mergeCondition)
         .whenMatched

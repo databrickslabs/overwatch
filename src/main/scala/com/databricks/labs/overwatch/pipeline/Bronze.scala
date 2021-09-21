@@ -70,7 +70,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     BronzeTargets.clustersSnapshotTarget.asDF,
     Seq(
       prepClusterEventLogs(
-        BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, auditLogsIncrementalCols),
+        BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
         clusterEventLogsModule.fromTime,
         clusterEventLogsModule.untilTime,
         config.apiEnv,
@@ -91,13 +91,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sparkEventLogsModule = Module(1006, "Bronze_SparkEventLogs", this, Array(1004), sparkLogClusterScaleCoefficient)
     .withSparkOverrides(sparkEventLogsSparkOverrides)
   lazy private val appendSparkEventLogsProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(
       collectEventLogPaths(
         sparkEventLogsModule.fromTime,
         sparkEventLogsModule.untilTime,
         config.cloudProvider,
-        BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, auditLogsIncrementalCols, 30),
+        BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, 30),
         BronzeTargets.clustersSnapshotTarget,
         sparkLogClusterScaleCoefficient
       ),

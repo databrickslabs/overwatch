@@ -189,9 +189,10 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(
       name = "jobrun_silver",
-      _keys = Array("runId", "idInJob", "endEpochMS"),
+      _keys = Array("runId", "startEpochMS"),
       config,
-      incrementalColumns = Array("endEpochMS"), // don't load into gold until run is terminated
+      _mode = WriteMode.merge,
+      incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated
       zOrderBy = Array("runId", "jobId"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -288,9 +289,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val jobRunTarget: PipelineTable = PipelineTable(
       name = "jobRun_gold",
-      _keys = Array("run_id", "id_in_job", "endEpochMS"),
+      _keys = Array("run_id", "id_in_job", "startEpochMS"),
       config,
-      incrementalColumns = Array("endEpochMS"),
+      incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
@@ -304,7 +305,7 @@ abstract class PipelineTargets(config: Config) {
       name = "jobRunCostPotentialFact_gold",
       _keys = Array("job_id", "id_in_job"),
       config,
-      incrementalColumns = Array("endEpochMS"),
+      incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
@@ -376,8 +377,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sparkJobTarget: PipelineTable = PipelineTable(
       name = "sparkJob_gold",
-      _keys = Array("spark_context_id", "job_id"),
+      _keys = Array("spark_context_id", "job_id", "date", "unixTimeMS"),
       config,
+      _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "date"),
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true,
@@ -392,8 +394,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sparkStageTarget: PipelineTable = PipelineTable(
       name = "sparkStage_gold",
-      _keys = Array("spark_context_id", "stage_id", "stage_attempt_id"),
+      _keys = Array("spark_context_id", "stage_id", "stage_attempt_id", "date", "unixTimeMS"),
       config,
+      _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "date"),
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true,
@@ -408,8 +411,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sparkTaskTarget: PipelineTable = PipelineTable(
       name = "sparkTask_gold",
-      _keys = Array("spark_context_id", "task_id", "task_attempt_id"),
+      _keys = Array("spark_context_id", "stage_id", "stage_attempt_id", "task_id", "task_attempt_id", "executor_id", "host", "date", "unixTimeMS"),
       config,
+      _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "date"),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("date", "unixTimeMS"),
@@ -425,10 +429,11 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sparkExecutionTarget: PipelineTable = PipelineTable(
       name = "sparkExecution_gold",
-      _keys = Array("spark_context_id", "execution_id"),
+      _keys = Array("spark_context_id", "execution_id", "date", "unixTimeMS"),
       config,
+      _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
-      incrementalColumns = Array("unixTimeMS"),
+      incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true
     )
 
@@ -440,10 +445,11 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sparkExecutorTarget: PipelineTable = PipelineTable(
       name = "sparkExecutor_gold",
-      _keys = Array("spark_context_id", "executor_id"),
+      _keys = Array("spark_context_id", "executor_id", "date", "unixTimeMS"),
       config,
+      _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
-      incrementalColumns = Array("unixTimeMS"),
+      incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true
     )
 
