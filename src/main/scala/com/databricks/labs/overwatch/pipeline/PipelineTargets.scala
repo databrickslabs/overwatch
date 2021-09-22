@@ -291,6 +291,7 @@ abstract class PipelineTargets(config: Config) {
       name = "jobRun_gold",
       _keys = Array("run_id", "startEpochMS"),
       config,
+      _mode = WriteMode.merge,
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -305,6 +306,7 @@ abstract class PipelineTargets(config: Config) {
       name = "jobRunCostPotentialFact_gold",
       _keys = Array("run_id", "startEpochMS"),
       config,
+      _mode = WriteMode.merge,
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )

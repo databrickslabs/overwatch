@@ -381,8 +381,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       // don't reprocess all 30 days of jobRuns each Overwatch run, only the open records
       val openJRCPRecordsRunIDs = jrcpLag30D
         .filter($"job_runtime.endEpochMS".isNull) // open jrcp records (i.e. not incomplete job runs)
-        .select('run_id).distinct // TODO -- switch to run_id when present
-      val outstandingJrRecordsToClose = jrGoldLag30D.join(openJRCPRecordsRunIDs, Seq("run_id"))
+        .select('organization_id, 'run_id).distinct // org_id left to force partition pruning
+      val outstandingJrRecordsToClose = jrGoldLag30D.join(openJRCPRecordsRunIDs, Seq("organization_id", "run_id"))
       newJrLaunches.unionByName(outstandingJrRecordsToClose) // combine open records (updates) with new records (inserts)
     } else newJrLaunches
 
@@ -575,7 +575,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         'run_id,
         'job_id,
         'id_in_job,
-        'endEpochMS,
+        'startEpochMS,
         'job_runtime,
         'job_terminal_state.alias("run_terminal_state"),
         'job_trigger_type.alias("run_trigger_type"),
@@ -844,7 +844,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val jobRunCostPotentialFactViewColumnMapping: String =
     """
-      |organization_id, job_id, id_in_job, job_runtime, run_terminal_state, run_trigger_type, run_task_type, cluster_id,
+      |organization_id, run_id, job_id, id_in_job, job_runtime, run_terminal_state, run_trigger_type, run_task_type, cluster_id,
       |cluster_name, cluster_type, custom_tags, driver_node_type_id, node_type_id, dbu_rate, running_days,
       |run_cluster_states, avg_cluster_share, avg_overlapping_runs, max_overlapping_runs, worker_potential_core_H,
       |driver_compute_cost, driver_dbu_cost, worker_compute_cost, worker_dbu_cost, total_driver_cost, total_worker_cost,
