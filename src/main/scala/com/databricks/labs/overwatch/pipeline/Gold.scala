@@ -87,9 +87,16 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     Seq(
       // Retrieve cluster states for current time period plus 2 days for lagging states
       buildJobRunCostPotentialFact(
-        GoldTargets.clusterStateFactTarget.asIncrementalDF(jobRunCostPotentialFactModule, 90, "unixTimeMS_state_start"),
-        GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date"),
-        GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, 2, "date")
+        GoldTargets.jobRunCostPotentialFactTarget.asIncrementalDF(
+          jobRunCostPotentialFactModule,
+          GoldTargets.jobRunCostPotentialFactTarget.incrementalColumns,
+          30
+        ),
+        GoldTargets.clusterStateFactTarget
+          .asIncrementalDF(jobRunCostPotentialFactModule, GoldTargets.clusterStateFactTarget.incrementalColumns, 90),
+        GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, GoldTargets.sparkJobTarget.incrementalColumns, 2),
+        GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, GoldTargets.sparkTaskTarget.incrementalColumns, 2),
+        jobRunCostPotentialFactModule.fromTime
       )),
     append(GoldTargets.jobRunCostPotentialFactTarget)
   )

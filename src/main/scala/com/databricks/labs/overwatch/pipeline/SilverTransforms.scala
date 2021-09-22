@@ -147,10 +147,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     executorAdded
       .joinWithLag(executorRemoved, joinKeys, "fileCreateDate", lagDays = 30, joinType = "left")
-      .filter(
-        coalesce('executorRemovedTS, 'executorAddedTS, lit(0)) >= fromTime.asUnixTimeMilli &&
-          coalesce('executorRemovedTS, 'executorAddedTS, lit(0)) < untilTime.asUnixTimeMilli
-      )
+      .filter(coalesce('executorRemovedTS, 'executorAddedTS, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("ExecutorAliveTime_tmp",
         TransformFunctions.subtractTime('executorAddedTS, 'executorRemovedTS))
       .drop("executorAddedTS", "executorRemovedTS", "fileCreateDate")
@@ -209,10 +206,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     //TODO -- review if skew is necessary -- on all DFs
     executionsStart
       .joinWithLag(executionsEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
-      .filter(
-        coalesce('SqlExecEndTime, 'SqlExecStartTime, lit(0)) >= fromTime.asUnixTimeMilli &&
-          coalesce('SqlExecEndTime, 'SqlExecStartTime, lit(0)) < untilTime.asUnixTimeMilli
-      )
+      .filter(coalesce('SqlExecEndTime, 'SqlExecStartTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("SqlExecutionRunTime",
         TransformFunctions.subtractTime('SqlExecStartTime, 'SqlExecEndTime))
       .drop("SqlExecStartTime", "SqlExecEndTime", "fileCreateDate")
@@ -248,10 +242,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     jobStart
       .joinWithLag(jobEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
-      .filter(
-        coalesce('CompletionTime, 'SubmissionTime, lit(0)) >= fromTime.asUnixTimeMilli &&
-          coalesce('CompletionTime, 'SubmissionTime, lit(0)) < untilTime.asUnixTimeMilli
-      )
+      .filter(coalesce('CompletionTime, 'SubmissionTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("JobRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime", "fileCreateDate")
       .withColumn("startTimestamp", $"JobRunTime.startEpochMS")
@@ -285,10 +276,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     stageStart
       .joinWithLag(stageEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
-      .filter(
-        coalesce('CompletionTime, 'SubmissionTime, lit(0)) >= fromTime.asUnixTimeMilli &&
-          coalesce('CompletionTime, 'SubmissionTime, lit(0)) < untilTime.asUnixTimeMilli
-      )
+      .filter(coalesce('CompletionTime, 'SubmissionTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("StageInfo", struct(
         $"StageEndInfo.Accumulables", $"StageEndInfo.CompletionTime", $"StageStartInfo.Details",
         $"StageStartInfo.FailureReason", $"StageEndInfo.NumberofTasks",
@@ -348,10 +336,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     taskStart.joinWithLag(taskEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
-      .filter(
-        coalesce('FinishTime, 'LaunchTime, lit(0)) >= fromTime.asUnixTimeMilli &&
-          coalesce('FinishTime, 'LaunchTime, lit(0)) < untilTime.asUnixTimeMilli
-      )
+      .filter(coalesce('FinishTime, 'LaunchTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("TaskInfo", struct(
         $"TaskEndInfo.Accumulables", $"TaskEndInfo.Failed", $"TaskEndInfo.FinishTime",
         $"TaskEndInfo.GettingResultTime",

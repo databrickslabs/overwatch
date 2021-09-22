@@ -125,11 +125,12 @@ class Database(config: Config) extends SparkSessionWrapper {
 
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
-  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, applySparkOverrides: Boolean = true): Boolean = {
+  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column): Boolean = {
     var finalDF: DataFrame = df
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
 
+    // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.mode == WriteMode.merge) { // DELTA MERGE / UPSERT
       val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")

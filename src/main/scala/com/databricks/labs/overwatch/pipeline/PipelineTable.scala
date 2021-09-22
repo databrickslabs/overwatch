@@ -167,7 +167,7 @@ case class PipelineTable(
   }
 
   def asDF(withGlobalFilters: Boolean = true): DataFrame = {
-    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters. Will attempt to continue"
+    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters"
     try {
       if (exists) {
         val fullDF = if (withMasterMinimumSchema) { // infer master schema if true and available
@@ -229,7 +229,7 @@ case class PipelineTable(
                      ): DataFrame = {
     val moduleId = module.moduleId
     val moduleName = module.moduleName
-    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters. Will attempt to continue"
+    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters"
 
     if (exists) {
       val instanceDF = if (withMasterMinimumSchema) { // infer master schema if true and available

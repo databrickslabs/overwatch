@@ -289,7 +289,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val jobRunTarget: PipelineTable = PipelineTable(
       name = "jobRun_gold",
-      _keys = Array("run_id", "id_in_job", "startEpochMS"),
+      _keys = Array("run_id", "startEpochMS"),
       config,
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -303,7 +303,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val jobRunCostPotentialFactTarget: PipelineTable = PipelineTable(
       name = "jobRunCostPotentialFact_gold",
-      _keys = Array("job_id", "id_in_job"),
+      _keys = Array("run_id", "startEpochMS"),
       config,
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")

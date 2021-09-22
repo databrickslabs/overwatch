@@ -390,7 +390,7 @@ class Pipeline(
     logger.log(Level.INFO, startLogMsg)
 
     // Append the output -- don't apply spark overrides, applied at top of function
-    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS, applySparkOverrides = false)
+    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
       println(readOnlyMsg)
