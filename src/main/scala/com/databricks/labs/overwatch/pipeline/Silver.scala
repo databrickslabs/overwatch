@@ -222,10 +222,14 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.dbJobRunsTarget)
   )
 
-  lazy private[overwatch] val poolsSpecModule = Module(2014, "Silver_PoolsSpec", this, Array(1004))
+  lazy private[overwatch] val poolsSpecModule = Module(2009, "Silver_PoolsSpec", this, Array(1004))
   lazy private val appendPoolsSpecProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns),
-    Seq(),
+    Seq(buildPoolsSpec(
+      BronzeTargets.poolsSnapshotTarget.asDF,
+      SilverTargets.poolsSpecTarget.asDF,
+      config.cloudProvider
+    )),
     append(SilverTargets.poolsSpecTarget)
   )
 
@@ -286,7 +290,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         modifiedAccountsModule.execute(appendModifiedAccountsProcess)
       }
       case OverwatchScope.notebooks => notebookSummaryModule.execute(appendNotebookSummaryProcess)
-      case OverwatchScope.pools => ???
+      case OverwatchScope.pools => poolsSpecModule.execute(appendPoolsSpecProcess)
       case OverwatchScope.clusters => clusterSpecModule.execute(appendClusterSpecProcess)
       case OverwatchScope.clusterEvents => clusterStateDetailModule.execute(appendClusterStateDetailProcess)
       case OverwatchScope.sparkEvents => {

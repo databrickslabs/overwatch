@@ -53,13 +53,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.clusterStateFactTarget)
   )
 
-  // Issue_37
-  //  private val poolsModule = Module(3006, "Gold_Pools")
-  //  lazy private val appendPoolsProcess = EtlDefinition(
-  //    BronzeTargets.poolsTarget.asIncrementalDF(
-  //      buildIncrementalFilter("")
-  //    )
-  //  )
+    lazy private[overwatch] val poolsModule = Module(3009, "Gold_Pools", this, Array(2009))
+    lazy private val appendPoolsProcess = ETLDefinition(
+      SilverTargets.poolsSpecTarget.asDF,
+      Seq(buildPools()),
+      append(GoldTargets.poolsTarget)
+    )
 
   lazy private[overwatch] val jobsModule = Module(3002, "Gold_Job", this, Array(2010))
   lazy private val appendJobsProcess = ETLDefinition(
@@ -196,6 +195,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.notebooks => {
         notebookModule.execute(appendNotebookProcess)
         GoldTargets.notebookViewTarget.publish(notebookViewColumnMappings)
+      }
+      case OverwatchScope.pools => {
+        poolsModule.execute(appendPoolsProcess)
+        GoldTargets.poolsViewTarget.publish(poolsViewColumnMapping)
       }
       case OverwatchScope.clusters => {
         clusterModule.execute(appendClusterProccess)

@@ -481,17 +481,15 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   protected def buildPoolsSpec(
-                                poolsSnapTarget: PipelineTable,
+                                poolSnapDF: DataFrame,
+                                poolsSpecExisting: DataFrame,
                                 cloudProvider: String
                               )(auditIncrementalDF: DataFrame): DataFrame = {
 
     val lastPoolValue = Window.partitionBy('instance_pool_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
-    val poolSnapDF = poolsSnapTarget.asDF
-      .withColumn("preloaded_spark_versions", to_json('preloaded_spark_versions))
-      .verifyMinimumSchema(Schema.poolSnapMinSchema)
-
     val poolSnapLookup = poolSnapDF
+      .withColumn("preloaded_spark_versions", to_json('preloaded_spark_versions))
       .select(
         'organization_id,
         (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
@@ -520,14 +518,14 @@ trait SilverTransforms extends SparkSessionWrapper {
       'timestamp,
       'date,
       'instance_pool_id,
-      PipelineFunctions.fillForward("instance_pool_name", lastPoolValue, Seq($"poolSnapDetails.instance_pool_name")),
-      PipelineFunctions.fillForward("node_type_id", lastPoolValue, Seq($"poolSnapDetails.node_type_id")),
-      PipelineFunctions.fillForward("idle_instance_autotermination_minutes", lastPoolValue, Seq($"poolSnapDetails.idle_instance_autotermination_minutes")),
-      PipelineFunctions.fillForward("min_idle_instances", lastPoolValue, Seq($"poolSnapDetails.min_idle_instances")),
-      PipelineFunctions.fillForward("max_capacity", lastPoolValue, Seq($"poolSnapDetails.max_capacity")),
-      PipelineFunctions.fillForward("preloaded_spark_versions", lastPoolValue, Seq($"poolSnapDetails.preloaded_spark_versions")),
+      PipelineFunctions.fillForward("instance_pool_name", lastPoolValue, Seq('instance_pool_name, $"poolSnapDetails.instance_pool_name")),
+      PipelineFunctions.fillForward("node_type_id", lastPoolValue, Seq('node_type_id, $"poolSnapDetails.node_type_id")),
+      PipelineFunctions.fillForward("idle_instance_autotermination_minutes", lastPoolValue, Seq('idle_instance_autotermination_minutes, $"poolSnapDetails.idle_instance_autotermination_minutes")),
+      PipelineFunctions.fillForward("min_idle_instances", lastPoolValue, Seq('min_idle_instances, $"poolSnapDetails.min_idle_instances")),
+      PipelineFunctions.fillForward("max_capacity", lastPoolValue, Seq('max_capacity, $"poolSnapDetails.max_capacity")),
+      PipelineFunctions.fillForward("preloaded_spark_versions", lastPoolValue, Seq('preloaded_spark_versions, $"poolSnapDetails.preloaded_spark_versions")),
       //   fillForward("preloaded_docker_images", lastPoolValue, Seq($"poolSnapDetails.preloaded_docker_images")), // SEC-6198 - DO NOT populate or test until closed
-      PipelineFunctions.fillForward(s"${cloudProvider}_attributes", lastPoolValue, Seq(col(s"${cloudProvider}_attributes"))),
+      PipelineFunctions.fillForward(s"${cloudProvider}_attributes", lastPoolValue, Seq(col(s"${cloudProvider}_attributes"), to_json(col(s"poolSnapDetails.${cloudProvider}_attributes")))),
       createCol,
       deleteCol,
       struct(
@@ -544,18 +542,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('serviceName === "instancePools")
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
 
-    val poolRemoved = poolsBase.filter('actionName === "delete")
-      .filter($"response.statusCode" === 200) // only successful deletes
-      .select(
-        'organization_id.alias("d_organization_id"),
-        'instance_pool_id.alias("d_instance_pool_id"),
-        struct(
-          $"userIdentity.email".alias("deleted_by"),
-          'timestamp.alias("deleted_at")
-        ).alias("delete_details")
-      )
-
-    poolsBase
+    val newPoolsRecords = poolsBase
       .filter('actionName.isin("create", "edit", "delete"))
       .withColumn("instance_pool_id", when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id")).otherwise('instance_pool_id))
       .withColumn("preloaded_spark_versions", get_json_object('preloaded_spark_versions, "$."))
@@ -564,6 +551,15 @@ trait SilverTransforms extends SparkSessionWrapper {
         poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
         maxLookAhead = Long.MaxValue, tsPartitionVal = 4
       ).df
+
+    // Module is overwrite -- extremely slow changing and tiny data.
+    if (newPoolsRecords.isEmpty && poolsSpecExisting.isEmpty) throw new NoNewDataException("", Level.WARN, allowModuleProgression = true)
+    else if (poolsSpecExisting.isEmpty && !newPoolsRecords.isEmpty) newPoolsRecords // only new pools (none previously)
+      .select(poolsSelects: _*)
+      .withColumn("create_details", PipelineFunctions.fillForward("create_details", lastPoolValue))
+    else if (!poolsSpecExisting.isEmpty && newPoolsRecords.isEmpty) poolsSpecExisting // only existing pools
+    else poolsSpecExisting // both new pools and existing pools
+      .unionByName(newPoolsRecords)
       .select(poolsSelects: _*)
       .withColumn("create_details", PipelineFunctions.fillForward("create_details", lastPoolValue))
 

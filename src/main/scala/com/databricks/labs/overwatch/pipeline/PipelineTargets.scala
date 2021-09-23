@@ -232,8 +232,9 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val poolsSpecTarget: PipelineTable = PipelineTable(
       name = "pools_silver",
-      _keys = Array("instance_pool_id"),
+      _keys = Array("instance_pool_id", "timestamp"),
       config,
+      _mode = WriteMode.overwrite,
       incrementalColumns = Array("timestamp"),
       statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
       partitionBy = Seq("organization_id")
@@ -270,6 +271,22 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val clusterViewTarget: PipelineView = PipelineView(
       name = "cluster",
       clusterTarget,
+      config
+    )
+
+    lazy private[overwatch] val poolsTarget: PipelineTable = PipelineTable(
+      name = "instancepool_gold",
+      _keys = Array("instance_pool_id", "timestamp"),
+      config,
+      _mode = WriteMode.overwrite,
+      incrementalColumns = Array("timestamp"),
+      statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val poolsViewTarget: PipelineView = PipelineView(
+      name = "instancepool",
+      poolsTarget,
       config
     )
 

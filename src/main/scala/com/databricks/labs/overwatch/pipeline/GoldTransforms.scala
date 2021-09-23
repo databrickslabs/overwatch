@@ -148,6 +148,28 @@ trait GoldTransforms extends SparkSessionWrapper {
     )
   }
 
+  protected def buildPools()(poolsDF: DataFrame): DataFrame = {
+    poolsDF.select(
+      'serviceName,
+      'actionName,
+      'organization_id,
+      'timestamp,
+      'date,
+      'instance_pool_id,
+      'instance_pool_name,
+      'node_type_id,
+      'idle_instance_autotermination_minutes,
+      'min_idle_instances,
+      'max_capacity,
+      'preloaded_spark_versions,
+      'azure_attributes,
+      'create_details,
+      'delete_details,
+      'request_details,
+      'poolSnapDetails
+    )
+  }
+
   protected def buildLogin(accountModSilver: DataFrame)(df: DataFrame): DataFrame = {
     val userIdLookup = if (!accountModSilver.isEmpty) {
       accountModSilver.select('organization_id, 'user_name.alias("login_user"), 'user_id)
@@ -826,6 +848,13 @@ trait GoldTransforms extends SparkSessionWrapper {
       |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix,
       |driver_instance_pool_id, instance_pool_id, driver_instance_pool_name, instance_pool_name,
       |spark_version, idempotency_token, deleted_by, created_by, last_edited_by
+      |""".stripMargin
+
+  protected val poolsViewColumnMapping: String =
+    """
+      |organization_id, instance_pool_id, serviceName, timestamp, date, actionName, instance_pool_name, node_type_id,
+      |idle_instance_autotermination_minutes, min_idle_instances, max_capacity, preloaded_spark_versions,
+      |azure_attributes, create_details, delete_details, request_details, poolSnapDetails
       |""".stripMargin
 
   protected val jobViewColumnMapping: String =
