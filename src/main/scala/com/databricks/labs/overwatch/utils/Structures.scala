@@ -177,25 +177,25 @@ private[overwatch] class InvalidInstanceDetailsException(
 
   import spark.implicits._
   private val erroredRecordsReport = instanceDetails
-    .withColumn("API_name", lower(trim('API_name)))
+    .withColumn("API_Name", lower(trim('API_Name)))
     .join(
       dfCheck
         .select(
-          lower(trim('API_name)).alias("API_name"),
+          lower(trim('API_Name)).alias("API_Name"),
           'rnk, 'rn, 'previousUntil,
           datediff('activeFrom, 'previousUntil).alias("daysBetweenCurrentAndPrevious")
         ),
-      Seq("API_name")
+      Seq("API_Name")
     )
-    .orderBy('API_name, 'activeFrom, 'activeUntil)
+    .orderBy('API_Name, 'activeFrom, 'activeUntil)
 
   println("InstanceDetails Error Report: ")
   erroredRecordsReport.show(numRows = 1000, false)
 
   private val badRecords = dfCheck.count()
-  private val badRawKeys = dfCheck.select('API_name).as[String].collect().mkString(", ")
-  private val errMsg = s"InstanceDetails Invalid: API_name keys with errors are: $badRawKeys. " +
-    s"A total of $badRecords records were found in conflict. Each key (API_name) must be unique for a given time period " +
+  private val badRawKeys = dfCheck.select('API_Name).as[String].collect().mkString(", ")
+  private val errMsg = s"InstanceDetails Invalid: API_Name keys with errors are: $badRawKeys. " +
+    s"A total of $badRecords records were found in conflict. Each key (API_Name) must be unique for a given time period " +
     s"(activeFrom --> activeUntil) AND the previous costs activeUntil must run through the previous date " +
     s"such that the function 'datediff' returns 1. Please correct the instanceDetails table before continuing " +
     s"with this module. "

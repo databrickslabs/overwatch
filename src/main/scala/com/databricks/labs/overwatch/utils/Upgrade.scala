@@ -151,7 +151,7 @@ object Upgrade extends SparkSessionWrapper {
       val bronzePipeline = Bronze(prodWorkspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
       val snapDate = bronzePipeline.pipelineSnapTime.asDTString
       val w = Window.partitionBy(lower(trim('API_name))).orderBy('activeFrom)
-      val wKeyCheck = Window.partitionBy(lower(trim('API_name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
+      val wKeyCheck = Window.partitionBy(lower(trim('API_Name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
 
       // UPGRADE InstanceDetails
       val instanceDetailsTarget = bronzePipeline.getAllTargets.filter(_.name == "instanceDetails").head

@@ -287,9 +287,9 @@ object PipelineFunctions {
                                instanceDetails: DataFrame,
                                snapDate: String = java.time.LocalDate.now.toString
                              ): Unit = {
-    val w = Window.partitionBy(lower(trim(col("API_name")))).orderBy(col("activeFrom"))
+    val w = Window.partitionBy(lower(trim(col("API_Name")))).orderBy(col("activeFrom"))
     val wKeyCheck = Window
-      .partitionBy(lower(trim(col("API_name"))), col("activeFrom"), col("activeUntil"))
+      .partitionBy(lower(trim(col("API_Name"))), col("activeFrom"), col("activeUntil"))
       .orderBy(col("activeFrom"), col("activeUntil"))
     val dfCheck = instanceDetails
       .withColumn("activeUntil", coalesce(col("activeUntil"), lit(snapDate)))

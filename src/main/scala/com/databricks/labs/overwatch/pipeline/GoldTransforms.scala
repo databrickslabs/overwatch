@@ -205,8 +205,8 @@ trait GoldTransforms extends SparkSessionWrapper {
                                        instanceDetails: DataFrame,
                                        snapDate: String
                                      ): Unit = {
-    val w = Window.partitionBy(lower(trim('API_name))).orderBy('activeFrom)
-    val wKeyCheck = Window.partitionBy(lower(trim('API_name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
+    val w = Window.partitionBy(lower(trim('API_Name))).orderBy('activeFrom)
+    val wKeyCheck = Window.partitionBy(lower(trim('API_Name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
     val dfCheck = instanceDetails
       .withColumn("activeUntil", coalesce('activeUntil, lit(snapDate)))
       .withColumn("previousUntil", lag('activeUntil, 1).over(w))
@@ -219,27 +219,27 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     if (!dfCheck.isEmpty) {
       val erroredRecordsReport = instanceDetails
-        .withColumn("API_name", lower(trim('API_name)))
+        .withColumn("API_Name", lower(trim('API_Name)))
         .join(
           dfCheck
             .select(
-              lower(trim('API_name)).alias("API_name"),
+              lower(trim('API_Name)).alias("API_Name"),
               'rnk, 'rn, 'previousUntil,
               datediff('activeFrom, 'previousUntil).alias("daysBetweenCurrentAndPrevious")
             ),
-          Seq("API_name")
+          Seq("API_Name")
         )
-        .orderBy('API_name, 'activeFrom, 'activeUntil)
+        .orderBy('API_Name, 'activeFrom, 'activeUntil)
 
       println("InstanceDetails Error Report: ")
       erroredRecordsReport.show(numRows = 1000, false)
 
       val badRecords = dfCheck.count()
-      val badRawKeys = dfCheck.select('API_name).as[String].collect().mkString(", ")
-      val errMsg = s"instanceDetails Invalid: Each key (API_name) must be unique for a given time period " +
+      val badRawKeys = dfCheck.select('API_Name).as[String].collect().mkString(", ")
+      val errMsg = s"instanceDetails Invalid: Each key (API_Name) must be unique for a given time period " +
         s"(activeFrom --> activeUntil) AND the previous costs activeUntil must run through the previous date " +
         s"such that the function 'datediff' returns 1. Please correct the instanceDetails table before continuing " +
-        s"with this module.\nThe API_name keys with errors are: $badRawKeys. A total of $badRecords records were " +
+        s"with this module.\nThe API_Name keys with errors are: $badRawKeys. A total of $badRecords records were " +
         s"found in conflict."
       throw new BadConfigException(errMsg)
     }
@@ -414,10 +414,10 @@ trait GoldTransforms extends SparkSessionWrapper {
       'cluster_name, 'custom_tags, 'unixTimeMS_state_start, 'unixTimeMS_state_end, 'timestamp_state_start,
       'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
       //        lit(interactiveDBUPrice).alias("interactiveDBUPrice"), lit(automatedDBUPrice).alias("automatedDBUPrice"),
-      $"driverSpecs.API_name".alias("driver_node_type_id"),
+      $"driverSpecs.API_Name".alias("driver_node_type_id"),
       $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
       $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
-      $"workerSpecs.API_name".alias("node_type_id"),
+      $"workerSpecs.API_Name".alias("node_type_id"),
       $"workerSpecs.Compute_Contract_Price".alias("worker_compute_hourly"),
       $"workerSpecs.Hourly_DBUs".alias("worker_dbu_hourly"),
       $"workerSpecs.vCPUs".alias("worker_cores"),
