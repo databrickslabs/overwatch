@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, InvalidInstanceDetailsException}
+import org.apache.ivy.core.module.id.ModuleId
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
@@ -319,6 +320,19 @@ object PipelineFunctions {
     filteredTarget.getOrElse(throw new Exception(s"NO TARGET FOUND: No targets exist for lower " +
       s"case $targetName.\nPotential targets include ${pipelineTargets.map(_.name).mkString(", ")}"))
 
+  }
+
+  def getPipelineModule(pipeline: Pipeline, moduleId: Integer): Module = {
+    val pipelineModules = pipeline match {
+      case bronze: Bronze => bronze.getAllModules
+      case silver: Silver => silver.getAllModules
+      case gold: Gold => gold.getAllModules
+      case _ => throw new Exception("Pipeline type must be an Overwatch Bronze, Silver, or Gold Pipeline instance")
+    }
+
+    val filteredModule = pipelineModules.find(_.moduleId == moduleId)
+    filteredModule.getOrElse(throw new Exception(s"NO MODULE FOUND: ModuleID $moduleId does not exist. Available " +
+      s"modules include ${pipelineModules.map(m => s"\n(${m.moduleId}, ${m.moduleName})").mkString("\n")}"))
   }
 
   def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
