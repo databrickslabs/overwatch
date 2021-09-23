@@ -241,6 +241,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   private def getEventStates(df: DataFrame, timeFilter: Column): DataFrame = {
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateUnboundReverse = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
+    val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.currentRow, 500L).orderBy('timestamp)
     val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
     val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
     val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull &&
@@ -269,9 +270,11 @@ trait GoldTransforms extends SparkSessionWrapper {
       .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
       .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
       .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
-      .withColumn("isRunning",
+      .withColumn("isRunning", coalesce(
         when('imputedTerminationEvent, lit(false))
-          .otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
+          .otherwise(last('runningSwitch, true).over(stateUntilCurrentW)),
+        !first('runningSwitch, true).over(stateFromCurrentW)
+      ))
       .withColumn(
         "current_num_workers",
         when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
