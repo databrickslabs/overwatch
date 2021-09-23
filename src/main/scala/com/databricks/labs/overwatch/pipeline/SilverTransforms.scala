@@ -775,6 +775,7 @@ trait SilverTransforms extends SparkSessionWrapper {
                                pipelineSnapTime: TimeTypes
                              )(clusterEventsDF: DataFrame): DataFrame = {
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+    val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.currentRow, 500L).orderBy('timestamp)
     val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
     val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
@@ -804,7 +805,10 @@ trait SilverTransforms extends SparkSessionWrapper {
       .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
       .withColumn("state", when('imputedTerminationEvent, "TERMINATING").otherwise('state))
       .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
-      .withColumn("isRunning", when('imputedTerminationEvent, lit(false)).otherwise(last('runningSwitch, true).over(stateUntilCurrentW)))
+      .withColumn("isRunning", coalesce(
+        when('imputedTerminationEvent, lit(false)).otherwise(last('runningSwitch, true).over(stateUntilCurrentW)),
+        !first('runningSwitch, true).over(stateFromCurrentW) // forward lookup
+      ))
       .withColumn(
         "current_num_workers",
         when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
