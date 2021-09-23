@@ -14,6 +14,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
    */
   def getAllTargets: Array[PipelineTable] = {
     Array(
+      GoldTargets.poolsTarget,
       GoldTargets.clusterTarget,
       GoldTargets.jobTarget,
       GoldTargets.jobRunTarget,
