@@ -28,6 +28,17 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
+  def getAllModules: Array[Module] = {
+    Array(
+      auditLogsModule,
+      clustersSnapshotModule,
+      clusterEventLogsModule,
+      jobsSnapshotModule,
+      poolsSnapshotModule,
+      sparkEventLogsModule
+    )
+  }
+
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)

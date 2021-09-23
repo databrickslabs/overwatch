@@ -31,6 +31,24 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
+  def getAllModules: Array[Module] = {
+    Array(
+      accountLoginsModule,
+      modifiedAccountsModule,
+      notebookSummaryModule,
+      poolsSpecModule,
+      clusterSpecModule,
+      clusterStateDetailModule,
+      jobStatusModule,
+      jobRunsModule,
+      executorsModule,
+      executionsModule,
+      sparkJobsModule,
+      sparkStagesModule,
+      sparkTasksModule
+    )
+  }
+
   envInit()
 
   private val logger: Logger = Logger.getLogger(this.getClass)
