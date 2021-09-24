@@ -241,11 +241,19 @@ trait GoldTransforms extends SparkSessionWrapper {
   private def getEventStates(df: DataFrame, timeFilter: Column): DataFrame = {
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateUnboundReverse = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
-    val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.currentRow, 500L).orderBy('timestamp)
+    val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
     val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
-    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, Window.currentRow).orderBy('timestamp)
+    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
     val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull &&
       lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
+
+    // some states like EXPANDED_DISK and NODES_LOST, etc are excluded because they
+    // occasionally do come after the cluster has been terminated; thus they are not a guaranteed event
+    // goal is to be certain about the 99th percentile
+    val runningStates = Array(
+      "STARTING", "INIT_SCRIPTS_STARTED", "RUNNING", "CREATING",
+      "RESIZING", "UPSIZE_COMPLETED", "DRIVER_HEALTHY"
+    )
 
     df
       .selectExpr("*", "details.*")
@@ -268,17 +276,34 @@ trait GoldTransforms extends SparkSessionWrapper {
         when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
       )
       .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
+      .withColumn("lastRunningSwitch", last('runningSwitch, true).over(stateUntilCurrentW)) // previous on/off switch
+      .withColumn("nextRunningSwitch", first('runningSwitch, true).over(stateFromCurrentW)) // next on/off switch
       .withColumn("type", when('imputedTerminationEvent, "TERMINATING").otherwise('type))
       .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
+      // given no anomaly, set on/off state to previous state
+      // if no previous state found, assume opposite of next state switch
+      .withColumn("isRunning",coalesce(
+        when('imputedTerminationEvent, lit(false)).otherwise('lastRunningSwitch),
+        !'nextRunningSwitch
+      ))
+      // if isRunning still undetermined, use guaranteed events to create state anchors to identify isRunning anchors
+      .withColumn("isRunning", when('isRunning.isNull && 'state.isin(runningStates: _*), lit(true)).otherwise('isRunning))
+      // use the anchors to fill in the null gaps between the state changes to determine if running
+      // if ultimately unable to be determined, assume not isRunning
       .withColumn("isRunning", coalesce(
-        when('imputedTerminationEvent, lit(false))
-          .otherwise(last('runningSwitch, true).over(stateUntilCurrentW)),
-        !first('runningSwitch, true).over(stateFromCurrentW)
+        when('isRunning.isNull, last('isRunning, true).over(stateUntilCurrentW)).otherwise('isRunning),
+        when('isRunning.isNull, !first('isRunning, true).over(stateFromCurrentW)).otherwise('isRunning),
+        lit(false)
       ))
       .withColumn(
         "current_num_workers",
         when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
+          .otherwise(coalesce(
+            'current_num_workers,
+            $"cluster_size.num_workers",
+            $"cluster_size.autoscale.min_workers",
+            last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true)
+              .over(stateUntilCurrentW)))
       )
       .withColumn(
         "target_num_workers",
