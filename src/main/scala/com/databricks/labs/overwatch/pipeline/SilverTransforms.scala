@@ -825,7 +825,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         when('isRunning.isNull, last('isRunning, true).over(stateUntilCurrentW)).otherwise('isRunning),
         when('isRunning.isNull, !first('isRunning, true).over(stateFromCurrentW)).otherwise('isRunning),
         lit(false)
-      ))
+      )).drop("lastRunningSwitch", "nextRunningSwitch")
       .withColumn(
         "current_num_workers",
         when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
