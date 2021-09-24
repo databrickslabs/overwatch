@@ -780,6 +780,11 @@ trait SilverTransforms extends SparkSessionWrapper {
       "STARTING", "TERMINATING", "CREATING", "RESTARTING"
     )
 
+    val runningStates = Array(
+      "STARTING", "INIT_SCRIPTS_FINISHED", "INIT_SCRIPTS_STARTED", "RUNNING", "CREATING",
+      "RESIZING", "UPSIZE_COMPLETED", "EXPANDED_DISK", "NODES_LOST", "DRIVER_HEALTHY"
+    )
+
     val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
     val clusterEventsBaseline = clusterEventsDF
       .selectExpr("*", "details.*")
@@ -801,9 +806,11 @@ trait SilverTransforms extends SparkSessionWrapper {
       .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
       .withColumn("state", when('imputedTerminationEvent, "TERMINATING").otherwise('state))
       .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
+      .withColumn("isRunning", when('state.isin(runningStates: _*), lit(true)).otherwise(lit(null).cast("boolean")))
       .withColumn("isRunning", coalesce(
         when('imputedTerminationEvent, lit(false)).otherwise(last('runningSwitch, true).over(stateUntilCurrentW)),
-        !first('runningSwitch, true).over(stateFromCurrentW) // forward lookup
+        !first('runningSwitch, true).over(stateFromCurrentW), // forward lookup
+        last('isRunning, true).over(stateUntilCurrentW) // if still null -- long-running cluster use state to get first isRunning value
       ))
       .withColumn(
         "current_num_workers",
