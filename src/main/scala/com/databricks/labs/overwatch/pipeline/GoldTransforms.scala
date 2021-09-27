@@ -287,7 +287,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         !'nextRunningSwitch
       ))
       // if isRunning still undetermined, use guaranteed events to create state anchors to identify isRunning anchors
-      .withColumn("isRunning", when('isRunning.isNull && 'state.isin(runningStates: _*), lit(true)).otherwise('isRunning))
+      .withColumn("isRunning", when('isRunning.isNull && 'type.isin(runningStates: _*), lit(true)).otherwise('isRunning))
       // use the anchors to fill in the null gaps between the state changes to determine if running
       // if ultimately unable to be determined, assume not isRunning
       .withColumn("isRunning", coalesce(
