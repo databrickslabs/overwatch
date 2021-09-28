@@ -340,17 +340,11 @@ class Pipeline(
 
   }
 
-  /**
-   * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
-   * Accepting data with higher precision than delivery causes bad data
-   */
-//  protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
-
   private[overwatch] def initiatePostProcessing(): Unit = {
 
     postProcessor.optimize(this, 12)
     Helpers.fastrm(Array(
-      "/tmp/overwatch/bronze/clusterEventsBatches"
+      s"/tmp/overwatch/bronze/${config.organizationId}/clusterEventsBatches"
     ))
 
     spark.catalog.clearCache()

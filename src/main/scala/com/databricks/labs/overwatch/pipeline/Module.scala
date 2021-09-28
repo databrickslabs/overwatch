@@ -190,6 +190,7 @@ class Module(
       inputConfig = config.inputConfig,
       parsedConfig = config.parsedConfig
     )
+
     finalizeModule(failedStatusReport)
     failedStatusReport
   }
@@ -298,6 +299,10 @@ class Module(
       finalizeModule(newState)
       newState
     } catch {
+      case e: ApiCallEmptyResponse =>
+        noNewDataHandler(e.apiCallDetail, Level.ERROR, allowModuleProgression = e.allowModuleProgression)
+      case e: ApiCallFailure if e.failPipeline =>
+        fail(e.msg)
       case e: FailedModuleException =>
         val errMessage = s"FAILED: $moduleId-$moduleName Module"
         logger.log(Level.ERROR, errMessage, e)

@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, InvalidInstanceDetailsException}
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config, IncrementalFilter, InvalidInstanceDetailsException}
 import org.apache.ivy.core.module.id.ModuleId
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
@@ -26,12 +26,15 @@ object PipelineFunctions {
   def parseEHConnectionString(connectionString: String): String = {
     val secretsRE = "\\{\\{secrets/([^/]+)/([^}]+)\\}\\}".r
 
-    secretsRE.findFirstMatchIn(connectionString) match {
+    val retrievedConnectionString = secretsRE.findFirstMatchIn(connectionString) match {
       case Some(i) =>
         dbutils.secrets.get(i.group(1), i.group(2))
       case None =>
         connectionString
     }
+    if (!retrievedConnectionString.matches("^Endpoint=sb://[a-zA-Z0-9-_:;/.=]*;SharedAccessKey=[a-zA-Z0-9-_:;/.=]*$")) {
+      throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
+    } else retrievedConnectionString
   }
 
   /**
@@ -337,7 +340,7 @@ object PipelineFunctions {
 
   def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
     val colToFill = col(colToFillName)
-    if (orderedLookups.nonEmpty){
+    if (orderedLookups.nonEmpty){ // TODO -- omit nulls from lookup
       val coalescedLookup = colToFill +: orderedLookups.map(lookupCol => {
         last(lookupCol, true).over(w)
       })

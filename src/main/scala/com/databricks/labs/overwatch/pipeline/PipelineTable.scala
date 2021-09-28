@@ -31,7 +31,6 @@ case class PipelineTable(
                           zOrderBy: Array[String] = Array(),
                           vacuum_H: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
                           enableSchemaMerge: Boolean = true,
-                          //                          sparkOverrides: Map[String, String] = Map[String, String](),
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true,
                           isTemp: Boolean = false,
