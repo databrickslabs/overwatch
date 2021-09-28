@@ -12,21 +12,21 @@
     <title>Azure :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1630533868" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1630533868" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1630533868" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1630533868" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1630533868" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1630533868" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1630533868" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1630533868" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1632829771" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1632829771" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1632829771" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1632829771" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1632829771" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1632829771" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1632829771" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1632829771" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1632829771" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1630533868" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1632829771" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1632829771"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1630533868"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1630533868"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1632829771"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1632829771"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1630533868"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1632829771"></script>
 
     
   </div>
@@ -614,7 +614,7 @@ distribute your Event Hubs and Namespaces appropriately.</p>
 <h4 id="step-1">Step 1</h4>
 <p><a href="https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-create">Create or reuse an Event Hub namespace.</a>
 
-<div class="notices warning" ><p><strong>Tht Event Hub Namespace MUST be in the same location as your control plane</strong></p>
+<div class="notices warning" ><p><strong>The Event Hub Namespace MUST be in the same location as your control plane</strong></p>
 </div>
 </p>
 
@@ -644,6 +644,14 @@ situation like this, the minimum autoscaling compute size should approximately e
 minimize waste.</p>
 </div>
 </p>
+<p>Once created, get the connection string from the SAS Policy for the Event Hub, find the following path in the Azure portal below.</p>
+<p>eh-namespace &ndash;&gt; eventhub &ndash;&gt; shared access policies &ndash;&gt; Connection String-primary key</p>
+<p>The connection string should begin with <code>Endpoint=sb://</code>. Note that the policy only needs the Listen permission</p>
+<p>Click Add button and select Listen option for generate policies
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/sas1.png" alt="sas1">
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/sas2.png" alt="sas2">
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/sas3.png" alt="sas3">
+Copy the Connection string-primary key and create a secret using Key vault</p>
 <h4 id="validate-messages-are-flowing">Validate Messages Are Flowing</h4>
 <p>Now that you have configured you Overwatch EventHub Namespace and a named Event Hub inside of the namespace, it&rsquo;s
 time to validate that messages are flowing. You may have to wait several minutes to begin to see messages flowing
@@ -1020,19 +1028,19 @@ storage account as it has not been fully tested. Container soft deletes are fine
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1630533868"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1630533868"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1630533868"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1630533868"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1630533868"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1632829771"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1632829771"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1632829771"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1632829771"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1632829771"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1632829771"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1630533868"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1630533868"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1630533868"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1632829771"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1632829771"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1632829771"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1630533868" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1630533868"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1632829771" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1632829771"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
