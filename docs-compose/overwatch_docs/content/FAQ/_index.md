@@ -125,3 +125,20 @@ More Details: [https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Descri
 The cluster logging paths are automatically acquired within Overwatch. There's no need to tell Overwatch where to load those from. 
 [Click here]({{%relref "EnvironmentSetup/azure.md"%}}/#configuring-overwatch-on-azure-databricks) for more details.
 ![FAQ4](/images/_index/faq4.png)
+
+## Q 5: Why i couldn't get data in the Bronze_ClusterEventLogs and getting Empty/Failed ?
+![FAQ5](/images/_index/clustereventlogs.PNG)
+
+Consider this example, the primordinal date was 22-06-2021 and deployment date was 21-09-2021.
+If you look at the **Bronze_ClusterEventLogs** (1005), it was EMPTY because it will never load more than 30 days data from the API. Always check the **untilTSt** column, Whenever we run overwatch, **untilTSt** column should be the present day. In our case, it stops at 08-22-2021. Gold_ClusterStateFact will also be empty, because it depends on Bronze_ClusterEventLogs.  
+
+**To Do:**  
+
+It can be done in 2 ways,
+1. Try changing the Primordial Date widget in the runner notebook like, today minus primordinal date(i.e, day difference between Sept-21 and June-22 is 93 days)
+2. Otherwise, change the Max Days widget to 30 and run the **Bronze(workspace).run()** multiple times, to get bronze data till current date
+
+If using notebook, clone the runner notebook and delete everything after Bronze(workspace).run(), except the display(pipReport) and check the untilTSt column, whether you are getting data till current day.
+
+If using Main class, add an argument to the json array string [“bronze”, “...<escaped_string>…”] and check the output.
+![main_class](/images/_index/main_class.PNG)
