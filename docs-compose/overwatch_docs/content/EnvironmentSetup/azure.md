@@ -51,7 +51,7 @@ distribute your Event Hubs and Namespaces appropriately.
 #### Step 1
 [Create or reuse an Event Hub namespace.](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-create)
 {{% notice warning %}}
-**The Event Hub Namespace MUST be in the same location as your control plane** 
+**Tht Event Hub Namespace MUST be in the same location as your control plane** 
 {{% /notice %}}
 
 {{% notice info %}}
@@ -81,18 +81,6 @@ but only has 8 partitions, any worker cores over 8 will sit idle while all 30 mi
 situation like this, the minimum autoscaling compute size should approximately equal the number of partitions to 
 minimize waste.  
 {{% /notice %}}
-
-Once created, get the connection string from the SAS Policy for the Event Hub, find the following path in the Azure portal below.
-
-eh-namespace --> eventhub --> shared access policies --> Connection String-primary key
-
-The connection string should begin with `Endpoint=sb://`. Note that the policy only needs the Listen permission
-
-Click Add button and select Listen option for generate policies
-![sas1](/images/EnvironmentSetup/sas1.png)
-![sas2](/images/EnvironmentSetup/sas2.png)
-![sas3](/images/EnvironmentSetup/sas3.png)
-Copy the Connection string-primary key and create a secret using Key vault
 
 #### Validate Messages Are Flowing
 Now that you have configured you Overwatch EventHub Namespace and a named Event Hub inside of the namespace, it's

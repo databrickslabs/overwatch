@@ -3,9 +3,6 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
-## 0.5.0.6
-* Patch for [Issue_235](https://github.com/databrickslabs/overwatch/issues/235)
-  * Edge cases resulted in nulls for several values in clusterstatefact.
 
 ## 0.5.0.5
 * Feature [Feature_223](https://github.com/databrickslabs/overwatch/issues/223)

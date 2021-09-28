@@ -101,7 +101,7 @@ Azure portal below.
 
 eh-namespace --> eventhub --> shared access policies --> Connection String-primary key
 
-The connection string should begin with `Endpoint=sb://`. Note that the policy only needs the Listen permission
+The connection string should begin with `Endpoing=sb://`. Note that the policy only needs the Listen permission
 
 ![ConnStringExample](/images/GettingStarted/Azure_EH_ConnString.png)
 
