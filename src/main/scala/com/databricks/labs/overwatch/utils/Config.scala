@@ -272,13 +272,15 @@ class Config() {
    */
   private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret]): this.type = {
     var rawToken = ""
+    var scope = ""
+    var key = ""
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
         _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
-        val scope = tokenSecret.get.scope
-        val key = tokenSecret.get.key
+        scope = tokenSecret.get.scope
+        key = tokenSecret.get.key
         rawToken = dbutils.secrets.get(scope, key)
         val authMessage = s"Valid Secret Identified: Executing with token located in secret, $scope : $key"
         logger.log(Level.INFO, authMessage)
@@ -299,10 +301,18 @@ class Config() {
           _tokenType = "Owner"
         }
       }
+      if (!rawToken.matches("^dapi[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
+        s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
+        s"a user access token. It should start with 'dapi' ")
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
       this
     } catch {
-      case e: Throwable => logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e); this
+      case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
+        throw new BadConfigException(e.getMessage, failPipeline = true)
+      case e: Throwable =>
+        logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e)
+        throw new BadConfigException(e.getMessage, failPipeline = true)
+        this
     }
   }
 
