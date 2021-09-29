@@ -32,11 +32,11 @@ There are two primary sources of data that need to be configured:
     files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data 
     to the data model.
     
-![AWSClusterLogging](/images/EnvironmentSetup/Cluster_Logs_AWS.png)
+![AWSClusterLogging](/images/EnvironmentSetup/AWS/Cluster_Logs_AWS.png)
 
 | Basic Deployment       | Multi-Region Deployment |
 | ---------------------- | ----------------------  |
-| ![BasicAwsArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_AWS.png)| ![AWSArch](/images/EnvironmentSetup/Overwatch_Arch_AWS.png)|
+| ![BasicAwsArch](/images/EnvironmentSetup/AWS/Overwatch_Arch_Simple_AWS.png)| ![AWSArch](/images/EnvironmentSetup/AWS/Overwatch_Arch_AWS.png)|
 
 ### With Databricks Billable Usage Delivery Logs
 Detailed costs data 
