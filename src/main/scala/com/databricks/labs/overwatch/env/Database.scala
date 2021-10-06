@@ -131,7 +131,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
-    if (target.mode == WriteMode.merge) { // DELTA MERGE / UPSERT
+    if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
       val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")
 //      val targetColumns = deltaTarget.toDF.columns

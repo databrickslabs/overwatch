@@ -72,7 +72,7 @@ case class PipelineTable(
     this
   }
 
-  def mode: WriteMode = { // initialize to constructor value
+  def writeMode: WriteMode = { // initialize to constructor value
     if (!exists && _mode == WriteMode.merge) {
       val onetimeModeChangeMsg = s"MODE CHANGED from MERGE to APPEND. Target ${tableFullName} does not exist, first write will be " +
         s"performed as an append, subsequent writes will be written as merge to this target"
@@ -313,27 +313,27 @@ case class PipelineTable(
   }
 
   def writer(df: DataFrame): Any = { // TODO -- don't return any, return instance of trait
-    if (mode != WriteMode.merge) { // DELTA Writer Built at write time
+    if (writeMode != WriteMode.merge) { // DELTA Writer Built at write time
       if (checkpointPath.nonEmpty) { // IS STREAMING
         val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
         if (config.debugFlag) println(streamWriterMessage)
         logger.log(Level.INFO, streamWriterMessage)
-        var streamWriter = df.writeStream.outputMode(mode.toString).format(format).option("checkpointLocation", checkpointPath.get)
+        var streamWriter = df.writeStream.outputMode(writeMode.toString).format(format).option("checkpointLocation", checkpointPath.get)
           .queryName(s"StreamTo_${name}")
         streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter // add partitions if exists
-        streamWriter = if (mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
+        streamWriter = if (writeMode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
           streamWriter.option("overwriteSchema", "true")
-        } else if (enableSchemaMerge && mode != WriteMode.overwrite) { // append AND merge schema
+        } else if (enableSchemaMerge && writeMode != WriteMode.overwrite) { // append AND merge schema
           streamWriter
             .option("mergeSchema", "true")
         } else streamWriter // append AND overwrite schema
         streamWriter // Return built Stream Writer
       } else { // NOT STREAMING
-        var dfWriter = df.write.mode(mode.toString).format(format)
+        var dfWriter = df.write.mode(writeMode.toString).format(format)
         dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter // add partitions if exists
-        dfWriter = if (mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
+        dfWriter = if (writeMode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
           dfWriter.option("overwriteSchema", "true")
-        } else if (enableSchemaMerge && mode != WriteMode.overwrite) { // append AND merge schema
+        } else if (enableSchemaMerge && writeMode != WriteMode.overwrite) { // append AND merge schema
           dfWriter
             .option("mergeSchema", "true")
         } else dfWriter // append AND overwrite schema
