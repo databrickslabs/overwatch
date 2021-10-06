@@ -23,6 +23,37 @@ object TransformFunctions {
       }
     }
 
+    def suffixDFCols(
+                      suffix: String,
+                      columnsToSuffix: Array[String] = Array(),
+                      caseSensitive: Boolean = false
+                    ): DataFrame = {
+      val dfFields = if (caseSensitive) df.schema.fields.map(_.name) else df.schema.fields.map(_.name.toLowerCase)
+      val allColumnsToSuffix = if (columnsToSuffix.isEmpty) {
+        dfFields
+      } else {
+        if (caseSensitive) columnsToSuffix else columnsToSuffix.map(_.toLowerCase)
+      }
+
+      df.select(dfFields.map(fName => {
+        if (allColumnsToSuffix.contains(fName)) col(fName).alias(s"${fName}${suffix}") else col(fName)
+      }): _*)
+    }
+
+    /**
+     * Join left and right as normal with the added feature that "lagDays" will be allowed to match on the join
+     * condition of the "laggingSide"
+     * EX: startEvent.joinWithLag(endEvent, keyColumn[s], "laggingDateCol", lagDays = 30, joinType = "left")
+     * The above example with match the join condition on all keyColumn[s] AND where left.laggingDateCol >=
+     * date_sub(right.laggingDateCol, 30)
+     * @param df2 df to be joined
+     * @param usingColumns key columns ** less the lagDateColumn
+     * @param lagDateColumnName name of the lag control column
+     * @param laggingSide which side of the join is the lagging side
+     * @param lagDays how many days to allow for lag
+     * @param joinType join type, one of left | inner | right
+     * @return
+     */
     def joinWithLag(
                      df2: DataFrame,
                      usingColumns: Seq[String],
@@ -32,20 +63,72 @@ object TransformFunctions {
                      joinType: String = "inner"
                    ): DataFrame = {
       require(laggingSide == "left" || laggingSide == "right", s"laggingSide must be either 'left' or 'right'; received $laggingSide")
-      val (left, right) = if (laggingSide == "left") {
-        (df.alias("laggard"), df2.alias("driver"))
+      require(joinType == "left" || joinType == "right" || joinType == "inner", s"Only left, right, inner joins " +
+        s"supported, you selected $joinType, switch to supported join type")
+      require( // both sides contain the lagDateColumnName
+        df.schema.fields.exists(_.name == lagDateColumnName) &&
+        df2.schema.fields.exists(_.name == lagDateColumnName),
+        s"$lagDateColumnName must exist on both sides of the join"
+      )
+
+      require( // lagDateColumn is date or timestamp type on both sides
+        df.schema.fields
+          .filter(f => f.name == lagDateColumnName)
+          .exists(f => f.dataType == TimestampType || f.dataType == DateType) &&
+        df2.schema.fields
+          .filter(f => f.name == lagDateColumnName)
+          .exists(f => f.dataType == TimestampType || f.dataType == DateType),
+        s"$lagDateColumnName must be either a Date or Timestamp type on both sides of the join"
+      )
+
+      val rightSuffix = "_right__OVERWATCH_CONTROL_COL"
+      val leftSuffix = "_left__OVERWATCH_CONTROL_COL"
+      val allJoinCols = (usingColumns :+ lagDateColumnName).toArray
+      val (left, right) = if (joinType == "left" || joinType == "inner") {
+        (df, df2.suffixDFCols(rightSuffix, allJoinCols, caseSensitive = true))
+      } else (df.suffixDFCols(leftSuffix, allJoinCols, caseSensitive = true), df2)
+
+      val baseJoinCondition = usingColumns.map(k => s"$k = ${k}${rightSuffix}").mkString(" AND ")
+      val joinConditionWLag = if (laggingSide == "left") {
+        expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${rightSuffix}, $lagDays)")
       } else {
-        (df.alias("driver"), df2.alias("laggard"))
+        expr(s"$baseJoinCondition AND ${lagDateColumnName}${rightSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
       }
 
-      val joinExpr = usingColumns.map(c => {
-        if (c == lagDateColumnName) {
-          datediff(col(s"driver.${c}"), col(s"laggard.${c}")) <= lagDays
-        } else col(s"driver.${c}") === col(s"laggard.${c}")
-      }).reduce((x, y) => x && y)
+      logger.log(Level.INFO, s"LagJoin Condition: $joinConditionWLag")
 
-      left.join(right, joinExpr, joinType)
-        .dropDupColumnByAlias("laggard", usingColumns: _*)
+      val joinResult = left.join(right, joinConditionWLag, joinType)
+      val joinSelects = if (joinType == "left" || joinType == "inner") {
+        joinResult.schema.fields.filterNot(_.name.endsWith(rightSuffix)).map(f => col(f.name))
+      } else joinResult.schema.fields.filterNot(_.name.endsWith(leftSuffix)).map(f => col(f.name))
+
+      joinResult.select(joinSelects: _*)
+    }
+
+    def requireFields(fieldName: Seq[String]): DataFrame = requireFields(false, fieldName: _*)
+    def requireFields(caseSensitive: Boolean, fieldName: String*): DataFrame = {
+      fieldName.map(f => {
+        val fWithCase = if (caseSensitive) f else f.toLowerCase
+        try {
+          if (caseSensitive) {
+            df.schema.fields.map(_.name).find(_ == fWithCase).get
+          } else {
+            df.schema.fields.map(_.name.toLowerCase).find(_ == fWithCase).get
+          }
+        } catch {
+          case e: NoSuchElementException =>
+            val errMsg = s"MISSING REQUIRED FIELD: $fWithCase."
+            println(errMsg)
+            logger.log(Level.ERROR, errMsg, e)
+            throw new Exception(errMsg)
+          case e =>
+            val errMsg = s"REQUIRED COLUMN FAILURE FOR: $fWithCase"
+            println(errMsg)
+            logger.log(Level.ERROR, errMsg, e)
+            throw new Exception(errMsg)
+        }
+      })
+      df
     }
 
     def toTSDF(
@@ -363,7 +446,7 @@ object TransformFunctions {
     ((unix_timestamp(tsStringCol.cast("timestamp")) * 1000) + substring(tsStringCol, -4, 3)).cast("long")
   }
 
-  private val applicableWorkers = when(col("type") === "RESIZING" &&
+  private val applicableWorkers = when(col("state") === "RESIZING" &&
     col("target_num_workers") < col("current_num_workers"), col("target_num_workers"))
     .otherwise(col("current_num_workers"))
 
@@ -377,10 +460,10 @@ object TransformFunctions {
     }
 
     if (multiplyTime) {
-      when(col("type") === "TERMINATING", lit(0))
+      when(col("state") === "TERMINATING", lit(0))
         .otherwise(round(baseMetric * col("uptime_in_state_S"), 2)).alias(s"${nodeType}_${baseMetric}S")
     } else {
-      when(col("type") === "TERMINATING", lit(0))
+      when(col("state") === "TERMINATING", lit(0))
         .otherwise(round(baseMetric, 2).alias(s"${nodeType}_${baseMetric}"))
     }
   }

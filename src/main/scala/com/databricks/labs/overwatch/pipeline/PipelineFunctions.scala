@@ -1,9 +1,9 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, InvalidInstanceDetailsException}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -232,7 +232,6 @@ object PipelineFunctions {
                               module: Option[Module],
                               filters: Seq[IncrementalFilter],
                               globalFilters: Seq[Column] = Seq(),
-                              dataFrequency: Frequency,
                               debugFlag: Boolean
                             ): DataFrame = {
     val parsedFilters = filters.map(filter => {
@@ -272,4 +271,66 @@ object PipelineFunctions {
       }
     }
   }
+
+  /**
+   * The instanceDetails costing lookup table is often edited direclty by users. Thus, each time this module runs
+   * the instanceDetails table is validated before continuing to guard against erroneous/missing cost data.
+   * As of Overwatch v 0.4.2, the instanceDetails table is a type-2 table. The record with and activeUntil column
+   * with a value of null will be considered the active record. There must be only one active record per key and
+   * there must be no gaps between dates. ActiveUntil expires on 06-01-2021 for node type X then there must be
+   * another record with activeUntil beginning on 06-01-2021 and a null activeUntil for this validation to pass.
+   *
+   * @param instanceDetails ETL table named instanceDetails referenced by the cloudDetail Target
+   * @param snapDate        snapshot date of the pipeline "yyyy-MM-dd" format
+   */
+  def validateInstanceDetails(
+                               instanceDetails: DataFrame,
+                               snapDate: String = java.time.LocalDate.now.toString
+                             ): Unit = {
+    val w = Window.partitionBy(lower(trim(col("API_Name")))).orderBy(col("activeFrom"))
+    val wKeyCheck = Window
+      .partitionBy(lower(trim(col("API_Name"))), col("activeFrom"), col("activeUntil"))
+      .orderBy(col("activeFrom"), col("activeUntil"))
+    val dfCheck = instanceDetails
+      .withColumn("activeUntil", coalesce(col("activeUntil"), lit(snapDate)))
+      .withColumn("previousUntil", lag(col("activeUntil"), 1).over(w))
+      .withColumn("rnk", rank().over(wKeyCheck))
+      .withColumn("rn", row_number().over(wKeyCheck))
+      .withColumn("isValid", when(col("previousUntil").isNull, lit(true)).otherwise(
+        col("activeFrom") === col("previousUntil")
+      ))
+      .filter(!col("isValid") || col("rnk") > 1 || col("rn") > 1)
+
+    if (!dfCheck.isEmpty) {
+      throw new InvalidInstanceDetailsException(instanceDetails, dfCheck)
+    }
+  }
+
+  def getPipelineTarget(pipeline: Pipeline, targetName: String): PipelineTable = {
+    val pipelineTargets = pipeline match {
+      case bronze: Bronze => bronze.getAllTargets
+      case silver: Silver => silver.getAllTargets
+      case gold: Gold => gold.getAllTargets
+      case _ => throw new Exception("Pipeline type must be an Overwatch Bronze, Silver, or Gold Pipeline instance")
+    }
+
+    val filteredTarget = pipelineTargets.find(_.name.toLowerCase == targetName.toLowerCase)
+
+    filteredTarget.getOrElse(throw new Exception(s"NO TARGET FOUND: No targets exist for lower " +
+      s"case $targetName.\nPotential targets include ${pipelineTargets.map(_.name).mkString(", ")}"))
+
+  }
+
+  def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+    val colToFill = col(colToFillName)
+    if (orderedLookups.nonEmpty){
+      val coalescedLookup = colToFill +: orderedLookups.map(lookupCol => {
+        last(lookupCol, true).over(w)
+      })
+      coalesce(coalescedLookup: _*).alias(colToFillName)
+    } else {
+      coalesce(colToFill, last(colToFill, true).over(w)).alias(colToFillName)
+    }
+  }
+
 }

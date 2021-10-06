@@ -1,4 +1,4 @@
-instance,API_name,vCPUs,Memory_GB,Compute_Contract_Price,On_Demand_Cost_Hourly,Linux_Reserved_Cost_Hourly,Hourly_DBUs
+instance,API_Name,vCPUs,Memory_GB,Compute_Contract_Price,On_Demand_Cost_Hourly,Linux_Reserved_Cost_Hourly,Hourly_DBUs
 DS4 v2,Standard_DS4_v2,8,28.0,0.46,0.46,0.276,0.15
 DS5 v2,Standard_DS5_v2,16,56.0,0.92,0.92,0.552,3
 D3 v2,Standard_D3_v2,4,14.0,0.23,0.23,0.138,0.75

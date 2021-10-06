@@ -1,7 +1,9 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold}
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions.getPipelineTarget
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Silver}
+import com.databricks.labs.overwatch.utils.Helpers.fastDrop
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -15,15 +17,31 @@ object Upgrade extends SparkSessionWrapper {
 
   import spark.implicits._
 
+  private def persistPipelineStateChange(db: String, moduleIds: Array[Int], asOf: Option[java.sql.Timestamp] = None): Unit = {
+    val logMsg = s"ROLLING BACK STATE: Modules ${moduleIds.mkString(",")} are rolling back"
+    println(logMsg)
+    logger.log(Level.INFO, logMsg)
+
+    val baseUpdateSQL = s"update ${db}.pipeline_report set status = 'UPGRADED' " +
+      s"where moduleID in (${moduleIds.mkString(", ")}) " +
+      s"and (status = 'SUCCESS' or status like 'EMPT%') "
+    val updateStatement = if (asOf.nonEmpty) {
+      baseUpdateSQL + s"and Pipeline_SnapTS > '${asOf.get.toString}' "
+    } else baseUpdateSQL
+
+    spark.sql(updateStatement)
+  }
+
+  private def getNumericalSchemaVersion(version: String): Int = {
+    version.split("\\.").reverse.head.toInt
+  }
+
   @throws(classOf[UpgradeException])
   private def validateSchemaUpgradeEligibility(currentVersion: String, targetVersion: String): Unit = {
     var valid = true
-    val currentVersionDotArray = currentVersion.split("\\.")
-    val targetVersionDotArray = targetVersion.split("\\.")
-    currentVersionDotArray.dropRight(1).zipWithIndex.foreach(currentV => {
-      valid = currentV._1 == targetVersionDotArray(currentV._2)
-    })
-    valid = valid && currentVersionDotArray.reverse.head.toInt < targetVersionDotArray.reverse.head.toInt
+    val currentNumericalVersion = getNumericalSchemaVersion(currentVersion)
+    val targetNumericalVersion = getNumericalSchemaVersion(targetVersion)
+    valid = targetNumericalVersion > currentNumericalVersion
     require(valid,
       s"This binary produces schema version $currentVersion. The Overwatch assets are registered as " +
         s"$targetVersion. This upgrade is meant to upgrade schemas below $targetVersion to $targetVersion schema. This is not a " +
@@ -70,7 +88,7 @@ object Upgrade extends SparkSessionWrapper {
 
         val upgradedDF = outputDF.select(SchemaTools.modifyStruct(outputDF.schema, changeInventory): _*)
         val upgradedJobsSnapTarget = jobsSnapshotTarget.copy(
-          mode = "overwrite",
+          _mode = WriteMode.overwrite,
           withCreateDate = false,
           withOverwatchRunID = false
         )
@@ -87,7 +105,7 @@ object Upgrade extends SparkSessionWrapper {
           val newClusterSnap = clusterSnapshotDF
             .withColumn("azure_attributes", SchemaTools.structToMap(clusterSnapshotDF, "azure_attributes"))
           val upgradeClusterSnapTarget = clusterSnapshotTarget.copy(
-            mode = "overwrite",
+            _mode = WriteMode.overwrite,
             withCreateDate = false,
             withOverwatchRunID = false
           )
@@ -119,14 +137,21 @@ object Upgrade extends SparkSessionWrapper {
   def upgradeTo042(prodWorkspace: Workspace, isLocalUpgrade: Boolean = false): Dataset[UpgradeReport] = {
     val currentSchemaVersion = SchemaTools.getSchemaVersion(prodWorkspace.getConfig.databaseName)
     val targetSchemaVersion = "0.420"
-    validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
+
     val upgradeStatus: ArrayBuffer[UpgradeReport] = ArrayBuffer()
+    if (getNumericalSchemaVersion(currentSchemaVersion) < 412) {
+      val logMsg = s"SCHEMA UPGRADE: Current Schema is < 0.412, attempting to step-upgrade the Schema"
+      println(logMsg)
+      logger.log(Level.INFO, logMsg)
+      upgradeStatus.appendAll(upgradeTo0412(prodWorkspace).collect())
+    }
+    validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
 
     try {
       val bronzePipeline = Bronze(prodWorkspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
       val snapDate = bronzePipeline.pipelineSnapTime.asDTString
       val w = Window.partitionBy(lower(trim('API_name))).orderBy('activeFrom)
-      val wKeyCheck = Window.partitionBy(lower(trim('API_name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
+      val wKeyCheck = Window.partitionBy(lower(trim('API_Name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
 
       // UPGRADE InstanceDetails
       val instanceDetailsTarget = bronzePipeline.getAllTargets.filter(_.name == "instanceDetails").head
@@ -149,7 +174,7 @@ object Upgrade extends SparkSessionWrapper {
           .drop("previousUntil", "isValid", "rnk", "rn")
 
         val upgradeTarget = instanceDetailsTarget.copy(
-          mode = "overwrite",
+          _mode = WriteMode.overwrite,
           withCreateDate = false,
           withOverwatchRunID = false
         )
@@ -173,7 +198,7 @@ object Upgrade extends SparkSessionWrapper {
           .withColumn("endEpochMS", $"job_runtime.endEpochMS")
 
         val upgradeTarget = jrcpGold.copy(
-          mode = "overwrite",
+          _mode = WriteMode.overwrite,
           withCreateDate = false,
           withOverwatchRunID = false
         )
@@ -191,6 +216,53 @@ object Upgrade extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Upgrading registered schema version to $targetSchemaVersion")
       SchemaTools.modifySchemaVersion(prodWorkspace.getConfig.databaseName, targetSchemaVersion)
       upgradeStatus.toDS()
+    } catch {
+      case e: UpgradeException => Seq(e.getUpgradeReport).toDS()
+      case e: Throwable =>
+        logger.log(Level.ERROR, e.getMessage, e)
+        Seq(UpgradeReport("", "", Some(e.getMessage))).toDS()
+    }
+  }
+
+  def upgradeTo043(prodWorkspace: Workspace, isLocalUpgrade: Boolean = false): Dataset[UpgradeReport] = {
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(prodWorkspace.getConfig.databaseName)
+    val targetSchemaVersion = "0.430"
+
+    val upgradeStatus: ArrayBuffer[UpgradeReport] = ArrayBuffer()
+    if (getNumericalSchemaVersion(currentSchemaVersion) < 420) {
+      val logMsg = s"SCHEMA UPGRADE: Current Schema is < 0.420, attempting to step-upgrade the Schema"
+      println(logMsg)
+      logger.log(Level.INFO, logMsg)
+      upgradeStatus.appendAll(upgradeTo042(prodWorkspace).collect())
+    }
+    validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
+
+    val cloudProvider = prodWorkspace.getConfig.cloudProvider
+    val silverPipeline = Silver(prodWorkspace, readOnly = true, suppressStaticDatasets = true, suppressReport = true)
+
+    try {
+      // job_status_silver -- small dim - easy drop and rebuild from bronze
+      fastDrop(getPipelineTarget(silverPipeline, "job_status_silver"), cloudProvider)
+
+      val moduleIDsToRollback = Array(2010)
+      persistPipelineStateChange(prodWorkspace.getConfig.databaseName, moduleIDsToRollback)
+      // other silver drops/rollbacks
+
+      val upgradeConfig = prodWorkspace.getConfig.inputConfig.copy(overwatchScope = Some(Array("audit", "clusters", "jobs")))
+      val upgradeArgs = JsonUtils.objToJson(upgradeConfig).compactString
+      val upgradeWorkspace = Initializer(upgradeArgs)
+      Silver(upgradeWorkspace).run()
+      // run Silver for proper scopes
+
+      // TODO - if count >= original count, success
+      upgradeStatus.append(UpgradeReport(prodWorkspace.getConfig.databaseName, "job_status_silver", Some("SUCCESS")))
+
+      upgradeStatus.toDS()
+    } catch {
+      case e: UpgradeException => Seq(e.getUpgradeReport).toDS()
+      case e: Throwable =>
+        logger.log(Level.ERROR, e.getMessage, e)
+        Seq(UpgradeReport("", "", Some(e.getMessage))).toDS()
     }
   }
 

@@ -298,10 +298,12 @@ object SchemaTools extends SparkSessionWrapper {
       s"is $requiredTypeName"
     val unsupportedComplexCastingMsg = s"SCHEMA ERROR: Required Schema for column $fullColName is $requiredTypeName " +
       s"but input type was $fieldTypeName. Implicit casting between / to / from complex types not supported."
+    val unsupportedMapCast = s"SCHEMA ERROR: Column: ${fullColName}\nImplicit casting of map types is not supported."
 
     // if one field is complex and the other is not, fail
     //noinspection TypeCheckCanBeMatch
     if (oneComplexOneNot) unsupportedComplexCastingMsg
+    else if (requiredTypeName == "map" || fieldTypeName == "map") unsupportedMapCast
     else if (req.dataType.isInstanceOf[ArrayType] && requiredTypeName == fieldTypeName) {
       // Both Array but Element Type not Equal
       val reqElementTypeName = req.dataType.asInstanceOf[ArrayType].elementType.typeName
@@ -423,6 +425,21 @@ object SchemaTools extends SparkSessionWrapper {
 
           // build and return struct
           validator.copy(column = struct(validatedChildren.map(_.column): _*).alias(fieldStructure.name))
+
+        case dt: MapType => // field is MapType
+          val dtMap = dt.asInstanceOf[MapType]
+          if (!requiredFieldStructure.dataType.isInstanceOf[MapType])
+            throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
+
+          // map key or value doesn't match FAIL
+          if (
+            dtMap.keyType != requiredFieldStructure.dataType.asInstanceOf[MapType].keyType ||
+              dtMap.valueType != requiredFieldStructure.dataType.asInstanceOf[MapType].valueType
+          ) throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
+
+          // build and return map(k,v)
+          validator
+
         case dt: ArrayType => // field is ArrayType
           val dtArray = dt.asInstanceOf[ArrayType]
           // field is array BUT requirement is NOT array --> throw error

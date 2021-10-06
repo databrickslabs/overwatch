@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.Frequency.Frequency
+import com.databricks.labs.overwatch.utils.WriteMode.WriteMode
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -19,9 +19,8 @@ case class PipelineTable(
                           private val _keys: Array[String],
                           config: Config,
                           incrementalColumns: Array[String] = Array(),
-                          dataFrequency: Frequency = Frequency.milliSecond,
                           format: String = "delta", // TODO -- Convert to Enum
-                          mode: String = "append", // TODO -- Convert to Enum
+                          _mode: WriteMode = WriteMode.append,
                           _databaseName: String = "default",
                           autoOptimize: Boolean = false,
                           autoCompact: Boolean = false,
@@ -73,13 +72,18 @@ case class PipelineTable(
     this
   }
 
-  /**
-   * This EITHER appends/changes the spark overrides OR sets them. This can only set spark params if updates
-   * are not passed --> setting the spark conf is really mean to be private action
-   *
-   * @param updates spark conf updates
-   */
+  def mode: WriteMode = { // initialize to constructor value
+    if (!exists && _mode == WriteMode.merge) {
+      val onetimeModeChangeMsg = s"MODE CHANGED from MERGE to APPEND. Target ${tableFullName} does not exist, first write will be " +
+        s"performed as an append, subsequent writes will be written as merge to this target"
+      if (config.debugFlag) println(onetimeModeChangeMsg)
+      logger.log(Level.INFO, onetimeModeChangeMsg)
+      WriteMode.append
+    } else _mode
+  }
+
   private[overwatch] def applySparkOverrides(updates: Map[String, String] = Map()): Unit = {
+
 
     if (autoOptimize) {
       logger.log(Level.INFO, s"enabling optimizeWrite on $tableFullName")
@@ -150,8 +154,8 @@ case class PipelineTable(
 
   def keys: Array[String] = keys()
 
-  def keys(withOveratchMeta: Boolean = false): Array[String] = {
-    if (withOveratchMeta) {
+  def keys(withOverwatchMeta: Boolean = false): Array[String] = {
+    if (withOverwatchMeta) {
       (_keys :+ "organization_id") ++ Array("Overwatch_RunID", "Pipeline_SnapTS")
     } else {
       _keys :+ "organization_id"
@@ -163,7 +167,7 @@ case class PipelineTable(
   }
 
   def asDF(withGlobalFilters: Boolean = true): DataFrame = {
-    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters. Will attempt to continue"
+    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters"
     try {
       if (exists) {
         val fullDF = if (withMasterMinimumSchema) { // infer master schema if true and available
@@ -225,7 +229,7 @@ case class PipelineTable(
                      ): DataFrame = {
     val moduleId = module.moduleId
     val moduleName = module.moduleName
-    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters. Will attempt to continue"
+    val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters"
 
     if (exists) {
       val instanceDF = if (withMasterMinimumSchema) { // infer master schema if true and available
@@ -299,7 +303,7 @@ case class PipelineTable(
       })
 
       PipelineFunctions.withIncrementalFilters(
-        instanceDF, Some(module), incrementalFilters, config.globalFilters, dataFrequency, config.debugFlag
+        instanceDF, Some(module), incrementalFilters, config.globalFilters, config.debugFlag
       )
     } else { // Source doesn't exist
       logger.log(Level.WARN, noExistsMsg)
@@ -308,29 +312,33 @@ case class PipelineTable(
     }
   }
 
-  def writer(df: DataFrame): Any = {
-    if (checkpointPath.nonEmpty) {
-      val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
-      if (config.debugFlag) println(streamWriterMessage)
-      logger.log(Level.INFO, streamWriterMessage)
-      var streamWriter = df.writeStream.outputMode(mode).format(format).option("checkpointLocation", checkpointPath.get)
-        .queryName(s"StreamTo_${name}")
-      streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter
-      streamWriter = if (mode == "overwrite") streamWriter.option("overwriteSchema", "true")
-      else if (enableSchemaMerge && mode != "overwrite")
-        streamWriter
-          .option("mergeSchema", "true")
-      else streamWriter
-      streamWriter
-    } else {
-      var dfWriter = df.write.mode(mode).format(format)
-      dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter
-      dfWriter = if (mode == "overwrite") dfWriter.option("overwriteSchema", "true")
-      else if (enableSchemaMerge && mode != "overwrite")
-        dfWriter
-          .option("mergeSchema", "true")
-      else dfWriter
-      dfWriter
+  def writer(df: DataFrame): Any = { // TODO -- don't return any, return instance of trait
+    if (mode != WriteMode.merge) { // DELTA Writer Built at write time
+      if (checkpointPath.nonEmpty) { // IS STREAMING
+        val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"
+        if (config.debugFlag) println(streamWriterMessage)
+        logger.log(Level.INFO, streamWriterMessage)
+        var streamWriter = df.writeStream.outputMode(mode.toString).format(format).option("checkpointLocation", checkpointPath.get)
+          .queryName(s"StreamTo_${name}")
+        streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter // add partitions if exists
+        streamWriter = if (mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
+          streamWriter.option("overwriteSchema", "true")
+        } else if (enableSchemaMerge && mode != WriteMode.overwrite) { // append AND merge schema
+          streamWriter
+            .option("mergeSchema", "true")
+        } else streamWriter // append AND overwrite schema
+        streamWriter // Return built Stream Writer
+      } else { // NOT STREAMING
+        var dfWriter = df.write.mode(mode.toString).format(format)
+        dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter // add partitions if exists
+        dfWriter = if (mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
+          dfWriter.option("overwriteSchema", "true")
+        } else if (enableSchemaMerge && mode != WriteMode.overwrite) { // append AND merge schema
+          dfWriter
+            .option("mergeSchema", "true")
+        } else dfWriter // append AND overwrite schema
+        dfWriter // Return built Stream Writer
+      }
     }
   }
 

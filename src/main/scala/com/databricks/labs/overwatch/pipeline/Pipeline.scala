@@ -183,7 +183,7 @@ class Pipeline(
       val overwriteTarget = cloudDetailTarget.copy(
         withOverwatchRunID = false,
         withCreateDate = false,
-        mode = "overwrite"
+        _mode = WriteMode.overwrite
       )
       database.write(newCloudDetailsDF, overwriteTarget, lit(null).cast("timestamp"))
     }
@@ -212,6 +212,7 @@ class Pipeline(
       }
 
       val finalInstanceDetailsDF = instanceDetailsDF
+        .withColumn("Memory_GB", 'Memory_GB.cast("double")) // ensure static load is in double format
         .withColumn("organization_id", lit(config.organizationId))
         .withColumn("interactiveDBUPrice", lit(config.contractInteractiveDBUPrice))
         .withColumn("automatedDBUPrice", lit(config.contractAutomatedDBUPrice))
@@ -343,7 +344,7 @@ class Pipeline(
    * Azure retrieves audit logs from EH which is to the millisecond whereas aws audit logs are delivered daily.
    * Accepting data with higher precision than delivery causes bad data
    */
-  protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
+//  protected val auditLogsIncrementalCols: Seq[String] = if (config.cloudProvider == "azure") Seq("timestamp", "date") else Seq("date")
 
   private[overwatch] def initiatePostProcessing(): Unit = {
 
@@ -389,7 +390,7 @@ class Pipeline(
     logger.log(Level.INFO, startLogMsg)
 
     // Append the output -- don't apply spark overrides, applied at top of function
-    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS, applySparkOverrides = false)
+    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
       println(readOnlyMsg)
@@ -427,7 +428,6 @@ class Pipeline(
       runEndTS = endTime,
       fromTS = module.fromTime.asUnixTimeMilli,
       untilTS = module.untilTime.asUnixTimeMilli,
-      dataFrequency = target.dataFrequency.toString,
       status = "SUCCESS",
       recordsAppended = dfCount,
       lastOptimizedTS = lastOptimizedTS,

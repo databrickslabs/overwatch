@@ -117,7 +117,7 @@ class Config() {
     Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
   }
 
-  private[overwatch] def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
+  def  overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
     val manualOverrides = Map(

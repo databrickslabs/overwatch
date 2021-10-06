@@ -19,6 +19,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.jobsTarget,
       SilverTargets.stagesTarget,
       SilverTargets.tasksTarget,
+      SilverTargets.poolsSpecTarget,
+      SilverTargets.clusterStateDetailTarget,
+      SilverTargets.poolsSpecTarget,
       SilverTargets.dbJobRunsTarget,
       SilverTargets.accountLoginTarget,
       SilverTargets.accountModTarget,
@@ -110,12 +113,15 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
   )
+  private val sparkEventsTarget = BronzeTargets.sparkEventLogsTarget
   lazy private[overwatch] val executorsModule = Module(2003, "Silver_SPARK_Executors", this, Array(1006))
     .withSparkOverrides(sparkExecutorsSparkOverrides)
   lazy private val appendExecutorsProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(executorsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(executor()),
+    sparkEventsTarget.asIncrementalDF(executorsModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(executor(
+      sparkEventsTarget.asIncrementalDF(executorsModule, 30, sparkEventsTarget.incrementalColumns: _*),
+      executorsModule.fromTime, executorsModule.untilTime
+    )),
     append(SilverTargets.executorsTarget)
   )
 
@@ -134,9 +140,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val executionsModule = Module(2005, "Silver_SPARK_Executions", this, Array(1006), 8.0)
     .withSparkOverrides(sparkExecutionsSparkOverrides)
   lazy private val appendExecutionsProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(executionsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(sqlExecutions()),
+    sparkEventsTarget.asIncrementalDF(executionsModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(sqlExecutions(
+      sparkEventsTarget.asIncrementalDF(executionsModule, 3, sparkEventsTarget.incrementalColumns: _*),
+      executionsModule.fromTime, executionsModule.untilTime
+    )),
     append(SilverTargets.executionsTarget)
   )
 
@@ -148,9 +156,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sparkJobsModule = Module(2006, "Silver_SPARK_Jobs", this, Array(1006), 8.0)
     .withSparkOverrides(sparkJobsSparkOverrides)
   lazy private val appendSparkJobsProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(sparkJobsModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(sparkJobs()),
+    sparkEventsTarget.asIncrementalDF(sparkJobsModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(sparkJobs(
+      sparkEventsTarget.asIncrementalDF(sparkJobsModule, 3, sparkEventsTarget.incrementalColumns: _*),
+      sparkJobsModule.fromTime, sparkJobsModule.untilTime
+    )),
     append(SilverTargets.jobsTarget)
   )
 
@@ -161,9 +171,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sparkStagesModule = Module(2007, "Silver_SPARK_Stages", this, Array(1006), 8.0)
     .withSparkOverrides(sparkStagesSparkOverrides)
   lazy private val appendSparkStagesProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(sparkStagesModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(sparkStages()),
+    sparkEventsTarget.asIncrementalDF(sparkStagesModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(sparkStages(
+      sparkEventsTarget.asIncrementalDF(sparkStagesModule, 3, sparkEventsTarget.incrementalColumns: _*),
+      sparkStagesModule.fromTime, sparkStagesModule.untilTime
+    )),
     append(SilverTargets.stagesTarget)
   )
 
@@ -174,16 +186,22 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sparkTasksModule = Module(2008, "Silver_SPARK_Tasks", this, Array(1006), 8.0)
     .withSparkOverrides(sparkTasksSparkOverrides)
   lazy private val appendSparkTasksProcess = ETLDefinition(
-    BronzeTargets.sparkEventLogsTarget
-      .asIncrementalDF(sparkTasksModule, 2, "fileCreateDate", "fileCreateEpochMS"),
-    Seq(sparkTasks()),
+    sparkEventsTarget.asIncrementalDF(sparkTasksModule, sparkEventsTarget.incrementalColumns: _*),
+    Seq(sparkTasks(
+      sparkEventsTarget.asIncrementalDF(sparkTasksModule, 3, sparkEventsTarget.incrementalColumns: _*),
+      sparkTasksModule.fromTime, sparkTasksModule.untilTime
+    )),
     append(SilverTargets.tasksTarget)
   )
 
   lazy private[overwatch] val jobStatusModule = Module(2010, "Silver_JobsStatus", this, Array(1004))
   lazy private val appendJobStatusProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, auditLogsIncrementalCols),
-    Seq(dbJobsStatusSummary()),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+    Seq(
+      dbJobsStatusSummary(
+        BronzeTargets.jobsSnapshotTarget.asDF,
+        config.cloudProvider
+      )),
     append(SilverTargets.dbJobsStatusTarget)
   )
 
@@ -192,51 +210,66 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     // TODO -- TEST NEEDED, jobs running longer than "additionalLagDays" of 2 below, are they able to get joined up
     //  with their jobStart events properly? If not, add logic to identify long running jobs and go get them
     //  from historical
-    BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, auditLogsIncrementalCols, 2),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, BronzeTargets.auditLogsTarget.incrementalColumns, 30),
     Seq(
       dbJobRunsSummary(
-        BronzeTargets.auditLogsTarget.withMinimumSchemaEnforcement.asDF,
         SilverTargets.clustersSpecTarget,
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
-        config.apiEnv,
-        jobRunsModule.fromTime.asColumnTS,
-        jobRunsModule.fromTime.asUnixTimeMilli
+        jobRunsModule.fromTime
       )
     ),
     append(SilverTargets.dbJobRunsTarget)
   )
 
+  lazy private[overwatch] val poolsSpecModule = Module(2009, "Silver_PoolsSpec", this, Array(1004))
+  lazy private val appendPoolsSpecProcess = ETLDefinition(
+    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+    Seq(buildPoolsSpec(
+      BronzeTargets.poolsSnapshotTarget.asDF,
+      SilverTargets.poolsSpecTarget.asDF,
+      config.cloudProvider
+    )),
+    append(SilverTargets.poolsSpecTarget)
+  )
+
   lazy private[overwatch] val clusterSpecModule = Module(2014, "Silver_ClusterSpec", this, Array(1004))
   lazy private val appendClusterSpecProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, auditLogsIncrementalCols),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(
       buildClusterSpec(
         BronzeTargets.clustersSnapshotTarget,
-        BronzeTargets.poolsTarget,
+        BronzeTargets.poolsSnapshotTarget,
         BronzeTargets.auditLogsTarget
       )),
     append(SilverTargets.clustersSpecTarget)
   )
 
+  lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005))
+  lazy private val appendClusterStateDetailProcess = ETLDefinition(
+    BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateDetailModule, "timestamp"),
+    Seq(buildClusterStateDetail(pipelineSnapTime)),
+    append(SilverTargets.clusterStateDetailTarget)
+  )
+
   lazy private[overwatch] val accountLoginsModule = Module(2016, "Silver_AccountLogins", this, Array(1004))
   lazy private val appendAccountLoginsProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(accountLoginsModule, auditLogsIncrementalCols),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(accountLoginsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(accountLogins()),
     append(SilverTargets.accountLoginTarget)
   )
 
   lazy private[overwatch] val modifiedAccountsModule = Module(2017, "Silver_ModifiedAccounts", this, Array(1004))
   lazy private val appendModifiedAccountsProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(modifiedAccountsModule, auditLogsIncrementalCols),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(modifiedAccountsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(accountMods()),
     append(SilverTargets.accountModTarget)
   )
 
   lazy private[overwatch] val notebookSummaryModule = Module(2018, "Silver_Notebooks", this, Array(1004))
   lazy private val appendNotebookSummaryProcess = ETLDefinition(
-    BronzeTargets.auditLogsTarget.asIncrementalDF(notebookSummaryModule, auditLogsIncrementalCols),
+    BronzeTargets.auditLogsTarget.asIncrementalDF(notebookSummaryModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(notebookSummary()),
     append(SilverTargets.notebookStatusTarget)
   )
@@ -258,7 +291,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         modifiedAccountsModule.execute(appendModifiedAccountsProcess)
       }
       case OverwatchScope.notebooks => notebookSummaryModule.execute(appendNotebookSummaryProcess)
+      case OverwatchScope.pools => poolsSpecModule.execute(appendPoolsSpecProcess)
       case OverwatchScope.clusters => clusterSpecModule.execute(appendClusterSpecProcess)
+      case OverwatchScope.clusterEvents => clusterStateDetailModule.execute(appendClusterStateDetailProcess)
       case OverwatchScope.sparkEvents => {
         processSparkEvents()
       }
