@@ -376,8 +376,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     var cumSum = 0L
 
     logger.log(Level.INFO, s"OVERWATCH: BUILDING CLUSTER EVENTS for ${clusterIDs.length} Clusters. " +
-      s"Large dynamic clusters," +
-      s"will take some time, especially on first runs. At present" +
+      s"Large dynamic clusters, " +
+      s"will take some time, especially on first runs. At present " +
       "the cluster events can only be acquired via api calls which are rate limited.\n" +
       s"BATCH SIZE: ${batchSize}\n" +
       s"CLUSTERS COUNT: ${clusterIDs.length}\n" +
