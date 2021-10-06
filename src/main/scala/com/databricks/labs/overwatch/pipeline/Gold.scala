@@ -31,6 +31,25 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
+  def getAllModules: Array[Module] = {
+    Array(
+      clusterModule,
+      clusterStateFactModule,
+      poolsModule,
+      jobsModule,
+      jobRunsModule,
+      jobRunCostPotentialFactModule,
+      notebookModule,
+      accountModModule,
+      accountLoginModule,
+      sparkJobModule,
+      sparkStageModule,
+      sparkTaskModule,
+      sparkExecutorModule,
+      sparkExecutionModule
+    )
+  }
+
   envInit()
 
   private val logger: Logger = Logger.getLogger(this.getClass)
