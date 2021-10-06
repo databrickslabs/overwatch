@@ -350,7 +350,7 @@ class Pipeline(
 
     postProcessor.optimize(this, 12)
     Helpers.fastrm(Array(
-      "/tmp/overwatch/bronze/clusterEventsBatches"
+      s"/tmp/overwatch/bronze/${config.organizationId}/clusterEventsBatches"
     ))
 
     spark.catalog.clearCache()

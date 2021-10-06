@@ -24,7 +24,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.clusterEventsTarget,
       BronzeTargets.sparkEventLogsTarget,
       BronzeTargets.processedEventLogs,
-      BronzeTargets.cloudMachineDetail
+      BronzeTargets.cloudMachineDetail,
+      BronzeTargets.clusterEventsErrorsTarget
     )
   }
 
@@ -84,8 +85,11 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
         clusterEventLogsModule.fromTime,
         clusterEventLogsModule.untilTime,
+        pipelineSnapTime,
         config.apiEnv,
-        config.organizationId
+        config.organizationId,
+        database,
+        BronzeTargets.clusterEventsErrorsTarget
       )
     ),
     append(BronzeTargets.clusterEventsTarget)

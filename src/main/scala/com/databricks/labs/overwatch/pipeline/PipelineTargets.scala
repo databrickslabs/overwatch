@@ -82,6 +82,13 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("timestamp"),
       statsColumns = "cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID".split(", "))
 
+    lazy private[overwatch] val clusterEventsErrorsTarget: PipelineTable = PipelineTable(
+      name = "errored_cluster_events_bronze",
+      _keys = Array("cluster_id", "from_epoch", "until_epoch", "Overwatch_RunID"),
+      config,
+      partitionBy = Seq("organization_id"),
+      incrementalColumns = Array("Pipeline_SnapTS"))
+
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
       _keys = Array("Event"), // really aren't any global valid keys for this table

@@ -301,7 +301,7 @@ class Config() {
           _tokenType = "Owner"
         }
       }
-      if (!rawToken.matches("^dapi[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
+      if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
