@@ -93,23 +93,38 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   def nestedColExists(df: DataFrame, dotPathOfField: String): Boolean = {
-    val dotPathAr = dotPathOfField.split("\\.")
-    val elder = dotPathAr.head
-    val children = dotPathAr.tail
-    val startField = df.schema.fields.find(_.name == elder)
+    nestedColExists(df.schema, dotPathOfField)
+  }
+
+  def nestedColExists(schema: StructType, dotPathOfField: String): Boolean = {
     try {
-      children.foldLeft(startField) {
-        case (f, childName) =>
-          if (f.nonEmpty) {
-            f.get.dataType match {
-              case child: StructType => child.find(_.name == childName)
-            }
-          } else None
-      }.nonEmpty
+      val f = getNestedColSchema(schema, dotPathOfField)
+      true
     } catch {
       case e: Throwable =>
-        logger.log(Level.WARN, s"${children.takeRight(1).head} column not found in source DF, attempting to continue without it", e)
+        logger.log(Level.WARN, s"Part of $dotPathOfField column not found in source DF, attempting to continue without it", e)
         false
+    }
+  }
+
+  def getNestedColSchema(schema: StructType, colName: String): StructField = {
+    val dotPathAr = colName.split('.')
+    val elder = dotPathAr.head
+    val children = dotPathAr.tail
+    val startField = schema.fields.find(_.name == elder)
+    if (startField.isEmpty) {
+      throw new RuntimeException(s"field $elder doesn't exist in provided schema")
+    }
+    children.foldLeft(startField.get) {
+      case (f, childName) =>
+        f.dataType match {
+          case child: StructType =>
+            val subfield = child.find(_.name == childName)
+            if (subfield.isEmpty) {
+              throw new RuntimeException(s"subfield $childName (part of $colName) doesn't exist in provided schema")
+            }
+            subfield.get
+        }
     }
   }
 

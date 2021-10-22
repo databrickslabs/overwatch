@@ -1,11 +1,49 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
+import com.databricks.labs.overwatch.utils.SchemaTools
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
+import org.apache.spark.sql.types
+import org.apache.spark.sql.types.{StringType, StructType}
 import org.scalatest.funspec.AnyFunSpec
 
 
 class SchemaTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
+  val schema: StructType = new StructType()
+    .add("col1", StringType)
+    .add("struct1", new StructType()
+      .add("subcol1", StringType)
+      .add("struct2", new StructType()
+        .add("subcol2", StringType)
+        .add("struct3", new StructType()
+          .add("subcol3",StringType)
+        )))
+
+  describe("SchemaTest") {
+    it("test getNestedColSchema") {
+      assertResult(StringType)(SchemaTools.getNestedColSchema(schema, "col1").dataType)
+      assertResult(StringType)(SchemaTools.getNestedColSchema(schema, "struct1.subcol1").dataType)
+      assertResult(StringType)(SchemaTools.getNestedColSchema(schema, "struct1.struct2.subcol2").dataType)
+      assertResult(StringType)(SchemaTools.getNestedColSchema(schema, "struct1.struct2.struct3.subcol3").dataType)
+
+      assertThrows[RuntimeException](SchemaTools.getNestedColSchema(schema, "col15"))
+      assertThrows[RuntimeException](SchemaTools.getNestedColSchema(schema, "struct1.col15"))
+      assertThrows[RuntimeException](SchemaTools.getNestedColSchema(schema, "struct1.struct2.col15"))
+      assertThrows[RuntimeException](SchemaTools.getNestedColSchema(schema, "struct1.struct2.struct3.col15"))
+    }
+
+    it("test nestedColExists") {
+      assertResult(true)(SchemaTools.nestedColExists(schema, "col1"))
+      assertResult(true)(SchemaTools.nestedColExists(schema, "struct1.subcol1"))
+      assertResult(true)(SchemaTools.nestedColExists(schema, "struct1.struct2.subcol2"))
+      assertResult(true)(SchemaTools.nestedColExists(schema, "struct1.struct2.struct3.subcol3"))
+
+      assertResult(false)(SchemaTools.nestedColExists(schema, "col15"))
+      assertResult(false)(SchemaTools.nestedColExists(schema, "struct1.col15"))
+      assertResult(false)(SchemaTools.nestedColExists(schema, "struct1.struct2.col15"))
+      assertResult(false)(SchemaTools.nestedColExists(schema, "struct1.struct2.struct3.col15"))
+    }
+  }
 
 //  import spark.implicits._
 //
