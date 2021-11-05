@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.{BadConfigException, Config, IncrementalFilter, InvalidInstanceDetailsException}
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config, IncrementalFilter, InvalidType2Input}
 import org.apache.ivy.core.module.id.ModuleId
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
@@ -277,36 +277,70 @@ object PipelineFunctions {
   }
 
   /**
-   * The instanceDetails costing lookup table is often edited direclty by users. Thus, each time this module runs
-   * the instanceDetails table is validated before continuing to guard against erroneous/missing cost data.
-   * As of Overwatch v 0.4.2, the instanceDetails table is a type-2 table. The record with and activeUntil column
-   * with a value of null will be considered the active record. There must be only one active record per key and
+   * There are currently two slow-changing input tables in the Overwatch pipeline, instanceDetails and dbuCostDetails.
+   * These tables track costs through time for DBUs and compute costs. These tables cannot skip time or have overlapping
+   * time for any keys as this will cause data quality issues. There must be only one active record per key and
    * there must be no gaps between dates. ActiveUntil expires on 06-01-2021 for node type X then there must be
    * another record with activeUntil beginning on 06-01-2021 and a null activeUntil for this validation to pass.
    *
-   * @param instanceDetails ETL table named instanceDetails referenced by the cloudDetail Target
-   * @param snapDate        snapshot date of the pipeline "yyyy-MM-dd" format
+   * @param target Pipeline Target to be validated
+   * @param fromCol column name of the active start date or time
+   * @param untilCol column name of the expiry date or time, null == active
+   * @param isActiveCol same as untilCol == null but more obvious for users
+   * @param snapDate snapshot date of the pipeline "yyyy-MM-dd" format
    */
-  def validateInstanceDetails(
-                               instanceDetails: DataFrame,
-                               snapDate: String = java.time.LocalDate.now.toString
-                             ): Unit = {
-    val w = Window.partitionBy(lower(trim(col("API_Name")))).orderBy(col("activeFrom"))
+  def validateType2Input(
+                           target: PipelineTable,
+                           fromCol: String,
+                           untilCol: String,
+                           isActiveCol: String,
+                           snapDate: String = java.time.LocalDate.now.toString
+                         ): Unit = {
+    val df = target.asDF
+    val keyCols = target.keys.map(k => lower(trim(col(k))).alias(k))
+
+    // only one active record per key is permitted
+    val maxActiveCountByKey = df.filter(col(isActiveCol)).groupBy(keyCols: _*)
+      .count().select(max(col("count"))).collect().map(_.getLong(0)).head
+    if (maxActiveCountByKey > 1) {
+      df
+        .filter(col(isActiveCol))
+        .orderBy(keyCols :+ col("pipeline_snapTS").desc: _*)
+        .show(20, false)
+      throw new BadConfigException(
+        s"Multiple active records found in ${target.tableFullName}. Only one record may be active " +
+          s"for each sku at a time. Please review this table and correct it."
+      )
+    }
+
+    // no time gaps or overlaps permitted for any key
+    val w = Window.partitionBy(keyCols: _*).orderBy(col(fromCol))
     val wKeyCheck = Window
-      .partitionBy(lower(trim(col("API_Name"))), col("activeFrom"), col("activeUntil"))
-      .orderBy(col("activeFrom"), col("activeUntil"))
-    val dfCheck = instanceDetails
-      .withColumn("activeUntil", coalesce(col("activeUntil"), lit(snapDate)))
-      .withColumn("previousUntil", lag(col("activeUntil"), 1).over(w))
+      .partitionBy(keyCols ++ Array(col(fromCol), col(untilCol)): _*)
+      .orderBy(col(fromCol), col(untilCol))
+    val dfCheck = df
+      .withColumn(untilCol, coalesce(col(untilCol), lit(snapDate)))
+      .withColumn("previousUntil", lag(col(untilCol), 1).over(w))
       .withColumn("rnk", rank().over(wKeyCheck))
       .withColumn("rn", row_number().over(wKeyCheck))
-      .withColumn("isValid", when(col("previousUntil").isNull, lit(true)).otherwise(
-        col("activeFrom") === col("previousUntil")
-      ))
+      .withColumn("isValid",
+        when(col("previousUntil").isNull && col(isActiveCol), lit(true))
+          .otherwise(
+            col(fromCol) === col("previousUntil") && // current from must equal previous until
+              coalesce(max(col(isActiveCol)).over(w.rowsBetween(Window.unboundedPreceding, -1)), lit(true)) === lit(false) // all prior records must be inactive
+          )
+      )
+      .filter(col(isActiveCol))
       .filter(!col("isValid") || col("rnk") > 1 || col("rn") > 1)
 
     if (!dfCheck.isEmpty) {
-      throw new InvalidInstanceDetailsException(instanceDetails, dfCheck)
+      val dfCheckReportCols = keyCols ++ Array(
+        col("rnk"),
+        col("rn"),
+        col("previousUntil"),
+        datediff(col(fromCol), col("previousUntil")).alias("daysBetweenCurrentAndPrevious")
+      )
+      throw new InvalidType2Input(target, dfCheck.select(dfCheckReportCols: _*), fromCol, untilCol)
     }
   }
 
@@ -336,6 +370,14 @@ object PipelineFunctions {
     val filteredModule = pipelineModules.find(_.moduleId == moduleId)
     filteredModule.getOrElse(throw new Exception(s"NO MODULE FOUND: ModuleID $moduleId does not exist. Available " +
       s"modules include ${pipelineModules.map(m => s"\n(${m.moduleId}, ${m.moduleName})").mkString("\n")}"))
+  }
+
+  private[overwatch] def deriveSKU(isAutomated: Column, sparkVersion: Column): Column = {
+    val isJobsLight = sparkVersion.like("apache_spark_%")
+    when(isAutomated && isJobsLight, "jobsLight")
+      .when(isAutomated && !isJobsLight, "automated")
+      .when(!isAutomated, "interactive")
+      .otherwise("unknown")
   }
 
   def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {

@@ -26,7 +26,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     if (!table.exists(catalogValidation = true) && table.exists(pathValidation = true)) {
       val createStatement = s"create table ${table.tableFullName} " +
         s"USING DELTA location '${table.tableLocation}'"
-      val logMessage = s"CREATING TABLE: ${table.tableFullName} at ${table.tableLocation}\n\n$createStatement"
+      val logMessage = s"CREATING TABLE: ${table.tableFullName} at ${table.tableLocation}\n$createStatement\n\n"
       logger.log(Level.INFO, logMessage)
       if (config.debugFlag) println(logMessage)
       spark.sql(createStatement)

@@ -246,44 +246,58 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
 
   protected def buildClusterStateFact(
-                                       instanceDetails: DataFrame,
+                                       instanceDetailsTarget: PipelineTable,
+                                       dbuCostDetailsTarget: PipelineTable,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
                                        pipelineSnapTime: TimeTypes
                                      )(clusterStateDetail: DataFrame): DataFrame = {
-    PipelineFunctions.validateInstanceDetails(instanceDetails, pipelineSnapTime.asDTString)
+    val instanceDetailsDF = instanceDetailsTarget.asDF
+    val dbuCostDetailsTSDF = dbuCostDetailsTarget.asDF
+      .select(
+        'organization_id,
+        (unix_timestamp('activeFrom) * 1000).alias("timestamp"),
+        'sku, 'contract_price.alias("dbu_rate")
+      )
+      .toTSDF("timestamp", "organization_id", "sku")
 
-    val driverNodeDetails = instanceDetails
+    val driverNodeDetails = instanceDetailsDF
       .select(
         'organization_id.alias("driver_orgid"), 'activeFrom, 'activeUntil,
         'API_Name.alias("driver_node_type_id_lookup"),
-        struct(instanceDetails.columns map col: _*).alias("driverSpecs")
+        struct(instanceDetailsDF.columns map col: _*).alias("driverSpecs")
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
       .withColumn("activeUntilEpochMillis",
-        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
-          .otherwise(unix_timestamp('activeUntil) * 1000)
+        coalesce(unix_timestamp('activeUntil) * 1000, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
       )
 
-    val workerNodeDetails = instanceDetails
+    val workerNodeDetails = instanceDetailsDF
       .select(
         'organization_id.alias("worker_orgid"), 'activeFrom, 'activeUntil,
         'API_Name.alias("node_type_id_lookup"),
-        'automatedDBUPrice, 'interactiveDBUPrice, 'sqlComputeDBUPrice, 'jobsLightDBUPrice,
-        struct(instanceDetails.columns map col: _*).alias("workerSpecs")
+        struct(instanceDetailsDF.columns map col: _*).alias("workerSpecs")
       )
       .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
       .withColumn("activeUntilEpochMillis",
-        when('activeUntil.isNull, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
-          .otherwise(unix_timestamp('activeUntil) * 1000)
+        coalesce(unix_timestamp('activeUntil) * 1000, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
       )
 
     val nodeTypeLookup = clusterSpec.asDF
       .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
+      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version))
+      .toTSDF("timestamp", "organization_id", "sku")
+      .lookupWhen(dbuCostDetailsTSDF)
+      .df
+
 
     val nodeTypeLookup2 = clusterSnapshot.asDF
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
       .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
+      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version))
+      .toTSDF("timestamp", "organization_id", "sku")
+      .lookupWhen(dbuCostDetailsTSDF)
+      .df
 
     val clusterPotential = clusterStateDetail
       .withColumn("timestamp", 'unixTimeMS_state_start) // time control temporary column
@@ -322,8 +336,6 @@ trait GoldTransforms extends SparkSessionWrapper {
           round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
       ).otherwise(lit(0.0)))
       .withColumn("isAutomated", isAutomated('cluster_name))
-      // TODO -- add additional skus
-      .withColumn("dbu_rate", when('isAutomated, 'automatedDBUPrice).otherwise('interactiveDBUPrice))
       .withColumn("worker_potential_core_H", 'worker_potential_core_S / lit(3600))
       .withColumn("driver_compute_cost", Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H))
       .withColumn("worker_compute_cost", Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H))
@@ -334,11 +346,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
       .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
       .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
-
-    // TODO - finish this logic for pricing compute by sku for a final dbuRate
-    //    val derivedDBURate = when('isAutomated && 'spark_version.like("apache-spark-%"), 'jobsLightDBUPrice)
-    //      .when('isAutomated && !'spark_version.like("apache-spark-%"), 'automatedDBUPrice)
-
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
@@ -361,6 +368,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'cloud_billable,
       'databricks_billable,
       'isAutomated,
+      'sku,
       'dbu_rate,
       'state_dates,
       'days_in_state,
@@ -413,7 +421,6 @@ trait GoldTransforms extends SparkSessionWrapper {
     val clsfLookups: Array[Column] = Array(
       'cluster_name, 'custom_tags, 'unixTimeMS_state_start, 'unixTimeMS_state_end, 'timestamp_state_start,
       'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
-      //        lit(interactiveDBUPrice).alias("interactiveDBUPrice"), lit(automatedDBUPrice).alias("automatedDBUPrice"),
       $"driverSpecs.API_Name".alias("driver_node_type_id"),
       $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
       $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
@@ -572,7 +579,6 @@ trait GoldTransforms extends SparkSessionWrapper {
     val runStateWithUtilizationAndCosts = jobRunByClusterState
       .join(cumulativeRunStateRunTimeByRunState, Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start", "unixTimeMS_state_end"), "left")
       .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
-      //        .withColumn("dbu_rate", when('cluster_type === "automated", 'automatedDBUPrice).otherwise('interactiveDBUPrice)) // removed 4.2
       .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time
       .withColumn("run_state_utilization",
         when('cluster_type === "interactive", least('runtime_in_cluster_state / 'cum_runtime_in_cluster_state, lit(1.0)))

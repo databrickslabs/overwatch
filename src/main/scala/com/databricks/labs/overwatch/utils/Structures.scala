@@ -12,7 +12,7 @@ import scalaj.http.HttpResponse
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
-import java.time.{LocalDateTime, ZonedDateTime}
+import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
 import java.util.Date
 
 case class DBDetail()
@@ -145,6 +145,15 @@ case class SimplifiedModuleStatusReport(
 
 case class IncrementalFilter(cronField: StructField, low: Column, high: Column)
 
+case class DBUCostDetail(
+                          organization_id: String,
+                          sku: String,
+                          contract_price: Double,
+                          activeFrom: LocalDate,
+                          activeUntil: Option[LocalDate],
+                          isActive: Boolean
+                        )
+
 case class UpgradeReport(db: String, tbl: String, errorMsg: Option[String])
 
 object OverwatchScope extends Enumeration {
@@ -168,6 +177,7 @@ private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 private[overwatch] class IncompleteFilterException(s: String) extends Exception(s) {}
 
 private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val allowModuleProgression: Boolean) extends Exception(apiCallDetail)
+
 private[overwatch] class ApiCallFailure(
                                          httpResponse: HttpResponse[String],
                                          apiCallDetail: String,
@@ -176,6 +186,7 @@ private[overwatch] class ApiCallFailure(
   private val logger = Logger.getLogger("ApiCall")
   private val hardFailErrors = Array(401, 404, 407)
   var failPipeline: Boolean = false
+
   private def buildAPIErrorMessage(r: HttpResponse[String]): String = {
     s"API CALL FAILED: ErrorCode: ${r.code} Databricks Message: " +
       s"${r.headers.getOrElse("x-databricks-reason-phrase", Vector("NA")).reduce(_ + " " + _)} " +
@@ -194,47 +205,64 @@ private[overwatch] class ApiCallFailure(
 
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
 
-private[overwatch] class InvalidInstanceDetailsException(
-                                                          instanceDetails: DataFrame,
-                                                          dfCheck: DataFrame)
+/**
+ * Specialized error to
+ *
+ * @param target          Pipeline Source throwing the error
+ * @param invalidReportDF details of keys causing the error
+ * @param fromCol         column name of the active start date or time
+ * @param untilCol        column name of the expiry date or time, null == active
+ */
+private[overwatch] class InvalidType2Input(
+                                            target: PipelineTable,
+                                            invalidReportDF: DataFrame,
+                                            fromCol: String,
+                                            untilCol: String
+                                          )
   extends Exception() with SparkSessionWrapper {
 
   import spark.implicits._
-  private val erroredRecordsReport = instanceDetails
-    .withColumn("API_Name", lower(trim('API_Name)))
+
+  private val erroredRecordsReport = target.asDF
     .join(
-      dfCheck
-        .select(
-          lower(trim('API_Name)).alias("API_Name"),
-          'rnk, 'rn, 'previousUntil,
-          datediff('activeFrom, 'previousUntil).alias("daysBetweenCurrentAndPrevious")
-        ),
-      Seq("API_Name")
+      invalidReportDF,
+      target.keys
     )
-    .orderBy('API_Name, 'activeFrom, 'activeUntil)
+    .orderBy(target.keys.map(col) ++ Array(col(fromCol), col(untilCol)): _*)
 
   println("InstanceDetails Error Report: ")
   erroredRecordsReport.show(numRows = 1000, false)
 
-  private val badRecords = dfCheck.count()
-  private val badRawKeys = dfCheck.select('API_Name).as[String].collect().mkString(", ")
-  private val errMsg = s"InstanceDetails Invalid: API_Name keys with errors are: $badRawKeys. " +
-    s"A total of $badRecords records were found in conflict. Each key (API_Name) must be unique for a given time period " +
-    s"(activeFrom --> activeUntil) AND the previous costs activeUntil must run through the previous date " +
-    s"such that the function 'datediff' returns 1. Please correct the instanceDetails table before continuing " +
-    s"with this module. "
+  private val badRecords = invalidReportDF.count()
+  private val badRawKeys = invalidReportDF.select(target.keys.map(col): _*).drop("organization_id").distinct()
+    .as[String].collect().mkString(", ")
+  private val errMsg = s"${target.tableFullName} Invalid: ${target.keys.mkString(", ")} keys with errors are: $badRawKeys. " +
+    s"A total of $badRecords records were found in conflict. " +
+    s"There cannot be any gaps or overlaps in time for a specific key such that " +
+    s"datediff($fromCol --> $untilCol) returns 0 for all keys. Please correct the data in the table " +
+    s"before continuing with Gold Pipeline."
   throw new BadConfigException(errMsg)
 }
 
-private[overwatch] class PipelineStateException(s: String, val target: Option[PipelineTable]) extends Exception(s) {}
+private[overwatch] class PipelineStateException(s: String, val target: Option[PipelineTable]) extends Exception(s) {
+  println(s)
+}
 
-private[overwatch] class BadConfigException(s: String, val failPipeline: Boolean = true) extends Exception(s) {}
+private[overwatch] class BadConfigException(s: String, val failPipeline: Boolean = true) extends Exception(s) {
+  println(s)
+}
 
-private[overwatch] class FailedModuleException(s: String, val target: PipelineTable) extends Exception(s) {}
+private[overwatch] class FailedModuleException(s: String, val target: PipelineTable) extends Exception(s) {
+  println(s)
+}
 
-private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {}
+private[overwatch] class UnsupportedTypeException(s: String) extends Exception(s) {
+  println(s)
+}
 
-private[overwatch] class BadSchemaException(s: String) extends Exception(s) {}
+private[overwatch] class BadSchemaException(s: String) extends Exception(s) {
+  println(s)
+}
 
 private[overwatch] class UpgradeException(s: String, target: PipelineTable) extends Exception(s) {
   def getUpgradeReport: UpgradeReport = {
