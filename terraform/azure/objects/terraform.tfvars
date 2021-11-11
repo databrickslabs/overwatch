@@ -1,3 +1,4 @@
-resource_group = "alexott-rg"
-region = "West Europe"
-name_prefix = "overwatch"
+resource_group = "some-rg"
+region = "UK South"
+name_prefix = "overwatch2"
+kv_name = "some-kv2"
