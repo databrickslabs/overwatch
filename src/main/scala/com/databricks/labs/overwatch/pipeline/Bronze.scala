@@ -30,15 +30,16 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
-  def getAllModules: Array[Module] = {
-    Array(
-      auditLogsModule,
-      clustersSnapshotModule,
-      clusterEventLogsModule,
-      jobsSnapshotModule,
-      poolsSnapshotModule,
-      sparkEventLogsModule
-    )
+  def getAllModules: Seq[Module] = {
+    config.overwatchScope.flatMap {
+      case OverwatchScope.audit => Array(auditLogsModule)
+      case OverwatchScope.clusters => Array(clustersSnapshotModule)
+      case OverwatchScope.clusterEvents => Array(clusterEventLogsModule)
+      case OverwatchScope.jobs => Array(jobsSnapshotModule)
+      case OverwatchScope.pools => Array(poolsSnapshotModule)
+      case OverwatchScope.sparkEvents => Array(sparkEventLogsModule)
+      case _ => Array[Module]()
+    }
   }
 
   private val logger: Logger = Logger.getLogger(this.getClass)

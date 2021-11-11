@@ -4,12 +4,14 @@ import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
 import org.apache.log4j.Logger
 
+
 class Gold(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
     with GoldTransforms {
 
   /**
    * Enable access to Gold pipeline tables externally.
+   *
    * @return
    */
   def getAllTargets: Array[PipelineTable] = {
@@ -31,23 +33,34 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
-  def getAllModules: Array[Module] = {
-    Array(
-      clusterModule,
-      clusterStateFactModule,
-      poolsModule,
-      jobsModule,
-      jobRunsModule,
-      jobRunCostPotentialFactModule,
-      notebookModule,
-      accountModModule,
-      accountLoginModule,
-      sparkJobModule,
-      sparkStageModule,
-      sparkTaskModule,
-      sparkExecutorModule,
-      sparkExecutionModule
-    )
+  def getAllModules: Seq[Module] = {
+    config.overwatchScope.flatMap {
+      case OverwatchScope.accounts => {
+        Array(accountModModule, accountLoginModule)
+      }
+      case OverwatchScope.notebooks => {
+        Array(notebookModule)
+      }
+      case OverwatchScope.pools => {
+        Array(poolsModule)
+      }
+      case OverwatchScope.clusters => {
+        Array(clusterModule)
+      }
+      case OverwatchScope.jobs => {
+        Array(jobsModule, jobRunsModule)
+      }
+      case OverwatchScope.sparkEvents => {
+        Array(
+          sparkJobModule,
+          sparkStageModule,
+          sparkTaskModule,
+          sparkExecutorModule,
+          sparkExecutionModule
+        )
+      }
+      case _ => Array[Module]()
+    }
   }
 
   envInit()
@@ -74,12 +87,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.clusterStateFactTarget)
   )
 
-    lazy private[overwatch] val poolsModule = Module(3009, "Gold_Pools", this, Array(2009))
-    lazy private val appendPoolsProcess = ETLDefinition(
-      SilverTargets.poolsSpecTarget.asDF,
-      Seq(buildPools()),
-      append(GoldTargets.poolsTarget)
-    )
+  lazy private[overwatch] val poolsModule = Module(3009, "Gold_Pools", this, Array(2009))
+  lazy private val appendPoolsProcess = ETLDefinition(
+    SilverTargets.poolsSpecTarget.asDF,
+    Seq(buildPools()),
+    append(GoldTargets.poolsTarget)
+  )
 
   lazy private[overwatch] val jobsModule = Module(3002, "Gold_Job", this, Array(2010))
   lazy private val appendJobsProcess = ETLDefinition(
@@ -265,7 +278,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     executeModules()
     buildFacts()
 
-        initiatePostProcessing()
+    initiatePostProcessing()
     this // to be used as fail switch later if necessary
   }
 

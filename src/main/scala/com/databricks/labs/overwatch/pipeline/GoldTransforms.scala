@@ -190,61 +190,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
   }
 
-  /**
-   * The instanceDetails costing lookup table is often edited direclty by users. Thus, each time this module runs
-   * the instanceDetails table is validated before continuing to guard against erroneous/missing cost data.
-   * As of Overwatch v 0.4.2, the instanceDetails table is a type-2 table. The record with and activeUntil column
-   * with a value of null will be considered the active record. There must be only one active record per key and
-   * there must be no gaps between dates. ActiveUntil expires on 06-01-2021 for node type X then there must be
-   * another record with activeUntil beginning on 06-01-2021 and a null activeUntil for this validation to pass.
-   *
-   * @param instanceDetails ETL table named instanceDetails referenced by the cloudDetail Target
-   * @param snapDate        snapshot date of the pipeline "yyyy-MM-dd" format
-   */
-  private def validateInstanceDetails(
-                                       instanceDetails: DataFrame,
-                                       snapDate: String
-                                     ): Unit = {
-    val w = Window.partitionBy(lower(trim('API_Name))).orderBy('activeFrom)
-    val wKeyCheck = Window.partitionBy(lower(trim('API_Name)), 'activeFrom, 'activeUntil).orderBy('activeFrom, 'activeUntil)
-    val dfCheck = instanceDetails
-      .withColumn("activeUntil", coalesce('activeUntil, lit(snapDate)))
-      .withColumn("previousUntil", lag('activeUntil, 1).over(w))
-      .withColumn("rnk", rank().over(wKeyCheck))
-      .withColumn("rn", row_number().over(wKeyCheck))
-      .withColumn("isValid", when('previousUntil.isNull, lit(true)).otherwise(
-        'activeFrom === 'previousUntil
-      ))
-      .filter(!'isValid || 'rnk > 1 || 'rn > 1)
-
-    if (!dfCheck.isEmpty) {
-      val erroredRecordsReport = instanceDetails
-        .withColumn("API_Name", lower(trim('API_Name)))
-        .join(
-          dfCheck
-            .select(
-              lower(trim('API_Name)).alias("API_Name"),
-              'rnk, 'rn, 'previousUntil,
-              datediff('activeFrom, 'previousUntil).alias("daysBetweenCurrentAndPrevious")
-            ),
-          Seq("API_Name")
-        )
-        .orderBy('API_Name, 'activeFrom, 'activeUntil)
-
-      println("InstanceDetails Error Report: ")
-      erroredRecordsReport.show(numRows = 1000, false)
-
-      val badRecords = dfCheck.count()
-      val badRawKeys = dfCheck.select('API_Name).as[String].collect().mkString(", ")
-      val errMsg = s"instanceDetails Invalid: Each key (API_Name) must be unique for a given time period " +
-        s"(activeFrom --> activeUntil) AND the previous costs activeUntil must run through the previous date " +
-        s"such that the function 'datediff' returns 1. Please correct the instanceDetails table before continuing " +
-        s"with this module.\nThe API_Name keys with errors are: $badRawKeys. A total of $badRecords records were " +
-        s"found in conflict."
-      throw new BadConfigException(errMsg)
-    }
-  }
-
   protected def buildClusterStateFact(
                                        instanceDetailsTarget: PipelineTable,
                                        dbuCostDetailsTarget: PipelineTable,

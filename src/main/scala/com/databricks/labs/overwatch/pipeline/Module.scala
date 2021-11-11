@@ -21,6 +21,14 @@ class Module(
   private val config = pipeline.config
 
   private var _isFirstRun: Boolean = false
+
+  private[overwatch] val moduleState: SimplifiedModuleStatusReport = {
+    if (pipeline.getModuleState(moduleId).isEmpty) {
+      initModuleState
+    }
+    else pipeline.getModuleState(moduleId).get
+  }
+
   private var sparkOverrides: Map[String, String] = Map[String, String]()
 
   def isFirstRun: Boolean = _isFirstRun
@@ -37,15 +45,6 @@ class Module(
   def withSparkOverrides(overrides: Map[String, String]): this.type = {
     sparkOverrides = sparkOverrides ++ overrides
     this
-  }
-
-  private[overwatch] def moduleState: SimplifiedModuleStatusReport = {
-    if (pipeline.getModuleState(moduleId).isEmpty) {
-      val initialModuleState = initModuleState
-      pipeline.updateModuleState(initialModuleState)
-      initialModuleState
-    }
-    else pipeline.getModuleState(moduleId).get
   }
 
   private def pipelineState: Map[Int, SimplifiedModuleStatusReport] = pipeline.getPipelineState.toMap
@@ -343,6 +342,7 @@ object Module {
       clusterScaleUpPercent,
       hardLimitMaxHistory
     )
+
   }
 
 }
