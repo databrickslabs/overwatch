@@ -3,11 +3,12 @@ package com.databricks.labs.overwatch.utils
 import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import com.databricks.labs.overwatch.validation.SnapReport
-import org.apache.log4j.Level
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
+import scalaj.http.HttpResponse
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
@@ -166,7 +167,30 @@ private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 
 private[overwatch] class IncompleteFilterException(s: String) extends Exception(s) {}
 
-private[overwatch] class ApiCallFailure(s: String) extends Exception(s) {}
+private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val allowModuleProgression: Boolean) extends Exception(apiCallDetail)
+private[overwatch] class ApiCallFailure(
+                                         httpResponse: HttpResponse[String],
+                                         apiCallDetail: String,
+                                         t: Throwable = null
+                                       ) extends Exception {
+  private val logger = Logger.getLogger("ApiCall")
+  private val hardFailErrors = Array(401, 404, 407)
+  var failPipeline: Boolean = false
+  private def buildAPIErrorMessage(r: HttpResponse[String]): String = {
+    s"API CALL FAILED: ErrorCode: ${r.code} Databricks Message: " +
+      s"${r.headers.getOrElse("x-databricks-reason-phrase", Vector("NA")).reduce(_ + " " + _)} " +
+      s"StatusLine: ${r.statusLine} " +
+      s"\nHTML Response Body: -- ${r.body}\n" +
+      s"API CALL DETAILS: \n " +
+      s"$apiCallDetail"
+  }
+
+  if (hardFailErrors.contains(httpResponse.code)) failPipeline = true
+  private val logLevel = if (failPipeline) Level.ERROR else Level.WARN
+  val msg: String = buildAPIErrorMessage(httpResponse)
+  println(msg)
+  if (t != null) logger.log(logLevel, msg, t) else logger.log(logLevel, msg)
+}
 
 private[overwatch] class TokenError(s: String) extends Exception(s) {}
 

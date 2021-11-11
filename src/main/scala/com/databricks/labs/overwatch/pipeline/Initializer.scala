@@ -146,6 +146,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       )
 
       config.setAuditLogConfig(auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig)))
+      // parse the connection string to validate format
+      PipelineFunctions.parseEHConnectionString(
+        config.auditLogConfig.azureAuditLogEventhubConfig.get.connectionString
+      )
 
     }
     this

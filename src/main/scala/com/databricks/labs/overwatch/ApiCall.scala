@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
-import scalaj.http.{Http, HttpOptions}
+import scalaj.http.{Http, HttpOptions, HttpResponse}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -19,23 +19,23 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   private var _getQueryString: String = _
   private var _initialQueryMap: Map[String, Any] = _
   private val results = ArrayBuffer[String]()
+  private val _rawResults = ArrayBuffer[HttpResponse[String]]()
   private var _limit: Long = _
   private var _paginate: Boolean = false
   private var _req: String = _
   private var _maxResults: Int = _
-  private var _status: String = "SUCCESS"
-  private var _errorFlag: Boolean = false
   private var _allowUnsafeSSL: Boolean = false
 
   private val mapper = JsonUtils.defaultObjectMapper
   private val httpHeaders = Seq[(String, String)](
     ("Content-Type", "application/json"),
-    ("Charset",  "UTF-8"),
-    ("User-Agent",  s"databricks-labs-overwatch-${env.packageVersion}"),
+    ("Charset", "UTF-8"),
+    ("User-Agent", s"databricks-labs-overwatch-${env.packageVersion}"),
     ("Authorization", s"Bearer ${env.rawToken}")
   )
 
   private def allowUnsafeSSL = _allowUnsafeSSL
+
   private def reqOptions: Seq[HttpOptions.HttpOption] = {
     val baseOptions = Seq(
       HttpOptions.connTimeout(ApiCall.connTimeoutMS),
@@ -56,7 +56,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
     _limit = _initialQueryMap.getOrElse("limit", 150).toString.toInt
     _jsonQuery = JsonUtils.objToJson(_initialQueryMap).compactString
-    _getQueryString = "?" + _initialQueryMap.map { case(k, v) => s"$k=$v"}.mkString("&")
+    _getQueryString = "?" + _initialQueryMap.map { case (k, v) => s"$k=$v" }.mkString("&")
     this
   }
 
@@ -81,14 +81,14 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     this
   }
 
-  private def setStatus(value: String, level: Level, e: Option[Throwable] = None): Unit = {
-    error()
-    _status = value
-    if (e.nonEmpty) logger.log(level, value, e.get)
-    else logger.log(level, value)
-  }
+  //  private def setStatus(value: String, level: Level, e: Option[Throwable] = None): Unit = {
+  //    error()
+  //    _status = value
+  //    if (e.nonEmpty) logger.log(level, value, e.get)
+  //    else logger.log(level, value)
+  //  }
 
-  private def error(): Unit = _errorFlag = true
+  //  private def error(): Unit = _errorFlag = true
 
   private def req: String = _req
 
@@ -96,31 +96,37 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   private def limit: Long = _limit
 
-  private[overwatch] def status: String = _status
+  def asRawResponses: Array[HttpResponse[String]] = _rawResults.toArray
 
-  private[overwatch] def isError: Boolean = _errorFlag
+  def errorsFound: Boolean = asRawResponses.exists(r => r.isError && r.code != 429) // don't consider rate limit an error
 
   def asStrings: Array[String] = results.toArray
 
   def asDF: DataFrame = {
-    try {
-      val apiResultDF = spark.read.json(Seq(results: _*).toDS)
-      if (dataCol == "*") apiResultDF
-      else apiResultDF.select(explode(col(dataCol)).alias(dataCol))
-        .select(col(s"$dataCol.*"))
-    } catch {
-      case e: Throwable =>
-        if (results.isEmpty) {
-          val msg = s"No data returned for api endpoint ${_apiName}"
-          setStatus(msg, Level.INFO, Some(e))
-          spark.emptyDataFrame
-        }
-        else {
-          val msg = s"Acquiring data from ${_apiName} failed."
-          setStatus(msg, Level.ERROR, Some(e))
-          spark.emptyDataFrame
-        }
+    if (results.isEmpty) {
+      if (errorsFound) {
+        val errMsg = s"API CALL CONTAINS ERRORS and resulting DF is empty. " +
+          s"FAILING MODULE, details below:\n$buildGenericErrorMessage"
+        throw new ApiCallEmptyResponse(errMsg, false)
+      } else {
+        val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
+          s"Details Below:\n$buildGenericErrorMessage"
+        throw new ApiCallEmptyResponse(errMsg, true)
+      }
     }
+    val apiResultDF = spark.read.json(Seq(results: _*).toDS)
+    val resultDFFieldNames = apiResultDF.schema.fieldNames
+    if (!resultDFFieldNames.contains(dataCol) && dataCol != "*") { // if known API but return column doesn't exist
+     val asDFErrMsg = s"The API endpoint is not returning the " +
+       s"expected structure, column $dataCol is expected and is not present in the dataframe"
+      logger.log(Level.ERROR, asDFErrMsg)
+      println(asDFErrMsg)
+      throw new Exception(asDFErrMsg)
+    }
+    if (dataCol == "*") apiResultDF
+    else apiResultDF.select(explode(col(dataCol)).alias(dataCol))
+      .select(col(s"$dataCol.*"))
+
   }
 
   private def dataCol: String = {
@@ -138,65 +144,37 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       case _: scala.MatchError => logger.log(Level.WARN, "API not configured, returning full dataset"); "*"
       case e: Throwable =>
         val msg = "API Not Supported."
-        setStatus(msg, Level.ERROR, Some(e))
+        logger.log(Level.ERROR, msg, e)
         ""
     }
   }
 
-  // TODO -- Issue_87 -- Simplify differences between get and post
-  //  and validate the error handling
-  @throws(classOf[ApiCallFailure])
-  @throws(classOf[java.lang.NoClassDefFoundError])
-  def executeGet(pageCall: Boolean = false): this.type = {
-    logger.log(Level.INFO, s"Loading $req -> query: $getQueryString")
-    try {
-      val result = try {
-        Http(req + getQueryString)
-          .copy(headers = httpHeaders)
-          .options(reqOptions)
-          .asString
-      } catch {
-        case _: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
-          val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
-            "ssl. If this is unexpected behavior, validate your ssl certs."
-          logger.log(Level.WARN, sslMSG)
-          println(sslMSG)
-          _allowUnsafeSSL = true
-          Http(req + getQueryString)
-            .copy(headers = httpHeaders)
-            .options(reqOptions)
-            .asString
-      }
-      if (result.isError) {
-        if (result.code == 429) {
-          Thread.sleep(2000)
-          executeGet(pageCall) // rate limit retry
-        }
-        if (mapper.readTree(result.body).has("error_code")) {
-          val err = mapper.readTree(result.body).get("error_code").asText()
-          throw new ApiCallFailure(s"${_apiName} could not execute: $err")
-        } else {
-          throw new ApiCallFailure(s"${_apiName} could not execute: ${result.code}")
-        }
-      }
-      if (!pageCall && _paginate) {
-        // Append initial results
-        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
-        paginate()
-      } else {
-        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
-      }
-      this
-    } catch {
-      case e: java.lang.NoClassDefFoundError =>
-        val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
-        println(msg, e)
-        throw new java.lang.NoClassDefFoundError
-      case e: Throwable =>
-        val msg = "Could not execute API call."
-        setStatus(msg, Level.ERROR, Some(e))
-        this
-    }
+  private def buildGenericErrorMessage: String = {
+    s"""API CALL FAILED: Endpoint: ${_apiName}
+       |isPaginate: ${_paginate}
+       |limit: ${_limit}
+       |initQueryMap: ${_initialQueryMap}
+       |jsonQuery: ${JsonUtils.objToJson(_initialQueryMap).compactString}
+       |queryString: $getQueryString
+       |""".stripMargin
+  }
+
+  private def buildGetErrorMessage: String = {
+    s"""GET FAILED: Endpoint: ${_apiName}
+       |isPaginate: ${_paginate}
+       |limit: ${_limit}
+       |initQueryMap: ${_initialQueryMap}
+       |queryString: $getQueryString
+       |""".stripMargin
+  }
+
+  private def buildPostErrorMessage: String = {
+    s"""POST FAILED: Endpoint: ${_apiName}
+       |jsonQuery: ${JsonUtils.objToJson(_initialQueryMap).compactString}
+       |isPaginate: ${_paginate}
+       |limit: ${_limit}
+       |initQueryMap: ${_initialQueryMap}
+       |""".stripMargin
   }
 
   // Paginate for Get Calls
@@ -210,8 +188,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       setQuery(Some(_initialQueryMap))
       executeGet(true)
       hasMore = JsonUtils.jsonToMap(results(i)).getOrElse("has_more", false).toString.toBoolean
-      i+=1
-      cumTotal+=limit
+      i += 1
+      cumTotal += limit
     }
   }
 
@@ -230,6 +208,60 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       executePost(pageCall = true)
     })
 
+  }
+
+  // TODO -- Issue_87 -- Simplify differences between get and post
+  //  and validate the error handling
+  @throws(classOf[ApiCallFailure])
+  @throws(classOf[java.lang.NoClassDefFoundError])
+  def executeGet(pageCall: Boolean = false): this.type = {
+    logger.log(Level.INFO, s"Loading $req -> query: $getQueryString")
+    try {
+      val result = try {
+        Http(req + getQueryString)
+          .copy(headers = httpHeaders)
+          .options(reqOptions)
+          .asString
+      } catch {
+        case _: javax.net.ssl.SSLHandshakeException if !allowUnsafeSSL => // for PVC with ssl errors
+          val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
+            "ssl. If this is unexpected behavior, validate your ssl certs."
+          logger.log(Level.WARN, sslMSG)
+          println(sslMSG)
+          _allowUnsafeSSL = true
+          Http(req + getQueryString)
+            .copy(headers = httpHeaders)
+            .options(reqOptions)
+            .asString
+      }
+      if (result.isError) {
+        if (result.code == 429) {
+          Thread.sleep(2000)
+          executeGet(pageCall) // rate limit retry
+        } else throw new ApiCallFailure(result, buildGetErrorMessage)
+      }
+      if (!pageCall && _paginate) {
+        // Append initial rawResults
+        _rawResults.append(result)
+        // Append initial results
+        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
+        paginate()
+      } else {
+        _rawResults.append(result)
+        results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
+      }
+      this
+    } catch {
+      case e: java.lang.NoClassDefFoundError =>
+        val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
+        println(msg, e)
+        throw new java.lang.NoClassDefFoundError
+      case e: ApiCallFailure if e.failPipeline => throw e
+      case e: Throwable =>
+        logger.log(Level.ERROR, buildGetErrorMessage, e)
+        println(buildGetErrorMessage)
+        throw e
+    }
   }
 
   @throws(classOf[NoNewDataException])
@@ -258,19 +290,24 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
             .options(reqOptions)
             .asString
       }
+
       if (result.isError) {
-        val err = mapper.readTree(result.body).get("error_code").asText()
-        val msg = mapper.readTree(result.body).get("message").asText()
-        setStatus(s"$err -> $msg", Level.WARN)
-        throw new ApiCallFailure(s"$err -> $msg")
+        if (result.code == 429) {
+          Thread.sleep(2000)
+          executePost(pageCall) // rate limit retry
+        } else throw new ApiCallFailure(result, buildPostErrorMessage)
       }
       if (!pageCall && _paginate) {
+        // if paginate == true and is first api call
+        // determine page call and make first call and then make recursive call to paginate through
+        _rawResults.append(result)
         val jsonResult = mapper.writeValueAsString(mapper.readTree(result.body))
         val totalCount = mapper.readTree(result.body).get("total_count").asInt(0)
         logger.log(Level.INFO, s"Total Count for Query: $jsonQuery is $totalCount by Limit: $limit")
         if (totalCount > 0) results.append(jsonResult)
-        if (totalCount > limit) paginate(totalCount)
-      } else {
+        if (totalCount > limit) paginate(totalCount) // paginate if more
+      } else { // if no pagination make single post call
+        _rawResults.append(result)
         results.append(mapper.writeValueAsString(mapper.readTree(result.body)))
       }
       this
@@ -278,23 +315,18 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       case e: java.lang.NoClassDefFoundError =>
         val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
         println(msg, e)
-        throw new java.lang.NoClassDefFoundError
-      case _: JsonMappingException =>
-        val msg = s"API POST: NO NEW DATA -> ${_apiName} Query: $jsonQuery"
-        setStatus(msg, Level.WARN)
-        this
+        throw new java.lang.NoClassDefFoundError(msg)
+      case _: JsonMappingException => {
+        println(buildPostErrorMessage)
+        val rawBodyResults = asRawResponses.map(_.body).mkString("\n\n")
+        throw new ApiCallEmptyResponse(s"No or malformed data returned: $buildPostErrorMessage\n" +
+          s"RAW return Value: ${rawBodyResults}", !errorsFound)
+      }
+      case e: ApiCallFailure if e.failPipeline => throw e
       case e: Throwable =>
-        val msg =
-          s"""POST FAILED: Endpoint: ${_apiName}
-             |jsonQuery: $jsonQuery
-             |SETTING QUERY:
-             |isPaginate: ${_paginate}
-             |limit: ${_limit}
-             |initQueryMap: ${_initialQueryMap}
-             |queryString: ${_getQueryString}
-             |""".stripMargin
-        setStatus(msg, Level.ERROR, Some(e))
-        this
+        logger.log(Level.ERROR, buildPostErrorMessage, e)
+        println(buildPostErrorMessage)
+        throw e
     }
   }
 
@@ -304,6 +336,7 @@ object ApiCall {
 
   val readTimeoutMS = 60000
   val connTimeoutMS = 10000
+
   def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None,
             maxResults: Int = Int.MaxValue, paginate: Boolean = true): ApiCall = {
     new ApiCall(apiEnv).setApiName(apiName)
