@@ -12,10 +12,20 @@ variable "max_node_count" {
   description = "Maximum number of the worker nodes"
 }
 
+
+variable "resource_group" {
+  description = "Resource group name"
+}
+
 variable "timezone" {
   description = "Timezone at which job will be executed"
   default = "UTC"
 }
+
+variable "storage_prefix" {
+
+}
+
 
 variable "cron_expression" {
   description = "Quartz cron expression for scheduling of the job"
@@ -23,14 +33,6 @@ variable "cron_expression" {
 
 variable "notebook_path" {
   description = "Path to the Overwatch notebook"
-}
-
-variable "overwatch_jar_path" {
-  description = "Local path to the Overwatch jar"
-}
-
-variable "overwatch_remote_path" {
-  description = "Path to the Overwatch jar on DBFS"
 }
 
 variable "overwatch_job_secrets_scope" {
@@ -51,6 +53,10 @@ variable "overwatch_job_evh_name" {
 
 variable "overwatch_job_dbname" {
   description = "Overwatch database name"
+}
+
+variable "overwatch_job_etl_dbname" {
+  description = "Overwatch ETL database name"
 }
 
 variable "overwatch_job_temppath" {
