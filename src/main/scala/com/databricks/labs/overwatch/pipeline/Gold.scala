@@ -65,7 +65,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClusterStateFactProccess = ETLDefinition(
     SilverTargets.clusterStateDetailTarget.asIncrementalDF(clusterStateFactModule, SilverTargets.clusterStateDetailTarget.incrementalColumns),
     Seq(buildClusterStateFact(
-      BronzeTargets.cloudMachineDetail.asDF,
+      BronzeTargets.cloudMachineDetail,
+      BronzeTargets.dbuCostDetail,
       BronzeTargets.clustersSnapshotTarget,
       SilverTargets.clustersSpecTarget,
       pipelineSnapTime
@@ -203,7 +204,13 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   }
 
+  private def validateCostSources(): Unit = {
+    PipelineFunctions.validateType2Input(BronzeTargets.dbuCostDetail, "activeFrom", "activeUntil", "isActive", pipelineSnapTime.asDTString)
+    PipelineFunctions.validateType2Input(BronzeTargets.cloudMachineDetail, "activeFrom", "activeUntil", "isActive", pipelineSnapTime.asDTString)
+  }
+
   private def executeModules(): Unit = {
+    validateCostSources()
     config.overwatchScope.foreach {
       case OverwatchScope.accounts => {
         accountModModule.execute(appendAccountModProcess)

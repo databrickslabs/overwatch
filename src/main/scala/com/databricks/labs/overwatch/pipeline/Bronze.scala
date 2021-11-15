@@ -25,6 +25,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.sparkEventLogsTarget,
       BronzeTargets.processedEventLogs,
       BronzeTargets.cloudMachineDetail,
+      BronzeTargets.dbuCostDetail,
       BronzeTargets.clusterEventsErrorsTarget
     )
   }

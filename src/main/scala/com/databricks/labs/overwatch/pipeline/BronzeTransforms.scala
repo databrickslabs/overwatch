@@ -231,6 +231,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     } catch { // chk dir is missing BUT raw audit hist has latest enq time and can resume from there creating a new chkpoint
       case e: BadConfigException if (!e.failPipeline) =>
+        spark.conf.set("spark.network.timeout", "1200s") // lazy loading of enqTime can cause futures to time out
         val lastEnqTime = azureRawAuditLogTarget.asDF()
           .select(max('enqueuedTime))
           .as[java.sql.Timestamp]

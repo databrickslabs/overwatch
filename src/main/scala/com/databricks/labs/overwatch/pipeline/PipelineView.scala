@@ -33,7 +33,7 @@ case class PipelineView(name: String,
       }
       val pubStatement = pubStatementSB.toString()
 
-      val msgLog = s"GOLD VIEW: CREATE: Statement --> $pubStatement"
+      val msgLog = s"GOLD VIEW: CREATE: Statement --> $pubStatement\n\n"
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
       try {

@@ -124,6 +124,20 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
+    lazy private[overwatch] val dbuCostDetail: PipelineTable = PipelineTable(
+      name = "dbuCostDetails",
+      _keys = Array("sku"),
+      config,
+      incrementalColumns = Array("activeFrom"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val dbuCostDetailViewTarget: PipelineView = PipelineView(
+      name = "dbuCostDetails",
+      dbuCostDetail,
+      config
+    )
+
   }
 
   /**
