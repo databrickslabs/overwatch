@@ -197,6 +197,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setInputConfig(rawParams)
 
 
+    val overwatchFriendlyName = rawParams.workspaceFriendlyName.getOrElse(config.organizationId)
+    config.setworkspaceFriendlyName(overwatchFriendlyName)
     val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
     val tokenSecret = rawParams.tokenSecret
     // TODO -- PRIORITY -- If data target is null -- default table gets dbfs:/null

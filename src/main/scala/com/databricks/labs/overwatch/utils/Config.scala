@@ -16,6 +16,7 @@ class Config() {
   private var _debugFlag: Boolean = false
   private var _overwatchSchemaVersion = "0.420"
   private var _organizationId: String = _
+  private var _workspaceFriendlyName: String = _
   private var _databaseName: String = _
   private var _databaseLocation: String = _
   private var _etlDataPathPrefix: String = _
@@ -56,6 +57,8 @@ class Config() {
   def debugFlag: Boolean = _debugFlag
 
   def organizationId: String = _organizationId
+
+  def workspaceFriendlyName: String = _workspaceFriendlyName
 
   def cloudProvider: String = _cloudProvider
 
@@ -240,10 +243,21 @@ class Config() {
   }
 
   private[overwatch] def setOrganizationId(value: String): this.type = {
-    if (debugFlag) println(s"organization ID set to ${value}")
+    val msg = s"organization ID set to $value"
+    logger.log(Level.INFO, msg)
+    if (debugFlag) println(msg)
     _organizationId = value
     this
   }
+
+  private[overwatch] def setworkspaceFriendlyName(value: String): this.type = {
+    val msg = s"workspaceFriendlyName set to $value"
+    logger.log(Level.INFO, msg)
+    if (debugFlag) println(msg)
+    _workspaceFriendlyName = value
+    this
+  }
+
   private def setApiEnv(value: ApiEnv): this.type = {
     _apiEnv = value
     this

@@ -158,6 +158,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       getOptionDouble(masterNode, "intelligentScaling.coeff").getOrElse(1.0)
     )
 
+    val workspaceFriendlyName = getOptionString(masterNode, "workspaceFriendlyName")
+
     OverwatchParams(
       auditLogConfig,
       token,
@@ -167,7 +169,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       maxDaysToLoad,
       dbContractPrices,
       primordialDateString,
-      intelligentScalingConfig
+      intelligentScalingConfig,
+      workspaceFriendlyName
     )
   }
 }
