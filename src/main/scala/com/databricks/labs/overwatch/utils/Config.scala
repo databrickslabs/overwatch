@@ -17,6 +17,7 @@ class Config() {
   private var _overwatchSchemaVersion = "0.420"
   private var _organizationId: String = _
   private var _workspaceFriendlyName: String = _
+  private var _isPVC: Boolean = false
   private var _databaseName: String = _
   private var _databaseLocation: String = _
   private var _etlDataPathPrefix: String = _
@@ -59,6 +60,8 @@ class Config() {
   def organizationId: String = _organizationId
 
   def workspaceFriendlyName: String = _workspaceFriendlyName
+
+  def isPVC: Boolean = _isPVC
 
   def cloudProvider: String = _cloudProvider
 
@@ -255,6 +258,11 @@ class Config() {
     logger.log(Level.INFO, msg)
     if (debugFlag) println(msg)
     _workspaceFriendlyName = value
+    this
+  }
+
+  private[overwatch] def setIsPVC(value: Boolean): this.type = {
+    _isPVC = value
     this
   }
 

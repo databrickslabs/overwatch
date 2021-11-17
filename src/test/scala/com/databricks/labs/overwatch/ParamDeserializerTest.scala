@@ -21,7 +21,7 @@ class ParamDeserializerTest extends AnyFunSpec {
         |"maxDaysToLoad":60,
         |"databricksContractPrices":{"interactiveDBUCostUSD":0.55,"automatedDBUCostUSD":0.15, "sqlComputeDBUCostUSD":0.22, "jobsLightDBUCostUSD":0.1},
         |"intelligentScaling":{"enabled":false, "minimumCores":4 , "maximumCores":512 , "coeff":1.0},
-        |"workspaceFriendlyName":{"myTestWorkspace"}}
+        |"workspaceFriendlyName":"myTestWorkspace"}
         |""".stripMargin
 
       val paramModule: SimpleModule = new SimpleModule()
