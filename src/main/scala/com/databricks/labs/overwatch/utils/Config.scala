@@ -18,6 +18,7 @@ class Config() {
   private var _organizationId: String = _
   private var _workspaceFriendlyName: String = _
   private var _isPVC: Boolean = false
+  private var _externalizeOptimize: Boolean = false
   private var _databaseName: String = _
   private var _databaseLocation: String = _
   private var _etlDataPathPrefix: String = _
@@ -62,6 +63,8 @@ class Config() {
   def workspaceFriendlyName: String = _workspaceFriendlyName
 
   def isPVC: Boolean = _isPVC
+
+  def externalizeOptimize: Boolean = _externalizeOptimize
 
   def cloudProvider: String = _cloudProvider
 
@@ -263,6 +266,17 @@ class Config() {
 
   private[overwatch] def setIsPVC(value: Boolean): this.type = {
     _isPVC = value
+    this
+  }
+
+  private[overwatch] def setExternalizeOptimize(value: Boolean): this.type = {
+    val msg = s"Pipeline Optimize DISABLED: You have elected to complete the optimizations externally. It's " +
+      s"imperative that you schedule a periodic optimization job using the Optimize main class. See documentation " +
+      s"for further instructions. If you do not complete optimizations outside or insdie the pipeline, the " +
+      s"performance will degrade."
+    if (value) logger.log(Level.INFO, msg)
+    if (debugFlag && value) println(msg)
+    _externalizeOptimize = value
     this
   }
 

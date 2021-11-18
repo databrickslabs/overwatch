@@ -235,6 +235,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      */
     if (isPVC) pvcOverrideOrganizationId
 
+    config.setExternalizeOptimize(rawParams.externalizeOptimize)
+
     val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
     val tokenSecret = rawParams.tokenSecret
     // TODO -- PRIORITY -- If data target is null -- default table gets dbfs:/null

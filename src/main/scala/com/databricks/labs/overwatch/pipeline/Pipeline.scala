@@ -28,7 +28,7 @@ class Pipeline(
   private var _pipelineSnapTime: Long = _
   private var _readOnly: Boolean = false
   private var _supressRangeReport: Boolean = false
-  lazy protected final val postProcessor = new PostProcessor()
+  lazy protected final val postProcessor = new PostProcessor(config)
   private val pipelineState = scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport]()
 
   import spark.implicits._
@@ -427,7 +427,7 @@ class Pipeline(
     logger.log(Level.INFO, msg)
 
     var lastOptimizedTS: Long = getLastOptimized(module.moduleId)
-    if (needsOptimize(module.moduleId, target.optimizeFrequency_H)) {
+    if (!config.externalizeOptimize && needsOptimize(module.moduleId, target.optimizeFrequency_H)) {
       postProcessor.markOptimize(target)
       lastOptimizedTS = module.untilTime.asUnixTimeMilli
     }
@@ -440,6 +440,7 @@ class Pipeline(
     // Generate Success Report
     ModuleStatusReport(
       organization_id = config.organizationId,
+      workspaceFriendlyName = config.workspaceFriendlyName,
       moduleID = module.moduleId,
       moduleName = module.moduleName,
       primordialDateString = config.primordialDateString,
@@ -452,7 +453,8 @@ class Pipeline(
       lastOptimizedTS = lastOptimizedTS,
       vacuumRetentionHours = 24 * 7,
       inputConfig = config.inputConfig,
-      parsedConfig = config.parsedConfig
+      parsedConfig = config.parsedConfig,
+      externalizeOptimize = config.externalizeOptimize
     )
   }
 

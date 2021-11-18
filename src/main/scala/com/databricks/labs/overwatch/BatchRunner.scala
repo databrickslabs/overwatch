@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Silver
 import com.databricks.labs.overwatch.utils.{BadConfigException, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 
-object BatchRunner extends SparkSessionWrapper{
+object BatchRunner extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
@@ -17,15 +17,16 @@ object BatchRunner extends SparkSessionWrapper{
    * if args length == 2, 0 = pipeline of bronze, silver, or gold and 1 = overwatch args
    * if args length == 1, overwatch args
    * if args length == 0, throw exception
+   *
    * @param args
    */
   def main(args: Array[String]): Unit = {
     envInit()
     setGlobalDeltaOverrides()
 
-//    JARS for databricks remote
-//    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2.jar")
-//    spark.sql("drop database if exists overwatch_local cascade")
+    //    JARS for databricks remote
+    //    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2.jar")
+    //    spark.sql("drop database if exists overwatch_local cascade")
 
     val workspace = if (args.length == 2) {
       Initializer(args(1))
@@ -66,7 +67,6 @@ object BatchRunner extends SparkSessionWrapper{
       logger.log(Level.INFO, "Starting Gold")
       Gold(workspace).run()
     }
-
 
 
   }

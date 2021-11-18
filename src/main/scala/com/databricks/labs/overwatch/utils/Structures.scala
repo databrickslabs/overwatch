@@ -82,7 +82,8 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(),
                            primordialDateString: Option[String] = None,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
-                           workspaceFriendlyName: Option[String]
+                           workspaceFriendlyName: Option[String],
+                           externalizeOptimize: Boolean
                           )
 
 case class ParsedConfig(
@@ -97,6 +98,7 @@ case class ParsedConfig(
 
 case class ModuleStatusReport(
                                organization_id: String,
+                               workspaceFriendlyName: String,
                                moduleID: Int,
                                moduleName: String,
                                primordialDateString: Option[String],
@@ -109,11 +111,13 @@ case class ModuleStatusReport(
                                lastOptimizedTS: Long,
                                vacuumRetentionHours: Int,
                                inputConfig: OverwatchParams,
-                               parsedConfig: ParsedConfig
+                               parsedConfig: ParsedConfig,
+                               externalizeOptimize: Boolean
                              ) {
   def simple: SimplifiedModuleStatusReport = {
     SimplifiedModuleStatusReport(
       organization_id,
+      workspaceFriendlyName,
       moduleID,
       moduleName,
       primordialDateString,
@@ -124,13 +128,15 @@ case class ModuleStatusReport(
       status,
       recordsAppended,
       lastOptimizedTS,
-      vacuumRetentionHours
+      vacuumRetentionHours,
+      externalizeOptimize
     )
   }
 }
 
 case class SimplifiedModuleStatusReport(
                                          organization_id: String,
+                                         workspaceFriendlyName: String,
                                          moduleID: Int,
                                          moduleName: String,
                                          primordialDateString: Option[String],
@@ -141,7 +147,8 @@ case class SimplifiedModuleStatusReport(
                                          status: String,
                                          recordsAppended: Long,
                                          lastOptimizedTS: Long,
-                                         vacuumRetentionHours: Int
+                                         vacuumRetentionHours: Int,
+                                         externalizeOptimize: Boolean
                                        )
 
 case class IncrementalFilter(cronField: StructField, low: Column, high: Column)

@@ -121,7 +121,7 @@ object TransformFunctions {
             println(errMsg)
             logger.log(Level.ERROR, errMsg, e)
             throw new Exception(errMsg)
-          case e =>
+          case e: Throwable =>
             val errMsg = s"REQUIRED COLUMN FAILURE FOR: $fWithCase"
             println(errMsg)
             logger.log(Level.ERROR, errMsg, e)

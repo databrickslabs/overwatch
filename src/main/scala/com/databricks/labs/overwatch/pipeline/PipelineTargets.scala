@@ -9,7 +9,7 @@ abstract class PipelineTargets(config: Config) {
    */
   val pipelineStateTarget: PipelineTable = PipelineTable(
     name = "pipeline_report",
-    _keys = Array("organization_id", "Overwatch_RunID"),
+    _keys = Array("organization_id", "moduleId", "Overwatch_RunID"),
     config = config,
     partitionBy = Array("organization_id"),
     incrementalColumns = Array("Pipeline_SnapTS"),
