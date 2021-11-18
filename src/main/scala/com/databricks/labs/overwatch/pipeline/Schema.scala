@@ -72,9 +72,9 @@ object Schema extends SparkSessionWrapper {
   }
 
   val badRecordsSchema: StructType = StructType(Seq(
-    StructField("path",StringType, nullable = true),
-    StructField("reason",StringType, nullable = true),
-    StructField("record",StringType, nullable = true)
+    StructField("path", StringType, nullable = true),
+    StructField("reason", StringType, nullable = true),
+    StructField("record", StringType, nullable = true)
   ))
 
   lazy private[overwatch] val auditMasterSchema = StructType(Seq(
@@ -255,6 +255,59 @@ object Schema extends SparkSessionWrapper {
   //  ResultSerializationTime, ResultSize, ShuffleReadMetrics,
   //  ShuffleWriteMetrics, UpdatedBlocks)
 
+  // simplified new cluster struct
+  lazy private[overwatch] val simplifiedNewClusterSchema = StructType(Seq(
+    StructField("autoscale",
+      StructType(Seq(
+        StructField("max_workers", LongType, true),
+        StructField("min_workers", LongType, true)
+      )), true),
+    StructField("azure_attributes", MapType(StringType, StringType, true), true),
+    StructField("cluster_name", StringType, true),
+    StructField("custom_tags", MapType(StringType, StringType, true), true),
+    StructField("driver_instance_pool_id", StringType, true),
+    StructField("driver_node_type_id", StringType, true),
+    StructField("enable_elastic_disk", BooleanType, true),
+    StructField("instance_pool_id", StringType, true),
+    StructField("node_type_id", StringType, true),
+    StructField("num_workers", LongType, true),
+    StructField("policy_id", StringType, true),
+    StructField("spark_conf", MapType(StringType, StringType, true), true),
+    StructField("spark_env_vars", MapType(StringType, StringType, true), true),
+    StructField("spark_version", StringType, true)
+  ))
+
+  // simplified new settings struct
+  lazy private[overwatch] val simplifiedNewSettingsSchema = StructType(Seq(
+    StructField("email_notifications",
+      StructType(Seq(
+        StructField("no_alert_for_skipped_runs", BooleanType, true),
+        StructField("on_failure", ArrayType(StringType, true), true)
+      )), true),
+    StructField("existing_cluster_id", StringType, true),
+    StructField("max_concurrent_runs", LongType, true),
+    StructField("name", StringType, true),
+    // new_cluster
+    StructField("notebook_task",
+      StructType(Seq(
+        StructField("base_parameters", MapType(StringType, StringType, true), true),
+        StructField("notebook_path", StringType, true)
+      )), true),
+    StructField("schedule",
+      StructType(Seq(
+        StructField("pause_status", StringType, true),
+        StructField("quartz_cron_expression", StringType, true),
+        StructField("timezone_id", StringType, true)
+      )), true),
+    StructField("spark_jar_task",
+      StructType(Seq(
+        StructField("jar_uri", StringType, true),
+        StructField("main_class_name", StringType, true),
+        StructField("parameters", ArrayType(StringType, true), true)
+      )), true),
+    StructField("timeout_seconds", LongType, true)
+  ))
+
   /**
    * Minimum required schema by module. "Minimum Requierd Schema" means that at least these columns of these types
    * must exist for the downstream ETLs to function.
@@ -265,8 +318,8 @@ object Schema extends SparkSessionWrapper {
   private[overwatch] val minimumSchemasByModule: Map[Int, StructType] = Map(
     1005 -> StructType(Seq(
       StructField("organization_id", StringType, nullable = false),
-      StructField("state",StringType, nullable = true),
-      StructField("cluster_id",StringType, nullable = true)
+      StructField("state", StringType, nullable = true),
+      StructField("cluster_id", StringType, nullable = true)
     )),
     1006 -> auditMasterSchema,
     // SparkExecutors
@@ -291,6 +344,40 @@ object Schema extends SparkSessionWrapper {
     2017 -> auditMasterSchema,
     // Notebook Summary
     2018 -> auditMasterSchema,
+    // jobStatus
+    3002 -> StructType(Seq(
+      StructField("timestamp", LongType, true),
+      StructField("organization_id", StringType, false),
+      StructField("jobId", LongType, true),
+      StructField("serviceName", StringType, true),
+      StructField("actionName", StringType, true),
+      StructField("jobName", StringType, true),
+      StructField("timeout_seconds", StringType, true),
+      StructField("notebook_path", StringType, true),
+      StructField("new_settings", simplifiedNewSettingsSchema, true),
+      StructField("aclPermissionSet", StringType, true),
+      StructField("grants", StringType, true),
+      StructField("targetUserId", StringType, true),
+      StructField("sessionId", StringType, true),
+      StructField("requestId", StringType, true),
+      StructField("userAgent", StringType, true),
+      common("response"),
+      StructField("sourceIPAddress", StringType, true),
+      StructField("version", StringType, true),
+      StructField("Pipeline_SnapTS", TimestampType, true),
+      StructField("job_type", StringType, true),
+      StructField("cluster_spec",
+        StructType(Seq(
+          StructField("existing_cluster_id", StringType, true),
+          StructField("new_cluster", simplifiedNewClusterSchema, true)
+        )), true),
+      StructField("created_by", StringType, true),
+      StructField("created_ts", StringType, true),
+      StructField("deleted_by", StringType, true),
+      StructField("deleted_ts", LongType, true),
+      StructField("last_edited_by", StringType, true),
+      StructField("last_edited_ts", LongType, true)
+    )),
     // clusterStateFact
     3005 -> StructType(Seq(
       StructField("organization_id", StringType, nullable = false),
@@ -315,7 +402,7 @@ object Schema extends SparkSessionWrapper {
       StructField("state_dates", ArrayType(DateType, containsNull = true), nullable = true),
       StructField("days_in_state", IntegerType, nullable = true)
     )),
-  // Account Mod Gold
+    // Account Mod Gold
     3007 -> StructType(Seq(
       StructField("organization_id", StringType, nullable = false),
       StructField("timestamp", LongType, nullable = true),
@@ -447,39 +534,39 @@ object Schema extends SparkSessionWrapper {
   val poolSnapMinSchema: StructType = StructType(Seq(
     StructField("azure_attributes",
       StructType(Seq(
-        StructField("availability",StringType,true),
-        StructField("spot_bid_max_price",DoubleType,true)
-      )),true),
+        StructField("availability", StringType, true),
+        StructField("spot_bid_max_price", DoubleType, true)
+      )), true),
     StructField("default_tags",
       StructType(Seq(
-        StructField("DatabricksInstanceGroupId",StringType,true),
-        StructField("DatabricksInstancePoolCreatorId",StringType,true),
-        StructField("DatabricksInstancePoolId",StringType,true),
-        StructField("MLWorkspaceLinkUpdateTime",StringType,true),
-        StructField("Vendor",StringType,true),
-        StructField("MLWorkspaceUnlinkUpdateTime",StringType,true)
-      )),true),
-    StructField("enable_elastic_disk",BooleanType,true),
-    StructField("idle_instance_autotermination_minutes",LongType,true),
-    StructField("instance_pool_id",StringType,true),
-    StructField("instance_pool_name",StringType,true),
-    StructField("max_capacity",LongType,true),
-    StructField("min_idle_instances",LongType,true),
-    StructField("node_type_id",StringType,true),
-    StructField("preloaded_spark_versions",StringType,true),
+        StructField("DatabricksInstanceGroupId", StringType, true),
+        StructField("DatabricksInstancePoolCreatorId", StringType, true),
+        StructField("DatabricksInstancePoolId", StringType, true),
+        StructField("MLWorkspaceLinkUpdateTime", StringType, true),
+        StructField("Vendor", StringType, true),
+        StructField("MLWorkspaceUnlinkUpdateTime", StringType, true)
+      )), true),
+    StructField("enable_elastic_disk", BooleanType, true),
+    StructField("idle_instance_autotermination_minutes", LongType, true),
+    StructField("instance_pool_id", StringType, true),
+    StructField("instance_pool_name", StringType, true),
+    StructField("max_capacity", LongType, true),
+    StructField("min_idle_instances", LongType, true),
+    StructField("node_type_id", StringType, true),
+    StructField("preloaded_spark_versions", StringType, true),
     //   StructField("preloaded_docker_images",ArrayType(StringType,true),true), // SEC-6198 - DO NOT populate or test until closed
-    StructField("state",StringType,true),
+    StructField("state", StringType, true),
     StructField("stats",
       StructType(Seq(
-        StructField("idle_count",LongType,true),
-        StructField("pending_idle_count",LongType,true),
-        StructField("pending_used_count",LongType,true),
-        StructField("used_count",LongType,true)
-      )),true),
-    StructField("organization_id",StringType,true),
-    StructField("custom_tags",MapType(StringType,StringType,true),true),
-    StructField("Pipeline_SnapTS",TimestampType,true),
-    StructField("Overwatch_RunID",StringType,true)
+        StructField("idle_count", LongType, true),
+        StructField("pending_idle_count", LongType, true),
+        StructField("pending_used_count", LongType, true),
+        StructField("used_count", LongType, true)
+      )), true),
+    StructField("organization_id", StringType, true),
+    StructField("custom_tags", MapType(StringType, StringType, true), true),
+    StructField("Pipeline_SnapTS", TimestampType, true),
+    StructField("Overwatch_RunID", StringType, true)
   ))
 
   def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleId)

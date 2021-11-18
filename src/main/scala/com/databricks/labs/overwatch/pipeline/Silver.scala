@@ -31,22 +31,27 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
-  def getAllModules: Array[Module] = {
-    Array(
-      accountLoginsModule,
-      modifiedAccountsModule,
-      notebookSummaryModule,
-      poolsSpecModule,
-      clusterSpecModule,
-      clusterStateDetailModule,
-      jobStatusModule,
-      jobRunsModule,
-      executorsModule,
-      executionsModule,
-      sparkJobsModule,
-      sparkStagesModule,
-      sparkTasksModule
-    )
+  def getAllModules: Seq[Module] = {
+    config.overwatchScope.flatMap {
+      case OverwatchScope.accounts => {
+        Array(accountLoginsModule, modifiedAccountsModule)
+      }
+      case OverwatchScope.notebooks => Array(notebookSummaryModule)
+      case OverwatchScope.pools => Array(poolsSpecModule)
+      case OverwatchScope.clusters => Array(clusterSpecModule)
+      case OverwatchScope.clusterEvents => Array(clusterStateDetailModule)
+      case OverwatchScope.sparkEvents => {
+        Array(executorsModule,
+        executionsModule,
+        sparkJobsModule,
+        sparkStagesModule,
+        sparkTasksModule)
+      }
+      case OverwatchScope.jobs => {
+        Array(jobStatusModule, jobRunsModule)
+      }
+      case _ => Array[Module]()
+    }
   }
 
   envInit()
@@ -218,7 +223,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     Seq(
       dbJobsStatusSummary(
         BronzeTargets.jobsSnapshotTarget.asDF,
-        config.cloudProvider
+        config.cloudProvider,
+        jobStatusModule.isFirstRun,
+        jobStatusModule.untilTime
       )),
     append(SilverTargets.dbJobsStatusTarget)
   )
@@ -259,7 +266,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       buildClusterSpec(
         BronzeTargets.clustersSnapshotTarget,
         BronzeTargets.poolsSnapshotTarget,
-        BronzeTargets.auditLogsTarget
+        BronzeTargets.auditLogsTarget,
+        clusterSpecModule.isFirstRun,
+        clusterSpecModule.untilTime
       )),
     append(SilverTargets.clustersSpecTarget)
   )
