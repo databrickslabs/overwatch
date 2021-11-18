@@ -794,7 +794,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val clusterViewColumnMapping: String =
     """
-      |organization_id, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
+      |organization_id, workspace_name, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
       |autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type, security_profile, cluster_log_conf,
       |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix,
       |driver_instance_pool_id, instance_pool_id, driver_instance_pool_name, instance_pool_name,
@@ -803,28 +803,28 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val poolsViewColumnMapping: String =
     """
-      |organization_id, instance_pool_id, serviceName, timestamp, date, actionName, instance_pool_name, node_type_id,
+      |organization_id, workspace_name, instance_pool_id, serviceName, timestamp, date, actionName, instance_pool_name, node_type_id,
       |idle_instance_autotermination_minutes, min_idle_instances, max_capacity, preloaded_spark_versions,
       |azure_attributes, create_details, delete_details, request_details, poolSnapDetails
       |""".stripMargin
 
   protected val jobViewColumnMapping: String =
     """
-      |organization_id, job_id, action, unixTimeMS, timestamp, date, job_name, job_type, timeout_seconds, schedule,
+      |organization_id, workspace_name, job_id, action, unixTimeMS, timestamp, date, job_name, job_type, timeout_seconds, schedule,
       |notebook_path, new_settings, cluster, aclPermissionSet, grants, targetUserId, session_id, request_id, user_agent,
       |response, source_ip_address, created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
       |""".stripMargin
 
   protected val jobRunViewColumnMapping: String =
     """
-      |organization_id, run_id, run_name, job_runtime, job_id, id_in_job, job_cluster_type, job_task_type,
+      |organization_id, workspace_name, run_id, run_name, job_runtime, job_id, id_in_job, job_cluster_type, job_task_type,
       |job_terminal_state, job_trigger_type, cluster_id, notebook_params, libraries, children, workflow_context,
       |task_detail, request_detail, time_detail
       |""".stripMargin
 
   protected val jobRunCostPotentialFactViewColumnMapping: String =
     """
-      |organization_id, run_id, job_id, id_in_job, job_runtime, run_terminal_state, run_trigger_type, run_task_type, cluster_id,
+      |organization_id, workspace_name, run_id, job_id, id_in_job, job_runtime, run_terminal_state, run_trigger_type, run_task_type, cluster_id,
       |cluster_name, cluster_type, custom_tags, driver_node_type_id, node_type_id, dbu_rate, running_days,
       |run_cluster_states, avg_cluster_share, avg_overlapping_runs, max_overlapping_runs, worker_potential_core_H,
       |driver_compute_cost, driver_dbu_cost, worker_compute_cost, worker_dbu_cost, total_driver_cost, total_worker_cost,
@@ -833,25 +833,25 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val notebookViewColumnMappings: String =
     """
-      |organization_id, notebook_id, notebook_name, notebook_path, cluster_id, action, unixTimeMS, timestamp, date, old_name, old_path,
+      |organization_id, workspace_name, notebook_id, notebook_name, notebook_path, cluster_id, action, unixTimeMS, timestamp, date, old_name, old_path,
       |new_name, new_path, parent_path, user_email, request_id, response
       |""".stripMargin
 
   protected val accountModViewColumnMappings: String =
     """
-      |organization_id, mod_unixTimeMS, mod_date, action, endpoint, modified_by, user_name, user_id,
+      |organization_id, workspace_name, mod_unixTimeMS, mod_date, action, endpoint, modified_by, user_name, user_id,
       |group_name, group_id, from_ip_address, user_agent, request_id, response
       |""".stripMargin
 
   protected val accountLoginViewColumnMappings: String =
     """
-      |organization_id, login_unixTimeMS, login_date, login_type, login_user, user_email, ssh_login_details
+      |organization_id, workspace_name, login_unixTimeMS, login_date, login_type, login_user, user_email, ssh_login_details
       |from_ip_address, user_agent, request_id, response
       |""".stripMargin
 
   protected val clusterStateFactViewColumnMappings: String =
     """
-      |organization_id, cluster_id, cluster_name, custom_tags, state_start_date, unixTimeMS_state_start, unixTimeMS_state_end,
+      |organization_id, workspace_name, cluster_id, cluster_name, custom_tags, state_start_date, unixTimeMS_state_start, unixTimeMS_state_end,
       |timestamp_state_start, timestamp_state_end, state, driver_node_type_id, node_type_id, current_num_workers,
       |target_num_workers, uptime_since_restart_S, uptime_in_state_S, uptime_in_state_H, cloud_billable,
       |databricks_billable, isAutomated, dbu_rate, state_dates, days_in_state, worker_potential_core_H, core_hours,
@@ -861,33 +861,33 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val sparkJobViewColumnMapping: String =
     """
-      |organization_id, spark_context_id, job_id, job_group_id, execution_id, stage_ids, cluster_id, notebook_id, notebook_path,
+      |organization_id, workspace_name, spark_context_id, job_id, job_group_id, execution_id, stage_ids, cluster_id, notebook_id, notebook_path,
       |db_job_id, db_id_in_job, db_job_type, unixTimeMS, timestamp, date, job_runtime, job_result, event_log_start,
       |event_log_end, user_email
       |""".stripMargin
 
   protected val sparkStageViewColumnMapping: String =
     """
-      |organization_id, spark_context_id, stage_id, stage_attempt_id, cluster_id, unixTimeMS, timestamp, date, stage_runtime,
+      |organization_id, workspace_name, spark_context_id, stage_id, stage_attempt_id, cluster_id, unixTimeMS, timestamp, date, stage_runtime,
       |stage_info, event_log_start, event_log_end
       |""".stripMargin
 
   protected val sparkTaskViewColumnMapping: String =
     """
-      |organization_id, spark_context_id, task_id, task_attempt_id, stage_id, stage_attempt_id, cluster_id, executor_id, host,
+      |organization_id, workspace_name, spark_context_id, task_id, task_attempt_id, stage_id, stage_attempt_id, cluster_id, executor_id, host,
       |unixTimeMS, timestamp, date, task_runtime, task_metrics, task_info, task_type, task_end_reason,
       |event_log_start, event_log_end
       |""".stripMargin
 
   protected val sparkExecutionViewColumnMapping: String =
     """
-      |organization_id, spark_context_id, execution_id, cluster_id, description, details, unixTimeMS, timestamp, date,
+      |organization_id, workspace_name, spark_context_id, execution_id, cluster_id, description, details, unixTimeMS, timestamp, date,
       |sql_execution_runtime, event_log_start, event_log_end
       |""".stripMargin
 
   protected val sparkExecutorViewColumnMapping: String =
     """
-      |organization_id, spark_context_id, executor_id, cluster_id, executor_info, removed_reason, executor_alivetime,
+      |organization_id, workspace_name, spark_context_id, executor_id, cluster_id, executor_info, removed_reason, executor_alivetime,
       |unixTimeMS, timestamp, date, event_log_start, event_log_end
       |""".stripMargin
 

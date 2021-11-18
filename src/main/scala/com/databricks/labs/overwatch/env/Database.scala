@@ -22,11 +22,15 @@ class Database(config: Config) extends SparkSessionWrapper {
     this
   }
 
-  private def registerTarget(table: PipelineTable): Unit = {
-    if (!table.exists(catalogValidation = true) && table.exists(pathValidation = true)) {
-      val createStatement = s"create table ${table.tableFullName} " +
-        s"USING DELTA location '${table.tableLocation}'"
-      val logMessage = s"CREATING TABLE: ${table.tableFullName} at ${table.tableLocation}\n$createStatement\n\n"
+  /**
+   * register an Overwatch target table in the configured Overwatch deployment
+   * @param target Pipeline table (i.e. target) as per the Overwatch deployed config
+   */
+  def registerTarget(target: PipelineTable): Unit = {
+    if (!target.exists(catalogValidation = true) && target.exists(pathValidation = true)) {
+      val createStatement = s"create table ${target.tableFullName} " +
+        s"USING DELTA location '${target.tableLocation}'"
+      val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
       logger.log(Level.INFO, logMessage)
       if (config.debugFlag) println(logMessage)
       spark.sql(createStatement)
@@ -129,6 +133,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     var finalDF: DataFrame = df
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
+    finalDF = if (target.withWorkspaceFriendlyName) finalDF.withColumn("Workspace_Name", lit(config.workspaceFriendlyName)) else finalDF
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT

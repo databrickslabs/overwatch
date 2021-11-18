@@ -21,10 +21,12 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _isSnap: Boolean = false
+
   private def setIsSnap(value: Boolean): this.type = {
     _isSnap = value
     this
   }
+
   private def isSnap: Boolean = _isSnap
 
   /**
@@ -155,6 +157,30 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     this
   }
 
+  private def isPVC: Boolean = {
+    val lowerOrgId = config.organizationId.toLowerCase
+    if (lowerOrgId.contains("ilb") || lowerOrgId.contains("elb")) {
+      val pvcDetectedMsg = "Databricks PVC: PVC WORKSPACE DETECTED!"
+      config.setIsPVC(true)
+      if (config.debugFlag) println(pvcDetectedMsg)
+      logger.log(Level.INFO, pvcDetectedMsg)
+      require(config.workspaceFriendlyName.toLowerCase != config.organizationId.toLowerCase,
+        s"PVC workspaces require the 'workspaceFriendlyName' to be configured in the Overwatch configs for " +
+          s"data continuity. Please choose a friendly workspace name and add it to the configuration and try to " +
+          s"run the pipeline again."
+      )
+      true
+    } else false
+  }
+
+  private def pvcOverrideOrganizationId: Unit = {
+    val overrideMsg = s"Databricks PVC: Overriding organization_id from ${config.organizationId} to " +
+      s"${config.workspaceFriendlyName} to accommodate data continuity across deployments"
+    if (config.debugFlag) println(overrideMsg)
+    logger.log(Level.INFO, overrideMsg)
+    config.setOrganizationId(config.workspaceFriendlyName)
+  }
+
   /**
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
@@ -185,8 +211,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      */
     val rawParams = if (config.isLocalTesting) {
       //      config.buildLocalOverwatchParams()
-//      val synthArgs = config.buildLocalOverwatchParams()
-//      mapper.readValue[OverwatchParams](synthArgs)
+      //      val synthArgs = config.buildLocalOverwatchParams()
+      //      mapper.readValue[OverwatchParams](synthArgs)
       mapper.readValue[OverwatchParams](overwatchArgs)
     } else {
       logger.log(Level.INFO, "Validating Input Parameters")
@@ -196,6 +222,18 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     // Now that the input parameters have been parsed -- set them in the config
     config.setInputConfig(rawParams)
 
+
+    val overwatchFriendlyName = rawParams.workspaceFriendlyName.getOrElse(config.organizationId)
+    config.setworkspaceFriendlyName(overwatchFriendlyName)
+
+    /**
+     * PVC: HARD OVERRIDE FOR PVC
+     * Each time PVC deploys a newer version the derived organization_id changes due to the load balancer id
+     * and/or URL to access the workspace changes. There are no identifiable, equal values that can be found
+     * between one deployment and the next. To resolve this, PVC customers will be REQUIRED to provide a canonical
+     * name for each workspace (i.e. workspaceFriendlyName) to provide consistency across deployments.
+     */
+    if (isPVC) pvcOverrideOrganizationId
 
     val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
     val tokenSecret = rawParams.tokenSecret
@@ -454,12 +492,12 @@ object Initializer extends SparkSessionWrapper {
    * and checks for avoidable issues. The initializer is also responsible for identifying any errors in the
    * configuration that can be identified before the runs begins to enable fail fast.
    *
-   * @param overwatchArgs      Json string of args -- When passing into args in Databricks job UI, the json string must
-   *                  be passed in as an escaped Json String. Use JsonUtils in Tools to build and extract the string
-   *                  to be used here.
-   * @param debugFlag manual Boolean setter to enable the debug flag. This is different than the log4j DEBUG Level
-   *                  When setting this to true it does enable the log4j DEBUG level but throughout the code there
-   *                  is more robust output when debug is enabled.
+   * @param overwatchArgs Json string of args -- When passing into args in Databricks job UI, the json string must
+   *                      be passed in as an escaped Json String. Use JsonUtils in Tools to build and extract the string
+   *                      to be used here.
+   * @param debugFlag     manual Boolean setter to enable the debug flag. This is different than the log4j DEBUG Level
+   *                      When setting this to true it does enable the log4j DEBUG level but throughout the code there
+   *                      is more robust output when debug is enabled.
    * @return
    */
   def apply(overwatchArgs: String, debugFlag: Boolean = false): Workspace = {

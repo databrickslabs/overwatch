@@ -20,7 +20,8 @@ class ParamDeserializerTest extends AnyFunSpec {
         |"overwatchScope":["audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools"],
         |"maxDaysToLoad":60,
         |"databricksContractPrices":{"interactiveDBUCostUSD":0.55,"automatedDBUCostUSD":0.15, "sqlComputeDBUCostUSD":0.22, "jobsLightDBUCostUSD":0.1},
-        |"intelligentScaling":{"enabled":false, "minimumCores":4 , "maximumCores":512 , "coeff":1.0}}
+        |"intelligentScaling":{"enabled":false, "minimumCores":4 , "maximumCores":512 , "coeff":1.0},
+        |"workspaceFriendlyName":"myTestWorkspace"}
         |""".stripMargin
 
       val paramModule: SimpleModule = new SimpleModule()
@@ -46,7 +47,8 @@ class ParamDeserializerTest extends AnyFunSpec {
         60,
         DatabricksContractPrices(),
         None,
-        IntelligentScaling()
+        IntelligentScaling(),
+        Some("myTestWorkspace")
       )
       assertResult(expected)(mapper.readValue[OverwatchParams](incomplete))
 
