@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions.structFromJson
 import com.databricks.labs.overwatch.utils.{BadConfigException, SparkSessionWrapper, TimeTypes}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -774,6 +775,100 @@ trait GoldTransforms extends SparkSessionWrapper {
     df.select(sparkExecutionCols: _*)
   }
 
+  protected def buildSparkStream(
+                                  sparkStreamsGoldTarget: PipelineTable,
+                                  sparkExecutionsSilverDFLag30d: DataFrame
+                                )(sparkEventsDF: DataFrame): DataFrame = {
+
+    val streamTargetKeys = sparkStreamsGoldTarget.keys
+    val streamSegment = when('Event.endsWith("StartedEvent"), "Started")
+      .when('Event.endsWith("ProgressEvent"), "Progressed")
+      .otherwise(lit(null).cast("string"))
+
+    def cleanseDesc(colName: String): Column = {
+      trim(
+        when(col(colName).like("%<br/>%"), regexp_replace(col(colName), "<br/>", " "))
+          .when(col(colName).like("%\n%"), regexp_replace(col(colName), "\\n", " "))
+          .otherwise(col(colName))
+      )
+    }
+
+    val deriveStreamingDesc = when('description.like("%id =%runId =%batch =%"), cleanseDesc("description")).otherwise(lit(null))
+
+    def deriveStreamDetails(streamArrayCol: Column): Column = {
+      val idPos = array_position(streamArrayCol, "id") + 1
+      val runIdPos = array_position(streamArrayCol, "runId") + 1
+      val batchIdPos = when(array_contains(streamArrayCol, "batchId"), array_position(streamArrayCol, "batchId"))
+        .when(array_contains(streamArrayCol, "batch"), array_position(streamArrayCol, "batch"))
+        .otherwise(lit(0)) + 1
+      struct(
+        streamArrayCol(idPos).alias("stream_id"),
+        streamArrayCol(runIdPos).alias("stream_run_id"),
+        streamArrayCol(batchIdPos).alias("stream_batch_id")
+      )
+    }
+
+    val streamRawDF = sparkEventsDF
+      .filter('Event.like("org.apache.spark.sql.streaming.StreamingQueryListener%"))
+      .filter(!'Event.endsWith("TerminatedEvent")) // no valuable data and no timestamp provided
+
+    val lastStreamValue = Window.partitionBy('organization_id, 'SparkContextId, 'clusterId, 'stream_id, 'stream_run_id).orderBy('stream_timestamp)
+    val onlyOnceEventGuaranteeW = Window.partitionBy(streamTargetKeys map col: _*).orderBy('fileCreateEpochMS.desc)
+
+    val streamBaseCols:Array[Column] = Array(
+      'organization_id,
+      'SparkContextId.alias("spark_context_id"),
+      'clusterId.alias("cluster_id"),
+      'stream_timestamp,
+      PipelineFunctions.epochMilliToTs("stream_timestamp").cast("date").alias("date"),
+      streamSegment.alias("streamSegment"),
+      'stream_id,
+      PipelineFunctions.fillForward("name", lastStreamValue).alias("stream_name"),
+      'stream_run_id,
+      coalesce($"streaming_metrics.batchId", lit(-1)).alias("stream_batch_id"), // started events don't have batch id but don't want null keys
+      'streaming_metrics,
+      'fileCreateEpochMS
+    )
+
+    val streamingExecCols: Array[Column] = Array(
+      'organization_id,
+      'SparkContextID.alias("spark_context_id"),
+      'clusterId.alias("cluster_id"),
+      'ExecutionID.alias("execution_id"),
+      $"streamDetails.*"
+    )
+
+    val streamsBaseDF = streamRawDF
+      .withColumn("streaming_metrics", structFromJson(spark, streamRawDF, "progress"))
+      .withColumn("stream_timestamp",
+        coalesce(PipelineFunctions.tsToEpochMilli("streaming_metrics.timestamp"), 'Timestamp))
+      .withColumn("stream_id", coalesce($"streaming_metrics.id", 'id))
+      .withColumn("stream_run_id", coalesce($"streaming_metrics.runId", 'runId))
+      .select(streamBaseCols: _*)
+      // Events are not guaranteed to be only once so duplicates must be filtered out by key for these events
+      .withColumn("rnk", rank().over(onlyOnceEventGuaranteeW))
+      .withColumn("rn", row_number().over(onlyOnceEventGuaranteeW))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn", "fileCreateEpochMS")
+
+    val streamExecutionsKeys = streamTargetKeys
+      .filterNot(_ =="stream_timestamp")
+      .filterNot(_ == "date")
+    val streamingExecutions = sparkExecutionsSilverDFLag30d.drop("details")
+      .withColumn("streamingDesc", deriveStreamingDesc)
+      .withColumn("streamDetailsAR", split('streamingDesc, " "))
+      .withColumn("streamDetails", deriveStreamDetails('streamDetailsAR))
+      .filter($"streamDetails.stream_id".isNotNull)
+      .select(streamingExecCols: _*)
+      .groupBy(streamExecutionsKeys map col: _*)
+      .agg(collect_list('execution_id).alias("execution_ids"))
+
+    streamsBaseDF
+      .join(streamingExecutions,
+        streamExecutionsKeys,
+        "left")
+
+  }
+
   protected def buildSparkExecutor()(df: DataFrame): DataFrame = {
     val sparkExecutorCols: Array[Column] = Array(
       'organization_id,
@@ -883,6 +978,12 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, workspace_name, spark_context_id, execution_id, cluster_id, description, details, unixTimeMS, timestamp, date,
       |sql_execution_runtime, event_log_start, event_log_end
+      |""".stripMargin
+
+  protected val sparkStreamViewColumnMapping: String =
+    """
+      |organization_id, workspace_name, spark_context_id, cluster_id, stream_id, stream_run_id, stream_batch_id,
+      |stream_timestamp, date, streamSegment, stream_name, streaming_metrics, execution_ids
       |""".stripMargin
 
   protected val sparkExecutorViewColumnMapping: String =

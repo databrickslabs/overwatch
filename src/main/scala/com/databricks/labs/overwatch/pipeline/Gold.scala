@@ -29,6 +29,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkStageTarget,
       GoldTargets.sparkTaskTarget,
       GoldTargets.sparkExecutionTarget,
+      GoldTargets.sparkStreamTarget,
       GoldTargets.sparkExecutorTarget
     )
   }
@@ -184,12 +185,24 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkTaskTarget)
   )
 
-  private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005), 6.0)
+  lazy private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005), 6.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkExecutionProcess = ETLDefinition(
     SilverTargets.executionsTarget.asIncrementalDF(sparkExecutionModule, SilverTargets.executionsTarget.incrementalColumns),
     Seq(buildSparkExecution()),
     append(GoldTargets.sparkExecutionTarget)
+  )
+
+  lazy private[overwatch] val sparkStreamModule = Module(3016, "Gold_SparkStream", this, Array(1006, 2005), 6.0)
+    .withSparkOverrides(sparkBaseSparkOverrides ++ Map("spark.sql.caseSensitive" -> "true"))
+  lazy private val appendSparkStreamProcess = ETLDefinition(
+    BronzeTargets.sparkEventLogsTarget.asIncrementalDF(sparkStreamModule, BronzeTargets.sparkEventLogsTarget.incrementalColumns),
+    Seq(
+      buildSparkStream(
+        GoldTargets.sparkStreamTarget,
+        SilverTargets.executionsTarget.asIncrementalDF(sparkStreamModule,SilverTargets.executionsTarget.incrementalColumns, 30)
+      )),
+    append(GoldTargets.sparkStreamTarget)
   )
 
   lazy private[overwatch] val sparkExecutorModule = Module(3014, "Gold_SparkExecutor", this, Array(2003), 6.0)
@@ -205,6 +218,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
     sparkExecutorModule.execute(appendSparkExecutorProcess)
     sparkExecutionModule.execute(appendSparkExecutionProcess)
+    sparkStreamModule.execute(appendSparkStreamProcess)
     sparkJobModule.execute(appendSparkJobProcess)
     sparkStageModule.execute(appendSparkStageProcess)
     sparkTaskModule.execute(appendSparkTaskProcess)
@@ -213,6 +227,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     GoldTargets.sparkStageViewTarget.publish(sparkStageViewColumnMapping)
     GoldTargets.sparkTaskViewTarget.publish(sparkTaskViewColumnMapping)
     GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
+    GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
     GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
 
   }
