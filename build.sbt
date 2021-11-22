@@ -7,17 +7,17 @@ version := "0.6.0-dev2"
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 
-val sparkVersion = "3.0.1"
+val sparkVersion = "3.1.2"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
 //libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion //% Provided
 libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5" % Provided
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
-libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0" % Provided
+libraryDependencies += "io.delta" % "delta-core_2.12" % "1.0.0" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 
 libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.18" % Provided
-libraryDependencies += "com.databricks.labs" %% "dataframe-rules-engine" % "0.1.2"
+libraryDependencies += "com.databricks.labs" %% "dataframe-rules-engine" % "0.2.0"
 
 libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.23.0" % Test
 libraryDependencies += "org.mockito" % "mockito-core" % "3.5.15" % Test
