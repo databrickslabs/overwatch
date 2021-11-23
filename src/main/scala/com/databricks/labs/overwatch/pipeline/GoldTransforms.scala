@@ -1,8 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions.structFromJson
-import com.databricks.labs.overwatch.utils.{BadConfigException, SparkSessionWrapper, TimeTypes}
+import com.databricks.labs.overwatch.utils.{BadConfigException, SchemaTools, SparkSessionWrapper, TimeTypes}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
@@ -839,7 +838,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     )
 
     val streamsBaseDF = streamRawDF
-      .withColumn("streaming_metrics", structFromJson(spark, streamRawDF, "progress"))
+      .withColumn("streaming_metrics", SchemaTools.structFromJson(spark, streamRawDF, "progress"))
       .withColumn("stream_timestamp",
         coalesce(PipelineFunctions.tsToEpochMilli("streaming_metrics.timestamp"), 'Timestamp))
       .withColumn("stream_id", coalesce($"streaming_metrics.id", 'id))

@@ -1,9 +1,10 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.ApiCall
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions.{fillForward, structFromJson}
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions.fillForward
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
+import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
@@ -1057,13 +1058,13 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val changeInventory = if (!jobStatusBase.isEmpty) {
       Map(
-        "cluster_spec.new_cluster" -> structFromJson(spark, jobStatusBaseFilled, "cluster_spec.new_cluster"),
-        "new_settings" -> structFromJson(spark, jobStatusBaseFilled, "new_settings"),
-        "schedule" -> structFromJson(spark, jobStatusBaseFilled, "schedule")
+        "cluster_spec.new_cluster" -> structFromJson(spark, jobStatusBaseFilled, "cluster_spec.new_cluster", Some(Schema.minimumNewClusterSchema)),
+        "new_settings" -> structFromJson(spark, jobStatusBaseFilled, "new_settings", Some(Schema.minimumNewSettingsSchema)),
+        "schedule" -> structFromJson(spark, jobStatusBaseFilled, "schedule", Some(Schema.minimumScheduleSchema))
       )} else { // new_settings is not present from snapshot and is a struct thus it cannot be added with dynamic schema
       Map(
-        "cluster_spec.new_cluster" -> structFromJson(spark, jobStatusBaseFilled, "cluster_spec.new_cluster"),
-        "schedule" -> structFromJson(spark, jobStatusBaseFilled, "schedule")
+        "cluster_spec.new_cluster" -> structFromJson(spark, jobStatusBaseFilled, "cluster_spec.new_cluster", Some(Schema.minimumNewClusterSchema)),
+        "schedule" -> structFromJson(spark, jobStatusBaseFilled, "schedule", Some(Schema.minimumScheduleSchema))
       )}
 
     // create structs from json strings and cleanse schema

@@ -1,9 +1,10 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions.logger
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 import scala.util.Random
 
@@ -86,17 +87,17 @@ object SchemaTools extends SparkSessionWrapper {
 
       f.dataType match {
         case c: StructType =>
-          changeInventory.getOrElse(fullFieldName, struct(modifyStruct(c, changeInventory, prefix = fullFieldName): _*)).alias(f.name)
+          changeInventory.getOrElse(fullFieldName, struct(modifyStruct(c, changeInventory, prefix = fullFieldName): _*).alias(f.name))
         case _ => changeInventory.getOrElse(fullFieldName, col(fullFieldName)).alias(f.name)
       }
     })
   }
 
-  def nestedColExists(df: DataFrame, dotPathOfField: String): Boolean = {
+  def nestedColExists(schema: StructType, dotPathOfField: String): Boolean = {
     val dotPathAr = dotPathOfField.split("\\.")
     val elder = dotPathAr.head
     val children = dotPathAr.tail
-    val startField = df.schema.fields.find(_.name == elder)
+    val startField = schema.fields.find(_.name == elder)
     try {
       children.foldLeft(startField) {
         case (f, childName) =>
@@ -113,13 +114,49 @@ object SchemaTools extends SparkSessionWrapper {
     }
   }
 
+  def structFromJson(spark: SparkSession, df: DataFrame, c: String, minSchema: Option[StructType] = None): Column = {
+    import spark.implicits._
+    require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
+    require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
+    val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
+    if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
+      println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
+    }
+    if (jsonSchema.isEmpty) {
+      if (minSchema.isEmpty) logger.log(Level.WARN, s"A schema cannot be inferred for $c give the data " +
+        s"in this dataframe. A minimum schema may be provided but hasn't been. Will implicitly cast $c to a null of " +
+        s"StringType. If errors persist, please review this field.")
+      lit(null).cast(minSchema.getOrElse(StringType))
+    } else {
+      from_json(col(c), jsonSchema).alias(c)
+    }
+  }
+
+  def structFromJson(spark: SparkSession, df: DataFrame, cs: String*): Column = {
+    import spark.implicits._
+    val dfFields = df.schema.fields
+    cs.foreach(c => {
+      require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
+      require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
+    })
+    array(
+      cs.map(c => {
+        val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
+        if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
+          println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
+        }
+        from_json(col(c), jsonSchema).alias(c)
+      }): _*
+    )
+  }
+
   // TODO -- Remove keys with nulls from maps?
   //  Add test to ensure that null/"" key and null/"" value are both handled
   //  as of 0.4.1 failed with key "" in spark_conf
   //  TEST for multiple null/"" cols / keynames in same struct/record
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
 
-    val mapColName = colToConvert.split("\\.").reverse.head
+    val mapColName = colToConvert.split("\\.").takeRight(1).head
     val removeEmptyKeys = udf((m: Map[String, String]) => m.filterNot(_._2 == null))
 
     val dfFlatColumnNames = getAllColumnNames(df.schema)
@@ -135,7 +172,7 @@ object SchemaTools extends SparkSessionWrapper {
           println(errMsg)
           s"null_${randomString(Some(42L), 6)}"
         } else kRaw
-        mapCols.add(lit(k))
+        mapCols.add(lit(k).cast("string"))
         mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
       })
       val newRawMap = map(mapCols.toSeq: _*)
