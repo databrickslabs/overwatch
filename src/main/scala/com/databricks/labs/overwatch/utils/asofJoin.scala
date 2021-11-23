@@ -4,7 +4,7 @@ package com.databricks.labs.overwatch.utils
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{StructField, StructType}
+import org.apache.spark.sql.types.StructField
 
 /**
  * Essentially a fork from dblabs tempo project

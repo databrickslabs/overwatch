@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, PostProcessor, Silver}
+import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils.{BadConfigException, JsonUtils, OverwatchParams, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame

@@ -16,7 +16,7 @@ libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provid
 libraryDependencies += "io.delta" % "delta-core_2.12" % "1.0.0" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 
-libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.18" % Provided
+libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.21" % Provided
 libraryDependencies += "com.databricks.labs" %% "dataframe-rules-engine" % "0.2.0"
 
 libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.23.0" % Test
