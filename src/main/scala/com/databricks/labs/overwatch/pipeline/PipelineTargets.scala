@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.utils.{Config, WriteMode}
 
 abstract class PipelineTargets(config: Config) {
+// TODO -- Refactor -- this class should extend workspace so these are "WorkspaceTargets"
 
   /**
    * global pipeline state table

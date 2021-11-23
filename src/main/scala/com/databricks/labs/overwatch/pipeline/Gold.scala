@@ -57,7 +57,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           sparkStageModule,
           sparkTaskModule,
           sparkExecutorModule,
-          sparkExecutionModule
+          sparkExecutionModule,
+          sparkStreamModule
         )
       }
       case _ => Array[Module]()

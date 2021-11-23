@@ -10,6 +10,7 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
 import scalaj.http.HttpResponse
 
+import java.net.URI
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
@@ -162,7 +163,18 @@ case class DBUCostDetail(
                           isActive: Boolean
                         )
 
-case class UpgradeReport(db: String, tbl: String, errorMsg: Option[String])
+case class UpgradeReport(
+                          db: String,
+                          tbl: String,
+                          statusMsg: Option[String] = None,
+                          step: Option[String] = None,
+                          failUpgrade: Boolean = false
+                        )
+
+case class WorkspaceDataset(path: String, name: String)
+case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
+case class CloneDetail(source: String, target: String, asOfTS: Option[String], cloneLevel: String = "DEEP")
+case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
@@ -272,9 +284,9 @@ private[overwatch] class BadSchemaException(s: String) extends Exception(s) {
   println(s)
 }
 
-private[overwatch] class UpgradeException(s: String, target: PipelineTable) extends Exception(s) {
+private[overwatch] class UpgradeException(s: String, target: PipelineTable, step: Option[String] = None) extends Exception(s) {
   def getUpgradeReport: UpgradeReport = {
-    UpgradeReport(target.databaseName, target.name, Some(s))
+    UpgradeReport(target.databaseName, target.name, Some(s), step)
   }
 }
 

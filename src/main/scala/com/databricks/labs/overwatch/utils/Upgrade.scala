@@ -2,14 +2,19 @@ package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions.getPipelineTarget
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Silver}
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, PipelineTable, Silver}
 import com.databricks.labs.overwatch.utils.Helpers.fastDrop
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, Dataset}
+import org.apache.spark.sql.{Column, DataFrame, Dataset}
 
+import scala.collection.concurrent
+import collection.JavaConverters._
+import java.util.concurrent.{ForkJoinPool, ConcurrentHashMap}
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.parallel.ForkJoinTaskSupport
 
 object Upgrade extends SparkSessionWrapper {
 
@@ -52,6 +57,7 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * Upgrade to 0412 schema workspace from prior version for tables:
    * jobs_snapshot_bronze & clusters_snapshot_bronze
+   *
    * @param prodWorkspace production workspace defined in production pipeline run configuration
    * @return
    */
@@ -130,6 +136,7 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * Upgrade to 0420 schema workspace from prior version for tables:
    * instanceDetails & jobruncostpotentialfact
+   *
    * @param prodWorkspace production workspace defined in production pipeline run configuration
    * @param isLocalUpgrade
    * @return
@@ -264,6 +271,337 @@ object Upgrade extends SparkSessionWrapper {
         logger.log(Level.ERROR, e.getMessage, e)
         Seq(UpgradeReport("", "", Some(e.getMessage))).toDS()
     }
+  }
+
+  private def verifyUpgradeStatus(
+                                   upgradeStatus: Array[UpgradeReport],
+                                   initialTableVersions: Map[String, Long],
+                                   snapDir: String): Unit = {
+    if (upgradeStatus.exists(_.failUpgrade)) { // if upgrade report contains fail upgrade
+      val reportTime = System.currentTimeMillis()
+      val upgradeReportPath = s"$snapDir/upgradeReport_$reportTime"
+      val initialTableVersionsPath = s"$snapDir/upgradeReport_$reportTime"
+
+      val failMsg = s"UPGRADE FAILED:\nUpgrade Report saved as Dataframe to $upgradeReportPath\nTable Versions " +
+        s"prior to upgrade stored as Dataframe at $initialTableVersionsPath"
+
+      logger.log(Level.INFO, failMsg)
+      println(failMsg)
+
+      upgradeStatus.toSeq.toDF().write.format("delta").mode("overwrite")
+        .save(upgradeReportPath)
+
+      initialTableVersions.toSeq.toDF().write.format("delta").mode("overwrite")
+        .save(initialTableVersionsPath)
+
+      throw new Exception(failMsg)
+    }
+  }
+
+  private def getWorkspaceUpdateLogic(workspaceMap: Map[String, String]): String = {
+    if (workspaceMap.nonEmpty) { // user provided workspace nam to org id map
+      "CASE " + workspaceMap.map(wm => s"WHEN (organization_id = '${wm._1}') THEN '${wm._2}'").mkString(" ") + " ELSE organization_id END"
+    } else { // no workpace name to map provided -- using org_id
+      "organization_id"
+    }
+  }
+
+  private def appendWorkspaceName(target: PipelineTable, workspaceMap: Map[String, String]): UpgradeReport = {
+    if (target.exists) { // ensure target exists
+      val alterTableStmt = s"alter table delta.`${target.tableLocation}` add columns (workspaceFriendlyName string)"
+      val workspaceColumnUpdateLogic = getWorkspaceUpdateLogic(workspaceMap)
+      val updateWorkspaceFriendlyNameStmt = s"update delta.`${target.tableLocation}` set workspaceFriendlyName = $workspaceColumnUpdateLogic"
+
+      if (target.asDF.schema.map(_.name).contains("workspaceFriendlyName")) { // column already exists fail upgrade for table
+        val columnExistsMsg = s"Column 'workspaceFriendlyName' already exists for ths table. Aborting upgrade for " +
+          s"${target.name}"
+        throw new UpgradeException(columnExistsMsg, target)
+      } else { // workspaceFriendlyName column does not exist -- continue
+        // upgrade target DDL
+        logger.log(Level.INFO, s"UPGRADE: Alter table ${target.name}\nSTATEMENT: $alterTableStmt")
+        try {
+          spark.sql(alterTableStmt)
+        } catch {
+          case e: Throwable =>
+            throw new UpgradeException(e.getMessage, target)
+        }
+
+        // backload workspaceFriendlyName
+        logger.log(Level.INFO, s"UPGRADE: Backfill workspaceFriendlyName for ${target.name}\nSTATEMENT: $updateWorkspaceFriendlyNameStmt")
+        try {
+          spark.sql(updateWorkspaceFriendlyNameStmt)
+        } catch {
+          case e: Throwable =>
+            throw new UpgradeException(e.getMessage, target)
+        }
+
+        UpgradeReport(target.databaseName, target.name, Some("SUCCESS"))
+      }
+
+    } else { // target does not exist
+      val nonExistsMsg = s"TABLE DOES NOT EXIST: ${target.name} skipping upgrade"
+      logger.log(Level.WARN, nonExistsMsg)
+      throw new UpgradeException(nonExistsMsg, target)
+      // log message here
+    }
+  }
+
+  def upgradeTo060(
+                    workspace: Workspace,
+                    workspaceNameMap: Map[String, String] = Map(),
+                    maxDays: Int = 9999,
+                    rebuildSparkTables: Boolean = true
+                  ): DataFrame = {
+
+    // TODO - ADD steps as an array to allow to resume upgrades at various steps
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(workspace.getConfig.databaseName)
+    val targetSchemaVersion = "0.600"
+    val upgradeStatus: ArrayBuffer[UpgradeReport] = ArrayBuffer()
+    val initialSourceVersions: concurrent.Map[String, Long] = new ConcurrentHashMap[String, Long]().asScala
+    validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
+    require(
+      getNumericalSchemaVersion(currentSchemaVersion) == 430,
+      "This upgrade function is only for upgrading schema version 043+ to new version 060. " +
+        "Please first upgrade to at least schema version 0.4.3 before proceeding."
+    )
+    val snapDir = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
+    val config = workspace.getConfig
+    config.setMaxDays(maxDays)
+    config.setExternalizeOptimize(true) // complete optimize at end
+    val cloudProvider = config.cloudProvider
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(getDriverCores * 2))
+
+    // Step 1 snap backup to enable fast recovery
+    val step1Msg = Some("Step 1: Snapshot Overwatch for quick recovery")
+    println(step1Msg.get)
+    logger.log(Level.INFO, step1Msg.get)
+    require(
+      !Helpers.pathExists(snapDir),
+      s"UPGRADE ERROR: It sseems there is already an upgrade in progress since $snapDir already exists. " +
+        s"This is where a temporary backup is stored during the upgrade. " +
+        s"Either complete the upgrade or delete this directory. WARNING: " +
+        s"If you delete the directory and the Overwatch dataset becomes " +
+        s"corrupted during upgrade there will be no backup."
+    )
+    println(step1Msg)
+    logger.log(Level.INFO, s"UPGRADE: BEGINNING BACKUP - This may take some time")
+    try {
+      workspace.snap(snapDir)
+      upgradeStatus.append(
+        UpgradeReport(config.databaseName, "VARIOUS", Some("SUCCESS"), step1Msg)
+      )
+    } catch {
+      case e: Throwable =>
+        val failMsg = s"UPGRADE FAILED: Backup could not complete as expected!\n${e.getMessage}"
+        logger.log(Level.ERROR, failMsg)
+        upgradeStatus.append(
+          UpgradeReport(config.databaseName, "VARIOUS", Some(failMsg), step1Msg, failUpgrade = true)
+        )
+    }
+
+    verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
+
+    // upgrade pipReport table
+    // it must be upgraded first as a pipeline cannot be instantiated without the upgrade
+    // step 2 Upgrade pipeline_report
+    val step2Msg = Some("Step 2: Upgrade pipeline_report")
+    println(step2Msg.get)
+    logger.log(Level.INFO, step2Msg)
+    val pipReportPath = s"${config.etlDataPathPrefix}/pipeline_report"
+    val pipReportLatestVersion = Helpers.getLatestVersion(pipReportPath)
+    initialSourceVersions.put("pipeline_report", pipReportLatestVersion)
+
+    val alterPipReportStmt =
+      s"""
+         |alter table delta.`$pipReportPath`
+         |add columns (externalizeOptimize boolean, workspaceFriendlyName string)
+         |""".stripMargin
+
+    val backloadNewColsForPipReportStmt =
+      s"""
+         |update delta.`$pipReportPath`
+         |set workspaceFriendlyName = ${getWorkspaceUpdateLogic(workspaceNameMap)},
+         |externalizeOptimize = false
+         |""".stripMargin
+
+    logger.log(Level.INFO, s"UPGRADE: Upgrading pipeline_report schema\nSTATEMENT:" +
+      s"$alterPipReportStmt")
+
+    logger.log(Level.INFO, s"UPGRADE: Backloading new pipeline_report columns schema\nSTATEMENT:" +
+      s"$backloadNewColsForPipReportStmt")
+
+    try {
+      spark.sql(alterPipReportStmt)
+      spark.sql(backloadNewColsForPipReportStmt)
+      upgradeStatus.append(
+        UpgradeReport(config.databaseName, "pipeline_report", Some("SUCCESS"), step2Msg)
+      )
+    } catch {
+      case e: Throwable =>
+        val errorMsg = s"UPGRADE FAILED: pipeline_report upgrade failed.\nAttempting to restore " +
+          s"to version $pipReportLatestVersion\nError message below\n${e.getMessage}"
+        upgradeStatus.append(
+          UpgradeReport(config.databaseName, "pipeline_report", Some(errorMsg),
+            Some("Step 1: Upgrade pipeline_report"), failUpgrade = true)
+        )
+    }
+    verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
+
+    // Step 3 - Append workspaceFriendlyName to all bronze targets
+    val step3Msg = Some("Step 3: Upgrade bronze targets")
+    println(step3Msg.get)
+    logger.log(Level.INFO, step3Msg.get)
+    val b = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
+    val bronzeTargets = b.getAllTargets.par
+    bronzeTargets.tasksupport = taskSupport
+
+    // Get start version of all bronze targets
+    bronzeTargets.foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestVersion(t.tableLocation)))
+
+    bronzeTargets.foreach(target => {
+      try {
+        appendWorkspaceName(target, workspaceNameMap)
+        upgradeStatus.append(
+          UpgradeReport(config.databaseName, target.name, Some("SUCCESS"), step3Msg)
+        )
+      } catch {
+        case e: UpgradeException =>
+          val upgradeReport = e.getUpgradeReport.copy(step = step3Msg)
+          upgradeStatus.append(upgradeReport)
+        case e: Throwable =>
+          upgradeStatus.append(
+            UpgradeReport(config.databaseName, target.name, Some(e.getMessage), step3Msg)
+          )
+      }
+    })
+    verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
+
+    // Step 4: drop silver / gold targets
+    val step4Msg = Some("Step 4: Drop original silver / golds for rebuild")
+    println(step4Msg.get)
+    logger.log(Level.INFO, step4Msg.get)
+    val s = Silver(workspace, suppressReport = true, suppressStaticDatasets = true)
+    val g = Gold(workspace, suppressReport = true, suppressStaticDatasets = true)
+    val allSilverGoldTargets = s.getAllTargets ++ g.getAllTargets
+    val targetsToRebuild = if (rebuildSparkTables) {
+      allSilverGoldTargets.par
+    } else {
+      allSilverGoldTargets.filterNot(_.name.toLowerCase.contains("spark")).par
+    }
+    targetsToRebuild.tasksupport = taskSupport
+
+    // Get start version of all targets to be rebuilt
+    targetsToRebuild.foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestVersion(t.tableLocation)))
+
+    targetsToRebuild.foreach(target => {
+      try {
+        logger.log(Level.INFO, s"UPGRADE: Beginning Step4, ${target.name}")
+        fastDrop(target, cloudProvider)
+        upgradeStatus.append(
+          UpgradeReport(target.databaseName, target.name, Some("SUCCESS"), step4Msg)
+        )
+      } catch {
+        case e: Throwable => {
+          upgradeStatus.append(
+            UpgradeReport(target.databaseName, target.name, Some(e.getMessage), step4Msg)
+          )
+        }
+      }
+    })
+    verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
+
+    // Step 5: update pipReport to reflect rolled back silver/gold
+    val step5Msg = Some("Step 5: update pipReport to reflect rolled back silver/gold")
+    logger.log(Level.INFO, step5Msg.get)
+    println(step5Msg)
+    val allSilverGoldModules = s.getAllModules ++ g.getAllModules
+    val moduleIDsToRollback = if (rebuildSparkTables) {
+      allSilverGoldModules
+    } else {
+      allSilverGoldModules.filterNot(m => m.moduleName.toLowerCase.contains("spark"))
+    }.map(_.moduleId)
+    val rollBackSilverGoldModulesStmt =
+      s"""
+         |update delta.`$pipReportPath`
+         |set status = concat('ROLLED BACK FOR UPGRADE: Original Status - ', status)
+         |where moduleID in (${moduleIDsToRollback.mkString(", ")})
+         |""".stripMargin
+
+    val updateMsg = s"UPGRADE - Step 5 - Rolling back modules to be rebuilt\nSTATEMENT: $rollBackSilverGoldModulesStmt"
+    logger.log(Level.INFO, updateMsg)
+    try {
+      spark.sql(rollBackSilverGoldModulesStmt)
+      upgradeStatus.append(
+        UpgradeReport(config.databaseName, "pipeline_report", Some("SUCCESS"), step5Msg)
+      )
+    } catch {
+      case e: Throwable =>
+        upgradeStatus.append(
+          UpgradeReport(config.databaseName, "pipeline_report", Some(e.getMessage), step5Msg, failUpgrade = true)
+        )
+    }
+    verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
+
+    // Step 6: rebuild silver / gold targets
+    val step6Msg = Some("Step 6: rebuild silver / gold targets")
+    logger.log(Level.INFO, step6Msg.get)
+    println(step6Msg.get)
+
+    try {
+      Silver(workspace).run()
+    } catch {
+      case e: Throwable =>
+        upgradeStatus.append(
+          UpgradeReport(config.databaseName, "VARIOUS", Some(e.getMessage), step5Msg, failUpgrade = true)
+        )
+    }
+
+    try {
+      Gold(workspace).run()
+    } catch {
+      case e: Throwable =>
+        upgradeStatus.append(
+          UpgradeReport(config.databaseName, "VARIOUS", Some(e.getMessage), step5Msg, failUpgrade = true)
+        )
+    }
+    verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
+
+    // Step 7: Backload workspace name for spark tables if they weren't rebuilt
+    val step7Msg = Some("Step 7: Backload workspace name for spark tables if they weren't rebuilt")
+    if (!rebuildSparkTables) {
+      logger.log(Level.INFO, step7Msg.get)
+      println(step7Msg.get)
+      allSilverGoldTargets
+        .filter(_.name.toLowerCase.contains("spark")).par
+        .foreach(target => {
+          try {
+            appendWorkspaceName(target, workspaceNameMap)
+            upgradeStatus.append(
+              UpgradeReport(config.databaseName, target.name, Some("SUCCESS"), step3Msg)
+            )
+          } catch {
+            case e: UpgradeException =>
+              val upgradeReport = e.getUpgradeReport.copy(step = step3Msg)
+              upgradeStatus.append(upgradeReport)
+            case e: Throwable =>
+              upgradeStatus.append(
+                UpgradeReport(config.databaseName, target.name, Some(e.getMessage), step3Msg)
+              )
+          }
+        })
+    }
+
+    upgradeStatus.toArray.toSeq.toDF
+  }
+
+  def finalize060Upgrade(): Unit = {
+    val snapDir = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
+    val cleanupMsg = s"Cleaning up all upgrade backups and temporary reports from the upgraded to 060 located " +
+      s"within path $snapDir"
+    logger.log(Level.INFO, cleanupMsg)
+    println(cleanupMsg)
+    Helpers.fastrm(Array(snapDir))
+    logger.log(Level.INFO, "UPGRADE - Cleanup complete")
   }
 
 }
