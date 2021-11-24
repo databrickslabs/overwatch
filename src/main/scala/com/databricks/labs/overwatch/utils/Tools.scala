@@ -122,7 +122,7 @@ object Helpers extends SparkSessionWrapper {
    * TODO: rename to defaultParallelism
    */
   private def parallelism: Int = {
-    Math.min(driverCores, 8)
+    Math.max(driverCores * 2, 8)
   }
 
   /**
@@ -306,14 +306,14 @@ object Helpers extends SparkSessionWrapper {
     tablesPar.foreach(tbl => {
       try {
         val zorderColumns = if (tbl.zOrderBy.nonEmpty) s"ZORDER BY (${tbl.zOrderBy.mkString(", ")})" else ""
-        val sql = s"""optimize ${tbl.tableFullName} $zorderColumns"""
-        println(s"optimizing: ${tbl.tableFullName} --> $sql")
+        val sql = s"""optimize delta.`${tbl.tableLocation}` $zorderColumns"""
+        println(s"optimizing: ${tbl.tableLocation} --> $sql")
         spark.sql(sql)
         if (tbl.vacuum_H > 0) {
-          println(s"vacuuming: ${tbl.tableFullName}, Retention == ${tbl.vacuum_H}")
-          spark.sql(s"VACUUM ${tbl.tableFullName} RETAIN ${tbl.vacuum_H} HOURS")
+          println(s"vacuuming: ${tbl.tableLocation}, Retention == ${tbl.vacuum_H}")
+          spark.sql(s"VACUUM delta.`${tbl.tableLocation}` RETAIN ${tbl.vacuum_H} HOURS")
         }
-        println(s"Complete: ${tbl.tableFullName}")
+        println(s"Complete: ${tbl.tableLocation}")
       } catch {
         case e: Throwable => println(e.printStackTrace())
       }

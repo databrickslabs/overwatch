@@ -179,7 +179,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
     executeModules()
 
-    initiatePostProcessing()
+    if (!config.externalizeOptimize) initiatePostProcessing()
     this
 
   }

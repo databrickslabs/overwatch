@@ -149,6 +149,7 @@ class Module(
     _isFirstRun = true
     val initState = SimplifiedModuleStatusReport(
       organization_id = config.organizationId,
+      workspaceFriendlyName = config.workspaceFriendlyName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = Some(pipeline.primordialTime(hardLimitMaxHistory).asDTString),
@@ -159,7 +160,8 @@ class Module(
       status = s"Initialized",
       recordsAppended = 0L,
       lastOptimizedTS = 0L,
-      vacuumRetentionHours = 24 * 7
+      vacuumRetentionHours = 24 * 7,
+      externalizeOptimize = config.externalizeOptimize
     )
     pipeline.updateModuleState(initState)
     initState
@@ -175,6 +177,7 @@ class Module(
   private def fail(msg: String, rollbackStatus: String = ""): ModuleStatusReport = {
     val failedStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
+      workspaceFriendlyName = config.workspaceFriendlyName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = config.primordialDateString,
@@ -187,7 +190,8 @@ class Module(
       lastOptimizedTS = moduleState.lastOptimizedTS,
       vacuumRetentionHours = moduleState.vacuumRetentionHours,
       inputConfig = config.inputConfig,
-      parsedConfig = config.parsedConfig
+      parsedConfig = config.parsedConfig,
+      externalizeOptimize = config.externalizeOptimize
     )
 
     finalizeModule(failedStatusReport)
@@ -225,6 +229,7 @@ class Module(
     val startTime = System.currentTimeMillis()
     val emptyStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
+      workspaceFriendlyName = config.workspaceFriendlyName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = config.primordialDateString,
@@ -237,7 +242,8 @@ class Module(
       lastOptimizedTS = moduleState.lastOptimizedTS,
       vacuumRetentionHours = moduleState.vacuumRetentionHours,
       inputConfig = config.inputConfig,
-      parsedConfig = config.parsedConfig
+      parsedConfig = config.parsedConfig,
+      externalizeOptimize = config.externalizeOptimize
     )
     finalizeModule(emptyStatusReport)
     emptyStatusReport

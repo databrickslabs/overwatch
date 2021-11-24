@@ -128,7 +128,7 @@ case class PipelineTable(
    */
   def exists: Boolean = {
     //    spark.catalog.tableExists(tableFullName)
-    exists(pathValidation = true)
+    exists()
   }
 
   /**
@@ -139,7 +139,7 @@ case class PipelineTable(
    * @param catalogValidation does the catalog table exist for this source -- even if the path does not or is empty
    * @return
    */
-  def exists(pathValidation: Boolean = false, dataValidation: Boolean = false, catalogValidation: Boolean = false): Boolean = {
+  def exists(pathValidation: Boolean = true, dataValidation: Boolean = false, catalogValidation: Boolean = false): Boolean = {
     var entityExists = true
     if (pathValidation || dataValidation) entityExists = Helpers.pathExists(tableLocation)
     if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)

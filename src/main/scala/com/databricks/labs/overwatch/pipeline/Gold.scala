@@ -278,7 +278,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     executeModules()
     buildFacts()
 
-    initiatePostProcessing()
+    if (!config.externalizeOptimize) initiatePostProcessing()
     this // to be used as fail switch later if necessary
   }
 

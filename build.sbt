@@ -2,7 +2,7 @@ name := "overwatch"
 
 organization := "com.databricks.labs"
 
-version := "0.6.0-dev1"
+version := "0.6.0-dev2"
 
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
@@ -10,7 +10,7 @@ scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 val sparkVersion = "3.0.1"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
-libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
+//libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion //% Provided
 libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5" % Provided
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
 libraryDependencies += "io.delta" % "delta-core_2.12" % "0.8.0" % Provided
