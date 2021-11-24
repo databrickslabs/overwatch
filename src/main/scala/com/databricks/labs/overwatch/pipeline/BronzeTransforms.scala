@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions.structFromJson
+import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule

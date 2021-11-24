@@ -77,7 +77,7 @@ object Schema extends SparkSessionWrapper {
     StructField("record", StringType, nullable = true)
   ))
 
-  lazy private[overwatch] val auditMasterSchema = StructType(Seq(
+  val auditMasterSchema: StructType = StructType(Seq(
     StructField("serviceName", StringType, nullable = false),
     StructField("actionName", StringType, nullable = false),
     StructField("organization_id", StringType, nullable = false),
@@ -176,7 +176,7 @@ object Schema extends SparkSessionWrapper {
     common("useridentity")
   ))
 
-  lazy private[overwatch] val sparkEventsRawMasterSchema = StructType(Seq(
+  val sparkEventsRawMasterSchema: StructType = StructType(Seq(
     StructField("organization_id", StringType, nullable = false),
     StructField("Event", StringType, nullable = false),
     StructField("clusterId", StringType, nullable = false),
@@ -249,11 +249,39 @@ object Schema extends SparkSessionWrapper {
     common("filenameGroup")
   ))
 
-  //  Array(DiskBytesSpilled, ExecutorCPUTime, ExecutorDeserializeCPUTime,
-  //  ExecutorDeserializeTime, ExecutorRunTime, InputMetrics, JVMGCTime,
-  //  MemoryBytesSpilled, OutputMetrics, PeakExecutionMemory,
-  //  ResultSerializationTime, ResultSize, ShuffleReadMetrics,
-  //  ShuffleWriteMetrics, UpdatedBlocks)
+  // Minimum required Schedule Schema
+  val minimumScheduleSchema: StructType = StructType(Seq(
+    StructField("pause_status", StringType, true),
+    StructField("quartz_cron_expression", StringType, true),
+    StructField("timezone_id", StringType, true)
+  ))
+
+  // minimum new cluster struct
+  val minimumNewClusterSchema: StructType = StructType(Seq(
+    StructField("autoscale",
+      StructType(Seq(
+        StructField("max_workers", LongType, true),
+        StructField("min_workers", LongType, true)
+      )), true),
+    StructField("cluster_name", StringType, true),
+    StructField("driver_instance_pool_id", StringType, true),
+    StructField("driver_node_type_id", StringType, true),
+    StructField("enable_elastic_disk", BooleanType, true),
+    StructField("instance_pool_id", StringType, true),
+    StructField("node_type_id", StringType, true),
+    StructField("num_workers", LongType, true),
+    StructField("policy_id", StringType, true),
+    StructField("spark_version", StringType, true)
+  ))
+
+  // minimum new jobs settings struct
+  val minimumNewSettingsSchema: StructType = StructType(Seq(
+    StructField("existing_cluster_id", StringType, true),
+    StructField("max_concurrent_runs", LongType, true),
+    StructField("name", StringType, true),
+    StructField("new_cluster", minimumNewClusterSchema, true),
+    StructField("timeout_seconds", LongType, true)
+  ))
 
   // simplified new cluster struct
   lazy private[overwatch] val simplifiedNewClusterSchema = StructType(Seq(
@@ -287,18 +315,13 @@ object Schema extends SparkSessionWrapper {
     StructField("existing_cluster_id", StringType, true),
     StructField("max_concurrent_runs", LongType, true),
     StructField("name", StringType, true),
-    // new_cluster
+    StructField("new_cluster", minimumNewClusterSchema, true),
     StructField("notebook_task",
       StructType(Seq(
         StructField("base_parameters", MapType(StringType, StringType, true), true),
         StructField("notebook_path", StringType, true)
       )), true),
-    StructField("schedule",
-      StructType(Seq(
-        StructField("pause_status", StringType, true),
-        StructField("quartz_cron_expression", StringType, true),
-        StructField("timezone_id", StringType, true)
-      )), true),
+    StructField("schedule", minimumScheduleSchema, true),
     StructField("spark_jar_task",
       StructType(Seq(
         StructField("jar_uri", StringType, true),
@@ -354,7 +377,7 @@ object Schema extends SparkSessionWrapper {
       StructField("jobName", StringType, true),
       StructField("timeout_seconds", StringType, true),
       StructField("notebook_path", StringType, true),
-      StructField("new_settings", simplifiedNewSettingsSchema, true),
+      StructField("new_settings", minimumNewSettingsSchema, true),
       StructField("aclPermissionSet", StringType, true),
       StructField("grants", StringType, true),
       StructField("targetUserId", StringType, true),
@@ -369,7 +392,7 @@ object Schema extends SparkSessionWrapper {
       StructField("cluster_spec",
         StructType(Seq(
           StructField("existing_cluster_id", StringType, true),
-          StructField("new_cluster", simplifiedNewClusterSchema, true)
+          StructField("new_cluster", minimumNewClusterSchema, true)
         )), true),
       StructField("created_by", StringType, true),
       StructField("created_ts", StringType, true),

@@ -36,35 +36,6 @@ object PipelineFunctions {
     } else retrievedConnectionString
   }
 
-  def structFromJson(spark: SparkSession, df: DataFrame, c: String): Column = {
-    import spark.implicits._
-    require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
-    require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
-    val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-    if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-      println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
-    }
-    from_json(col(c), jsonSchema).alias(c)
-  }
-
-  def structFromJson(spark: SparkSession, df: DataFrame, cs: String*): Column = {
-    import spark.implicits._
-    val dfFields = df.schema.fields
-    cs.foreach(c => {
-      require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
-      require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
-    })
-    array(
-      cs.map(c => {
-        val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-        if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-          println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
-        }
-        from_json(col(c), jsonSchema).alias(c)
-      }): _*
-    )
-  }
-
   /**
    * Ensure no duplicate slashes in path and default to dbfs:/ URI prefix where no uri specified to result in
    * fully qualified URI for db location
