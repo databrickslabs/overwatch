@@ -484,13 +484,14 @@ object Upgrade extends SparkSessionWrapper {
           .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
           .partitionBy("organization_id")
           .saveAsTable(s"${config.databaseName}.dbuCostDetails")
+
         upgradeStatus.append(
           UpgradeReport(config.databaseName, "dbuCostDetails", Some("SUCCESS"), step21Msg)
         )
         logger.log(Level.INFO, "dbuCostDetails rebuild complete")
 
-        logger.log(Level.INFO, "REBUILDING instanceDetails table for 0.6.0")
         // rebuild instanceDetails and retain custom costs through time
+        logger.log(Level.INFO, "REBUILDING instanceDetails table for 0.6.0")
         spark.table(s"${config.databaseName}.instanceDetails")
           .drop("interactiveDBUPrice", "automatedDBUPrice", "sqlComputeDBUPrice", "jobsLightDBUPrice")
           .withColumn("isActive", when('activeUntil.isNull, lit(true)).otherwise(lit(false)))
@@ -623,6 +624,52 @@ object Upgrade extends SparkSessionWrapper {
       verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
     }
 
+    // Step 4.1: upgrade default_tags from struct to map in bronze tables
+    if (startStep <= 4.1) {
+      val step41Msg = Some("Step 4.1: upgrade default_tags from struct to map in bronze tables")
+      logger.log(Level.INFO, step41Msg.get)
+      println(step41Msg.get)
+
+      val b = Bronze(workspace)
+      val clustersSnapTarget = PipelineFunctions.getPipelineTarget(b, "clusters_snapshot_bronze")
+      val poolsSnapTarget = PipelineFunctions.getPipelineTarget(b, "pools_snapshot_bronze")
+
+      try {
+        val clustersSnapDF = spark.read.format("delta").load(clustersSnapTarget.tableLocation)
+        val poolsSnapDF = spark.read.format("delta").load(poolsSnapTarget.tableLocation)
+
+        clustersSnapDF
+          .withColumn("default_tags", SchemaTools.structToMap(clustersSnapDF, "default_tags"))
+          .repartition('organization_id)
+          .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
+          .partitionBy("organization_id")
+          .save(clustersSnapTarget.tableLocation)
+
+        upgradeStatus.append(
+          UpgradeReport(config.databaseName, "clusters_snapshot_bronze", Some("SUCCESS"), step41Msg)
+        )
+
+        poolsSnapDF
+          .withColumn("default_tags", SchemaTools.structToMap(poolsSnapDF, "default_tags"))
+          .repartition('organization_id)
+          .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
+          .partitionBy("organization_id")
+          .save(clustersSnapTarget.tableLocation)
+
+        upgradeStatus.append(
+          UpgradeReport(config.databaseName, "pools_snapshot_bronze", Some("SUCCESS"), step41Msg)
+        )
+      } catch {
+        case e: Throwable =>
+          upgradeStatus.append(
+            UpgradeReport(config.databaseName, "*_snapshot_bronze", Some(e.getMessage), step41Msg, failUpgrade = true)
+          )
+      }
+
+
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
+    }
+
     // Step 5: update pipReport to reflect rolled back silver/gold
     if (startStep <= 5) {
       val step5Msg = Some("Step 5: update pipReport to reflect rolled back silver/gold")
@@ -687,7 +734,7 @@ object Upgrade extends SparkSessionWrapper {
           upgradeStatus.append(
             UpgradeReport(
               config.databaseName, "SILVER TARGETS", Some(s"SUCCESS: ORG_ID = ${org.organization_id}"),
-              step6Msg, failUpgrade = true
+              step6Msg
             )
           )
         })
@@ -729,7 +776,7 @@ object Upgrade extends SparkSessionWrapper {
           upgradeStatus.append(
             UpgradeReport(
               config.databaseName, "GOLD TARGETS", Some(s"SUCCESS: ORG_ID = ${org.organization_id}"),
-              step61Msg, failUpgrade = true
+              step61Msg
             )
           )
         })
