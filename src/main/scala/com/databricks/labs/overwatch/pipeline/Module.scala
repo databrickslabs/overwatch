@@ -149,7 +149,7 @@ class Module(
     _isFirstRun = true
     val initState = SimplifiedModuleStatusReport(
       organization_id = config.organizationId,
-      workspaceFriendlyName = config.workspaceFriendlyName,
+      workspace_name = config.workspaceName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = Some(pipeline.primordialTime(hardLimitMaxHistory).asDTString),
@@ -177,7 +177,7 @@ class Module(
   private def fail(msg: String, rollbackStatus: String = ""): ModuleStatusReport = {
     val failedStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
-      workspaceFriendlyName = config.workspaceFriendlyName,
+      workspace_name = config.workspaceName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = config.primordialDateString,
@@ -229,7 +229,7 @@ class Module(
     val startTime = System.currentTimeMillis()
     val emptyStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
-      workspaceFriendlyName = config.workspaceFriendlyName,
+      workspace_name = config.workspaceName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = config.primordialDateString,

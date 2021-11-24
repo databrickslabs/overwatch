@@ -158,7 +158,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       getOptionDouble(masterNode, "intelligentScaling.coeff").getOrElse(1.0)
     )
 
-    val workspaceFriendlyName = getOptionString(masterNode, "workspaceFriendlyName")
+    val workspace_name = getOptionString(masterNode, "workspace_name")
     val externalizeOptimize = getOptionBoolean(masterNode, "externalizeOptimize").getOrElse(false)
 
     OverwatchParams(
@@ -171,7 +171,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       dbContractPrices,
       primordialDateString,
       intelligentScalingConfig,
-      workspaceFriendlyName,
+      workspace_name,
       externalizeOptimize
     )
   }

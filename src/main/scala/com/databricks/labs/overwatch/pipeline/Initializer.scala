@@ -164,8 +164,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       config.setIsPVC(true)
       if (config.debugFlag) println(pvcDetectedMsg)
       logger.log(Level.INFO, pvcDetectedMsg)
-      require(config.workspaceFriendlyName.toLowerCase != config.organizationId.toLowerCase,
-        s"PVC workspaces require the 'workspaceFriendlyName' to be configured in the Overwatch configs for " +
+      require(config.workspaceName.toLowerCase != config.organizationId.toLowerCase,
+        s"PVC workspaces require the 'workspaceName' to be configured in the Overwatch configs for " +
           s"data continuity. Please choose a friendly workspace name and add it to the configuration and try to " +
           s"run the pipeline again."
       )
@@ -175,10 +175,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
   private def pvcOverrideOrganizationId: Unit = {
     val overrideMsg = s"Databricks PVC: Overriding organization_id from ${config.organizationId} to " +
-      s"${config.workspaceFriendlyName} to accommodate data continuity across deployments"
+      s"${config.workspaceName} to accommodate data continuity across deployments"
     if (config.debugFlag) println(overrideMsg)
     logger.log(Level.INFO, overrideMsg)
-    config.setOrganizationId(config.workspaceFriendlyName)
+    config.setOrganizationId(config.workspaceName)
   }
 
   /**
@@ -223,15 +223,15 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setInputConfig(rawParams)
 
 
-    val overwatchFriendlyName = rawParams.workspaceFriendlyName.getOrElse(config.organizationId)
-    config.setworkspaceFriendlyName(overwatchFriendlyName)
+    val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
+    config.setWorkspaceName(overwatchFriendlyName)
 
     /**
      * PVC: HARD OVERRIDE FOR PVC
      * Each time PVC deploys a newer version the derived organization_id changes due to the load balancer id
      * and/or URL to access the workspace changes. There are no identifiable, equal values that can be found
      * between one deployment and the next. To resolve this, PVC customers will be REQUIRED to provide a canonical
-     * name for each workspace (i.e. workspaceFriendlyName) to provide consistency across deployments.
+     * name for each workspace (i.e. workspaceName) to provide consistency across deployments.
      */
     if (isPVC) pvcOverrideOrganizationId
 

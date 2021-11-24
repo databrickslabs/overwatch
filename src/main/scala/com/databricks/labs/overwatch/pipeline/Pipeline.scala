@@ -440,7 +440,7 @@ class Pipeline(
     // Generate Success Report
     ModuleStatusReport(
       organization_id = config.organizationId,
-      workspaceFriendlyName = config.workspaceFriendlyName,
+      workspace_name = config.workspaceName,
       moduleID = module.moduleId,
       moduleName = module.moduleName,
       primordialDateString = config.primordialDateString,
@@ -490,7 +490,7 @@ object Pipeline {
     )
   }
 
-  def apply(workspace: Workspace, database: Database, config: Config, suppressStaticDatasets: Boolean = false): Pipeline = {
+  def apply(workspace: Workspace, database: Database, config: Config): Pipeline = {
 
     new Pipeline(workspace, database, config)
 

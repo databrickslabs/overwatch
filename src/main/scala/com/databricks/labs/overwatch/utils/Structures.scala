@@ -83,7 +83,7 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(),
                            primordialDateString: Option[String] = None,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
-                           workspaceFriendlyName: Option[String],
+                           workspace_name: Option[String],
                            externalizeOptimize: Boolean
                           )
 
@@ -99,7 +99,7 @@ case class ParsedConfig(
 
 case class ModuleStatusReport(
                                organization_id: String,
-                               workspaceFriendlyName: String,
+                               workspace_name: String,
                                moduleID: Int,
                                moduleName: String,
                                primordialDateString: Option[String],
@@ -118,7 +118,7 @@ case class ModuleStatusReport(
   def simple: SimplifiedModuleStatusReport = {
     SimplifiedModuleStatusReport(
       organization_id,
-      workspaceFriendlyName,
+      workspace_name,
       moduleID,
       moduleName,
       primordialDateString,
@@ -137,7 +137,7 @@ case class ModuleStatusReport(
 
 case class SimplifiedModuleStatusReport(
                                          organization_id: String,
-                                         workspaceFriendlyName: String,
+                                         workspace_name: String,
                                          moduleID: Int,
                                          moduleName: String,
                                          primordialDateString: Option[String],
@@ -175,6 +175,7 @@ case class WorkspaceDataset(path: String, name: String)
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
 case class CloneDetail(source: String, target: String, asOfTS: Option[String], cloneLevel: String = "DEEP")
 case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
+case class OrgRunDetail(organization_id: String, primordialDateString: String)
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value

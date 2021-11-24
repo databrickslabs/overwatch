@@ -33,7 +33,7 @@ case class PipelineTable(
                           enableSchemaMerge: Boolean = true,
                           withCreateDate: Boolean = true,
                           withOverwatchRunID: Boolean = true,
-                          withWorkspaceFriendlyName: Boolean = true,
+                          workspaceName: Boolean = true,
                           isTemp: Boolean = false,
                           checkpointPath: Option[String] = None,
                           masterSchema: Option[StructType] = None
