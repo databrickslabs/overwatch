@@ -15,10 +15,8 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
-import sun.font.LayoutPathImpl.EndType
 
 import java.time.{Duration, LocalDateTime}
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
