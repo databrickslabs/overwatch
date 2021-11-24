@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.utils.{SchemaTools, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
-import org.apache.spark.sql.expressions.{Window, WindowSpec}
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}

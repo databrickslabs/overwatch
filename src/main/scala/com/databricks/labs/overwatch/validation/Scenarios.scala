@@ -131,12 +131,12 @@ object Scenarios extends SparkSessionWrapper {
     )
 
     // execute
-    val (rulesReport, passed) = RuleSet(df_clusterPotentialWCosts)
+    val validationResults = RuleSet(df_clusterPotentialWCosts)
       .add(clusterPotentialWCostsRules) // case based tests - array
       //.addMinMaxRules(ClusterAvgShareInvalidRule) // bounds based tests - individual
       .validate()
 
-    rulesReport
+    validationResults.summaryReport
   }
 
   /**
@@ -199,12 +199,12 @@ object Scenarios extends SparkSessionWrapper {
     val df_jobRunCostPotentialFact = spark.table(dbName + ".jobruncostpotentialfact_gold")
 
     // execute
-    val (rulesReport, passed) = RuleSet(df_jobRunCostPotentialFact)
+    val validationReport = RuleSet(df_jobRunCostPotentialFact)
       .add(jobRunCostPotentialFactRules) // case based tests - array
       .addMinMaxRules(ClusterAvgShareInvalidRule) // bounds based tests - individual
       .validate()
 
-    rulesReport
+    validationReport.summaryReport
   }
 
   /**
@@ -370,10 +370,10 @@ object Scenarios extends SparkSessionWrapper {
       Rule("jrcpWorkerPotentialInvalid", jrcpWorkerPotentialInvalidCol, Array(1))
     )
 
-    val (rulesReport, passed) = RuleSet(jobRunCostPotential)
+    val validationReport = RuleSet(jobRunCostPotential)
       .add(jobRunCostPotentialFactRules) // case based tests - array
       .validate()
 
-    rulesReport
+    validationReport.summaryReport
   }
 }
