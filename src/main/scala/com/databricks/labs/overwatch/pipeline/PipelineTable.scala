@@ -152,13 +152,22 @@ case class PipelineTable(
     entityExists
   }
 
+  /**
+   * returns all keys including partition columns
+   * @return
+   */
   def keys: Array[String] = keys()
 
+  /**
+   * returns all keys including partition columns
+   * @param withOverwatchMeta if true, returns Overwatch_RunID and Pipeline_SnapTS as part of the keys
+   * @return
+   */
   def keys(withOverwatchMeta: Boolean = false): Array[String] = {
     if (withOverwatchMeta) {
-      (_keys :+ "organization_id") ++ Array("Overwatch_RunID", "Pipeline_SnapTS")
+      ((_keys :+ "organization_id") ++ Array("Overwatch_RunID", "Pipeline_SnapTS")).distinct
     } else {
-      _keys :+ "organization_id"
+      (_keys ++ partitionBy :+ "organization_id").distinct
     }
   }
 

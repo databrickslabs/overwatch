@@ -97,7 +97,7 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
       .withColumn("lastOptimizedTS", lit(System.currentTimeMillis()))
       .alias("updates")
 
-    val immutableCols = (pipelineStateTarget.keys ++ pipelineStateTarget.partitionBy ++ pipelineStateTarget.incrementalColumns).distinct
+    val immutableCols = (pipelineStateTarget.keys ++ pipelineStateTarget.incrementalColumns).distinct
     val mergeCondition = immutableCols.map(k => s"updates.$k = target.$k").mkString(" AND ")
     val updateExpr = Map("target.lastOptimizedTS" -> "updates.lastOptimizedTS")
 

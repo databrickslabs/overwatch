@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions.structFromJson
 import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
@@ -37,16 +38,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                succeeded: Boolean,
                                error: Option[ErrorDetail]
                              )
-
-  private def structFromJson(df: DataFrame, c: String): Column = {
-    require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col $c")
-    require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
-    val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-    if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-      println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
-    }
-    from_json(col(c), jsonSchema).alias(c)
-  }
 
   protected def setNewDataRetrievedFlag(value: Boolean): this.type = {
     _newDataRetrieved = value
@@ -300,7 +291,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(azureAuditSourceFilters)
       val schemaBuilders = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
-        .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
+        .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
         .selectExpr("streamRecord.*", "organization_id")
         .withColumn("version", 'operationVersion)
@@ -313,7 +304,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       auditRawLand.asDF
         .filter(azureAuditSourceFilters)
-        .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
+        .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
         .selectExpr("streamRecord.*", "organization_id")
         .withColumn("version", 'operationVersion)
@@ -321,10 +312,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
         .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"), 'organization_id)
-        .withColumn("userIdentity", structFromJson(schemaBuilders, "userIdentity"))
+        .withColumn("userIdentity", structFromJson(spark, schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
-        .withColumn("requestParams", structFromJson(schemaBuilders, "requestParams"))
-        .withColumn("response", structFromJson(schemaBuilders, "response"))
+        .withColumn("requestParams", structFromJson(spark, schemaBuilders, "requestParams"))
+        .withColumn("response", structFromJson(spark, schemaBuilders, "response"))
         .drop("logId")
 
     } else {
@@ -344,7 +335,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           val rawDFWRPJsonified = rawDF
             .withColumn("requestParams", to_json('requestParams))
           rawDFWRPJsonified
-            .withColumn("requestParams", structFromJson(rawDFWRPJsonified, "requestParams"))
+            .withColumn("requestParams", structFromJson(spark, rawDFWRPJsonified, "requestParams"))
         }
 
         baseDF

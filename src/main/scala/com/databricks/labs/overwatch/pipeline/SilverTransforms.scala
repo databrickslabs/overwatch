@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.ApiCall
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions.fillForward
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions.{fillForward, structFromJson}
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
@@ -18,37 +18,6 @@ trait SilverTransforms extends SparkSessionWrapper {
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-
-  // TODO -- move to Transform Functions
-  def structFromJson(df: DataFrame, c: String): Column = {
-    require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
-    require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
-    //    require(df.schema.fields.map(_.name).contains(c), s"The dataframe does not contain col $c")
-    //    require(df.schema.fields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
-    val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-    if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-      println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
-    }
-    from_json(col(c), jsonSchema).alias(c)
-  }
-
-  // TODO -- move to Transform Functions
-  def structFromJson(df: DataFrame, cs: String*): Column = {
-    val dfFields = df.schema.fields
-    cs.foreach(c => {
-      require(dfFields.map(_.name).contains(c), s"The dataframe does not contain col $c")
-      require(dfFields.filter(_.name == c).head.dataType.isInstanceOf[StringType], "Column must be a json formatted string")
-    })
-    array(
-      cs.map(c => {
-        val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-        if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-          println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
-        }
-        from_json(col(c), jsonSchema).alias(c)
-      }): _*
-    )
-  }
 
   private def appendPowerProperties: Column = {
     struct(
@@ -876,14 +845,32 @@ trait SilverTransforms extends SparkSessionWrapper {
       )).drop("lastRunningSwitch", "nextRunningSwitch")
       .withColumn(
         "current_num_workers",
+        coalesce(
         when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .otherwise(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers", last(coalesce('current_num_workers, $"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"), true).over(stateUntilCurrentW)))
+          .otherwise(
+            coalesce( // get current_num_workers no matter where the value is stored based on business rules
+              'current_num_workers,
+              $"cluster_size.num_workers",
+              $"cluster_size.autoscale.min_workers",
+              last(coalesce( // look for the last non-null value when current value isn't present
+                'current_num_workers,
+                $"cluster_size.num_workers",
+                $"cluster_size.autoscale.min_workers"
+              ), true).over(stateUntilCurrentW)
+            )
+          ),
+          lit(0) // don't allow null returns
+        )
       )
       .withColumn(
         "target_num_workers",
+        coalesce(
         when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .when('state === "CREATING", coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
-          .otherwise(coalesce('target_num_workers, 'current_num_workers))
+          .when('state === "CREATING",
+            coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
+          .otherwise(coalesce('target_num_workers, 'current_num_workers)),
+          lit(0) // don't allow null returns
+        )
       )
       .select(
         'organization_id, 'cluster_id, 'isRunning,
@@ -923,31 +910,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("days_in_state", size('state_dates))
 
   }
-
-//  /**
-//   * TODO -- move to transform funcs and pass in expressions as Seq
-//   * Generalizing so it can also be used for other DFs
-//   *
-//   * @param colName
-//   * @param w
-//   * @param withSnapLookup
-//   * @param path
-//   * @return
-//   */
-//  private def fillForward_deprecated(colName: String, w: WindowSpec, withSnapLookup: Boolean = true, path: Option[String] = None): Column = {
-//    val settingsPath = s"'$$.${path.getOrElse(colName)}'"
-//    val firstNonNullVal: Seq[Column] = Seq(
-//      expr(s"get_json_object(new_settings, $settingsPath)"),
-//      col(colName),
-//      last(expr(s"get_json_object(lookup_settings, $settingsPath)"), true).over(w),
-//      last(col(colName), true).over(w)
-//    )
-//
-//    val firstNonNullSnapLookupVal: Seq[Column] = Seq(get_json_object('lookup_settings, settingsPath))
-//    val orderedNonNullLookups = if (withSnapLookup) firstNonNullVal ++ firstNonNullSnapLookupVal else firstNonNullVal
-//
-//    coalesce(orderedNonNullLookups: _*)
-//  }
 
   private def getJobsBase(df: DataFrame): DataFrame = {
     df.filter(col("serviceName") === "jobs")
@@ -1003,21 +965,21 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("new_cluster", coalesce('new_cluster, get_json_object('new_settings, "$.new_cluster")))
       // Following section builds out a "clusterSpec" as it is defined at the timestamp. existing_cluster_id
       // and new_cluster should never both be populated as a job must be one or the other at a timestamp
-      .withColumn(
+      .withColumn( // initialize cluster_spec at record timestamp
         "x",
         struct(
           when('existing_cluster_id.isNotNull, struct('timestamp, 'existing_cluster_id)).otherwise(lit(null)).alias("last_existing"),
           when('new_cluster.isNotNull, struct('timestamp, 'new_cluster)).otherwise(lit(null)).alias("last_new")
         )
       )
-      .withColumn(
+      .withColumn( // last non_null cluster id / spec
         "x2",
         struct(
           last($"x.last_existing", true).over(lastJobStatus).alias("last_existing"),
           last($"x.last_new", true).over(lastJobStatus).alias("last_new"),
         )
       )
-      .withColumn(
+      .withColumn( //
         "cluster_spec",
         struct(
           when($"x2.last_existing.timestamp" > coalesce($"x2.last_new.timestamp", lit(0)), $"x2.last_existing.existing_cluster_id").otherwise(lit(null)).alias("existing_cluster_id"),
@@ -1031,7 +993,6 @@ trait SilverTransforms extends SparkSessionWrapper {
           when($"cluster_spec.existing_cluster_id".isNull && $"cluster_spec.new_cluster".isNull, get_json_object('lookup_settings, "$.new_cluster")).otherwise($"cluster_spec.new_cluster").alias("new_cluster")
         )
       ).drop("existing_cluster_id", "new_cluster", "x", "x2") // drop temp columns and old version of clusterSpec components
-      // TODO -- test/validate this section below fillForward_deprecated
       .withColumn("job_type", when('job_type.isNull, last('job_type, true).over(lastJobStatus)).otherwise('job_type))
       .withColumn("schedule", fillForward("schedule", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))))
       .withColumn("timeout_seconds", fillForward("timeout_seconds", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))))
@@ -1066,25 +1027,43 @@ trait SilverTransforms extends SparkSessionWrapper {
         .filter('rnk === 1).drop("rnk")
         .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
         .select(
-          'organization_id, 'timestamp, 'job_id.alias("jobId"), lit("jobs").alias("serviceName"), lit("snapImpute").alias("actionName"),
-          $"settings.name".alias("jobName"), $"settings.timeout_seconds", to_json($"settings.schedule").alias("schedule"),
+          'organization_id,
+          'timestamp,
+          'job_id.alias("jobId"),
+          lit("jobs").alias("serviceName"),
+          lit("snapImpute").alias("actionName"),
+          $"settings.name".alias("jobName"),
+          $"settings.timeout_seconds",
+          to_json($"settings.schedule").alias("schedule"),
           $"settings.notebook_task.notebook_path",
-          when($"settings.existing_cluster_id".isNotNull, struct($"settings.existing_cluster_id", lit(null).alias("new_cluster")))
-            .otherwise(struct(lit(null).alias("existing_cluster_id"), to_json($"settings.new_cluster").alias("new_cluster"))).alias("cluster_spec"),
-          'creator_user_name.alias("created_by"), 'created_time.alias("created_ts")
+          when($"settings.existing_cluster_id".isNotNull,
+            struct( // has existing cluster_id, no new_cluster_spec
+              $"settings.existing_cluster_id",
+              lit(null).alias("new_cluster")
+            )
+          )
+            .otherwise(
+              struct(
+                lit(null).alias("existing_cluster_id"),
+                to_json($"settings.new_cluster").alias("new_cluster")
+              )
+            )
+            .alias("cluster_spec"),
+          'creator_user_name.alias("created_by"),
+          'created_time.alias("created_ts")
         )
       if (!jobStatusBase.isEmpty) unionWithMissingAsNull(jobStatusBase, jSnapMissingJobs) else jSnapMissingJobs
     } else jobStatusBase
 
     val changeInventory = if (!jobStatusBase.isEmpty) {
       Map(
-        "cluster_spec.new_cluster" -> structFromJson(jobStatusBaseFilled, "cluster_spec.new_cluster"),
-        "new_settings" -> structFromJson(jobStatusBaseFilled, "new_settings"),
-        "schedule" -> structFromJson(jobStatusBaseFilled, "schedule")
+        "cluster_spec.new_cluster" -> structFromJson(spark, jobStatusBaseFilled, "cluster_spec.new_cluster"),
+        "new_settings" -> structFromJson(spark, jobStatusBaseFilled, "new_settings"),
+        "schedule" -> structFromJson(spark, jobStatusBaseFilled, "schedule")
       )} else { // new_settings is not present from snapshot and is a struct thus it cannot be added with dynamic schema
       Map(
-        "cluster_spec.new_cluster" -> structFromJson(jobStatusBaseFilled, "cluster_spec.new_cluster"),
-        "schedule" -> structFromJson(jobStatusBaseFilled, "schedule")
+        "cluster_spec.new_cluster" -> structFromJson(spark, jobStatusBaseFilled, "cluster_spec.new_cluster"),
+        "schedule" -> structFromJson(spark, jobStatusBaseFilled, "schedule")
       )}
 
     // create structs from json strings and cleanse schema

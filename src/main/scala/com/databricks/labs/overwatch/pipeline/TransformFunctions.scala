@@ -219,7 +219,11 @@ object TransformFunctions {
                  computeTime_H: Column,
                  smoothingCol: Option[Column] = None
                ): Column = {
-      when(isCloudBillable, computeCost_H * computeTime_H * nodeCount * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
+      coalesce(
+        when(isCloudBillable, computeCost_H * computeTime_H * nodeCount * smoothingCol.getOrElse(lit(1)))
+          .otherwise(lit(0)),
+        lit(0) // don't allow costs to be null (i.e. missing worker node type and/or single node workers
+      )
     }
 
     def dbu(
@@ -230,7 +234,11 @@ object TransformFunctions {
              computeTime_H: Column,
              smoothingCol: Option[Column] = None
            ): Column = {
-      when(isDatabricksBillable, dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))).otherwise(lit(0))
+      coalesce(
+        when(isDatabricksBillable, dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1)))
+          .otherwise(lit(0)),
+        lit(0) // don't allow costs to be null (i.e. missing worker node type and/or single node workers
+      )
     }
 
     /**

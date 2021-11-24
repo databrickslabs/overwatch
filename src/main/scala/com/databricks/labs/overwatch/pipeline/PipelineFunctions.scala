@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.{BadConfigException, Config, IncrementalFilter, InvalidType2Input}
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config, IncrementalFilter, InvalidType2Input, SchemaTools}
 import org.apache.ivy.core.module.id.ModuleId
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
@@ -35,6 +35,35 @@ object PipelineFunctions {
     if (!retrievedConnectionString.matches("^Endpoint=sb://[a-zA-Z0-9-_:;/.=]*;SharedAccessKey=[a-zA-Z0-9-_:;/.=]*$")) {
       throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
     } else retrievedConnectionString
+  }
+
+  def structFromJson(spark: SparkSession, df: DataFrame, c: String): Column = {
+    import spark.implicits._
+    require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
+    require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
+    val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
+    if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
+      println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
+    }
+    from_json(col(c), jsonSchema).alias(c)
+  }
+
+  def structFromJson(spark: SparkSession, df: DataFrame, cs: String*): Column = {
+    import spark.implicits._
+    val dfFields = df.schema.fields
+    cs.foreach(c => {
+      require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
+      require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
+    })
+    array(
+      cs.map(c => {
+        val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
+        if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
+          println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
+        }
+        from_json(col(c), jsonSchema).alias(c)
+      }): _*
+    )
   }
 
   /**
@@ -128,12 +157,25 @@ object PipelineFunctions {
   }
 
   /**
-   * converts a long type
-   * @param epochColName
-   * @return
+   * converts an epoch millisecond timestamp of long type to timestamp and preserves milliseconds
+   * @param c name of column as a string
+   * @return converted string
    */
-  def epochMilliToTs(epochColName: String): Column = {
-    from_unixtime(col(epochColName).cast("double") / 1000).cast("timestamp").alias("epochColName")
+  def epochMilliToTs(c: String): Column = {
+    val defaultAlias = if (c.contains(".")) c.split("\\.").takeRight(1).head else c
+    to_timestamp(col(c) / 1000.0).alias(defaultAlias)
+  }
+
+  /**
+   * converts timestamp to epoch and retains milliseconds
+   * @param c name of column as a string
+   * @return converted string
+   */
+  def tsToEpochMilli(c: String): Column = {
+    val defaultAlias = if (c.contains(".")) c.split("\\.").takeRight(1).head else c
+    ((unix_timestamp(col(c).cast("timestamp")) +
+      (substring(col(c), -4, 3).cast("double") / 1000))*1000)
+      .alias(defaultAlias)
   }
 
   def optimizeWritePartitions(

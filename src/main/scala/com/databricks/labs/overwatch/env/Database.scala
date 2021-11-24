@@ -140,7 +140,7 @@ class Database(config: Config) extends SparkSessionWrapper {
       val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")
 //      val targetColumns = deltaTarget.toDF.columns
-      val immutableColumns = (target.keys ++ target.partitionBy ++ target.incrementalColumns).distinct
+      val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
 //      val columnsToUpdateOnMatch = targetColumns.filterNot(c => immutableColumns.contains(c))
 
       val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")
