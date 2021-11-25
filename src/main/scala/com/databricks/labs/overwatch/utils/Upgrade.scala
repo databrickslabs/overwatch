@@ -630,7 +630,7 @@ object Upgrade extends SparkSessionWrapper {
       logger.log(Level.INFO, step41Msg.get)
       println(step41Msg.get)
 
-      val b = Bronze(workspace)
+      val b = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
       val clustersSnapTarget = PipelineFunctions.getPipelineTarget(b, "clusters_snapshot_bronze")
       val poolsSnapTarget = PipelineFunctions.getPipelineTarget(b, "pools_snapshot_bronze")
 
