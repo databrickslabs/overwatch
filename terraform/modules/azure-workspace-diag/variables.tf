@@ -27,5 +27,6 @@ variable enabled_log_types {
   type        = list(string)
   description = "List of the log types to enable"
   default     = ["dbfs", "clusters", "accounts", "jobs", "notebook", "ssh",
-    "workspace", "secrets", "sqlPermissions", "instancePools"]
+    "workspace", "secrets", "sqlPermissions", "instancePools", "sqlanalytics", "genie", "globalInitScripts",
+    "iamRole", "mlflowExperiment", "featureStore", "mlflowAcledArtifact", "RemoteHistoryService"]
 }

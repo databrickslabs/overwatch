@@ -123,7 +123,7 @@ object Helpers extends SparkSessionWrapper {
    * TODO: rename to defaultParallelism
    */
   private def parallelism: Int = {
-    Math.max(driverCores * 2, 8)
+    driverCores
   }
 
   /**
@@ -301,7 +301,7 @@ object Helpers extends SparkSessionWrapper {
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * maxFileSizeMB)
 
     val tablesPar = tables.par
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism - 1))
     tablesPar.tasksupport = taskSupport
 
     tablesPar.foreach(tbl => {

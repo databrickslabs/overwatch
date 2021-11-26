@@ -6,13 +6,9 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.expressions.{Window, WindowSpec}
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
-
-import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.forkjoin.ForkJoinPool
 
 trait SilverTransforms extends SparkSessionWrapper {
 

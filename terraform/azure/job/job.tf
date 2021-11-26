@@ -17,20 +17,22 @@ resource "databricks_job" "overwatch" {
         destination = "dbfs:/cluster-logs"
       }
     }
-  }
+}
 
   notebook_task {
     notebook_path = databricks_notebook.overwatch.path
     base_parameters = {
-      etlDBName = var.overwatch_job_dbname
-      presentationDBName = var.overwatch_job_dbname
-      evhName = var.overwatch_job_evh_name
+      etlDBName = var.overwatch_job_etl_dbname
+      consumerDBName = var.overwatch_job_dbname
+      ehName = var.overwatch_job_evh_name
       secretsScope = var.overwatch_job_secrets_scope
-      secretsEvHubKey = var.overwatch_job_secrets_evhub_key_name
-      overwatchDBKey = var.overwatch_job_secrets_dbpat_key_name
+      ehKey = var.overwatch_job_secrets_evhub_key_name
+      dbPATKey = var.overwatch_job_secrets_dbpat_key_name
       tempPath = var.overwatch_job_temppath
       maxDaysToLoad = var.overwatch_max_days_to_load
       primordialDateString = var.overwatch_primodial_date
+      storagePrefix = var.storage_prefix
+      scopes = "all"
     }
   }
 
@@ -52,7 +54,9 @@ resource "databricks_job" "overwatch" {
   }
 
   library {
-    jar = "dbfs:${databricks_dbfs_file.overwatch_jar.path}"
+    maven {
+      coordinates = "com.databricks.labs:overwatch_2.12:0.5.0.6"
+    }
   }
 }
 

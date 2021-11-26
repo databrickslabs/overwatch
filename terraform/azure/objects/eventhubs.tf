@@ -28,8 +28,10 @@ resource "azurerm_eventhub_authorization_rule" "overwatch_listen" {
   manage = false
 }
 
-output "eventhub_conn_read" {
-  value = azurerm_eventhub_authorization_rule.overwatch_listen.primary_connection_string
+resource "azurerm_key_vault_secret" "example" {
+  name         = "overwatch-eventhubs"
+  value        = azurerm_eventhub_authorization_rule.overwatch_listen.primary_connection_string
+  key_vault_id = azurerm_key_vault.example.id
 }
 
 resource "azurerm_eventhub_namespace_authorization_rule" "overwatch" {

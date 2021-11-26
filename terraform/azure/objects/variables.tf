@@ -13,3 +13,7 @@ variable name_prefix {
   description = "prefix to add to the names of resources, like, eventhubs, etc."
 }
 
+variable kv_name {
+  type        = string
+  description = "name of key vault"
+}
