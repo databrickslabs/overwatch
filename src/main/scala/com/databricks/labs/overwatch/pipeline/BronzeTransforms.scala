@@ -48,7 +48,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     if (!clusterEventCalls.forall(_.succeeded)) {
       val errorCount = clusterEventCalls.filterNot(_.succeeded).length
       val errMessage = s"WARNING: $errorCount ERRORS DETECTED in Bronze_ClusterEvents. At least one batch " +
-        s"could not be loaded. Review errored_cluster_events_bronze for more details."
+        s"could not be loaded. Review cluster_events_errors_bronze for more details."
       logger.log(Level.WARN, errMessage)
       println(errMessage)
     }
@@ -220,7 +220,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     } catch { // chk dir is missing BUT raw audit hist has latest enq time and can resume from there creating a new chkpoint
       case e: BadConfigException if (!e.failPipeline) =>
-        spark.conf.set("spark.network.timeout", "1200s") // lazy loading of enqTime can cause futures to time out
         val lastEnqTime = azureRawAuditLogTarget.asDF()
           .select(max('enqueuedTime))
           .as[java.sql.Timestamp]
@@ -249,7 +248,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
       "settings.new_cluster.spark_conf" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_conf"),
       "settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_env_vars"),
-      s"settings.new_cluster.${cloudProvider}_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.${cloudProvider}_attributes"),
+      s"settings.new_cluster.aws_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.aws_attributes"),
+      s"settings.new_cluster.azure_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.azure_attributes"),
       "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
     )
 
@@ -264,14 +264,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
       .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
       .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
-      .withColumn(s"${cloudProvider}_attributes", SchemaTools.structToMap(outputDF, s"${cloudProvider}_attributes"))
+      .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
+      .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
 
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
     val outputDF = SchemaTools.scrubSchema(df)
-    outputDF.withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
-    outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
+    outputDF
+      .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
+      .withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
   }
 
   //noinspection ScalaCustomHdfsFormat

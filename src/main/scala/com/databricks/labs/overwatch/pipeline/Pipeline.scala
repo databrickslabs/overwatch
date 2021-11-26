@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
 import com.databricks.labs.overwatch.utils._
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
@@ -367,15 +368,17 @@ class Pipeline(
 
   private[overwatch] def initiatePostProcessing(): Unit = {
 
-    postProcessor.optimize(this, 12)
+    if (!config.externalizeOptimize) postProcessor.optimize(this, 12)
     Helpers.fastrm(Array(
       s"/tmp/overwatch/bronze/${config.organizationId}/clusterEventsBatches"
     ))
 
+    postProcessor.refreshPipReportView(pipelineStateViewTarget)
+
     spark.catalog.clearCache()
   }
 
-  protected def restoreSparkConf(): Unit = {
+  private[overwatch] def restoreSparkConf(): Unit = {
     restoreSparkConf(config.initialSparkConf)
   }
 
@@ -383,15 +386,15 @@ class Pipeline(
     PipelineFunctions.setSparkOverrides(spark, value, config.debugFlag)
   }
 
-  private def getLastOptimized(moduleID: Int): Long = {
-    val state = pipelineState.get(moduleID)
-    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
-  }
+//  private def getLastOptimized(moduleID: Int): Long = {
+//    val state = pipelineState.get(moduleID)
+//    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
+//  }
 
-  private def needsOptimize(moduleID: Int, optimizeFreq_H: Int): Boolean = {
+  private def needsOptimize(lastOptimizedTS: Long, optimizeFreq_H: Int): Boolean = {
     val optFreq_Millis = 1000L * 60L * 60L * optimizeFreq_H.toLong
     val tsLessSevenD = System.currentTimeMillis() - optFreq_Millis
-    if (getLastOptimized(moduleID) < tsLessSevenD && !config.isLocalTesting) true
+    if (lastOptimizedTS < tsLessSevenD && !config.isLocalTesting) true
     else false
   }
 
@@ -418,24 +421,26 @@ class Pipeline(
 
     // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
     // of attempting to re-read the very inefficient json.gz files.
-    val dfCount = if (target.name == "spark_events_bronze") {
-      target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
-    } else finalDF.count()
+//    val dfCount = if (target.name == "spark_events_bronze") {
+//      target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
+//    } else finalDF.count()
 
-    val msg = s"SUCCESS! ${module.moduleName}: $dfCount records appended."
-    println(msg)
-    logger.log(Level.INFO, msg)
+    val writeOpsMetrics = PipelineFunctions.getTargetWriteMetrics(spark, target, pipelineSnapTime, config.runID)
 
-    var lastOptimizedTS: Long = getLastOptimized(module.moduleId)
-    if (!config.externalizeOptimize && needsOptimize(module.moduleId, target.optimizeFrequency_H)) {
+    val lastOptimizedTS: Long = PipelineFunctions.getLastOptimized(spark, target)
+    if (!config.externalizeOptimize && needsOptimize(lastOptimizedTS, target.optimizeFrequency_H)) {
       postProcessor.markOptimize(target)
-      lastOptimizedTS = module.untilTime.asUnixTimeMilli
     }
 
     restoreSparkConf()
 
     val endTime = System.currentTimeMillis()
 
+    val rowsWritten = writeOpsMetrics.getOrElse("numOutputRows", "0")
+    val execMins: Double = (endTime - startTime) / 1000.0 / 60.0
+    val msg = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: $execMins"
+    println(msg)
+    logger.log(Level.INFO, msg)
 
     // Generate Success Report
     ModuleStatusReport(
@@ -449,7 +454,7 @@ class Pipeline(
       fromTS = module.fromTime.asUnixTimeMilli,
       untilTS = module.untilTime.asUnixTimeMilli,
       status = "SUCCESS",
-      recordsAppended = dfCount,
+      writeOpsMetrics = writeOpsMetrics,
       lastOptimizedTS = lastOptimizedTS,
       vacuumRetentionHours = 24 * 7,
       inputConfig = config.inputConfig,

@@ -108,7 +108,7 @@ case class ModuleStatusReport(
                                fromTS: Long,
                                untilTS: Long,
                                status: String,
-                               recordsAppended: Long,
+                               writeOpsMetrics: Map[String, String],
                                lastOptimizedTS: Long,
                                vacuumRetentionHours: Int,
                                inputConfig: OverwatchParams,
@@ -127,7 +127,7 @@ case class ModuleStatusReport(
       fromTS,
       untilTS,
       status,
-      recordsAppended,
+      writeOpsMetrics,
       lastOptimizedTS,
       vacuumRetentionHours,
       externalizeOptimize
@@ -146,7 +146,7 @@ case class SimplifiedModuleStatusReport(
                                          fromTS: Long,
                                          untilTS: Long,
                                          status: String,
-                                         recordsAppended: Long,
+                                         writeOpsMetrics: Map[String, String],
                                          lastOptimizedTS: Long,
                                          vacuumRetentionHours: Int,
                                          externalizeOptimize: Boolean
@@ -172,10 +172,16 @@ case class UpgradeReport(
                         )
 
 case class WorkspaceDataset(path: String, name: String)
+
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
+
 case class CloneDetail(source: String, target: String, asOfTS: Option[String], cloneLevel: String = "DEEP")
+
 case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
-case class OrgRunDetail(organization_id: String, primordialDateString: String)
+
+case class OrgConfigDetail(organization_id: String, latestParams: OverwatchParams)
+
+case class DeltaHistory(version: Long, timestamp: java.sql.Timestamp, operation: String, clusterId: String, operationMetrics: Map[String, String], userMetadata: String)
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
@@ -202,7 +208,8 @@ private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val all
 private[overwatch] class ApiCallFailure(
                                          httpResponse: HttpResponse[String],
                                          apiCallDetail: String,
-                                         t: Throwable = null
+                                         t: Throwable = null,
+                                         debugFlag: Boolean = false
                                        ) extends Exception {
   private val logger = Logger.getLogger("ApiCall")
   private val hardFailErrors = Array(401, 404, 407)
@@ -220,7 +227,7 @@ private[overwatch] class ApiCallFailure(
   if (hardFailErrors.contains(httpResponse.code)) failPipeline = true
   private val logLevel = if (failPipeline) Level.ERROR else Level.WARN
   val msg: String = buildAPIErrorMessage(httpResponse)
-  println(msg)
+  if (debugFlag) println(msg)
   if (t != null) logger.log(logLevel, msg, t) else logger.log(logLevel, msg)
 }
 
@@ -285,9 +292,9 @@ private[overwatch] class BadSchemaException(s: String) extends Exception(s) {
   println(s)
 }
 
-private[overwatch] class UpgradeException(s: String, target: PipelineTable, step: Option[String] = None) extends Exception(s) {
+private[overwatch] class UpgradeException(s: String, target: PipelineTable, step: Option[String] = None, failUpgrade: Boolean = false) extends Exception(s) {
   def getUpgradeReport: UpgradeReport = {
-    UpgradeReport(target.databaseName, target.name, Some(s), step)
+    UpgradeReport(target.databaseName, target.name, Some(s), step, failUpgrade)
   }
 }
 

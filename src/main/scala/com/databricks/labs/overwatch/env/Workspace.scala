@@ -46,7 +46,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
     val jobsEndpoint = "jobs/list"
 
-    ApiCall(jobsEndpoint, config.apiEnv)
+    ApiCall(jobsEndpoint, config.apiEnv, debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -63,7 +63,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"
-    ApiCall(clustersEndpoint, config.apiEnv)
+    ApiCall(clustersEndpoint, config.apiEnv, debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -80,7 +80,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val queryMap = Map[String, Any](
       "path" -> dbfsPath
     )
-    ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap))
+    ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap), debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -93,7 +93,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getPoolsDF: DataFrame = {
     val poolsEndpoint = "instance-pools/list"
-    ApiCall(poolsEndpoint, config.apiEnv)
+    ApiCall(poolsEndpoint, config.apiEnv, debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -106,7 +106,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getProfilesDF: DataFrame = {
     val profilesEndpoint = "instance-profiles/list"
-    ApiCall(profilesEndpoint, config.apiEnv)
+    ApiCall(profilesEndpoint, config.apiEnv, debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -119,7 +119,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getWorkspaceUsersDF: DataFrame = {
     val workspaceEndpoint = "workspace/list"
-    ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")))
+    ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")), debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -132,7 +132,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "num_workers" -> numWorkers
     )
 
-    ApiCall(endpoint, apiEnv, Some(query), paginate = false).executePost()
+    ApiCall(endpoint, apiEnv, Some(query), paginate = false, debugFlag = config.debugFlag).executePost()
   }
 
   /**

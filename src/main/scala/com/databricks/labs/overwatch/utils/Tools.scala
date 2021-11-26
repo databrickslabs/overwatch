@@ -357,7 +357,7 @@ object Helpers extends SparkSessionWrapper {
    * @param cloudProvider - name of the cloud provider
    */
   @throws(classOf[UnhandledException])
-  private[overwatch] def fastDrop(target: PipelineTable, cloudProvider: String): Unit = {
+  private[overwatch] def fastDrop(target: PipelineTable, cloudProvider: String): String = {
     require(target.exists, s"TARGET DOES NOT EXIST: ${target.tableFullName}")
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "true")
     if (cloudProvider == "aws") {
@@ -378,6 +378,7 @@ object Helpers extends SparkSessionWrapper {
       fastrm(Array(target.tableLocation))
     }
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "false")
+    s"SHRED COMPLETE: ${target.tableFullName}"
   }
 
   /**

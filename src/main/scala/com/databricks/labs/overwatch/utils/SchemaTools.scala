@@ -114,7 +114,7 @@ object SchemaTools extends SparkSessionWrapper {
     }
   }
 
-  def structFromJson(spark: SparkSession, df: DataFrame, c: String, minSchema: Option[StructType] = None): Column = {
+  def structFromJson(spark: SparkSession, df: DataFrame, c: String): Column = {
     import spark.implicits._
     require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
     require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
@@ -123,10 +123,7 @@ object SchemaTools extends SparkSessionWrapper {
       println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
     }
     if (jsonSchema.isEmpty) {
-      if (minSchema.isEmpty) logger.log(Level.WARN, s"A schema cannot be inferred for $c give the data " +
-        s"in this dataframe. A minimum schema may be provided but hasn't been. Will implicitly cast $c to a null of " +
-        s"StringType. If errors persist, please review this field.")
-      lit(null).cast(minSchema.getOrElse(StringType))
+      lit(null)
     } else {
       from_json(col(c), jsonSchema).alias(c)
     }

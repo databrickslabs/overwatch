@@ -48,8 +48,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.clusters => {
         Array(clusterModule)
       }
+      case OverwatchScope.clusterEvents => {
+        Array(clusterStateFactModule)
+      }
       case OverwatchScope.jobs => {
-        Array(jobsModule, jobRunsModule)
+        Array(jobsModule, jobRunsModule, jobRunCostPotentialFactModule)
       }
       case OverwatchScope.sparkEvents => {
         Array(
@@ -69,7 +72,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  lazy private[overwatch] val clusterModule = Module(3001, "Gold_Cluster", this, Array(2014))
+  lazy private[overwatch] val clusterModule = Module(3001, "Gold_Cluster", this, Array(2014, 2019))
   lazy private val appendClusterProccess = ETLDefinition(
     SilverTargets.clustersSpecTarget.asIncrementalDF(clusterModule, "timestamp"),
     Seq(buildCluster()),
@@ -294,7 +297,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     executeModules()
     buildFacts()
 
-    if (!config.externalizeOptimize) initiatePostProcessing()
+    initiatePostProcessing()
     this // to be used as fail switch later if necessary
   }
 

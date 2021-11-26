@@ -159,15 +159,18 @@ case class PipelineTable(
   def keys: Array[String] = keys()
 
   /**
-   * returns all keys including partition columns
+   * returns all keys including partition columns EXCEPT the overwatch_ctrl_noise which is used for localized
+   * noise to reduce skew, not a business key
    * @param withOverwatchMeta if true, returns Overwatch_RunID and Pipeline_SnapTS as part of the keys
    * @return
    */
   def keys(withOverwatchMeta: Boolean = false): Array[String] = {
+    //
+    val baselineKeys = (_keys ++ partitionBy :+ "organization_id").filterNot(_ == "__overwatch_ctrl_noise").distinct
     if (withOverwatchMeta) {
-      ((_keys :+ "organization_id") ++ Array("Overwatch_RunID", "Pipeline_SnapTS")).distinct
+      (baselineKeys ++ Array("Overwatch_RunID", "Pipeline_SnapTS")).distinct
     } else {
-      (_keys ++ partitionBy :+ "organization_id").distinct
+      baselineKeys.distinct
     }
   }
 

@@ -14,16 +14,17 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private var _apiName: String = _
-  private var _jsonQuery: String = _
-  private var _getQueryString: String = _
-  private var _initialQueryMap: Map[String, Any] = _
+  private var _apiName: String = "EMPTY"
+  private var _jsonQuery: String = "EMPTY"
+  private var _getQueryString: String = "EMPTY"
+  private var _initialQueryMap: Map[String, Any] = Map()
   private val results = ArrayBuffer[String]()
   private val _rawResults = ArrayBuffer[HttpResponse[String]]()
-  private var _limit: Long = _
+  private var _limit: Long = -1L
   private var _paginate: Boolean = false
-  private var _req: String = _
-  private var _maxResults: Int = _
+  private var _debugFlag: Boolean = false
+  private var _req: String = "EMPTY"
+  private var _maxResults: Int = -1
   private var _allowUnsafeSSL: Boolean = false
 
   private val mapper = JsonUtils.defaultObjectMapper
@@ -70,6 +71,11 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     this
   }
 
+  private def setDebugFlag(value: Boolean): this.type = {
+    _debugFlag = value
+    this
+  }
+
   private def setApiName(value: String): this.type = {
     _apiName = value
 
@@ -96,6 +102,8 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   private def limit: Long = _limit
 
+  private def debugFlag: Boolean = _debugFlag
+
   def asRawResponses: Array[HttpResponse[String]] = _rawResults.toArray
 
   def errorsFound: Boolean = asRawResponses.exists(r => r.isError && r.code != 429) // don't consider rate limit an error
@@ -120,7 +128,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
      val asDFErrMsg = s"The API endpoint is not returning the " +
        s"expected structure, column $dataCol is expected and is not present in the dataframe"
       logger.log(Level.ERROR, asDFErrMsg)
-      println(asDFErrMsg)
+      if (debugFlag) println(asDFErrMsg)
       throw new Exception(asDFErrMsg)
     }
     if (dataCol == "*") apiResultDF
@@ -210,10 +218,6 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   }
 
-  // TODO -- Issue_87 -- Simplify differences between get and post
-  //  and validate the error handling
-  @throws(classOf[ApiCallFailure])
-  @throws(classOf[java.lang.NoClassDefFoundError])
   def executeGet(pageCall: Boolean = false): this.type = {
     logger.log(Level.INFO, s"Loading $req -> query: $getQueryString")
     try {
@@ -227,7 +231,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
             "ssl. If this is unexpected behavior, validate your ssl certs."
           logger.log(Level.WARN, sslMSG)
-          println(sslMSG)
+          if (debugFlag) println(sslMSG)
           _allowUnsafeSSL = true
           Http(req + getQueryString)
             .copy(headers = httpHeaders)
@@ -238,7 +242,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         if (result.code == 429) {
           Thread.sleep(2000)
           executeGet(pageCall) // rate limit retry
-        } else throw new ApiCallFailure(result, buildGetErrorMessage)
+        } else throw new ApiCallFailure(result, buildGetErrorMessage, debugFlag = debugFlag)
       }
       if (!pageCall && _paginate) {
         // Append initial rawResults
@@ -259,7 +263,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       case e: ApiCallFailure if e.failPipeline => throw e
       case e: Throwable =>
         logger.log(Level.ERROR, buildGetErrorMessage, e)
-        println(buildGetErrorMessage)
+        if (debugFlag) println(buildGetErrorMessage)
         throw e
     }
   }
@@ -282,7 +286,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
           val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
             "ssl. If this is unexpected behavior, validate your ssl certs."
           logger.log(Level.WARN, sslMSG)
-          println(sslMSG)
+          if (debugFlag) println(sslMSG)
           _allowUnsafeSSL = true
           Http(req)
             .copy(headers = httpHeaders)
@@ -295,7 +299,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         if (result.code == 429) {
           Thread.sleep(2000)
           executePost(pageCall) // rate limit retry
-        } else throw new ApiCallFailure(result, buildPostErrorMessage)
+        } else throw new ApiCallFailure(result, buildPostErrorMessage, debugFlag = debugFlag)
       }
       if (!pageCall && _paginate) {
         // if paginate == true and is first api call
@@ -317,7 +321,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         println(msg, e)
         throw new java.lang.NoClassDefFoundError(msg)
       case _: JsonMappingException => {
-        println(buildPostErrorMessage)
+        if (debugFlag) println(buildPostErrorMessage)
         val rawBodyResults = asRawResponses.map(_.body).mkString("\n\n")
         throw new ApiCallEmptyResponse(s"No or malformed data returned: $buildPostErrorMessage\n" +
           s"RAW return Value: ${rawBodyResults}", !errorsFound)
@@ -325,7 +329,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
       case e: ApiCallFailure if e.failPipeline => throw e
       case e: Throwable =>
         logger.log(Level.ERROR, buildPostErrorMessage, e)
-        println(buildPostErrorMessage)
+        if (debugFlag) println(buildPostErrorMessage)
         throw e
     }
   }
@@ -338,11 +342,12 @@ object ApiCall {
   val connTimeoutMS = 10000
 
   def apply(apiName: String, apiEnv: ApiEnv, queryMap: Option[Map[String, Any]] = None,
-            maxResults: Int = Int.MaxValue, paginate: Boolean = true): ApiCall = {
+            maxResults: Int = Int.MaxValue, paginate: Boolean = true, debugFlag: Boolean = false): ApiCall = {
     new ApiCall(apiEnv).setApiName(apiName)
       .setQuery(queryMap)
       .setMaxResults(maxResults)
       .setPaginate(paginate)
+      .setDebugFlag(debugFlag)
   }
 
 }

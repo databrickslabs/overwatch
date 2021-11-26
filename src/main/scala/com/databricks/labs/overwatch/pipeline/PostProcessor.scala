@@ -142,4 +142,17 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
     emitCompletionLog
   }
 
+  private[overwatch] def refreshPipReportView(pipReportViewTarget: PipelineView): Unit = {
+    val pipReportViewColumnMappings =
+      s"""
+         |organization_id, workspace_name, moduleID as module_id, moduleName as module_name,
+         |cast(primordialDateString as date) as primordialDate,
+         |to_timestamp(fromTS / 1000.0) as fromTS,
+         |to_timestamp(untilTS / 1000.0) as untilTS,
+         |status, writeOpsMetrics as write_metrics,
+         |Pipeline_SnapTS, Overwatch_RunID
+         |""".stripMargin
+    pipReportViewTarget.publish(pipReportViewColumnMappings, sorted = true, reverse = true)
+  }
+
 }

@@ -14,8 +14,16 @@ abstract class PipelineTargets(config: Config) {
     config = config,
     partitionBy = Array("organization_id"),
     incrementalColumns = Array("Pipeline_SnapTS"),
-    statsColumns = ("moduleID, moduleName, runStartTS, runEndTS, fromTS, untilTS, dataFrequency, status, " +
-      "recordsAppended, lastOptimizedTS, Pipeline_SnapTS, organization_id, primordialDateString").split(", ")
+    statsColumns = ("organization_id, workspace_name, moduleID, moduleName, runStartTS, runEndTS, " +
+      "fromTS, untilTS, status, " +
+      "writeOpsMetrics, lastOptimizedTS, Pipeline_SnapTS, primordialDateString").split(", ")
+  )
+
+  lazy private[overwatch] val pipelineStateViewTarget: PipelineView = PipelineView(
+    name = "pipReport",
+    pipelineStateTarget,
+    config,
+    dbTargetOverride = Some(config.databaseName)
   )
 
   /**
@@ -86,7 +94,7 @@ abstract class PipelineTargets(config: Config) {
       statsColumns = "cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID".split(", "))
 
     lazy private[overwatch] val clusterEventsErrorsTarget: PipelineTable = PipelineTable(
-      name = "errored_cluster_events_bronze",
+      name = "cluster_events_errors_bronze",
       _keys = Array("cluster_id", "from_epoch", "until_epoch", "Overwatch_RunID"),
       config,
       partitionBy = Seq("organization_id"),

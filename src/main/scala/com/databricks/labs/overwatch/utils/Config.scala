@@ -142,7 +142,9 @@ class Config() {
         value.getOrElse("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "50000"),
       "spark.databricks.delta.optimizeWrite.binSize" ->
         value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
-      "spark.sql.caseSensitive" -> "false"
+      "spark.sql.caseSensitive" -> "false",
+      "spark.databricks.delta.commitInfo.userMetadata" -> runID,
+      "spark.databricks.delta.schema.autoMerge.enabled" -> "true"
     )
     _initialSparkConf = value ++ manualOverrides
     this
@@ -188,6 +190,11 @@ class Config() {
 
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value
+    this
+  }
+
+  private[overwatch] def setCloudProvider(value: String): this.type = {
+    _cloudProvider = value
     this
   }
 

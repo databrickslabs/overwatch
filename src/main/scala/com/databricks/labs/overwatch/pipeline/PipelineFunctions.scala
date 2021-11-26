@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils._
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
@@ -402,6 +403,51 @@ object PipelineFunctions {
     } else {
       coalesce(colToFill, last(colToFill, true).over(w)).alias(colToFillName)
     }
+  }
+
+  def getDeltaHistory(spark: SparkSession, target: PipelineTable, n: Int = 9999): DataFrame = {
+    import spark.implicits._
+    DeltaTable.forPath(target.tableLocation).history(n)
+      .select(
+        'version,
+        'timestamp,
+        'operation,
+        'clusterId,
+        'operationMetrics,
+        'userMetadata
+      )
+  }
+
+  def getTargetWriteMetrics(
+                             spark: SparkSession,
+                             target: PipelineTable,
+                             snapTime: TimeTypes,
+                             runId: String,
+                             operations: Array[String] = Array("WRITE", "MERGE")
+                           ): Map[String, String] = {
+    import spark.implicits._
+    getDeltaHistory(spark, target)
+      .filter('operation.isin(operations: _*))
+      .filter('timestamp > snapTime.asColumnTS && 'userMetadata === runId)
+      .withColumn("rnk", rank().over(Window.orderBy('timestamp)))
+      .filter('rnk === 1)
+      .as[DeltaHistory]
+      .collect()
+      .headOption
+      .map(_.operationMetrics)
+      .getOrElse(Map[String, String]())
+
+  }
+
+  def getLastOptimized(spark: SparkSession, target: PipelineTable): Long = {
+    import spark.implicits._
+    getDeltaHistory(spark, target)
+      .filter('operation === "OPTIMIZE")
+      .select(max(unix_timestamp('timestamp) * 1000))
+      .as[Option[Long]]
+      .collect()
+      .head
+      .getOrElse(0L)
   }
 
 }
