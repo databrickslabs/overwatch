@@ -157,6 +157,7 @@ class Database(config: Config) extends SparkSessionWrapper {
            |MERGE CONDITION: $mergeCondition
            |""".stripMargin
       logger.log(Level.INFO, mergeDetailMsg)
+      spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", config.runID)
       // TODO -- when DBR 9.1 LTS GA, use LSM (low-shuffle-merge) to improve pipeline
       deltaTarget
         .merge(updatesDF, mergeCondition)
@@ -165,6 +166,8 @@ class Database(config: Config) extends SparkSessionWrapper {
         .whenNotMatched
         .insertAll()
         .execute()
+
+      spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
 
     } else {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")

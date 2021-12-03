@@ -58,7 +58,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clustersSnapshotTarget)
   )
 
-  lazy private[overwatch] val poolsSnapshotModule = Module(1003, "Bronze_Pools", this)
+  lazy private[overwatch] val poolsSnapshotModule = Module(1003, "Bronze_Pools_Snapshot", this)
   lazy private val appendPoolsProcess = ETLDefinition(
     workspace.getPoolsDF,
     Seq(cleanseRawPoolsDF()),

@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.pipeline.{Module, PipelineTable}
+import com.databricks.labs.overwatch.pipeline.{Module, PipelineFunctions, PipelineTable}
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import com.databricks.labs.overwatch.validation.SnapReport
 import org.apache.log4j.{Level, Logger}
@@ -294,7 +294,7 @@ private[overwatch] class BadSchemaException(s: String) extends Exception(s) {
 
 private[overwatch] class UpgradeException(s: String, target: PipelineTable, step: Option[String] = None, failUpgrade: Boolean = false) extends Exception(s) {
   def getUpgradeReport: UpgradeReport = {
-    UpgradeReport(target.databaseName, target.name, Some(s), step, failUpgrade)
+    UpgradeReport(target.databaseName, target.name, Some(PipelineFunctions.appendStackStrace(this, s)), step, failUpgrade)
   }
 }
 

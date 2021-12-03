@@ -166,8 +166,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'azure_attributes,
       'create_details,
       'delete_details,
-      'request_details,
-      'poolSnapDetails
+      'request_details
     )
   }
 
@@ -949,7 +948,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, workspace_name, instance_pool_id, serviceName, timestamp, date, actionName, instance_pool_name, node_type_id,
       |idle_instance_autotermination_minutes, min_idle_instances, max_capacity, preloaded_spark_versions,
-      |azure_attributes, create_details, delete_details, request_details, poolSnapDetails
+      |azure_attributes, create_details, delete_details, request_details
       |""".stripMargin
 
   protected val jobViewColumnMapping: String =

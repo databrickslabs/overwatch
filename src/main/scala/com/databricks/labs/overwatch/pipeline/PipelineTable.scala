@@ -340,6 +340,7 @@ case class PipelineTable(
             .option("mergeSchema", "true")
         } else streamWriter // append AND overwrite schema
         streamWriter // Return built Stream Writer
+          .option("userMetadata", config.runID)
       } else { // NOT STREAMING
         var dfWriter = df.write.mode(writeMode.toString).format(format)
         dfWriter = if (partitionBy.nonEmpty) dfWriter.partitionBy(partitionBy: _*) else dfWriter // add partitions if exists
@@ -349,7 +350,8 @@ case class PipelineTable(
           dfWriter
             .option("mergeSchema", "true")
         } else dfWriter // append AND overwrite schema
-        dfWriter // Return built Stream Writer
+        dfWriter // Return built Batch Writer
+          .option("userMetadata", config.runID)
       }
     }
   }

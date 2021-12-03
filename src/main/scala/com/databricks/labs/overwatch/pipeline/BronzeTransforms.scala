@@ -274,6 +274,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     outputDF
       .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
       .withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
+      .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
+      .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
   }
 
   //noinspection ScalaCustomHdfsFormat
@@ -323,9 +325,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
     } else {
 
       // inclusive from exclusive to
-      val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
-        .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
-        .filter(Helpers.pathExists)
+      val datesGlob = if (fromDT == untilDT) {
+        Array(s"${auditLogConfig.rawAuditPath.get}/date=${fromDT.toString}")
+      } else {
+        datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
+          .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
+          .filter(Helpers.pathExists)
+      }
 
       val auditLogsFailureMsg = s"Audit Logs Module Failure: Audit logs are required to use Overwatch and no data " +
         s"was found in the following locations: ${datesGlob.mkString(", ")}"

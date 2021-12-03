@@ -402,7 +402,7 @@ object Upgrade extends SparkSessionWrapper {
           val failMsg = s"UPGRADE FAILED: Backup could not complete as expected!\n${e.getMessage}"
           logger.log(Level.ERROR, failMsg)
           upgradeStatus.append(
-            UpgradeReport(config.databaseName, "VARIOUS", Some(failMsg), stepMsg, failUpgrade = true)
+            UpgradeReport(config.databaseName, "VARIOUS", Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
           )
       }
 
@@ -442,7 +442,7 @@ object Upgrade extends SparkSessionWrapper {
           val errorMsg = s"UPGRADE FAILED: pipeline_report upgrade failed.\nAttempting to restore " +
             s"to version $pipReportLatestVersion\nError message below\n${e.getMessage}"
           upgradeStatus.append(
-            UpgradeReport(config.databaseName, "pipeline_report", Some(errorMsg),
+            UpgradeReport(config.databaseName, "pipeline_report", Some(PipelineFunctions.appendStackStrace(e, errorMsg)),
               Some("Step 1: Upgrade pipeline_report"), failUpgrade = true)
           )
       }
@@ -505,7 +505,7 @@ object Upgrade extends SparkSessionWrapper {
           val errorMsg = s"ERROR upgrading costing tables: ${e.getMessage}"
           logger.log(Level.INFO, errorMsg)
           upgradeStatus.append(
-            UpgradeReport(config.databaseName, "instanceDetails", Some(errorMsg), stepMsg, failUpgrade = true)
+            UpgradeReport(config.databaseName, "instanceDetails", Some(PipelineFunctions.appendStackStrace(e, errorMsg)), stepMsg, failUpgrade = true)
           )
       }
 
@@ -537,7 +537,7 @@ object Upgrade extends SparkSessionWrapper {
             val errMsg = s"audit_log_raw_events table was found at ${auditLogRawTarget.tableLocation} but the " +
               s"table upgrade failed. CAUSE: ${e.getMessage}"
             upgradeStatus.append(
-              UpgradeReport(config.databaseName, "audit_log_raw_events", Some(errMsg), stepMsg, failUpgrade = true)
+              UpgradeReport(config.databaseName, "audit_log_raw_events", Some(PipelineFunctions.appendStackStrace(e, errMsg)), stepMsg, failUpgrade = true)
             )
         }
       } else { // either not azure and/or table does not exist
@@ -577,7 +577,7 @@ object Upgrade extends SparkSessionWrapper {
             upgradeStatus.append(upgradeReport)
           case e: Throwable =>
             upgradeStatus.append(
-              UpgradeReport(config.databaseName, target.name, Some(e.getMessage), stepMsg)
+              UpgradeReport(config.databaseName, target.name, Some(PipelineFunctions.appendStackStrace(e, e.getMessage)), stepMsg)
             )
         }
       })
@@ -611,6 +611,8 @@ object Upgrade extends SparkSessionWrapper {
 
         poolsSnapDF
           .withColumn("default_tags", SchemaTools.structToMap(poolsSnapDF, "default_tags"))
+          .withColumn(s"aws_attributes", SchemaTools.structToMap(poolsSnapDF, s"aws_attributes"))
+          .withColumn(s"azure_attributes", SchemaTools.structToMap(poolsSnapDF, s"azure_attributes"))
           .repartition('organization_id)
           .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
           .partitionBy("organization_id")
@@ -622,7 +624,7 @@ object Upgrade extends SparkSessionWrapper {
       } catch {
         case e: Throwable =>
           upgradeStatus.append(
-            UpgradeReport(config.databaseName, "*_snapshot_bronze", Some(e.getMessage), stepMsg, failUpgrade = true)
+            UpgradeReport(config.databaseName, "*_snapshot_bronze", Some(PipelineFunctions.appendStackStrace(e)), stepMsg, failUpgrade = true)
           )
       }
 
@@ -654,7 +656,7 @@ object Upgrade extends SparkSessionWrapper {
                 upgradeStatus.append(upgradeReport)
               case e: Throwable =>
                 upgradeStatus.append(
-                  UpgradeReport(config.databaseName, target.name, Some(e.getMessage), stepMsg)
+                  UpgradeReport(config.databaseName, target.name, Some(PipelineFunctions.appendStackStrace(e)), stepMsg)
                 )
             }
           })
@@ -695,7 +697,7 @@ object Upgrade extends SparkSessionWrapper {
         } catch {
           case e: Throwable => {
             upgradeStatus.append(
-              UpgradeReport(target.databaseName, target.name, Some(e.getMessage), stepMsg)
+              UpgradeReport(target.databaseName, target.name, Some(PipelineFunctions.appendStackStrace(e)), stepMsg)
             )
           }
         }
@@ -738,7 +740,7 @@ object Upgrade extends SparkSessionWrapper {
       } catch {
         case e: Throwable =>
           upgradeStatus.append(
-            UpgradeReport(config.databaseName, "pipeline_report", Some(e.getMessage), stepMsg, failUpgrade = true)
+            UpgradeReport(config.databaseName, "pipeline_report", Some(PipelineFunctions.appendStackStrace(e)), stepMsg, failUpgrade = true)
           )
       }
       verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, snapDir)
@@ -791,11 +793,8 @@ object Upgrade extends SparkSessionWrapper {
         })
       } catch {
         case e: Throwable =>
-          val sw = new StringWriter
-          e.printStackTrace(new PrintWriter(sw))
-          logger.error(sw.toString)
           upgradeStatus.append(
-            UpgradeReport(config.databaseName, "SILVER TARGETS", Some(e.getMessage + sw.toString), stepMsg, failUpgrade = true)
+            UpgradeReport(config.databaseName, "SILVER TARGETS", Some(PipelineFunctions.appendStackStrace(e)), stepMsg, failUpgrade = true)
           )
       }
 
@@ -846,11 +845,8 @@ object Upgrade extends SparkSessionWrapper {
         })
       } catch {
         case e: Throwable =>
-          val sw = new StringWriter
-          e.printStackTrace(new PrintWriter(sw))
-          logger.error(sw.toString)
           upgradeStatus.append(
-            UpgradeReport(config.databaseName, "GOLD TARGETS", Some(e.getMessage + sw.toString), stepMsg, failUpgrade = true)
+            UpgradeReport(config.databaseName, "GOLD TARGETS", Some(PipelineFunctions.appendStackStrace(e)), stepMsg, failUpgrade = true)
           )
       }
 

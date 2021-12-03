@@ -9,6 +9,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
+import java.io.{PrintWriter, StringWriter}
 import java.net.URI
 
 object PipelineFunctions {
@@ -287,6 +288,14 @@ object PipelineFunctions {
           logger.log(Level.WARN, s"Failed trying to set $k", e)
       }
     }
+  }
+
+  def appendStackStrace(e: Throwable, customMsg: String = ""): String = {
+    val sw = new StringWriter
+    sw.append(customMsg + "\n")
+    sw.append(e.getMessage + "\n")
+    e.printStackTrace(new PrintWriter(sw))
+    sw.toString
   }
 
   /**

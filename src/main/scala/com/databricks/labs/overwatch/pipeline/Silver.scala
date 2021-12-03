@@ -143,7 +143,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     sparkEventsTarget.asIncrementalDF(executorsModule, sparkEventsTarget.incrementalColumns: _*),
     Seq(executor(
       sparkEventsTarget.asIncrementalDF(executorsModule, 30, sparkEventsTarget.incrementalColumns: _*),
-      executorsModule.fromTime, executorsModule.untilTime
+      executorsModule.fromTime
     )),
     append(SilverTargets.executorsTarget)
   )
@@ -217,15 +217,13 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.tasksTarget)
   )
 
-  lazy private[overwatch] val jobStatusModule = Module(2010, "Silver_JobsStatus", this, Array(1004))
+  lazy private[overwatch] val jobStatusModule = Module(2010, "Silver_JobsStatus", this, Array(1001, 1004))
   lazy private val appendJobStatusProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(
       dbJobsStatusSummary(
-        BronzeTargets.jobsSnapshotTarget.asDF,
-        config.cloudProvider,
+        BronzeTargets.jobsSnapshotTarget,
         jobStatusModule.isFirstRun,
-        jobStatusModule.untilTime
       )),
     append(SilverTargets.dbJobsStatusTarget)
   )
@@ -245,17 +243,17 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.dbJobRunsTarget)
   )
 
-  lazy private[overwatch] val poolsSpecModule = Module(2009, "Silver_PoolsSpec", this, Array(1004))
+  lazy private[overwatch] val poolsSpecModule = Module(2009, "Silver_PoolsSpec", this, Array(1003, 1004))
   lazy private val appendPoolsSpecProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(poolsSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(buildPoolsSpec(
       BronzeTargets.poolsSnapshotTarget.asDF,
-      SilverTargets.poolsSpecTarget.asDF
+      SilverTargets.poolsSpecTarget.exists(dataValidation = true)
     )),
     append(SilverTargets.poolsSpecTarget)
   )
 
-  lazy private[overwatch] val clusterSpecModule = Module(2014, "Silver_ClusterSpec", this, Array(1004))
+  lazy private[overwatch] val clusterSpecModule = Module(2014, "Silver_ClusterSpec", this, Array(1002, 1004))
   lazy private val appendClusterSpecProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(

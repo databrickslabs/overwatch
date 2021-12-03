@@ -110,7 +110,7 @@ object Schema extends SparkSessionWrapper {
         StructField("libraries", StringType, nullable = true),
         StructField("run_name", StringType, nullable = true),
         StructField("name", StringType, nullable = true),
-        StructField("timeout_seconds", StringType, nullable = true),
+        StructField("timeout_seconds", LongType, nullable = true),
         StructField("schedule", StringType, nullable = true),
         StructField("notebook_task", StringType, nullable = true),
         StructField("spark_python_task", StringType, nullable = true),
@@ -379,18 +379,29 @@ object Schema extends SparkSessionWrapper {
     StructField("idle_instance_autotermination_minutes",LongType, nullable = true),
     StructField("min_idle_instances",LongType, nullable = true),
     StructField("max_capacity",LongType, nullable = true),
-    StructField("preloaded_spark_versions",StringType, nullable = true),
-    StructField("aws_attributes",
-      StructType(Seq(
-        StructField("availability",StringType, nullable = true),
-        StructField("spot_bid_price_percent",LongType, nullable = true),
-        StructField("zone_id",StringType,nullable = true)
-      )), nullable = true),
-    StructField("azure_attributes",
-      StructType(Seq(
-        StructField("availability",StringType, nullable = true),
-        StructField("spot_bid_max_price",DoubleType, nullable = true)
-      )), nullable = true)
+    StructField("preloaded_spark_versions",ArrayType(StringType, containsNull = true), nullable = true),
+    StructField("aws_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true)
+  ))
+
+  val poolsDeleteSchema: StructType = StructType(Seq(
+    StructField("deleted_by", StringType, nullable = true),
+    StructField("deleted_at_epochMillis", LongType, nullable = true),
+    StructField("deleted_at", TimestampType, nullable = true),
+  ))
+
+  val poolsCreateSchema: StructType = StructType(Seq(
+    StructField("created_by", StringType, nullable = true),
+    StructField("created_at_epochMillis", LongType, nullable = true),
+    StructField("created_at", TimestampType, nullable = true),
+  ))
+
+  val poolsRequestDetails: StructType = StructType(Seq(
+    StructField("requestId",StringType, nullable = true),
+    common("response"),
+    StructField("sessionId",StringType, nullable = true),
+    StructField("sourceIPAddress",StringType, nullable = true),
+    StructField("userAgent",StringType, nullable = true)
   ))
 
   /**
@@ -521,6 +532,25 @@ object Schema extends SparkSessionWrapper {
       StructField("userAgent", StringType, nullable = true),
       StructField("requestId", StringType, nullable = true),
       common("response")
+    )),
+    // poolsGold
+    3009 -> StructType(Seq(
+      StructField("organization_id",StringType, nullable = false),
+      StructField("serviceName",StringType, nullable = true),
+      StructField("actionName",StringType, nullable = true),
+      StructField("timestamp",LongType, nullable = false),
+      StructField("date",DateType, nullable = true),
+      StructField("instance_pool_id",StringType, nullable = false),
+      StructField("instance_pool_name",StringType, nullable = true),
+      StructField("node_type_id",StringType, nullable = true),
+      StructField("idle_instance_autotermination_minutes",LongType, nullable = true),
+      StructField("min_idle_instances",LongType, nullable = true),
+      StructField("max_capacity",LongType, nullable = true),
+      StructField("preloaded_spark_versions",StringType, nullable = true),
+      StructField("azure_attributes",MapType(StringType,StringType, valueContainsNull = true), nullable = true),
+      StructField("create_details", poolsCreateSchema, nullable = true),
+      StructField("delete_details", poolsDeleteSchema, nullable = true),
+      StructField("request_details", poolsRequestDetails, nullable = true)
     )),
     // sparkJob
     3010 -> StructType(Seq(

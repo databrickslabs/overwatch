@@ -157,27 +157,34 @@ object SchemaTools extends SparkSessionWrapper {
     val removeEmptyKeys = udf((m: Map[String, String]) => m.filterNot(_._2 == null))
 
     val dfFlatColumnNames = getAllColumnNames(df.schema)
-    if (dfFlatColumnNames.exists(_.startsWith(colToConvert))) {
-      val schema = df.select(s"${colToConvert}.*").schema
-      val mapCols = collection.mutable.LinkedHashSet[Column]()
-      schema.fields.foreach(field => {
-        val kRaw = field.name.trim
-        val k = if (kRaw.isEmpty || kRaw == "") {
-          val errMsg = s"SCHEMA WARNING: Column $colToConvert is being converted to a map but has a null key value. " +
-            s"This key value will be replaced with a 'null_<random_string>' but should be corrected."
-          logger.log(Level.WARN, errMsg)
-          println(errMsg)
-          s"null_${randomString(Some(42L), 6)}"
-        } else kRaw
-        mapCols.add(lit(k).cast("string"))
-        mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
-      })
-      val newRawMap = map(mapCols.toSeq: _*)
-      if (dropEmptyKeys) {
-        when(newRawMap.isNull, lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)))
-          .otherwise(removeEmptyKeys(newRawMap)).alias(mapColName)
-      } else newRawMap.alias(mapColName)
-    } else {
+    if (dfFlatColumnNames.exists(_.startsWith(colToConvert))) { // if column exists within schema
+      df.select(colToConvert).schema.fields.head.dataType.typeName match {
+        case "struct" =>
+          val schema = df.select(s"${colToConvert}.*").schema
+          val mapCols = collection.mutable.LinkedHashSet[Column]()
+          schema.fields.foreach(field => {
+            val kRaw = field.name.trim
+            val k = if (kRaw.isEmpty || kRaw == "") {
+              val errMsg = s"SCHEMA WARNING: Column $colToConvert is being converted to a map but has a null key value. " +
+                s"This key value will be replaced with a 'null_<random_string>' but should be corrected."
+              logger.log(Level.WARN, errMsg)
+              println(errMsg)
+              s"null_${randomString(Some(42L), 6)}"
+            } else kRaw
+            mapCols.add(lit(k).cast("string"))
+            mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
+          })
+          val newRawMap = map(mapCols.toSeq: _*)
+          if (dropEmptyKeys) {
+            when(newRawMap.isNull, lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)))
+              .otherwise(removeEmptyKeys(newRawMap)).alias(mapColName)
+          } else newRawMap.alias(mapColName)
+        case "null" =>
+          lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
+        case x =>
+          throw new Exception(s"function structToMap, columnToConvert must be of type struct but found $x instead")
+      }
+    } else { // colToConvert doesn't exist within the schema return null map type
       lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
     }
   }
@@ -197,6 +204,7 @@ object SchemaTools extends SparkSessionWrapper {
   //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
   //  UPDATE: This has been handled with spark.conf.get("spark.sql.caseSensitive") but needs to be tested on structs
   // TODO -- throw exception if the resulting string is empty
+
   /**
    * Remove special characters from the field name
    *

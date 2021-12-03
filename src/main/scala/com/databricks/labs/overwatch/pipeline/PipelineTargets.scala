@@ -266,7 +266,6 @@ abstract class PipelineTargets(config: Config) {
       name = "pools_silver",
       _keys = Array("instance_pool_id", "timestamp"),
       config,
-      _mode = WriteMode.overwrite,
       incrementalColumns = Array("timestamp"),
       statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
       partitionBy = Seq("organization_id")
@@ -274,7 +273,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable(
       name = "job_status_silver",
-      _keys = Array("timestamp", "jobId"),
+      _keys = Array("timestamp", "jobId", "actionName", "requestId"),
       config,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -324,7 +323,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val jobTarget: PipelineTable = PipelineTable(
       name = "job_gold",
-      _keys = Array("job_id", "unixTimeMS"),
+      _keys = Array("job_id", "unixTimeMS", "action", "request_id"),
       config,
       incrementalColumns = Array("unixTimeMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")

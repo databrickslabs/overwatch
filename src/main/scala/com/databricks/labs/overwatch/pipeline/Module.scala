@@ -312,22 +312,23 @@ class Module(
       newState
     } catch {
       case e: ApiCallEmptyResponse =>
-        noNewDataHandler(e.apiCallDetail, Level.ERROR, allowModuleProgression = e.allowModuleProgression)
+        noNewDataHandler(PipelineFunctions.appendStackStrace(e, e.apiCallDetail), Level.ERROR, allowModuleProgression = e.allowModuleProgression)
       case e: ApiCallFailure if e.failPipeline =>
-        fail(e.msg)
+        fail(PipelineFunctions.appendStackStrace(e, e.msg))
       case e: FailedModuleException =>
         val errMessage = s"FAILED: $moduleId-$moduleName Module"
         logger.log(Level.ERROR, errMessage, e)
-        failWithRollback(e.target, s"$errMessage\n${e.getMessage}")
+        failWithRollback(e.target, PipelineFunctions.appendStackStrace(e, errMessage))
       case e: NoNewDataException =>
         // EMPTY prefix gets prepended in the errorHandler
-        val errMessage = s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
+        val customMsg = s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
           s"module will not progress until new data is received by this module.\n " +
-          s"Module Dependencies: ${moduleDependencies.mkString(", ")}\n" + e.getMessage
+          s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        val errMessage = PipelineFunctions.appendStackStrace(e, customMsg)
         logger.log(Level.ERROR, errMessage, e)
         noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
       case e: Throwable =>
-        val msg = s"$moduleName FAILED -->\nMessage: ${e.getMessage}"
+        val msg = PipelineFunctions.appendStackStrace(e, s"$moduleName FAILED -->\n")
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     }

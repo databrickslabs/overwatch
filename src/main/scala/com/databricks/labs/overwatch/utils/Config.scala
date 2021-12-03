@@ -143,7 +143,6 @@ class Config() {
       "spark.databricks.delta.optimizeWrite.binSize" ->
         value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
       "spark.sql.caseSensitive" -> "false",
-      "spark.databricks.delta.commitInfo.userMetadata" -> runID,
       "spark.databricks.delta.schema.autoMerge.enabled" -> "true"
     )
     _initialSparkConf = value ++ manualOverrides

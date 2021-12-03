@@ -395,8 +395,12 @@ object Helpers extends SparkSessionWrapper {
     cloneDetailsPar.map(cloneSpec => {
       val baseCloneStatement = s"CREATE OR REPLACE TABLE delta.`${cloneSpec.target}` ${cloneSpec.cloneLevel} CLONE " +
         s"delta.`${cloneSpec.source}`"
-      val temporalCloneStatement = s"$baseCloneStatement TIMESTAMP AS OF '${cloneSpec.asOfTS.get}'"
-      val stmt = if (cloneSpec.asOfTS.isEmpty) baseCloneStatement else temporalCloneStatement
+      val stmt = if (cloneSpec.asOfTS.isEmpty) { // asofTS empty
+        baseCloneStatement
+      } else { // asofTS provided
+        val temporalCloneStatement = s"$baseCloneStatement TIMESTAMP AS OF '${cloneSpec.asOfTS.get}'"
+        temporalCloneStatement
+      }
       logger.log(Level.INFO, stmt)
       try {
         spark.sql(stmt)
