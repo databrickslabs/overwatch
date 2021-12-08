@@ -17,6 +17,17 @@ is working on the fix.
 AnalysisException: Found duplicate column(s) in the data schema: `datasourceid`
 ```
 
+### UPDATE - Dec 8 2021
+The issue has been resolved through a Databricks Pull Request and will be deployed in the next deployment cycle.
+A handler has been added to the Overwatch code to handle this and a [PR](https://github.com/databrickslabs/overwatch/pull/280) 
+has been raised to close this issue. I fully expect for the **patch release to be available tomorrow Dec 9 in Maven**.
+If you are affected by this, you may swap the Maven JAR file with the latest version and resume your job 
+and the issue should be cleared up. 
+
+If this notice is removed when you check back, you know the release has made it to Maven and is available for upgrade. 
+
+Thanks for your patience through this.
+
 ## Project Overview
 
 Overwatch was built to enable Databricks' customers, employees, and partners to quickly / easily understand 
