@@ -242,7 +242,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .selectExpr("*", "properties.*").drop("properties")
 
 
-      auditRawLand.asDF
+      val baselineAuditLogs = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
@@ -255,6 +255,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("userIdentity", structFromJson(schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
         .withColumn("requestParams", structFromJson(schemaBuilders, "requestParams"))
+
+      PipelineFunctions.cleanseCorruptAuditLogs(spark, baselineAuditLogs)
         .withColumn("response", structFromJson(schemaBuilders, "response"))
         .drop("logId")
 
@@ -266,7 +268,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(Helpers.pathExists)
 
       if (datesGlob.nonEmpty) {
-        val rawDF = spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        val rawDF = PipelineFunctions
+          .cleanseCorruptAuditLogs(spark, spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*))
+
         val baseDF = if (auditLogConfig.auditLogFormat == "json") rawDF else {
           val rawDFWRPJsonified = rawDF
             .withColumn("requestParams", to_json('requestParams))
