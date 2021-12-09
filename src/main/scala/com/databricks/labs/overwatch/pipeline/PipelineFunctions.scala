@@ -246,12 +246,12 @@ object PipelineFunctions {
   def cleanseCorruptAuditLogs(spark: SparkSession, df: DataFrame): DataFrame = {
     import spark.implicits._
     val flatFieldNames = SchemaTools.getAllColumnNames(df.select(col("requestParams")).schema)
-    if (flatFieldNames.contains("requestParams.DataSourceId")) {
+    val corruptedNames = Array("requestParams.DataSourceId", "requestParams.DashboardId", "requestParams.AlertId")
+    if (corruptedNames.length != corruptedNames.diff(flatFieldNames).length) { // df has at least one of the corrupted names
       logger.warn("Handling corrupted source audit log field requestParams.DataSourceId")
-      val corruptedNames = Array("requestParams.DataSourceId", "requestParams.DashboardId", "requestParams.AlertId")
-      val rpFlatFields = flatFieldNames
+      spark.conf.set("spark.sql.caseSensitive", "true")
+    val rpFlatFields = flatFieldNames
         .filterNot(fName => corruptedNames.contains(fName))
-//        .filterNot(fName => fName == "requestParams.DataSourceId")
 
       val cleanRPFields = rpFlatFields.map {
         case "requestParams.dataSourceId" =>

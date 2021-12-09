@@ -339,16 +339,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
         s"was found in the following locations: ${datesGlob.mkString(", ")}"
 
       if (datesGlob.nonEmpty) {
-        val cleanRawDF = try {
+        val rawDF = try {
           spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
-        } catch {
+        } catch { // corrupted audit logs with duplicate columns in the source
           case e: AnalysisException if e.message.contains("Found duplicate column(s) in the data schema") =>
             spark.conf.set("spark.sql.caseSensitive", "true")
-            val rawDF = spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
-            PipelineFunctions.cleanseCorruptAuditLogs(spark, rawDF)
+            spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
         }
-
-        if (cleanRawDF.isEmpty) throw new Exception(auditLogsFailureMsg)
+        // clean corrupted source audit logs even when there is only one of the duplicate columns in the source
+        // but still will conflict with the existing columns in the target
+        val cleanRawDF = PipelineFunctions.cleanseCorruptAuditLogs(spark, rawDF)
 
         val baseDF = if (auditLogConfig.auditLogFormat == "json") cleanRawDF else {
           val rawDFWRPJsonified = cleanRawDF
