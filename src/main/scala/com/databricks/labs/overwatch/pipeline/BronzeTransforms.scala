@@ -13,7 +13,7 @@ import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, Event
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
 import java.time.{Duration, LocalDateTime}
@@ -339,13 +339,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
         s"was found in the following locations: ${datesGlob.mkString(", ")}"
 
       if (datesGlob.nonEmpty) {
-        val rawDF = PipelineFunctions
-          .cleanseCorruptAuditLogs(spark, spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*))
+        val cleanRawDF = try {
+          spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        } catch {
+          case e: AnalysisException if e.message.contains("Found duplicate column(s) in the data schema") =>
+            spark.conf.set("spark.sql.caseSensitive", "true")
+            val rawDF = spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+            PipelineFunctions.cleanseCorruptAuditLogs(spark, rawDF)
+        }
 
-        if (rawDF.isEmpty) throw new Exception(auditLogsFailureMsg)
+        if (cleanRawDF.isEmpty) throw new Exception(auditLogsFailureMsg)
 
-        val baseDF = if (auditLogConfig.auditLogFormat == "json") rawDF else {
-          val rawDFWRPJsonified = rawDF
+        val baseDF = if (auditLogConfig.auditLogFormat == "json") cleanRawDF else {
+          val rawDFWRPJsonified = cleanRawDF
             .withColumn("requestParams", to_json('requestParams))
           rawDFWRPJsonified
             .withColumn("requestParams", structFromJson(spark, rawDFWRPJsonified, "requestParams"))
