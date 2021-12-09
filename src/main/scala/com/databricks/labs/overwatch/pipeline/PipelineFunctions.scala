@@ -243,6 +243,28 @@ object PipelineFunctions {
     }
   }
 
+  def cleanseCorruptAuditLogs(spark: SparkSession, df: DataFrame): DataFrame = {
+    import spark.implicits._
+    val flatFieldNames = SchemaTools.getAllColumnNames(df.select(col("requestParams")).schema)
+    if (flatFieldNames.contains("requestParams.DataSourceId")) {
+      logger.warn("Handling corrupted source audit log field requestParams.DataSourceId")
+      spark.conf.set("spark.sql.caseSensitive", "true")
+      val rpFlatFields = flatFieldNames
+        .filterNot(fName => fName == "requestParams.DataSourceId")
+
+      val cleanRPFields = rpFlatFields.map(fName => {
+        if (fName == "requestParams.dataSourceId") {
+          when('actionName === "executeFastQuery", $"requestParams.DataSourceId")
+            .when('actionName === "executeAdhocQuery", $"requestParams.dataSourceId")
+            .otherwise(lit(null).cast("string"))
+          .alias("dataSourceId")
+        } else col(fName)
+      })
+
+      df.withColumn("requestParams", struct(cleanRPFields: _*))
+    } else df
+  }
+
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
   //  currently filters with nested columns aren't supported
   def withIncrementalFilters(
