@@ -228,20 +228,39 @@ object PipelineFunctions {
   def cleanseCorruptAuditLogs(spark: SparkSession, df: DataFrame): DataFrame = {
     import spark.implicits._
     val flatFieldNames = SchemaTools.getAllColumnNames(df.select(col("requestParams")).schema)
-    if (flatFieldNames.contains("requestParams.DataSourceId")) {
+    val corruptedNames = Array("requestParams.DataSourceId", "requestParams.DashboardId", "requestParams.AlertId")
+    if (corruptedNames.length != corruptedNames.diff(flatFieldNames).length) { // df has at least one of the corrupted names
       logger.warn("Handling corrupted source audit log field requestParams.DataSourceId")
       spark.conf.set("spark.sql.caseSensitive", "true")
-      val rpFlatFields = flatFieldNames
-        .filterNot(fName => fName == "requestParams.DataSourceId")
+    val rpFlatFields = flatFieldNames
+        .filterNot(fName => corruptedNames.contains(fName))
 
-      val cleanRPFields = rpFlatFields.map(fName => {
-        if (fName == "requestParams.dataSourceId") {
-          when('actionName === "executeFastQuery", $"requestParams.DataSourceId")
-            .when('actionName === "executeAdhocQuery", $"requestParams.dataSourceId")
-            .otherwise(lit(null).cast("string"))
-          .alias("dataSourceId")
-        } else col(fName)
-      })
+      val cleanRPFields = rpFlatFields.map {
+        case "requestParams.dataSourceId" =>
+          if (flatFieldNames.contains("requestParams.DataSourceId")) {
+            when('actionName === "executeFastQuery", $"requestParams.DataSourceId")
+              .when('actionName === "executeAdhocQuery", $"requestParams.dataSourceId")
+              .otherwise(lit(null).cast("string"))
+              .alias("dataSourceId")
+          } else $"requestParams.dataSourceId"
+        case "requestParams.dashboardId" =>
+          if (flatFieldNames.contains("requestParams.DashboardId")) {
+            when(
+              'actionName.isin("createRefreshSchedule", "deleteRefreshSchedule", "updateRefreshSchedule"),
+              $"requestParams.DashboardId"
+            ).otherwise($"requestParams.dashboardId")
+              .alias("dashboardId")
+          } else $"requestParams.dashboardId"
+        case "requestParams.alertId" =>
+          if (flatFieldNames.contains("requestParams.AlertId")) {
+            when(
+              'actionName.isin("createRefreshSchedule", "deleteRefreshSchedule", "updateRefreshSchedule"),
+              $"requestParams.AlertId"
+            ).otherwise($"requestParams.alertId")
+              .alias("alertId")
+          } else $"requestParams.alertId"
+        case fName => col(fName)
+      }
 
       df.withColumn("requestParams", struct(cleanRPFields: _*))
     } else df
