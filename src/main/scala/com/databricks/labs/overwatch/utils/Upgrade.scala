@@ -481,6 +481,10 @@ object Upgrade extends SparkSessionWrapper {
           .partitionBy("organization_id")
           .save(dbuCostLocation)
 
+        // create the metastore entry
+        val b = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
+        b.database.registerTarget(b.BronzeTargets.dbuCostDetail)
+
         upgradeStatus.append(
           UpgradeReport(config.databaseName, "dbuCostDetails", Some("SUCCESS"), stepMsg)
         )
