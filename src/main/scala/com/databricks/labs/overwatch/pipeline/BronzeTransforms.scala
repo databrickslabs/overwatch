@@ -12,7 +12,7 @@ import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, Event
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
 import java.time.{Duration, LocalDateTime}
@@ -242,7 +242,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .selectExpr("*", "properties.*").drop("properties")
 
 
-      auditRawLand.asDF
+      val baselineAuditLogs = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
@@ -255,6 +255,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("userIdentity", structFromJson(schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
         .withColumn("requestParams", structFromJson(schemaBuilders, "requestParams"))
+
+      PipelineFunctions.cleanseCorruptAuditLogs(spark, baselineAuditLogs)
         .withColumn("response", structFromJson(schemaBuilders, "response"))
         .drop("logId")
 
@@ -266,9 +268,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(Helpers.pathExists)
 
       if (datesGlob.nonEmpty) {
-        val rawDF = spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
-        val baseDF = if (auditLogConfig.auditLogFormat == "json") rawDF else {
-          val rawDFWRPJsonified = rawDF
+        val rawDF = try {
+          spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        } catch { // corrupted audit logs with duplicate columns in the source
+          case e: AnalysisException if e.message.contains("Found duplicate column(s) in the data schema") =>
+            spark.conf.set("spark.sql.caseSensitive", "true")
+            spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        }
+        // clean corrupted source audit logs even when there is only one of the duplicate columns in the source
+        // but still will conflict with the existing columns in the target
+        val cleanRawDF = PipelineFunctions.cleanseCorruptAuditLogs(spark, rawDF)
+
+        val baseDF = if (auditLogConfig.auditLogFormat == "json") cleanRawDF else {
+          val rawDFWRPJsonified = cleanRawDF
             .withColumn("requestParams", to_json('requestParams))
           rawDFWRPJsonified
             .withColumn("requestParams", structFromJson(rawDFWRPJsonified, "requestParams"))

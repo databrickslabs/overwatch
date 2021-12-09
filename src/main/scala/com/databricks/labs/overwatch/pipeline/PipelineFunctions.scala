@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.Frequency.Frequency
-import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter}
+import com.databricks.labs.overwatch.utils.{Config, IncrementalFilter, SchemaTools}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -223,6 +223,47 @@ object PipelineFunctions {
       case (rawDF, filter) =>
         rawDF.filter(filter)
     }
+  }
+
+  def cleanseCorruptAuditLogs(spark: SparkSession, df: DataFrame): DataFrame = {
+    import spark.implicits._
+    val flatFieldNames = SchemaTools.getAllColumnNames(df.select(col("requestParams")).schema)
+    val corruptedNames = Array("requestParams.DataSourceId", "requestParams.DashboardId", "requestParams.AlertId")
+    if (corruptedNames.length != corruptedNames.diff(flatFieldNames).length) { // df has at least one of the corrupted names
+      logger.warn("Handling corrupted source audit log field requestParams.DataSourceId")
+      spark.conf.set("spark.sql.caseSensitive", "true")
+    val rpFlatFields = flatFieldNames
+        .filterNot(fName => corruptedNames.contains(fName))
+
+      val cleanRPFields = rpFlatFields.map {
+        case "requestParams.dataSourceId" =>
+          if (flatFieldNames.contains("requestParams.DataSourceId")) {
+            when('actionName === "executeFastQuery", $"requestParams.DataSourceId")
+              .when('actionName === "executeAdhocQuery", $"requestParams.dataSourceId")
+              .otherwise(lit(null).cast("string"))
+              .alias("dataSourceId")
+          } else $"requestParams.dataSourceId"
+        case "requestParams.dashboardId" =>
+          if (flatFieldNames.contains("requestParams.DashboardId")) {
+            when(
+              'actionName.isin("createRefreshSchedule", "deleteRefreshSchedule", "updateRefreshSchedule"),
+              $"requestParams.DashboardId"
+            ).otherwise($"requestParams.dashboardId")
+              .alias("dashboardId")
+          } else $"requestParams.dashboardId"
+        case "requestParams.alertId" =>
+          if (flatFieldNames.contains("requestParams.AlertId")) {
+            when(
+              'actionName.isin("createRefreshSchedule", "deleteRefreshSchedule", "updateRefreshSchedule"),
+              $"requestParams.AlertId"
+            ).otherwise($"requestParams.alertId")
+              .alias("alertId")
+          } else $"requestParams.alertId"
+        case fName => col(fName)
+      }
+
+      df.withColumn("requestParams", struct(cleanRPFields: _*))
+    } else df
   }
 
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
