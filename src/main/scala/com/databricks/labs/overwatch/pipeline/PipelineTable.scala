@@ -270,14 +270,11 @@ case class PipelineTable(
                 s"${partitionBy.mkString(", ")}"
               throw new IncompleteFilterException(errmsg)
             }
-            // If Overwatch runs > 1X / day the date filter must be inclusive or filter will omit all data since
-            // the following cannot be true
-            // date >= today && date < today
-            // The above right-side exclusive filter is created from the filter generator thus one tick must be
-            // added to the right (end) date
-            val untilDate = if (module.fromTime.asLocalDateTime.toLocalDate == module.untilTime.asLocalDateTime.toLocalDate) {
-              PipelineFunctions.addNTicks(module.untilTime.asColumnTS, 1, DateType)
-            } else module.untilTime.asColumnTS
+
+            // Nothing in Overwatch is incremental at the date level thus until date should always be inclusive
+            // so add 1 day to follow the rule value >= date && value < date
+            // but still keep it inclusive
+            val untilDate = PipelineFunctions.addNTicks(module.untilTime.asColumnTS, 1, DateType)
             IncrementalFilter(
               field,
               date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
@@ -286,8 +283,8 @@ case class PipelineTable(
           }
           case dt: TimestampType => {
             val start = if (additionalLagDays > 0) {
-              val epochMillis = module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)
-              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000).cast(dt)
+              val epochMillis = module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)
+              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000.0).cast(dt)
             } else {
               module.fromTime.asColumnTS
             }
@@ -299,7 +296,7 @@ case class PipelineTable(
           }
           case dt: LongType => {
             val start = if (additionalLagDays > 0) {
-              lit(module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000)).cast(dt)
+              lit(module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)).cast(dt)
             } else {
               lit(module.fromTime.asUnixTimeMilli)
             }
