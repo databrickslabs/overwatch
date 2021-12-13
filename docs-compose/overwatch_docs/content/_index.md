@@ -2,32 +2,6 @@
 title: "Welcome To OverWatch"
 ---
 
-## ALERT -- PARTIAL OUTAGE - Dec 7 2021
-
-Please be aware that all workspaces using DBSQL are at risk of Overwatch run failure. If you see the following error 
-please **pause your Overwatch job** until the fix has been made.
-
-**CAUSE**
-One of the Databricks SQL Services published a corrupt schema to the audit logs. This is being repaired, and the audit 
-logs will be re-published (or another work around will be communicated) as soon as possible. Databricks engineering 
-is working on the fix.
-
-**ERROR**
-```
-AnalysisException: Found duplicate column(s) in the data schema: `datasourceid`
-```
-
-### UPDATE - Dec 8 2021
-The issue has been resolved through a Databricks Pull Request and will be deployed in the next deployment cycle.
-A handler has been added to the Overwatch code to handle this and a [PR](https://github.com/databrickslabs/overwatch/pull/280) 
-has been raised to close this issue. I fully expect for the **patch release to be available tomorrow Dec 9 in Maven**.
-If you are affected by this, you may swap the Maven JAR file with the latest version and resume your job 
-and the issue should be cleared up. 
-
-If this notice is removed when you check back, you know the release has made it to Maven and is available for upgrade. 
-
-Thanks for your patience through this.
-
 ## Project Overview
 
 Overwatch was built to enable Databricks' customers, employees, and partners to quickly / easily understand 
