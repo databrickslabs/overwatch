@@ -116,7 +116,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   val jrcpSparkOverrides = Map(
     "spark.sql.autoBroadcastJoinThreshold" -> "-1"
   )
-  lazy private[overwatch] val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact", this, Array(3001, 3003, 3005, 3010, 3012), 3.0)
+  lazy private[overwatch] val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact", this, Array(3001, 3003, 3005), 3.0)
     .withSparkOverrides(jrcpSparkOverrides)
   //Incremental current spark job and tasks DFs plus 2 days for lag coverage
   lazy private val appendJobRunCostPotentialFactProcess = ETLDefinition(

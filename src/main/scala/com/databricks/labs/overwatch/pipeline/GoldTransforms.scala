@@ -591,7 +591,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     // GET UTILIZATION BY KEY
     // IF incremental spark events are present calculate utilization, otherwise just return with NULLS
     // Spark events are commonly missing if no clusters are logging and/or in test environments
-    if (!sparkJobLag2D.isEmpty) {
+    if (!sparkJobLag2D.isEmpty && !sparkTaskLag2D.isEmpty) {
       val sparkJobMini = sparkJobLag2D
         .select('organization_id, 'date, 'spark_context_id, 'job_group_id,
           'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
