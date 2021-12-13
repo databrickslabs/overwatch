@@ -10,7 +10,6 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
 import scalaj.http.HttpResponse
 
-import java.net.URI
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDate, LocalDateTime, ZonedDateTime}

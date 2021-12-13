@@ -1,20 +1,17 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions.getPipelineTarget
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, PipelineFunctions, PipelineTable, Silver}
+import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils.Helpers.fastDrop
-import io.delta.tables.DeltaTable
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 
-import java.io.{PrintWriter, StringWriter}
-import scala.collection.concurrent
-import collection.JavaConverters._
 import java.util.concurrent.{ConcurrentHashMap, ForkJoinPool}
+import scala.collection.JavaConverters._
+import scala.collection.concurrent
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.ForkJoinTaskSupport
 
