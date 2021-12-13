@@ -870,9 +870,13 @@ object Upgrade extends SparkSessionWrapper {
     logger.log(Level.INFO, cleanupMsg)
     println(cleanupMsg)
     Helpers.fastrm(Array(snapDir))
-    logger.log(Level.INFO, "UPGRADE - Cleanup complete")
+    val cleanupCompleteMsg = "UPGRADE - Cleanup complete"
+    logger.log(Level.INFO, cleanupCompleteMsg)
+    println(cleanupMsg)
     SchemaTools.modifySchemaVersion(overwatchETLDBName, targetSchemaVersion)
-
+    val upgradeFinalizedMsg = "Upgrade Complete & Finalized"
+    logger.log(Level.INFO, upgradeFinalizedMsg)
+    println(upgradeFinalizedMsg)
   }
 
 }
