@@ -368,7 +368,7 @@ class Pipeline(
 
   private[overwatch] def initiatePostProcessing(): Unit = {
 
-    if (!config.externalizeOptimize) postProcessor.optimize(this, 12)
+    if (!config.externalizeOptimize) postProcessor.optimize(this, Pipeline.OPTIMIZESCALINGCOEF)
     Helpers.fastrm(Array(
       s"/tmp/overwatch/bronze/${config.organizationId}/clusterEventsBatches"
     ))
@@ -469,6 +469,7 @@ object Pipeline {
 
   val systemZoneId: ZoneId = ZoneId.systemDefault()
   val systemZoneOffset: ZoneOffset = systemZoneId.getRules.getOffset(LocalDateTime.now(systemZoneId))
+  private val OPTIMIZESCALINGCOEF = 12
 
   def deriveLocalDate(dtString: String, dtFormat: SimpleDateFormat): LocalDate = {
     dtFormat.parse(dtString).toInstant.atZone((systemZoneId)).toLocalDate

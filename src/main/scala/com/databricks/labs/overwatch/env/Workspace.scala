@@ -140,7 +140,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * @return Seq[WorkspaceDataset]
    */
   def getWorkspaceDatasets: Seq[WorkspaceDataset] = {
-    dbutils.fs.ls(config.etlDataPathPrefix).map(dataset => {
+    dbutils.fs.ls(config.etlDataPathPrefix)
+      .filter(_.isDir)
+      .map(dataset => {
       val path = dataset.path
       val uri = Helpers.getURI(path)
       val name = if(dataset.name.endsWith("/")) dataset.name.dropRight(1) else dataset.name
