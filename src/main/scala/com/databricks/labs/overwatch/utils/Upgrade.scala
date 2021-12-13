@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.pipeline.PipelineFunctions.getPipelineTarge
 import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, PipelineFunctions, PipelineTable, Silver}
 import com.databricks.labs.overwatch.utils.Helpers.fastDrop
 import io.delta.tables.DeltaTable
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -282,6 +283,7 @@ object Upgrade extends SparkSessionWrapper {
         try {
           spark.sql(alterTableStmt)
         } catch {
+          case _: NoSuchObjectException =>
           case e: Throwable =>
             throw new UpgradeException(e.getMessage, target, failUpgrade = true)
         }
@@ -291,6 +293,7 @@ object Upgrade extends SparkSessionWrapper {
         try {
           spark.sql(updateWorkspaceNameStmt)
         } catch {
+          case _: NoSuchObjectException =>
           case e: Throwable =>
             throw new UpgradeException(e.getMessage, target, failUpgrade = true)
         }
