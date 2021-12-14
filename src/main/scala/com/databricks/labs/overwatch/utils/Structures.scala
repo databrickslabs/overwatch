@@ -206,11 +206,11 @@ private[overwatch] class IncompleteFilterException(s: String) extends Exception(
 private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val allowModuleProgression: Boolean) extends Exception(apiCallDetail)
 
 private[overwatch] class ApiCallFailure(
-                                         httpResponse: HttpResponse[String],
+                                         val httpResponse: HttpResponse[String],
                                          apiCallDetail: String,
                                          t: Throwable = null,
                                          debugFlag: Boolean = false
-                                       ) extends Exception {
+                                       ) extends Exception (httpResponse.body) {
   private val logger = Logger.getLogger("ApiCall")
   private val hardFailErrors = Array(401, 404, 407)
   var failPipeline: Boolean = false

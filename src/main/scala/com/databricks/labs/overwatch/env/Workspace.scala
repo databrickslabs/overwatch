@@ -1,9 +1,8 @@
 package com.databricks.labs.overwatch.env
 
-import com.databricks.backend.daemon.dbutils.FileInfo
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
-import com.databricks.labs.overwatch.utils.{ApiEnv, BadConfigException, CloneDetail, CloneReport, Config, Helpers, SparkSessionWrapper, WorkspaceDataset, WorkspaceMetastoreRegistrationReport}
+import com.databricks.labs.overwatch.utils.{ApiCallFailure, ApiEnv, BadConfigException, CloneDetail, CloneReport, Config, Helpers, JsonUtils, SparkSessionWrapper, WorkspaceDataset, WorkspaceMetastoreRegistrationReport}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -22,6 +21,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _database: Database = _
+  private[overwatch] val overwatchRunClusterId = spark.conf.get("spark.databricks.clusterUsageTags.clusterId")
 
   private[overwatch] def database: Database = _database
 
@@ -125,14 +125,42 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
+  private def clusterState(apiEnv: ApiEnv): String = {
+    val endpoint = "clusters/get"
+    val query = Map(
+      "cluster_id" -> overwatchRunClusterId
+    )
+    try {
+      val stateJsonString = ApiCall(endpoint, apiEnv, Some(query)).executeGet().asStrings.head
+      JsonUtils.defaultObjectMapper.readTree(stateJsonString).get("state").asText()
+    } catch {
+      case e: Throwable => {
+        val msg = s"Cluster State Error: Cannot determine state of cluster: $overwatchRunClusterId\n$e"
+        logger.log(Level.ERROR, msg, e)
+        if(config.debugFlag) println(msg)
+        "ERROR"
+      }
+    }
+  }
+
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {
     val endpoint = "clusters/resize"
     val query = Map(
-      "cluster_id" -> spark.conf.get("spark.databricks.clusterUsageTags.clusterId"),
+      "cluster_id" -> overwatchRunClusterId,
       "num_workers" -> numWorkers
     )
 
-    ApiCall(endpoint, apiEnv, Some(query), paginate = false, debugFlag = config.debugFlag).executePost()
+    try {
+      ApiCall(endpoint, apiEnv, Some(query), paginate = false, debugFlag = config.debugFlag).executePost()
+    } catch {
+      case e: ApiCallFailure if e.httpResponse.code == 400 &&
+        e.httpResponse.body.contains("cannot transition from Reconfiguring to Reconfiguring") =>
+        val resizeErrorAttemptMsg = s"The Overwatch cluster cannot resize to $numWorkers nodes at this time " +
+          s"as it is still resizing from a previous module. For smaller workspaces and daily runs " +
+          s"intelligent scaling may not be necessary."
+        if (config.debugFlag) println(resizeErrorAttemptMsg)
+        logger.warn(resizeErrorAttemptMsg)
+    }
   }
 
   /**
