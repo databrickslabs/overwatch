@@ -646,7 +646,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val jobGroupW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.JobGroupID")
     val executionW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.ExecutionID")
-    val principalObjectIDW = Window.partitionBy($"PowerProperties.principalIdpObjectId")
+    val principalObjectIDW = Window.partitionBy('organization_id, $"PowerProperties.principalIdpObjectId")
     val isolationIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBIsolationID")
     val replIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBREPLID")
       .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)

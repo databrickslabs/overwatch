@@ -266,6 +266,7 @@ abstract class PipelineTargets(config: Config) {
       name = "pools_silver",
       _keys = Array("instance_pool_id", "timestamp"),
       config,
+      _mode = WriteMode.merge,
       incrementalColumns = Array("timestamp"),
       statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
       partitionBy = Seq("organization_id")

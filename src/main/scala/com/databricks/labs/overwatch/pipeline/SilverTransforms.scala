@@ -450,7 +450,12 @@ trait SilverTransforms extends SparkSessionWrapper {
                                 poolsSilverTargetHasData: Boolean
                               )(auditIncrementalDF: DataFrame): DataFrame = {
 
-    val lastPoolValue = Window.partitionBy('instance_pool_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val lastPoolValue = Window.partitionBy('organization_id, 'instance_pool_id)
+      .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+    // audit logs semantics for pools are at least once, this is to filter out duplicate publications
+    val exactlyOnceFilterW = Window.partitionBy('organization_id, 'instance_pool_id)
+      .orderBy('timestamp)
 
     val poolsSnapDFUntilCurrent = poolSnapDF
       .verifyMinimumSchema(Schema.poolsSnapMinimumSchema)
@@ -526,6 +531,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('actionName.isin("create", "edit", "delete"))
       .withColumn("instance_pool_id", when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id")).otherwise('instance_pool_id))
       .withColumn("preloaded_spark_versions", get_json_object('preloaded_spark_versions, "$."))
+      .withColumn("rnk", rank().over(exactlyOnceFilterW))
+      .withColumn("rn", row_number().over(exactlyOnceFilterW))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
       .toTSDF("timestamp", "organization_id", "instance_pool_id")
       .lookupWhen(
         poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
@@ -1221,7 +1229,7 @@ trait SilverTransforms extends SparkSessionWrapper {
      * but for now, this is required or multiple records will be created in the fact due to the multiple events.
      * Confirmed that the first event emitted is the correct event as per ES-65402
      */
-    val firstRunSemanticsW = Window.partitionBy('runId).orderBy('timestamp)
+    val firstRunSemanticsW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
 
     // Completes must be >= etlStartTime as it is the driver endpoint
     // All joiners to Completes may be from the past up to N days as defined in the incremental df
