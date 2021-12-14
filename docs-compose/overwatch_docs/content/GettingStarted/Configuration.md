@@ -4,28 +4,24 @@ date: 2020-10-28T11:55:12-04:00
 weight: 2
 ---
 
-The configuration for Overwatch is fairly basic for the initial release but the plan is to open a lot of options
-and make the config much more robust to allow for much more granular control over operations. The ongoing changes
-will be documented here.
-
 ## Configuration Basics
 The Overwatch configuration can be created as a case class of [OverwatchParams](#overwatchparams) or as a json string passed into
 the main class `com.databricks.labs.overwatch.BatchRunner`. When passed in as a json string, it is 
-deserialized into an instance of [OverwatchParams](#overwatchparams). This provides strong validation on the input parameters
+serialized into an instance of [OverwatchParams](#overwatchparams). This provides strong validation on the input parameters
 and strong typing for additional validation options. All configs attempt to be defaulted to a reasonable default
-where possible. If a default is set, passing in a value will simply overwrite the default.
+where possible. If a default is set, passing in a value will overwrite the default.
 
 ## Config Examples
 Below are some configurations examples of building the configuration parameters called *params* which is a variable
 set to contain an instance of the class *OverwatchParams*.
 
 Once the config has been created according to your needs, refer back to the 
-[Getting Started - Run Via Notebook]({{%relref "GettingStarted"%}}#run-via-notebook) or
-[Getting Started - Run Via Main Class]({{%relref "GettingStarted"%}}#run-via-main-class) section to see how it's can be used
+[Getting Started - Run Via Notebook]({{%relref "GettingStarted"%}}#via-a-notebook) or
+[Getting Started - Run Via Main Class]({{%relref "GettingStarted"%}}#via-main-class) section to see how it's can be used
 when executing the Overwatch Run.
 
 {{% notice warning%}}
-The configuration examples below use a data target prefix of */user/hive/warehouse*. It is strongly recommended that
+The configuration examples below use a data target prefix of */user/hive/warehouse*. It is STRONGLY recommended that
 a data target with a prefix other than /user/hive/warehouse be used. Even though the tables are external, any 
 spark database located within the default warehouse will drop all tables (including external) with certain drop database
 commands resulting in permanent data loss. This is default behavior and has nothing to do with Overwatch specifically
@@ -34,27 +30,7 @@ access to this location invokes certain drop database commands, all tables will 
 workspaces.
 {{% /notice %}}
 
-### Simplified Example
-The simplest configuration possible. This is just for testing and likely is not a sufficient configuration for 
-real-world application.
-
-If using Azure you must change the auditLogConfig to the Azure version
-which can be found below in [Azure Example](#azure-example)
-
-```scala
-import com.databricks.labs.overwatch.pipeline.{Initializer, Bronze, Silver, Gold}
-import com.databricks.labs.overwatch.utils._
-private val storagePrefix = "/mnt/overwatch/"
-private val db = "Overwatch_Test"
-private val auditLogConfig = AuditLogConfig(Some(s"${storagePrefix}/workspace_id/audit_logs"))
-private val dataTarget = DataTarget(Some(db), Some(s"${storagePrefix}/workspace_id/${db}.db"), Some(s"${storagePrefix}/global_data"))
-private val tokenSecret = TokenSecret("db_services", "databricks_overwatch")
-private val overwatchModules = "audit,accounts,sparkEvents,jobs,clusters,clusterEvents,notebooks".split(",")
-
-val params = OverwatchParams(auditLogConfig)
-```
-
-### Azure Example (Full)
+### Azure Example
 Azure does require an event hub to be set up and referenced in the config as an 
 [AzureAuditLogEventhubConfig](#azureauditlogeventhubconfig). More details for setting up this Event Hub
 can be found in the [Azure Environment Setup]({{%relref "EnvironmentSetup/azure.md"%}}) page. An example notebook
@@ -62,14 +38,14 @@ can be found [here](/assets/GettingStarted/azure_runner_docs_example.html).
 ```scala
 import com.databricks.labs.overwatch.pipeline.{Initializer, Bronze, Silver, Gold}
 import com.databricks.labs.overwatch.utils._
+private val storagePrefix = /mnt/overwatch_global
 private val dataTarget = DataTarget(
   Some(etlDB), Some(s"${storagePrefix}/${workspaceID}/${etlDB}.db"), Some(s"${storagePrefix}/global_share"),
   Some(consumerDB), Some(s"${storagePrefix}/${workspaceID}/${consumerDB}.db")
 )
 
 private val tokenSecret = TokenSecret(secretsScope, dbPATKey)
-// as of 0.5.0.4 -- previous methods still functional but not recommended
-// use the format exactly replacing "scope" and "key" with the names of the scope and key where your 
+// Use the format exactly replacing "scope" and "key" with the names of the scope and key where your 
 // Event Hub connection string is stored.
 private val ehConnScopeKeyString = "{{secrets/scope/key}}"
 
@@ -80,6 +56,7 @@ private val interactiveDBUPrice = 0.56
 private val automatedDBUPrice = 0.26
 private val DatabricksSQLDBUPrice = 0.22
 private val automatedJobsLightDBUPrice = 0.10
+private val customWorkspaceName = workspaceID // customize this to a custom name if custom workspace_name is desired
 
 val params = OverwatchParams(
   auditLogConfig = AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig)),
@@ -90,11 +67,14 @@ val params = OverwatchParams(
   maxDaysToLoad = maxDaysToLoad,
   databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice, DatabricksSQLDBUPrice, automatedJobsLightDBUPrice),
   primordialDateString = Some(primordialDateString),
-  intelligentScaling = IntelligentScaling(enabled = true, minimumCores = 16, maximumCores = 64, coeff = 1.0)
+  intelligentScaling = IntelligentScaling(enabled = true, minimumCores = 16, maximumCores = 64, coeff = 1.0),
+  workspace_name = Some(customWorkspaceName), // as of 0.6.0
+  externalizeOptimize = false // as of 0.6.0
 )
 ```
 
-**NOTE** The connection string stored in the *ehConnScopeKeyString* above is stored as a secret since it contains a key. 
+**NOTE** The connection string stored in the *ehConnScopeKeyString* above is stored as a secret since it contains 
+sensitive information.
 
 **THIS IS NOT THE KEY** but the actual connection string from the SAS Policy. To find this follow the path in the 
 Azure portal below.
@@ -105,11 +85,12 @@ The connection string should begin with `Endpoint=sb://`. Note that the policy o
 
 ![ConnStringExample](/images/GettingStarted/Azure_EH_ConnString.png)
 
-### AWS Example (Full)
+### AWS Example
 An example notebook can be found [here](/assets/GettingStarted/aws_runner_docs_example.html).
 ```scala
 import com.databricks.labs.overwatch.pipeline.{Initializer, Bronze, Silver, Gold}
 import com.databricks.labs.overwatch.utils._
+private val storagePrefix = /mnt/overwatch_global
 private val dataTarget = DataTarget(
   Some(etlDB), Some(s"${storagePrefix}/${workspaceID}/${etlDB}.db"), Some(s"${storagePrefix}/global_share"),
   Some(consumerDB), Some(s"${storagePrefix}/${workspaceID}/${consumerDB}.db")
@@ -122,6 +103,7 @@ private val interactiveDBUPrice = 0.56
 private val automatedDBUPrice = 0.26
 private val DatabricksSQLDBUPrice = 0.22
 private val automatedJobsLightDBUPrice = 0.10
+private val customWorkspaceName = workspaceID // customize this to a custom name if custom workspace_name is desired
 
 val params = OverwatchParams(
   auditLogConfig = AuditLogConfig(rawAuditPath = Some(auditSourcePath), auditLogFormat = "json"),
@@ -132,24 +114,34 @@ val params = OverwatchParams(
   maxDaysToLoad = maxDaysToLoad,
   databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice, DatabricksSQLDBUPrice, automatedJobsLightDBUPrice),
   primordialDateString = Some(primordialDateString),
-  intelligentScaling = IntelligentScaling(enabled = true, minimumCores = 16, maximumCores = 64, coeff = 1.0)
+  intelligentScaling = IntelligentScaling(enabled = true, minimumCores = 16, maximumCores = 64, coeff = 1.0),
+  workspace_name = Some(customWorkspaceName), // as of 0.6.0
+  externalizeOptimize = false // as of 0.6.0
 )
 ```
+
+### Simplifying the Config
+The simplest configuration possible is one that uses as many defaults as possible.
+A config with all defaults is likely just for testing and not sufficient for real-world application. As such, examples
+for the complete configs are illustrated above. Reference the defaults below to see which ones you may omit. Note
+that if you omit certain configs, their defaults will still be present in the json config.
 
 ### OverwatchParams
 The configuration structure required for Overwatch
 
-Config | Required Override | Default Value | Type | Description
-:--------------------------|:---|:----------|:----------|:--------------------------------------------------
-**auditLogConfig**|Y|NULL|[AuditLogConfig](#auditlogconfig)|Databricks Audit Log delivery information.
-**tokenSecret**|N|Execution Owner's Token|Option[\[TokenSecret\]](#tokensecret)|Secret retrieval information
-**dataTarget**|N|DataTarget("overwatch", "/user/hive/warehouse/{databaseName}.db", "/user/hive/warehouse/{databaseName}.db")|Option[\[DataTarget\]](#datatarget)|What to call the database and where to store it
-**badRecordsPath**|N|/tmp/overwatch/badRecordsPath|Option\[String\]|When reading the log files, where should Overwatch store the records / files that cannot be parsed. Overwatch must have write permissions to this path 
-**overwatchScope**|N|all|Option\[Seq\[String\]\]|List of [modules]({{%relref "GettingStarted/Modules.md"%}}) in scope for the run. It's important to note that there are many co-dependencies. When choosing a module, be sure to also enable it's requisites. If not value provided, all modules will execute.
-**maxDaysToLoad**|N|60|Int|On large, busy workspaces 60 days of data may amount in 10s of TB of raw data. This parameter allows the job to be broken out into several smaller runs.
-**primordialDateString**|N|Today's date minus 60 days, format = "yyyy-mm-dd"|String|Date from which data collection was to begin. This is the earliest date for which data should attempted to be collected.
-**databricksContractPrices**|N|DatabricksContractPrices()|[DatabricksContractPrices](#databrickscontractprices)|Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the *instanceDetails* consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices().
-**IntelligentScaling**|N|IntelligentScaling()|[IntelligentScaling](#intelligentscaling)|Allows the user to enable / disable intelligent scaling and configure min/max core counts to be used when scaling the cluster
+Config | Required Override | Default Value | Type | AsOfVersion | Description
+:--------------------------|:---|:----------|:----------|:--------|:--------------------------------------------------
+**auditLogConfig**|Y|NULL|[AuditLogConfig](#auditlogconfig)|0.5.x|Databricks Audit Log delivery information.
+**tokenSecret**|N|Execution Owner's Token|Option[\[TokenSecret\]](#tokensecret)|0.5.x|Secret retrieval information
+**dataTarget**|N|DataTarget("overwatch", "/user/hive/warehouse/{databaseName}.db", "/user/hive/warehouse/{databaseName}.db")|Option[\[DataTarget\]](#datatarget)|0.5.x|What to call the database and where to store it
+**badRecordsPath**|N|/tmp/overwatch/badRecordsPath|Option\[String\]|0.5.x|When reading the log files, where should Overwatch store the records / files that cannot be parsed. Overwatch must have write permissions to this path 
+**overwatchScope**|N|all|Option\[Seq\[String\]\]|0.5.x|List of [modules]({{%relref "GettingStarted/Modules.md"%}}) in scope for the run. It's important to note that there are many co-dependencies. When choosing a module, be sure to also enable it's requisites. If not value provided, all modules will execute.
+**maxDaysToLoad**|N|60|Int|0.5.x|On large, busy workspaces 60 days of data may amount in 10s of TB of raw data. This parameter allows the job to be broken out into several smaller runs.
+**primordialDateString**|N|Today's date minus 60 days, format = "yyyy-mm-dd"|String|0.5.x|Date from which data collection was to begin. This is the earliest date for which data should attempted to be collected.
+**databricksContractPrices**|N|DatabricksContractPrices()|[DatabricksContractPrices](#databrickscontractprices)|0.5.x|Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the *instanceDetails* consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices().
+**IntelligentScaling**|N|IntelligentScaling()|[IntelligentScaling](#intelligentscaling)|0.5.x|Allows the user to enable / disable intelligent scaling and configure min/max core counts to be used when scaling the cluster
+**workspace_name**|N|<organization_id>|Option\[String\]|0.6.x|Allows the user to specify the workspace_name to be different than the default, canonical workspace_id (i.e. organization_id). This is helpful during analysis as it provides a human-legible reference for the workspace
+**externalizeOptimize**|N|false|Boolean|0.6.x|Allows the user to externalize the optimize and zorders done on the delta tables. This can be run as a secondary job with different cluster configs at different intervals increasing efficiency
 
 ### AuditLogConfig
 Config to point Overwatch to the location of the delivered audit logs
@@ -212,7 +204,6 @@ Config | Required Override | Default Value | Type | Description
 **automatedDBUCostUSD**|N|0.26|Double|Approximate list price of automated DBU
 **sqlComputeDBUCostUSD**|N|0.22|Double|Approximate list price of DatabricksSQL DBU
 **jobsLightDBUCostUSD**|N|0.10|Double|Approximate list price of JobsLight Automated DBU
-
 
 ### IntelligentScaling
 Config | Required Override | Default Value | Type | Description

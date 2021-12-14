@@ -7,6 +7,10 @@ weight: 3
 ![OverwatchERD](/images/_index/Overwatch_Gold.png)
 For full fidelity image, right click and save the image.
 
+[Overwatch ERD 06x](/images/_index/Overwatch_Gold.png)
+
+[Overwatch ERD 05x](/images/_index/Overwatch_Gold_05x.png)
+
 ## Overwatch Data Promotion Process
 Overwatch data is promoted from bronze - silver - gold - presentation to ensure data consistency and quality as the 
 data is enriched between the stages. The presentation layer is composed of views that reference the latest schema

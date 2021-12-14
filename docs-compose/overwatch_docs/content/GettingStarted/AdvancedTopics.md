@@ -5,8 +5,42 @@ weight: 4
 ---
 
 ## Quick Reference
+* [Externalize Optimize & Z-Order](#externalize-optimize--z-order-as-of-060)
 * [Interacting With Overwatch and its State](#interacting-with-overwatch-and-its-state)
 * [Joining With Slow Changing Dimensions (SCD)](#joining-with-slow-changing-dimensions-scd)
+
+## Externalize Optimize & Z-Order (as of 0.6.0)
+The Overwatch pipeline has always included the Optimize & Z-Order functions. By default all targets are set to 
+be optimized once per week which resulted in very different runtimes once per week.
+As of 0.6.0, this can be externalized. 
+Reasons to externalize include:
+* Lower job runtime variability and/or improve consistency to hit SLAs
+* Utilize a more efficient cluster type/size for the optimize job
+  * Optimize & Zorder are extremely efficient but do heavily depend on local storage; thus Storage Optimized compute 
+  nodes are highly recommended for this type of workload.
+    * Azure: i3.*xLarge 
+    * AWS: Standard_L*s series
+* Allow a single job to efficiently optimize Overwatch for all workspaces
+  * Note that the scope of "all workspaces" above is within the scope of a data target. All workspaces that send 
+  data to the same dataset can be optimized from a single workspace.
+    
+To externalize the optimize and z-order tasks:
+* Set *externalizeOptimize* to true in the runner notebook config (All Workspaces)
+  * If running as a job don't forget to update the job parameters with the new escaped JSON config string
+* Create a job to execute the optimize on the workspace you wish (One Workspace - One Job)
+  * Type: JAR
+  * Main Class: `com.databricks.labs.overwatch.Optimizer`
+  * Dependent Libraries: `com.databricks.labs:overwatch_2.12:0.6.0.1`
+  * Parameters: `["<Overwatch_etl_database_name>"]`
+  * Cluster Config: Recommended
+    * DBR Version: 9.1LTS
+    * Enable Autoscaling Compute with enough nodes to go as fast as you want. 4-8 is a good starting point
+    * AWS -- Enable autoscaling local storage
+    * Worker Nodes: Storage Optimize
+    * Driver Node: General Purpose with 16+ cores
+      * The driver gets very busy on these workloads - recommend 16 - 64 cores depending on the max size of the cluster
+  
+![OptimizeJob](/images/GettingStarted/AdvancedTopics/optimizerJob.png)
 
 ## Interacting With Overwatch and its State
 Use your production notebook (or equivallent) to instantiate your Overatch Configs. 

@@ -12,8 +12,7 @@
       <pubDate>Wed, 28 Oct 2020 11:55:12 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/configuration/</guid>
-      <description>The configuration for Overwatch is fairly basic for the initial release but the plan is to open a lot of options and make the config much more robust to allow for much more granular control over operations. The ongoing changes will be documented here.
-Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.databricks.labs.overwatch.BatchRunner. When passed in as a json string, it is deserialized into an instance of OverwatchParams.</description>
+      <description>Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.databricks.labs.overwatch.BatchRunner. When passed in as a json string, it is serialized into an instance of OverwatchParams. This provides strong validation on the input parameters and strong typing for additional validation options. All configs attempt to be defaulted to a reasonable default where possible. If a default is set, passing in a value will overwrite the default.</description>
     </item>
     
     <item>

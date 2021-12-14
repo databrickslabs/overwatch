@@ -50,6 +50,8 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [jobrun](#jobrun)
 * [jobRunCostPotentialFact](#jobruncostpotentialfact)
 * [notebook](#notebook)
+* [instancePool](#instancepool)
+* [dbuCostDetail](#dbucostdetails)
 * [user](#user)
 * [accountLoginFact](#accountloginfact)
 * [accountModificationFact](#accountmodificationfact)
@@ -58,6 +60,7 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [sparkJob](#sparkjob)
 * [sparkStage](#sparkstage)
 * [sparkTask](#sparktask)
+* [sparkStream](#sparkstream_preview) **preview
 * [Common Meta Fields](#common-meta-fields)
   * There are several fields that are present in all tables. Instead of cluttering each table with them, this section
   was created as a reference to each of these.
@@ -72,23 +75,19 @@ The data in the files were generated from an Azure, test deployment created by O
 #### Cluster
 [**SAMPLE**](/assets/TableSamples/cluster.tab)
 
-**KEY** -- organization_id + cluster_id + action + unixTimeMS_state_start
+**KEY** -- organization_id + cluster_id + unixTimeMS
 
-{{% notice warning %}}
-[Issue 154](https://github.com/databrickslabs/overwatch/issues/154): This table is not a properly defined slow-changing
-dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action
-column and does not reference the complete state of the object at the corresponding time. Furthermore, this table
-only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will
-likely be a lot of missing data. <br><br>
-Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is < lookup time.
-This will result in many null values that must be further filled from the corresponding snapshot table in the etl
-database.
-{{% /notice %}}
+**Incremental Columns** -- unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 cluster_id                  |string           |Canonical Databricks cluster ID (more info in [Common Meta Fields](#common-meta-fields))
-action                      |string           |Either **create** OR **edit** -- depicts the type of action for the cluster
+action                      |string           |create, edit, or snapImpute -- depicts the type of action for the cluster -- **snapImpute is used on first run to initialize the state of the cluster even if it wasn't created/edited since audit logs began
+timestamp                   |timestamp        |timestamp the action took place
 cluster_name                |string           |user-defined name of the cluster
 driver_node_type            |string           |Canonical name of the driver node type.
 node_type                   |string           |Canonical name of the worker node type.
@@ -100,27 +99,38 @@ is_automated                |booelan          |Whether the cluster is automated 
 cluster_type                |string           |Type of cluster (i.e. Serverless, SQL Analytics, Single Node, Standard)
 security_profile            |struct           |Complex type to describe secrity features enabled on the cluster. More information [Below]()
 cluster_log_conf            |string           |Logging directory if configured
-init_script                 |Array\[Struct\]  |Array of init scripts
+init_script                 |array<struct>    |Array of init scripts
 custom_tags                 |string           |User-Defined tags AND also includes Databricks JobID and Databricks RunName when the cluster is created by a Databricks Job as an automated cluster. Other Databricks services that create clusters also store unique information here such as SqlEndpointID when a cluster is created by "SqlAnalytics" 
 cluster_source              |string           |Shows the source of the action **(TODO -- checking on why null scenario with BUI)
 spark_env_vars              |string           |Spark environment variables defined on the cluster
 spark_conf                  |string           |custom spark configuration on the cluster that deviate from default
 acl_path_prefix             |string           |Automated jobs pass acl to clusters via a path format, the path is defined here
-instance_pool_id            |string           |Canononical pool id from which the cluster receives its nodes
+instance_pool_id            |string           |Canononical pool id from which workers receive nodes
+driver_instance_pool_id     |string           |Canononical pool id from which driver receives node
+instance_pool_name          |string           |Name of pool from which workers receive nodes
+driver_instance_pool_name   |string           |Name of pool from which driver receives node
 spark_version               |string           |DBR version - scala version
 idempotency_token           |string           |Idempotent jobs token if used
-organization_id             |string           |Workspace / Organization ID on which the cluster was instantiated
 
 #### ClusterStateFact
 [**SAMPLE**](/assets/TableSamples/clusterstatefact.tab)
 
 **KEY** -- organization_id + cluster_id + state + unixTimeMS_state_start
 
+**Incremental Columns** -- state_start_date + unixTimeMS
+
+**Partition Columns** -- organization_id + state_start_date
+
+**Z-Order Columns** -- cluster_id + unixTimeMS_state_start
+
+**Write Mode** -- Merge
+
 Costs and state details by cluster at every state in the cluster lifecycle.
 
 **NOTE** This fact table is not normalized on time. Some states will span multiple days and must be smoothed across 
-days (i.e. divide by days_in_state) when trying to calculate costs by day. Also, note that costs may not be captured
-for a cluster_state combination until that state ends.
+days (i.e. divide by days_in_state) when trying to calculate costs by day. All states are force-terminated at the 
+end of the Overwatch run to the until-timestamp of the run. If the state was still active at this time, it will be 
+updated on the subsequent run.
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
@@ -141,6 +151,7 @@ cloud_billable              |boolean          |All current known states are clou
 databricks_billable         |boolean          |State incurs databricks DBU costs. All states incur DBU costs except: INIT_SCRIPTS_FINISHED, INIT_SCRIPTS_STARTED, STARTING, TERMINATING, CREATING, RESTARTING
 isAutomated                 |boolean          |Whether the cluster was created as an "automated" or "interactive" cluster
 dbu_rate                    |double           |Effective dbu rate used for calculations (effective at time of pipeline run)
+state_dates                 |array<date>      |Array of all dates across which the state spanned
 days_in_state               |int              |Number of days in state
 worker_potential_core_H     |double           |Worker core hours available to execute spark tasks
 core_hours                  |double           |All core hours of entire cluster (including driver). Nodes * cores * hours in state
@@ -161,81 +172,102 @@ workerSpecs                 |struct           |Worker node details
 
 **KEY** -- Organization_ID + API_name
 
+**Incremental Columns** -- Pipeline_SnapTS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
+
+
 This table is unique and it's purpose is to enable users to identify node specific contract costs associated with 
 Databricks and the Cloud Provider through time. 
-Defaults are loaded as an example by workspace. These defaults should closely (if not perfectly) 
-represent your cloud node details including costs, CPUs, etc. Everytime Overwatch runs, it validates the presence of 
-this table and whether it has any data present for the current worksapce, if it does not creates / appends the relevant
+Defaults are loaded as an example by workspace. These defaults are meant to be reasonable, not accurate by default 
+as there is a wide difference between cloud discount rates and prices between regions / countries. 
+Everytime Overwatch runs, it validates the presence of 
+this table and whether it has any data present for the current workspace, if it does not it creates and appends the relevant
 data to it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their 
 needs by workspace. Each organization_id (workspace), should provide complete cost data for each node used in that
-region. If you decide to completely customize the table, it's critical to note that **some columns are required** for the ETL
-to function; these fields include are indicated below in the table with an asterisk.
+workspace. If you decide to completely customize the table, it's critical to note that **some columns are required** 
+for the ETL to function; these fields are indicated below in the table with an asterisk.
 
 The organization_id (i.e. workspace id) is automatically generated for each workspace if that organization_id is not
 present in the table already (or the table is not present at all). Each workspace
 (i.e. organization_id) often has unique costs, this table enables you to customize compute pricing.
 
-This table currently tracks costs for machine AND DBUs which is confusing. [Issue 153](https://github.com/databrickslabs/overwatch/issues/153)
-has been created to resolve this confusion. Until this issue is complete, any DBU contract price changes via the 
-Overwatch config will expire all existing compute pricing and add a new record with the updated DBU costs. This will 
-happen automagically as long as the user only changes the DBU contract prices via the Overwatch config. To simplify, 
-only manually edit this table when adjusting costs for compute and/or when historically adjusting compute/dbu costs.
-
-**IMPORTANT** This table must be configured such that there are no overlapping costs and no gaps in costs within 
-a single organization_id between primordial date and current date. 
-This means that when one record for a node type is "expired", a new one must be created 
-with the expiry date (activeUntil of the expired record) must == activeFrom of the new record and the active record must
-a null for the activeUntil date.
+**IMPORTANT** This table must be configured such that there are no overlapping costs (by time) and no gaps (by time) 
+in costs for any key (organization_id + API_name) between primordial date and current date. 
+This means that for a record to be "expired" the following must be true:
+* original key expired by setting activeUntil == expiry date
+* original key must be created with updated information and must:
+  * have activeFrom == expiry date of previous record (no gap, no overlap)
+  * have activeUntil == lit(null).cast("date")
 
 [Azure VM Pricing Page](https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/)
 
 [AWS EC2 Pricing Page](https://aws.amazon.com/ec2/pricing/on-demand/)
 
-Column | Type | AutoManaged | Description
-:---------------------------|:----------------|:----------------|:--------------------------------------------------
-instance                    |string           |NA               |Common name of instance type 
-API_name*                   |string           |NA               |Canonical KEY name of the node type -- use this to join to node_ids elsewhere
-vCPUs*                      |int              |NA               |Number of virtual cpus provisioned for the node type
-Memory_GB                   |double           |NA               |Gigabyes of memory provisioned for the node type
-Compute_Contract_Price*     |double           |NA               |Contract price for the instance type as negotiated between customer and cloud vendor. This is the value used in cost functions to deliver cost estimates. It is defaulted to equal the on_demand compute price
-On_Demand_Cost_Hourly       |double           |NA               |On demand, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
-Linux_Reserved_Cost_Hourly  |double           |NA               |Reserved, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
-Hourly_DBUs*                |double           |NA               |Number of DBUs charged for the node type
-interactiveDBUPrice*        |double           |by Overwatch     |DBU contract price of interactive DBUs - Change this via Overwatch Config
-automatedDBUPrice*          |double           |by Overwatch     |DBU contract price of automated DBUs - Change this via Overwatch Config
-sqlComputeDBUPrice*         |double           |by Overwatch     |DBU contract price of DatabricksSQL DBUs - Change this via Overwatch Config
-jobsLightDBUPrice*          |double           |by Overwatch     |DBU contract price of automated DBUs that are eligible for the jobs light SKU - Change this via Overwatch Config
-activeFrom*                 |date             |by Overwatch     |The start date for the costs in this record. **NOTE** this MUST be equal to one other record's activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.
-activeUntil*                |date             |by Overwatch     |The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active) 
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+instance                    |string           |Common name of instance type 
+API_name*                   |string           |Canonical KEY name of the node type -- use this to join to node_ids elsewhere
+vCPUs*                      |int              |Number of virtual cpus provisioned for the node type
+Memory_GB                   |double           |Gigabyes of memory provisioned for the node type
+Compute_Contract_Price*     |double           |Contract price for the instance type as negotiated between customer and cloud vendor. This is the value used in cost functions to deliver cost estimates. It is defaulted to equal the on_demand compute price
+On_Demand_Cost_Hourly       |double           |On demand, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
+Linux_Reserved_Cost_Hourly  |double           |Reserved, list price for node type DISCLAIMER -- cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing
+Hourly_DBUs*                |double           |Number of DBUs charged for the node type
+is_active                   |boolean          |whether the contract price is currently active. This must be true for each key where activeUntil is null
+activeFrom*                 |date             |The start date for the costs in this record. **NOTE** this MUST be equal to one other record's activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.
+activeUntil*                |date             |The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active)
+
+#### dbuCostDetails
+**KEY** -- Organization_ID + sku
+
+**Incremental Columns** -- activeFrom
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
+
+Slow-changing dimension to track DBU contract costs by workspace through time. This table should only need to be edited 
+in very rare circumstances such as historical cost correction. Note that editing these contract prices will not 
+retroactively modify historical pricing in the costing table such as clusterStateFact or jobRunCostPotentialFact. For 
+prices to be recalculated, the gold pipeline modules must be rolled back properly such that the costs can be 
+rebuilt with the updated values.
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+sku                         |string           |One of automated, interactive, jobsLight, sqlCompute
+contract_price              |double           |Price paid per DBU on the sku
+is_active                   |boolean          |whether the contract price is currently active. This must be true for each key where activeUntil is null
+activeFrom*                 |date             |The start date for the costs in this record. **NOTE** this MUST be equal to one other record's activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.
+activeUntil*                |date             |The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active)
+
 
 #### Job
 [**SAMPLE**](/assets/TableSamples/job.tab)
 
-**KEY** -- organization_id + job_id
+**KEY** -- organization_id + job_id + unixTimeMS + action + request_id
 
-{{% notice warning %}}
-[Issue 154](https://github.com/databrickslabs/overwatch/issues/154): This table is not a properly defined slow-changing
-dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action 
-column and does not reference the complete state of the object at the corresponding time. Furthermore, this table 
-only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will 
-likely be a lot of missing data. <br><br>
-Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is < lookup time. 
-This will result in many null values that must be further filled from the corresponding snapshot table in the etl 
-database.
-{{% /notice %}}
+**Incremental Columns** -- unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 organization_id             |string           |Canonical workspace id
 job_id                      |string           |Databricks job id
 action                      |string           |Action type defined by the record. One of: create, reset, update, delete, resetJobAcl, changeJobAcl. More information about these actions can be found [here](https://docs.databricks.com/dev-tools/api/latest/jobs.html)
+timestamp                   |timestamp        |timestamp the action took place
 job_name                    |string           |User defined name of job. NOTE, all jobs created through the UI are initialized with the name, "Untitled" therefore UI-created-named jobs will have an edit action to set the name. The cluster is also set to automated and defaulted on UI create as well
 job_type                    |string           |?? TBD ?? -- there is a job_task_type but that's in Run_id
 timeout_seconds             |string           |null unless specified, default == null. Timeout seconds specified in UI or via api
 schedule                    |string           |JSON - quartz cron expression of scheduled job and timezone_id
 notebook_path               |string           |null if job task does not point to a notebook task. If job points to notebook for execution, this is path to that notebook
-new_settings                |string JSON      |job action with "reset" or "update" where settings were changed. Includes complex type of cluster. [JobSettings Structure Found Here](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobsjobsettings)
-cluster                     |struct           |Where relevant, contains the "new_cluster" spec when cluster definition is "new_cluster" or automated. If job definition points to existing cluster the cluster_id can be found here
+new_settings                |dynamic struct   |job action with "reset" or "update" where settings were changed. Includes complex type of cluster. [JobSettings Structure Found Here](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobsjobsettings)
+cluster                     |dyanmic struct   |Where relevant, contains the "new_cluster" spec when cluster definition is "new_cluster" or automated. If job definition points to existing cluster the cluster_id can be found here
 aclPermissionSet            |string           |Predefined aclPermissionsSet such as "Admin" or "Owner". More information on these can be found [HERE](https://docs.databricks.com/security/access-control/jobs-acl.html#jobs-access-control)
 grants                      |string JSON      |Array of explicit grants given to explicit user list
 target_user_id              |string           |Databricks canonical user id to which the aclPermissionSet is to be applied
@@ -248,7 +280,13 @@ source_ip_address           |string           |Origin IP of action requested
 #### JobRun
 [**SAMPLE**](/assets/TableSamples/jobrun.tab)
 
-**KEY** -- organization_id + run_id
+**KEY** -- organization_id + run_id + startEpochMS
+
+**Incremental Columns** -- startEpochMS
+
+**Partition Columns** -- organization_id 
+
+**Write Mode** -- Merge
 
 Inventory of every canonical job run executed in a databricks workspace.
 
@@ -267,6 +305,7 @@ job_trigger_type            |string           |Type of trigger: PERIODIC, ONE_TI
 cluster_id                  |string           |Canonical workspace cluster id
 notebook_params             |string JSON      |A map of (String, String) parameters sent to notebook parameter overrides. See [ParamPair](https://docs.databricks.com/dev-tools/api/latest/jobs.html#parampair) 
 libraries                   |string JSON      |Array of Libraries in the format defined [HERE](https://docs.databricks.com/dev-tools/api/latest/libraries.html#library)
+children                    |array<struct>    |Array of structs that show all children of this job
 workflow_context            |string           |?? REVIEW ??
 task_detail                 |struct           |Unified location for JobTask contingent upon jobrun task. See [JobTask](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobtask)
 cancellation_detail         |struct           |All cancellation request detail and status
@@ -277,7 +316,13 @@ request_detail              |struct           |Complete request detail received 
 #### JobRunCostPotentialFact
 [**SAMPLE**](/assets/TableSamples/jobruncostpotentialfact.tab)
 
-**KEY** -- organization_id + job_id + id_in_job
+**KEY** -- organization_id + run_id + startEpochMS
+
+**Incremental Columns** -- startEpochMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Merge
 
 This fact table defines the job, the cluster, the cost, the potential, and utilization (if cluster logging is enabled) 
 of a cluster associated with a specific Databricks Job Run.
@@ -324,7 +369,7 @@ run_terminal_state          |string           |Final state of the job such as "S
 run_trigger_type            |string           |How the run was triggered (i.e. cron / manual)
 run_task_type               |string           |Type of task in the job (i.e. notebook, jar, spark-submit, etc.)
 driver_node_type_id         |string           |KEY of driver node type to enable join to [instanceDetails](#instanceDetails)
-note_type_id                |string           |KEY of worker node type to enable join to [instanceDetails](#instanceDetails)
+node_type_id                |string           |KEY of worker node type to enable join to [instanceDetails](#instanceDetails)
 dbu_rate                    |double           |Effective DBU rate at time of job run used for calculations based on configured contract price in [instanceDetails](#instanceDetails) at the time of the Overwatch Pipeline Run  
 running_days                |array<date>      |Array (or list) of dates (not strings) across which the job run executed. This simplifies day-level cost attribution, among other metrics, when trying to smooth costs for long-running / streaming jobs 
 avg_cluster_share           |double           |Average share of the cluster the run had available assuming fair scheduling. This DOES NOT account for activity outside of jobs (i.e. interactive notebooks running alongside job runs), this measure only splits out the share among concurrent job runs. Measure is only calculated for interactive clusters, automated clusters assume 100% run allocation. For more granular utilization detail, enable cluster logging and utilize "job_run_cluster_util" column which derives utilization at the spark task level.
@@ -348,27 +393,22 @@ job_run_cluster_util        |double           |Cluster utilization: spark task e
 #### Notebook
 [**SAMPLE**](/assets/TableSamples/notebook.tab)
 
-**KEY** -- organization_id + notebook_id + action + unixTimeMS
+**KEY** -- organization_id + notebook_id + request_id + action + unixTimeMS
 
-{{% notice warning %}}
-[Issue 154](https://github.com/databrickslabs/overwatch/issues/154): This table is not a properly defined slow-changing
-dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action
-column and does not reference the complete state of the object at the corresponding time. Furthermore, this table
-only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will
-likely be a lot of missing data. <br><br>
-Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is < lookup time.
-This will result in many null values that must be further filled from the corresponding snapshot table in the etl
-database.
-{{% /notice %}}
+**Incremental Columns** -- unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
-organization_id             |string           |Canonical workspace id
 notebook_id                 |string           |Canonical notebook id
 notebook_name               |string           |Name of notebook at time of action requested
 notebook_path               |string           |Path of notebook at time of action requested
 cluster_id                  |string           |Canonical workspace cluster id
 action                      |string           |action recorded
+timestamp                   |timestamp        |timestamp the action took place
 old_name                    |string           |When action is "renameNotebook" this holds notebook name before rename
 old_path                    |string           |When action is "moveNotebook" this holds notebook path before move
 new_name                    |string           |When action is "renameNotebook" this holds notebook name after rename
@@ -377,6 +417,28 @@ parent_path                 |string           |When action is "renameNotebook" n
 user_email                  |string           |Email of the user requesting the action
 request_id                  |string           |Canonical request_id
 response                    |struct           |HTTP response including errorMessage, result, and statusCode
+
+#### InstancePool
+
+**KEY** -- organization_id + instance_pool_id + timestamp
+
+**Incremental Columns** -- timestamp
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Merge
+
+Column | Type | Description
+:---------------------------------------------|:----------------|:--------------------------------------------------
+instance_pool_id                              |string           |Canonical notebook id
+instance_pool_name                            |string           |Name of notebook at time of action requested
+actionName                                    |string           |action recorded
+timestamp                                     |long             |timestamp the action took place
+node_type_id                                  |string           |Type of node in the pool
+idle_instance_autotermination_minutes         |long             |Minutes after which a node shall be terminated if unused
+min_idle_instances                            |long             |Minimum number of hot instances in the pool
+max_capacity                                  |long             |Maximum number of nodes allowed in the pool
+preloaded_spark_versions                      |string           |Spark versions preloaded on nodes in the pool
 
 #### Account Tables
 
@@ -410,15 +472,29 @@ added_from_ip_address       |string           |Source IP of the request
 added_by                    |string           |Authenticated user that made the request
 user_agent                  |string           |request origin such as browser, terraform, api, etc.
 
-#### AccountModificationFact
+#### AccountMod
 [**SAMPLE**](/assets/TableSamples/accountmodificationfact.tab)
+
+**KEY** -- organization_id + acton + mod_unixTimeMS + request_id
+
+**Incremental Columns** -- mod_unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
 
 TODO
 
-#### AccountLoginFact
+#### AccountLogin
 [**SAMPLE**](/assets/TableSamples/accountloginfact.tab)
 
-**KEY** -- organization_id + user_id + login_type + UnixTimeMS
+**KEY** -- organization_id + login_type + login_unixTimeMS + from_ip_address
+
+**Incremental Columns** -- login_unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
 
 {{% notice note%}}
 **Not exposed in the consumer database**. This table contains more sensitive information and by default is not
@@ -428,14 +504,13 @@ desired. If desired, this can be exposed in consumer database with a simple vew 
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
-organization_id             |string           |Canonical workspace id
 user_id                     |string           |Canonical user id (within the workspace)
 user_email                  |string           |User's email
 login_type                  |string           |Type of login such as web, ssh, token
 ssh_username                |string           |username used to login via SSH
 groups_user_name            |string           |?? To research ??
 account_admin_userID        |string           |?? To research ??
-login_from_ip_address       |string           |Source IP from which login was initiated
+login_from_ip_address       |struct           |Details about the source login and target logged into
 user_agent                  |string           |request origin such as browser, terraform, api, etc.
 
 {{% notice note%}}
@@ -447,7 +522,13 @@ make this section simpler. Please [**reference Spark Hierarchy For More Details*
 #### SparkExecution
 [**SAMPLE**](/assets/TableSamples/sparkexecution.tab)
 
-**KEY** -- organization_id + spark_context_id + execution_id + cluster_id
+**KEY** -- organization_id + spark_context_id + execution_id + date + unixTimeMS
+
+**Incremental Columns** -- date + unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Merge
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
@@ -462,7 +543,13 @@ sql_execution_runtime       |struct           |Complete runtime detail breakdown
 #### SparkExecutor
 [**SAMPLE**](/assets/TableSamples/sparkexecutor.tab)
 
-**KEY** -- organization_id + spark_context_id + executor_id + cluster_id
+**KEY** -- organization_id + spark_context_id + executor_id + date + unixTimeMS
+
+**Incremental Columns** -- date + unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Merge
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
@@ -477,9 +564,15 @@ executor_alivetime          |struct           |Complete lifetime detail breakdow
 #### SparkJob
 [**SAMPLE**](/assets/TableSamples/sparkjob.tab)
 
-**KEY** -- organization_id + spark_context_id + job_id + cluster_id
+**KEY** -- organization_id + spark_context_id + job_id + unixTimeMS
 
-**Partition Column[s]** -- date
+**Incremental Columns** -- date + unixTimeMS
+
+**Partition Columns** -- organization_id + date
+
+**Z-Order Columns** -- cluster_id
+
+**Write Mode** -- Merge
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
@@ -501,9 +594,15 @@ job_result                  |struct           |Job Result and Exception if prese
 #### SparkStage
 [**SAMPLE**](/assets/TableSamples/sparkstage.tab)
 
-**KEY** -- organization_id + spark_context_id + stage_id + stage_attempt_id + cluster_id
+**KEY** -- organization_id + spark_context_id + stage_id + stage_attempt_id + unixTimeMS
 
-**Partition Column[s]** -- date
+**Incremental Columns** -- date + unixTimeMS
+
+**Partition Columns** -- organization_id + date
+
+**Z-Order Columns** -- cluster_id
+
+**Write Mode** -- Merge
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
@@ -518,9 +617,15 @@ stage_info                  |string           |Lineage of all accumulables for t
 #### SparkTask
 [**SAMPLE**](/assets/TableSamples/sparktask.tab)
 
-**KEY** -- organization_id + spark_context_id + task_id + task_attempt_id + stage_id + stage_attempt_id + cluster_id
+**KEY** -- organization_id + spark_context_id + task_id + task_attempt_id + stage_id + stage_attempt_id + host + unixTimeMS
 
-**Partition Column[s]** -- date
+**Incremental Columns** -- date + unixTimeMS
+
+**Partition Columns** -- organization_id + date
+
+**Z-Order Columns** -- cluster_id
+
+**Write Mode** -- Merge
 
 {{% notice warning%}}
 **USE THE PARTITION COLUMN** (date) and Indexed Column (cluster_id) in all joins and filters where possible. 
@@ -531,6 +636,7 @@ to improve performance.
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 organization_id             |string           |Canonical workspace id
+workspace_name              |string           |Customizable human-legible name of the workspace, should be globally unique within the organization
 spark_context_id            |string           |Canonical context ID -- One Spark Context per Cluster
 cluster_id                  |string           |Canonical workspace cluster id
 task_id                     |string           |Spark Task ID
@@ -545,9 +651,37 @@ task_info                   |string           |Lineage of all accumulables for t
 task_type                   |string           |Spark task Type (i.e. ResultTask, ShuffleMapTask, etc)
 task_end_reason             |string           |Task end status, state, and details plus stake trace when error
 
+#### SparkStream_preview
+**KEY** -- organization_id + spark_context_id + cluster_id + stream_id + stream_run_id + stream_batch_id + stream_timestamp
+
+**Incremental Columns** -- date + stream_timestamp
+
+**Partition Columns** -- organization_id + date
+
+**Z-Order Columns** -- cluster_id
+
+**Write Mode** -- Merge
+
+Remains in preview through version 0.6.0 as more feedback is requested from users and use-cases before this table 
+structure solidifes.
+
+Column | Type | Description
+:---------------------------|:----------------|:--------------------------------------------------
+spark_context_id            |string           |Canonical context ID -- One Spark Context per Cluster
+cluster_id                  |string           |Canonical workspace cluster id
+stream_id                   |string           |GUID ID of the spark stream
+stream_name                 |string           |Name of stream if named
+stream_run_id               |string           |GUID ID of the spark stream run
+stream_batch_id             |long             |GUID ID of the spark stream run batch
+stream_timestamp            |long             |Unix time (millis) the stream reported its batch complete metrics
+streamSegment               |string           |Type of event from the event listener such as 'Progressed'
+streaming_metrics           |dynamic struct   |All metrics available for the stream batch run
+execution_ids               |array<long>      |Array of execution_ids in the spark_context. Can explode and tie back to sparkExecution and other spark tables
+
 #### Common Meta Fields
 Column | Type | Description
 :---------------------------|:--------------|:--------------------------------------------------
+organization_id             |string         |Workspace / Organization ID on which the cluster was instantiated
 cluster_id                  |string         |Canonical workspace cluster id
 unixTimeMS                  |long           |unix time epoch as a long in milliseconds
 timestamp                   |string         |unixTimeMS as a timestamp type in milliseconds
@@ -567,10 +701,10 @@ The following are the list of potential tables, the module with which it's creat
 This list consists of only the ETL tables created to facilitate and deliver the [consumption layer](#consumption-layer-tables)
 <br><br>
 The gold and consumption layers are the only layers that maintain column name uniformity and naming convention across
-all tables. Users should always reference Consumption and Gold layers unless the data necssary has not been curated.
+all tables. Users should always reference Consumption and Gold layers unless the data necessary has not been curated.
 
 ### Bronze
-Table | Module | Layer | Description
+Table | Scope | Layer | Description
 :---------------------------|:--------------|:--------------|:--------------------------------------------------
 audit_log_bronze            |audit          |bronze         |Raw audit log data full schema
 audit_log_raw_events        |audit          |bronze (azure) |Intermediate staging table responsible for coordinating intermediate events from azure Event Hub
@@ -583,25 +717,24 @@ spark_events_processedfiles |sparkEvents    |bronze         |Table that keeps tr
 pipeline_report             |NA             |tracking       |Tracking table used to identify state and status of each Overwatch Pipeline run. This table is also used to control the start and end points of each run. Altering the timestamps and status of this table will change the ETL start/end points.
 
 ### Silver
-Table | Module | Layer | Description
+Table | Scope | Layer | Description
 :---------------------------|:--------------|:--------------|:--------------------------------------------------
 account_login_silver        |accounts       |silver         |Login events
 account_mods_silver         |accounts       |silver         |Account modification events
 cluster_spec_silver         |clusters       |silver         |Slow changing dimension used to track all clusters through time including edits but **excluding state change**.
-cluster_status_silver       |clusters       |silver         |**Deprecated** Originally used to track cluster state and scale through time but is no longer used and is incomplete.
+cluster_state_detail_silver |clusterEvents  |silver         |State detail for each cluster event enriched with cost information
 job_status_silver           |jobs           |silver         |Slow changing dimension used to track all jobs specifications through time
 jobrun_silver               |jobs           |silver         |Historical run of every job since Overwatch began capturing the audit_log_data
-notebook_silver             |notebooks      |silver         |Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook. 
+notebook_silver             |notebooks      |silver         |Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook.
+pools_silver                |pools          |silver         |Slow changing dimension used to track all changes to instance pools
 spark_executions_silver     |sparkEvents    |silver         |All spark event data relevant to spark executions
 spark_executors_silver      |sparkEvents    |silver         |All spark event data relevant to spark executors
 spark_jobs_silver           |sparkEvents    |silver         |All spark event data relevant to spark jobs
 spark_stages_silver         |sparkEvents    |silver         |All spark event data relevant to spark stages
 spark_tasks_silver          |sparkEvents    |silver         |All spark event data relevant to spark tasks
-user_account_silver         |accounts       |silver         |Slow changing dimension of user accounts through time
-user_login_silver           |accounts       |silver         |User login metadata through time
 
 ### Gold
-Table | Module | Layer | Description
+Table | Scope | Layer | Description
 :---------------------------|:--------------|:--------------|:--------------------------------------------------
 account_login_gold          |accounts       |gold           |Login events
 account_mods_gold           |accounts       |gold           |Account modification events
@@ -610,8 +743,10 @@ clusterStateFact_gold       |clusterEvents  |gold           |All cluster event c
 job_gold                    |jobs           |gold           |Slow-changing dimension of all changes to a job definition through time
 jobrun_gold                 |jobs           |gold           |Dimensional data for each job run in the databricks workspace
 notebook_gold               |notebooks      |gold           |Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook.
+instancepool_gold           |pools          |gold           |Slow changing dimension used to track all changes to instance pools
 sparkexecution_gold         |sparkEvents    |gold           |All spark event data relevant to spark executions
 sparkexecutor_gold          |sparkEvents    |gold           |All spark event data relevant to spark executors
 sparkjob_gold               |sparkEvents    |gold           |All spark event data relevant to spark jobs
 sparkstage_gold             |sparkEvents    |gold           |All spark event data relevant to spark stages
 sparktask_gold              |sparkEvents    |gold           |All spark event data relevant to spark tasks
+sparkstream_gold            |sparkEvents    |gold           |All spark event data relevant to spark streams

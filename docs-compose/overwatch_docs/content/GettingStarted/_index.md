@@ -4,10 +4,17 @@ date: 2020-10-27T16:40:00-04:00
 weight: 1
 ---
 
+## How It Works
+* Build the Config (json string)
+  * The notebooks below are designed to simplify this and offer some basic best practices for constructed paths
+* Instantiate Overwatch's *workspace* object
+* Use the *workspace* object to run the Pipelines (i.e. Bronze/Silver/Gold)
+  * e.g. - Bronze(workspace).run()
+
 ## Run Methods
-Overwatch is usually run via one of two methods:
-1. As a job controlling [**running a notebook**](#executing-overwatch-via-notebook)
-2. As a job running the [**main class**](#executing-overwatch-via-main-class) with the configs
+Overwatch is run via one of two methods:
+1. As a job controlling [**running a notebook**](#via-a-notebook)
+2. As a job running the [**main class**](#via-main-class)
 
 Below are instructions for both methods. The primary difference is the way by which the
 [configuration]({{%relref "GettingStarted/Configuration.md"%}}) is implemented and the choice of which to use is
@@ -16,15 +23,15 @@ and tables and manages all spark parameters and optimization requirements to ope
 and the job run setup, Overwatch runs best as a black box -- enable it and forget about it.
 
 ## Cluster Requirements
-* DBR 7.3+ tests completed on latest LTS version.
+* DBR 9.1LTS
+  * Overwatch will likely run on later versions but is built and tested on 9.1LTS
 * Add the relevant [dependencies](#cluster-dependencies)
-* Azure - Spot Instances not yet tested
 
 ### Cluster Dependencies
 Add the following dependencies to your cluster
 * Overwatch Assembly (fat jar): `com.databricks.labs:overwatch_2.12:<latest>`
 * **(Azure Only)** azure-eventhubs-spark - integration with Azure EventHubs
-    * Maven Coordinate: `com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.18`
+    * Maven Coordinate: `com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21`
 
 ### Notes on Autoscaling
 * Auto-scaling compute -- **Not Recommended** Use [**Intelligent Scaling**]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling)
@@ -33,7 +40,7 @@ Add the following dependencies to your cluster
   (for historical loads) and have to be throttled to protect the workspace. As such, it's recommended to not use
   autoscaling; use [Intelligent Scaling]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling) 
   instead as it is Overwatch aware and will make better autoscaling decisions.
-* Auto-scaling Storage -- **Strongly Recommended** for historical loads
+* Auto-scaling Local Storage -- **Strongly Recommended** for historical loads
   * Some of the data sources can grow to be quite large and require very large shuffle stages which requires
     sufficient local disk. If you choose not to use auto-scaling storage be sure you provision sufficient local
     disk space.
@@ -61,17 +68,18 @@ processes).
 In a notebook, run the following commands (customized for your needs of course) to initialize the targets. For 
 additional details on config customization options see [**configuration**]({{%relref "GettingStarted/Configuration.md"%}}).
 
-**Example Notebooks:**
+#### Jump Start Notebooks
 The following notebooks will demonstrate a typical best practice for multi-workspace (and stand-alone) configurations. 
 Simply populate the necessary variables for your environment.
+* AZURE ([HTML 0.6.0+](/assets/GettingStarted/azure_runner_docs_example_060.html) / [DBC 0.6.0+](/assets/GettingStarted/azure_runner_docs_example_060.dbc))
+* AWS ([HTML 0.6.0+](/assets/GettingStarted/aws_runner_docs_example_060.html) / [DBC 0.6.0+](/assets/GettingStarted/aws_runner_docs_example_060.dbc))
 * AZURE ([HTML 0.5.0.4+](/assets/GettingStarted/azure_runner_docs_example_0504.html) / [DBC 0.5.0.4+](/assets/GettingStarted/azure_runner_docs_example_0504.dbc))
-* AWS ([HTML 0.4.2+](/assets/GettingStarted/aws_runner_docs_example_042.html) / [DBC 0.4.2+](/assets/GettingStarted/aws_runner_docs_example_042.dbc))
-* AZURE ([HTML 0.4.2+](/assets/GettingStarted/azure_runner_docs_example_042.html) / [DBC 0.4.2+](/assets/GettingStarted/azure_runner_docs_example_042.dbc))
-* AWS ([HTML PRE 0.4.2](/assets/GettingStarted/aws_runner_docs_example_041.html) / [DBC PRE 0.4.2](/assets/GettingStarted/aws_runner_docs_example_041.dbc))
-* AZURE ([HTML PRE 0.4.2](/assets/GettingStarted/azure_runner_docs_example_041.html) / [DBC PRE 0.4.2](/assets/GettingStarted/azure_runner_docs_example_041.dbc))
+* AWS ([HTML 0.5.x](/assets/GettingStarted/aws_runner_docs_example_042.html) / [DBC 0.5.x](/assets/GettingStarted/azure_runner_docs_example_042.dbc))
 
 The code snippet below will initialize the workspace (simple aws example).
 ```scala
+private val storagePrefix = "/mnt/global/Overwatch/working/directory"
+private val workspaceID = ??? //automatically generated in the runner scripts referenced above
 private val dataTarget = DataTarget(
   Some(etlDB), Some(s"${storagePrefix}/${workspaceID}/${etlDB}.db"), Some(s"${storagePrefix}/global_share"),
   Some(consumerDB), Some(s"${storagePrefix}/${workspaceID}/${consumerDB}.db")
@@ -82,6 +90,7 @@ private val badRecordsPath = s"${storagePrefix}/${workspaceID}/sparkEventsBadRec
 private val auditSourcePath = "/path/to/my/workspaces/raw_audit_logs" // INPUT: workspace audit log directory
 private val interactiveDBUPrice = 0.56
 private val automatedDBUPrice = 0.26
+private val customWorkspaceName = workspaceID // customize this to a custom name if custom workspace_name is desired
 
 val params = OverwatchParams(
   auditLogConfig = AuditLogConfig(rawAuditPath = Some(auditSourcePath)),
@@ -91,18 +100,22 @@ val params = OverwatchParams(
   overwatchScope = Some(scopes),
   maxDaysToLoad = maxDaysToLoad,
   databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice),
-  primordialDateString = Some(primordialDateString)
+  primordialDateString = Some(primordialDateString),
+  workspace_name = Some(customWorkspaceName), // as of 0.6.0
+  externalizeOptimize = false // as of 0.6.0
 )
 
-private val args = JsonUtils.objToJson(params).compactString
-val workspace = Initializer(args) // 0.4.2+
-//val workspace = Initializer(Array(args)) // Deprecated - pre 0.4.2
+// args are the full json config to be used for the Overwatch workspace deployment
+val args = JsonUtils.objToJson(params).compactString
+
+// the workspace object contains everything Overwatch needs to build, run, maintain its pipelines
+val workspace = Initializer(args) // 0.5.x+
 ```
 
-If this is the first run and you'd like to customize compute costs to mirror your region / contract price, be sure to 
-run the following to initialize the pipeline which will in turn create the instanceDetails table, which you can edit 
-/ complete according to your needs. This is only necessary for first-time init with custom costs. More information below 
-in the [Configuring Custom Costs](#configuring-custom-costs) section.
+If this is the first run and you'd like to **customize compute costs** to mirror your region / contract price, be sure to 
+run the following to initialize the pipeline which will in turn create some costing tables, which you can customize 
+according to your needs. This is only necessary for first-time init with custom costs. More information below 
+in the [**Configuring Custom Costs**](#configuring-custom-costs) section.
 ```scala
 Bronze(workspace)
 ```
@@ -110,56 +123,32 @@ Bronze(workspace)
 This is also a great time to materialize the JSON configs for use in the Databricks job the main class (not notebook) 
 is to be used to execute the job.
 ```scala
-val escapedConfigString = JsonUtils.objToJson(params).escapedString
-val prettyConfigString = JsonUtils.objToJson(params).compactString
+val escapedConfigString = JsonUtils.objToJson(params).escapedString // used for job runs using main class
+val compactConfigString = JsonUtils.objToJson(params).compactString // used to instantiate workspace in a notebook
+val prettyConfigString = JsonUtils.objToJson(params).prettyString // human-readable json config 
 ```
 
-The target database\[s\] should now be visible from the data tab in Databricks. Additionally, the consumer database 
-should contain the [InstanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table. This is the 
-time to make customizations to this table, after first init but before first pipeline run.
+The target database\[s\] (defined in the *dataTarget* variable above) should now be visible from the data tab 
+in Databricks. Additionally, the ETL database 
+should contain the custom costing tables, 
+[instanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) and 
+[dbuCostDetails]({{%relref "DataEngineer/Definitions.md"%}}/#dbucostdetails). This is a good time 
+to [customize compute prices](#configuring-custom-costs) if you so desire; after first init but before first pipeline run.
 
-### Configuring Custom Costs
-There are three essential components to the cost function:
-* The node type and its associated contract price
-* The node type and its associated DBUs per hour
-* The DBU contract prices for the SKU under which your DBUs are charged such as:
-  * Interactive
-  * Automated
-  * DatabricksSQL (not automatically calculated in Gold as of 0.4.2)
-  * JobsLight (not automatically calculated in Gold as of 0.4.2)
+### Executing The Pipeline
+{{% notice info %}}
+Don't load years worth of data on your first attempt. There are very simple 
+[workspace cleanup scripts]({{%relref "FAQ"%}}/##q1-how-to-clean-re-deploy) in the docs
+to allow you to quickly start fresh. Best practice is to load the latest 5 or so days (i.e. set primordial date to
+today minus 5) and let the entire pipeline run, review the pipReport and validate everything. If all looks good,
+now you can begin your historical loading journey. **NOTE** cluster events are only available for 30 days thus
+*clusterStateFact* and *jobRunCostPotentialFact* will not load for data older than 30 days.
+{{% /notice %}}
 
-The DBU contract costs are captured from the [Overwatch run config]({{%relref "GettingStarted/Configuration.md"%}}/#databrickscontractprices); 
-however, compute costs and dbu to node
-associations are maintained in the [InstanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table.
-**IMPORTANT** This table is automatically created in the target database upon first initialization of the pipeline. 
-**DO NOT** try to manually create the target database outside of Overwatch as that will lead to database validation errors. 
+### Via A Notebook
+Now that we understand our config and have a valid workspace object, the Overwatch pipeline can be run. It's often 
+a good idea to run the first run from a notebook to validate the configuration and the pipeline.
 
-**To customize costs** using this table run the [first initialization](#initializing-the-environment) as detailed above 
-including the pipeline initialization (e.g Bronze(workspace) - DO NOT call the .run function yet).
-Note that each subsequent workspace referencing the same etlDataPathPrefix on which you execute Overwatch, the 
-default costs by node will be appended to instanceDetails table if no data is present for that organization_id 
-(i.e. workspace). If you would like to customize compute costs for all workspaces,   
-export the instanceDetails dataset to external editor (after first init), add the required metrics mentioned above 
-for each workspace, and overwrite the target table with the customized cost information. Note that the instanceDetails 
-object in the consumer database is just a view so you must edit/overwrite the table in the ETL database. The view 
-will automatically be recreated upon first pipeline run. 
-
-More details available at the [InstanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table definition
-
-[Helpful Tool (AZURE_Only)](https://azureprice.net/) to get pricing by region by node.
-
-
-{{< rawhtml >}}
-<a href="https://drive.google.com/file/d/1tj0GV-vX1Ka9cRcJpJSwkQx6bbpueSwl/view?usp=sharing" target="_blank">AWS Example</a>
-{{< /rawhtml >}} |
-{{< rawhtml >}}
-<a href="https://drive.google.com/file/d/13hYZrOAmzLwIjfgNz0YWx-qE2TdWe0-c/view?usp=sharing" target="_blank">Azure Example</a>
-{{< /rawhtml >}}
-
-### Executing Overwatch via Notebook
-Continuing from where we left off above in [Initializing The Environment](#initializing-the-environment), we'll 
-make sure we have the workspace variable and then we can run the pipeline layers in order. Note that when executing
-via a notebook, the pretty / compact arguments String should be used (not the escaped string).
 ```scala
 private val args = JsonUtils.objToJson(params).compactString
 val workspace = Initializer(Array(args), debugFlag = false)
@@ -169,40 +158,91 @@ Silver(workspace).run()
 Gold(workspace).run()
 ```
 
-### Executing Overwatch via Main Class
+### Via Main Class
 {{% notice note %}}
 **AZURE** Must use version 0.5.0.4 or later so as not to pass EH connection string credentials into arguments in 
 clear text.
 {{% /notice %}}
+
 The Main class version does the same thing as the notebook version the difference is just how it's kicked off and
-configured. The tricky party about the main class is that the parameters must be passed in as a json array of a strings 
-with one length and escaped. The "OverwatchParams" object gets serialized and passed into the args of the Main Class. To
+configured. The tricky party about the main class is that the parameters must be passed in as a json array of 
+escaped strings (this is why the JsonUtils above have the option for *escapedString*. 
+The "OverwatchParams" object gets serialized and passed into the args of the Main Class. To
 simplify the creation of this string simply follow the example above [Initializing The Environment](#initializing-the-environment)
-and use the `escapedConfigString`. Now that you have the string, setup the job with that string as the Parameters. 
-The Main Class for histoical batch is `com.databricks.labs.overwatch.BatchRunner`<br>
+and use the *escapedConfigString*. Now that you have the string, setup the job with that string as the Parameters. 
+The Main Class for historical batch is `com.databricks.labs.overwatch.BatchRunner`<br>
+
+Notice that the escaped Overwatch Json config goes inside the array of strings parameter config
+```json
+["<overwatch_escaped_params>"]
+["bronze", "<overwatch_escaped_params>"]
+["silver", "<overwatch_escaped_params>"]
+["gold", "<overwatch_escaped_params>"]
+```
 
 {{% notice info %}}
-**If a single argument** passed to main class: Arg(0) is Overwatch Parameters json string (escaped if sent through API). 
+**If a single argument** passed to main class: Arg(0) is Overwatch Parameters json string (escaped if sent through API).
 **If TWO arguments** are passed to main class: Arg(0) must be 'bronze', 'silver', or 'gold' corresponding to the 
 Overwatch Pipeline layer you want to be run. Arg(1) will be the Overwatch Parameters json string.
 {{% /notice %}}
 
-![job_params](/images/GettingStarted/job_params.png) <br>
-![jarSetupExample](/images/GettingStarted/jarSetupExample.png)
+![newUIJarSetup](/images/GettingStarted/0601JobSetupExample.png)
 
-#### The new Jobs UI
-There's a new jobs UI being rolled out around the same time as Overwatch and to use it there is a slight difference, the 
-string needs to be wrapped inside an array, thus the escapedConfigString should be surrounded by `["<escapedConfigString>"]`
-where <escapedConfigString> is replaced with the actual parameters string. The images below should help clarify.
+### Configuring Custom Costs
+There are three essential components to the cost function:
+* The node type and its associated contract price
+* The node type and its associated DBUs per hour
+* The DBU contract prices for the SKU under which your DBUs are charged such as:
+  * Interactive
+  * Automated
+  * DatabricksSQL
+  * JobsLight
 
-![newUIJarSetup](/images/GettingStarted/jarSetupNewUI.png) <br>
-![newUIJarSetup](/images/GettingStarted/OverwatchViaMaven.png)
+The DBU contract costs are captured from the
+[Overwatch Configuration]({{%relref "GettingStarted/Configuration.md"%}}/#databrickscontractprices) maintained
+as a slow-changing-dimension in the [dbuCostDetails table]({{%relref "DataEngineer/Definitions.md"%}}/#dbucostdetails).
+The compute costs and dbu to node
+associations are maintained as a slow-changing-dimension in the
+[instanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table.
+* **IMPORTANT** These tables are automatically created in the dataTarget upon first initialization of the pipeline.
+* **DO NOT** try to manually create the target database outside of Overwatch as that will lead to database validation errors.
 
-### Modules
-Choosing which modules are right for your organization can seem a bit overwhelming, but for now it should be
-quite simple as several modules aren't yet released in this version. "Modules" are also
-referred to as "Scope", the meaning is synonymous. To understand which modules are available in your
-version and get more details on what's included, please refer to [Modules]({{%relref "GettingStarted/Modules.md"%}})
+**To customize costs** generate the workspace object as demonstrated in the [Jump Start Notebooks](#jump-start-notebooks)
+above. Once the configs are built out and the workspace object is ready, the Bronze pipeline can be instantiated
+(but not ran) to initialize the custom cost tables for customization.
+
+Note that each subsequent workspace referencing the same dataTarget will append default compute prices to instanceDetails
+table if no data is present for that organization_id (i.e. workspace).
+If you would like to customize compute costs for all workspaces,   
+export the instanceDetails dataset to external editor (after first init), add the required metrics referenced above
+for each workspace, and update the target table with the customized cost information. Note that the instanceDetails
+object in the consumer database is just a view so you must edit/overwrite the underlying table in the ETL database. The view
+will automatically be recreated upon first pipeline run.
+
+**IMPORTANT** These cost tables are slow-changing-dimensions and thus they have specific rule requirements; familiarize
+yourself with the details at the links below. If the rules fail, the Gold Pipeline will fail with specific costing
+errors to help you resolve it.
+* [InstanceDetails Table Details]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails)
+* [dbuCostDetails Table Details]({{%relref "DataEngineer/Definitions.md"%}}/#dbucostdetails)
+
+[Helpful Tool (AZURE_Only)](https://azureprice.net/) to get pricing by region by node.
+
+Sample compute details available below. These are only meant for reference, they do not have all required fields.
+Follow the instruction above for how to implement custom costs.
+{{< rawhtml >}}
+<a href="https://drive.google.com/file/d/1tj0GV-vX1Ka9cRcJpJSwkQx6bbpueSwl/view?usp=sharing" target="_blank">AWS Example</a>
+{{< /rawhtml >}} |
+{{< rawhtml >}}
+<a href="https://drive.google.com/file/d/13hYZrOAmzLwIjfgNz0YWx-qE2TdWe0-c/view?usp=sharing" target="_blank">Azure Example</a>
+{{< /rawhtml >}}
+
+### Overwatch Scopes
+The Overwatch parameters take in *scopes* which reference an abstract Databricks component that can be 
+enabled/disabled for Overwatch observability. If a scope such as *jobs* is disabled, none of the bronze/silver/gold 
+modules that materialize databricks jobs will be created. Furthermore, neither will any of their dependencies. For 
+example, if jobs is disabled, jobs, jobRuns and jobRunCostPotentialFact will all be missing from the data model as 
+they were disabled. It's recommended to just leave them all enabled unless there's a specific need to disable a scope.
+For more information on scopes and modules please refer to [Modules]({{%relref "GettingStarted/Modules.md"%}})
 
 ### Security Considerations
 
