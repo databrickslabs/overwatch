@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import io.delta.tables.DeltaTable
 import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -356,7 +357,7 @@ object Helpers extends SparkSessionWrapper {
    * @param cloudProvider - name of the cloud provider
    */
   @throws(classOf[UnhandledException])
-  private[overwatch] def fastDrop(target: PipelineTable, cloudProvider: String): Unit = {
+  private[overwatch] def fastDrop(target: PipelineTable, cloudProvider: String): String = {
     require(target.exists, s"TARGET DOES NOT EXIST: ${target.tableFullName}")
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "true")
     if (cloudProvider == "aws") {
@@ -377,9 +378,53 @@ object Helpers extends SparkSessionWrapper {
       fastrm(Array(target.tableLocation))
     }
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "false")
+    s"SHRED COMPLETE: ${target.tableFullName}"
   }
 
-  private def getURI(pathString: String): URI = {
+  /**
+   * Execute a parallelized clone to follow the instructions provided through CloneDetail class
+   * @param cloneDetails details required to execute the parallelized clone
+   * @return
+   */
+  def parClone(cloneDetails: Seq[CloneDetail]): Seq[CloneReport] = {
+    val cloneDetailsPar = cloneDetails.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    cloneDetailsPar.tasksupport = taskSupport
+
+    logger.log(Level.INFO, "CLONE START:")
+    cloneDetailsPar.map(cloneSpec => {
+      val baseCloneStatement = s"CREATE OR REPLACE TABLE delta.`${cloneSpec.target}` ${cloneSpec.cloneLevel} CLONE " +
+        s"delta.`${cloneSpec.source}`"
+      val stmt = if (cloneSpec.asOfTS.isEmpty) { // asofTS empty
+        baseCloneStatement
+      } else { // asofTS provided
+        val temporalCloneStatement = s"$baseCloneStatement TIMESTAMP AS OF '${cloneSpec.asOfTS.get}'"
+        temporalCloneStatement
+      }
+      logger.log(Level.INFO, stmt)
+      try {
+        spark.sql(stmt)
+        logger.log(Level.INFO, s"CLONE COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
+        CloneReport(cloneSpec, stmt, "SUCCESS")
+      } catch {
+        case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
+          val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
+            s"resulted in a temporally unsafe exception. Cloned the source without the as of timestamp arg. " +
+            s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
+          logger.log(Level.WARN, msg)
+          spark.sql(baseCloneStatement)
+          CloneReport(cloneSpec, baseCloneStatement, msg)
+        }
+        case e: Throwable => CloneReport(cloneSpec, stmt, e.getMessage)
+      }
+    }).toArray.toSeq
+  }
+
+  def getLatestVersion(tablePath: String): Long = {
+    DeltaTable.forPath(tablePath).history(1).select('version).as[Long].head
+  }
+
+  def getURI(pathString: String): URI = {
     val path = PipelineFunctions.cleansePathURI(pathString)
     new URI(path)
   }

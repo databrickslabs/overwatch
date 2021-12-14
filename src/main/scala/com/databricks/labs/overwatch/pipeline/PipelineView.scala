@@ -12,7 +12,7 @@ case class PipelineView(name: String,
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
 
-  def publish(colDefinition: String): Unit = {
+  def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false): Unit = {
     if (dataSource.exists) {
       val pubStatementSB = new StringBuilder("create or replace view ")
       pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
@@ -29,6 +29,14 @@ case class PipelineView(name: String,
           partMap.tail.foreach(pCol => {
             pubStatementSB.append(s"and ${pCol._1} = ${dataSource.name}.${pCol._2} ")
           })
+        }
+        if (sorted) {
+          val orderDef = if (reverse) {
+            dataSource.incrementalColumns.map(c => s"$c desc").mkString(", ")
+          } else {
+            dataSource.incrementalColumns.mkString(", ")
+          }
+          pubStatementSB.append(s"order by $orderDef ")
         }
       }
       val pubStatement = pubStatementSB.toString()

@@ -48,8 +48,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.clusters => {
         Array(clusterModule)
       }
+      case OverwatchScope.clusterEvents => {
+        Array(clusterStateFactModule)
+      }
       case OverwatchScope.jobs => {
-        Array(jobsModule, jobRunsModule)
+        Array(jobsModule, jobRunsModule, jobRunCostPotentialFactModule)
       }
       case OverwatchScope.sparkEvents => {
         Array(
@@ -57,7 +60,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           sparkStageModule,
           sparkTaskModule,
           sparkExecutorModule,
-          sparkExecutionModule
+          sparkExecutionModule,
+          sparkStreamModule
         )
       }
       case _ => Array[Module]()
@@ -68,14 +72,14 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  lazy private[overwatch] val clusterModule = Module(3001, "Gold_Cluster", this, Array(2014))
+  lazy private[overwatch] val clusterModule = Module(3001, "Gold_Cluster", this, Array(2014, 2019))
   lazy private val appendClusterProccess = ETLDefinition(
     SilverTargets.clustersSpecTarget.asIncrementalDF(clusterModule, "timestamp"),
     Seq(buildCluster()),
     append(GoldTargets.clusterTarget)
   )
 
-  lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(1005, 2014), 3.0)
+  lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(2019, 2014), 3.0)
   lazy private val appendClusterStateFactProccess = ETLDefinition(
     SilverTargets.clusterStateDetailTarget.asIncrementalDF(clusterStateFactModule, SilverTargets.clusterStateDetailTarget.incrementalColumns),
     Seq(buildClusterStateFact(
@@ -293,7 +297,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     executeModules()
     buildFacts()
 
-    if (!config.externalizeOptimize) initiatePostProcessing()
+    initiatePostProcessing()
     this // to be used as fail switch later if necessary
   }
 

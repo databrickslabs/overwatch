@@ -2,12 +2,14 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils._
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
+import java.io.{PrintWriter, StringWriter}
 import java.net.URI
 
 object PipelineFunctions {
@@ -173,7 +175,7 @@ object PipelineFunctions {
       // TODO -- handle streaming until Module refactor with source -> target mappings
       val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
         target.name match {
-          case "audit_log_bronze" =>
+          case "audit_log_bronze" => // TODO -- check to ensure this should be audit_log_bronze, not audit_log_raw_events
             target.asDF.rdd.partitions.length * target.shuffleFactor
           case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
         }
@@ -241,6 +243,47 @@ object PipelineFunctions {
     }
   }
 
+  def cleanseCorruptAuditLogs(spark: SparkSession, df: DataFrame): DataFrame = {
+    import spark.implicits._
+    val flatFieldNames = SchemaTools.getAllColumnNames(df.select(col("requestParams")).schema)
+    val corruptedNames = Array("requestParams.DataSourceId", "requestParams.DashboardId", "requestParams.AlertId")
+    if (corruptedNames.length != corruptedNames.diff(flatFieldNames).length) { // df has at least one of the corrupted names
+      logger.warn("Handling corrupted source audit log field requestParams.DataSourceId")
+      spark.conf.set("spark.sql.caseSensitive", "true")
+    val rpFlatFields = flatFieldNames
+        .filterNot(fName => corruptedNames.contains(fName))
+
+      val cleanRPFields = rpFlatFields.map {
+        case "requestParams.dataSourceId" =>
+          if (flatFieldNames.contains("requestParams.DataSourceId")) {
+            when('actionName === "executeFastQuery", $"requestParams.DataSourceId")
+              .when('actionName === "executeAdhocQuery", $"requestParams.dataSourceId")
+              .otherwise(lit(null).cast("string"))
+              .alias("dataSourceId")
+          } else $"requestParams.dataSourceId"
+        case "requestParams.dashboardId" =>
+          if (flatFieldNames.contains("requestParams.DashboardId")) {
+            when(
+              'actionName.isin("createRefreshSchedule", "deleteRefreshSchedule", "updateRefreshSchedule"),
+              $"requestParams.DashboardId"
+            ).otherwise($"requestParams.dashboardId")
+              .alias("dashboardId")
+          } else $"requestParams.dashboardId"
+        case "requestParams.alertId" =>
+          if (flatFieldNames.contains("requestParams.AlertId")) {
+            when(
+              'actionName.isin("createRefreshSchedule", "deleteRefreshSchedule", "updateRefreshSchedule"),
+              $"requestParams.AlertId"
+            ).otherwise($"requestParams.alertId")
+              .alias("alertId")
+          } else $"requestParams.alertId"
+        case fName => col(fName)
+      }
+
+      df.withColumn("requestParams", struct(cleanRPFields: _*))
+    } else df
+  }
+
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
   //  currently filters with nested columns aren't supported
   def withIncrementalFilters(
@@ -286,6 +329,14 @@ object PipelineFunctions {
           logger.log(Level.WARN, s"Failed trying to set $k", e)
       }
     }
+  }
+
+  def appendStackStrace(e: Throwable, customMsg: String = ""): String = {
+    val sw = new StringWriter
+    sw.append(customMsg + "\n")
+    sw.append(e.getMessage + "\n")
+    e.printStackTrace(new PrintWriter(sw))
+    sw.toString
   }
 
   /**
@@ -402,6 +453,51 @@ object PipelineFunctions {
     } else {
       coalesce(colToFill, last(colToFill, true).over(w)).alias(colToFillName)
     }
+  }
+
+  def getDeltaHistory(spark: SparkSession, target: PipelineTable, n: Int = 9999): DataFrame = {
+    import spark.implicits._
+    DeltaTable.forPath(target.tableLocation).history(n)
+      .select(
+        'version,
+        'timestamp,
+        'operation,
+        'clusterId,
+        'operationMetrics,
+        'userMetadata
+      )
+  }
+
+  def getTargetWriteMetrics(
+                             spark: SparkSession,
+                             target: PipelineTable,
+                             snapTime: TimeTypes,
+                             runId: String,
+                             operations: Array[String] = Array("WRITE", "MERGE")
+                           ): Map[String, String] = {
+    import spark.implicits._
+    getDeltaHistory(spark, target)
+      .filter('operation.isin(operations: _*))
+      .filter('timestamp > snapTime.asColumnTS && 'userMetadata === runId)
+      .withColumn("rnk", rank().over(Window.orderBy('timestamp)))
+      .filter('rnk === 1)
+      .as[DeltaHistory]
+      .collect()
+      .headOption
+      .map(_.operationMetrics)
+      .getOrElse(Map[String, String]())
+
+  }
+
+  def getLastOptimized(spark: SparkSession, target: PipelineTable): Long = {
+    import spark.implicits._
+    getDeltaHistory(spark, target)
+      .filter('operation === "OPTIMIZE")
+      .select(max(unix_timestamp('timestamp) * 1000))
+      .as[Option[Long]]
+      .collect()
+      .head
+      .getOrElse(0L)
   }
 
 }

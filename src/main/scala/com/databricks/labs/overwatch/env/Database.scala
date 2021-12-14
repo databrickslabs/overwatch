@@ -133,7 +133,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     var finalDF: DataFrame = df
     finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
     finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
-    finalDF = if (target.withWorkspaceFriendlyName) finalDF.withColumn("Workspace_Name", lit(config.workspaceFriendlyName)) else finalDF
+    finalDF = if (target.workspaceName) finalDF.withColumn("workspace_name", lit(config.workspaceName)) else finalDF
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
@@ -157,6 +157,7 @@ class Database(config: Config) extends SparkSessionWrapper {
            |MERGE CONDITION: $mergeCondition
            |""".stripMargin
       logger.log(Level.INFO, mergeDetailMsg)
+      spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", config.runID)
       // TODO -- when DBR 9.1 LTS GA, use LSM (low-shuffle-merge) to improve pipeline
       deltaTarget
         .merge(updatesDF, mergeCondition)
@@ -165,6 +166,8 @@ class Database(config: Config) extends SparkSessionWrapper {
         .whenNotMatched
         .insertAll()
         .execute()
+
+      spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
 
     } else {
       logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")

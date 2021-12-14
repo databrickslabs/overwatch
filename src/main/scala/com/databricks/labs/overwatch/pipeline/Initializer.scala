@@ -21,6 +21,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _isSnap: Boolean = false
+  private var _disableValidations: Boolean = false
 
   private def setIsSnap(value: Boolean): this.type = {
     _isSnap = value
@@ -28,6 +29,13 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   }
 
   private def isSnap: Boolean = _isSnap
+
+  private def setDisableValidations(value: Boolean): this.type = {
+    _disableValidations = value
+    this
+  }
+
+  private def disableValidations: Boolean = _disableValidations
 
   /**
    * Initialize the "Database" object
@@ -93,8 +101,31 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     intelligentScaling
   }
 
+  private def quickBuildAuditLogConfig(auditLogConfig: AuditLogConfig): AuditLogConfig = {
+    if (auditLogConfig.rawAuditPath.nonEmpty) {
+      val auditLogPath = auditLogConfig.rawAuditPath.get
+      val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim
+
+      val finalAuditLogPath = if (auditLogPath.endsWith("/")) auditLogPath.dropRight(1) else auditLogPath
+      auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
+    } else if (auditLogConfig.azureAuditLogEventhubConfig.nonEmpty) {
+      val ehConfig = auditLogConfig.azureAuditLogEventhubConfig.get
+      val ehPrefix = ehConfig.auditRawEventsPrefix
+      val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
+      val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
+      val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
+      val ehFinalConfig = auditLogConfig.azureAuditLogEventhubConfig.get.copy(
+        auditRawEventsPrefix = cleanPrefix,
+        auditRawEventsChk = Some(rawEventsCheckpoint),
+        auditLogChk = Some(auditLogBronzeChk)
+      )
+      auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig))
+    } else throw new BadConfigException("Audit Configuration Failed")
+
+  }
+
   @throws(classOf[BadConfigException])
-  private def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): this.type = {
+  private def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): AuditLogConfig = {
 
     if (config.cloudProvider == "aws") {
 
@@ -118,9 +149,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
       val finalAuditLogPath = if (auditLogPath.get.endsWith("/")) auditLogPath.get.dropRight(1) else auditLogPath.get
 
-      config.setAuditLogConfig(
-        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
-      )
+      // return validated audit log config for aws
+      auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
 
     } else {
       val ehConfigOp = auditLogConfig.azureAuditLogEventhubConfig
@@ -147,14 +177,11 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         auditLogChk = Some(auditLogBronzeChk)
       )
 
-      config.setAuditLogConfig(auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig)))
       // parse the connection string to validate format
-      PipelineFunctions.parseEHConnectionString(
-        config.auditLogConfig.azureAuditLogEventhubConfig.get.connectionString
-      )
-
+      PipelineFunctions.parseEHConnectionString(ehFinalConfig.connectionString)
+      // return validated auditLogConfig for Azure
+      auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig))
     }
-    this
   }
 
   private def isPVC: Boolean = {
@@ -164,8 +191,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       config.setIsPVC(true)
       if (config.debugFlag) println(pvcDetectedMsg)
       logger.log(Level.INFO, pvcDetectedMsg)
-      require(config.workspaceFriendlyName.toLowerCase != config.organizationId.toLowerCase,
-        s"PVC workspaces require the 'workspaceFriendlyName' to be configured in the Overwatch configs for " +
+      require(config.workspaceName.toLowerCase != config.organizationId.toLowerCase,
+        s"PVC workspaces require the 'workspaceName' to be configured in the Overwatch configs for " +
           s"data continuity. Please choose a friendly workspace name and add it to the configuration and try to " +
           s"run the pipeline again."
       )
@@ -175,10 +202,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
   private def pvcOverrideOrganizationId: Unit = {
     val overrideMsg = s"Databricks PVC: Overriding organization_id from ${config.organizationId} to " +
-      s"${config.workspaceFriendlyName} to accommodate data continuity across deployments"
+      s"${config.workspaceName} to accommodate data continuity across deployments"
     if (config.debugFlag) println(overrideMsg)
     logger.log(Level.INFO, overrideMsg)
-    config.setOrganizationId(config.workspaceFriendlyName)
+    config.setOrganizationId(config.workspaceName)
   }
 
   /**
@@ -223,15 +250,15 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setInputConfig(rawParams)
 
 
-    val overwatchFriendlyName = rawParams.workspaceFriendlyName.getOrElse(config.organizationId)
-    config.setworkspaceFriendlyName(overwatchFriendlyName)
+    val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
+    config.setWorkspaceName(overwatchFriendlyName)
 
     /**
      * PVC: HARD OVERRIDE FOR PVC
      * Each time PVC deploys a newer version the derived organization_id changes due to the load balancer id
      * and/or URL to access the workspace changes. There are no identifiable, equal values that can be found
      * between one deployment and the next. To resolve this, PVC customers will be REQUIRED to provide a canonical
-     * name for each workspace (i.e. workspaceFriendlyName) to provide consistency across deployments.
+     * name for each workspace (i.e. workspaceName) to provide consistency across deployments.
      */
     if (isPVC) pvcOverrideOrganizationId
 
@@ -250,7 +277,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
     // validate token secret requirements
     // TODO - Validate if token has access to necessary assets. Warn/Fail if not
-    if (tokenSecret.nonEmpty && !config.isLocalTesting) {
+    if (tokenSecret.nonEmpty && !disableValidations && !config.isLocalTesting) {
       if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
         throw new BadConfigException(s"Secret AND Key must be provided together or neither of them. " +
           s"Either supply both or neither.")
@@ -269,7 +296,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     } else config.registerWorkspaceMeta(None)
 
     // Validate data Target
-    if (!config.isLocalTesting) dataTargetIsValid(dataTarget)
+    if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
 
     // If data target is valid get db name and location and set it
     val dbName = dataTarget.databaseName.get
@@ -291,14 +318,20 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setPrimordialDateString(rawParams.primordialDateString)
 
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
-    validateAuditLogConfigs(auditLogConfig)
+    if (!disableValidations) {
+      config.setAuditLogConfig(validateAuditLogConfigs(auditLogConfig))
+    } else {
+      config.setAuditLogConfig(quickBuildAuditLogConfig(auditLogConfig))
+    }
+
 
     // Todo -- add validation to badRecordsPath
     config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
 
     config.setMaxDays(rawParams.maxDaysToLoad)
 
-    config.setIntelligentScaling(validateIntelligentScaling(rawParams.intelligentScaling))
+    if (!disableValidations) validateIntelligentScaling(rawParams.intelligentScaling)
+    config.setIntelligentScaling(rawParams.intelligentScaling)
 
     this
   }
@@ -519,7 +552,12 @@ object Initializer extends SparkSessionWrapper {
     workspace
   }
 
-  private[overwatch] def apply(overwatchArgs: String, debugFlag: Boolean, isSnap: Boolean): Workspace = {
+  private[overwatch] def apply(
+                                overwatchArgs: String,
+                                debugFlag: Boolean,
+                                isSnap: Boolean,
+                                disableValidations: Boolean
+                              ): Workspace = {
 
     val config = initConfigState(debugFlag)
 
@@ -527,6 +565,7 @@ object Initializer extends SparkSessionWrapper {
     val initializer = new Initializer(config)
     val database = initializer
       .setIsSnap(isSnap)
+      .setDisableValidations(true)
       .validateAndRegisterArgs(overwatchArgs)
       .initializeDatabase()
 

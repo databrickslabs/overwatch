@@ -95,6 +95,9 @@ object Schema extends SparkSessionWrapper {
         StructField("clusterName", StringType, nullable = true),
         StructField("cluster_name", StringType, nullable = true),
         StructField("clusterState", StringType, nullable = true),
+        StructField("dataSourceId", StringType, nullable = true),
+        StructField("dashboardId", StringType, nullable = true),
+        StructField("alertId", StringType, nullable = true),
         StructField("jobId", LongType, nullable = true),
         StructField("job_id", LongType, nullable = true),
         StructField("jobTaskType", StringType, nullable = true),
@@ -110,7 +113,7 @@ object Schema extends SparkSessionWrapper {
         StructField("libraries", StringType, nullable = true),
         StructField("run_name", StringType, nullable = true),
         StructField("name", StringType, nullable = true),
-        StructField("timeout_seconds", StringType, nullable = true),
+        StructField("timeout_seconds", LongType, nullable = true),
         StructField("schedule", StringType, nullable = true),
         StructField("notebook_task", StringType, nullable = true),
         StructField("spark_python_task", StringType, nullable = true),
@@ -122,6 +125,8 @@ object Schema extends SparkSessionWrapper {
         StructField("aclPermissionSet", StringType, nullable = true),
         StructField("grants", StringType, nullable = true),
         StructField("targetUserId", StringType, nullable = true),
+        StructField("aws_attributes", StringType, nullable = true),
+        StructField("azure_attributes", StringType, nullable = true),
         StructField("instanceId", StringType, nullable = true),
         StructField("port", StringType, nullable = true),
         StructField("publicKey", StringType, nullable = true),
@@ -160,7 +165,11 @@ object Schema extends SparkSessionWrapper {
         StructField("driver_instance_pool_id", StringType, nullable = true),
         StructField("instance_pool_id", StringType, nullable = true),
         StructField("instance_pool_name", StringType, nullable = true),
+        StructField("preloaded_spark_versions", StringType, nullable = true),
         StructField("spark_version", StringType, nullable = true),
+        StructField("idle_instance_autotermination_minutes", LongType, nullable = true),
+        StructField("max_capacity", LongType, nullable = true),
+        StructField("min_idle_instances", LongType, nullable = true),
         StructField("cluster_creator", StringType, nullable = true),
         StructField("idempotency_token", StringType, nullable = true),
         StructField("user_id", StringType, nullable = true),
@@ -284,7 +293,7 @@ object Schema extends SparkSessionWrapper {
   ))
 
   // simplified new cluster struct
-  lazy private[overwatch] val simplifiedNewClusterSchema = StructType(Seq(
+  private[overwatch] val simplifiedNewClusterSchema = StructType(Seq(
     StructField("autoscale",
       StructType(Seq(
         StructField("max_workers", LongType, true),
@@ -306,7 +315,7 @@ object Schema extends SparkSessionWrapper {
   ))
 
   // simplified new settings struct
-  lazy private[overwatch] val simplifiedNewSettingsSchema = StructType(Seq(
+  private[overwatch] val simplifiedNewSettingsSchema = StructType(Seq(
     StructField("email_notifications",
       StructType(Seq(
         StructField("no_alert_for_skipped_runs", BooleanType, true),
@@ -329,6 +338,73 @@ object Schema extends SparkSessionWrapper {
         StructField("parameters", ArrayType(StringType, true), true)
       )), true),
     StructField("timeout_seconds", LongType, true)
+  ))
+
+  val streamingGoldMinimumSchema: StructType = StructType(Seq(
+    StructField("cluster_id", StringType, nullable = false),
+    StructField("organization_id", StringType, nullable = false),
+    StructField("spark_context_id", StringType, nullable = false),
+    StructField("stream_id", StringType, nullable = false),
+    StructField("stream_run_id", StringType, nullable = false),
+    StructField("stream_batch_id", LongType, nullable = false),
+    StructField("stream_timestamp", DoubleType, nullable = true),
+    StructField("date", DateType, nullable = false),
+    StructField("streamSegment", StringType, nullable = true),
+    StructField("stream_name", StringType, nullable = true),
+    StructField("streaming_metrics",
+      StructType(Seq(
+        StructField("batchDuration", LongType, nullable = true),
+        StructField("batchId", LongType, nullable = true),
+        StructField("durationMs", StringType, nullable = true),
+        StructField("eventTime", StructType(Seq(
+          StructField("avg", StringType, nullable = true),
+          StructField("max", StringType, nullable = true),
+          StructField("min", StringType, nullable = true),
+          StructField("watermark", StringType, nullable = true)
+        )), nullable = true),
+        StructField("id", StringType, nullable = true),
+        StructField("name", StringType, nullable = true),
+        StructField("runId", StringType, nullable = true),
+        StructField("sink", StringType, nullable = true),
+        StructField("sources", StringType, nullable = true),
+        StructField("stateOperators", StringType, nullable = true),
+        StructField("timestamp", StringType, nullable = true)
+      )), nullable = true),
+    StructField("execution_ids", ArrayType(LongType, containsNull = true), nullable = true)
+  ))
+
+  val poolsSnapMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id",StringType, nullable = false),
+    StructField("Pipeline_SnapTS",TimestampType, nullable = false),
+    StructField("instance_pool_id",StringType, nullable = false),
+    StructField("instance_pool_name",StringType, nullable = true),
+    StructField("node_type_id",StringType, nullable = true),
+    StructField("idle_instance_autotermination_minutes",LongType, nullable = true),
+    StructField("min_idle_instances",LongType, nullable = true),
+    StructField("max_capacity",LongType, nullable = true),
+    StructField("preloaded_spark_versions",ArrayType(StringType, containsNull = true), nullable = true),
+    StructField("aws_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true)
+  ))
+
+  val poolsDeleteSchema: StructType = StructType(Seq(
+    StructField("deleted_by", StringType, nullable = true),
+    StructField("deleted_at_epochMillis", LongType, nullable = true),
+    StructField("deleted_at", TimestampType, nullable = true),
+  ))
+
+  val poolsCreateSchema: StructType = StructType(Seq(
+    StructField("created_by", StringType, nullable = true),
+    StructField("created_at_epochMillis", LongType, nullable = true),
+    StructField("created_at", TimestampType, nullable = true),
+  ))
+
+  val poolsRequestDetails: StructType = StructType(Seq(
+    StructField("requestId",StringType, nullable = true),
+    common("response"),
+    StructField("sessionId",StringType, nullable = true),
+    StructField("sourceIPAddress",StringType, nullable = true),
+    StructField("userAgent",StringType, nullable = true)
   ))
 
   /**
@@ -355,6 +431,8 @@ object Schema extends SparkSessionWrapper {
     2007 -> sparkEventsRawMasterSchema,
     // SparkTasks
     2008 -> sparkEventsRawMasterSchema,
+    // PoolsSpec
+    2009 -> auditMasterSchema,
     // JobStatus
     2010 -> auditMasterSchema,
     // JobRuns
@@ -458,6 +536,25 @@ object Schema extends SparkSessionWrapper {
       StructField("requestId", StringType, nullable = true),
       common("response")
     )),
+    // poolsGold
+    3009 -> StructType(Seq(
+      StructField("organization_id",StringType, nullable = false),
+      StructField("serviceName",StringType, nullable = true),
+      StructField("actionName",StringType, nullable = true),
+      StructField("timestamp",LongType, nullable = false),
+      StructField("date",DateType, nullable = true),
+      StructField("instance_pool_id",StringType, nullable = false),
+      StructField("instance_pool_name",StringType, nullable = true),
+      StructField("node_type_id",StringType, nullable = true),
+      StructField("idle_instance_autotermination_minutes",LongType, nullable = true),
+      StructField("min_idle_instances",LongType, nullable = true),
+      StructField("max_capacity",LongType, nullable = true),
+      StructField("preloaded_spark_versions",StringType, nullable = true),
+      StructField("azure_attributes",MapType(StringType,StringType, valueContainsNull = true), nullable = true),
+      StructField("create_details", poolsCreateSchema, nullable = true),
+      StructField("delete_details", poolsDeleteSchema, nullable = true),
+      StructField("request_details", poolsRequestDetails, nullable = true)
+    )),
     // sparkJob
     3010 -> StructType(Seq(
       StructField("organization_id", StringType, nullable = false),
@@ -553,44 +650,6 @@ object Schema extends SparkSessionWrapper {
       common("endfilenamegroup")
     ))
   )
-
-  val poolSnapMinSchema: StructType = StructType(Seq(
-    StructField("azure_attributes",
-      StructType(Seq(
-        StructField("availability", StringType, true),
-        StructField("spot_bid_max_price", DoubleType, true)
-      )), true),
-    StructField("default_tags",
-      StructType(Seq(
-        StructField("DatabricksInstanceGroupId", StringType, true),
-        StructField("DatabricksInstancePoolCreatorId", StringType, true),
-        StructField("DatabricksInstancePoolId", StringType, true),
-        StructField("MLWorkspaceLinkUpdateTime", StringType, true),
-        StructField("Vendor", StringType, true),
-        StructField("MLWorkspaceUnlinkUpdateTime", StringType, true)
-      )), true),
-    StructField("enable_elastic_disk", BooleanType, true),
-    StructField("idle_instance_autotermination_minutes", LongType, true),
-    StructField("instance_pool_id", StringType, true),
-    StructField("instance_pool_name", StringType, true),
-    StructField("max_capacity", LongType, true),
-    StructField("min_idle_instances", LongType, true),
-    StructField("node_type_id", StringType, true),
-    StructField("preloaded_spark_versions", StringType, true),
-    //   StructField("preloaded_docker_images",ArrayType(StringType,true),true), // SEC-6198 - DO NOT populate or test until closed
-    StructField("state", StringType, true),
-    StructField("stats",
-      StructType(Seq(
-        StructField("idle_count", LongType, true),
-        StructField("pending_idle_count", LongType, true),
-        StructField("pending_used_count", LongType, true),
-        StructField("used_count", LongType, true)
-      )), true),
-    StructField("organization_id", StringType, true),
-    StructField("custom_tags", MapType(StringType, StringType, true), true),
-    StructField("Pipeline_SnapTS", TimestampType, true),
-    StructField("Overwatch_RunID", StringType, true)
-  ))
 
   def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleId)
 

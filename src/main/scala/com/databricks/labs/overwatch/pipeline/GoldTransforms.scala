@@ -1,7 +1,8 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, SchemaTools, TimeTypes}
+import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes}
+import org.apache.log4j.Level
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
@@ -165,8 +166,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'azure_attributes,
       'create_details,
       'delete_details,
-      'request_details,
-      'poolSnapDetails
+      'request_details
     )
   }
 
@@ -344,8 +344,17 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               fromTime: TimeTypes
                                             )(jrGoldLag30D: DataFrame): DataFrame = {
 
-    val clusterPotentialWCosts = clsfLag90D
-      .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
+    val clusterPotentialWCosts = if (clsfLag90D.isEmpty) {
+      val emptyMsg = s"Dependent on clusterStateFact -- Dependent on clusterEventLogs which only has 30d of data " +
+        s"available. You're likely not getting source data for 1 of 2 reasons. 1) the Overwatch account doesn't " +
+        s"have access to any clusters or 2) the Overwatch Pipeline this module is loading historical data and only 30d " +
+        s"of data is accessible for clusterEvents. Progressing module but will not be able to load clusterEvents prior " +
+        s"to today - 30d"
+      throw new NoNewDataException(emptyMsg, Level.WARN, allowModuleProgression = true)
+    } else {
+      clsfLag90D
+        .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
+    }
 
     val newJrLaunches = jrGoldLag30D
       .filter($"job_runtime.startEpochMS" >= fromTime.asUnixTimeMilli)
@@ -811,6 +820,10 @@ trait GoldTransforms extends SparkSessionWrapper {
       .filter('Event.like("org.apache.spark.sql.streaming.StreamingQueryListener%"))
       .filter(!'Event.endsWith("TerminatedEvent")) // no valuable data and no timestamp provided
 
+    // when there is no input data break out of module, progress timeline and continue with pipeline
+    val emptyMsg = s"No new streaming data found."
+    if (streamRawDF.isEmpty) throw new NoNewDataException(emptyMsg, Level.WARN, allowModuleProgression = true)
+
     val lastStreamValue = Window.partitionBy('organization_id, 'SparkContextId, 'clusterId, 'stream_id, 'stream_run_id).orderBy('stream_timestamp)
     val onlyOnceEventGuaranteeW = Window.partitionBy(streamTargetKeys map col: _*).orderBy('fileCreateEpochMS.desc)
 
@@ -837,7 +850,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       $"streamDetails.*"
     )
 
-    val streamsBaseDF = streamRawDF
+    val enhancedStreamsRawDF = streamRawDF
       .withColumn("streaming_metrics", SchemaTools.structFromJson(spark, streamRawDF, "progress"))
       .withColumn("stream_timestamp",
         coalesce(PipelineFunctions.tsToEpochMilli("streaming_metrics.timestamp"), 'Timestamp))
@@ -848,6 +861,20 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("rnk", rank().over(onlyOnceEventGuaranteeW))
       .withColumn("rn", row_number().over(onlyOnceEventGuaranteeW))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn", "fileCreateEpochMS")
+
+    // Convert several complex columns to JSON string since different sources/sinks offer different metrics
+    // the nested structs cannot always be merged; thus, schema on read is required
+    val statefulCustomMetrics = to_json(col("streaming_metrics.stateOperators"))
+    val changeInventory = Map[String, Column](
+      "streaming_metrics.stateOperators" ->
+        when(statefulCustomMetrics === "[]", lit(null).cast("string"))
+          .otherwise(statefulCustomMetrics),
+      "streaming_metrics.durationMs" -> to_json(col("streaming_metrics.durationMs")).alias("durationMs"),
+      "streaming_metrics.sink" -> to_json(col("streaming_metrics.sink")).alias("sink"),
+      "streaming_metrics.sources" -> to_json(col("streaming_metrics.sources")).alias("sources"),
+      "streaming_metrics.metrics" -> to_json(col("streaming_metrics.metrics")).alias("metrics"),
+      "streaming_metrics.observedMetrics" -> to_json(col("streaming_metrics.observedMetrics")).alias("observedMetrics")
+    )
 
     val streamExecutionsKeys = streamTargetKeys
       .filterNot(_ =="stream_timestamp")
@@ -861,10 +888,32 @@ trait GoldTransforms extends SparkSessionWrapper {
       .groupBy(streamExecutionsKeys map col: _*)
       .agg(collect_list('execution_id).alias("execution_ids"))
 
-    streamsBaseDF
+    enhancedStreamsRawDF
+      .select(SchemaTools.modifyStruct(enhancedStreamsRawDF.schema, changeInventory): _*)
       .join(streamingExecutions,
         streamExecutionsKeys,
         "left")
+      .verifyMinimumSchema(Schema.streamingGoldMinimumSchema)
+
+//    val simpleCols = streamsBaseDF.schema.filterNot(f => f.dataType.typeName == "struct").map(f => col(f.name))
+//    val handledStructs = Array("stateOperators", "durationMs", "sink", "sources", "metrics", "eventTime")
+//      .map(fName => s"streaming_metrics.${fName}")
+//
+//    // TODO -- create jsonify unhandled dynamic structs (including nested) function
+//    val streamingMetricsSimpleCols = streamsBaseDF.select($"streaming_metrics.*").schema
+//      .filterNot(f => f.dataType.typeName == "struct").map(f => col(s"streaming_metrics.${f.name}"))
+//    val unhandledStreamingMetricsStructs = streamsBaseDF.select($"streaming_metrics.*").schema
+//      .filter(f => f.dataType.typeName == "struct" && !handledStructs.contains(f.name))
+//      .map(f => to_json(col(s"streaming_metrics.${f.name}")).alias(f.name))
+//    val unhandledTopStructs = streamsBaseDF.schema
+//      .filter(f => f.dataType.typeName == "struct" && f.name != "streaming_metrics")
+//      .map(f => to_json(col(s"${f.name}")).alias(f.name))
+//
+//    val streamsSelects = simpleCols ++
+//      Array(struct(streamingMetricsSimpleCols ++ unhandledStreamingMetricsStructs: _*).alias("streaming_metrics")) ++
+//      unhandledTopStructs
+//
+//    streamsBaseDF.select(streamsSelects: _*)
 
   }
 
@@ -899,7 +948,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, workspace_name, instance_pool_id, serviceName, timestamp, date, actionName, instance_pool_name, node_type_id,
       |idle_instance_autotermination_minutes, min_idle_instances, max_capacity, preloaded_spark_versions,
-      |azure_attributes, create_details, delete_details, request_details, poolSnapDetails
+      |azure_attributes, create_details, delete_details, request_details
       |""".stripMargin
 
   protected val jobViewColumnMapping: String =

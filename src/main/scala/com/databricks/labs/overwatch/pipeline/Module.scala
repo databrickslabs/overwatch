@@ -74,12 +74,17 @@ class Module(
 
     val defaultUntilSecond = pipeline.pipelineSnapTime.asUnixTimeMilli
 
-    // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
-    if (startSecondPlusMaxDays < defaultUntilSecond) {
-      Pipeline.createTimeDetail(startSecondPlusMaxDays)
-    } else {
-      Pipeline.createTimeDetail(defaultUntilSecond)
-    }
+    val sourceAvailableFrom = if (hardLimitMaxHistory.nonEmpty) {
+      // snapTS - hardLimitMaxDaysHistory
+      pipeline.primordialTime(hardLimitMaxHistory).asUnixTimeMilli
+    } else -1L
+
+    val maxAllowedUntilDate = Math.max( // untilTime cannot be < sourceAvailableFrom
+      Math.min( // untilTime cannot be > the least of snapTime, start+maxDays
+        startSecondPlusMaxDays, defaultUntilSecond
+      ), sourceAvailableFrom
+    )
+    Pipeline.createTimeDetail(maxAllowedUntilDate)
   }
 
   private def limitUntilTimeToMostLaggingDependency(originalUntilTime: TimeTypes): TimeTypes = {
@@ -137,19 +142,19 @@ class Module(
    */
   def untilTime: TimeTypes = {
     // Reduce UntilTS IF fromTime + MAX Days < pipeline Snap Time
+    // Increase UntilTS IF snap - hardLimitMaxDays > pipelineSnapTime
     val maxIndependentUntilTime = limitUntilTimeToSnapTime
 
     if (pipeline.readOnly) { // don't validate dependency progress when not writing data to pipeline
       maxIndependentUntilTime
     } else limitUntilTimeToMostLaggingDependency(maxIndependentUntilTime)
-
   }
 
   private def initModuleState: SimplifiedModuleStatusReport = {
     _isFirstRun = true
     val initState = SimplifiedModuleStatusReport(
       organization_id = config.organizationId,
-      workspaceFriendlyName = config.workspaceFriendlyName,
+      workspace_name = config.workspaceName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = Some(pipeline.primordialTime(hardLimitMaxHistory).asDTString),
@@ -158,7 +163,7 @@ class Module(
       fromTS = fromTime.asUnixTimeMilli,
       untilTS = untilTime.asUnixTimeMilli,
       status = s"Initialized",
-      recordsAppended = 0L,
+      writeOpsMetrics = Map[String, String](),
       lastOptimizedTS = 0L,
       vacuumRetentionHours = 24 * 7,
       externalizeOptimize = config.externalizeOptimize
@@ -177,7 +182,7 @@ class Module(
   private def fail(msg: String, rollbackStatus: String = ""): ModuleStatusReport = {
     val failedStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
-      workspaceFriendlyName = config.workspaceFriendlyName,
+      workspace_name = config.workspaceName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = config.primordialDateString,
@@ -186,7 +191,7 @@ class Module(
       fromTS = fromTime.asUnixTimeMilli,
       untilTS = untilTime.asUnixTimeMilli,
       status = s"FAILED --> $rollbackStatus\nERROR:\n$msg",
-      recordsAppended = 0L,
+      writeOpsMetrics = Map[String, String](),
       lastOptimizedTS = moduleState.lastOptimizedTS,
       vacuumRetentionHours = moduleState.vacuumRetentionHours,
       inputConfig = config.inputConfig,
@@ -229,7 +234,7 @@ class Module(
     val startTime = System.currentTimeMillis()
     val emptyStatusReport = ModuleStatusReport(
       organization_id = config.organizationId,
-      workspaceFriendlyName = config.workspaceFriendlyName,
+      workspace_name = config.workspaceName,
       moduleID = moduleId,
       moduleName = moduleName,
       primordialDateString = config.primordialDateString,
@@ -238,7 +243,7 @@ class Module(
       fromTS = fromTime.asUnixTimeMilli,
       untilTS = if (allowModuleProgression) untilTime.asUnixTimeMilli else fromTime.asUnixTimeMilli,
       status = s"EMPTY: $msg",
-      recordsAppended = 0L,
+      writeOpsMetrics = Map[String, String](),
       lastOptimizedTS = moduleState.lastOptimizedTS,
       vacuumRetentionHours = moduleState.vacuumRetentionHours,
       inputConfig = config.inputConfig,
@@ -288,13 +293,15 @@ class Module(
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
 
-    println(s"Beginning: $moduleName")
+    val startMsg = s"\nBeginning: $moduleId-$moduleName\nTIME RANGE: ${fromTime.asTSString} -> ${untilTime.asTSString}"
+    println(startMsg)
 
-    val debugMsg = s"MODULE: $moduleId-$moduleName\nTIME RANGE: " +
-      s"    From -> To == ${fromTime.asTSString} -> ${untilTime.asTSString}"
-    println(debugMsg)
-    logger.log(Level.INFO, debugMsg)
+    if (config.debugFlag) println(startMsg)
+    logger.log(Level.INFO, startMsg)
     try {
+      if (fromTime.asUnixTimeMilli == untilTime.asUnixTimeMilli)
+        throw new NoNewDataException("FROM and UNTIL times are identical. Likely due to upstream dependencies " +
+          "being at or ahead of current module.", Level.WARN)
       validatePipelineState()
       PipelineFunctions.scaleCluster(pipeline, moduleScaleCoefficient)
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
@@ -305,22 +312,23 @@ class Module(
       newState
     } catch {
       case e: ApiCallEmptyResponse =>
-        noNewDataHandler(e.apiCallDetail, Level.ERROR, allowModuleProgression = e.allowModuleProgression)
+        noNewDataHandler(PipelineFunctions.appendStackStrace(e, e.apiCallDetail), Level.ERROR, allowModuleProgression = e.allowModuleProgression)
       case e: ApiCallFailure if e.failPipeline =>
-        fail(e.msg)
+        fail(PipelineFunctions.appendStackStrace(e, e.msg))
       case e: FailedModuleException =>
         val errMessage = s"FAILED: $moduleId-$moduleName Module"
         logger.log(Level.ERROR, errMessage, e)
-        failWithRollback(e.target, s"$errMessage\n${e.getMessage}")
+        failWithRollback(e.target, PipelineFunctions.appendStackStrace(e, errMessage))
       case e: NoNewDataException =>
         // EMPTY prefix gets prepended in the errorHandler
-        val errMessage = s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
+        val customMsg = s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
           s"module will not progress until new data is received by this module.\n " +
-          s"Module Dependencies: ${moduleDependencies.mkString(", ")}\n" + e.getMessage
+          s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        val errMessage = PipelineFunctions.appendStackStrace(e, customMsg)
         logger.log(Level.ERROR, errMessage, e)
         noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
       case e: Throwable =>
-        val msg = s"$moduleName FAILED -->\nMessage: ${e.getMessage}"
+        val msg = PipelineFunctions.appendStackStrace(e, s"$moduleName FAILED -->\n")
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     }
@@ -339,6 +347,9 @@ object Module {
             clusterScaleUpPercent: Double = 1.0,
             hardLimitMaxHistory: Option[Int] = None
            ): Module = {
+
+    // reset spark configs to default for each module
+    pipeline.restoreSparkConf()
 
     new Module(
       moduleId,

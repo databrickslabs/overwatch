@@ -377,7 +377,7 @@ object Kitana {
     )
 
     val snapArgs = objToJson(snapWorkspaceParams).compactString
-    val snapWorkspace = Initializer(snapArgs, debugFlag = origConfig.debugFlag, isSnap = true)
+    val snapWorkspace = Initializer(snapArgs, debugFlag = origConfig.debugFlag, isSnap = true, disableValidations = false)
 
     new Kitana(workspace, snapWorkspace, sourceDBName, parallelism)
 

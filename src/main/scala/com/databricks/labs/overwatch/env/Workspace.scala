@@ -1,10 +1,15 @@
 package com.databricks.labs.overwatch.env
 
+import com.databricks.backend.daemon.dbutils.FileInfo
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCall
-import com.databricks.labs.overwatch.utils.{ApiEnv, Config, SparkSessionWrapper}
-import org.apache.log4j.Logger
+import com.databricks.labs.overwatch.utils.{ApiEnv, BadConfigException, CloneDetail, CloneReport, Config, Helpers, SparkSessionWrapper, WorkspaceDataset, WorkspaceMetastoreRegistrationReport}
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 /**
  * The Workspace class gets instantiated once per run per Databricks workspace. THe need for this class evolved
@@ -41,7 +46,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
     val jobsEndpoint = "jobs/list"
 
-    ApiCall(jobsEndpoint, config.apiEnv)
+    ApiCall(jobsEndpoint, config.apiEnv, debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -58,7 +63,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"
-    ApiCall(clustersEndpoint, config.apiEnv)
+    ApiCall(clustersEndpoint, config.apiEnv, debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -75,7 +80,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val queryMap = Map[String, Any](
       "path" -> dbfsPath
     )
-    ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap))
+    ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap), debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -88,7 +93,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getPoolsDF: DataFrame = {
     val poolsEndpoint = "instance-pools/list"
-    ApiCall(poolsEndpoint, config.apiEnv)
+    ApiCall(poolsEndpoint, config.apiEnv, debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -101,7 +106,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getProfilesDF: DataFrame = {
     val profilesEndpoint = "instance-profiles/list"
-    ApiCall(profilesEndpoint, config.apiEnv)
+    ApiCall(profilesEndpoint, config.apiEnv, debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -114,7 +119,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getWorkspaceUsersDF: DataFrame = {
     val workspaceEndpoint = "workspace/list"
-    ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")))
+    ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")), debugFlag = config.debugFlag)
       .executeGet()
       .asDF
       .withColumn("organization_id", lit(config.organizationId))
@@ -127,7 +132,76 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "num_workers" -> numWorkers
     )
 
-    ApiCall(endpoint, apiEnv, Some(query), paginate = false).executePost()
+    ApiCall(endpoint, apiEnv, Some(query), paginate = false, debugFlag = config.debugFlag).executePost()
+  }
+
+  /**
+   * get EXISTING dataset[s] metadata within the configured Overwatch workspace
+   * @return Seq[WorkspaceDataset]
+   */
+  def getWorkspaceDatasets: Seq[WorkspaceDataset] = {
+    dbutils.fs.ls(config.etlDataPathPrefix)
+      .filter(_.isDir)
+      .map(dataset => {
+      val path = dataset.path
+      val uri = Helpers.getURI(path)
+      val name = if(dataset.name.endsWith("/")) dataset.name.dropRight(1) else dataset.name
+      WorkspaceDataset(uri.getPath, name)
+    })
+  }
+
+  /**
+   * Create a backup of the Overwatch datasets
+   * @param targetPrefix
+   * @param cloneLevel
+   * @param asOfTS
+   * @return
+   */
+  def snap(targetPrefix: String, cloneLevel: String = "DEEP", asOfTS: Option[String] = None): Seq[CloneReport] = {
+    val acceptableCloneLevels = Array("DEEP", "SHALLOW")
+    require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
+      s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
+
+    val sourcesToSnap = getWorkspaceDatasets
+    val cloneSpecs = sourcesToSnap.map(dataset => {
+      val sourceName = dataset.name
+      val sourcePath = dataset.path
+      val targetPath = if (targetPrefix.takeRight(1) == "/") s"$targetPrefix$sourceName" else s"$targetPrefix/$sourceName"
+      CloneDetail(sourcePath, targetPath, asOfTS, cloneLevel)
+    }).toArray.toSeq
+    Helpers.parClone(cloneSpecs)
+  }
+
+  /**
+   * add existing tables to the metastore in the configured database.
+   * @return Seq[WorkspaceMetastoreRegistrationReport]
+   */
+  def addToMetastore(): Seq[WorkspaceMetastoreRegistrationReport] = {
+    require(Helpers.pathExists(config.etlDataPathPrefix), s"This function can only register the Overwatch data tables " +
+      s"to the Data Target configured in Overwatch. The location ${config.etlDataPathPrefix} does not exist.")
+    val datasets = getWorkspaceDatasets.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(getDriverCores * 2))
+    datasets.tasksupport = taskSupport
+    logger.log(Level.INFO, s"BEGINNING METASTORE REGISTRATION: Database Name ${config.databaseName}")
+    val addReport = datasets.map(dataset => {
+      val fullTableName = s"${config.databaseName}.${dataset.name}"
+      val stmt = s"CREATE TABLE $fullTableName USING DELTA LOCATION '${dataset.path}'"
+      logger.log(Level.INFO, stmt)
+      try {
+        if (spark.catalog.tableExists(fullTableName)) throw new BadConfigException(s"TABLE EXISTS: SKIPPING")
+        spark.sql(stmt)
+        WorkspaceMetastoreRegistrationReport(dataset, stmt, "SUCCESS")
+      } catch {
+        case e: BadConfigException =>
+          WorkspaceMetastoreRegistrationReport(dataset, stmt, e.getMessage)
+        case e: Throwable =>
+          val msg = s"TABLE REGISTRATION FAILED: ${e.getMessage}"
+          logger.log(Level.ERROR, msg)
+          WorkspaceMetastoreRegistrationReport(dataset, stmt, msg)
+      }
+    }).toArray.toSeq
+    spark.sql(s"refresh ${config.databaseName}")
+    addReport
   }
 
 }

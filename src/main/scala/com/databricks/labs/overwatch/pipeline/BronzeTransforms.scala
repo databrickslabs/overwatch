@@ -13,7 +13,7 @@ import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, Event
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
 import java.time.{Duration, LocalDateTime}
@@ -48,7 +48,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     if (!clusterEventCalls.forall(_.succeeded)) {
       val errorCount = clusterEventCalls.filterNot(_.succeeded).length
       val errMessage = s"WARNING: $errorCount ERRORS DETECTED in Bronze_ClusterEvents. At least one batch " +
-        s"could not be loaded. Review errored_cluster_events_bronze for more details."
+        s"could not be loaded. Review cluster_events_errors_bronze for more details."
       logger.log(Level.WARN, errMessage)
       println(errMessage)
     }
@@ -220,7 +220,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     } catch { // chk dir is missing BUT raw audit hist has latest enq time and can resume from there creating a new chkpoint
       case e: BadConfigException if (!e.failPipeline) =>
-        spark.conf.set("spark.network.timeout", "1200s") // lazy loading of enqTime can cause futures to time out
         val lastEnqTime = azureRawAuditLogTarget.asDF()
           .select(max('enqueuedTime))
           .as[java.sql.Timestamp]
@@ -249,7 +248,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
       "settings.new_cluster.spark_conf" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_conf"),
       "settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_env_vars"),
-      s"settings.new_cluster.${cloudProvider}_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.${cloudProvider}_attributes"),
+      s"settings.new_cluster.aws_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.aws_attributes"),
+      s"settings.new_cluster.azure_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.azure_attributes"),
       "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
     )
 
@@ -260,16 +260,22 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val outputDF = SchemaTools.scrubSchema(df)
 
     outputDF
+      .withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
       .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
       .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
       .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
-      .withColumn(s"${cloudProvider}_attributes", SchemaTools.structToMap(outputDF, s"${cloudProvider}_attributes"))
+      .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
+      .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
 
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
     val outputDF = SchemaTools.scrubSchema(df)
-    outputDF.withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
+    outputDF
+      .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
+      .withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
+      .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
+      .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
   }
 
   //noinspection ScalaCustomHdfsFormat
@@ -300,7 +306,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .selectExpr("*", "properties.*").drop("properties")
 
 
-      auditRawLand.asDF
+      val baselineAuditLogs = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
@@ -313,24 +319,39 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("userIdentity", structFromJson(spark, schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
         .withColumn("requestParams", structFromJson(spark, schemaBuilders, "requestParams"))
+
+      PipelineFunctions.cleanseCorruptAuditLogs(spark, baselineAuditLogs)
         .withColumn("response", structFromJson(spark, schemaBuilders, "response"))
         .drop("logId")
 
     } else {
 
       // inclusive from exclusive to
-      val datesGlob = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
-        .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
-        .filter(Helpers.pathExists)
+      val datesGlob = if (fromDT == untilDT) {
+        Array(s"${auditLogConfig.rawAuditPath.get}/date=${fromDT.toString}")
+      } else {
+        datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
+          .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
+          .filter(Helpers.pathExists)
+      }
 
       val auditLogsFailureMsg = s"Audit Logs Module Failure: Audit logs are required to use Overwatch and no data " +
         s"was found in the following locations: ${datesGlob.mkString(", ")}"
 
       if (datesGlob.nonEmpty) {
-        val rawDF = spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
-        if (rawDF.isEmpty) throw new Exception(auditLogsFailureMsg)
-        val baseDF = if (auditLogConfig.auditLogFormat == "json") rawDF else {
-          val rawDFWRPJsonified = rawDF
+        val rawDF = try {
+          spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        } catch { // corrupted audit logs with duplicate columns in the source
+          case e: AnalysisException if e.message.contains("Found duplicate column(s) in the data schema") =>
+            spark.conf.set("spark.sql.caseSensitive", "true")
+            spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        }
+        // clean corrupted source audit logs even when there is only one of the duplicate columns in the source
+        // but still will conflict with the existing columns in the target
+        val cleanRawDF = PipelineFunctions.cleanseCorruptAuditLogs(spark, rawDF)
+
+        val baseDF = if (auditLogConfig.auditLogFormat == "json") cleanRawDF else {
+          val rawDFWRPJsonified = cleanRawDF
             .withColumn("requestParams", to_json('requestParams))
           rawDFWRPJsonified
             .withColumn("requestParams", structFromJson(spark, rawDFWRPJsonified, "requestParams"))

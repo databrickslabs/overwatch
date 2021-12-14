@@ -14,9 +14,9 @@ class Config() {
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _debugFlag: Boolean = false
-  private var _overwatchSchemaVersion = "0.420"
+  private var _overwatchSchemaVersion = "0.600"
   private var _organizationId: String = _
-  private var _workspaceFriendlyName: String = _
+  private var _workspaceName: String = _
   private var _isPVC: Boolean = false
   private var _externalizeOptimize: Boolean = false
   private var _databaseName: String = _
@@ -60,7 +60,7 @@ class Config() {
 
   def organizationId: String = _organizationId
 
-  def workspaceFriendlyName: String = _workspaceFriendlyName
+  def workspaceName: String = _workspaceName
 
   def isPVC: Boolean = _isPVC
 
@@ -142,7 +142,8 @@ class Config() {
         value.getOrElse("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "50000"),
       "spark.databricks.delta.optimizeWrite.binSize" ->
         value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
-      "spark.sql.caseSensitive" -> "false"
+      "spark.sql.caseSensitive" -> "false",
+      "spark.databricks.delta.schema.autoMerge.enabled" -> "true"
     )
     _initialSparkConf = value ++ manualOverrides
     this
@@ -188,6 +189,11 @@ class Config() {
 
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value
+    this
+  }
+
+  private[overwatch] def setCloudProvider(value: String): this.type = {
+    _cloudProvider = value
     this
   }
 
@@ -256,11 +262,11 @@ class Config() {
     this
   }
 
-  private[overwatch] def setworkspaceFriendlyName(value: String): this.type = {
-    val msg = s"workspaceFriendlyName set to $value"
+  private[overwatch] def setWorkspaceName(value: String): this.type = {
+    val msg = s"workspaceName set to $value"
     logger.log(Level.INFO, msg)
     if (debugFlag) println(msg)
-    _workspaceFriendlyName = value
+    _workspaceName = value
     this
   }
 
