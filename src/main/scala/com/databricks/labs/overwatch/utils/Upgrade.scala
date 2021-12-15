@@ -1,19 +1,17 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions.getPipelineTarget
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, PipelineFunctions, PipelineTable, Silver}
+import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils.Helpers.fastDrop
-import io.delta.tables.DeltaTable
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 
-import java.io.{PrintWriter, StringWriter}
-import scala.collection.concurrent
-import collection.JavaConverters._
 import java.util.concurrent.{ConcurrentHashMap, ForkJoinPool}
+import scala.collection.JavaConverters._
+import scala.collection.concurrent
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.ForkJoinTaskSupport
 
@@ -282,6 +280,7 @@ object Upgrade extends SparkSessionWrapper {
         try {
           spark.sql(alterTableStmt)
         } catch {
+          case _: NoSuchObjectException =>
           case e: Throwable =>
             throw new UpgradeException(e.getMessage, target, failUpgrade = true)
         }
@@ -291,6 +290,7 @@ object Upgrade extends SparkSessionWrapper {
         try {
           spark.sql(updateWorkspaceNameStmt)
         } catch {
+          case _: NoSuchObjectException =>
           case e: Throwable =>
             throw new UpgradeException(e.getMessage, target, failUpgrade = true)
         }
@@ -870,9 +870,13 @@ object Upgrade extends SparkSessionWrapper {
     logger.log(Level.INFO, cleanupMsg)
     println(cleanupMsg)
     Helpers.fastrm(Array(snapDir))
-    logger.log(Level.INFO, "UPGRADE - Cleanup complete")
+    val cleanupCompleteMsg = "UPGRADE - Cleanup complete"
+    logger.log(Level.INFO, cleanupCompleteMsg)
+    println(cleanupMsg)
     SchemaTools.modifySchemaVersion(overwatchETLDBName, targetSchemaVersion)
-
+    val upgradeFinalizedMsg = "Upgrade Complete & Finalized"
+    logger.log(Level.INFO, upgradeFinalizedMsg)
+    println(upgradeFinalizedMsg)
   }
 
 }

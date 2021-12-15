@@ -1,14 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions.fillForward
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
+import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
 
 trait SilverTransforms extends SparkSessionWrapper {
@@ -452,7 +450,12 @@ trait SilverTransforms extends SparkSessionWrapper {
                                 poolsSilverTargetHasData: Boolean
                               )(auditIncrementalDF: DataFrame): DataFrame = {
 
-    val lastPoolValue = Window.partitionBy('instance_pool_id).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val lastPoolValue = Window.partitionBy('organization_id, 'instance_pool_id)
+      .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+    // audit logs semantics for pools are at least once, this is to filter out duplicate publications
+    val exactlyOnceFilterW = Window.partitionBy('organization_id, 'instance_pool_id)
+      .orderBy('timestamp)
 
     val poolsSnapDFUntilCurrent = poolSnapDF
       .verifyMinimumSchema(Schema.poolsSnapMinimumSchema)
@@ -528,6 +531,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('actionName.isin("create", "edit", "delete"))
       .withColumn("instance_pool_id", when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id")).otherwise('instance_pool_id))
       .withColumn("preloaded_spark_versions", get_json_object('preloaded_spark_versions, "$."))
+      .withColumn("rnk", rank().over(exactlyOnceFilterW))
+      .withColumn("rn", row_number().over(exactlyOnceFilterW))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
       .toTSDF("timestamp", "organization_id", "instance_pool_id")
       .lookupWhen(
         poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
@@ -1046,15 +1052,14 @@ trait SilverTransforms extends SparkSessionWrapper {
           when($"cluster_spec.existing_cluster_id".isNull && $"cluster_spec.new_cluster".isNull, get_json_object('lookup_settings, "$.new_cluster")).otherwise($"cluster_spec.new_cluster").alias("new_cluster")
         )
       ).drop("existing_cluster_id", "new_cluster", "x", "x2") // drop temp columns and old version of clusterSpec components
-      .withColumn("job_type", when('job_type.isNull, last('job_type, true).over(lastJobStatus)).otherwise('job_type))
       .withColumn("schedule", fillForward("schedule", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))))
-      .withColumn("timeout_seconds", fillForward("timeout_seconds", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))))
-      .withColumn("notebook_path", fillForward("notebook_path", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))))
-      .withColumn("jobName", fillForward("jobName", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))))
+      .withColumn("timeout_seconds", fillForward("timeout_seconds", lastJobStatus, Seq(get_json_object('lookup_settings, "$.timeout_seconds"))))
+      .withColumn("notebook_path", fillForward("notebook_path", lastJobStatus, Seq(get_json_object('lookup_settings, "$.notebook_task.notebook_path"))))
+      .withColumn("jobName", fillForward("jobName", lastJobStatus, Seq(get_json_object('lookup_settings, "$.name"))))
       .withColumn("created_by", when('actionName === "create", $"userIdentity.email"))
-      .withColumn("created_by", coalesce(fillForward("created_by", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))), 'snap_lookup_created_by))
+      .withColumn("created_by", coalesce(fillForward("created_by", lastJobStatus), 'snap_lookup_created_by))
       .withColumn("created_ts", when('actionName === "create", 'timestamp))
-      .withColumn("created_ts", coalesce(fillForward("created_ts", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))), 'snap_lookup_created_time))
+      .withColumn("created_ts", coalesce(fillForward("created_ts", lastJobStatus), 'snap_lookup_created_time))
       .withColumn("deleted_by", when('actionName === "delete", $"userIdentity.email"))
       .withColumn("deleted_ts", when('actionName === "delete", 'timestamp))
       .withColumn("last_edited_by", when('actionName.isin("update", "reset"), $"userIdentity.email"))
@@ -1224,7 +1229,7 @@ trait SilverTransforms extends SparkSessionWrapper {
      * but for now, this is required or multiple records will be created in the fact due to the multiple events.
      * Confirmed that the first event emitted is the correct event as per ES-65402
      */
-    val firstRunSemanticsW = Window.partitionBy('runId).orderBy('timestamp)
+    val firstRunSemanticsW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
 
     // Completes must be >= etlStartTime as it is the driver endpoint
     // All joiners to Completes may be from the past up to N days as defined in the incremental df
