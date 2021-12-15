@@ -12,21 +12,21 @@
     <title>Configuration :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639456858" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639609837" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639456858" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639609837" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639609837"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639456858"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639456858"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639609837"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639456858"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639609837"></script>
 
     
   </div>
@@ -658,6 +658,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <th style="text-align:left">Required Override</th>
 <th style="text-align:left">Default Value</th>
 <th style="text-align:left">Type</th>
+<th style="text-align:left">AsOfVersion</th>
 <th style="text-align:left">Description</th>
 </tr>
 </thead>
@@ -667,6 +668,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">Y</td>
 <td style="text-align:left">NULL</td>
 <td style="text-align:left"><a href="#auditlogconfig">AuditLogConfig</a></td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">Databricks Audit Log delivery information.</td>
 </tr>
 <tr>
@@ -674,6 +676,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">Execution Owner&rsquo;s Token</td>
 <td style="text-align:left">Option<a href="#tokensecret">[TokenSecret]</a></td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">Secret retrieval information</td>
 </tr>
 <tr>
@@ -681,6 +684,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">DataTarget(&ldquo;overwatch&rdquo;, &ldquo;/user/hive/warehouse/{databaseName}.db&rdquo;, &ldquo;/user/hive/warehouse/{databaseName}.db&rdquo;)</td>
 <td style="text-align:left">Option<a href="#datatarget">[DataTarget]</a></td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">What to call the database and where to store it</td>
 </tr>
 <tr>
@@ -688,6 +692,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">/tmp/overwatch/badRecordsPath</td>
 <td style="text-align:left">Option[String]</td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">When reading the log files, where should Overwatch store the records / files that cannot be parsed. Overwatch must have write permissions to this path</td>
 </tr>
 <tr>
@@ -695,6 +700,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">all</td>
 <td style="text-align:left">Option[Seq[String]]</td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">List of <a href="https://databrickslabs.github.io/overwatch/gettingstarted/modules/">modules</a> in scope for the run. It&rsquo;s important to note that there are many co-dependencies. When choosing a module, be sure to also enable it&rsquo;s requisites. If not value provided, all modules will execute.</td>
 </tr>
 <tr>
@@ -702,6 +708,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">60</td>
 <td style="text-align:left">Int</td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">On large, busy workspaces 60 days of data may amount in 10s of TB of raw data. This parameter allows the job to be broken out into several smaller runs.</td>
 </tr>
 <tr>
@@ -709,6 +716,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">Today&rsquo;s date minus 60 days, format = &ldquo;yyyy-mm-dd&rdquo;</td>
 <td style="text-align:left">String</td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">Date from which data collection was to begin. This is the earliest date for which data should attempted to be collected.</td>
 </tr>
 <tr>
@@ -716,6 +724,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">DatabricksContractPrices()</td>
 <td style="text-align:left"><a href="#databrickscontractprices">DatabricksContractPrices</a></td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the <em>instanceDetails</em> consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices().</td>
 </tr>
 <tr>
@@ -723,6 +732,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">IntelligentScaling()</td>
 <td style="text-align:left"><a href="#intelligentscaling">IntelligentScaling</a></td>
+<td style="text-align:left">0.5.x</td>
 <td style="text-align:left">Allows the user to enable / disable intelligent scaling and configure min/max core counts to be used when scaling the cluster</td>
 </tr>
 <tr>
@@ -730,6 +740,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">&lt;organization_id&gt;</td>
 <td style="text-align:left">Option[String]</td>
+<td style="text-align:left">0.6.x</td>
 <td style="text-align:left">Allows the user to specify the workspace_name to be different than the default, canonical workspace_id (i.e. organization_id). This is helpful during analysis as it provides a human-legible reference for the workspace</td>
 </tr>
 <tr>
@@ -737,6 +748,7 @@ that if you omit certain configs, their defaults will still be present in the js
 <td style="text-align:left">N</td>
 <td style="text-align:left">false</td>
 <td style="text-align:left">Boolean</td>
+<td style="text-align:left">0.6.x</td>
 <td style="text-align:left">Allows the user to externalize the optimize and zorders done on the delta tables. This can be run as a secondary job with different cluster configs at different intervals increasing efficiency</td>
 </tr>
 </tbody>
@@ -1293,19 +1305,19 @@ Eventhub streaming environment configurations</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639609837"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639609837"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639456858" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639456858"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639609837" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639609837"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

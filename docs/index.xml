@@ -40,8 +40,8 @@ Each module is responsible for building certain entities at each layer, bronze, 
       <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
-      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new binary and before the pipeline is executed. The general upgrade process is:
- Adjust any Overwatch configurations and get the updated compactString from JsonUtils Import the upgrade package Use the compactString of parameters to instantiate the workspace Call the upgrade function for the version to which you&amp;rsquo;re upgrading.</description>
+      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. The general upgrade process is:
+ Use the compactString of parameters to instantiate the workspace  The compact string can be found in your original runner notebook which you got from here   Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object  Basic pseudocode can be found below as a reference.</description>
     </item>
     
     <item>
@@ -60,9 +60,7 @@ Each module is responsible for building certain entities at each layer, bronze, 
       <pubDate>Wed, 28 Oct 2020 13:43:52 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</guid>
-      <description>Quick Reference  Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD)  Interacting With Overwatch and its State Use your production notebook (or equivallent) to instantiate your Overatch Configs. From there use JsonUtils.compactString to get the condensed parameters for your workspace.
-NOTE you cannot use the escaped string, it needs to be the compactString.
-Below is an example of getting the compact string. You may also refer to the example runner notebook for your cloud provider.</description>
+      <description>Quick Reference  Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD)  Externalize Optimize &amp;amp; Z-Order (as of 0.6.0) The Overwatch pipeline has always included the Optimize &amp;amp; Z-Order functions. By default all targets are set to be optimized once per week which resulted in very different runtimes once per week. As of 0.6.0, this can be externalized. Reasons to externalize include:</description>
     </item>
     
     <item>

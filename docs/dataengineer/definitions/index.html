@@ -12,21 +12,21 @@
     <title>Definitions :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639456858" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639609837" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639456858" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639609837" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639609837"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639456858"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639456858"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639609837"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639456858"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639609837"></script>
 
     
   </div>
@@ -594,6 +594,7 @@ tirelessly to expose additional SparkUI data and will publish as soon as it&rsqu
 <li><a href="#jobruncostpotentialfact">jobRunCostPotentialFact</a></li>
 <li><a href="#notebook">notebook</a></li>
 <li><a href="#instancepool">instancePool</a></li>
+<li><a href="#dbucostdetails">dbuCostDetail</a></li>
 <li><a href="#user">user</a></li>
 <li><a href="#accountloginfact">accountLoginFact</a></li>
 <li><a href="#accountmodificationfact">accountModificationFact</a></li>
@@ -619,7 +620,10 @@ The data in the files were generated from an Azure, test deployment created by O
 
 <h4 id="cluster">Cluster</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/cluster.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + cluster_id + action + unixTimeMS_state_start</p>
+<p><strong>KEY</strong> &ndash; organization_id + cluster_id + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <table>
 <thead>
 <tr>
@@ -764,6 +768,10 @@ The data in the files were generated from an Azure, test deployment created by O
 <h4 id="clusterstatefact">ClusterStateFact</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/clusterstatefact.tab"><strong>SAMPLE</strong></a></p>
 <p><strong>KEY</strong> &ndash; organization_id + cluster_id + state + unixTimeMS_state_start</p>
+<p><strong>Incremental Columns</strong> &ndash; state_start_date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + state_start_date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id + unixTimeMS_state_start</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <p>Costs and state details by cluster at every state in the cluster lifecycle.</p>
 <p><strong>NOTE</strong> This fact table is not normalized on time. Some states will span multiple days and must be smoothed across 
 days (i.e. divide by days_in_state) when trying to calculate costs by day. All states are force-terminated at the 
@@ -943,6 +951,9 @@ updated on the subsequent run.</p>
 <h3 id="instancedetails">InstanceDetails</h3>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_aws.tab"><strong>AWS Sample</strong></a> | <a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_azure.tab"><strong>AZURE_Sample</strong></a></p>
 <p><strong>KEY</strong> &ndash; Organization_ID + API_name</p>
+<p><strong>Incremental Columns</strong> &ndash; Pipeline_SnapTS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <p>This table is unique and it&rsquo;s purpose is to enable users to identify node specific contract costs associated with 
 Databricks and the Cloud Provider through time. 
 Defaults are loaded as an example by workspace. These defaults are meant to be reasonable, not accurate by default 
@@ -1038,6 +1049,9 @@ This means that for a record to be &ldquo;expired&rdquo; the following must be t
 </table>
 <h4 id="dbucostdetails">dbuCostDetails</h4>
 <p><strong>KEY</strong> &ndash; Organization_ID + sku</p>
+<p><strong>Incremental Columns</strong> &ndash; activeFrom</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <p>Slow-changing dimension to track DBU contract costs by workspace through time. This table should only need to be edited 
 in very rare circumstances such as historical cost correction. Note that editing these contract prices will not 
 retroactively modify historical pricing in the costing table such as clusterStateFact or jobRunCostPotentialFact. For 
@@ -1081,7 +1095,10 @@ rebuilt with the updated values.</p>
 </table>
 <h4 id="job">Job</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/job.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + job_id</p>
+<p><strong>KEY</strong> &ndash; organization_id + job_id + unixTimeMS + action + request_id</p>
+<p><strong>Incremental Columns</strong> &ndash; unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <table>
 <thead>
 <tr>
@@ -1190,7 +1207,10 @@ rebuilt with the updated values.</p>
 </table>
 <h4 id="jobrun">JobRun</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/jobrun.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + run_id</p>
+<p><strong>KEY</strong> &ndash; organization_id + run_id + startEpochMS</p>
+<p><strong>Incremental Columns</strong> &ndash; startEpochMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <p>Inventory of every canonical job run executed in a databricks workspace.</p>
 <table>
 <thead>
@@ -1305,7 +1325,10 @@ rebuilt with the updated values.</p>
 </table>
 <h4 id="jobruncostpotentialfact">JobRunCostPotentialFact</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/jobruncostpotentialfact.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + job_id + id_in_job</p>
+<p><strong>KEY</strong> &ndash; organization_id + run_id + startEpochMS</p>
+<p><strong>Incremental Columns</strong> &ndash; startEpochMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <p>This fact table defines the job, the cluster, the cost, the potential, and utilization (if cluster logging is enabled) 
 of a cluster associated with a specific Databricks Job Run.</p>
 <p><strong>Dimensionality</strong> Note that this fact table is not normalized by time but rather by job run and cluster state. 
@@ -1508,7 +1531,10 @@ a cluster state, a run that continues across cluster-state lines will result in 
 </table>
 <h4 id="notebook">Notebook</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/notebook.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + notebook_id + action + unixTimeMS</p>
+<p><strong>KEY</strong> &ndash; organization_id + notebook_id + request_id + action + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <table>
 <thead>
 <tr>
@@ -1592,6 +1618,9 @@ a cluster state, a run that continues across cluster-state lines will result in 
 </table>
 <h4 id="instancepool">InstancePool</h4>
 <p><strong>KEY</strong> &ndash; organization_id + instance_pool_id + timestamp</p>
+<p><strong>Incremental Columns</strong> &ndash; timestamp</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -1713,10 +1742,17 @@ Additionally, you may filter down to specific actions using &ldquo;actionName&rd
 </table>
 <h4 id="accountmod">AccountMod</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/accountmodificationfact.tab"><strong>SAMPLE</strong></a></p>
+<p><strong>KEY</strong> &ndash; organization_id + acton + mod_unixTimeMS + request_id</p>
+<p><strong>Incremental Columns</strong> &ndash; mod_unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <p>TODO</p>
 <h4 id="accountlogin">AccountLogin</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/accountloginfact.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + user_id + login_type + UnixTimeMS</p>
+<p><strong>KEY</strong> &ndash; organization_id + login_type + login_unixTimeMS + from_ip_address</p>
+<p><strong>Incremental Columns</strong> &ndash; login_unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 
 <div class="notices note" ><p><strong>Not exposed in the consumer database</strong>. This table contains more sensitive information and by default is not
 exposed in the consumer database but held back in the etl datbase. This is done purposely to simplify security when/if
@@ -1782,7 +1818,10 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 
 <h4 id="sparkexecution">SparkExecution</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparkexecution.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + execution_id + cluster_id</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + execution_id + date + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -1831,7 +1870,10 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 </table>
 <h4 id="sparkexecutor">SparkExecutor</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparkexecutor.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + executor_id + cluster_id</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + executor_id + date + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -1880,8 +1922,11 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 </table>
 <h4 id="sparkjob">SparkJob</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparkjob.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + job_id + cluster_id</p>
-<p><strong>Partition Column[s]</strong> &ndash; date</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + job_id + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -1965,8 +2010,11 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 </table>
 <h4 id="sparkstage">SparkStage</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparkstage.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + stage_id + stage_attempt_id + cluster_id</p>
-<p><strong>Partition Column[s]</strong> &ndash; date</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + stage_id + stage_attempt_id + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -2015,8 +2063,11 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 </table>
 <h4 id="sparktask">SparkTask</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparktask.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + task_id + task_attempt_id + stage_id + stage_attempt_id + cluster_id</p>
-<p><strong>Partition Column[s]</strong> &ndash; date</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + task_id + task_attempt_id + stage_id + stage_attempt_id + host + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 
 <div class="notices warning" ><p><strong>USE THE PARTITION COLUMN</strong> (date) and Indexed Column (cluster_id) in all joins and filters where possible. 
 This table can get extremely large, select samples or smaller date ranges and reduce joins and columns selected 
@@ -2110,7 +2161,11 @@ to improve performance.</p>
 </tbody>
 </table>
 <h4 id="sparkstream_preview">SparkStream_preview</h4>
-<p><strong>KEY</strong> &ndash; organization_id + cluster_id + spark_context_id + stream_id + stream_run_id + stream_batch_id</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + cluster_id + stream_id + stream_run_id + stream_batch_id + stream_timestamp</p>
+<p><strong>Incremental Columns</strong> &ndash; date + stream_timestamp</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <p>Remains in preview through version 0.6.0 as more feedback is requested from users and use-cases before this table 
 structure solidifes.</p>
 <table>
@@ -2803,19 +2858,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639609837"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639609837"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639456858" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639456858"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639609837" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639609837"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

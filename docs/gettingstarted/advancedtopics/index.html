@@ -12,21 +12,21 @@
     <title>Advanced Topics :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639456858" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639456858" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639609837" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639456858" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639609837" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639609837"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639456858"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639456858"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639609837"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639456858"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639609837"></script>
 
     
   </div>
@@ -504,6 +504,7 @@
 <nav id="TableOfContents">
   <ul>
     <li><a href="#quick-reference">Quick Reference</a></li>
+    <li><a href="#externalize-optimize--z-order-as-of-060">Externalize Optimize &amp; Z-Order (as of 0.6.0)</a></li>
     <li><a href="#interacting-with-overwatch-and-its-state">Interacting With Overwatch and its State</a>
       <ul>
         <li><a href="#instantiating-the-workspace">Instantiating the Workspace</a></li>
@@ -538,9 +539,65 @@
 
 <h2 id="quick-reference">Quick Reference</h2>
 <ul>
+<li><a href="#externalize-optimize--z-order-as-of-060">Externalize Optimize &amp; Z-Order</a></li>
 <li><a href="#interacting-with-overwatch-and-its-state">Interacting With Overwatch and its State</a></li>
 <li><a href="#joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</a></li>
 </ul>
+<h2 id="externalize-optimize--z-order-as-of-060">Externalize Optimize &amp; Z-Order (as of 0.6.0)</h2>
+<p>The Overwatch pipeline has always included the Optimize &amp; Z-Order functions. By default all targets are set to 
+be optimized once per week which resulted in very different runtimes once per week.
+As of 0.6.0, this can be externalized. 
+Reasons to externalize include:</p>
+<ul>
+<li>Lower job runtime variability and/or improve consistency to hit SLAs</li>
+<li>Utilize a more efficient cluster type/size for the optimize job
+<ul>
+<li>Optimize &amp; Zorder are extremely efficient but do heavily depend on local storage; thus Storage Optimized compute 
+nodes are highly recommended for this type of workload.
+<ul>
+<li>Azure: i3.*xLarge</li>
+<li>AWS: Standard_L*s series</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Allow a single job to efficiently optimize Overwatch for all workspaces
+<ul>
+<li>Note that the scope of &ldquo;all workspaces&rdquo; above is within the scope of a data target. All workspaces that send 
+data to the same dataset can be optimized from a single workspace.</li>
+</ul>
+</li>
+</ul>
+<p>To externalize the optimize and z-order tasks:</p>
+<ul>
+<li>Set <em>externalizeOptimize</em> to true in the runner notebook config (All Workspaces)
+<ul>
+<li>If running as a job don&rsquo;t forget to update the job parameters with the new escaped JSON config string</li>
+</ul>
+</li>
+<li>Create a job to execute the optimize on the workspace you wish (One Workspace - One Job)
+<ul>
+<li>Type: JAR</li>
+<li>Main Class: <code>com.databricks.labs.overwatch.Optimizer</code></li>
+<li>Dependent Libraries: <code>com.databricks.labs:overwatch_2.12:0.6.0.1</code></li>
+<li>Parameters: <code>[&quot;&lt;Overwatch_etl_database_name&gt;&quot;]</code></li>
+<li>Cluster Config: Recommended
+<ul>
+<li>DBR Version: 9.1LTS</li>
+<li>Enable Autoscaling Compute with enough nodes to go as fast as you want. 4-8 is a good starting point</li>
+<li>AWS &ndash; Enable autoscaling local storage</li>
+<li>Worker Nodes: Storage Optimize</li>
+<li>Driver Node: General Purpose with 16+ cores
+<ul>
+<li>The driver gets very busy on these workloads - recommend 16 - 64 cores depending on the max size of the cluster</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/AdvancedTopics/optimizerJob.png" alt="OptimizeJob"></p>
 <h2 id="interacting-with-overwatch-and-its-state">Interacting With Overwatch and its State</h2>
 <p>Use your production notebook (or equivallent) to instantiate your Overatch Configs. 
 From there use <code>JsonUtils.compactString</code> to get the condensed parameters for your workspace.</p>
@@ -934,19 +991,19 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639609837"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639456858"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639456858"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639609837"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639456858" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639456858"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639609837" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639609837"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
