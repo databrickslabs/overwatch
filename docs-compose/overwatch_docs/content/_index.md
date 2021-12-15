@@ -30,7 +30,11 @@ total cost of ownership, and even take on additional exploratory efforts.
 ## How It Works
 Overwatch has two primary modes, Historical & Realtime
 * **Historical** -- Good for identifying trends, outliers, issues, challenges
-* **Realtime** (coming 2021) -- Good for monitoring / alerting
+* **Realtime** -- Good for monitoring / alerting
+    * Utilizes standard integrated drop-wizard and collectd data publications methods through Graphite or Prometheus.
+      See [Spark Monitoring](https://spark.apache.org/docs/latest/monitoring.html#monitoring-and-instrumentation) for more information
+    * Init script to be published ASAP but requires client-side architecture set up. Example client-side 
+    architecture [available below](#realtime--monitoring--alerting).
 
 ### Data Process Flow
 ![OverwatchProcessFlow](/images/_index/ProcessFlow.png)

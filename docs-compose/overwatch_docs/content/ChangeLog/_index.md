@@ -3,11 +3,80 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+
+## 0.6.0.1 (MAJOR UPGRADE/RELEASE)
+**Existing Customers on 0.5.x --> 0.6.x [UPGRADE PROCESS REQUIRED]({{%relref "DataEngineer/Upgrade.md"%}})**
+* Upgrade process detailed in linked upgrade script [**HTML**](/assets/ChangeLog/060_upgrade_process.html) | 
+  [**DBC**](/assets/ChangeLog/060_upgrade_process.dbc)
+  
+Notice -- 0.6.0 had a concurrent merge conflict for some multi-workspace deployments described in 
+[issue 284](https://github.com/databrickslabs/overwatch/issues/284). When upgrading to 0.6 please use 0.6.0.1 as the 
+base version, 0.6.0 shouldn't be used.
+
+**Noteworthy Features**
+* Custom workspace names
+* Upserts - Previous versions only appended data which meant that the run / clusterState / etc had to end before 
+the Overwatch job would pick it up. Now Overwatch utilizes delta upserts/merges so all data comes into the pipeline 
+anchored on start_time not end_time.
+* Numerous and Significant Schema enhancements in Gold/Consumer layer
+  * Increases resiliency and simplifies analysis
+* New Entities in Consumer Layer
+  * InstancePools
+  * Streams (preview) -- Releasing as preview to get more feedback and improve structure for use cases.
+  * DBSQL - slipped -- DBSQL entities did not make it to gold in 0.6.0 but are staged to be released in next minor release
+* Separated node (compute) contract costs from dbu contract costs
+  * DBU costs by sku slow-changing-dimension added (dbuCostDetails)
+  * Old *instanceDetails* table greatly simplified. Name is still the same, only the structure changed
+* Enabled externalized optimize & z-order pipelines
+  * This was and is baked into the Overwatch process but as of 0.6.0 users can decide to externalize this. This  
+  is powerful as it allows the Overwatch pipeline to be more efficient and the Optimize/Zorder job to be completed 
+  from a single workspace with the appropriate cluster size/configuration for the workload.
+* Gold Table Initializations
+  * In previous version there were often significant gaps in early runs of Overwatch as the objects that create the 
+  slow-changing-dims weren't created/edited thus were absent from the audit logs. The APIs are now used to get an 
+  initial full picture of the workspace and that is merged with the audit logs to jump-start all records for early 
+  runs of Overwatch
+* Error Message Improvements
+  * The error messaging pipelines have been signficantly improved to provide more useful and specific errors
+* All tables fully externalized to paths
+  * Enables finer-grained security for multi-workspace environments
+  
+0.6.0.1 also brings numerous data quality enhancements, performance optimization, and resolves several outstanding bugs
+
+Please note that pipelines may run a bit longer in some cases as we are now executing merges instead of appends. 
+Merges are a bit more compute intensive and future optimizations are already in the works to minimize the increase. 
+The increases were marginal but noteworthy.
+
+A more complete list of features and improvements can be found on the closed features/bugs list of 
+[Milestone 0.6.0](https://github.com/databrickslabs/overwatch/milestone/6?closed=1)
+
+## Version 0.5.x NOTE
+If you’re on 0.5.x and not ready to upgrade to 0.6.0 yet, and you’re not on the latest version of 0.5.x please do 
+upgrade to the latest 0.5.x as 0.5.x will no longer be receiving feature updates and is considered stable at 
+the latest version. No upgrade necessary, just swap the JAR to the latest version of 0.5.x and everything will 
+work even better.
+
+### Regarding Deprecated Versions
+Please note that we're a pretty small team trying to keep up with a wide customer base. If the version you're on 
+shows deprecated, please note thta it doesn't mean that we won't try to offer assistance, just that we may first ask 
+that you swap the jar out to the latest version of 0.5.x before we do a deep dive as many of the issues you may face 
+are already resolved in the later version. Please do upgrade to the latest release as soon as possible.
+
+## 0.5.0.6.1
+Apologies for the insanity of the version number -- will be better in future
+* Patch for [Issue_278](https://github.com/databrickslabs/overwatch/issues/278)
+  * Databricks published some corrupted log files. These log files had duplicate column names with upper and lower 
+  case references. This was promptly resolved on the Databricks side but the logs were not retroactively created; 
+  thus, if you hit the error below using 0506 or earlier, you will need to switch to this JAR for your pipeline to 
+  continue.
+    
+```AnalysisException: Found duplicate column(s) in the data schema: <column_name>```
+
 ## 0.5.0.6
 * Patch for [Issue_235](https://github.com/databrickslabs/overwatch/issues/235)
   * Edge cases resulted in nulls for several values in clusterstatefact.
 
-## 0.5.0.5
+## 0.5.0.5 - deprecated
 * Feature [Feature_223](https://github.com/databrickslabs/overwatch/issues/223)
   * Adds package version to parsed config in pipeline_report
 * Patch fix for [Issue_210](https://github.com/databrickslabs/overwatch/issues/210)
@@ -25,12 +94,12 @@ weight: 4
 * Patch fix for [Issue_206](https://github.com/databrickslabs/overwatch/issues/206)
   * Incorrect default prices for several node types
 
-## 0.5.0.4
+## 0.5.0.4 - deprecated
 * Patch fix for [Issue_196](https://github.com/databrickslabs/overwatch/issues/196)
 * AZURE - Enhancement - Enable full EH configuration to be passed through the job arguments to the main class using 
 secrets / scopes -- [Issue_197](https://github.com/databrickslabs/overwatch/issues/197)
 
-## 0.5.0.3
+## 0.5.0.3 - deprecated
 {{% notice warning %}}
 **BUG FOR NEW DEPLOYMENTS**
 When using 0.5.0.3 for a brand new deployment, a duplicate key was left in a static
@@ -59,20 +128,20 @@ delete from <overwatch_etl>.instancedetails where API_Name = 'Standard_E4as_v4' 
 * Improved logging
 * Costing - node details lookups for edge cases -- there was a bug in the join condition for users running Overwatch multiple times per day in the same workspace
 
-## 0.5.0.2
+## 0.5.0.2 - deprecated
 **If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
 * Hotfix release to resolve [Issue 179](https://github.com/databrickslabs/overwatch/issues/179).
   * clusterstatefact_gold incremental column was start_timestamp instead of end_timestamp. Meant to roll this into
   0.5.0.1 but it got missed, sorry for the double release.
 
-## 0.5.0.1
+## 0.5.0.1 - deprecated
 **If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
 * Hotfix release to resolve [Issue 170](https://github.com/databrickslabs/overwatch/issues/170).
 * Hotfix to resolve laggard DF lookups required to join across pipeline runs.
   * Caused some events to not be joined with their lagging start events in the data model.
 * Hotfix to enable non-json formatted audit logs (AWS) primarily for PVC edge cases
 
-## 0.5.0
+## 0.5.0 - deprecated
 ### Upgrading and Required Changes
 * **[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED** - If you are upgrading from 0.4.12+ please 
   use *Upgrade.UpgradeTo0420* If upgrading from a schema 
@@ -116,7 +185,7 @@ Below are the major feature and enhancements in 0.4.2
   * Costing for additional SKUs were added to the configuration such that they can be tracked. Note that as of 0.4.2 
   release, no calculation changes in costing as it relates to sku have yet been incorporated. These recalculations for
   jobs light and DatabricksSQL are in progress.
-* Enabled [Main class execution]({{%relref "GettingStarted"%}}/#executing-overwatch-via-main-class) to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily 
+* Enabled [Main class execution]({{%relref "GettingStarted"%}}/#via) to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily 
   enabled for future enablement with jobs pipelines and for development / testing purposes.
   * User can now pass 2 arguments to the databricks job where the first is 'bronze', 'silver', or 'gold' and the second
   is the escaped configuration string and only that pipeline layer will execute.
@@ -146,18 +215,18 @@ if there is a SSLHandshakeException. Targeted at specific scenarios.
 * api schema scrubber improvements for addtional edge cases
 
 
-## 0.4.2
+## 0.4.2 - deprecated
 * Deprecated release - please use [0.5.0](#050)
 * The 0.4.2 can be viewed as an RC for 0.5.0. The 0.5.0 release is the 0.4.2 release with several bug fixes
 
-## 0.4.13
+## 0.4.13 - deprecated
 * Hotfix for [Issue 138](https://github.com/databrickslabs/overwatch/issues/138)
 
 An upgrade to this minor release is only necessary if you're experience api limits and/or seeing 429 issues. 
 Otherwise, this release can be skipped as the fix will be in 0.4.2+. New users should use this version until 
 the next release is published.
 
-## 0.4.12
+## 0.4.12 - deprecated
 **[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED**
 * Hotfix for [Issue 126](https://github.com/databrickslabs/overwatch/issues/126).
 * Hotfix for [Issue 129](https://github.com/databrickslabs/overwatch/issues/129).
@@ -169,13 +238,13 @@ the next release is published.
 * Corrected issue with missing quotes around update statement to track failed files in 
   spark_events_processedFiles
 
-## 0.4.11
+## 0.4.11 - deprecated
 * Hotfix for [Issue 119](https://github.com/databrickslabs/overwatch/issues/119). Issue was only present in edge cases.
   Edge cases include workspaces missing data and attempting to run modules for which data didn't exist.
 * Added additional guard rails to pipeline state checks to help clarify workspace / pipeline state issues for
   future users.
 
-## 0.4.1
+## 0.4.1 - deprecated
 * [Converted all delta targets from managed tables to external tables](https://github.com/databrickslabs/overwatch/issues/50)
     * Better security and best practice
     * Enabled etl data path prefix to simplify and protect the raw data across workspaces
@@ -196,5 +265,5 @@ the next release is published.
 * Bug fix for multi-workspace Azure, filter from audit_raw_land table was incomplete
 * Bug fix to allow for consumerDB to be omitted from DataTarget in config
 
-## 0.4.0
+## 0.4.0 - deprecated
 Initial Public Release

@@ -23,7 +23,10 @@ val upgradeReport = Upgrade.upgradeTo042(prodWorkspace)
 display(upgradeReport)
 ```
 
-## Q 1: I just deployed Overwatch and made a mistake and want to clean up everything and re-deploy. I can't seem to get a clean state from which to begin though.
+## Q1: How To Clean Re-Deploy
+**I just deployed Overwatch and made a mistake and want to clean up everything and re-deploy. 
+I can't seem to get a clean state from which to begin though.**
+
 Overwatch tables are intentionally created as external tables. When the 
 [etlDataPathPrefix]({{%relref "GettingStarted/Configuration.md"%}}/#datatarget) is configured (as recommended) 
 the target data does not live underneath the database directory and as such is not deleted when the database is dropped. 
@@ -52,7 +55,7 @@ workspace for a clean run.
 [multi_workspace_cleanup.dbc](/assets/FAQ/multi_workspace_cleanup.dbc) |
 [multi_workspace_cleanup.html](/assets/FAQ/multi_workspace_cleanup.html)
 
-## Q 2: The incorrect costs were entered for a specific time range, I'd like to correct them, how should I do that?
+## Q2: The incorrect costs were entered for a specific time range, I'd like to correct them, how should I do that?
 Please refer to the [Configuring Custom Costs]({{%relref "GettingStarted"%}}#configuring-custom-costs) 
 to baseline your understanding. Also, closely review the details of the 
 [instanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails)
@@ -74,7 +77,7 @@ Both options will require a corresponding appropriate update to the pipeline_rep
 that write to those tables (3005, 3015). [Here are several examples]({{%relref "DataEngineer/ETL_Process.md"%}}/#reloading-data-example)
 on ways to update the pipeline_report to change update the state of a module.
 
-## Q 3: What is the current guidance / state of customers who want to capture EC2 spot pricing?
+## Q3: What is the current guidance / state of customers who want to capture EC2 spot pricing?
 
 The easiest way is to identify an "average" SPOT price and apply it to all compute cost calcuations. Going a bit further, calculate average spot price by region, average spot price by region by node type and lastly down to a time resolution like hour of day. Use the AWS APIs to get the historical spot price at by these dims.This can be automated via a little script they build but it require proper access to the AWS account.
 
@@ -121,7 +124,7 @@ More Details: [https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Descri
 
 
 
-## Q 4: How to config the cluster logs path?
+## Q4: How to config the cluster logs path?
 The cluster logging paths are automatically acquired within Overwatch. There's no need to tell Overwatch where to load those from. 
 [Click here]({{%relref "EnvironmentSetup/azure.md"%}}/#configuring-overwatch-on-azure-databricks) for more details.
 ![FAQ4](/images/_index/faq4.png)

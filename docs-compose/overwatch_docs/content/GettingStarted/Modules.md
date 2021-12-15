@@ -106,10 +106,11 @@ other resources are heavily utilizing api calls.
 ### Pools
 *Requires:* Audit 
 
-**In Progress** -- The snapshots are currently being recorded but the slow changing dimensions are still under construction
-and are not going to make it into the initial release.
-
-The Pools Module records the metadata related to Databricks Instance Pools.
+*Gold Entities:* InstancePool
+Simple module that offers observability to configuration changes (not state) of an instance pool. Databricks does 
+not yet publish the state change data for instance pools; thus Overwatch cannot deliver metrics for 
+how long a node was used, how long it was idle, when it became idle, when it was terminated, etc. When Databricks 
+makes this data available, Overwatch will add this to the data model in a release shortly thereafter.
 
 ### Jobs
 *Requires:* Audit|Clusters|ClusterEvents
@@ -156,7 +157,7 @@ Currently a very simple module that just enables the materialization of notebook
 ### SparkEvents
 *Requires:* Clusters
 
-*Gold Entities:* SparkExecution|SparkJob|SparkStage|SparkTask|SparkExecutor|SparkJDBC
+*Gold Entities:* SparkExecution|SparkJob|SparkStage|SparkTask|SparkExecutor|SparkStream|SparkJDBC
 
 Databricks captures all "SparkEvents" captured by Open Source Spark (OSS) AND some additional events that are 
 proprietary to Databricks. These events are captured and persisted in event log files when cluster logging is enabled.

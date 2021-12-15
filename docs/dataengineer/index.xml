@@ -31,8 +31,8 @@ Each module is responsible for building certain entities at each layer, bronze, 
       <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
-      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new binary and before the pipeline is executed. The general upgrade process is:
- Adjust any Overwatch configurations and get the updated compactString from JsonUtils Import the upgrade package Use the compactString of parameters to instantiate the workspace Call the upgrade function for the version to which you&amp;rsquo;re upgrading.</description>
+      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. The general upgrade process is:
+ Use the compactString of parameters to instantiate the workspace  The compact string can be found in your original runner notebook which you got from here   Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object  Basic pseudocode can be found below as a reference.</description>
     </item>
     
   </channel>

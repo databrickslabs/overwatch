@@ -5,16 +5,15 @@ weight: 3
 ---
 
 Sometimes upgrading from one version to the next requires a schema change. In these cases, the 
-[CHANGELOG]({{%relref "ChangeLog/"%}}) will be explicit. Upgrades MUST be executed WITH the **new binary** and 
+[CHANGELOG]({{%relref "ChangeLog/"%}}) will be explicit. Upgrades MUST be executed WITH the **new library (jar)** and 
 **before the pipeline is executed**. The general upgrade process is:
-* Adjust any Overwatch configurations and get the updated compactString from JsonUtils
-* Import the upgrade package
 * Use the compactString of parameters to instantiate the workspace
-* Call the upgrade function for the version to which you're upgrading.
+  * The compact string can be found in your original runner notebook which you got from 
+    [here]({{%relref "GettingStarted/"%}}#jump-start-notebooks)
+* Call the upgrade function for the version to which you're upgrading and pass in the workspace object
 
-To upgrade to version 0.4.12, the code is below. Note, the "buildWorkspace" function is just a helper function to 
-construct the workspace. Same as using Databricks widgets and passing parameters, this function just 
-builds the OverwatchParams and returns the workspace instance.
+Basic pseudocode can be found below as a reference. For actual version upgrade scripts please reference the upgrade 
+scripts linked to your target version in the [Changelog]({{%relref "ChangeLog/"%}}).
 
 {{% notice warning %}}
 When a schema upgrade is required between versions, **this step cannot be skipped**. Overwatch will not allow you 
@@ -28,11 +27,11 @@ A sample notebook is provided below for reference.
 ```scala
 import com.databricks.labs.overwatch.utils.Upgrade
 import com.databricks.labs.overwatch.pipeline.Initializer
-val params = OverwatchParams(...)
-val prodArgs = JsonUtils.objToJson(params).compactString
+val prodArgs = """<myConfigCompactString>""" // from runner notebook
 
 // A more verbose example is available in the example notebooks referenced above
-val prodWorkspace = Initializer(prodArgs, debugFlag = true)
-val upgradeReport = Upgrade.upgradeTo042(prodWorkspace)
+val prodWorkspace = Initializer(prodArgs)
+val upgradeReport = Upgrade.upgradeTo060(prodWorkspace, ...)
 display(upgradeReport)
+Upgrade.finalize060Upgrade("<overwatch_etl_db_name>")
 ```

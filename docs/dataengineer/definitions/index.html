@@ -12,21 +12,21 @@
     <title>Definitions :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639425385" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639425385" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639425385" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639425385" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639425385" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639425385" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639425385" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639425385" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639425385" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639609837" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639425385" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639609837" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639425385"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639609837"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639425385"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639425385"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639609837"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639425385"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639609837"></script>
 
     
   </div>
@@ -593,6 +593,8 @@ tirelessly to expose additional SparkUI data and will publish as soon as it&rsqu
 <li><a href="#jobrun">jobrun</a></li>
 <li><a href="#jobruncostpotentialfact">jobRunCostPotentialFact</a></li>
 <li><a href="#notebook">notebook</a></li>
+<li><a href="#instancepool">instancePool</a></li>
+<li><a href="#dbucostdetails">dbuCostDetail</a></li>
 <li><a href="#user">user</a></li>
 <li><a href="#accountloginfact">accountLoginFact</a></li>
 <li><a href="#accountmodificationfact">accountModificationFact</a></li>
@@ -601,6 +603,7 @@ tirelessly to expose additional SparkUI data and will publish as soon as it&rsqu
 <li><a href="#sparkjob">sparkJob</a></li>
 <li><a href="#sparkstage">sparkStage</a></li>
 <li><a href="#sparktask">sparkTask</a></li>
+<li><a href="#sparkstream_preview">sparkStream</a> **preview</li>
 <li><a href="#common-meta-fields">Common Meta Fields</a>
 <ul>
 <li>There are several fields that are present in all tables. Instead of cluttering each table with them, this section
@@ -617,18 +620,10 @@ The data in the files were generated from an Azure, test deployment created by O
 
 <h4 id="cluster">Cluster</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/cluster.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + cluster_id + action + unixTimeMS_state_start</p>
-
-<div class="notices warning" ><p><a href="https://github.com/databrickslabs/overwatch/issues/154">Issue 154</a>: This table is not a properly defined slow-changing
-dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action
-column and does not reference the complete state of the object at the corresponding time. Furthermore, this table
-only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will
-likely be a lot of missing data. <!-- raw HTML omitted --><!-- raw HTML omitted -->
-Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is &lt; lookup time.
-This will result in many null values that must be further filled from the corresponding snapshot table in the etl
-database.</p>
-</div>
-
+<p><strong>KEY</strong> &ndash; organization_id + cluster_id + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <table>
 <thead>
 <tr>
@@ -646,7 +641,12 @@ database.</p>
 <tr>
 <td style="text-align:left">action</td>
 <td style="text-align:left">string</td>
-<td style="text-align:left">Either <strong>create</strong> OR <strong>edit</strong> &ndash; depicts the type of action for the cluster</td>
+<td style="text-align:left">create, edit, or snapImpute &ndash; depicts the type of action for the cluster &ndash; **snapImpute is used on first run to initialize the state of the cluster even if it wasn&rsquo;t created/edited since audit logs began</td>
+</tr>
+<tr>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">timestamp the action took place</td>
 </tr>
 <tr>
 <td style="text-align:left">cluster_name</td>
@@ -705,7 +705,7 @@ database.</p>
 </tr>
 <tr>
 <td style="text-align:left">init_script</td>
-<td style="text-align:left">Array[Struct]</td>
+<td style="text-align:left">array<!-- raw HTML omitted --></td>
 <td style="text-align:left">Array of init scripts</td>
 </tr>
 <tr>
@@ -736,7 +736,22 @@ database.</p>
 <tr>
 <td style="text-align:left">instance_pool_id</td>
 <td style="text-align:left">string</td>
-<td style="text-align:left">Canononical pool id from which the cluster receives its nodes</td>
+<td style="text-align:left">Canononical pool id from which workers receive nodes</td>
+</tr>
+<tr>
+<td style="text-align:left">driver_instance_pool_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Canononical pool id from which driver receives node</td>
+</tr>
+<tr>
+<td style="text-align:left">instance_pool_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Name of pool from which workers receive nodes</td>
+</tr>
+<tr>
+<td style="text-align:left">driver_instance_pool_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Name of pool from which driver receives node</td>
 </tr>
 <tr>
 <td style="text-align:left">spark_version</td>
@@ -748,20 +763,20 @@ database.</p>
 <td style="text-align:left">string</td>
 <td style="text-align:left">Idempotent jobs token if used</td>
 </tr>
-<tr>
-<td style="text-align:left">organization_id</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Workspace / Organization ID on which the cluster was instantiated</td>
-</tr>
 </tbody>
 </table>
 <h4 id="clusterstatefact">ClusterStateFact</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/clusterstatefact.tab"><strong>SAMPLE</strong></a></p>
 <p><strong>KEY</strong> &ndash; organization_id + cluster_id + state + unixTimeMS_state_start</p>
+<p><strong>Incremental Columns</strong> &ndash; state_start_date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + state_start_date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id + unixTimeMS_state_start</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <p>Costs and state details by cluster at every state in the cluster lifecycle.</p>
 <p><strong>NOTE</strong> This fact table is not normalized on time. Some states will span multiple days and must be smoothed across 
-days (i.e. divide by days_in_state) when trying to calculate costs by day. Also, note that costs may not be captured
-for a cluster_state combination until that state ends.</p>
+days (i.e. divide by days_in_state) when trying to calculate costs by day. All states are force-terminated at the 
+end of the Overwatch run to the until-timestamp of the run. If the state was still active at this time, it will be 
+updated on the subsequent run.</p>
 <table>
 <thead>
 <tr>
@@ -857,6 +872,11 @@ for a cluster_state combination until that state ends.</p>
 <td style="text-align:left">Effective dbu rate used for calculations (effective at time of pipeline run)</td>
 </tr>
 <tr>
+<td style="text-align:left">state_dates</td>
+<td style="text-align:left">array<!-- raw HTML omitted --></td>
+<td style="text-align:left">Array of all dates across which the state spanned</td>
+</tr>
+<tr>
 <td style="text-align:left">days_in_state</td>
 <td style="text-align:left">int</td>
 <td style="text-align:left">Number of days in state</td>
@@ -931,28 +951,34 @@ for a cluster_state combination until that state ends.</p>
 <h3 id="instancedetails">InstanceDetails</h3>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_aws.tab"><strong>AWS Sample</strong></a> | <a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_azure.tab"><strong>AZURE_Sample</strong></a></p>
 <p><strong>KEY</strong> &ndash; Organization_ID + API_name</p>
+<p><strong>Incremental Columns</strong> &ndash; Pipeline_SnapTS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <p>This table is unique and it&rsquo;s purpose is to enable users to identify node specific contract costs associated with 
 Databricks and the Cloud Provider through time. 
-Defaults are loaded as an example by workspace. These defaults should closely (if not perfectly) 
-represent your cloud node details including costs, CPUs, etc. Everytime Overwatch runs, it validates the presence of 
-this table and whether it has any data present for the current worksapce, if it does not creates / appends the relevant
+Defaults are loaded as an example by workspace. These defaults are meant to be reasonable, not accurate by default 
+as there is a wide difference between cloud discount rates and prices between regions / countries. 
+Everytime Overwatch runs, it validates the presence of 
+this table and whether it has any data present for the current workspace, if it does not it creates and appends the relevant
 data to it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their 
 needs by workspace. Each organization_id (workspace), should provide complete cost data for each node used in that
-region. If you decide to completely customize the table, it&rsquo;s critical to note that <strong>some columns are required</strong> for the ETL
-to function; these fields include are indicated below in the table with an asterisk.</p>
+workspace. If you decide to completely customize the table, it&rsquo;s critical to note that <strong>some columns are required</strong> 
+for the ETL to function; these fields are indicated below in the table with an asterisk.</p>
 <p>The organization_id (i.e. workspace id) is automatically generated for each workspace if that organization_id is not
 present in the table already (or the table is not present at all). Each workspace
 (i.e. organization_id) often has unique costs, this table enables you to customize compute pricing.</p>
-<p>This table currently tracks costs for machine AND DBUs which is confusing. <a href="https://github.com/databrickslabs/overwatch/issues/153">Issue 153</a>
-has been created to resolve this confusion. Until this issue is complete, any DBU contract price changes via the 
-Overwatch config will expire all existing compute pricing and add a new record with the updated DBU costs. This will 
-happen automagically as long as the user only changes the DBU contract prices via the Overwatch config. To simplify, 
-only manually edit this table when adjusting costs for compute and/or when historically adjusting compute/dbu costs.</p>
-<p><strong>IMPORTANT</strong> This table must be configured such that there are no overlapping costs and no gaps in costs within 
-a single organization_id between primordial date and current date. 
-This means that when one record for a node type is &ldquo;expired&rdquo;, a new one must be created 
-with the expiry date (activeUntil of the expired record) must == activeFrom of the new record and the active record must
-a null for the activeUntil date.</p>
+<p><strong>IMPORTANT</strong> This table must be configured such that there are no overlapping costs (by time) and no gaps (by time) 
+in costs for any key (organization_id + API_name) between primordial date and current date. 
+This means that for a record to be &ldquo;expired&rdquo; the following must be true:</p>
+<ul>
+<li>original key expired by setting activeUntil == expiry date</li>
+<li>original key must be created with updated information and must:
+<ul>
+<li>have activeFrom == expiry date of previous record (no gap, no overlap)</li>
+<li>have activeUntil == lit(null).cast(&ldquo;date&rdquo;)</li>
+</ul>
+</li>
+</ul>
 <p><a href="https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/">Azure VM Pricing Page</a></p>
 <p><a href="https://aws.amazon.com/ec2/pricing/on-demand/">AWS EC2 Pricing Page</a></p>
 <table>
@@ -960,7 +986,6 @@ a null for the activeUntil date.</p>
 <tr>
 <th style="text-align:left">Column</th>
 <th style="text-align:left">Type</th>
-<th style="text-align:left">AutoManaged</th>
 <th style="text-align:left">Description</th>
 </tr>
 </thead>
@@ -968,103 +993,112 @@ a null for the activeUntil date.</p>
 <tr>
 <td style="text-align:left">instance</td>
 <td style="text-align:left">string</td>
-<td style="text-align:left">NA</td>
 <td style="text-align:left">Common name of instance type</td>
 </tr>
 <tr>
 <td style="text-align:left">API_name*</td>
 <td style="text-align:left">string</td>
-<td style="text-align:left">NA</td>
 <td style="text-align:left">Canonical KEY name of the node type &ndash; use this to join to node_ids elsewhere</td>
 </tr>
 <tr>
 <td style="text-align:left">vCPUs*</td>
 <td style="text-align:left">int</td>
-<td style="text-align:left">NA</td>
 <td style="text-align:left">Number of virtual cpus provisioned for the node type</td>
 </tr>
 <tr>
 <td style="text-align:left">Memory_GB</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">NA</td>
 <td style="text-align:left">Gigabyes of memory provisioned for the node type</td>
 </tr>
 <tr>
 <td style="text-align:left">Compute_Contract_Price*</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">NA</td>
 <td style="text-align:left">Contract price for the instance type as negotiated between customer and cloud vendor. This is the value used in cost functions to deliver cost estimates. It is defaulted to equal the on_demand compute price</td>
 </tr>
 <tr>
 <td style="text-align:left">On_Demand_Cost_Hourly</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">NA</td>
 <td style="text-align:left">On demand, list price for node type DISCLAIMER &ndash; cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing</td>
 </tr>
 <tr>
 <td style="text-align:left">Linux_Reserved_Cost_Hourly</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">NA</td>
 <td style="text-align:left">Reserved, list price for node type DISCLAIMER &ndash; cloud provider pricing is dynamic and this is meant as an initial reference. This value should be validated and updated to reflect actual pricing</td>
 </tr>
 <tr>
 <td style="text-align:left">Hourly_DBUs*</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">NA</td>
 <td style="text-align:left">Number of DBUs charged for the node type</td>
 </tr>
 <tr>
-<td style="text-align:left">interactiveDBUPrice*</td>
-<td style="text-align:left">double</td>
-<td style="text-align:left">by Overwatch</td>
-<td style="text-align:left">DBU contract price of interactive DBUs - Change this via Overwatch Config</td>
-</tr>
-<tr>
-<td style="text-align:left">automatedDBUPrice*</td>
-<td style="text-align:left">double</td>
-<td style="text-align:left">by Overwatch</td>
-<td style="text-align:left">DBU contract price of automated DBUs - Change this via Overwatch Config</td>
-</tr>
-<tr>
-<td style="text-align:left">sqlComputeDBUPrice*</td>
-<td style="text-align:left">double</td>
-<td style="text-align:left">by Overwatch</td>
-<td style="text-align:left">DBU contract price of DatabricksSQL DBUs - Change this via Overwatch Config</td>
-</tr>
-<tr>
-<td style="text-align:left">jobsLightDBUPrice*</td>
-<td style="text-align:left">double</td>
-<td style="text-align:left">by Overwatch</td>
-<td style="text-align:left">DBU contract price of automated DBUs that are eligible for the jobs light SKU - Change this via Overwatch Config</td>
+<td style="text-align:left">is_active</td>
+<td style="text-align:left">boolean</td>
+<td style="text-align:left">whether the contract price is currently active. This must be true for each key where activeUntil is null</td>
 </tr>
 <tr>
 <td style="text-align:left">activeFrom*</td>
 <td style="text-align:left">date</td>
-<td style="text-align:left">by Overwatch</td>
 <td style="text-align:left">The start date for the costs in this record. <strong>NOTE</strong> this MUST be equal to one other record&rsquo;s activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.</td>
 </tr>
 <tr>
 <td style="text-align:left">activeUntil*</td>
 <td style="text-align:left">date</td>
-<td style="text-align:left">by Overwatch</td>
+<td style="text-align:left">The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="dbucostdetails">dbuCostDetails</h4>
+<p><strong>KEY</strong> &ndash; Organization_ID + sku</p>
+<p><strong>Incremental Columns</strong> &ndash; activeFrom</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
+<p>Slow-changing dimension to track DBU contract costs by workspace through time. This table should only need to be edited 
+in very rare circumstances such as historical cost correction. Note that editing these contract prices will not 
+retroactively modify historical pricing in the costing table such as clusterStateFact or jobRunCostPotentialFact. For 
+prices to be recalculated, the gold pipeline modules must be rolled back properly such that the costs can be 
+rebuilt with the updated values.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Column</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">sku</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">One of automated, interactive, jobsLight, sqlCompute</td>
+</tr>
+<tr>
+<td style="text-align:left">contract_price</td>
+<td style="text-align:left">double</td>
+<td style="text-align:left">Price paid per DBU on the sku</td>
+</tr>
+<tr>
+<td style="text-align:left">is_active</td>
+<td style="text-align:left">boolean</td>
+<td style="text-align:left">whether the contract price is currently active. This must be true for each key where activeUntil is null</td>
+</tr>
+<tr>
+<td style="text-align:left">activeFrom*</td>
+<td style="text-align:left">date</td>
+<td style="text-align:left">The start date for the costs in this record. <strong>NOTE</strong> this MUST be equal to one other record&rsquo;s activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.</td>
+</tr>
+<tr>
+<td style="text-align:left">activeUntil*</td>
+<td style="text-align:left">date</td>
 <td style="text-align:left">The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active)</td>
 </tr>
 </tbody>
 </table>
 <h4 id="job">Job</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/job.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + job_id</p>
-
-<div class="notices warning" ><p><a href="https://github.com/databrickslabs/overwatch/issues/154">Issue 154</a>: This table is not a properly defined slow-changing
-dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action 
-column and does not reference the complete state of the object at the corresponding time. Furthermore, this table 
-only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will 
-likely be a lot of missing data. <!-- raw HTML omitted --><!-- raw HTML omitted -->
-Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is &lt; lookup time. 
-This will result in many null values that must be further filled from the corresponding snapshot table in the etl 
-database.</p>
-</div>
-
+<p><strong>KEY</strong> &ndash; organization_id + job_id + unixTimeMS + action + request_id</p>
+<p><strong>Incremental Columns</strong> &ndash; unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <table>
 <thead>
 <tr>
@@ -1088,6 +1122,11 @@ database.</p>
 <td style="text-align:left">action</td>
 <td style="text-align:left">string</td>
 <td style="text-align:left">Action type defined by the record. One of: create, reset, update, delete, resetJobAcl, changeJobAcl. More information about these actions can be found <a href="https://docs.databricks.com/dev-tools/api/latest/jobs.html">here</a></td>
+</tr>
+<tr>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">timestamp the action took place</td>
 </tr>
 <tr>
 <td style="text-align:left">job_name</td>
@@ -1116,12 +1155,12 @@ database.</p>
 </tr>
 <tr>
 <td style="text-align:left">new_settings</td>
-<td style="text-align:left">string JSON</td>
+<td style="text-align:left">dynamic struct</td>
 <td style="text-align:left">job action with &ldquo;reset&rdquo; or &ldquo;update&rdquo; where settings were changed. Includes complex type of cluster. <a href="https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobsjobsettings">JobSettings Structure Found Here</a></td>
 </tr>
 <tr>
 <td style="text-align:left">cluster</td>
-<td style="text-align:left">struct</td>
+<td style="text-align:left">dyanmic struct</td>
 <td style="text-align:left">Where relevant, contains the &ldquo;new_cluster&rdquo; spec when cluster definition is &ldquo;new_cluster&rdquo; or automated. If job definition points to existing cluster the cluster_id can be found here</td>
 </tr>
 <tr>
@@ -1168,7 +1207,10 @@ database.</p>
 </table>
 <h4 id="jobrun">JobRun</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/jobrun.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + run_id</p>
+<p><strong>KEY</strong> &ndash; organization_id + run_id + startEpochMS</p>
+<p><strong>Incremental Columns</strong> &ndash; startEpochMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <p>Inventory of every canonical job run executed in a databricks workspace.</p>
 <table>
 <thead>
@@ -1245,6 +1287,11 @@ database.</p>
 <td style="text-align:left">Array of Libraries in the format defined <a href="https://docs.databricks.com/dev-tools/api/latest/libraries.html#library">HERE</a></td>
 </tr>
 <tr>
+<td style="text-align:left">children</td>
+<td style="text-align:left">array<!-- raw HTML omitted --></td>
+<td style="text-align:left">Array of structs that show all children of this job</td>
+</tr>
+<tr>
 <td style="text-align:left">workflow_context</td>
 <td style="text-align:left">string</td>
 <td style="text-align:left">?? REVIEW ??</td>
@@ -1278,7 +1325,10 @@ database.</p>
 </table>
 <h4 id="jobruncostpotentialfact">JobRunCostPotentialFact</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/jobruncostpotentialfact.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + job_id + id_in_job</p>
+<p><strong>KEY</strong> &ndash; organization_id + run_id + startEpochMS</p>
+<p><strong>Incremental Columns</strong> &ndash; startEpochMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <p>This fact table defines the job, the cluster, the cost, the potential, and utilization (if cluster logging is enabled) 
 of a cluster associated with a specific Databricks Job Run.</p>
 <p><strong>Dimensionality</strong> Note that this fact table is not normalized by time but rather by job run and cluster state. 
@@ -1378,7 +1428,7 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <td style="text-align:left">KEY of driver node type to enable join to <a href="#instanceDetails">instanceDetails</a></td>
 </tr>
 <tr>
-<td style="text-align:left">note_type_id</td>
+<td style="text-align:left">node_type_id</td>
 <td style="text-align:left">string</td>
 <td style="text-align:left">KEY of worker node type to enable join to <a href="#instanceDetails">instanceDetails</a></td>
 </tr>
@@ -1481,18 +1531,10 @@ a cluster state, a run that continues across cluster-state lines will result in 
 </table>
 <h4 id="notebook">Notebook</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/notebook.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + notebook_id + action + unixTimeMS</p>
-
-<div class="notices warning" ><p><a href="https://github.com/databrickslabs/overwatch/issues/154">Issue 154</a>: This table is not a properly defined slow-changing
-dimensions as it should be. This table more closely resembles the audit log which is very dependent on the action
-column and does not reference the complete state of the object at the corresponding time. Furthermore, this table
-only receives updates when the definition of the object is modified, thus, in the early days of Overwatch, there will
-likely be a lot of missing data. <!-- raw HTML omitted --><!-- raw HTML omitted -->
-Use this table as a left-joined lookup table with the last non-null lookup value where the timestamp is &lt; lookup time.
-This will result in many null values that must be further filled from the corresponding snapshot table in the etl
-database.</p>
-</div>
-
+<p><strong>KEY</strong> &ndash; organization_id + notebook_id + request_id + action + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <table>
 <thead>
 <tr>
@@ -1502,11 +1544,6 @@ database.</p>
 </tr>
 </thead>
 <tbody>
-<tr>
-<td style="text-align:left">organization_id</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Canonical workspace id</td>
-</tr>
 <tr>
 <td style="text-align:left">notebook_id</td>
 <td style="text-align:left">string</td>
@@ -1531,6 +1568,11 @@ database.</p>
 <td style="text-align:left">action</td>
 <td style="text-align:left">string</td>
 <td style="text-align:left">action recorded</td>
+</tr>
+<tr>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">timestamp the action took place</td>
 </tr>
 <tr>
 <td style="text-align:left">old_name</td>
@@ -1571,6 +1613,67 @@ database.</p>
 <td style="text-align:left">response</td>
 <td style="text-align:left">struct</td>
 <td style="text-align:left">HTTP response including errorMessage, result, and statusCode</td>
+</tr>
+</tbody>
+</table>
+<h4 id="instancepool">InstancePool</h4>
+<p><strong>KEY</strong> &ndash; organization_id + instance_pool_id + timestamp</p>
+<p><strong>Incremental Columns</strong> &ndash; timestamp</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Column</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">instance_pool_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Canonical notebook id</td>
+</tr>
+<tr>
+<td style="text-align:left">instance_pool_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Name of notebook at time of action requested</td>
+</tr>
+<tr>
+<td style="text-align:left">actionName</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">action recorded</td>
+</tr>
+<tr>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">timestamp the action took place</td>
+</tr>
+<tr>
+<td style="text-align:left">node_type_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Type of node in the pool</td>
+</tr>
+<tr>
+<td style="text-align:left">idle_instance_autotermination_minutes</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Minutes after which a node shall be terminated if unused</td>
+</tr>
+<tr>
+<td style="text-align:left">min_idle_instances</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Minimum number of hot instances in the pool</td>
+</tr>
+<tr>
+<td style="text-align:left">max_capacity</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Maximum number of nodes allowed in the pool</td>
+</tr>
+<tr>
+<td style="text-align:left">preloaded_spark_versions</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Spark versions preloaded on nodes in the pool</td>
 </tr>
 </tbody>
 </table>
@@ -1637,12 +1740,19 @@ Additionally, you may filter down to specific actions using &ldquo;actionName&rd
 </tr>
 </tbody>
 </table>
-<h4 id="accountmodificationfact">AccountModificationFact</h4>
+<h4 id="accountmod">AccountMod</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/accountmodificationfact.tab"><strong>SAMPLE</strong></a></p>
+<p><strong>KEY</strong> &ndash; organization_id + acton + mod_unixTimeMS + request_id</p>
+<p><strong>Incremental Columns</strong> &ndash; mod_unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <p>TODO</p>
-<h4 id="accountloginfact">AccountLoginFact</h4>
+<h4 id="accountlogin">AccountLogin</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/accountloginfact.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + user_id + login_type + UnixTimeMS</p>
+<p><strong>KEY</strong> &ndash; organization_id + login_type + login_unixTimeMS + from_ip_address</p>
+<p><strong>Incremental Columns</strong> &ndash; login_unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 
 <div class="notices note" ><p><strong>Not exposed in the consumer database</strong>. This table contains more sensitive information and by default is not
 exposed in the consumer database but held back in the etl datbase. This is done purposely to simplify security when/if
@@ -1658,11 +1768,6 @@ desired. If desired, this can be exposed in consumer database with a simple vew 
 </tr>
 </thead>
 <tbody>
-<tr>
-<td style="text-align:left">organization_id</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Canonical workspace id</td>
-</tr>
 <tr>
 <td style="text-align:left">user_id</td>
 <td style="text-align:left">string</td>
@@ -1695,8 +1800,8 @@ desired. If desired, this can be exposed in consumer database with a simple vew 
 </tr>
 <tr>
 <td style="text-align:left">login_from_ip_address</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Source IP from which login was initiated</td>
+<td style="text-align:left">struct</td>
+<td style="text-align:left">Details about the source login and target logged into</td>
 </tr>
 <tr>
 <td style="text-align:left">user_agent</td>
@@ -1713,7 +1818,10 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 
 <h4 id="sparkexecution">SparkExecution</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparkexecution.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + execution_id + cluster_id</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + execution_id + date + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -1762,7 +1870,10 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 </table>
 <h4 id="sparkexecutor">SparkExecutor</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparkexecutor.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + executor_id + cluster_id</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + executor_id + date + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -1811,8 +1922,11 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 </table>
 <h4 id="sparkjob">SparkJob</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparkjob.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + job_id + cluster_id</p>
-<p><strong>Partition Column[s]</strong> &ndash; date</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + job_id + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -1896,8 +2010,11 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 </table>
 <h4 id="sparkstage">SparkStage</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparkstage.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + stage_id + stage_attempt_id + cluster_id</p>
-<p><strong>Partition Column[s]</strong> &ndash; date</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + stage_id + stage_attempt_id + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
 <tr>
@@ -1946,8 +2063,11 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 </table>
 <h4 id="sparktask">SparkTask</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sparktask.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + task_id + task_attempt_id + stage_id + stage_attempt_id + cluster_id</p>
-<p><strong>Partition Column[s]</strong> &ndash; date</p>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + task_id + task_attempt_id + stage_id + stage_attempt_id + host + unixTimeMS</p>
+<p><strong>Incremental Columns</strong> &ndash; date + unixTimeMS</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
 
 <div class="notices warning" ><p><strong>USE THE PARTITION COLUMN</strong> (date) and Indexed Column (cluster_id) in all joins and filters where possible. 
 This table can get extremely large, select samples or smaller date ranges and reduce joins and columns selected 
@@ -1967,6 +2087,11 @@ to improve performance.</p>
 <td style="text-align:left">organization_id</td>
 <td style="text-align:left">string</td>
 <td style="text-align:left">Canonical workspace id</td>
+</tr>
+<tr>
+<td style="text-align:left">workspace_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Customizable human-legible name of the workspace, should be globally unique within the organization</td>
 </tr>
 <tr>
 <td style="text-align:left">spark_context_id</td>
@@ -2035,6 +2160,75 @@ to improve performance.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="sparkstream_preview">SparkStream_preview</h4>
+<p><strong>KEY</strong> &ndash; organization_id + spark_context_id + cluster_id + stream_id + stream_run_id + stream_batch_id + stream_timestamp</p>
+<p><strong>Incremental Columns</strong> &ndash; date + stream_timestamp</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
+<p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
+<p>Remains in preview through version 0.6.0 as more feedback is requested from users and use-cases before this table 
+structure solidifes.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Column</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">spark_context_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Canonical context ID &ndash; One Spark Context per Cluster</td>
+</tr>
+<tr>
+<td style="text-align:left">cluster_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Canonical workspace cluster id</td>
+</tr>
+<tr>
+<td style="text-align:left">stream_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">GUID ID of the spark stream</td>
+</tr>
+<tr>
+<td style="text-align:left">stream_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Name of stream if named</td>
+</tr>
+<tr>
+<td style="text-align:left">stream_run_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">GUID ID of the spark stream run</td>
+</tr>
+<tr>
+<td style="text-align:left">stream_batch_id</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">GUID ID of the spark stream run batch</td>
+</tr>
+<tr>
+<td style="text-align:left">stream_timestamp</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Unix time (millis) the stream reported its batch complete metrics</td>
+</tr>
+<tr>
+<td style="text-align:left">streamSegment</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Type of event from the event listener such as &lsquo;Progressed&rsquo;</td>
+</tr>
+<tr>
+<td style="text-align:left">streaming_metrics</td>
+<td style="text-align:left">dynamic struct</td>
+<td style="text-align:left">All metrics available for the stream batch run</td>
+</tr>
+<tr>
+<td style="text-align:left">execution_ids</td>
+<td style="text-align:left">array<!-- raw HTML omitted --></td>
+<td style="text-align:left">Array of execution_ids in the spark_context. Can explode and tie back to sparkExecution and other spark tables</td>
+</tr>
+</tbody>
+</table>
 <h4 id="common-meta-fields">Common Meta Fields</h4>
 <table>
 <thead>
@@ -2045,6 +2239,11 @@ to improve performance.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align:left">organization_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Workspace / Organization ID on which the cluster was instantiated</td>
+</tr>
 <tr>
 <td style="text-align:left">cluster_id</td>
 <td style="text-align:left">string</td>
@@ -2117,13 +2316,13 @@ to improve performance.</p>
 This list consists of only the ETL tables created to facilitate and deliver the <a href="#consumption-layer-tables">consumption layer</a>
 <!-- raw HTML omitted --><!-- raw HTML omitted -->
 The gold and consumption layers are the only layers that maintain column name uniformity and naming convention across
-all tables. Users should always reference Consumption and Gold layers unless the data necssary has not been curated.</p>
+all tables. Users should always reference Consumption and Gold layers unless the data necessary has not been curated.</p>
 <h3 id="bronze">Bronze</h3>
 <table>
 <thead>
 <tr>
 <th style="text-align:left">Table</th>
-<th style="text-align:left">Module</th>
+<th style="text-align:left">Scope</th>
 <th style="text-align:left">Layer</th>
 <th style="text-align:left">Description</th>
 </tr>
@@ -2190,7 +2389,7 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <thead>
 <tr>
 <th style="text-align:left">Table</th>
-<th style="text-align:left">Module</th>
+<th style="text-align:left">Scope</th>
 <th style="text-align:left">Layer</th>
 <th style="text-align:left">Description</th>
 </tr>
@@ -2215,10 +2414,10 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <td style="text-align:left">Slow changing dimension used to track all clusters through time including edits but <strong>excluding state change</strong>.</td>
 </tr>
 <tr>
-<td style="text-align:left">cluster_status_silver</td>
-<td style="text-align:left">clusters</td>
+<td style="text-align:left">cluster_state_detail_silver</td>
+<td style="text-align:left">clusterEvents</td>
 <td style="text-align:left">silver</td>
-<td style="text-align:left"><strong>Deprecated</strong> Originally used to track cluster state and scale through time but is no longer used and is incomplete.</td>
+<td style="text-align:left">State detail for each cluster event enriched with cost information</td>
 </tr>
 <tr>
 <td style="text-align:left">job_status_silver</td>
@@ -2237,6 +2436,12 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <td style="text-align:left">notebooks</td>
 <td style="text-align:left">silver</td>
 <td style="text-align:left">Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook.</td>
+</tr>
+<tr>
+<td style="text-align:left">pools_silver</td>
+<td style="text-align:left">pools</td>
+<td style="text-align:left">silver</td>
+<td style="text-align:left">Slow changing dimension used to track all changes to instance pools</td>
 </tr>
 <tr>
 <td style="text-align:left">spark_executions_silver</td>
@@ -2268,18 +2473,6 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <td style="text-align:left">silver</td>
 <td style="text-align:left">All spark event data relevant to spark tasks</td>
 </tr>
-<tr>
-<td style="text-align:left">user_account_silver</td>
-<td style="text-align:left">accounts</td>
-<td style="text-align:left">silver</td>
-<td style="text-align:left">Slow changing dimension of user accounts through time</td>
-</tr>
-<tr>
-<td style="text-align:left">user_login_silver</td>
-<td style="text-align:left">accounts</td>
-<td style="text-align:left">silver</td>
-<td style="text-align:left">User login metadata through time</td>
-</tr>
 </tbody>
 </table>
 <h3 id="gold">Gold</h3>
@@ -2287,7 +2480,7 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <thead>
 <tr>
 <th style="text-align:left">Table</th>
-<th style="text-align:left">Module</th>
+<th style="text-align:left">Scope</th>
 <th style="text-align:left">Layer</th>
 <th style="text-align:left">Description</th>
 </tr>
@@ -2336,6 +2529,12 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <td style="text-align:left">Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook.</td>
 </tr>
 <tr>
+<td style="text-align:left">instancepool_gold</td>
+<td style="text-align:left">pools</td>
+<td style="text-align:left">gold</td>
+<td style="text-align:left">Slow changing dimension used to track all changes to instance pools</td>
+</tr>
+<tr>
 <td style="text-align:left">sparkexecution_gold</td>
 <td style="text-align:left">sparkEvents</td>
 <td style="text-align:left">gold</td>
@@ -2364,6 +2563,12 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <td style="text-align:left">sparkEvents</td>
 <td style="text-align:left">gold</td>
 <td style="text-align:left">All spark event data relevant to spark tasks</td>
+</tr>
+<tr>
+<td style="text-align:left">sparkstream_gold</td>
+<td style="text-align:left">sparkEvents</td>
+<td style="text-align:left">gold</td>
+<td style="text-align:left">All spark event data relevant to spark streams</td>
 </tr>
 </tbody>
 </table>
@@ -2653,19 +2858,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639425385"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639425385"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639425385"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639425385"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639425385"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639425385"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639609837"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639425385"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639425385"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639425385"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639609837"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639425385" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639425385"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639609837" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639609837"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
