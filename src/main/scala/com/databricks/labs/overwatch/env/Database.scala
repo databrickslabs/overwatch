@@ -143,7 +143,8 @@ class Database(config: Config) extends SparkSessionWrapper {
       val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
 //      val columnsToUpdateOnMatch = targetColumns.filterNot(c => immutableColumns.contains(c))
 
-      val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")
+      val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")  + " " +
+        s"AND target.organization_id = '${config.organizationId}'" // force partition filter for concurrent merge
 //      val updateExpr: Map[String, String] = columnsToUpdateOnMatch.map(updateCol => {
 //        s"target.$updateCol" -> s"updates.$updateCol"
 //      }).toMap
