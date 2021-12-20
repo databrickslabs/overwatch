@@ -12,21 +12,21 @@
     <title>Modules :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1640015967" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1640015967" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1640015967"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639609837"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1640015967"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1640015967"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1640015967"></script>
 
     
   </div>
@@ -552,7 +552,7 @@
 <li><a href="#sparkevents">sparkEvents</a></li>
 </ul>
 <p>The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently,
-under normal, daily operations, there no significant cost to any of these modules. It&rsquo;s likely best to leave them 
+under normal, daily operations, there no significant cost to any of these modules. It&rsquo;s likely best to leave them
 all turned on unless there&rsquo;s a specific reason not to.
 
 <div class="notices warning" ><p>The very first run can be an exception to &ldquo;no significant cost&rdquo;. The historical load of 60+ days can take some time
@@ -561,7 +561,7 @@ to load depending on the size of the workspace and quantity of historical data t
 </div>
 </p>
 <p>These modules control which parts of Overwatch are run when the Overwatch job executes. Many of the modules
-are dependent on other modules (details below). At present, the audit module is always required as it 
+are dependent on other modules (details below). At present, the audit module is always required as it
 contains most of the metadata to enable the other overwatch modules.</p>
 <p>A full list of which tables are ultimately made available by which module can be found in the
 <a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions/">Data Definitions</a> section.</p>
@@ -586,8 +586,8 @@ base, required schema is defined to ensure requisite data fields are present. Ad
 table as events occur in the workspace and the schema will evolve as necessary to accommodate the new events.</p>
 
 <div class="notices note" ><p>Events for entities such as clusters and jobs are only recorded when a user creates, edits, deletes the entity. As such,
-if the audit logging begins on Day 10, but the cluster and/or job were created and last edited before Day 10 it&rsquo;s 
-likely that much or all of the metadata will be missing for the particular job. This is the reason the entity 
+if the audit logging begins on Day 10, but the cluster and/or job were created and last edited before Day 10 it&rsquo;s
+likely that much or all of the metadata will be missing for the particular job. This is the reason the entity
 snapshots are so important. The entity snapshots significantly close this gap for existing workspace entities but there
 may still be missing data in the early days of Overwatch runs. It&rsquo;s important to ensure Overwatch runs periodically
 to reduce/eliminate data gaps.</p>
@@ -597,11 +597,11 @@ to reduce/eliminate data gaps.</p>
 <p><em>Requires:</em> Audit</p>
 <p><em>Enables:</em> All</p>
 <p><em>Gold Entities:</em> Cluster</p>
-<p>The clusters module is pretty low-level. The cluster_id field throughout the layers is the primary method through 
-which users can tie spark-side data to databricks-side data. Additionally, cluster_ids are required to calculated 
+<p>The clusters module is pretty low-level. The cluster_id field throughout the layers is the primary method through
+which users can tie spark-side data to databricks-side data. Additionally, cluster_ids are required to calculated
 costs for clusters and for jobs since they are the basis for the compute. Without this metadata, the value of Overwatch
 is signifcantly stifled.</p>
-<p>In addition to cluster_id, the clusters module also provides the cluster logging path of all clusters identified by 
+<p>In addition to cluster_id, the clusters module also provides the cluster logging path of all clusters identified by
 Overwatch. From the logging path the SparkEvents (event log) locations can be extrapolated and consumed; without
 the clusters module, the sparkEvents cannot function.</p>
 <h3 id="clusterevents">ClusterEvents</h3>
@@ -612,9 +612,9 @@ the clusters module, the sparkEvents cannot function.</p>
 change. All of these events can be seen in the UI if you navigate to a spcific cluster and click on <em>eEvent Log</em>.
 <img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/Modules/clusterEvents.png" alt="ClusterEventsExample">
 This data acquisition is driven from a paginated API calls and can only go back 30 days. Note that a large, autoscaling
-cluster with many users is likely to have <strong>MANY EVENTS</strong>. The api can return 500 results (max) per call and the 
+cluster with many users is likely to have <strong>MANY EVENTS</strong>. The api can return 500 results (max) per call and the
 process for getting all the results are via pagination. This is <strong>particularly relevant on the first run</strong>. The API
-can only go so fast so the first run will take quite a while for larger workspaces with a lot of cluster events, 
+can only go so fast so the first run will take quite a while for larger workspaces with a lot of cluster events,
 plan your initial load cluster size appropriately.</p>
 
 <div class="notices warning" ><p>A lot of work has been done to optimize this speed
@@ -626,34 +626,34 @@ other resources are heavily utilizing api calls.</p>
 <h3 id="pools">Pools</h3>
 <p><em>Requires:</em> Audit</p>
 <p><em>Gold Entities:</em> InstancePool
-Simple module that offers observability to configuration changes (not state) of an instance pool. Databricks does 
-not yet publish the state change data for instance pools; thus Overwatch cannot deliver metrics for 
-how long a node was used, how long it was idle, when it became idle, when it was terminated, etc. When Databricks 
+Simple module that offers observability to configuration changes (not state) of an instance pool. Databricks does
+not yet publish the state change data for instance pools; thus Overwatch cannot deliver metrics for
+how long a node was used, how long it was idle, when it became idle, when it was terminated, etc. When Databricks
 makes this data available, Overwatch will add this to the data model in a release shortly thereafter.</p>
 <h3 id="jobs">Jobs</h3>
 <p><em>Requires:</em> Audit|Clusters|ClusterEvents
 <em>Enables:</em> JobRunCostPotentialFact</p>
 <p><em>Gold Entities:</em> Job|JobRun|JobRunCostPotentialFact</p>
-<p>Overwatch curates all the job definitions through time, capturing as much metadata about these job definitions as 
+<p>Overwatch curates all the job definitions through time, capturing as much metadata about these job definitions as
 possible. In addition to the job definition metadata, Overwatch also captures each run and ties the run to a cluster_id
-and a run_id. There are two types of *run_id&quot; in Databricks, a global, canonical run_id and an <em>id_in_job</em> which 
+and a run_id. There are two types of *run_id&quot; in Databricks, a global, canonical run_id and an <em>id_in_job</em> which
 starts at 1 for each job and increments by 1 for each of that job&rsquo;s runs. Remember that the job definition can change
-between runs including important aspects such as the cluster definition, name, schedule, notebook, jar, etc. A job_id 
-can be completely different from day to day and combining the point-in-time definition of a job along with the 
+between runs including important aspects such as the cluster definition, name, schedule, notebook, jar, etc. A job_id
+can be completely different from day to day and combining the point-in-time definition of a job along with the
 point-in-time cluster definition and run-times can be very powerful, and very hard to curate without Overwatch.
 <img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/Modules/run_id_v_id_in_job.png" alt="run_id_v_id_in_job"></p>
 <h3 id="accounts">Accounts</h3>
 <p><em>Requires:</em> Audit</p>
 <p><em>Gold Entities:</em> AccountModificationFact|AccountLoginFact</p>
 <p>The accounts module is very simple and is meant to assist the IT Admin team in keeping track of users. The Accounts
-module includes some very useful auditing information as well as enables authorized users to tie user_ids back to 
+module includes some very useful auditing information as well as enables authorized users to tie user_ids back to
 user_emails. The Accounts module includes two key entities:</p>
 <ul>
 <li>userLoginFact - identifies a user login, method, sourceIPAddress, and any authorizing groups.</li>
 <li>user - Slow changing dimension of a user entity through time including create, edit, delete. The user table also
 records the source IP address of any add/edit/delete action performed on a user.</li>
 </ul>
-<p>These tables (which are actually views) have been purposely maintained in the ETL database not the consumer database. 
+<p>These tables (which are actually views) have been purposely maintained in the ETL database not the consumer database.
 This is because these are considerably sensitive tables and it&rsquo;s best to simplify the security around these tables.
 If desired, views, can be created manually in the consumer database to publish these more broadly.</p>
 
@@ -667,30 +667,30 @@ If desired, views, can be created manually in the consumer database to publish t
 <h3 id="sparkevents">SparkEvents</h3>
 <p><em>Requires:</em> Clusters</p>
 <p><em>Gold Entities:</em> SparkExecution|SparkJob|SparkStage|SparkTask|SparkExecutor|SparkStream|SparkJDBC</p>
-<p>Databricks captures all &ldquo;SparkEvents&rdquo; captured by Open Source Spark (OSS) AND some additional events that are 
+<p>Databricks captures all &ldquo;SparkEvents&rdquo; captured by Open Source Spark (OSS) AND some additional events that are
 proprietary to Databricks. These events are captured and persisted in event log files when cluster logging is enabled.
 Below are screenshots of the cluster logs configuration and the resulting event log parent directories.</p>
 <p>When the SparkEvents module is enabled and a cluster is configured to capture cluster logs, Overwatch will dive into
 the cluster logging folder and find the event logs that were created since the previous run. This is why the clusters
-module is required for the SparkEvents module to function. Overwatch will remember which files it&rsquo;s processed and 
+module is required for the SparkEvents module to function. Overwatch will remember which files it&rsquo;s processed and
 only process new files captured within the relevant timeframe.</p>
 
 <div class="notices note" ><p>It&rsquo;s best practice to configure cluster logs to be delivered to a location with time-to-live (TTL) properties set up
-(sometimes referred to as lifecycle properties). This allows for files to age out and not continue to eat up space. 
-Files can be configured to be deleted or moved to cold storage after some defined timeframe. The raw files are very 
-inefficient to store long-term and once the data has been captured by Overwatch, it&rsquo;s stored in an efficient way; 
+(sometimes referred to as lifecycle properties). This allows for files to age out and not continue to eat up space.
+Files can be configured to be deleted or moved to cold storage after some defined timeframe. The raw files are very
+inefficient to store long-term and once the data has been captured by Overwatch, it&rsquo;s stored in an efficient way;
 therefore, there&rsquo;s little to no reason to keep the files in warm/hot storage for greater than some a few weeks.
 More information can be found on this topic in the <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">Advanced Topics</a>
 section.</p>
 </div>
 
-<p>The eventlog <strong>schema</strong> is very complex and implicit. Each event is categorized by &ldquo;Event&rdquo; and the columns 
-populated are contingent upon the event. This method causes chaos when trying to analyze the logs manually and yet 
+<p>The eventlog <strong>schema</strong> is very complex and implicit. Each event is categorized by &ldquo;Event&rdquo; and the columns
+populated are contingent upon the event. This method causes chaos when trying to analyze the logs manually and yet
 another reason Overwatch was created. The schema ultimately contains every single piece of information that can be
 found in the Spark UI and it can be accessed and analyzed programmatically. The most common data points have been
 curated and organized for consumption. The Overwatch team has grand plans to dig deeper and curate additional sources
 as they are created by Spark and Databricks.</p>
-<p>The cluster_id is the primary method through which Spark data can be tied to Databricks metadata such as jobs, costs, 
+<p>The cluster_id is the primary method through which Spark data can be tied to Databricks metadata such as jobs, costs,
 users, core count, pools, workspaces, etc. Once the Spark operation data is combined with a cluster it&rsquo;s relatively
 easy to tie it back to any dimension.</p>
 
@@ -700,7 +700,7 @@ etl table</p>
 </div>
 
 <h4 id="sparkevents-organization">SparkEvents Organization</h4>
-<p>Tying the SparkEvents together and using only the data necessary is the key to success when working in these large 
+<p>Tying the SparkEvents together and using only the data necessary is the key to success when working in these large
 datasets. It&rsquo;s best to identify the highest level that has the measure you need and work your way up to the ClusterID
 and over to Databricks Environment metadata. The image below attempts to depict the relationships visually to simplify
 the interactions. A few bullet points have been provided below to help you digest the visual. Additionally, if you&rsquo;re
@@ -708,11 +708,11 @@ familiar with the SparkUI, the hierarchy and encapsulations are identical.</p>
 <p>Additional clarification of the Spark Hierachy can be found on this <a href="https://youtu.be/daXEp4HmS-E?t=108">Spark+AI Summit YT Video</a></p>
 <p><img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/Modules/SparkJobHierarchy.png" alt="SparkHierarchyVix"></p>
 <ul>
-<li>A <strong>SparkExecutionID</strong> is only present when the spark job[s] are spawned from a SparkSQL command. RDD and Delta 
-metadata commands are not encapsulated by an ExecutionID; as such, JobGroupIDs and JobIDs can exist without the 
+<li>A <strong>SparkExecutionID</strong> is only present when the spark job[s] are spawned from a SparkSQL command. RDD and Delta
+metadata commands are not encapsulated by an ExecutionID; as such, JobGroupIDs and JobIDs can exist without the
 presence of an ExecutionID.
 <img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/Modules/execution_id.png" alt="ExecutionIDViz"></li>
-<li>A <strong>JobGroupID</strong> is present anytime a single spark DAG requires multiple Spark Jobs to complete the action. A 
+<li>A <strong>JobGroupID</strong> is present anytime a single spark DAG requires multiple Spark Jobs to complete the action. A
 JobGroupID has 0:m ExecutionIDs and 1:m JobIDs.
 <ul>
 <li>Another very important note about the JobGroupID is that if the jobGroupID was launched from a Databricks Job,
@@ -722,7 +722,7 @@ any Spark Job can be directly tied back to a specific Databricks Job Run.
 </ul>
 </li>
 <li>A <strong>SparkJobID</strong> IS required for every spark job and has 1:m Spark StageIDs. The SparkJobID has a 0:1 to a Spark
-JobGroupID and a 1:m to StageID. SparkJobIDs are also special because they provide the Databricks metadata such as 
+JobGroupID and a 1:m to StageID. SparkJobIDs are also special because they provide the Databricks metadata such as
 user and cluster_id. Spark_events_bronze also has many additional Databricks properties published in certain circumstances.
 <img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/Modules/stage_details.png" alt="JobIDViz"></li>
 <li>A <strong>SparkStageID</strong> is required for all spark jobs and has a 1:1 relationship to JobID and a 1:m to TaskID.</li>
@@ -730,7 +730,7 @@ user and cluster_id. Spark_events_bronze also has many additional Databricks pro
 and contains all the execution compute statistics for the tasks just as in the SparkUI.</li>
 <li>Every task much execute on one and only one <strong>SparkExecutorID</strong>. a TaskID has a 1:1 relationship to ExecutorID event
 though a task can be retried because a unique Task is also identified by the AttemptID; thus, when a task fails on
-due to node failure, the task + attempt is marked as failed and a new attempt is executed on another node. The 
+due to node failure, the task + attempt is marked as failed and a new attempt is executed on another node. The
 ExecutorID is the node on which the work was executed.
 <img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/Modules/Task_Detail.png" alt="TaskViz"></li>
 </ul>
@@ -1020,19 +1020,19 @@ ExecutorID is the node on which the work was executed.
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1640015967"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1640015967"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639609837" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639609837"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1640015967" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1640015967"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

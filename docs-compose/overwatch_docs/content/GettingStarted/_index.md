@@ -74,7 +74,7 @@ Simply populate the necessary variables for your environment.
 * AZURE ([HTML 0.6.0+](/assets/GettingStarted/azure_runner_docs_example_060.html) / [DBC 0.6.0+](/assets/GettingStarted/azure_runner_docs_example_060.dbc))
 * AWS ([HTML 0.6.0+](/assets/GettingStarted/aws_runner_docs_example_060.html) / [DBC 0.6.0+](/assets/GettingStarted/aws_runner_docs_example_060.dbc))
 * AZURE ([HTML 0.5.0.4+](/assets/GettingStarted/azure_runner_docs_example_0504.html) / [DBC 0.5.0.4+](/assets/GettingStarted/azure_runner_docs_example_0504.dbc))
-* AWS ([HTML 0.5.x](/assets/GettingStarted/aws_runner_docs_example_042.html) / [DBC 0.5.x](/assets/GettingStarted/azure_runner_docs_example_042.dbc))
+* AWS ([HTML 0.5.x](/assets/GettingStarted/aws_runner_docs_example_042.html) / [DBC 0.5.x](/assets/GettingStarted/aws_runner_docs_example_042.dbc))
 
 The code snippet below will initialize the workspace (simple aws example).
 ```scala

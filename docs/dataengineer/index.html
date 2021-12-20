@@ -12,21 +12,21 @@
     <title>Data Engineering :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1640015967" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1640015967" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1640015967"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639609837"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1640015967"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1640015967"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1640015967"></script>
 
     
   </div>
@@ -537,10 +537,10 @@ For full fidelity image, right click and save the image.</p>
 <p><a href="https://databrickslabs.github.io/overwatch/images/_index/Overwatch_Gold.png">Overwatch ERD 06x</a></p>
 <p><a href="https://databrickslabs.github.io/overwatch/images/_index/Overwatch_Gold_05x.png">Overwatch ERD 05x</a></p>
 <h2 id="overwatch-data-promotion-process">Overwatch Data Promotion Process</h2>
-<p>Overwatch data is promoted from bronze - silver - gold - presentation to ensure data consistency and quality as the 
+<p>Overwatch data is promoted from bronze - silver - gold - presentation to ensure data consistency and quality as the
 data is enriched between the stages. The presentation layer is composed of views that reference the latest schema
 version of the gold layer. This disconnects the consumption layer from the underlying data structure so that developers
-can transparently add and alter columns without user disruption. All tables in each layer (except consumption) are 
+can transparently add and alter columns without user disruption. All tables in each layer (except consumption) are
 suffixed in the ETL database with <em>_layer</em>.</p>
 
 <div class="notices note" ><p>Note, the ETL database and consumption database are usually different,
@@ -549,24 +549,24 @@ determined by the <a href="https://databrickslabs.github.io/overwatch/gettingsta
 
 <h2 id="common-terms--concepts">Common Terms &amp; Concepts</h2>
 <h3 id="snapshot">Snapshot</h3>
-<p>A snapshot is a point in time image of a context. For example, Cluster and Job definitions come and go in a 
+<p>A snapshot is a point in time image of a context. For example, Cluster and Job definitions come and go in a
 Databricks workspace but at the time of an Overwatch run, there is a state and the snapshots capture this state.</p>
 <p>Several <em>snapshot</em> tables can be found in the bronze layer such as <em>clusters_snapshot_bronze</em>. As a specific
 example, this snapshot is an entire capture of all existing clusters and definitions at the time of the Overwatch run.
-This is an important reference point, especially in the early days of running Overwatch, as depending on when the 
-process and logging was begun, many of the existing clusters were created (and last edited) before the audit logs 
-could capture it therefore, the existence and metadata of a cluster would be missing from Overwatch if not for the 
-snapshot. The snapshots also serve as a good last resort lookup for any missing data through time, espeically as 
+This is an important reference point, especially in the early days of running Overwatch, as depending on when the
+process and logging was begun, many of the existing clusters were created (and last edited) before the audit logs
+could capture it therefore, the existence and metadata of a cluster would be missing from Overwatch if not for the
+snapshot. The snapshots also serve as a good last resort lookup for any missing data through time, espeically as
 it pertains to assets that exist for a longer period of time.</p>
-<p>Snapshots should not be the first choice when looking for data regarding slow changing assets (such as clusters) as 
-the resolution is expectedly low, it&rsquo;s much better to hit the slow changing dimensions in gold, <em>cluster</em>, or even 
-in silver such as <em>cluster_spec_silver</em>. If the raw data you require has not been enriched from raw state then you 
-likely have no other choice than to go directly to the audit logs, <em>audit_log_bronze</em>, and filter down to the 
+<p>Snapshots should not be the first choice when looking for data regarding slow changing assets (such as clusters) as
+the resolution is expectedly low, it&rsquo;s much better to hit the slow changing dimensions in gold, <em>cluster</em>, or even
+in silver such as <em>cluster_spec_silver</em>. If the raw data you require has not been enriched from raw state then you
+likely have no other choice than to go directly to the audit logs, <em>audit_log_bronze</em>, and filter down to the
 relevant <em>service_name</em> and <em>action</em>.</p>
 <h3 id="job">Job</h3>
 
 <div class="notices note" ><p>Be weary of the term <strong>JOB</strong> when working with Overwatch (and Spark on Databricks in general). A Databricks Job is
-a very different entity than a Spark Job. The documentation attempts to be very clear, please file a ticket if you 
+a very different entity than a Spark Job. The documentation attempts to be very clear, please file a ticket if you
 find a section in which the difference is not made clear.</p>
 </div>
 
@@ -859,19 +859,19 @@ find a section in which the difference is not made clear.</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1640015967"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1640015967"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639609837" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639609837"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1640015967" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1640015967"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

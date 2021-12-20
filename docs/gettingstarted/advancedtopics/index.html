@@ -12,21 +12,21 @@
     <title>Advanced Topics :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1640015967" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1640015967" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1640015967"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639609837"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1640015967"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1640015967"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1640015967"></script>
 
     
   </div>
@@ -544,15 +544,15 @@
 <li><a href="#joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</a></li>
 </ul>
 <h2 id="externalize-optimize--z-order-as-of-060">Externalize Optimize &amp; Z-Order (as of 0.6.0)</h2>
-<p>The Overwatch pipeline has always included the Optimize &amp; Z-Order functions. By default all targets are set to 
+<p>The Overwatch pipeline has always included the Optimize &amp; Z-Order functions. By default all targets are set to
 be optimized once per week which resulted in very different runtimes once per week.
-As of 0.6.0, this can be externalized. 
+As of 0.6.0, this can be externalized.
 Reasons to externalize include:</p>
 <ul>
 <li>Lower job runtime variability and/or improve consistency to hit SLAs</li>
 <li>Utilize a more efficient cluster type/size for the optimize job
 <ul>
-<li>Optimize &amp; Zorder are extremely efficient but do heavily depend on local storage; thus Storage Optimized compute 
+<li>Optimize &amp; Zorder are extremely efficient but do heavily depend on local storage; thus Storage Optimized compute
 nodes are highly recommended for this type of workload.
 <ul>
 <li>Azure: i3.*xLarge</li>
@@ -563,7 +563,7 @@ nodes are highly recommended for this type of workload.
 </li>
 <li>Allow a single job to efficiently optimize Overwatch for all workspaces
 <ul>
-<li>Note that the scope of &ldquo;all workspaces&rdquo; above is within the scope of a data target. All workspaces that send 
+<li>Note that the scope of &ldquo;all workspaces&rdquo; above is within the scope of a data target. All workspaces that send
 data to the same dataset can be optimized from a single workspace.</li>
 </ul>
 </li>
@@ -599,11 +599,11 @@ data to the same dataset can be optimized from a single workspace.</li>
 </ul>
 <p><img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/AdvancedTopics/optimizerJob.png" alt="OptimizeJob"></p>
 <h2 id="interacting-with-overwatch-and-its-state">Interacting With Overwatch and its State</h2>
-<p>Use your production notebook (or equivallent) to instantiate your Overatch Configs. 
+<p>Use your production notebook (or equivallent) to instantiate your Overatch Configs.
 From there use <code>JsonUtils.compactString</code> to get the condensed parameters for your workspace.</p>
 <p><strong>NOTE</strong> you cannot use the escaped string, it needs to be the compactString.</p>
-<p>Below is an example of getting the compact string. You may also refer to the 
-<a href="https://databrickslabs.github.io/overwatch/gettingstarted/#initializing-the-environment">example runner notebook</a> 
+<p>Below is an example of getting the compact string. You may also refer to the
+<a href="https://databrickslabs.github.io/overwatch/gettingstarted/#initializing-the-environment">example runner notebook</a>
 for your cloud provider.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">val</span> params <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">OverwatchParams</span><span style="color:#f92672">(...)</span>
 print<span style="color:#f92672">(</span><span style="color:#a6e22e">JsonUtils</span><span style="color:#f92672">.</span>objToJson<span style="color:#f92672">(</span>params<span style="color:#f92672">).</span>compactString<span style="color:#f92672">)</span>
@@ -612,8 +612,8 @@ print<span style="color:#f92672">(</span><span style="color:#a6e22e">JsonUtils</
 <h4 id="azure">Azure</h4>
 
 <div class="notices warning" ><p><strong>IMPORTANT</strong>: The EventHub connection string needs to be input as a string but it contains sensitive information
-thus we want to reference the secret. To do so, simply use the format {{secrets/scope/key}} and replace words 
-&ldquo;scope&rdquo; and &ldquo;key&rdquo; with the names of the scope and key where the EH connection string is stored. This will be parsed 
+thus we want to reference the secret. To do so, simply use the format {{secrets/scope/key}} and replace words
+&ldquo;scope&rdquo; and &ldquo;key&rdquo; with the names of the scope and key where the EH connection string is stored. This will be parsed
 within Overwatch and never stored in clear text. Note, this is a <a href="https://docs.databricks.com/security/secrets/secrets.html#path-value">standard created and supported by Databricks</a></p>
 </div>
 
@@ -628,7 +628,7 @@ within Overwatch and never stored in clear text. Note, this is a <a href="https:
 <p>Now that you have the workspace you can interact with Overwatch very intuitively.</p>
 <h4 id="exploring-the-config">Exploring the Config</h4>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">prodWorkspace<span style="color:#f92672">.</span>getConfig<span style="color:#f92672">.*</span>
-</code></pre></div><p>After the last period in the command above, push tab and you will be able to see the entire 
+</code></pre></div><p>After the last period in the command above, push tab and you will be able to see the entire
 derived configuratin and it&rsquo;s state.</p>
 <h4 id="interacting-with-the-pipeline">Interacting with the Pipeline</h4>
 <p>When you instantiate a pipeline you can get stateful Dataframes, modules, and their configs such as the timestamp
@@ -637,13 +637,13 @@ from which a DF will resume, etc.</p>
 <span style="color:#66d9ef">val</span> silverPipeline <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Silver</span><span style="color:#f92672">(</span>prodWorkspace<span style="color:#f92672">)</span>
 <span style="color:#66d9ef">val</span> goldPipeline <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Gold</span><span style="color:#f92672">(</span>prodWorkspace<span style="color:#f92672">)</span>
 bronzePipeline<span style="color:#f92672">.*</span>
-</code></pre></div><p>Instantiating a pipeline gives you access to its public methods. 
+</code></pre></div><p>Instantiating a pipeline gives you access to its public methods.
 Doing this allows you to navigate the pipeline and its state very naturally</p>
 <h4 id="using-targets">Using Targets</h4>
-<p>A &ldquo;target&rdquo; is essentially an Overwatch-defined table with a ton of helper methods and attributes. The attributes 
-are closed off in 0.5.0 but <a href="https://github.com/databrickslabs/overwatch/issues/164">Issue 164</a> will expose all 
+<p>A &ldquo;target&rdquo; is essentially an Overwatch-defined table with a ton of helper methods and attributes. The attributes
+are closed off in 0.5.0 but <a href="https://github.com/databrickslabs/overwatch/issues/164">Issue 164</a> will expose all
 reasonably helpful attributes making the target definition even more powerful.</p>
-<p>Note that the scala filter method below will be simplified in upcoming release, referenced in 
+<p>Note that the scala filter method below will be simplified in upcoming release, referenced in
 <a href="https://github.com/databrickslabs/overwatch/issues/166">Issue 166</a></p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">val</span> bronzeTargets <span style="color:#66d9ef">=</span> bronzePipeline<span style="color:#f92672">.</span>getAllTargets
 <span style="color:#66d9ef">val</span> auditLogTarget <span style="color:#66d9ef">=</span> bronzeTargets<span style="color:#f92672">.</span>filter<span style="color:#f92672">(</span><span style="color:#66d9ef">_</span><span style="color:#f92672">.</span>name <span style="color:#f92672">===</span> <span style="color:#e6db74">&#34;audit_log_bronze&#34;</span><span style="color:#f92672">)</span> <span style="color:#75715e">// the name of a target is the name of the etl table
@@ -656,20 +656,20 @@ reasonably helpful attributes making the target definition even more powerful.</
 <span style="color:#75715e">// If you want to get the global dataframe
 </span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> auditLogGlobalDF <span style="color:#66d9ef">=</span> auditLogTarget<span style="color:#f92672">.</span>asDF<span style="color:#f92672">(</span>withGlobalFilters <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">false</span><span style="color:#f92672">)</span>
 </code></pre></div><h2 id="joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</h2>
-<p>The nature of time throughout the Overwatch project has resulted in the need to for 
-advanced time-series DataFrame management. As such, a vanilla version of 
-<a href="https://github.com/databrickslabs/tempo">databrickslabs/tempo</a> was implemented 
+<p>The nature of time throughout the Overwatch project has resulted in the need to for
+advanced time-series DataFrame management. As such, a vanilla version of
+<a href="https://github.com/databrickslabs/tempo">databrickslabs/tempo</a> was implemented
 for the sole purpose of enabling Scala time-series DataFrames (TSDF). TSDFs enable
-&ldquo;asofJoin&rdquo; and &ldquo;lookupWhen&rdquo; functions that also efficiently handle massive skew as is 
+&ldquo;asofJoin&rdquo; and &ldquo;lookupWhen&rdquo; functions that also efficiently handle massive skew as is
 introduced with the partitioning of organization_id and cluster_id. Please refer to the Tempo
-documentation for deeper info. When Tempo&rsquo;s implementation for Scala is complete, Overwatch plans to 
+documentation for deeper info. When Tempo&rsquo;s implementation for Scala is complete, Overwatch plans to
 simply reference it as a dependency.</p>
-<p>This is discussed here because these functionalities have been made public through Overwatch which 
-means you can easily utilize &ldquo;lookupWhen&rdquo; and &ldquo;asofJoin&rdquo; when interrogating Overwatch. The details for 
-optimizing skewed windows is beyond the scope of this documentation but please do reference the Tempo 
+<p>This is discussed here because these functionalities have been made public through Overwatch which
+means you can easily utilize &ldquo;lookupWhen&rdquo; and &ldquo;asofJoin&rdquo; when interrogating Overwatch. The details for
+optimizing skewed windows is beyond the scope of this documentation but please do reference the Tempo
 documentation for more details.</p>
 <p>In the example below, assume you wanted the cluster name at the time of some event in a fact table.
-Since cluster names can be edited, this name could be different throughout time so what was that 
+Since cluster names can be edited, this name could be different throughout time so what was that
 value at the time of some event in a driving table.</p>
 <p>The function signature for &ldquo;lookupWhen&rdquo; is:</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">  <span style="color:#66d9ef">def</span> lookupWhen<span style="color:#f92672">(</span>
@@ -991,19 +991,19 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1640015967"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1640015967"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639609837" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639609837"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1640015967" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1640015967"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

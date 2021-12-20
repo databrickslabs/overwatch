@@ -12,21 +12,21 @@
     <title>Configuration :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1639609837" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1640015967" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1640015967" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1639609837" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1640015967" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1640015967"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1639609837"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1640015967"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1640015967"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1639609837"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1640015967"></script>
 
     
   </div>
@@ -544,29 +544,29 @@
 
 <h2 id="configuration-basics">Configuration Basics</h2>
 <p>The Overwatch configuration can be created as a case class of <a href="#overwatchparams">OverwatchParams</a> or as a json string passed into
-the main class <code>com.databricks.labs.overwatch.BatchRunner</code>. When passed in as a json string, it is 
+the main class <code>com.databricks.labs.overwatch.BatchRunner</code>. When passed in as a json string, it is
 serialized into an instance of <a href="#overwatchparams">OverwatchParams</a>. This provides strong validation on the input parameters
 and strong typing for additional validation options. All configs attempt to be defaulted to a reasonable default
 where possible. If a default is set, passing in a value will overwrite the default.</p>
 <h2 id="config-examples">Config Examples</h2>
 <p>Below are some configurations examples of building the configuration parameters called <em>params</em> which is a variable
 set to contain an instance of the class <em>OverwatchParams</em>.</p>
-<p>Once the config has been created according to your needs, refer back to the 
+<p>Once the config has been created according to your needs, refer back to the
 <a href="https://databrickslabs.github.io/overwatch/gettingstarted/#via-a-notebook">Getting Started - Run Via Notebook</a> or
 <a href="https://databrickslabs.github.io/overwatch/gettingstarted/#via-main-class">Getting Started - Run Via Main Class</a> section to see how it&rsquo;s can be used
 when executing the Overwatch Run.</p>
 
 <div class="notices warning" ><p>The configuration examples below use a data target prefix of <em>/user/hive/warehouse</em>. It is STRONGLY recommended that
-a data target with a prefix other than /user/hive/warehouse be used. Even though the tables are external, any 
+a data target with a prefix other than /user/hive/warehouse be used. Even though the tables are external, any
 spark database located within the default warehouse will drop all tables (including external) with certain drop database
 commands resulting in permanent data loss. This is default behavior and has nothing to do with Overwatch specifically
-but it&rsquo;s called out here as a major precaution. If multiple workspaces are to be configured and someone with write 
-access to this location invokes certain drop database commands, all tables will be permanently deleted for all 
+but it&rsquo;s called out here as a major precaution. If multiple workspaces are to be configured and someone with write
+access to this location invokes certain drop database commands, all tables will be permanently deleted for all
 workspaces.</p>
 </div>
 
 <h3 id="azure-example">Azure Example</h3>
-<p>Azure does require an event hub to be set up and referenced in the config as an 
+<p>Azure does require an event hub to be set up and referenced in the config as an
 <a href="#azureauditlogeventhubconfig">AzureAuditLogEventhubConfig</a>. More details for setting up this Event Hub
 can be found in the <a href="https://databrickslabs.github.io/overwatch/environmentsetup/azure/">Azure Environment Setup</a> page. An example notebook
 can be found <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example.html">here</a>.</p>
@@ -605,9 +605,9 @@ can be found <a href="https://databrickslabs.github.io/overwatch/assets/GettingS
   workspace_name <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>customWorkspaceName<span style="color:#f92672">),</span> <span style="color:#75715e">// as of 0.6.0
 </span><span style="color:#75715e"></span>  externalizeOptimize <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">false</span> <span style="color:#75715e">// as of 0.6.0
 </span><span style="color:#75715e"></span><span style="color:#f92672">)</span>
-</code></pre></div><p><strong>NOTE</strong> The connection string stored in the <em>ehConnScopeKeyString</em> above is stored as a secret since it contains 
+</code></pre></div><p><strong>NOTE</strong> The connection string stored in the <em>ehConnScopeKeyString</em> above is stored as a secret since it contains
 sensitive information.</p>
-<p><strong>THIS IS NOT THE KEY</strong> but the actual connection string from the SAS Policy. To find this follow the path in the 
+<p><strong>THIS IS NOT THE KEY</strong> but the actual connection string from the SAS Policy. To find this follow the path in the
 Azure portal below.</p>
 <p>eh-namespace &ndash;&gt; eventhub &ndash;&gt; shared access policies &ndash;&gt; Connection String-primary key</p>
 <p>The connection string should begin with <code>Endpoint=sb://</code>. Note that the policy only needs the Listen permission</p>
@@ -791,11 +791,11 @@ that if you omit certain configs, their defaults will still be present in the js
 </table>
 <h3 id="tokensecret">TokenSecret</h3>
 <p>Overwatch must have permission to perform its functions; these are further discussed in <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">AdvancedTopics</a>.
-The token secret stores the Databricks Secret scope / key for Overwatch to retrieve. The key should store the 
+The token secret stores the Databricks Secret scope / key for Overwatch to retrieve. The key should store the
 token secret to be used which usually starts with &ldquo;dapi&hellip;&rdquo;</p>
-<p>If no TokenSecret is passed into the config, the operation owner&rsquo;s token will be used. If Overwatch is being 
-executed in a notebook the notebook user&rsquo;s token will be used. If Overwatch is being executed through a job the 
-token of the job owner will be used. Whatever token is used, it must have the appropriate access or it will result 
+<p>If no TokenSecret is passed into the config, the operation owner&rsquo;s token will be used. If Overwatch is being
+executed in a notebook the notebook user&rsquo;s token will be used. If Overwatch is being executed through a job the
+token of the job owner will be used. Whatever token is used, it must have the appropriate access or it will result
 in missing data, or an Overwatch run failure.</p>
 <table>
 <thead>
@@ -827,10 +827,10 @@ in missing data, or an Overwatch run failure.</p>
 <h3 id="datatarget">DataTarget</h3>
 <p>Where to create the database and what to call it. This must be defined on first run or Overwatch will create a
 database named &ldquo;Overwatch&rdquo; at the default location which is &ldquo;/user/hive/warehouse/overwatch.db&rdquo;. This is challenging
-to change later, so be sure you choose a good starting point. After the initial run, this must not change without 
+to change later, so be sure you choose a good starting point. After the initial run, this must not change without
 and entire <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">database migration</a>. Overwatch can perform destructive tasks within its own database and
 this is how it protects itself against harming existing data. Overwatch creates specific metadata inside the database
-at creation time to ensure the database is created and owned by the Overwatch process. Furthermore, metadata is 
+at creation time to ensure the database is created and owned by the Overwatch process. Furthermore, metadata is
 managed to track schema versions and other states.</p>
 <table>
 <thead>
@@ -1305,19 +1305,19 @@ Eventhub streaming environment configurations</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1640015967"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1639609837"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1639609837"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1640015967"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1640015967"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1639609837" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1639609837"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1640015967" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1640015967"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
