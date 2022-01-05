@@ -458,7 +458,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .orderBy('timestamp)
 
     val poolsSnapDFUntilCurrent = poolSnapDF
-      .verifyMinimumSchema(Schema.poolsSnapMinimumSchema)
       .withColumn("preloaded_spark_versions", to_json('preloaded_spark_versions))
       .withColumn("poolSnapDetails", struct(expr("*")))
 

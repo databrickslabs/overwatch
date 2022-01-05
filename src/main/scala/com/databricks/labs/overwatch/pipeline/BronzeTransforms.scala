@@ -781,32 +781,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val daysToProcess = Duration.between(fromDate.atStartOfDay(), untilDate.plusDays(1L).atStartOfDay())
       .toDays.toInt
 
-    val dbfsLogSchema = StructType(Seq(
-      StructField("destination", StringType, true)
-    ))
-
-    val s3LogSchema = StructType(Seq(
-      StructField("canned_acl", StringType, true),
-      StructField("destination", StringType, true),
-      StructField("enable_encryption", BooleanType, true),
-      StructField("region", StringType, true)
-    ))
-
-    val logConfSchema = StructType(Seq(
-      StructField("dbfs", dbfsLogSchema, true),
-      StructField("s3", s3LogSchema, true)
-    ))
-
-    val clusterSnapshotMinSchema = StructType(
-      Seq(
-        StructField("cluster_id", StringType, nullable = true),
-        StructField("state", StringType, nullable = true),
-        StructField("cluster_log_conf", logConfSchema, nullable = true)
-      )
-    )
-
     val clusterSnapshot = clusterSnapshotTable.asDF
-      .verifyMinimumSchema(clusterSnapshotMinSchema)
     // Shoot for partitions coreCount < 16 partitions per day < 576
     // This forces autoscaling clusters to scale up appropriately to handle the volume
     val optimizeParCount = math.min(math.max(coreCount * 2, daysToProcess * 32), 1024)
@@ -814,7 +789,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // clusterIDs with activity identified from audit logs since last run
     val incrementalClusterWLogging = historicalAuditLookupDF
-      .verifyMinimumSchema(Schema.auditMasterSchema)
       .withColumn("global_cluster_id", cluster_idFromAudit)
       .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
       .join(incrementalClusterIDs, Seq("cluster_id"))

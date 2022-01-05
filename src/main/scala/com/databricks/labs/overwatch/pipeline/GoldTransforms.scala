@@ -783,6 +783,27 @@ trait GoldTransforms extends SparkSessionWrapper {
     df.select(sparkExecutionCols: _*)
   }
 
+  private def cleanseDesc(colName: String): Column = {
+    trim(
+      when(col(colName).like("%<br/>%"), regexp_replace(col(colName), "<br/>", " "))
+        .when(col(colName).like("%\n%"), regexp_replace(col(colName), "\\n", " "))
+        .otherwise(col(colName))
+    )
+  }
+
+  private def deriveStreamDetails(streamArrayCol: Column): Column = {
+    val idPos = array_position(streamArrayCol, "id") + 1
+    val runIdPos = array_position(streamArrayCol, "runId") + 1
+    val batchIdPos = when(array_contains(streamArrayCol, "batchId"), array_position(streamArrayCol, "batchId"))
+      .when(array_contains(streamArrayCol, "batch"), array_position(streamArrayCol, "batch"))
+      .otherwise(lit(0)) + 1
+    struct(
+      streamArrayCol(idPos).alias("stream_id"),
+      streamArrayCol(runIdPos).alias("stream_run_id"),
+      streamArrayCol(batchIdPos).alias("stream_batch_id")
+    )
+  }
+
   protected def buildSparkStream(
                                   sparkStreamsGoldTarget: PipelineTable,
                                   sparkExecutionsSilverDFLag30d: DataFrame
@@ -793,28 +814,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .when('Event.endsWith("ProgressEvent"), "Progressed")
       .otherwise(lit(null).cast("string"))
 
-    def cleanseDesc(colName: String): Column = {
-      trim(
-        when(col(colName).like("%<br/>%"), regexp_replace(col(colName), "<br/>", " "))
-          .when(col(colName).like("%\n%"), regexp_replace(col(colName), "\\n", " "))
-          .otherwise(col(colName))
-      )
-    }
-
     val deriveStreamingDesc = when('description.like("%id =%runId =%batch =%"), cleanseDesc("description")).otherwise(lit(null))
-
-    def deriveStreamDetails(streamArrayCol: Column): Column = {
-      val idPos = array_position(streamArrayCol, "id") + 1
-      val runIdPos = array_position(streamArrayCol, "runId") + 1
-      val batchIdPos = when(array_contains(streamArrayCol, "batchId"), array_position(streamArrayCol, "batchId"))
-        .when(array_contains(streamArrayCol, "batch"), array_position(streamArrayCol, "batch"))
-        .otherwise(lit(0)) + 1
-      struct(
-        streamArrayCol(idPos).alias("stream_id"),
-        streamArrayCol(runIdPos).alias("stream_run_id"),
-        streamArrayCol(batchIdPos).alias("stream_batch_id")
-      )
-    }
 
     val streamRawDF = sparkEventsDF
       .filter('Event.like("org.apache.spark.sql.streaming.StreamingQueryListener%"))
@@ -894,26 +894,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         streamExecutionsKeys,
         "left")
       .verifyMinimumSchema(Schema.streamingGoldMinimumSchema)
-
-//    val simpleCols = streamsBaseDF.schema.filterNot(f => f.dataType.typeName == "struct").map(f => col(f.name))
-//    val handledStructs = Array("stateOperators", "durationMs", "sink", "sources", "metrics", "eventTime")
-//      .map(fName => s"streaming_metrics.${fName}")
-//
-//    // TODO -- create jsonify unhandled dynamic structs (including nested) function
-//    val streamingMetricsSimpleCols = streamsBaseDF.select($"streaming_metrics.*").schema
-//      .filterNot(f => f.dataType.typeName == "struct").map(f => col(s"streaming_metrics.${f.name}"))
-//    val unhandledStreamingMetricsStructs = streamsBaseDF.select($"streaming_metrics.*").schema
-//      .filter(f => f.dataType.typeName == "struct" && !handledStructs.contains(f.name))
-//      .map(f => to_json(col(s"streaming_metrics.${f.name}")).alias(f.name))
-//    val unhandledTopStructs = streamsBaseDF.schema
-//      .filter(f => f.dataType.typeName == "struct" && f.name != "streaming_metrics")
-//      .map(f => to_json(col(s"${f.name}")).alias(f.name))
-//
-//    val streamsSelects = simpleCols ++
-//      Array(struct(streamingMetricsSimpleCols ++ unhandledStreamingMetricsStructs: _*).alias("streaming_metrics")) ++
-//      unhandledTopStructs
-//
-//    streamsBaseDF.select(streamsSelects: _*)
 
   }
 
