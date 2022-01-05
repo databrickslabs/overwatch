@@ -126,7 +126,10 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
     val resultDFFieldNames = apiResultDF.schema.fieldNames
     if (!resultDFFieldNames.contains(dataCol) && dataCol != "*") { // if known API but return column doesn't exist
      val asDFErrMsg = s"The API endpoint is not returning the " +
-       s"expected structure, column $dataCol is expected and is not present in the dataframe"
+       s"expected structure, column $dataCol is expected and is not present in the dataframe.\nIf this module " +
+       s"references data that does not exist or to which the Overwatch account does have access, please remove the " +
+       s"scope. For example: if you have 'pools' scope enabled but there are no pools or Overwatch PAT doesn't " +
+       s"have access to any pools, this scope must be removed."
       logger.log(Level.ERROR, asDFErrMsg)
       if (debugFlag) println(asDFErrMsg)
       throw new Exception(asDFErrMsg)
