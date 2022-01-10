@@ -879,13 +879,16 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
       .withColumn("lastRunningSwitch", last('runningSwitch, true).over(stateUntilCurrentW)) // previous on/off switch
       .withColumn("nextRunningSwitch", first('runningSwitch, true).over(stateFromCurrentW)) // next on/off switch
-      // given no anamoly, set on/off state to previous state
+      // given no anomaly, set on/off state to current state
+      // if no current state use previous state
       // if no previous state found, assume opposite of next state switch
       .withColumn("isRunning",coalesce(
-        when('imputedTerminationEvent, lit(false)).otherwise('lastRunningSwitch),
+        when('imputedTerminationEvent, lit(false)).otherwise(lit(null).cast("boolean")),
+        'runningSwitch,
+        'lastRunningSwitch,
         !'nextRunningSwitch
       ))
-      // if isRunning still undetermined, use guarateed events to create state anchors to identify isRunning anchors
+      // if isRunning still undetermined, use guaranteed events to create state anchors to identify isRunning anchors
       .withColumn("isRunning", when('isRunning.isNull && 'state.isin(runningStates: _*), lit(true)).otherwise('isRunning))
       // use the anchors to fill in the null gaps between the state changes to determine if running
       // if ultimately unable to be determined, assume not isRunning
