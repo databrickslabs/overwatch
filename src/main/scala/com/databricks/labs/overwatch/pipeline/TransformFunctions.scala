@@ -103,6 +103,7 @@ object TransformFunctions {
       } else joinResult.schema.fields.filterNot(_.name.endsWith(leftSuffix)).map(f => col(f.name))
 
       joinResult.select(joinSelects: _*)
+        .dropDuplicates(usingColumns) // remove any duplicates produced by joining current overtop of lag
     }
 
     def requireFields(fieldName: Seq[String]): DataFrame = requireFields(false, fieldName: _*)
