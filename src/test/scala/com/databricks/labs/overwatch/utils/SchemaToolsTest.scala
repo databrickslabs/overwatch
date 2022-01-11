@@ -13,7 +13,7 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper {
         val df = spark.createDataFrame(Seq((1,2))).toDF("field1", "field2")
         SchemaTools.scrubSchema(df).schema.toDDL
       }
-      assertResult("`field1` INT,`field2` INT"){
+      assertResult("`field_1` INT,`f_i_e_l_d__2` INT"){
         val df = spark.createDataFrame(Seq((1,2))).toDF("field-1", "f-i-e-l-d\\\\2")
         SchemaTools.scrubSchema(df).schema.toDDL
       }
@@ -29,7 +29,7 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper {
       assertResult("`b-2-2-2` ARRAY<STRUCT<`abc`: STRING, `c_1-\\45`: BIGINT>>,`i-1` BIGINT") {
         df.schema.toDDL
       }
-      assertResult("`b222` ARRAY<STRUCT<`abc`: STRING, `c_145`: BIGINT>>,`i1` BIGINT") {
+      assertResult("`b_2_2_2` ARRAY<STRUCT<`abc`: STRING, `c_1__45`: BIGINT>>,`i_1` BIGINT") {
         SchemaTools.scrubSchema(df).schema.toDDL
       }
     }
@@ -44,7 +44,7 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper {
       assertResult("`b-2-2-2` STRUCT<`abc`: STRING, `c_1-\\45`: BIGINT>,`i-1` BIGINT") {
         df.schema.toDDL
       }
-      assertResult("`b222` STRUCT<`abc`: STRING, `c_145`: BIGINT>,`i1` BIGINT") {
+      assertResult("`b_2_2_2` STRUCT<`abc`: STRING, `c_1__45`: BIGINT>,`i_1` BIGINT") {
         SchemaTools.scrubSchema(df).schema.toDDL
       }
     }

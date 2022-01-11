@@ -48,6 +48,8 @@ publishTo := Some(
 //coverageMinimum := 80
 //coverageFailOnMinimum := true
 
+//test in assembly := {}
+
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
   case x => MergeStrategy.first

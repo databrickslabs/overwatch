@@ -211,7 +211,7 @@ object SchemaTools extends SparkSessionWrapper {
    * @return
    */
   private def sanitizeFieldName(s: String): String = {
-    s.replaceAll("[^a-zA-Z0-9_]", "")
+    s.replaceAll("[^a-zA-Z0-9_]", "_")
   }
 
   /**
