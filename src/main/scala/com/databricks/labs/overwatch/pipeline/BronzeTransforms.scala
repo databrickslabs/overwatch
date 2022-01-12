@@ -543,7 +543,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val fileTrackerDF = newFiles
       .withColumn("failed", lit(false))
       .withColumn("organization_id", lit(orgId))
-      .coalesce(4) // narrow, short table -- each append will == spark event log files processed
+//      .coalesce(4) // narrow, short table -- each append will == spark event log files processed
     database.write(fileTrackerDF, trackerTarget, pipelineSnapTime)
   }
 
