@@ -785,9 +785,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   private def cleanseDesc(colName: String): Column = {
     trim(
-      when(col(colName).like("%<br/>%"), regexp_replace(col(colName), "<br/>", " "))
-        .when(col(colName).like("%\n%"), regexp_replace(col(colName), "\\n", " "))
-        .otherwise(col(colName))
+      regexp_replace(regexp_replace(col(colName), "<br/>", " "),  "\\n", " ")
     )
   }
 

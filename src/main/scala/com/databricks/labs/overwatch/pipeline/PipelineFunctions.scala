@@ -33,7 +33,7 @@ object PipelineFunctions {
       case None =>
         connectionString
     }
-    if (!retrievedConnectionString.matches("^Endpoint=sb://[a-zA-Z0-9-_:;/.=]*;SharedAccessKey=[a-zA-Z0-9-_:;/.=+]*$")) {
+    if (!retrievedConnectionString.matches("^Endpoint=sb://.*;SharedAccessKey=.*$")) {
       throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
     } else retrievedConnectionString
   }
