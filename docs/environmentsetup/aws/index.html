@@ -12,21 +12,21 @@
     <title>AWS :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1640095605" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1642174326" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1640095605" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1642174326" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1640095605"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1642174326"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1640095605"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1640095605"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1642174326"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1642174326"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1640095605"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1642174326"></script>
 
     
   </div>
@@ -542,28 +542,28 @@ environment configuration may be required in addition to the Basic Deployment.</
 <ul>
 <li><a href="https://docs.databricks.com/administration-guide/account-settings/audit-logs.html">Audit Logs</a>
 <ul>
-<li>These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis
-and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.
+<li>These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis 
+and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions. 
 We don&rsquo;t want multiple workspaces delivering into the same prefix. The audit logs contain data for every interaction
-within the environment and are used to track the state of various objects through time along with which accounts
-interacted with them. This data is relatively small and delivery occurs infrequently which is why it&rsquo;s
+within the environment and are used to track the state of various objects through time along with which accounts 
+interacted with them. This data is relatively small and delivery occurs infrequently which is why it&rsquo;s 
 rarely of any consequence to deliver audit logs to buckets even outside of the control plane region.</li>
 </ul>
 </li>
 <li>Cluster Logs - Crucial to get the most out of Overwatch
 <ul>
-<li>Cluster logs delivery location is configured in the cluster spec &ndash;&gt; Advanced Options &ndash;&gt; Logging. These logs can
-get quite large and they are stored in a very inefficient format for query and long-term storage. As such, it&rsquo;s
-crucial to store these logs in the same region as the worker nodes for best results. Additionally, using dedicated
+<li>Cluster logs delivery location is configured in the cluster spec &ndash;&gt; Advanced Options &ndash;&gt; Logging. These logs can 
+get quite large and they are stored in a very inefficient format for query and long-term storage. As such, it&rsquo;s 
+crucial to store these logs in the same region as the worker nodes for best results. Additionally, using dedicated 
 buckets provides more flexibility when configuring TTL (time-to-live) to minimize long-term, unnecessary costs.
 It&rsquo;s not recommended to store these on DBFS directly (dbfs mount points are ok).</li>
-<li>Best Practice - Multi-Workspace &ndash; When multiple workspaces are using Overwatch within a single region it&rsquo;s best to
+<li>Best Practice - Multi-Workspace &ndash; When multiple workspaces are using Overwatch within a single region it&rsquo;s best to 
 ensure that each are going to their own prefix, even if sharing a bucket. This greatly reduces Overwatch scan times
 as the log files build up.</li>
 <li>Best Practice - Sharding &ndash; When many clusters send their logs to the same prefix it reduces the AWS read parallelism
-for these small files. It&rsquo;s best to find a methodology for log prefixes that works for your org. One example would
-be to have each workspace and each team store their logs in a specific prefix, etc to break up the number of log
-files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data
+for these small files. It&rsquo;s best to find a methodology for log prefixes that works for your org. One example would 
+be to have each workspace and each team store their logs in a specific prefix, etc to break up the number of log 
+files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data 
 to the data model.</li>
 </ul>
 </li>
@@ -584,30 +584,30 @@ to the data model.</li>
 </tbody>
 </table>
 <h3 id="with-databricks-billable-usage-delivery-logs">With Databricks Billable Usage Delivery Logs</h3>
-<p>Detailed costs data
-<a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">directly from Databricks</a>.
-This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn&rsquo;t support this just yet,
+<p>Detailed costs data 
+<a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">directly from Databricks</a>. 
+This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn&rsquo;t support this just yet, 
 if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
-to load all the historical data from the day that you began receiving it.
+to load all the historical data from the day that you began receiving it. 
 
 <div class="notices info" ><p>Targeted Q3 2021</p>
 </div>
 </p>
 <h3 id="with-cloud-provider-costs">With Cloud Provider Costs</h3>
-<p>There can be substantial cloud provider costs associated with a cluster. Databricks (and Overwatch) has no visibility
-to this by default. The plan here is to work with a few pilot customers to build API keys with appropriate
-permissions to allow Overwatch to capture the compute, storage, etc costs associated with cluster machines. The
-primary focus here would be to help customers visualize and optimize SPOT markets by illuminating costs
-and opportunities across different AZs in your region given you machine types. Additionally, Overwatch could
+<p>There can be substantial cloud provider costs associated with a cluster. Databricks (and Overwatch) has no visibility 
+to this by default. The plan here is to work with a few pilot customers to build API keys with appropriate 
+permissions to allow Overwatch to capture the compute, storage, etc costs associated with cluster machines. The 
+primary focus here would be to help customers visualize and optimize SPOT markets by illuminating costs 
+and opportunities across different AZs in your region given you machine types. Additionally, Overwatch could 
 make recommendations on:</p>
 <ul>
 <li>Actual compute/disk costs associated with clusters</li>
 <li>Optimal time of day for large jobs</li>
 <li>Small adjustments to node type by hour of day (i.e. i3.4xlarge instead of i3.2xlarge)</li>
 </ul>
-<p>The goal is to go even deeper than compute by looking at disk IO as well to determine the benefit/need of NVMEs
-vs SSDs vs HDDs. Picking the right storage type and amount can save large sums over the course of a year. Picking
-the wrong type (or not enough) can result in elevated compute bills due to inefficiencies. If you&rsquo;re interested in
+<p>The goal is to go even deeper than compute by looking at disk IO as well to determine the benefit/need of NVMEs 
+vs SSDs vs HDDs. Picking the right storage type and amount can save large sums over the course of a year. Picking 
+the wrong type (or not enough) can result in elevated compute bills due to inefficiencies. If you&rsquo;re interested in 
 this feature and would like to participate, please inform your CSE and/or Databricks Account Team.</p>
 
 <div class="notices info" ><p>Targeted 2021</p>
@@ -902,19 +902,19 @@ this feature and would like to participate, please inform your CSE and/or Databr
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1640095605"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1642174326"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1640095605"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1642174326"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1640095605" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1640095605"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1642174326" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1642174326"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

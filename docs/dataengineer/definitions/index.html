@@ -12,21 +12,21 @@
     <title>Definitions :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1640095605" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1640095605" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1642174326" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1642174326" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1640095605" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1642174326" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1640095605"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1642174326"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1640095605"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1640095605"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1642174326"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1642174326"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1640095605"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1642174326"></script>
 
     
   </div>
@@ -560,13 +560,13 @@
 Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart
 from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all
 (with a few minor exceptions such as lookup tables) but rather views. This allows for the Overwatch development team
-to alter the underlying columns, names, types, and structures without breaking existing transformations. Instead,
+to alter the underlying columns, names, types, and structures without breaking existing transformations. Instead, 
 view column names will remain the same but may be repointed to a newer version of a column, etc.</p>
 
-<div class="notices note" ><p>ETL should not be developed atop the consumption layer views but rather the gold layer. Before Overwatch version
+<div class="notices note" ><p>ETL should not be developed atop the consumption layer views but rather the gold layer. Before Overwatch version 
 upgrades, it&rsquo;s important that the engineering team review the change list and upgrade requirements before upgrading.
 These upgrades may require a remap depending on the changes. As of version 1.0 release, all columns in the gold layer
-will be underscored with their schema version number, column changes will reference the later release version but the
+will be underscored with their schema version number, column changes will reference the later release version but the 
 views published with Overwatch will almost always point to the latest version of each column and will not include the
 schema suffix to simplify the data model for the average consumer.</p>
 </div>
@@ -578,8 +578,8 @@ schema suffix to simplify the data model for the average consumer.</p>
 governance. This data can also be enriched with the Spark data enabling in-depth analyses. The breadth of metadata
 is continuing to grow, stay tuned for additional capabilities.</li>
 <li><strong>Spark UI</strong> The spark UI section is derived from the spark event logs and essentially contains every single piece
-of data from the Spark UI. There are a few sections that are not included in the first release but the data is
-present in <em>spark_events_bronze</em> albeit extremely complex to derive. The Overwatch development team is working
+of data from the Spark UI. There are a few sections that are not included in the first release but the data is 
+present in <em>spark_events_bronze</em> albeit extremely complex to derive. The Overwatch development team is working 
 tirelessly to expose additional SparkUI data and will publish as soon as it&rsquo;s ready.</li>
 </ul>
 <p><img src="https://databrickslabs.github.io/overwatch/images/_index/Overwatch_Gold.png" alt="OverwatchERD"></p>
@@ -612,9 +612,9 @@ was created as a reference to each of these.</li>
 </li>
 </ul>
 
-<div class="notices info" ><p>Most tables below provide a data <strong>SAMPLE</strong> for reference. You may either click to view it or
+<div class="notices info" ><p>Most tables below provide a data <strong>SAMPLE</strong> for reference. You may either click to view it or 
 right click the SAMPLE link and click saveTargetAs or saveLinkAs and save the file.
-Note that these files are <strong>TAB</strong> delimited, so you will need to view as such if you save to local file.
+Note that these files are <strong>TAB</strong> delimited, so you will need to view as such if you save to local file. 
 The data in the files were generated from an Azure, test deployment created by Overwatch Developers.</p>
 </div>
 
@@ -773,9 +773,9 @@ The data in the files were generated from an Azure, test deployment created by O
 <p><strong>Z-Order Columns</strong> &ndash; cluster_id + unixTimeMS_state_start</p>
 <p><strong>Write Mode</strong> &ndash; Merge</p>
 <p>Costs and state details by cluster at every state in the cluster lifecycle.</p>
-<p><strong>NOTE</strong> This fact table is not normalized on time. Some states will span multiple days and must be smoothed across
-days (i.e. divide by days_in_state) when trying to calculate costs by day. All states are force-terminated at the
-end of the Overwatch run to the until-timestamp of the run. If the state was still active at this time, it will be
+<p><strong>NOTE</strong> This fact table is not normalized on time. Some states will span multiple days and must be smoothed across 
+days (i.e. divide by days_in_state) when trying to calculate costs by day. All states are force-terminated at the 
+end of the Overwatch run to the until-timestamp of the run. If the state was still active at this time, it will be 
 updated on the subsequent run.</p>
 <table>
 <thead>
@@ -954,21 +954,21 @@ updated on the subsequent run.</p>
 <p><strong>Incremental Columns</strong> &ndash; Pipeline_SnapTS</p>
 <p><strong>Partition Columns</strong> &ndash; organization_id</p>
 <p><strong>Write Mode</strong> &ndash; Append</p>
-<p>This table is unique and it&rsquo;s purpose is to enable users to identify node specific contract costs associated with
-Databricks and the Cloud Provider through time.
-Defaults are loaded as an example by workspace. These defaults are meant to be reasonable, not accurate by default
-as there is a wide difference between cloud discount rates and prices between regions / countries.
-Everytime Overwatch runs, it validates the presence of
+<p>This table is unique and it&rsquo;s purpose is to enable users to identify node specific contract costs associated with 
+Databricks and the Cloud Provider through time. 
+Defaults are loaded as an example by workspace. These defaults are meant to be reasonable, not accurate by default 
+as there is a wide difference between cloud discount rates and prices between regions / countries. 
+Everytime Overwatch runs, it validates the presence of 
 this table and whether it has any data present for the current workspace, if it does not it creates and appends the relevant
-data to it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their
+data to it; otherwise no action is taken. This gives the user the ability to extend / customize this table to fit their 
 needs by workspace. Each organization_id (workspace), should provide complete cost data for each node used in that
-workspace. If you decide to completely customize the table, it&rsquo;s critical to note that <strong>some columns are required</strong>
+workspace. If you decide to completely customize the table, it&rsquo;s critical to note that <strong>some columns are required</strong> 
 for the ETL to function; these fields are indicated below in the table with an asterisk.</p>
 <p>The organization_id (i.e. workspace id) is automatically generated for each workspace if that organization_id is not
 present in the table already (or the table is not present at all). Each workspace
 (i.e. organization_id) often has unique costs, this table enables you to customize compute pricing.</p>
-<p><strong>IMPORTANT</strong> This table must be configured such that there are no overlapping costs (by time) and no gaps (by time)
-in costs for any key (organization_id + API_name) between primordial date and current date.
+<p><strong>IMPORTANT</strong> This table must be configured such that there are no overlapping costs (by time) and no gaps (by time) 
+in costs for any key (organization_id + API_name) between primordial date and current date. 
 This means that for a record to be &ldquo;expired&rdquo; the following must be true:</p>
 <ul>
 <li>original key expired by setting activeUntil == expiry date</li>
@@ -1052,10 +1052,10 @@ This means that for a record to be &ldquo;expired&rdquo; the following must be t
 <p><strong>Incremental Columns</strong> &ndash; activeFrom</p>
 <p><strong>Partition Columns</strong> &ndash; organization_id</p>
 <p><strong>Write Mode</strong> &ndash; Append</p>
-<p>Slow-changing dimension to track DBU contract costs by workspace through time. This table should only need to be edited
-in very rare circumstances such as historical cost correction. Note that editing these contract prices will not
-retroactively modify historical pricing in the costing table such as clusterStateFact or jobRunCostPotentialFact. For
-prices to be recalculated, the gold pipeline modules must be rolled back properly such that the costs can be
+<p>Slow-changing dimension to track DBU contract costs by workspace through time. This table should only need to be edited 
+in very rare circumstances such as historical cost correction. Note that editing these contract prices will not 
+retroactively modify historical pricing in the costing table such as clusterStateFact or jobRunCostPotentialFact. For 
+prices to be recalculated, the gold pipeline modules must be rolled back properly such that the costs can be 
 rebuilt with the updated values.</p>
 <table>
 <thead>
@@ -1329,15 +1329,15 @@ rebuilt with the updated values.</p>
 <p><strong>Incremental Columns</strong> &ndash; startEpochMS</p>
 <p><strong>Partition Columns</strong> &ndash; organization_id</p>
 <p><strong>Write Mode</strong> &ndash; Merge</p>
-<p>This fact table defines the job, the cluster, the cost, the potential, and utilization (if cluster logging is enabled)
+<p>This fact table defines the job, the cluster, the cost, the potential, and utilization (if cluster logging is enabled) 
 of a cluster associated with a specific Databricks Job Run.</p>
-<p><strong>Dimensionality</strong> Note that this fact table is not normalized by time but rather by job run and cluster state.
+<p><strong>Dimensionality</strong> Note that this fact table is not normalized by time but rather by job run and cluster state. 
 Costs are not derived from job runs but from clusters thus the state[s] of the cluster are what&rsquo;s pertinent when
 tying to cost. This is <strong>extremely important</strong> in the case of long running jobs, such as streaming.</p>
 <p>SCENARIO: <!-- raw HTML omitted -->
-Imagine a streaming job with 12 concurrent runs on an existing cluster that run for 20 days at the end of which the
-driver dies for some reason causing all runs fail and begin retrying but failing. When the 20 days end, the cost will
-be captured solely on that date and even more importantly, not only will all 20 days be captured at that date but the
+Imagine a streaming job with 12 concurrent runs on an existing cluster that run for 20 days at the end of which the 
+driver dies for some reason causing all runs fail and begin retrying but failing. When the 20 days end, the cost will 
+be captured solely on that date and even more importantly, not only will all 20 days be captured at that date but the 
 cost associated will be cluster runtime for 20 days * number of runs. Overwatch will automatically smooth the costs
 across the concurrent runs but not the days running since this fact table is not based by on an equidistant time axis.</p>
 <ul>
@@ -1350,12 +1350,12 @@ The compute costs in <a href="#instancedetails">instanceDetails</a> table are ta
 instance type in instanceDetails.</li>
 <li>Utilization: Utilization is a function of core milliseconds used during spark task execution divided by the total
 amount of core milliseconds available given the cluster size and state. (i.e. spark_task_runtime_H / worker_potential_core_H)</li>
-<li>Cluster State: The state[s] of a cluster during a run. As the cluster scales and morphs to accommodate the run&rsquo;s
+<li>Cluster State: The state[s] of a cluster during a run. As the cluster scales and morphs to accommodate the run&rsquo;s 
 needs, the state changes. The number of state changes are recorded in this table as &ldquo;run_cluster_states&rdquo;.</li>
-<li>Run State: Advanced Topic for data engineers and developers. This topic is discussed in considerable detail in the
+<li>Run State: Advanced Topic for data engineers and developers. This topic is discussed in considerable detail in the 
 <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">Advanced Topics</a> section.
-Given a cluster state, the run state is a state of all runs on a cluster at a given moment in time. This
-is the measure used to calculate shared costs across concurrent runs. A run state cannot pass the boundaries of
+Given a cluster state, the run state is a state of all runs on a cluster at a given moment in time. This 
+is the measure used to calculate shared costs across concurrent runs. A run state cannot pass the boundaries of 
 a cluster state, a run that continues across cluster-state lines will result in a new run state.</li>
 </ul>
 <table>
@@ -1811,8 +1811,8 @@ desired. If desired, this can be exposed in consumer database with a simple vew 
 </tbody>
 </table>
 
-<div class="notices note" ><p>The following sections are related to Spark. Everything that can be seend/found in the SparkUI is visibel in the
-spark tables below. A reasonable understanding of the Spark hierarchy is necessary to
+<div class="notices note" ><p>The following sections are related to Spark. Everything that can be seend/found in the SparkUI is visibel in the 
+spark tables below. A reasonable understanding of the Spark hierarchy is necessary to 
 make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevents)"><strong>reference Spark Hierarchy For More Details</strong></a> for more details.</p>
 </div>
 
@@ -2069,8 +2069,8 @@ make this section simpler. Please <a href="(/gettingstarted/modules//#sparkevent
 <p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
 <p><strong>Write Mode</strong> &ndash; Merge</p>
 
-<div class="notices warning" ><p><strong>USE THE PARTITION COLUMN</strong> (date) and Indexed Column (cluster_id) in all joins and filters where possible.
-This table can get extremely large, select samples or smaller date ranges and reduce joins and columns selected
+<div class="notices warning" ><p><strong>USE THE PARTITION COLUMN</strong> (date) and Indexed Column (cluster_id) in all joins and filters where possible. 
+This table can get extremely large, select samples or smaller date ranges and reduce joins and columns selected 
 to improve performance.</p>
 </div>
 
@@ -2166,7 +2166,7 @@ to improve performance.</p>
 <p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
 <p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
 <p><strong>Write Mode</strong> &ndash; Merge</p>
-<p>Remains in preview through version 0.6.0 as more feedback is requested from users and use-cases before this table
+<p>Remains in preview through version 0.6.0 as more feedback is requested from users and use-cases before this table 
 structure solidifes.</p>
 <table>
 <thead>
@@ -2858,19 +2858,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1640095605"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1642174326"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1640095605"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1640095605"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1642174326"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1642174326"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1640095605" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1640095605"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1642174326" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1642174326"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

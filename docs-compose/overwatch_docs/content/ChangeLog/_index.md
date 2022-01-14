@@ -4,6 +4,11 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.6.0.2 (Maintenance Release)
+Several bug fixes - mostly edge cases
+
+A full list of resolutions can be found [here](https://github.com/databrickslabs/overwatch/milestone/7?closed=1)
+
 ## 0.6.0.1 (MAJOR UPGRADE/RELEASE)
 **Existing Customers on 0.5.x --> 0.6.x [UPGRADE PROCESS REQUIRED]({{%relref "DataEngineer/Upgrade.md"%}})**
 * Upgrade process detailed in linked upgrade script [**HTML**](/assets/ChangeLog/060_upgrade_process.html) | 
