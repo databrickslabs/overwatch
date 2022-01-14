@@ -599,32 +599,36 @@ object Upgrade extends SparkSessionWrapper {
       val poolsSnapTarget = PipelineFunctions.getPipelineTarget(b, "pools_snapshot_bronze")
 
       try {
-        val clustersSnapDF = spark.read.format("delta").load(clustersSnapTarget.tableLocation)
-        val poolsSnapDF = spark.read.format("delta").load(poolsSnapTarget.tableLocation)
+        if (clustersSnapTarget.exists) {
+          val clustersSnapDF = spark.read.format("delta").load(clustersSnapTarget.tableLocation)
 
-        clustersSnapDF
-          .withColumn("default_tags", SchemaTools.structToMap(clustersSnapDF, "default_tags"))
-          .repartition('organization_id)
-          .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
-          .partitionBy("organization_id")
-          .save(clustersSnapTarget.tableLocation)
+          clustersSnapDF
+            .withColumn("default_tags", SchemaTools.structToMap(clustersSnapDF, "default_tags"))
+            .repartition('organization_id)
+            .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
+            .partitionBy("organization_id")
+            .save(clustersSnapTarget.tableLocation)
 
-        upgradeStatus.append(
-          UpgradeReport(config.databaseName, "clusters_snapshot_bronze", Some("SUCCESS"), stepMsg)
-        )
+          upgradeStatus.append(
+            UpgradeReport(config.databaseName, "clusters_snapshot_bronze", Some("SUCCESS"), stepMsg)
+          )
+        }
 
-        poolsSnapDF
-          .withColumn("default_tags", SchemaTools.structToMap(poolsSnapDF, "default_tags"))
-          .withColumn(s"aws_attributes", SchemaTools.structToMap(poolsSnapDF, s"aws_attributes"))
-          .withColumn(s"azure_attributes", SchemaTools.structToMap(poolsSnapDF, s"azure_attributes"))
-          .repartition('organization_id)
-          .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
-          .partitionBy("organization_id")
-          .save(poolsSnapTarget.tableLocation)
+        if (poolsSnapTarget.exists) {
+          val poolsSnapDF = spark.read.format("delta").load(poolsSnapTarget.tableLocation)
+          poolsSnapDF
+            .withColumn("default_tags", SchemaTools.structToMap(poolsSnapDF, "default_tags"))
+            .withColumn(s"aws_attributes", SchemaTools.structToMap(poolsSnapDF, s"aws_attributes"))
+            .withColumn(s"azure_attributes", SchemaTools.structToMap(poolsSnapDF, s"azure_attributes"))
+            .repartition('organization_id)
+            .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
+            .partitionBy("organization_id")
+            .save(poolsSnapTarget.tableLocation)
 
-        upgradeStatus.append(
-          UpgradeReport(config.databaseName, "pools_snapshot_bronze", Some("SUCCESS"), stepMsg)
-        )
+          upgradeStatus.append(
+            UpgradeReport(config.databaseName, "pools_snapshot_bronze", Some("SUCCESS"), stepMsg)
+          )
+        }
       } catch {
         case e: Throwable =>
           upgradeStatus.append(
@@ -719,14 +723,14 @@ object Upgrade extends SparkSessionWrapper {
       val sparkExecutorModulesToRebuild = Array(2003, 3014)
       val allSilverGoldModules = s.getAllModules ++ g.getAllModules
       val moduleIDsToRollback = if (rebuildSparkTables) {
-        allSilverGoldModules
+        allSilverGoldModules.map(_.moduleId)
       } else { // don't rebuild spark modules (except executors)
         // executor tables had schema upgrade, they are small so just rebuild them
         allSilverGoldModules.filter(m =>
           !m.moduleName.toLowerCase.contains("spark") ||
             sparkExecutorModulesToRebuild.contains(m.moduleId)
-        )
-      }.map(_.moduleId)
+        ).map(_.moduleId)
+      }
       val rollBackSilverGoldModulesStmt =
         s"""
            |update delta.`$pipReportPath`
