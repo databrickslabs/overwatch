@@ -37,7 +37,8 @@ abstract class PipelineTargets(config: Config) {
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = "created_time, creator_user_name, job_id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.jobSnapMinimumSchema)
     )
 
     lazy private[overwatch] val clustersSnapshotTarget: PipelineTable = PipelineTable(
@@ -47,7 +48,8 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = ("organization_id, cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
         "start_time, terminated_time, Overwatch_RunID").split(", "),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.clusterSnapMinimumSchema)
     )
 
     lazy private[overwatch] val poolsSnapshotTarget: PipelineTable = PipelineTable(
@@ -57,7 +59,8 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = ("instance_pool_id, node_type_id, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.poolsSnapMinimumSchema)
     )
 
     lazy private[overwatch] val auditLogsTarget: PipelineTable = PipelineTable(

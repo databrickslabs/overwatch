@@ -292,28 +292,6 @@ object Schema extends SparkSessionWrapper {
     StructField("timeout_seconds", LongType, true)
   ))
 
-  // simplified new cluster struct
-  private[overwatch] val simplifiedNewClusterSchema = StructType(Seq(
-    StructField("autoscale",
-      StructType(Seq(
-        StructField("max_workers", LongType, true),
-        StructField("min_workers", LongType, true)
-      )), true),
-    StructField("azure_attributes", MapType(StringType, StringType, true), true),
-    StructField("cluster_name", StringType, true),
-    StructField("custom_tags", MapType(StringType, StringType, true), true),
-    StructField("driver_instance_pool_id", StringType, true),
-    StructField("driver_node_type_id", StringType, true),
-    StructField("enable_elastic_disk", BooleanType, true),
-    StructField("instance_pool_id", StringType, true),
-    StructField("node_type_id", StringType, true),
-    StructField("num_workers", LongType, true),
-    StructField("policy_id", StringType, true),
-    StructField("spark_conf", MapType(StringType, StringType, true), true),
-    StructField("spark_env_vars", MapType(StringType, StringType, true), true),
-    StructField("spark_version", StringType, true)
-  ))
-
   // simplified new settings struct
   private[overwatch] val simplifiedNewSettingsSchema = StructType(Seq(
     StructField("email_notifications",
@@ -407,6 +385,92 @@ object Schema extends SparkSessionWrapper {
     StructField("userAgent",StringType, nullable = true)
   ))
 
+  private val s3LogSchema = StructType(Seq(
+    StructField("canned_acl",StringType,nullable = true),
+    StructField("destination",StringType,nullable = true),
+    StructField("enable_encryption",BooleanType,nullable = true),
+    StructField("region",StringType,nullable = true)
+  ))
+
+  private val dbfsLogSchema = StructType(Seq(
+    StructField("destination", StringType, true)
+  ))
+
+  private val logConfSchema = StructType(Seq(
+    StructField("dbfs", dbfsLogSchema, true),
+    StructField("s3", s3LogSchema, true)
+  ))
+
+  val clusterSnapMinimumSchema: StructType = StructType(Seq(
+    StructField("autoscale",
+      StructType(Seq(
+        StructField("max_workers",LongType,nullable = true),
+        StructField("min_workers",LongType,nullable = true)
+      )),nullable = true),
+    StructField("autotermination_minutes",LongType,nullable = true),
+    StructField("cluster_id",StringType,nullable = true),
+    StructField("cluster_log_conf",logConfSchema,nullable = true),
+    StructField("cluster_name",StringType,nullable = true),
+    StructField("cluster_source",StringType,nullable = true),
+    StructField("creator_user_name",StringType,nullable = true),
+    StructField("driver_instance_pool_id",StringType,nullable = true),
+    StructField("driver_node_type_id",StringType,nullable = true),
+    StructField("enable_elastic_disk",BooleanType,nullable = true),
+    StructField("enable_local_disk_encryption",BooleanType,nullable = true),
+    StructField("instance_pool_id",StringType,nullable = true),
+    StructField("node_type_id",StringType,nullable = true),
+    StructField("num_workers",LongType,nullable = true),
+    StructField("single_user_name",StringType,nullable = true),
+    StructField("spark_version",StringType,nullable = true),
+    StructField("state",StringType,nullable = true),
+    StructField("default_tags",MapType(StringType,StringType,valueContainsNull = true),nullable = true),
+    StructField("custom_tags",MapType(StringType,StringType,valueContainsNull = true),nullable = true),
+    StructField("start_time",LongType,nullable = true),
+    StructField("terminated_time",LongType,nullable = true),
+    StructField("organization_id",StringType,nullable = false),
+    StructField("Pipeline_SnapTS",TimestampType,nullable = true),
+    StructField("Overwatch_RunID",StringType,nullable = true),
+    StructField("workspace_name",StringType,nullable = true)
+  ))
+
+  val jobSnapMinimumSchema: StructType = StructType(Seq(
+    StructField("created_time",LongType,nullable = true),
+    StructField("creator_user_name",StringType,nullable = true),
+    StructField("job_id",LongType,nullable = true),
+    StructField("settings",StructType(Seq(
+      StructField("existing_cluster_id",StringType,nullable = true),
+      StructField("max_concurrent_runs",LongType,nullable = true),
+      StructField("name",StringType,nullable = true),
+      StructField("new_cluster",minimumNewClusterSchema,nullable = true),
+      StructField("notebook_task",
+        StructType(Seq(
+          StructField("base_parameters", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+          StructField("notebook_path", StringType, nullable = true)
+        )), nullable = true),
+        StructField("schedule",minimumScheduleSchema,nullable = true),
+      StructField("spark_jar_task",
+        StructType(Seq(
+          StructField("jar_uri", StringType, nullable = true),
+          StructField("main_class_name", StringType, nullable = true),
+          StructField("parameters", ArrayType(StringType, containsNull = true), nullable = true)
+        )), nullable = true),
+      StructField("spark_python_task",
+        StructType(Seq(
+          StructField("parameters",ArrayType(StringType,containsNull = true),nullable = true),
+          StructField("python_file",StringType,nullable = true)
+        )),nullable = true),
+      StructField("timeout_seconds",LongType,nullable = true),
+      StructField("format",StringType,nullable = true),
+      StructField("max_retries",LongType,nullable = true),
+      StructField("min_retry_interval_millis",LongType,nullable = true),
+      StructField("retry_on_timeout",BooleanType,nullable = true)
+    )),nullable = true),
+    StructField("organization_id",StringType,nullable = false),
+    StructField("Pipeline_SnapTS",TimestampType,nullable = true),
+    StructField("Overwatch_RunID",StringType,nullable = true),
+    StructField("job_type",StringType,nullable = true),
+    StructField("workspace_name",StringType,nullable = true)
+  ))
   /**
    * Minimum required schema by module. "Minimum Requierd Schema" means that at least these columns of these types
    * must exist for the downstream ETLs to function.

@@ -2,7 +2,7 @@ name := "overwatch"
 
 organization := "com.databricks.labs"
 
-version := "0.6.0.1"
+version := "0.6.0.2"
 
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
@@ -47,6 +47,8 @@ publishTo := Some(
 //coverageEnabled := true
 //coverageMinimum := 80
 //coverageFailOnMinimum := true
+
+//test in assembly := {}
 
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
