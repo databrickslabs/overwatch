@@ -418,6 +418,11 @@ object Schema extends SparkSessionWrapper {
     StructField("enable_elastic_disk",BooleanType,nullable = true),
     StructField("enable_local_disk_encryption",BooleanType,nullable = true),
     StructField("instance_pool_id",StringType,nullable = true),
+    StructField("init_scripts",ArrayType(StructType(Seq(
+      StructField("dbfs",StructType(Seq(
+        StructField("destination",StringType,nullable = true)
+      )),nullable = true)
+    )),containsNull = true),nullable = true),
     StructField("node_type_id",StringType,nullable = true),
     StructField("num_workers",LongType,nullable = true),
     StructField("single_user_name",StringType,nullable = true),
