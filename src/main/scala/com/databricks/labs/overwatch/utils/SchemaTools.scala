@@ -492,9 +492,14 @@ object SchemaTools extends SparkSessionWrapper {
           // if elementType is nested complex, recurse to validate and return array of validated children
           dtArray.elementType match {
             case eType: StructType =>
+              val requiredElementType = requiredFieldStructure.dataType.asInstanceOf[ArrayType].elementType
+              // Required element type must be a structType if actual field elementType is structType
+              // as explicit cast to StructType is required
+              if (!requiredElementType.isInstanceOf[StructType])
+                throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
               val validatedChildren = buildValidationRunner(
                 eType,
-                requiredFieldStructure.dataType.asInstanceOf[StructType],
+                requiredElementType.asInstanceOf[StructType],
                 enforceNonNullCols,
                 isDebug,
                 newPrefix
