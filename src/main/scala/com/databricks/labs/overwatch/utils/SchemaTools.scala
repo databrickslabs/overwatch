@@ -205,13 +205,14 @@ object SchemaTools extends SparkSessionWrapper {
   // TODO -- throw exception if the resulting string is empty
 
   /**
-   * Remove special characters from the field name
+   * First, replace white space " " with null string and then special characters with "_". White space to null string
+   * is critical for several bronze processes to cleanse schemas with columns including white space.
    *
    * @param s
    * @return
    */
   private def sanitizeFieldName(s: String): String = {
-    s.replaceAll("[^a-zA-Z0-9_]", "_")
+    s.replaceAll("\\s", "").replaceAll("[^a-zA-Z0-9]", "_")
   }
 
   /**
