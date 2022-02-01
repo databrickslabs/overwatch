@@ -61,6 +61,7 @@ case class AzureAuditLogEventhubConfig(
                                         eventHubName: String,
                                         auditRawEventsPrefix: String,
                                         maxEventsPerTrigger: Int = 10000,
+                                        minEventsPerTrigger: Int = 10,
                                         auditRawEventsChk: Option[String] = None,
                                         auditLogChk: Option[String] = None
                                       )

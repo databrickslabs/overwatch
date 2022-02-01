@@ -109,6 +109,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         getOptionString(node, "eventHubName").getOrElse(""),
         getOptionString(node, "auditRawEventsPrefix").getOrElse(""),
         getOptionInt(node, "maxEventsPerTrigger").getOrElse(10000),
+        getOptionInt(node, "minEventsPerTrigger").getOrElse(10),
         getOptionString(node, "auditRawEventsChk"),
         getOptionString(node, "auditLogChk")
       ))
