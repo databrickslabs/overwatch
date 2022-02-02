@@ -76,6 +76,9 @@ several types of errors that result in a module failure, and those errors are wr
 when they occur. Sometimes, there will truly be no new data in an upstream Module, this is ok and will not stop the 
 progression of the "until" time as no data is not considered an error. Below are the ETL Modules and their dependencies
 
+### Module Dependencies Diagram
+![ModuleDepDiagram](/images/DataEngineer/Overwatch_Entity_Dependencies.png)
+
 Module ID | Module Name | Target Table Name | Module ID Dependencies
 :--------------------------|:---|:---|:-----
 1001|Bronze_Jobs_Snapshot|jobs_snapshot_bronze|

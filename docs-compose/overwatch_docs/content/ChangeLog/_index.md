@@ -7,6 +7,9 @@ weight: 4
 ## 0.6.0.3 (Maintenance Release)
 * Fixes regression found in [0602](#0602----deprecated----dont-use)
   * [Issue 297](https://github.com/databrickslabs/overwatch/issues/297)
+  * **If you are affected**, please **use the script** linked below to cleanup the historical data. If you'd like assistance, 
+  please file a [git ticket](https://github.com/databrickslabs/overwatch/issues/new) and someone will review the process with you.
+    * CLEANUP SCRIPT ([DBC](/assets/ChangeLog/0602_Spark_Repair.dbc) | [HTML](/assets/ChangeLog/0602_Spark_Repair.html))
 * Minimum Events for Azure audit log stream ingest -- improvement for very busy workspaces
   * [Issue 299](https://github.com/databrickslabs/overwatch/issues/299)
 * Resolves issue where "init_scripts" field is missing
