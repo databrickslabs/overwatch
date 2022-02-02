@@ -4,7 +4,7 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
-## 0.6.0.2 (Maintenance Release)
+## 0.6.0.3 (Maintenance Release)
 * Fixes regression found in [0602](#0602----deprecated----dont-use)
   * [Issue 297](https://github.com/databrickslabs/overwatch/issues/297)
 * Minimum Events for Azure audit log stream ingest -- improvement for very busy workspaces
