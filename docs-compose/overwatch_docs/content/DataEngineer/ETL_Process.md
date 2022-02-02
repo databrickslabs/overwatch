@@ -89,6 +89,7 @@ Module ID | Module Name | Target Table Name | Module ID Dependencies
 2006|Silver_SPARK_Jobs|spark_jobs_silver|1006
 2007|Silver_SPARK_Stages|spark_stages_silver|1006
 2008|Silver_SPARK_Tasks|spark_tasks_silver|1006
+2009|Silver_PoolsSpec|pools_silver|1003,1004
 2010|Silver_JobsStatus|job_status_silver|1004
 2011|Silver_JobsRuns|jobrun_silver|1004,2010,2014
 2014|Silver_ClusterSpec|cluster_spec_silver|1004
@@ -102,11 +103,13 @@ Module ID | Module Name | Target Table Name | Module ID Dependencies
 3005|Gold_ClusterStateFact|clusterstatefact_gold|1005,2014
 3007|Gold_AccountMod|account_mods_gold|2017
 3008|Gold_AccountLogin|account_login_gold|2016
+3009|Gold_Pools|instancepool_gold|2009
 3010|Gold_SparkJob|sparkjob_gold|2006
 3011|Gold_SparkStage|sparkstage_gold|2007
 3012|Gold_SparkTask|sparktask_gold|2008
 3013|Gold_SparkExecution|sparkexecution_gold|2005
 3014|Gold_SparkExecutor|sparkexecutor_gold|2003
+3016|Gold_SparkStream|sparkstream_gold|1006,2005
 3015|Gold_jobRunCostPotentialFact|jobruncostpotentialfact_gold|3001,3003,3005,3010,3012
 
 

@@ -194,6 +194,7 @@ Config | Required Override | Default Value | Type | Description
 **eventHubName**|Y|NA|String|Retrieve from Azure Portal Event Hub
 **auditRawEventsPrefix**|Y|NA|String|Path prefix for checkpoint directories
 **maxEventsPerTrigger**|N|10000|Int|Events to pull for each trigger, this should be increased during initial cold runs or runs that have very large numbers of audit log events.
+**minEventsPerTrigger**|N|10|Int|Large workspaces can send events faster than batches can complete thus a minimum threshold for new events is needed. Optional override as of v0603
 **auditRawEventsChk**|N|{auditRawEventsPrefix}/rawEventsCheckpoint|Option[String]|Checkpoint Directory name for the raw dump of events from Eventhub. This directory gets overwritten upon successful pull into Overwatch.
 **auditLogChk**|N|{auditRawEventsPrefix}/auditLogBronzeCheckpoint|Option[String]|**DEPRECATED** Checkpoint Directory name for the audit log stream target. This target will continuously grow as more audit logs are created and delivered
 

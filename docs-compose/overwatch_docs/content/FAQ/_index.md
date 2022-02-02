@@ -128,3 +128,8 @@ More Details: [https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Descri
 The cluster logging paths are automatically acquired within Overwatch. There's no need to tell Overwatch where to load those from. 
 [Click here]({{%relref "EnvironmentSetup/azure.md"%}}/#configuring-overwatch-on-azure-databricks) for more details.
 ![FAQ4](/images/_index/faq4.png)
+
+## Q5: Can I configure custom log4j appender settings
+Yes, Overwatch does not ingest from log4j output files; thus this can be edited as per customer needs without any 
+impact on Overwatch. Overwatch utilizes the spark event logs from the cluster logs direction, not the stdout, stderr, 
+or the log4j.

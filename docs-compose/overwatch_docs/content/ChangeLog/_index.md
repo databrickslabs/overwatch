@@ -5,6 +5,18 @@ weight: 4
 ---
 
 ## 0.6.0.2 (Maintenance Release)
+* Fixes regression found in [0602](#0602----deprecated----dont-use)
+  * [Issue 297](https://github.com/databrickslabs/overwatch/issues/297)
+* Minimum Events for Azure audit log stream ingest -- improvement for very busy workspaces
+  * [Issue 299](https://github.com/databrickslabs/overwatch/issues/299)
+* Resolves issue where "init_scripts" field is missing
+  * Workspaces that have never had a cluster with an init script could hit this issue
+* Performance Improvement for Azure Audit log ingestion
+* Improved Schema enforcement
+* Fix for ArrayType minimum schema requirements
+
+## 0.6.0.2 -- DEPRECATED -- DONT USE
+Contains data quality regression - See [Issue 297](https://github.com/databrickslabs/overwatch/issues/297)
 Several bug fixes - mostly edge cases
 
 A full list of resolutions can be found [here](https://github.com/databrickslabs/overwatch/milestone/7?closed=1)
