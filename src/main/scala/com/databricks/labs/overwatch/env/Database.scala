@@ -104,7 +104,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     registerTarget(target)
   }
 
-  private def getQueryListener(query: StreamingQuery): StreamingQueryListener = {
+  private def getQueryListener(query: StreamingQuery, minEventsPerTrigger: Long): StreamingQueryListener = {
     val streamManager = new StreamingQueryListener() {
       override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
         println("Query started: " + queryStarted.id)
@@ -119,7 +119,7 @@ class Database(config: Config) extends SparkSessionWrapper {
         if (config.debugFlag) {
           println(query.status.prettyJson)
         }
-        if (queryProgress.progress.numInputRows == 0) {
+        if (queryProgress.progress.numInputRows <= minEventsPerTrigger) {
           query.stop()
         }
       }
@@ -188,7 +188,7 @@ class Database(config: Config) extends SparkSessionWrapper {
           .asInstanceOf[DataStreamWriter[Row]]
           .option("path", target.tableLocation)
           .start()
-        val streamManager = getQueryListener(streamWriter)
+        val streamManager = getQueryListener(streamWriter, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
         spark.streams.addListener(streamManager)
         val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
         if (config.debugFlag) println(listenerAddedMsg)

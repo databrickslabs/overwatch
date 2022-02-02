@@ -528,7 +528,7 @@ object Upgrade extends SparkSessionWrapper {
       if (auditLogRawTarget.exists) {
         try {
           spark.read.format("delta").load(auditLogRawTarget.tableLocation)
-            .repartition('organization_id)
+            .repartition('organization_id, 'Overwatch_RunID)
             .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
             .partitionBy("organization_id")
             .save(auditLogRawTarget.tableLocation)
@@ -569,7 +569,7 @@ object Upgrade extends SparkSessionWrapper {
       // Get start version of all bronze targets
       bronzeTargets.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestVersion(t.tableLocation)))
 
-      bronzeTargets.foreach(target => {
+      bronzeTargets.filter(_.exists).foreach(target => {
         try {
           appendWorkspaceName(target, workspaceNameMap)
           upgradeStatus.append(

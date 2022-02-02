@@ -205,13 +205,14 @@ object SchemaTools extends SparkSessionWrapper {
   // TODO -- throw exception if the resulting string is empty
 
   /**
-   * Remove special characters from the field name
+   * First, replace white space " " with null string and then special characters with "_". White space to null string
+   * is critical for several bronze processes to cleanse schemas with columns including white space.
    *
    * @param s
    * @return
    */
   private def sanitizeFieldName(s: String): String = {
-    s.replaceAll("[^a-zA-Z0-9_]", "_")
+    s.replaceAll("\\s", "").replaceAll("[^a-zA-Z0-9]", "_")
   }
 
   /**
@@ -491,9 +492,14 @@ object SchemaTools extends SparkSessionWrapper {
           // if elementType is nested complex, recurse to validate and return array of validated children
           dtArray.elementType match {
             case eType: StructType =>
+              val requiredElementType = requiredFieldStructure.dataType.asInstanceOf[ArrayType].elementType
+              // Required element type must be a structType if actual field elementType is structType
+              // as explicit cast to StructType is required
+              if (!requiredElementType.isInstanceOf[StructType])
+                throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
               val validatedChildren = buildValidationRunner(
                 eType,
-                requiredFieldStructure.dataType.asInstanceOf[StructType],
+                requiredElementType.asInstanceOf[StructType],
                 enforceNonNullCols,
                 isDebug,
                 newPrefix
