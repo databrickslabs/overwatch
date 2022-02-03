@@ -18,8 +18,8 @@ Reasons to externalize include:
 * Utilize a more efficient cluster type/size for the optimize job
   * Optimize & Zorder are extremely efficient but do heavily depend on local storage; thus Storage Optimized compute 
   nodes are highly recommended for this type of workload.
-    * Azure: i3.*xLarge 
-    * AWS: Standard_L*s series
+    * Azure: Standard_L*s series 
+    * AWS: i3.*xLarge
 * Allow a single job to efficiently optimize Overwatch for all workspaces
   * Note that the scope of "all workspaces" above is within the scope of a data target. All workspaces that send 
   data to the same dataset can be optimized from a single workspace.
