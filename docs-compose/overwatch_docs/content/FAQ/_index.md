@@ -133,3 +133,7 @@ The cluster logging paths are automatically acquired within Overwatch. There's n
 Yes, Overwatch does not ingest from log4j output files; thus this can be edited as per customer needs without any 
 impact on Overwatch. Overwatch utilizes the spark event logs from the cluster logs direction, not the stdout, stderr, 
 or the log4j.
+
+## Q6: I'd like to add or update workspace_name on my Overwatch deployment, is there an easy way to do that?
+Yes, follow the instructions in the script posted below.
+[DBC](/assets/FAQ/update_workspace_name.dbc) | [HTML](/assets/FAQ/update_workspace_name.html) 
