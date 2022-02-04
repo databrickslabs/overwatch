@@ -1,7 +1,9 @@
 package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
-import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.labs.overwatch.pipeline.{Initializer, PipelineFunctions, PipelineTable}
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -481,6 +483,52 @@ object Helpers extends SparkSessionWrapper {
       val fs = FileSystem.get(fsURI, conf.value)
       fs.delete(new Path(dir), true)
     })
+  }
+
+  /**
+   * Simplifies the acquisition of the workspace
+   * Requires that the ETLDB exists and has had successful previous runs
+   * As of 0.6.0.4
+   * Cannot derive schemas < 0.6.0.3
+   * @param etlDB Overwatch ETL database
+   * @return
+   */
+  def getWorkspaceByDatabase(etlDB: String): Workspace = {
+    // verify database exists
+    assert(spark.catalog.databaseExists(etlDB), s"The database provided, $etlDB, does not exist.")
+    val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
+    val dbProperties = dbMeta.properties
+
+    // verify database is owned and managed by Overwatch
+    assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided, $etlDB, is not an Overwatch managed Database. Please provide an Overwatch managed database")
+    val workspaceID = if (dbutils.notebook.getContext.tags("orgId") == "0") {
+      dbutils.notebook.getContext.tags("browserHostName").split("\\.")(0)
+    } else dbutils.notebook.getContext.tags("orgId")
+
+    // handle non-nullable field between azure and aws
+    val addNewConfigs = Map(
+      "auditLogConfig.azureAuditLogEventhubConfig" ->
+        when($"auditLogConfig.rawAuditPath".isNotNull, lit(null))
+          .otherwise($"auditLogConfig.azureAuditLogEventhubConfig")
+          .alias("azureAuditLogEventhubConfig")
+    )
+
+    // acquires the config for the current workspace from the last run
+    val orgRunDetailsBase = spark.table(s"${etlDB}.pipeline_report")
+      .filter('organization_id === workspaceID)
+      .select('organization_id, 'Pipeline_SnapTS, 'inputConfig)
+      .orderBy('Pipeline_SnapTS.desc)
+      .select($"inputConfig.*")
+
+    // get latest workspace config by org_id
+    val overwatchParams = orgRunDetailsBase
+      .select(SchemaTools.modifyStruct(orgRunDetailsBase.schema, addNewConfigs): _*)
+      .limit(1)
+      .as[OverwatchParams]
+      .first
+
+    val compactString = JsonUtils.objToJson(overwatchParams).compactString
+    Initializer(compactString)
   }
 
 }
