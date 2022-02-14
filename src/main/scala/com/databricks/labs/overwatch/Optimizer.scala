@@ -20,8 +20,10 @@ object Optimizer extends SparkSessionWrapper{
    * @return
    */
   private[overwatch] def getLatestSuccessState(overwatchETLDB: String): DataFrame = {
+    val orgId = Initializer.getOrgId
     val lastSuccessByModuleW = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
     spark.table(s"${overwatchETLDB}.pipeline_report")
+      .filter('organization_id === orgId)
       .filter('status === "SUCCESS" || 'status.like("EMPTY:%"))
       .withColumn("rnk", rank.over(lastSuccessByModuleW))
       .withColumn("rn", row_number.over(lastSuccessByModuleW))
