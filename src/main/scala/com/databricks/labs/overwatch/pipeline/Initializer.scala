@@ -501,13 +501,17 @@ object Initializer extends SparkSessionWrapper {
   // Init the SparkSessionWrapper with envVars
   envInit()
 
+  def getOrgId: String = {
+    if (dbutils.notebook.getContext.tags("orgId") == "0") {
+      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+    } else dbutils.notebook.getContext.tags("orgId")
+  }
+
   private def initConfigState(debugFlag: Boolean): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
     val orgId = if (config.isLocalTesting) System.getenv("ORGID") else {
-      if (dbutils.notebook.getContext.tags("orgId") == "0") {
-        dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-      } else dbutils.notebook.getContext.tags("orgId")
+      getOrgId
     }
     config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
