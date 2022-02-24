@@ -1136,7 +1136,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       )}
 
     // create structs from json strings and cleanse schema
-    val jobStatusEnhanced = SchemaTools.scrubSchema(
+    val jobStatusEnhanced = SchemaScrubber.scrubSchema(
       jobStatusBaseFilled
         .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
     )

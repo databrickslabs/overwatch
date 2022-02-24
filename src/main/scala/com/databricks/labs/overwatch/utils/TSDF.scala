@@ -179,16 +179,13 @@ object TSDF {
     TimestampType,
     DateType)
 
-  private[overwatch] def colByName(df: DataFrame)(colName: String): StructField =
-    df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
-
   def apply(
              df: DataFrame,
              tsColumnName: String,
              partitionColNames: String*): TSDF = {
 
     df.requireFields(tsColumnName +: partitionColNames)
-    val colFinder = colByName(df) _
+    val colFinder = SchemaTools.colByName(df) _
     val tsColumn = colFinder(tsColumnName)
     val partitionCols = partitionColNames.map(colFinder)
     new BaseTSDF(df, tsColumn, partitionCols: _*)
