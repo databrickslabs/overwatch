@@ -94,7 +94,9 @@ abstract class PipelineTargets(config: Config) {
       config,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("timestamp"),
-      statsColumns = "cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID".split(", "))
+      statsColumns = "cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID".split(", "),
+      masterSchema = Some(Schema.clusterEventsMinimumSchema)
+    )
 
     lazy private[overwatch] val clusterEventsErrorsTarget: PipelineTable = PipelineTable(
       name = "cluster_events_errors_bronze",
