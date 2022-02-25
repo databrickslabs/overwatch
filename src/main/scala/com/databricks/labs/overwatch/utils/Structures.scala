@@ -183,6 +183,22 @@ case class OrgConfigDetail(organization_id: String, latestParams: OverwatchParam
 
 case class DeltaHistory(version: Long, timestamp: java.sql.Timestamp, operation: String, clusterId: String, operationMetrics: Map[String, String], userMetadata: String)
 
+/**
+ * Rule for sanitizing schemas.
+ * @param from regex search string
+ * @param to replace string
+ */
+case class SanitizeRule(from: String, to: String)
+
+/**
+ * Exception to global schema sanitization rules by field
+ * @param field field to which different rules should be applied
+ * @param rules ordered list of rules to be applied. The rules will be applied in order incrementing
+ *              from the lowest index
+ * @param recursive Whether or not to recurse down a struct and apply the parent rule to all children of the struct
+ */
+case class SanitizeFieldException(field: StructField, rules: List[SanitizeRule], recursive: Boolean)
+
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
   val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value

@@ -113,7 +113,7 @@ object Schema extends SparkSessionWrapper {
         StructField("libraries", StringType, nullable = true),
         StructField("run_name", StringType, nullable = true),
         StructField("name", StringType, nullable = true),
-        StructField("timeout_seconds", LongType, nullable = true),
+        StructField("timeout_seconds", StringType, nullable = true),
         StructField("schedule", StringType, nullable = true),
         StructField("notebook_task", StringType, nullable = true),
         StructField("spark_python_task", StringType, nullable = true),

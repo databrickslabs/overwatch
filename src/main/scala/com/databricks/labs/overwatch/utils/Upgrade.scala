@@ -81,7 +81,7 @@ object Upgrade extends SparkSessionWrapper {
         upgradeStatus.toDS()
       } else {
         val jobSnapshotDF = jobsSnapshotTarget.asDF(withGlobalFilters = false)
-        val outputDF = SchemaTools.scrubSchema(jobSnapshotDF)
+        val outputDF = SchemaScrubber.scrubSchema(jobSnapshotDF)
 
         val changeInventory = Map[String, Column](
           "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
@@ -107,7 +107,7 @@ object Upgrade extends SparkSessionWrapper {
           logger.log(Level.ERROR, errMsg)
           upgradeStatus.append(UpgradeReport(clusterSnapshotTarget.databaseName, clusterSnapshotTarget.name, Some(errMsg)))
         } else {
-          val clusterSnapshotDF = SchemaTools.scrubSchema(clusterSnapshotTarget.asDF(withGlobalFilters = false))
+          val clusterSnapshotDF = SchemaScrubber.scrubSchema(clusterSnapshotTarget.asDF(withGlobalFilters = false))
           val newClusterSnap = clusterSnapshotDF
             .withColumn("azure_attributes", SchemaTools.structToMap(clusterSnapshotDF, "azure_attributes"))
           val upgradeClusterSnapTarget = clusterSnapshotTarget.copy(

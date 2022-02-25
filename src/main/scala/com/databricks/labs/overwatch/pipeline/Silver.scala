@@ -21,7 +21,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.tasksTarget,
       SilverTargets.poolsSpecTarget,
       SilverTargets.clusterStateDetailTarget,
-      SilverTargets.poolsSpecTarget,
       SilverTargets.dbJobRunsTarget,
       SilverTargets.accountLoginTarget,
       SilverTargets.accountModTarget,

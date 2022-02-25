@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{SchemaTools, TSDF, ValidatedColumn}
+import com.databricks.labs.overwatch.utils.{SchemaScrubber, SchemaTools, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 import org.apache.spark.sql.expressions.Window
@@ -130,6 +130,14 @@ object TransformFunctions {
         }
       })
       df
+    }
+
+    def scrubSchema: DataFrame = {
+      SchemaScrubber.scrubSchema((df))
+    }
+
+    def scrubSchema(schemaScrubber: SchemaScrubber): DataFrame = {
+      schemaScrubber.scrubSchema(df)
     }
 
     def toTSDF(

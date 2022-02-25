@@ -1005,7 +1005,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .when('actionName.isin("update", "reset"), get_json_object('new_settings, "$.name"))
         .otherwise(lit(null).cast("string")).alias("jobName"),
       'job_type,
-      'timeout_seconds.cast("long").alias("timeout_seconds"),
+      'timeout_seconds.cast("string").alias("timeout_seconds"),
       'schedule,
       get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
       'new_settings, 'existing_cluster_id, 'new_cluster, 'aclPermissionSet, 'grants, 'targetUserId,
@@ -1055,7 +1055,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         )
       ).drop("existing_cluster_id", "new_cluster", "x", "x2") // drop temp columns and old version of clusterSpec components
       .withColumn("schedule", fillForward("schedule", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))))
-      .withColumn("timeout_seconds", fillForward("timeout_seconds", lastJobStatus, Seq(get_json_object('lookup_settings, "$.timeout_seconds"))))
+      .withColumn("timeout_seconds", fillForward("timeout_seconds", lastJobStatus, Seq(get_json_object('lookup_settings, "$.timeout_seconds"))).cast("string").alias("timeout_seconds"))
       .withColumn("notebook_path", fillForward("notebook_path", lastJobStatus, Seq(get_json_object('lookup_settings, "$.notebook_task.notebook_path"))))
       .withColumn("jobName", fillForward("jobName", lastJobStatus, Seq(get_json_object('lookup_settings, "$.name"))))
       .withColumn("created_by", when('actionName === "create", $"userIdentity.email"))
@@ -1097,7 +1097,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           lit("snapImpute").alias("actionName"),
           lit("-1").alias("requestId"),
           $"settings.name".alias("jobName"),
-          $"settings.timeout_seconds",
+          $"settings.timeout_seconds".cast("string").alias("timeout_seconds"),
           to_json($"settings.schedule").alias("schedule"),
           $"settings.notebook_task.notebook_path",
           when($"settings.existing_cluster_id".isNotNull,
@@ -1136,7 +1136,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       )}
 
     // create structs from json strings and cleanse schema
-    val jobStatusEnhanced = SchemaTools.scrubSchema(
+    val jobStatusEnhanced = SchemaScrubber.scrubSchema(
       jobStatusBaseFilled
         .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
     )
@@ -1296,7 +1296,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           lit(null).cast("string").alias("shell_command_task")
         ).alias("taskDetail"),
         lit(null).cast("string").alias("libraries"),
-        lit(null).cast("long").alias("timeout_seconds"),
+        lit(null).cast("string").alias("timeout_seconds"),
         'sourceIPAddress.alias("submitSourceIP"),
         'sessionId.alias("submitSessionId"),
         'requestId.alias("submitRequestID"),
@@ -1327,7 +1327,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'shell_command_task
         ).alias("taskDetail"),
         'libraries,
-        'timeout_seconds.cast("long").alias("timeout_seconds"),
+        'timeout_seconds.cast("string").alias("timeout_seconds"),
         'sourceIPAddress.alias("submitSourceIP"),
         'sessionId.alias("submitSessionId"),
         'requestId.alias("submitRequestID"),

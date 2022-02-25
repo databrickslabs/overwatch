@@ -28,8 +28,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _newDataRetrieved: Boolean = true
+
   case class ErrorDetail(errorMsg: String, startTime: Long, endTime: Long)
+
   case class ClusterIdsWEventCounts(clusterId: String, count: Long)
+
   case class ClusterEventCall(
                                cluster_id: String,
                                payload: Array[String],
@@ -121,9 +124,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // TODO - Identify why parallel errors
     val results = ids.map(id => {
       val query = Map("cluster_id" -> id,
-      "start_time" -> startTime.asUnixTimeMilli,
-      "end_time" -> endTime.asUnixTimeMilli,
-      "limit" -> 500
+        "start_time" -> startTime.asUnixTimeMilli,
+        "end_time" -> endTime.asUnixTimeMilli,
+        "limit" -> 500
       )
 
       callClusterEventApi(id, startTime.asUnixTimeMilli, endTime.asUnixTimeMilli, ApiCall("clusters/events", apiEnv, Some(query)))
@@ -242,7 +245,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def cleanseRawJobsSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
-    val outputDF = SchemaTools.scrubSchema(df)
+    val outputDF = SchemaScrubber.scrubSchema(df)
 
     val changeInventory = Map[String, Column](
       "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
@@ -257,7 +260,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
-    val outputDF = SchemaTools.scrubSchema(df)
+    val outputDF = SchemaScrubber.scrubSchema(df)
 
     outputDF
       .withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
@@ -270,7 +273,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
-    val outputDF = SchemaTools.scrubSchema(df)
+    val outputDF = SchemaScrubber.scrubSchema(df)
     outputDF
       .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
       .withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
@@ -484,7 +487,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       if (clusterEvents.nonEmpty) {
         try {
-          val tdf = SchemaTools.scrubSchema(
+          val tdf = SchemaScrubber.scrubSchema(
             spark.read.json(Seq(clusterEvents: _*).toDS())
               .select(explode('events).alias("events"))
               .select(col("events.*"))
@@ -499,7 +502,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
           )
 
-          SchemaTools.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+          SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
             .withColumn("organization_id", lit(organizationId))
             .write.mode("append").format("delta")
             .option("mergeSchema", "true")
@@ -543,7 +546,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val fileTrackerDF = newFiles
       .withColumn("failed", lit(false))
       .withColumn("organization_id", lit(orgId))
-//      .coalesce(4) // narrow, short table -- each append will == spark event log files processed
+    //      .coalesce(4) // narrow, short table -- each append will == spark event log files processed
     database.write(fileTrackerDF, trackerTarget, pipelineSnapTime)
   }
 
@@ -691,6 +694,28 @@ trait BronzeTransforms extends SparkSessionWrapper {
           }
         }
 
+        // build special scrubber for df
+        //        val scrubExceptions = baseEventsDF.select("Properties").schema.fields.map(f => {
+        //          Tuple2(
+        //            f,
+        //                    Array(
+        //                      SanitizeRule("\\s", ""),
+        //                      SanitizeRule("\\.", ""),
+        //                      SanitizeRule("[^a-zA-Z0-9]", "_")
+        //                    )
+        //          )
+        //        }).toMap
+        val propertiesScrubException = SanitizeFieldException(
+          field = SchemaTools.colByName(baseEventsDF)("Properties"),
+          rules = List(
+            SanitizeRule("\\s", ""),
+            SanitizeRule("\\.", ""),
+            SanitizeRule("[^a-zA-Z0-9]", "_")
+          ),
+          recursive = true
+        )
+        val bronzeSparkEventsScrubber = SchemaScrubber(exceptions = Array(propertiesScrubException))
+
         // Handle custom metrics and listeners in streams
         val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
           to_json(col("progress")).alias("progress")
@@ -710,7 +735,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         } else col("Stage Attempt ID")
 
         val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
-          SchemaTools.scrubSchema(baseEventsDF
+          baseEventsDF
             .withColumn("progress", progressCol)
             .withColumn("filename", input_file_name)
             .withColumn("pathSize", size(split('filename, "/")))
@@ -720,9 +745,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("StageAttemptID", stageAttemptIDColumnOverride)
             .drop("pathSize", "Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId")
             .withColumn("filenameGroup", groupFilename('filename))
-          )
+            .scrubSchema(bronzeSparkEventsScrubber)
         } else {
-          SchemaTools.scrubSchema(baseEventsDF
+          baseEventsDF
             .withColumn("progress", progressCol)
             .withColumn("filename", input_file_name)
             .withColumn("pathSize", size(split('filename, "/")))
@@ -730,7 +755,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
             .drop("pathSize")
             .withColumn("filenameGroup", groupFilename('filename))
-          )
+            .scrubSchema(bronzeSparkEventsScrubber)
         }
 
         val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
