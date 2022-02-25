@@ -501,9 +501,7 @@ object Helpers extends SparkSessionWrapper {
 
     // verify database is owned and managed by Overwatch
     assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided, $etlDB, is not an Overwatch managed Database. Please provide an Overwatch managed database")
-    val workspaceID = if (dbutils.notebook.getContext.tags("orgId") == "0") {
-      dbutils.notebook.getContext.tags("browserHostName").split("\\.")(0)
-    } else dbutils.notebook.getContext.tags("orgId")
+    val workspaceID = Initializer.getOrgId
 
     // handle non-nullable field between azure and aws
     val addNewConfigs = Map(
