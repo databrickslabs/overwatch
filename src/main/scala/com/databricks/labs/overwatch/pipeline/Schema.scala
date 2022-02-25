@@ -438,6 +438,33 @@ object Schema extends SparkSessionWrapper {
     StructField("workspace_name",StringType,nullable = true)
   ))
 
+  val clusterEventsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id",StringType,nullable = false),
+    StructField("cluster_id",StringType,nullable = false),
+    StructField("timestamp",LongType,nullable = false),
+    StructField("type",StringType,nullable = true),
+    StructField("details",
+      StructType(Seq(
+        StructField("cluster_size",
+          StructType(Seq(
+            StructField("autoscale",
+              StructType(Seq(
+                StructField("max_workers",LongType,nullable = true),
+                StructField("min_workers",LongType,nullable = true)
+              )),nullable = true),
+            StructField("num_workers",LongType,nullable = true)
+          )),nullable = true),
+        StructField("current_num_workers",LongType,nullable = true),
+        StructField("target_num_workers",LongType,nullable = true),
+        StructField("user",StringType,nullable = true),
+        StructField("disk_size",LongType,nullable = true),
+        StructField("free_space",LongType,nullable = true),
+        StructField("instance_id",StringType,nullable = true),
+        StructField("previous_disk_size",LongType,nullable = true),
+        StructField("driver_state_message",StringType,nullable = true)
+      )),nullable = true)
+  ))
+
   val jobSnapMinimumSchema: StructType = StructType(Seq(
     StructField("created_time",LongType,nullable = true),
     StructField("creator_user_name",StringType,nullable = true),
