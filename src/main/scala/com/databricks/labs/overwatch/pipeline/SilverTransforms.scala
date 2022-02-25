@@ -515,8 +515,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
 
     val poolsRawWithStructs = poolsRaw
-      .withColumn("aws_attributes", SchemaTools.structFromJson(spark, poolsRaw, "aws_attributes"))
-      .withColumn("azure_attributes", SchemaTools.structFromJson(spark, poolsRaw, "azure_attributes"))
+      .withColumn("aws_attributes",
+        when('aws_attributes.isNull, struct(lit(null).cast("string").alias("emptyKey")))
+          .otherwise(SchemaTools.structFromJson(spark, poolsRaw, "aws_attributes")))
+      .withColumn("azure_attributes",
+        when('azure_attributes.isNull, struct(lit(null).cast("string").alias("emptyKey")))
+          .otherwise(SchemaTools.structFromJson(spark, poolsRaw, "azure_attributes")))
 
     val changeInventory = Map[String, Column](
       "aws_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "aws_attributes"),
