@@ -503,7 +503,7 @@ object Initializer extends SparkSessionWrapper {
 
   def getOrgId: String = {
     if (dbutils.notebook.getContext.tags("orgId") == "0") {
-      dbutils.notebook.getContext.tags("browserHostName").split("\\.")(0)
+      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
     } else dbutils.notebook.getContext.tags("orgId")
   }
 
