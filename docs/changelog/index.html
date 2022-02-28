@@ -12,21 +12,21 @@
     <title>ChangeLog :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1644000042" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1644000042" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1644000042" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1644000042" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1644000042" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1644000042" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1644000042" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1644000042" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1644000042" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1646072154" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1646072154" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1646072154" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1646072154" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1646072154" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1646072154" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1646072154" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1646072154" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1646072154" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1644000042" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1646072154" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1644000042"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1646072154"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1644000042"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1644000042"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1646072154"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1646072154"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1644000042"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1646072154"></script>
 
     
   </div>
@@ -497,7 +497,8 @@
     <div class="wrapper">
 <nav id="TableOfContents">
   <ul>
-    <li><a href="#0603-maintenance-release">0.6.0.3 (Maintenance Release)</a></li>
+    <li><a href="#0604-maintenance-release">0.6.0.4 (Maintenance Release)</a></li>
+    <li><a href="#0603-deprecated">0.6.0.3 (Deprecated)</a></li>
     <li><a href="#0602----deprecated----dont-use">0.6.0.2 &ndash; DEPRECATED &ndash; DONT USE</a></li>
     <li><a href="#0601-major-upgraderelease">0.6.0.1 (MAJOR UPGRADE/RELEASE)</a></li>
     <li><a href="#version-05x-note">Version 0.5.x NOTE</a>
@@ -551,7 +552,22 @@
 
 
 
-	<h2 id="0603-maintenance-release">0.6.0.3 (Maintenance Release)</h2>
+	<h2 id="0604-maintenance-release">0.6.0.4 (Maintenance Release)</h2>
+<ul>
+<li>Bug fixes
+<ul>
+<li><a href="https://github.com/databrickslabs/overwatch/issues/305">Issue 305</a> - Silver_jobStatus timeout_seconds schema type</li>
+<li><a href="https://github.com/databrickslabs/overwatch/issues/308">Issue 308</a> - Optimize job could get the wrong workspace 
+credentials in some cases</li>
+<li><a href="https://github.com/databrickslabs/overwatch/issues/310">Issue 310</a> - SparkJob table, many nulled fields</li>
+<li><a href="https://github.com/databrickslabs/overwatch/issues/313">Issue 313</a> - Silver_ClusterStateDetail - no column 
+autoscale</li>
+</ul>
+</li>
+</ul>
+<h2 id="0603-deprecated">0.6.0.3 (Deprecated)</h2>
+<p>If an issue is found in this version, please try the latest 0.6.x version, if the issue persists, please open a 
+<a href="https://github.com/databrickslabs/overwatch/issues/new">git ticket</a></p>
 <ul>
 <li>Fixes regression found in <a href="#0602----deprecated----dont-use">0602</a>
 <ul>
@@ -1230,19 +1246,19 @@ if it didn&rsquo;t already exist for the workspace</li>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1644000042"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1644000042"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1644000042"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1644000042"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1644000042"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1644000042"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1646072154"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1646072154"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1646072154"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1646072154"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1646072154"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1646072154"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1644000042"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1644000042"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1644000042"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1646072154"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1646072154"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1646072154"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1644000042" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1644000042"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1646072154" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1646072154"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

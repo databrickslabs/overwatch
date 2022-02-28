@@ -4,7 +4,19 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
-## 0.6.0.3 (Maintenance Release)
+## 0.6.0.4 (Maintenance Release)
+* Bug fixes
+  * [Issue 305](https://github.com/databrickslabs/overwatch/issues/305) - Silver_jobStatus timeout_seconds schema type
+  * [Issue 308](https://github.com/databrickslabs/overwatch/issues/308) - Optimize job could get the wrong workspace 
+  credentials in some cases
+  * [Issue 310](https://github.com/databrickslabs/overwatch/issues/310) - SparkJob table, many nulled fields
+  * [Issue 313](https://github.com/databrickslabs/overwatch/issues/313) - Silver_ClusterStateDetail - no column 
+  autoscale
+    
+
+## 0.6.0.3 (Deprecated)
+If an issue is found in this version, please try the latest 0.6.x version, if the issue persists, please open a 
+[git ticket](https://github.com/databrickslabs/overwatch/issues/new)
 * Fixes regression found in [0602](#0602----deprecated----dont-use)
   * [Issue 297](https://github.com/databrickslabs/overwatch/issues/297)
   * **If you are affected**, please **use the script** linked below to cleanup the historical data. If you'd like assistance, 
