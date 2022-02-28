@@ -99,6 +99,7 @@ Module ID | Module Name | Target Table Name | Module ID Dependencies
 2016|Silver_AccountLogins|accountlogin|1004
 2017|Silver_ModifiedAccounts|account_mods_silver|1004
 2018|Silver_Notebooks|notebook_silver|1004
+2019|Silver_ClusterStateDetail|cluster_state_detail_silver|1005
 3001|Gold_Cluster|cluster_gold|2014
 3002|Gold_Job|job_gold|2010
 3003|Gold_JobRun|jobrun_gold|2011
