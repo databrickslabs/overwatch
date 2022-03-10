@@ -310,16 +310,8 @@ object Upgrade extends SparkSessionWrapper {
    * @param pipelineReportPath pass in database name
    * @return
    */
-  private def getLatestWorkspaceByOrg(pipelineReportPath: String): Array[OrgConfigDetail] = {
+  def getLatestWorkspaceByOrg(pipelineReportPath: String): Array[OrgConfigDetail] = {
     val oldestDateByModuleW = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
-
-    // handle optional nulls error when building OverwatchParams
-    val addNewConfigs = Map(
-      "inputConfig.auditLogConfig.azureAuditLogEventhubConfig" ->
-        when($"inputConfig.auditLogConfig.rawAuditPath".isNotNull, lit(null))
-          .otherwise($"inputConfig.auditLogConfig.azureAuditLogEventhubConfig")
-          .alias("azureAuditLogEventhubConfig")
-    )
 
     val overwatchParamsCols = Array("auditLogConfig", "tokenSecret", "dataTarget", "badRecordsPath", "overwatchScope",
       "maxDaysToLoad", "databricksContractPrices", "primordialDateString", "intelligentScaling", "workspace_name",
@@ -327,11 +319,22 @@ object Upgrade extends SparkSessionWrapper {
 
     // Necessary because if recovering pipeline upgrade the columns may or may not exist so both scenarios
     // must be handled. This ensures both columns are present and present only once
-    val orgRunDetailsBase = spark.read.format("delta").load(pipelineReportPath)
+    val orgRunDetailsBase = spark.read.format("delta").load("/mnt/overwatch_global/05x/global_share/pipeline_report")
       .select('organization_id, 'Pipeline_SnapTS, $"inputConfig.*")
       .withColumn("workspace_name", lit("placeholder"))
       .withColumn("externalizeOptimize", lit(true))
       .select('organization_id, 'Pipeline_SnapTS, struct(overwatchParamsCols map col: _*).alias("inputConfig"))
+
+    val ehConfigCols = orgRunDetailsBase.selectExpr("inputConfig.auditLogConfig.azureAuditLogEventhubConfig.*")
+      .schema.fields.map(f => col("inputConfig.auditLogConfig.azureAuditLogEventhubConfig." + f.name).alias(f.name)) :+ lit(10).alias("minEventsPerTrigger")
+
+    // handle optional nulls error when building OverwatchParams
+    val addNewConfigs = Map(
+      "inputConfig.auditLogConfig.azureAuditLogEventhubConfig" ->
+        when($"inputConfig.auditLogConfig.rawAuditPath".isNotNull, lit(null))
+          .otherwise(struct(ehConfigCols: _*))
+          .alias("azureAuditLogEventhubConfig")
+    )
 
     // get latest workspace config by org_id
     orgRunDetailsBase
