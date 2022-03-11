@@ -325,8 +325,16 @@ object Upgrade extends SparkSessionWrapper {
       .withColumn("externalizeOptimize", lit(true))
       .select('organization_id, 'Pipeline_SnapTS, struct(overwatchParamsCols map col: _*).alias("inputConfig"))
 
-    val ehConfigCols = orgRunDetailsBase.selectExpr("inputConfig.auditLogConfig.azureAuditLogEventhubConfig.*")
-      .schema.fields.map(f => col("inputConfig.auditLogConfig.azureAuditLogEventhubConfig." + f.name).alias(f.name)) :+ lit(10).alias("minEventsPerTrigger")
+    val ehConfigFields = orgRunDetailsBase.selectExpr("inputConfig.auditLogConfig.azureAuditLogEventhubConfig.*")
+      .schema.fields
+
+    val ehConfigExistingCols = ehConfigFields.map(f => col("inputConfig.auditLogConfig.azureAuditLogEventhubConfig." + f.name).alias(f.name))
+
+    val ehConfigCols = if(ehConfigFields.map(_.name).contains("minEventsPerTrigger")) {
+      ehConfigExistingCols
+    } else {
+      ehConfigExistingCols :+ lit(10).alias("minEventsPerTrigger")
+    }
 
     // handle optional nulls error when building OverwatchParams
     val addNewConfigs = Map(
