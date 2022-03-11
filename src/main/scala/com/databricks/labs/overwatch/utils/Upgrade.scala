@@ -319,7 +319,7 @@ object Upgrade extends SparkSessionWrapper {
 
     // Necessary because if recovering pipeline upgrade the columns may or may not exist so both scenarios
     // must be handled. This ensures both columns are present and present only once
-    val orgRunDetailsBase = spark.read.format("delta").load("/mnt/overwatch_global/05x/global_share/pipeline_report")
+    val orgRunDetailsBase = spark.read.format("delta").load(pipelineReportPath)
       .select('organization_id, 'Pipeline_SnapTS, $"inputConfig.*")
       .withColumn("workspace_name", lit("placeholder"))
       .withColumn("externalizeOptimize", lit(true))
