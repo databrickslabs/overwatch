@@ -310,16 +310,8 @@ object Upgrade extends SparkSessionWrapper {
    * @param pipelineReportPath pass in database name
    * @return
    */
-  private def getLatestWorkspaceByOrg(pipelineReportPath: String): Array[OrgConfigDetail] = {
+  def getLatestWorkspaceByOrg(pipelineReportPath: String): Array[OrgConfigDetail] = {
     val oldestDateByModuleW = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
-
-    // handle optional nulls error when building OverwatchParams
-    val addNewConfigs = Map(
-      "inputConfig.auditLogConfig.azureAuditLogEventhubConfig" ->
-        when($"inputConfig.auditLogConfig.rawAuditPath".isNotNull, lit(null))
-          .otherwise($"inputConfig.auditLogConfig.azureAuditLogEventhubConfig")
-          .alias("azureAuditLogEventhubConfig")
-    )
 
     val overwatchParamsCols = Array("auditLogConfig", "tokenSecret", "dataTarget", "badRecordsPath", "overwatchScope",
       "maxDaysToLoad", "databricksContractPrices", "primordialDateString", "intelligentScaling", "workspace_name",
@@ -332,6 +324,25 @@ object Upgrade extends SparkSessionWrapper {
       .withColumn("workspace_name", lit("placeholder"))
       .withColumn("externalizeOptimize", lit(true))
       .select('organization_id, 'Pipeline_SnapTS, struct(overwatchParamsCols map col: _*).alias("inputConfig"))
+
+    val ehConfigFields = orgRunDetailsBase.selectExpr("inputConfig.auditLogConfig.azureAuditLogEventhubConfig.*")
+      .schema.fields
+
+    val ehConfigExistingCols = ehConfigFields.map(f => col("inputConfig.auditLogConfig.azureAuditLogEventhubConfig." + f.name).alias(f.name))
+
+    val ehConfigCols = if(ehConfigFields.map(_.name).contains("minEventsPerTrigger")) {
+      ehConfigExistingCols
+    } else {
+      ehConfigExistingCols :+ lit(10).alias("minEventsPerTrigger")
+    }
+
+    // handle optional nulls error when building OverwatchParams
+    val addNewConfigs = Map(
+      "inputConfig.auditLogConfig.azureAuditLogEventhubConfig" ->
+        when($"inputConfig.auditLogConfig.rawAuditPath".isNotNull, lit(null))
+          .otherwise(struct(ehConfigCols: _*))
+          .alias("azureAuditLogEventhubConfig")
+    )
 
     // get latest workspace config by org_id
     orgRunDetailsBase
