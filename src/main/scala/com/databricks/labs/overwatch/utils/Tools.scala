@@ -362,7 +362,7 @@ object Helpers extends SparkSessionWrapper {
   private[overwatch] def fastDrop(target: PipelineTable, cloudProvider: String): String = {
     require(target.exists, s"TARGET DOES NOT EXIST: ${target.tableFullName}")
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "true")
-    if (cloudProvider == "aws") {
+    if (cloudProvider != "azure") {
       spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
       spark.sql(s"truncate table ${target.tableFullName}")
       spark.sql(s"VACUUM ${target.tableFullName} RETAIN 0 HOURS")

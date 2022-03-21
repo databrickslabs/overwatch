@@ -319,6 +319,9 @@ class Config() {
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
+        // Todo: This is failing to pull data from url using this dbutils api
+        // for workaround I have hard coded the url like this 
+        // _workspaceUrl = "https://631866050010.0.gcp.databricks.com"
         _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         scope = tokenSecret.get.scope
@@ -334,6 +337,9 @@ class Config() {
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _tokenType = "Environment"
         } else { // Use default token for job owner
+          // Todo: This is failing to pull data from url using this dbutils api
+          // for workaround I have hard coded the url like this 
+          // _workspaceUrl = "https://631866050010.0.gcp.databricks.com"
           _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
           _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
           rawToken = dbutils.notebook.getContext().apiToken.get

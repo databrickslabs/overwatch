@@ -127,7 +127,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   @throws(classOf[BadConfigException])
   private def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): AuditLogConfig = {
 
-    if (config.cloudProvider == "aws") {
+    if (config.cloudProvider != "azure") {
 
       val auditLogPath = auditLogConfig.rawAuditPath
       val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim
