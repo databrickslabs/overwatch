@@ -341,7 +341,8 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               clsfLag90D: DataFrame,
                                               sparkJobLag2D: DataFrame,
                                               sparkTaskLag2D: DataFrame,
-                                              fromTime: TimeTypes
+                                              fromTime: TimeTypes,
+                                              untilTime: TimeTypes
                                             )(jrGoldLag30D: DataFrame): DataFrame = {
 
     val clusterPotentialWCosts = if (clsfLag90D.isEmpty) {
@@ -356,6 +357,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
     }
 
+    // TODO -- review the neaAndOpenJobRuns with updated jobRun logic to ensure all open runs are accounted for
     val newJrLaunches = jrGoldLag30D
       .filter($"job_runtime.startEpochMS" >= fromTime.asUnixTimeMilli)
 
@@ -423,7 +425,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .lookupWhen(
         clusterPotentialInitialState
           .toTSDF("timestamp", "organization_id", "cluster_id"),
-        tsPartitionVal = 16, maxLookAhead = 1L
+        tsPartitionVal = 4, maxLookAhead = 1L
       ).df
       .drop("timestamp")
       .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
@@ -433,12 +435,12 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("lifecycleState", lit("init"))
 
     val jobRunTerminalState = newAndOpenJobRuns
-      .withColumn("timestamp", $"job_runtime.endEpochMS")
+      .withColumn("timestamp", coalesce($"job_runtime.endEpochMS", lit(untilTime.asUnixTimeMilli))) // include currently executing runs and calculate costs through module until time
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         clusterPotentialTerminalState
           .toTSDF("timestamp", "organization_id", "cluster_id"),
-        tsPartitionVal = 8, maxLookback = 0L, maxLookAhead = 1L
+        tsPartitionVal = 4, maxLookback = 0L, maxLookAhead = 1L
       ).df
       .drop("timestamp")
       .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull && 'unixTimeMS_state_end > $"job_runtime.endEpochMS")

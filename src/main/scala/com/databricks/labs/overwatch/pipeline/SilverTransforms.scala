@@ -1233,6 +1233,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     // TODO -- identify the subset of jobs that need to be updated in the final merge
     //  this includes newly completed runs, newly started runs, and ongoing runs from previous run
     //  this requires additional testing and is generally for perf so putting this off until a bit later.
+    //  look at jrcp logic as it seems to handle this
     val newJobRuns = jobRunsLag30D
       .filter('date >= etlStartTime.asColumnTS.cast("date") && 'timestamp >= lit(etlStartTime.asUnixTimeMilli))
 
@@ -1294,6 +1295,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // DF for jobs launched with actionName == "runNow"
     // Lookback 30 days for laggard starts prior to current run
+    // only field from runNow that we care about is the response.result.runId
     val runNowStart = jobRunsLag30D
       .filter('actionName.isin("runNow"))
       .select(
@@ -1413,9 +1415,9 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // match all completed and cancelled (i.e. terminated) jobRuns with their launch assuming launch was in now - 30d
     val jobRunsBase = allCompletes
-      .join(allCancellations, Seq("runId", "organization_id"), "left")
-      .join(allSubmissions, Seq("runId", "organization_id"), "left")
-      .join(runStarts, Seq("runId", "organization_id"), "left")
+      .join(allCancellations, Seq("runId", "organization_id"), "full")
+      .join(allSubmissions, Seq("runId", "organization_id"), "full")
+      .join(runStarts, Seq("runId", "organization_id"), "full")
       .withColumn("jobId", coalesce('completedJobId, 'runStartJobId, 'runNowJobId).cast("long"))
       .withColumn("idInJob", coalesce('idInJob, 'runId))
       .withColumn("jobClusterType", coalesce('jobClusterType_Completed, 'jobClusterType_Started))
@@ -1426,8 +1428,11 @@ trait SilverTransforms extends SparkSessionWrapper {
         'runId.cast("long"),
         'jobId,
         'idInJob, 'JobRunTime, 'run_name,
-        'jobClusterType, 'jobTaskType, 'jobTerminalState,
-        'jobTriggerType, 'new_cluster,
+        'jobClusterType,
+        coalesce('jobTaskType_Completed, 'jobTaskType_Started).alias("jobTaskType"),
+        coalesce('jobTriggerType_Completed, 'jobTriggerType_Started).alias("jobTriggerType"),
+        'jobTerminalState,
+        'new_cluster,
         coalesce('clusterId, 'startClusterId, 'existing_cluster_id).alias("clusterId"),
         'cluster_name,
         'organization_id,
