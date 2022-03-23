@@ -1226,7 +1226,13 @@ trait SilverTransforms extends SparkSessionWrapper {
                                   etlStartTime: TimeTypes
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
+    val jobRunActions = Array("runSucceeded", "runFailed", "runNow", "runStart", "submitRun", "cancel")
     val jobRunsLag30D = getJobsBase(auditLogLag30D)
+      .filter('actionName.isin(jobRunActions: _*))
+
+    // TODO -- identify the subset of jobs that need to be updated in the final merge
+    //  this includes newly completed runs, newly started runs, and ongoing runs from previous run
+    //  this requires additional testing and is generally for perf so putting this off until a bit later.
     val newJobRuns = jobRunsLag30D
       .filter('date >= etlStartTime.asColumnTS.cast("date") && 'timestamp >= lit(etlStartTime.asUnixTimeMilli))
 
@@ -1240,34 +1246,37 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Completes must be >= etlStartTime as it is the driver endpoint
     // All joiners to Completes may be from the past up to N days as defined in the incremental df
     // Identify all completed jobs in scope for this overwatch run
-    val allCompletes = newJobRuns
+    val allCompletes = jobRunsLag30D
       .filter('actionName.isin("runSucceeded", "runFailed"))
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
       .select(
         'serviceName, 'actionName,
         'organization_id,
         'date,
+        'timestamp,
         'runId,
-        'jobId,
-        'idInJob, 'clusterId, 'jobClusterType, 'jobTaskType, 'jobTerminalState,
-        'jobTriggerType,
+        'jobId.alias("completedJobId"),
+        'idInJob, 'clusterId,
+        'jobClusterType.alias("jobClusterType_Completed"),
+        'jobTaskType.alias("jobTaskType_Completed"),
+        'jobTriggerType.alias("jobTriggerType_Completed"),
+        'jobTerminalState,
         'requestId.alias("completionRequestID"),
         'response.alias("completionResponse"),
         'timestamp.alias("completionTime")
       )
+      .filter('runId.isNotNull)
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
+      .filter('rnk === 1 && 'rn === 1)
+      .drop("rnk", "rn", "timestamp")
 
     // CancelRequests are still lookups from the driver "complete" as a cancel request is a request and still
     // results in a runFailed after the cancellation
     // Identify all cancelled jobs in scope for this overwatch run
-    val allCancellations = newJobRuns
+    val allCancellations = jobRunsLag30D
       .filter('actionName.isin("cancel"))
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
       .select(
-        'organization_id, 'date,
+        'organization_id, 'date, 'timestamp,
         'run_id.cast("long").alias("runId"),
         'requestId.alias("cancellationRequestId"),
         'response.alias("cancellationResponse"),
@@ -1276,17 +1285,20 @@ trait SilverTransforms extends SparkSessionWrapper {
         'timestamp.alias("cancellationTime"),
         'userAgent.alias("cancelledUserAgent"),
         'userIdentity.alias("cancelledBy")
-      ).filter('runId.isNotNull)
+      )
+      .filter('runId.isNotNull)
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
+      .filter('rnk === 1 && 'rn === 1)
+      .drop("rnk", "rn", "timestamp")
 
     // DF for jobs launched with actionName == "runNow"
     // Lookback 30 days for laggard starts prior to current run
     val runNowStart = jobRunsLag30D
       .filter('actionName.isin("runNow"))
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
       .select(
-        'organization_id, 'date,
+        'organization_id, 'date, 'timestamp,
+        'job_id.cast("long").alias("runNowJobId"),
         get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
         lit(null).cast("string").alias("run_name"),
         'timestamp.alias("submissionTime"),
@@ -1307,19 +1319,24 @@ trait SilverTransforms extends SparkSessionWrapper {
         'response.alias("submitResponse"),
         'userAgent.alias("submitUserAgent"),
         'userIdentity.alias("submittedBy")
-      ).filter('runId.isNotNull)
-
-    // DF for jobs launched with actionName == "submitRun"
-    // Lookback 30 days for laggard starts prior to current run
-    val runSubmitStart = jobRunsLag30D
-      .filter('actionName.isin("submitRun"))
-      .withColumn("runId", get_json_object($"response.result", "$.run_id").cast("long"))
+      )
+      .filter('runId.isNotNull)
       .withColumn("rnk", rank().over(firstRunSemanticsW))
       .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
+      .drop("rnk", "rn", "timestamp")
+
+    // DF for jobs launched with actionName == "submitRun"
+    // Lookback 30 days for laggard starts prior to current run
+
+    // TODO: move taskDetail and libraries to jobStatus as it only exists for create and submitRun actions
+    //  it will be much more complete over there
+    val runSubmitStart = jobRunsLag30D
+      .filter('actionName.isin("submitRun"))
       .select(
-        'organization_id, 'date,
-        'runId,
+        'organization_id, 'date, 'timestamp,
+        lit(null).cast("long").alias("runNowJobId"),
+        get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
         'run_name,
         'timestamp.alias("submissionTime"),
         'new_cluster, 'existing_cluster_id,
@@ -1340,6 +1357,10 @@ trait SilverTransforms extends SparkSessionWrapper {
         'userIdentity.alias("submittedBy")
       )
       .filter('runId.isNotNull)
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
+      .filter('rnk === 1 && 'rn === 1)
+      .drop("rnk", "rn", "timestamp")
 
     // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
     val allSubmissions = runNowStart
@@ -1349,16 +1370,21 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Lookback 30 days for laggard starts prior to current run
     val runStarts = jobRunsLag30D
       .filter('actionName.isin("runStart"))
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
       .select(
-        'organization_id, 'date,
+        'organization_id, 'date, 'timestamp,
+        'jobId.alias("runStartJobId").cast("long"),
         'runId,
+        'jobClusterType.alias("jobClusterType_Started"),
+        'jobTaskType.alias("jobTaskType_Started"),
+        'jobTriggerType.alias("jobTriggerType_Started"),
         'clusterId.alias("startClusterId"),
         'timestamp.alias("startTime"),
         'requestId.alias("startRequestID")
       )
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
+      .filter('rnk === 1 && 'rn === 1)
+      .drop("rnk", "rn", "timestamp")
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
     lazy val clusterSpecLookup = clusterSpec.asDF
@@ -1390,15 +1416,19 @@ trait SilverTransforms extends SparkSessionWrapper {
       .join(allCancellations, Seq("runId", "organization_id"), "left")
       .join(allSubmissions, Seq("runId", "organization_id"), "left")
       .join(runStarts, Seq("runId", "organization_id"), "left")
+      .withColumn("jobId", coalesce('completedJobId, 'runStartJobId, 'runNowJobId).cast("long"))
+      .withColumn("idInJob", coalesce('idInJob, 'runId))
+      .withColumn("jobClusterType", coalesce('jobClusterType_Completed, 'jobClusterType_Started))
       .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
       .withColumn("JobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
       .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null).cast("string")))
       .select(
-        'runId.cast("long"), 'jobId.cast("long"), 'idInJob, 'JobRunTime, 'run_name,
+        'runId.cast("long"),
+        'jobId,
+        'idInJob, 'JobRunTime, 'run_name,
         'jobClusterType, 'jobTaskType, 'jobTerminalState,
         'jobTriggerType, 'new_cluster,
-        when('actionName.isin("runStart", "runFailed", "runSucceeded"), coalesce('clusterId, 'startClusterId)) // notebookRuns
-          .otherwise('existing_cluster_id).alias("clusterId"), //
+        coalesce('clusterId, 'startClusterId, 'existing_cluster_id).alias("clusterId"),
         'cluster_name,
         'organization_id,
         'notebook_params, 'libraries,
@@ -1436,12 +1466,15 @@ trait SilverTransforms extends SparkSessionWrapper {
           ).alias("startRequest")
         ).alias("requestDetails")
       )
-      .withColumn("timestamp", $"JobRunTime.endEpochMS")
+      .withColumn("timestamp", $"JobRunTime.startEpochMS")
 
     val jrBaseExisting = jobRunsBase.filter('jobClusterType === "existing")
 
     val automatedJobRunsBase = jobRunsBase
       .filter('jobClusterType === "new")
+
+    val jobsClusterJobRunsBase = jobRunsBase
+      .filter('jobClusterType === "job_cluster")
 
     // LOOKUP - ClusterID By JobID -- EXISTING CLUSTER JOB RUNS
     // JobRuns with interactive clusters
@@ -1464,7 +1497,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     } else jrBaseExisting
 
     // Re-Combine Interactive and Automated Job Run Clusters
-    val jobRunsBaseWIDs = interactiveRunsWID.unionByName(automatedJobRunsBase)
+    val jobRunsBaseWIDs = interactiveRunsWID
+      .unionByName(automatedJobRunsBase)
+      .unionByName(jobsClusterJobRunsBase)
 
     // Get JobName for All Jobs
 
@@ -1505,8 +1540,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .toTSDF("timestamp", "organization_id", "clusterId")
           .lookupWhen(
             clusterLookups("clusterSpecLookup")
-              .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 16
+              .toTSDF("timestamp", "organization_id", "clusterId")
           ).df
 
         // get cluster_id by cluster_name (derived)
@@ -1524,8 +1558,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           .toTSDF("timestamp", "organization_id", "clusterId")
           .lookupWhen(
             clusterLookups("clusterSnapLookup")
-              .toTSDF("timestamp", "organization_id", "clusterId"),
-            tsPartitionVal = 16
+              .toTSDF("timestamp", "organization_id", "clusterId")
           ).df
 
         automatedClusterMetaLookupBuilder = automatedClusterMetaLookupBuilder
