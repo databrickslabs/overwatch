@@ -185,7 +185,7 @@ object SchemaTools extends SparkSessionWrapper {
                 s"This key value will be replaced with a 'null_<random_string>' but should be corrected."
               logger.log(Level.WARN, errMsg)
               println(errMsg)
-              s"null_${randomString(42L, 6)}"
+              s"null_${randomString(22L, 6)}"
             } else kRaw
             mapCols.add(lit(k).cast("string"))
             mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
@@ -211,7 +211,9 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   def uniqueRandomStrings(uniquesNeeded: Option[Int] = None, seed: Option[Long] = None, length: Int = 10): Seq[String] = {
-    (0 to uniquesNeeded.getOrElse(500) + 10).map(i => randomString(seed.getOrElse(42L) + i, length)).distinct
+    (0 to uniquesNeeded.getOrElse(500) + 10)
+      .map(i => randomString(seed.getOrElse(new Random().nextLong()) + i, length))
+      .distinct
   }
 
   /**

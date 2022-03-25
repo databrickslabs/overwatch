@@ -17,6 +17,17 @@ class SchemaScrubber(
   //  UPDATE: This has been handled with spark.conf.get("spark.sql.caseSensitive") but needs to be tested on structs
   // TODO -- throw exception if the resulting string is empty
 
+  private var _seededUniqueSuffixes = true
+
+  private def setSeededUniqueSuffixes(value: Boolean): this.type = {
+    _seededUniqueSuffixes = value
+    this
+  }
+
+  private def getSeededUniqueSuffixes: Boolean = {
+    _seededUniqueSuffixes
+  }
+
   /**
    * First, replace white space " " with null string and then special characters with "_". White space to null string
    * is critical for several bronze processes to cleanse schemas with columns including white space.
@@ -64,6 +75,7 @@ class SchemaScrubber(
    * @return
    */
   private def generateUniques(fields: Array[StructField]): Array[StructField] = {
+    val suffixSeed = if (getSeededUniqueSuffixes) Some(42L) else None
     val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
     //    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
     val fieldNames = if (caseSensitive) {
@@ -80,7 +92,7 @@ class SchemaScrubber(
         s"${dups.mkString("\n")}"
       println(warnMsg)
       logger.log(Level.WARN, warnMsg)
-      val uniqueSuffixes = uniqueRandomStrings(Some(fields.length), Some(42L), 6)
+      val uniqueSuffixes = uniqueRandomStrings(Some(fields.length), suffixSeed, 6)
       fields.zipWithIndex.map(f => {
         val fieldName = if (caseSensitive) f._1.name else f._1.name.toLowerCase
         if (dups.contains(fieldName)) {
@@ -150,13 +162,21 @@ object SchemaScrubber {
    */
   def apply(
              sanitizationRules: List[SanitizeRule] = _defaultSanitizationRules,
-             exceptions: Array[SanitizeFieldException] = _noExceptions
-           ): SchemaScrubber = new SchemaScrubber(
-    sanitizationRules, exceptions
-  )
+             exceptions: Array[SanitizeFieldException] = _noExceptions,
+             seededUniqueSuffixes: Boolean = true
+           ): SchemaScrubber = {
+    new SchemaScrubber(
+      sanitizationRules, exceptions
+    )
+    .setSeededUniqueSuffixes(seededUniqueSuffixes)
+  }
 
   def scrubSchema(df: DataFrame): DataFrame = {
     apply().scrubSchema(df)
+  }
+
+  def scrubSchema(df: DataFrame, seededUniqueSuffixes: Boolean): DataFrame = {
+    apply(seededUniqueSuffixes = seededUniqueSuffixes).scrubSchema(df)
   }
 
 }

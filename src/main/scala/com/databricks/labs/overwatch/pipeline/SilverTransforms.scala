@@ -1140,10 +1140,15 @@ trait SilverTransforms extends SparkSessionWrapper {
       )}
 
     // create structs from json strings and cleanse schema
-    val jobStatusEnhanced = SchemaScrubber.scrubSchema(
+    val jobStatusEnhanced = if (isFirstRun) { // only on first run, allow snapshot to have additional cardinality
       jobStatusBaseFilled
         .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
-    )
+        .scrubSchema(seededSuffix = false)
+    } else {
+      jobStatusBaseFilled
+        .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
+        .scrubSchema
+    }
 
     // convert structs to maps where the structs' keys are allowed to be typed by the user to avoid
     // bad duplicate keys
