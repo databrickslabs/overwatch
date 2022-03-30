@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.utils.SchemaTools.{uniqueRandomStrings}
+import com.databricks.labs.overwatch.utils.SchemaScrubber.SanitizedField
+import com.databricks.labs.overwatch.utils.SchemaTools.uniqueRandomStrings
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
@@ -16,17 +17,6 @@ class SchemaScrubber(
   //  struct type but the key's are derived via user-input (i.e. event log "properties" field).
   //  UPDATE: This has been handled with spark.conf.get("spark.sql.caseSensitive") but needs to be tested on structs
   // TODO -- throw exception if the resulting string is empty
-
-  private var _seededUniqueSuffixes = true
-
-  private def setSeededUniqueSuffixes(value: Boolean): this.type = {
-    _seededUniqueSuffixes = value
-    this
-  }
-
-  private def getSeededUniqueSuffixes: Boolean = {
-    _seededUniqueSuffixes
-  }
 
   /**
    * First, replace white space " " with null string and then special characters with "_". White space to null string
@@ -49,7 +39,7 @@ class SchemaScrubber(
    * @param field
    * @return
    */
-  private def sanitizeFields(field: StructField, parentSanitizations: List[SanitizeRule] = List[SanitizeRule]()): StructField = {
+  private def sanitizeFields(field: StructField, parentSanitizations: List[SanitizeRule] = List[SanitizeRule]()): SanitizedField = {
     require(
       sanitizationExceptions.map(_.field).deep == sanitizationExceptions.map(_.field).distinct.deep,
       s"""DUPLICATE EXCEPTIONS FOUND FOR SAME FIELD(s):
@@ -62,7 +52,10 @@ class SchemaScrubber(
       (parentSanitizations ++ fieldException.map(_.rules).getOrElse(sanitizationRules)).distinct
     } else fieldException.map(_.rules).getOrElse(sanitizationRules)
 
-    field.copy(name = sanitizeFieldName(field.name, sanitizations), dataType = sanitizeSchema(field.dataType, sanitizations))
+    SanitizedField(
+      field,
+      field.copy(name = sanitizeFieldName(field.name, sanitizations), dataType = sanitizeSchema(field.dataType, sanitizations))
+    )
   }
 
   /**
@@ -74,35 +67,32 @@ class SchemaScrubber(
    * @param fields
    * @return
    */
-  private def generateUniques(fields: Array[StructField]): Array[StructField] = {
-    val suffixSeed = if (getSeededUniqueSuffixes) Some(42L) else None
+  private def generateUniques(fields: Array[SanitizedField]): Array[StructField] = {
     val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
-    //    val r = new scala.util.Random(42L) // Using seed to reuse suffixes on continuous duplicates
     val fieldNames = if (caseSensitive) {
-      fields.map(_.name.trim)
-    } else fields.map(_.name.trim.toLowerCase())
+      fields.map(_.sanitizedField.name.trim)
+    } else fields.map(_.sanitizedField.name.trim.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
     val dupCount = dups.length
     if (dupCount == 0) {
-      fields
+      fields.map(_.sanitizedField)
     } else {
-      val warnMsg = s"WARNING: SCHEMA ERROR --> The following fields were found to be duplicated in the schema. " +
-        s"The fields have been renamed in place and should be reviewed.\n" +
+      val warnMsg = s"SCHEMA WARNING: --> The following fields were not unique after schema cleansing and " +
+        s"have been renamed in place but should be reviewed.\n" +
         s"DUPLICATE FIELDS:\n" +
         s"${dups.mkString("\n")}"
       println(warnMsg)
       logger.log(Level.WARN, warnMsg)
-      val uniqueSuffixes = uniqueRandomStrings(Some(fields.length), suffixSeed, 6)
-      fields.zipWithIndex.map(f => {
-        val fieldName = if (caseSensitive) f._1.name else f._1.name.toLowerCase
+      fields.map(f => {
+        val fieldName = if (caseSensitive) f.sanitizedField.name else f.sanitizedField.name.toLowerCase
         if (dups.contains(fieldName)) {
-          val generatedUniqueName = f._1.name + "_UNIQUESUFFIX_" + uniqueSuffixes(f._2)
-          val uniqueColumnMapping = s"\n${f._1.name} --> ${generatedUniqueName}"
+          val generatedUniqueName = f.sanitizedField.name + "_UNIQUESUFFIX_" + f.originalField.name.hashCode.toString
+          val uniqueColumnMapping = s"\n${f.originalField.name} --> ${generatedUniqueName}"
           println(uniqueColumnMapping)
           logger.log(Level.WARN, uniqueColumnMapping)
-          f._1.copy(name = generatedUniqueName)
+          f.sanitizedField.copy(name = generatedUniqueName)
         }
-        else f._1
+        else f.sanitizedField
       })
     }
   }
@@ -145,6 +135,8 @@ class SchemaScrubber(
 
 object SchemaScrubber {
 
+  case class SanitizedField(originalField: StructField, sanitizedField: StructField)
+
   private val _defaultSanitizationRules: List[SanitizeRule] = List[SanitizeRule](
     SanitizeRule("\\s", ""),
     SanitizeRule("[^a-zA-Z0-9]", "_")
@@ -162,21 +154,15 @@ object SchemaScrubber {
    */
   def apply(
              sanitizationRules: List[SanitizeRule] = _defaultSanitizationRules,
-             exceptions: Array[SanitizeFieldException] = _noExceptions,
-             seededUniqueSuffixes: Boolean = true
+             exceptions: Array[SanitizeFieldException] = _noExceptions
            ): SchemaScrubber = {
     new SchemaScrubber(
       sanitizationRules, exceptions
     )
-    .setSeededUniqueSuffixes(seededUniqueSuffixes)
   }
 
   def scrubSchema(df: DataFrame): DataFrame = {
     apply().scrubSchema(df)
-  }
-
-  def scrubSchema(df: DataFrame, seededUniqueSuffixes: Boolean): DataFrame = {
-    apply(seededUniqueSuffixes = seededUniqueSuffixes).scrubSchema(df)
   }
 
 }

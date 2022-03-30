@@ -1143,7 +1143,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobStatusEnhanced = if (isFirstRun) { // only on first run, allow snapshot to have additional cardinality
       jobStatusBaseFilled
         .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
-        .scrubSchema(seededSuffix = false)
+        .scrubSchema
     } else {
       jobStatusBaseFilled
         .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)

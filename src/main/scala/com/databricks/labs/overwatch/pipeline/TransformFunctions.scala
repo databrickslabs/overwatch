@@ -136,10 +136,6 @@ object TransformFunctions {
       SchemaScrubber.scrubSchema(df)
     }
 
-    def scrubSchema(seededSuffix: Boolean): DataFrame = {
-      SchemaScrubber.scrubSchema(df, seededSuffix)
-    }
-
     def scrubSchema(schemaScrubber: SchemaScrubber): DataFrame = {
       schemaScrubber.scrubSchema(df)
     }
