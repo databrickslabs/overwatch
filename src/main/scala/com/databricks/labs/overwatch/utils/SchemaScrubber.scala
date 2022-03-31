@@ -19,8 +19,8 @@ class SchemaScrubber(
   // TODO -- throw exception if the resulting string is empty
 
   /**
-   * First, replace white space " " with null string and then special characters with "_". White space to null string
-   * is critical for several bronze processes to cleanse schemas with columns including white space.
+   * Sanitize the field names using the list of sanitization rules passed in. These fields are processed in the
+   * order of which they are received in the list.
    *
    * @param s
    * @return
@@ -34,7 +34,7 @@ class SchemaScrubber(
   }
 
   /**
-   * Clean field name and recurse
+   * Clean field name and recurse according to the sanitization rules provided
    *
    * @param field
    * @return
@@ -60,11 +60,14 @@ class SchemaScrubber(
 
   /**
    * When working with complex, evolving schemas across MANY versions and platforms, it's common to wind up with bad
-   * schemas. At times schemas have the same name multiple times which cannot be saved. We cannot have Overwatch break
-   * due to one bad record in a run, so instead, we add a unique suffix to the end of the offending columns and log
-   * / note the issue as a warning as well as print it out in the run log via stdOUT.
+   * schemas. After cleansing, schemas can result in multiple columns with idential names
+   * which cannot be saved. Overwatch must be resilient to this; thus, uniques are created.
+   * A unique suffix to the end of the offending columns and logged to
+   * note the issue as a warning as well as print it out in the run log via stdOUT.
    *
-   * @param fields
+   * @param fields Array[SanitizedField] which includes the original field name and the sanitized field name. The
+   *               original field name is used for logging and to produce a unique hash before sanitization in the
+   *               case of post-sanitization duplicates
    * @return
    */
   private def generateUniques(fields: Array[SanitizedField]): Array[StructField] = {
@@ -74,9 +77,10 @@ class SchemaScrubber(
     } else fields.map(_.sanitizedField.name.trim.toLowerCase())
     val dups = fieldNames.diff(fieldNames.distinct)
     val dupCount = dups.length
-    if (dupCount == 0) {
+    if (dupCount == 0) { // if no dups, return the sanitized fields
       fields.map(_.sanitizedField)
-    } else {
+    } else { // if dups are present, create a hash based on the original (bad / duplicated) field
+      // switched to hash (from random string) as of version 0605 to reduce cardinality of unique suffixes
       val warnMsg = s"SCHEMA WARNING: --> The following fields were not unique after schema cleansing and " +
         s"have been renamed in place but should be reviewed.\n" +
         s"DUPLICATE FIELDS:\n" +
