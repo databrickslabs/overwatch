@@ -112,6 +112,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     executorAdded
       .joinWithLag(executorRemoved, joinKeys, "fileCreateDate", lagDays = 30, joinType = "left")
+      .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('executorRemovedTS, 'executorAddedTS, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("ExecutorAliveTime",
         TransformFunctions.subtractTime('executorAddedTS, 'executorRemovedTS))
@@ -171,6 +172,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     //TODO -- review if skew is necessary -- on all DFs
     executionsStart
       .joinWithLag(executionsEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+      .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('SqlExecEndTime, 'SqlExecStartTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("SqlExecutionRunTime",
         TransformFunctions.subtractTime('SqlExecStartTime, 'SqlExecEndTime))
@@ -207,6 +209,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     jobStart
       .joinWithLag(jobEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+      .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('CompletionTime, 'SubmissionTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("JobRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
       .drop("SubmissionTime", "CompletionTime", "fileCreateDate")
@@ -241,6 +244,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     stageStart
       .joinWithLag(stageEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+      .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('CompletionTime, 'SubmissionTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("StageInfo", struct(
         $"StageEndInfo.Accumulables", $"StageEndInfo.CompletionTime", $"StageStartInfo.Details",
@@ -300,7 +304,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       "StageID", "StageAttemptID", "TaskID", "TaskAttempt", "ExecutorID", "Host"
     )
 
-    taskStart.joinWithLag(taskEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+    taskStart
+      .joinWithLag(taskEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+      .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('FinishTime, 'LaunchTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("TaskInfo", struct(
         $"TaskEndInfo.Accumulables", $"TaskEndInfo.Failed", $"TaskEndInfo.FinishTime",
