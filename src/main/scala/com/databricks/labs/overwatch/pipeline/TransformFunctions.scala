@@ -132,7 +132,7 @@ object TransformFunctions {
     }
 
     def scrubSchema: DataFrame = {
-      SchemaScrubber.scrubSchema((df))
+      SchemaScrubber.scrubSchema(df)
     }
 
     def scrubSchema(schemaScrubber: SchemaScrubber): DataFrame = {
