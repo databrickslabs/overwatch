@@ -367,10 +367,10 @@ class Pipeline(
 
   private[overwatch] def initiatePostProcessing(): Unit = {
 
+    // cleanse the temp dir
+    // if failure doesn't allow pipeline to get here, temp dir will be cleansed on workspace init
     if (!config.externalizeOptimize) postProcessor.optimize(this, Pipeline.OPTIMIZESCALINGCOEF)
-    Helpers.fastrm(Array(
-      s"/tmp/overwatch/bronze/${config.organizationId}/clusterEventsBatches"
-    ))
+    Helpers.fastrm(Array(config.tempWorkingDir))
 
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
 

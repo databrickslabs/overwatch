@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.util.SerializableConfiguration
 
 /**
  * Take the config and validate the setup
@@ -208,6 +209,21 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setOrganizationId(config.workspaceName)
   }
 
+  private def prepAndSetTempWorkingDir(tempPath: String): Unit = {
+    val workspaceTempWorkingDir = if (tempPath.split("/").takeRight(1).headOption.getOrElse("") == config.organizationId) { // if user defined value already ends in orgid don't append it
+      tempPath
+    } else { // if doesn't end with org id append it
+      s"$tempPath/${config.organizationId}"
+    }
+    val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
+    if (Helpers.pathExists(workspaceTempWorkingDir)) { // if temp path exists clean it
+      Helpers.fastrm(Helpers.parListFiles(workspaceTempWorkingDir, hadoopConf))
+    }
+    // ensure path exists at init
+    dbutils.fs.mkdirs(workspaceTempWorkingDir)
+    config.setTempWorkingDir(workspaceTempWorkingDir)
+  }
+
   /**
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
@@ -252,6 +268,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
+    prepAndSetTempWorkingDir(rawParams.tempWorkingDir)
 
     /**
      * PVC: HARD OVERRIDE FOR PVC
@@ -270,7 +287,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     val dataTarget = rawParams.dataTarget.getOrElse(
       DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None))
     val auditLogConfig = rawParams.auditLogConfig
-    val badRecordsPath = rawParams.badRecordsPath
 
     if (overwatchScope.head == "all") config.setOverwatchScope(config.orderedOverwatchScope)
     else config.setOverwatchScope(validateScope(overwatchScope))
@@ -325,8 +341,11 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     }
 
 
-    // Todo -- add validation to badRecordsPath
-    config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
+    // must happen AFTER data target validation
+    val badRecordsPath = rawParams.badRecordsPath
+    config.setBadRecordsPath(badRecordsPath.getOrElse(
+      s"${dataTarget.etlDataPathPrefix}/spark_events_bad_records_files/${config.organizationId}")
+    )
 
     config.setMaxDays(rawParams.maxDaysToLoad)
 

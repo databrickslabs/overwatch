@@ -91,7 +91,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.apiEnv,
         config.organizationId,
         database,
-        BronzeTargets.clusterEventsErrorsTarget
+        BronzeTargets.clusterEventsErrorsTarget,
+        config.tempWorkingDir
       )
     ),
     append(BronzeTargets.clusterEventsTarget)

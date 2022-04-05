@@ -364,7 +364,8 @@ object Upgrade extends SparkSessionWrapper {
                     workspaceNameMap: Map[String, String] = Map(),
                     maxDays: Int = 9999,
                     rebuildSparkTables: Boolean = true,
-                    startStep: Double = 1.0 // TODO -- Reorder steps and switch back to Int
+                    startStep: Double = 1.0, // TODO -- Reorder steps and switch back to Int
+                    snapDir: String = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
                   ): DataFrame = {
 
     // TODO - ADD steps as an array to allow to resume upgrades at various steps
@@ -378,7 +379,6 @@ object Upgrade extends SparkSessionWrapper {
       "This upgrade function is only for upgrading schema version 042+ to new version 060. " +
         "Please first upgrade to at least schema version 0.4.2 before proceeding."
     )
-    val snapDir = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
     val config = workspace.getConfig
     config.setMaxDays(maxDays)
       .setExternalizeOptimize(true) // complete optimize at end
@@ -877,8 +877,10 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * Call this function after the entire upgrade has been confirmed to cleanup the backups and temporary files
    */
-    def finalize060Upgrade(overwatchETLDBName: String): Unit = {
-    val snapDir = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
+    def finalize060Upgrade(
+                            overwatchETLDBName: String,
+                            snapDir: String = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
+                          ): Unit = {
     val targetSchemaVersion = "0.600"
     val cleanupMsg = s"Cleaning up all upgrade backups and temporary reports from the upgraded to 060 located " +
       s"within path $snapDir"

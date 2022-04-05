@@ -442,7 +442,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       apiEnv: ApiEnv,
                                       organizationId: String,
                                       database: Database,
-                                      erroredBronzeEventsTarget: PipelineTable
+                                      erroredBronzeEventsTarget: PipelineTable,
+                                      tempWorkingDir: String
                                     )(clusterSnapshotDF: DataFrame): DataFrame = {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
@@ -462,7 +463,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
      */
     val batchSize = 500000D
     // TODO -- remove hard-coded path
-    val tmpClusterEventsPath = s"/tmp/overwatch/bronze/$organizationId/clusterEventsBatches"
+    val tmpClusterEventsPath = s"$tempWorkingDir/bronze/clusterEventsBatches"
     val (clusterEventsBuffer, failedBatchingCalls) = buildClusterEventBatches(apiEnv, batchSize, startTime, endTime, clusterIDs)
 
     persistErrors(
