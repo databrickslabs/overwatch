@@ -209,10 +209,22 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setOrganizationId(config.workspaceName)
   }
 
-  private def prepAndSetTempWorkingDir(tempPath: String): Unit = {
-    val workspaceTempWorkingDir = if (tempPath.split("/").takeRight(1).headOption.getOrElse("") == config.organizationId) { // if user defined value already ends in orgid don't append it
+  /**
+   * defaults temp working dir to etlTargetPath/organizationId
+   * this is important to minimize bandwidth issues
+   * also setting temp target to be within the etl target minimizes liklihood for read/write permissions
+   * issues. Can be overridden in config
+   * @param tempPath defaults to "" (nullstring) in the config
+   * @param etlTargetPath target path for all overwatch data
+   */
+  private def prepAndSetTempWorkingDir(tempPath: String, etlTargetPath: String): Unit = {
+    val defaultTempPath = s"$etlTargetPath/tempWorkingDir/${config.organizationId}"
+    val workspaceTempWorkingDir = if (tempPath == "") { // default null string
+      defaultTempPath
+    }
+    else if (tempPath.split("/").takeRight(1).headOption.getOrElse("") == config.organizationId) { // if user defined value already ends in orgid don't append it
       tempPath
-    } else { // if doesn't end with org id append it
+    } else { // if user configured value doesn't end with org id append it
       s"$tempPath/${config.organizationId}"
     }
     val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
@@ -268,7 +280,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
-    prepAndSetTempWorkingDir(rawParams.tempWorkingDir)
 
     /**
      * PVC: HARD OVERRIDE FOR PVC
@@ -342,10 +353,14 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
 
     // must happen AFTER data target validation
+    // persistent location for corrupted spark event log files
     val badRecordsPath = rawParams.badRecordsPath
     config.setBadRecordsPath(badRecordsPath.getOrElse(
       s"${dataTarget.etlDataPathPrefix}/spark_events_bad_records_files/${config.organizationId}")
     )
+
+    // must happen AFTER data target validation
+    prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
 
     config.setMaxDays(rawParams.maxDaysToLoad)
 

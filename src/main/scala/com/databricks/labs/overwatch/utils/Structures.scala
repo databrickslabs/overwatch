@@ -85,7 +85,7 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
                            workspace_name: Option[String] = None,
                            externalizeOptimize: Boolean = false,
-                           tempWorkingDir: String = "/tmp/overwatch_pipeline_ctrl__2022__"
+                           tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )
 
 case class ParsedConfig(
