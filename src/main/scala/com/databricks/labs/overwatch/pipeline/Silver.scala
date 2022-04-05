@@ -223,6 +223,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       dbJobsStatusSummary(
         BronzeTargets.jobsSnapshotTarget,
         jobStatusModule.isFirstRun,
+        SilverTargets.dbJobsStatusTarget.keys
       )),
     append(SilverTargets.dbJobsStatusTarget)
   )
