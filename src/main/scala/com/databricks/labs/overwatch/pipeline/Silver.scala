@@ -236,7 +236,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
-        jobRunsModule.fromTime
+        jobRunsModule.fromTime, jobRunsModule.untilTime
       )
     ),
     append(SilverTargets.dbJobRunsTarget)

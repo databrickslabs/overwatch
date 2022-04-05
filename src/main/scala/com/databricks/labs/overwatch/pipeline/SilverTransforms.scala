@@ -1223,7 +1223,8 @@ trait SilverTransforms extends SparkSessionWrapper {
                                   clusterSnapshot: PipelineTable,
                                   jobsStatus: PipelineTable,
                                   jobsSnapshot: PipelineTable,
-                                  etlStartTime: TimeTypes
+                                  etlStartTime: TimeTypes,
+                                  etlUntilTime: TimeTypes
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
     val jobRunActions = Array("runSucceeded", "runFailed", "runNow", "runStart", "submitRun", "cancel")
@@ -1422,12 +1423,13 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("idInJob", coalesce('idInJob, 'runId))
       .withColumn("jobClusterType", coalesce('jobClusterType_Completed, 'jobClusterType_Started))
       .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
-      .withColumn("JobRunTime", TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), array_max(array('completionTime, 'cancellationTime))))
       .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null).cast("string")))
       .select(
         'runId.cast("long"),
         'jobId,
-        'idInJob, 'JobRunTime, 'run_name,
+        'idInJob,
+        TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), coalesce(array_max(array('completionTime, 'cancellationTime)), lit(etlUntilTime.asUnixTimeMilli))).alias("JobRunTime"),
+        'run_name,
         'jobClusterType,
         coalesce('jobTaskType_Completed, 'jobTaskType_Started).alias("jobTaskType"),
         coalesce('jobTriggerType_Completed, 'jobTriggerType_Started).alias("jobTriggerType"),
