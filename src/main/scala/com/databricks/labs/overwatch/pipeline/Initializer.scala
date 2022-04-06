@@ -539,28 +539,28 @@ object Initializer extends SparkSessionWrapper {
    *                      is more robust output when debug is enabled.
    * @return
    */
-  def apply(overwatchArgs: String, debugFlag: Boolean = false): Workspace = {
-
-    val config = initConfigState(debugFlag)
-
-    logger.log(Level.INFO, "Initializing Environment")
-    val initializer = new Initializer(config)
-    val database = initializer
-      .validateAndRegisterArgs(overwatchArgs)
-      .initializeDatabase()
-
-    logger.log(Level.INFO, "Initializing Workspace")
-    val workspace = Workspace(database, config)
-
-
-    workspace
+  def apply(overwatchArgs: String): Workspace = {
+    apply(
+      overwatchArgs,
+      debugFlag = false,
+      isSnap = false,
+      disableValidations = false
+    )
+  }
+  def apply(overwatchArgs: String, debugFlag: Boolean): Workspace = {
+    apply(
+      overwatchArgs,
+      debugFlag,
+      isSnap = false,
+      disableValidations = false
+    )
   }
 
   private[overwatch] def apply(
                                 overwatchArgs: String,
-                                debugFlag: Boolean,
-                                isSnap: Boolean,
-                                disableValidations: Boolean
+                                debugFlag: Boolean = false,
+                                isSnap: Boolean = false,
+                                disableValidations: Boolean = false
                               ): Workspace = {
 
     val config = initConfigState(debugFlag)
@@ -569,13 +569,12 @@ object Initializer extends SparkSessionWrapper {
     val initializer = new Initializer(config)
     val database = initializer
       .setIsSnap(isSnap)
-      .setDisableValidations(true)
+      .setDisableValidations(disableValidations)
       .validateAndRegisterArgs(overwatchArgs)
       .initializeDatabase()
 
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)
-
 
     workspace
   }
