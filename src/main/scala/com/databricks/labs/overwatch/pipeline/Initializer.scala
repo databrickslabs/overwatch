@@ -360,7 +360,10 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     )
 
     // must happen AFTER data target validation
-    prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
+    if (!disableValidations) { // temp working dir is not necessary for disabled validations as pipelines cannot be
+    // executed without validations
+      prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
+    }
 
     config.setMaxDays(rawParams.maxDaysToLoad)
 
