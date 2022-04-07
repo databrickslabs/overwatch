@@ -1095,7 +1095,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
       val lastJobSnapW = Window.partitionBy('organization_id, 'job_id).orderBy('Pipeline_SnapTS.desc)
       val jSnapMissingJobs = jobsSnapshotDFComplete
-        .join(missingJobIds, Seq("organization_id", "job_id"))
+        .join(missingJobIds, Seq("organization_id", "job_id")) // filter to only the missing job IDs
         .withColumn("rnk", rank().over(lastJobSnapW))
         .filter('rnk === 1).drop("rnk")
         .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
