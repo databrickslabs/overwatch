@@ -896,4 +896,40 @@ object Upgrade extends SparkSessionWrapper {
     println(upgradeFinalizedMsg)
   }
 
+  def upgradeTo0605(etlDatabaseName: String): Unit = {
+    updateJobSchema(etlDatabaseName)
+  }
+
+  def updateJobSchema(etlDatabaseName: String): Unit = {
+    val blankConfig = new Config()
+    val packageVersion = blankConfig.getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
+    val schemaVersion = SchemaTools.getSchemaVersion("overwatch_global_etl").split("\\.").takeRight(1).head.toInt
+    assert(schemaVersion >= 600 && packageVersion >= 605, s"This schema upgrade is only necessary when upgrading from " +
+      s"Overwatch versions < 0605 but > 05x. If upgrading from 05x directly to 0605+ simply run the 'upgradeTo060' function.")
+    assert(spark.catalog.tableExists(etlDatabaseName, "job_status_silver"), s"job_status_silver cannot be " +
+      s"found in db $etlDatabaseName, double check your etlDatabaseName")
+    assert(spark.catalog.tableExists(etlDatabaseName, "job_gold"), s"job_gold cannot be " +
+      s"found in db $etlDatabaseName, double check your etlDatabaseName")
+    val jobSilverDF = spark.table(s"${etlDatabaseName}.job_status_silver")
+    val jobGoldDF = spark.table(s"${etlDatabaseName}.job_gold")
+
+    SchemaTools.cullNestedColumns(jobSilverDF, "new_settings", Array("tasks", "job_clusters"))
+      .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
+      .write
+      .format("delta")
+      .partitionBy("organization_id", "__overwatch_ctrl_noise")
+      .mode("overwrite")
+      .option("overwriteSchema", "true")
+      .saveAsTable(s"${etlDatabaseName}.job_status_silver")
+
+    SchemaTools.cullNestedColumns(jobGoldDF, "new_settings", Array("tasks", "job_clusters"))
+      .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
+      .write
+      .format("delta")
+      .partitionBy("organization_id", "__overwatch_ctrl_noise")
+      .mode("overwrite")
+      .option("overwriteSchema", "true")
+      .saveAsTable(s"${etlDatabaseName}.job_status_silver")
+  }
+
 }

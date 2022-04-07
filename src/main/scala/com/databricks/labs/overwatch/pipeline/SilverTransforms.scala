@@ -984,9 +984,49 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
   }
 
+  private def cleanseNewSettingsTasks(df: DataFrame, keys: Array[String]): DataFrame = {
+    val jobStatusByKeyW = Window.partitionBy(keys map col: _*)
+    val tasksExplodedWKeys = df
+      .filter(size($"new_settings.tasks") >= 1)
+      .select((keys map col) :+ explode($"new_settings.tasks").alias("newSettingsTask"): _*)
+
+    val tasksChangeInventory = Map(
+      "newSettingsTask.new_cluster.custom_tags" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.custom_tags"),
+      "newSettingsTask.new_cluster.aws_attributes" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.aws_attributes"),
+      "newSettingsTask.new_cluster.azure_attributes" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.azure_attributes"),
+      "newSettingsTask.new_cluster.spark_conf" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.spark_conf"),
+      "newSettingsTask.new_cluster.spark_env_vars" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.spark_env_vars"),
+      "newSettingsTask.notebook_task.base_parameters" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.notebook_task.base_parameters")
+    )
+
+    tasksExplodedWKeys
+      .select(SchemaTools.modifyStruct(tasksExplodedWKeys.schema, tasksChangeInventory): _*)
+      .withColumn("newSettingsTask", collect_list('newSettingsTask).over(jobStatusByKeyW))
+  }
+
+  private def cleanseJobClusters(df: DataFrame, keys: Array[String]): DataFrame = {
+    val jobStatusByKeyW = Window.partitionBy(keys map col: _*)
+    val jobClustersExplodedWKeys = df
+      .filter(size($"new_settings.job_clusters") > 0)
+      .select((keys map col) :+ explode($"new_settings.job_clusters").alias("job_clusters"): _*)
+
+    val jobClustersChangeInventory = Map(
+      "job_clusters.new_cluster.custom_tags" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.custom_tags"),
+      "job_clusters.new_cluster.aws_attributes" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.aws_attributes"),
+      "job_clusters.new_cluster.azure_attributes" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.azure_attributes"),
+      "job_clusters.new_cluster.spark_conf" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.spark_conf"),
+      "job_clusters.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.spark_env_vars")
+    )
+
+    jobClustersExplodedWKeys
+      .select(SchemaTools.modifyStruct(jobClustersExplodedWKeys.schema, jobClustersChangeInventory): _*)
+      .withColumn("job_clusters", collect_list('job_clusters).over(jobStatusByKeyW))
+  }
+
   protected def dbJobsStatusSummary(
                                      jobsSnapshotTargetComplete: PipelineTable,
                                      isFirstRun: Boolean,
+                                     targetKeys: Array[String]
                                    )(df: DataFrame): DataFrame = {
 
     if (!jobsSnapshotTargetComplete.exists(dataValidation = true)) {
@@ -1146,19 +1186,13 @@ trait SilverTransforms extends SparkSessionWrapper {
       )}
 
     // create structs from json strings and cleanse schema
-    val jobStatusEnhanced = if (isFirstRun) { // only on first run, allow snapshot to have additional cardinality
-      jobStatusBaseFilled
+    val jobStatusEnhanced = jobStatusBaseFilled
         .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
         .scrubSchema
-    } else {
-      jobStatusBaseFilled
-        .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
-        .scrubSchema
-    }
 
     // convert structs to maps where the structs' keys are allowed to be typed by the user to avoid
     // bad duplicate keys
-    val structsCleaner = Map(
+    val structsCleaner = collection.mutable.Map(
       "new_settings.new_cluster.custom_tags" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.custom_tags"),
       "new_settings.new_cluster.spark_conf" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.spark_conf"),
       "new_settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.spark_env_vars"),
@@ -1174,36 +1208,30 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // if new tasks are used cleanse the nested tasks columns as they contain additional nested structs
     // with user-defined keys -- they should be converted to a map and the new_settings column rebuilt
-    if (SchemaTools.getAllColumnNames(jobStatusEnhanced.schema).contains("new_settings.tasks")) {
-      val jobStatusByKeyW = Window.partitionBy('organization_id, 'timestamp, 'actionName, 'requestId).orderBy('timestamp)
-      val tasksExplodedWKeys = jobStatusEnhanced
-        .filter(size($"new_settings.tasks") >= 1)
-        .select('organization_id, 'jobId, 'actionName, 'timestamp, 'requestId, explode($"new_settings.tasks").alias("newSettingsTask"))
+    val withCleansedTasks = if (SchemaTools.getAllColumnNames(jobStatusEnhanced.schema).contains("new_settings.tasks")) {
+      val cleansedNewSettingsTasksDF = cleanseNewSettingsTasks(jobStatusEnhanced, targetKeys)
 
-      val tasksChangeInventory = Map(
-        "newSettingsTask.new_cluster.custom_tags" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.custom_tags"),
-        "newSettingsTask.new_cluster.aws_attributes" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.aws_attributes"),
-        "newSettingsTask.new_cluster.azure_attributes" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.azure_attributes"),
-        "newSettingsTask.new_cluster.spark_conf" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.spark_conf"),
-        "newSettingsTask.new_cluster.spark_env_vars" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.spark_env_vars"),
-        "newSettingsTask.notebook_task.base_parameters" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.notebook_task.base_parameters")
-      )
-
-      val cleansedNewSettingsTasksDF = tasksExplodedWKeys
-        .select(SchemaTools.modifyStruct(tasksExplodedWKeys.schema, tasksChangeInventory): _*)
-        .withColumn("newSettingsTask", collect_list('newSettingsTask).over(jobStatusByKeyW))
-
-      val structsCleanerWithNewSettingsTasks = structsCleaner + (s"new_settings.tasks" -> col("newSettingsTask"))
+      structsCleaner("new_settings.tasks") = col("newSettingsTask")
 
       jobStatusEnhanced
-        .join(cleansedNewSettingsTasksDF, Seq("organization_id", "jobId", "actionName", "timestamp", "requestId"), "left")
-        .select(SchemaTools.modifyStruct(jobStatusEnhanced.schema, structsCleanerWithNewSettingsTasks): _*)
-        .drop("newSettingsTask")
+        .join(cleansedNewSettingsTasksDF, targetKeys.toSeq, "left")
 
     } else { // new_settings.tasks column doesn't exist (i.e. jobs pipelines not used in workspace)
       jobStatusEnhanced
-        .select(SchemaTools.modifyStruct(jobStatusEnhanced.schema, structsCleaner): _*)
     }
+
+    val withCleansedJobClusters = if (SchemaTools.getAllColumnNames(jobStatusEnhanced.schema).contains("new_settings.job_clusters")) {
+      val cleansedJobClustersDF = cleanseJobClusters(jobStatusEnhanced, targetKeys)
+      structsCleaner("new_settings.job_clusters") = col("job_clusters")
+      withCleansedTasks
+        .join(cleansedJobClustersDF, targetKeys.toSeq, "left")
+    } else {
+      withCleansedTasks
+    }
+
+    withCleansedJobClusters
+      .select(SchemaTools.modifyStruct(withCleansedJobClusters.schema, structsCleaner.toMap): _*)
+      .drop("newSettingsTask", "job_clusters")
   }
 
   /**

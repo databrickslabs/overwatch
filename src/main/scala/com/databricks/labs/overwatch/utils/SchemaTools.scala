@@ -97,6 +97,17 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+  def cullNestedColumns(df: DataFrame, structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
+    val originalFieldNames = df.select(s"$structToModify.*").columns
+    val remainingFieldNames = if (spark.conf.get("spark.sql.caseSensitive") == "true") {
+      originalFieldNames.diff(nestedFieldsToCull)
+    } else {
+      originalFieldNames.filterNot(f => nestedFieldsToCull.map(_.toLowerCase).contains(f.toLowerCase))
+    }
+    val newStructCol = struct(remainingFieldNames.map(f => s"$structToModify.$f") map col: _*).alias(structToModify)
+    df.withColumn(structToModify, newStructCol)
+  }
+
   def modifyStruct(structToModify: StructType, changeInventory: Map[String, Column], prefix: String = null): Array[Column] = {
     structToModify.fields.map(f => {
       val fullFieldName = if (prefix == null) f.name else (prefix + "." + f.name)
