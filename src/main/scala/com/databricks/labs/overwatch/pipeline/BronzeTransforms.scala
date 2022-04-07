@@ -695,17 +695,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
           }
         }
 
-        // build special scrubber for df
-        //        val scrubExceptions = baseEventsDF.select("Properties").schema.fields.map(f => {
-        //          Tuple2(
-        //            f,
-        //                    Array(
-        //                      SanitizeRule("\\s", ""),
-        //                      SanitizeRule("\\.", ""),
-        //                      SanitizeRule("[^a-zA-Z0-9]", "_")
-        //                    )
-        //          )
-        //        }).toMap
         val propertiesScrubException = SanitizeFieldException(
           field = SchemaTools.colByName(baseEventsDF)("Properties"),
           rules = List(
@@ -760,6 +749,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
         }
 
         val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+          .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
+          .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
         //TODO -- use map_filter to remove massive redundant useless column to save space
