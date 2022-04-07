@@ -442,7 +442,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       apiEnv: ApiEnv,
                                       organizationId: String,
                                       database: Database,
-                                      erroredBronzeEventsTarget: PipelineTable
+                                      erroredBronzeEventsTarget: PipelineTable,
+                                      tempWorkingDir: String
                                     )(clusterSnapshotDF: DataFrame): DataFrame = {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
@@ -462,7 +463,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
      */
     val batchSize = 500000D
     // TODO -- remove hard-coded path
-    val tmpClusterEventsPath = s"/tmp/overwatch/bronze/$organizationId/clusterEventsBatches"
+    val tmpClusterEventsPath = s"$tempWorkingDir/bronze/clusterEventsBatches"
     val (clusterEventsBuffer, failedBatchingCalls) = buildClusterEventBatches(apiEnv, batchSize, startTime, endTime, clusterIDs)
 
     persistErrors(
@@ -694,17 +695,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
           }
         }
 
-        // build special scrubber for df
-        //        val scrubExceptions = baseEventsDF.select("Properties").schema.fields.map(f => {
-        //          Tuple2(
-        //            f,
-        //                    Array(
-        //                      SanitizeRule("\\s", ""),
-        //                      SanitizeRule("\\.", ""),
-        //                      SanitizeRule("[^a-zA-Z0-9]", "_")
-        //                    )
-        //          )
-        //        }).toMap
         val propertiesScrubException = SanitizeFieldException(
           field = SchemaTools.colByName(baseEventsDF)("Properties"),
           rules = List(
@@ -759,6 +749,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
         }
 
         val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+          .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
+          .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
         //TODO -- use map_filter to remove massive redundant useless column to save space

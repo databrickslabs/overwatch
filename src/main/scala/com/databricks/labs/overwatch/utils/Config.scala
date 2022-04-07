@@ -17,6 +17,7 @@ class Config() {
   private var _overwatchSchemaVersion = "0.600"
   private var _organizationId: String = _
   private var _workspaceName: String = _
+  private var _tempWorkingDir: String = _
   private var _isPVC: Boolean = false
   private var _externalizeOptimize: Boolean = false
   private var _databaseName: String = _
@@ -61,6 +62,8 @@ class Config() {
   def organizationId: String = _organizationId
 
   def workspaceName: String = _workspaceName
+
+  def tempWorkingDir: String = _tempWorkingDir
 
   def isPVC: Boolean = _isPVC
 
@@ -267,6 +270,11 @@ class Config() {
     logger.log(Level.INFO, msg)
     if (debugFlag) println(msg)
     _workspaceName = value
+    this
+  }
+
+  private[overwatch] def setTempWorkingDir(value: String): this.type = {
+    _tempWorkingDir = value
     this
   }
 

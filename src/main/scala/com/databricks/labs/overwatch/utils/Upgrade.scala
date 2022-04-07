@@ -364,7 +364,8 @@ object Upgrade extends SparkSessionWrapper {
                     workspaceNameMap: Map[String, String] = Map(),
                     maxDays: Int = 9999,
                     rebuildSparkTables: Boolean = true,
-                    startStep: Double = 1.0 // TODO -- Reorder steps and switch back to Int
+                    startStep: Double = 1.0, // TODO -- Reorder steps and switch back to Int
+                    snapDir: String = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
                   ): DataFrame = {
 
     // TODO - ADD steps as an array to allow to resume upgrades at various steps
@@ -378,7 +379,6 @@ object Upgrade extends SparkSessionWrapper {
       "This upgrade function is only for upgrading schema version 042+ to new version 060. " +
         "Please first upgrade to at least schema version 0.4.2 before proceeding."
     )
-    val snapDir = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
     val config = workspace.getConfig
     config.setMaxDays(maxDays)
       .setExternalizeOptimize(true) // complete optimize at end
@@ -877,8 +877,10 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * Call this function after the entire upgrade has been confirmed to cleanup the backups and temporary files
    */
-    def finalize060Upgrade(overwatchETLDBName: String): Unit = {
-    val snapDir = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
+    def finalize060Upgrade(
+                            overwatchETLDBName: String,
+                            snapDir: String = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
+                          ): Unit = {
     val targetSchemaVersion = "0.600"
     val cleanupMsg = s"Cleaning up all upgrade backups and temporary reports from the upgraded to 060 located " +
       s"within path $snapDir"
@@ -892,6 +894,42 @@ object Upgrade extends SparkSessionWrapper {
     val upgradeFinalizedMsg = "Upgrade Complete & Finalized"
     logger.log(Level.INFO, upgradeFinalizedMsg)
     println(upgradeFinalizedMsg)
+  }
+
+  def upgradeTo0605(etlDatabaseName: String): Unit = {
+    updateJobSchema(etlDatabaseName)
+  }
+
+  def updateJobSchema(etlDatabaseName: String): Unit = {
+    val blankConfig = new Config()
+    val packageVersion = blankConfig.getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
+    val schemaVersion = SchemaTools.getSchemaVersion("overwatch_global_etl").split("\\.").takeRight(1).head.toInt
+    assert(schemaVersion >= 600 && packageVersion >= 605, s"This schema upgrade is only necessary when upgrading from " +
+      s"Overwatch versions < 0605 but > 05x. If upgrading from 05x directly to 0605+ simply run the 'upgradeTo060' function.")
+    assert(spark.catalog.tableExists(etlDatabaseName, "job_status_silver"), s"job_status_silver cannot be " +
+      s"found in db $etlDatabaseName, double check your etlDatabaseName")
+    assert(spark.catalog.tableExists(etlDatabaseName, "job_gold"), s"job_gold cannot be " +
+      s"found in db $etlDatabaseName, double check your etlDatabaseName")
+    val jobSilverDF = spark.table(s"${etlDatabaseName}.job_status_silver")
+    val jobGoldDF = spark.table(s"${etlDatabaseName}.job_gold")
+
+    SchemaTools.cullNestedColumns(jobSilverDF, "new_settings", Array("tasks", "job_clusters"))
+      .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
+      .write
+      .format("delta")
+      .partitionBy("organization_id", "__overwatch_ctrl_noise")
+      .mode("overwrite")
+      .option("overwriteSchema", "true")
+      .saveAsTable(s"${etlDatabaseName}.job_status_silver")
+
+    SchemaTools.cullNestedColumns(jobGoldDF, "new_settings", Array("tasks", "job_clusters"))
+      .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
+      .write
+      .format("delta")
+      .partitionBy("organization_id", "__overwatch_ctrl_noise")
+      .mode("overwrite")
+      .option("overwriteSchema", "true")
+      .saveAsTable(s"${etlDatabaseName}.job_status_silver")
   }
 
 }

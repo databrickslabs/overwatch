@@ -83,8 +83,9 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(),
                            primordialDateString: Option[String] = None,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
-                           workspace_name: Option[String],
-                           externalizeOptimize: Boolean
+                           workspace_name: Option[String] = None,
+                           externalizeOptimize: Boolean = false,
+                           tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )
 
 case class ParsedConfig(
