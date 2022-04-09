@@ -111,8 +111,8 @@ abstract class PipelineTargets(config: Config) {
       config,
       incrementalColumns = Array("fileCreateDate", "fileCreateEpochMS"),
       partitionBy = Seq("organization_id", "Event", "fileCreateDate"),
-      statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID," +
-        "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename," +
+      statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID, " +
+        "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "),
       autoOptimize = true, // TODO -- perftest
       masterSchema = Some(Schema.sparkEventsRawMasterSchema)

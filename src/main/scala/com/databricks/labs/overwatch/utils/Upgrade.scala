@@ -897,10 +897,6 @@ object Upgrade extends SparkSessionWrapper {
   }
 
   def upgradeTo0605(etlDatabaseName: String): Unit = {
-    updateJobSchema(etlDatabaseName)
-  }
-
-  def updateJobSchema(etlDatabaseName: String): Unit = {
     val blankConfig = new Config()
     val packageVersion = blankConfig.getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
     val schemaVersion = SchemaTools.getSchemaVersion("overwatch_global_etl").split("\\.").takeRight(1).head.toInt
@@ -929,7 +925,33 @@ object Upgrade extends SparkSessionWrapper {
       .partitionBy("organization_id", "__overwatch_ctrl_noise")
       .mode("overwrite")
       .option("overwriteSchema", "true")
-      .saveAsTable(s"${etlDatabaseName}.job_status_silver")
+      .saveAsTable(s"${etlDatabaseName}.job_gold")
+
+    if (spark.catalog.tableExists(s"${etlDatabaseName}.spark_events_bronze")) {
+      spark.conf.set("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "500000")
+      spark.conf.set("spark.databricks.delta.optimizeWrite.binSize", "2048")
+      spark.conf.set("spark.sql.files.maxPartitionBytes", (1024 * 1024 * 64).toString)
+      spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+
+      val sparkEventsBronzeDF = spark.table(s"${etlDatabaseName}.spark_events_bronze")
+      val sparkEventsSchema = sparkEventsBronzeDF.schema
+      val partitionByCols = Seq("organization_id", "Event", "fileCreateDate")
+      val statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID, " +
+        "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename, " +
+        "Pipeline_SnapTS, Overwatch_RunID").split(", ")
+      val fieldsRequiringRebuild = Array("modifiedConfigs", "extraTags")
+      if (sparkEventsSchema.fields.exists(f => fieldsRequiringRebuild.contains(f.name))) {
+        TransformFunctions.moveColumnsToFront(
+          sparkEventsBronzeDF
+            .drop(fieldsRequiringRebuild: _*),
+          statsColumns
+        )
+          .write.format("delta")
+          .partitionBy(partitionByCols: _*)
+          .mode("overwrite").option("overwriteSchema", "true")
+          .saveAsTable(s"${etlDatabaseName}.spark_events_bronze")
+      }
+    }
   }
 
 }

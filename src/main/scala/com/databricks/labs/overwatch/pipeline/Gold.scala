@@ -291,7 +291,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
-  private[overwatch] def refreshViews(): Unit = {
+  def refreshViews(): Unit = {
     config.overwatchScope.foreach {
       case OverwatchScope.accounts => {
         GoldTargets.accountLoginViewTarget.publish(accountLoginViewColumnMappings)

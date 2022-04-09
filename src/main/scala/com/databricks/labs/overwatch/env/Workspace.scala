@@ -31,7 +31,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     this
   }
 
-  private def setValidated(value: Boolean): this.type = {
+  private[overwatch] def setValidated(value: Boolean): this.type = {
     _validated = value
     this
   }
