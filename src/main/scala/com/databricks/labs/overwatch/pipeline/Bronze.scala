@@ -172,6 +172,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     restoreSparkConf()
 
     if (config.debugFlag) println(s"DEBUG: CLOUD PROVIDER = ${config.cloudProvider}")
+    println("TEST OUTPUT")
 
     if (config.cloudProvider == "azure") {
       landAzureAuditEvents()

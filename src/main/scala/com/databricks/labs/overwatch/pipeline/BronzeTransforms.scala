@@ -705,6 +705,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
         //                    )
         //          )
         //        }).toMap
+        println("Print dataset schema")
+        println(baseEventsDF.printSchema())
         val propertiesScrubException = SanitizeFieldException(
           field = SchemaTools.colByName(baseEventsDF)("Properties"),
           rules = List(
