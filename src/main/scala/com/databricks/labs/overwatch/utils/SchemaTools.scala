@@ -72,7 +72,7 @@ object SchemaTools extends SparkSessionWrapper {
    */
   def colByName(df: DataFrame)(colName: String): StructField = {
     println("Print dataset schema")
-    df.printSchema()
+    println(df.printSchema())
     if (spark.conf.get("spark.sql.caseSensitive") == "true") {
       df.schema.find(_.name == colName).get
     } else {
