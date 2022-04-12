@@ -21,4 +21,4 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.DATA_ENG_CI_CD_KEY_PROD }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DATA_ENG_CI_CD_SECRET_PROD }}
         run: |
-          aws s3 cp target/scala-2.11/overwatch-assembly-0.6.0.4.jar s3://scribd-data-eng-artifacts-prod/overwatch/overwatch-assembly-0.6.0.4.jar
+          aws s3 cp target/scala-2.12/overwatch-assembly-0.6.0.4.jar s3://scribd-data-eng-artifacts-prod/overwatch/overwatch-assembly-0.6.0.4.jar
