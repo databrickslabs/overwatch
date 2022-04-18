@@ -837,7 +837,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // all files considered for ingest
     val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
-    allEventLogPrefixes
+    val eventLogPaths = allEventLogPrefixes
       .repartition(optimizeParCount)
       .as[String]
       .map(x => Helpers.parListFiles(x, hadoopConf)) // parallelized file lister since large / shared / long-running (months) clusters will have MANy paths
@@ -851,6 +851,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumnRenamed("pathString", "filename")
       .withColumn("fileCreateTS", from_unixtime('fileCreateEpochMS / lit(1000)).cast("timestamp"))
       .withColumn("fileCreateDate", 'fileCreateTS.cast("date"))
+      .repartition().cache()
+
+    // eager execution to minimize secondary compute downstream
+    eventLogPaths.count()
+    eventLogPaths
 
   }
 

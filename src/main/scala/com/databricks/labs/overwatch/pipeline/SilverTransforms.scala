@@ -171,7 +171,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     //TODO -- review if skew is necessary -- on all DFs
     executionsStart
-      .joinWithLag(executionsEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+      .joinWithLag(executionsEnd, joinKeys, "fileCreateDate", joinType = "left")
       .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('SqlExecEndTime, 'SqlExecStartTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("SqlExecutionRunTime",
@@ -208,7 +208,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val joinKeys = Seq("organization_id", "clusterId", "SparkContextID", "JobID")
 
     jobStart
-      .joinWithLag(jobEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+      .joinWithLag(jobEnd, joinKeys, "fileCreateDate", joinType = "left")
       .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('CompletionTime, 'SubmissionTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("JobRunTime", TransformFunctions.subtractTime('SubmissionTime, 'CompletionTime))
@@ -243,7 +243,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val joinKeys = Seq("organization_id", "clusterId", "SparkContextID", "StageID", "StageAttemptID")
 
     stageStart
-      .joinWithLag(stageEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+      .joinWithLag(stageEnd, joinKeys, "fileCreateDate", joinType = "left")
       .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('CompletionTime, 'SubmissionTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("StageInfo", struct(
@@ -305,7 +305,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     taskStart
-      .joinWithLag(taskEnd, joinKeys, "fileCreateDate", lagDays = 3, joinType = "left")
+      .joinWithLag(taskEnd, joinKeys, "fileCreateDate", joinType = "left")
       .dropDuplicates(joinKeys) // events are emitted at least once -- remove potential duplicate keys
       .filter(coalesce('FinishTime, 'LaunchTime, lit(0)) >= fromTime.asUnixTimeMilli)
       .withColumn("TaskInfo", struct(
@@ -864,7 +864,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       "RESIZING", "UPSIZE_COMPLETED", "DRIVER_HEALTHY"
     )
 
-    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1).over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
+    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1)
+      .over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
     val clusterEventsBaseline = clusterEventsDF
       .selectExpr("*", "details.*")
       .drop("details")
