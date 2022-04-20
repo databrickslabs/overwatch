@@ -323,12 +323,32 @@ trait SilverTransforms extends SparkSessionWrapper {
   // TODO -- Azure Review
   //  Tested in AWS, azure account logic may be slightly different
   protected def accountLogins()(df: DataFrame): DataFrame = {
-    val endpointLogins = df.filter(
+    val prunedDF = df
+      .select(
+        'timestamp,
+        'organization_id,
+        'serviceName,
+        'actionName,
+        'date,
+        'requestId,
+        'sessionId,
+        'sourceIPAddress,
+        'userAgent,
+        'userIdentity,
+        'response,
+        $"requestParams.instanceId".alias("instance_id"),
+        $"requestParams.port".alias("login_port"),
+        $"requestParams.publicKey".alias("login_public_key"),
+        $"requestParams.containerId".alias("container_id"),
+        $"requestParams.userName".alias("container_user_name"),
+        $"requestParams.user".alias("login_user")
+      )
+    val endpointLogins = prunedDF.filter(
       'serviceName === "accounts" &&
         lower('actionName).like("%login%") &&
         $"userIdentity.email" =!= "dbadmin")
 
-    val sshLoginRaw = df.filter('serviceName === "ssh" && 'actionName === "login")
+    val sshLoginRaw = prunedDF.filter('serviceName === "ssh" && 'actionName === "login")
       .withColumn("actionName", lit("ssh"))
 
     val accountLogins = endpointLogins.unionByName(sshLoginRaw)
@@ -340,12 +360,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       'requestId,
       lit("ssh").alias("login_type"),
       struct(
-        $"requestParams.instanceId".alias("instance_id"),
-        $"requestParams.port".alias("login_port"),
+        'instance_id,
+        'login_port,
         'sessionId.alias("session_id"),
-        $"requestParams.publicKey".alias("login_public_key"),
-        $"requestParams.containerId".alias("container_id"),
-        $"requestParams.userName".alias("container_user_name")
+        'login_public_key,
+        'container_id,
+        'container_user_name
       ).alias("ssh_login_details")
     )
 
@@ -358,10 +378,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'date.alias("login_date"),
           'serviceName,
           'actionName.alias("login_type"),
-          $"requestParams.user".alias("login_user"),
-          //        $"requestParams.userName".alias("ssh_user_name"), TODO -- these are null in Azure - verify on AWS
-          //        $"requestParams.user_name".alias("groups_user_name"),
-          //        $"requestParams.userID".alias("account_admin_userID"),
+          'login_user,
           $"userIdentity.email".alias("user_email"),
           'sourceIPAddress, 'userAgent, 'requestId, 'response
         )
@@ -521,6 +538,10 @@ trait SilverTransforms extends SparkSessionWrapper {
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .withColumn("aws_attributes", coalesce('aws_attributes, lit("""{"emptyKey": ""}""")))
       .withColumn("azure_attributes", coalesce('azure_attributes, lit("""{"emptyKey": ""}""")))
+
+    if (poolsRaw.isEmpty) throw new NoNewDataException("No updates to instance pools found in audit logs",
+      Level.WARN, allowModuleProgression = true
+    )
 
     val poolsRawWithStructs = poolsRaw
       .withColumn("aws_attributes", SchemaTools.structFromJson(spark, poolsRaw, "aws_attributes"))

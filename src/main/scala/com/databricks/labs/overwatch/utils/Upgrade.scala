@@ -307,6 +307,7 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * when instantiating the workspace for orgs outside the current workspace the workspace config must be built
    * using the pipeline_report's latest configs for the org
+   *
    * @param pipelineReportPath pass in database name
    * @return
    */
@@ -330,7 +331,7 @@ object Upgrade extends SparkSessionWrapper {
 
     val ehConfigExistingCols = ehConfigFields.map(f => col("inputConfig.auditLogConfig.azureAuditLogEventhubConfig." + f.name).alias(f.name))
 
-    val ehConfigCols = if(ehConfigFields.map(_.name).contains("minEventsPerTrigger")) {
+    val ehConfigCols = if (ehConfigFields.map(_.name).contains("minEventsPerTrigger")) {
       ehConfigExistingCols
     } else {
       ehConfigExistingCols :+ lit(10).alias("minEventsPerTrigger")
@@ -694,7 +695,7 @@ object Upgrade extends SparkSessionWrapper {
       val targetsToRebuild = if (rebuildSparkTables) { // rebuild all spark modules
         allSilverGoldTargets.par
       } else { // don't rebuild spark modules (except executors)
-         // executor tables had schema upgrade, they are small so just rebuild them
+        // executor tables had schema upgrade, they are small so just rebuild them
         allSilverGoldTargets.filter(
           t => !t.name.toLowerCase.contains("spark") ||
             sparkExecutorTargetsToRebuild.contains(t.name)).par
@@ -877,10 +878,10 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * Call this function after the entire upgrade has been confirmed to cleanup the backups and temporary files
    */
-    def finalize060Upgrade(
-                            overwatchETLDBName: String,
-                            snapDir: String = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
-                          ): Unit = {
+  def finalize060Upgrade(
+                          overwatchETLDBName: String,
+                          snapDir: String = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
+                        ): Unit = {
     val targetSchemaVersion = "0.600"
     val cleanupMsg = s"Cleaning up all upgrade backups and temporary reports from the upgraded to 060 located " +
       s"within path $snapDir"
@@ -898,7 +899,8 @@ object Upgrade extends SparkSessionWrapper {
 
   private def upgradeDeltaTables(qualifiedName: String): Unit = {
     try {
-      val tblPropertiesUpgradeStmt = s"""ALTER TABLE $qualifiedName SET TBLPROPERTIES (
+      val tblPropertiesUpgradeStmt =
+        s"""ALTER TABLE $qualifiedName SET TBLPROPERTIES (
       'delta.minReaderVersion' = '2',
       'delta.minWriterVersion' = '5',
       'delta.columnMapping.mode' = 'name'
@@ -917,7 +919,7 @@ object Upgrade extends SparkSessionWrapper {
     val blankConfig = new Config()
     val dbrVersion = spark.conf.get("spark.databricks.clusterUsageTags.effectiveSparkVersion")
     val packageVersion = blankConfig.getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
-    val schemaVersion = SchemaTools.getSchemaVersion("overwatch_global_etl").split("\\.").takeRight(1).head.toInt
+    val schemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName).split("\\.").takeRight(1).head.toInt
     assert(schemaVersion >= 600 && packageVersion >= 605, s"This schema upgrade is only necessary when upgrading from " +
       s"Overwatch versions < 0605 but > 05x. If upgrading from 05x directly to 0605+ simply run the 'upgradeTo060' function.")
     assert(spark.catalog.tableExists(etlDatabaseName, "job_status_silver"), s"job_status_silver cannot be " +
@@ -945,24 +947,26 @@ object Upgrade extends SparkSessionWrapper {
       .option("overwriteSchema", "true")
       .saveAsTable(s"${etlDatabaseName}.job_gold")
 
-    if (dbrVersion != "10.4.x-scala2.12") {
-      assert(enableUpgradeBelowDBR104, "EXPLICIT force of parameter 'enableUpgradeBelowDBR104' is required " +
-        "as upgrading without DBR 10.4LTS+ requires a full rebuild of spark_events_bronze table which can be " +
-        "compute intensive for customers with large tables. Recommend upgrade to DBR 10.4LTS before " +
-        "continuing.")
-      if (spark.catalog.tableExists(s"${etlDatabaseName}.spark_events_bronze")) {
-        spark.conf.set("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "500000")
-        spark.conf.set("spark.databricks.delta.optimizeWrite.binSize", "2048")
-        spark.conf.set("spark.sql.files.maxPartitionBytes", (1024 * 1024 * 64).toString)
-        spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+    if (spark.catalog.tableExists(s"${etlDatabaseName}.spark_events_bronze")) {
+      spark.conf.set("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "500000")
+      spark.conf.set("spark.databricks.delta.optimizeWrite.binSize", "2048")
+      spark.conf.set("spark.sql.files.maxPartitionBytes", (1024 * 1024 * 64).toString)
+      spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
 
-        val sparkEventsBronzeDF = spark.table(s"${etlDatabaseName}.spark_events_bronze")
-        val sparkEventsSchema = sparkEventsBronzeDF.schema
+      val sparkEventsBronzeDF = spark.table(s"${etlDatabaseName}.spark_events_bronze")
+      val sparkEventsSchema = sparkEventsBronzeDF.schema
+      val fieldsRequiringRebuild = Array("modifiedConfigs", "extraTags")
+
+      if (dbrVersion != "10.4.x-scala2.12") {
+        assert(enableUpgradeBelowDBR104, "EXPLICIT force of parameter 'enableUpgradeBelowDBR104' is required " +
+          "as upgrading without DBR 10.4LTS+ requires a full rebuild of spark_events_bronze table which can be " +
+          "compute intensive for customers with large tables. Recommend upgrade to DBR 10.4LTS before " +
+          "continuing.")
+
         val partitionByCols = Seq("organization_id", "Event", "fileCreateDate")
         val statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID, " +
           "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename, " +
           "Pipeline_SnapTS, Overwatch_RunID").split(", ")
-        val fieldsRequiringRebuild = Array("modifiedConfigs", "extraTags")
         if (sparkEventsSchema.fields.exists(f => fieldsRequiringRebuild.contains(f.name))) {
           logger.info(s"Beginning full rebuild of spark_events_bronze table. This could take some time. Recommend " +
             s"monitoring of cluster size and ensure autoscaling enabled.")
@@ -975,25 +979,25 @@ object Upgrade extends SparkSessionWrapper {
             .mode("overwrite").option("overwriteSchema", "true")
             .saveAsTable(s"${etlDatabaseName}.spark_events_bronze")
         }
+      } else {
+        val parallelism = 12
+        val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+        val sourceTableIds = spark.sessionState.catalog.listTables(etlDatabaseName)
+        val fullTableNames = sourceTableIds.map(tbli => spark.sessionState.catalog.getTableMetadata(tbli))
+          .filterNot(_.tableType.name == "VIEW")
+          .map(t => t.qualifiedName)
+          .toArray.par
+        fullTableNames.tasksupport = taskSupport
+        fullTableNames.foreach(upgradeDeltaTables)
+
+        val fieldsToRename = sparkEventsSchema.fieldNames.filter(f => fieldsRequiringRebuild.contains(f))
+        fieldsToRename.foreach(f => {
+          val modifyColStmt = s"alter table ${etlDatabaseName}.spark_events_bronze rename " +
+            s"column $f to ${f}_tobedeleted"
+          logger.info(s"Beginning spark_events_bronze upgrade\nSTMT1: $modifyColStmt")
+          spark.sql(modifyColStmt)
+        })
       }
-    } else {
-      val parallelism = 12
-      val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-      val sourceTableIds = spark.sessionState.catalog.listTables(etlDatabaseName)
-      val fullTableNames = sourceTableIds.map(tbli => spark.sessionState.catalog.getTableMetadata(tbli))
-        .filterNot(_.tableType.name == "VIEW")
-        .map(t => t.qualifiedName)
-        .toArray.par
-      fullTableNames.tasksupport = taskSupport
-      fullTableNames.foreach(upgradeDeltaTables)
-      val modifyCol1Stmt = s"alter table ${etlDatabaseName}.spark_events_bronze rename " +
-        s"column modifiedConfigs to modifiedConfigs_tobedeleted"
-      val modifyCol2Stmt = s"alter table ${etlDatabaseName}.spark_events_bronze rename " +
-        s"column extraTags to extraTags_tobedeleted"
-      logger.info(s"Beginning spark_events_bronze upgrade\nSTMT1: $modifyCol1Stmt")
-      spark.sql(modifyCol1Stmt)
-      logger.info(s"STMT2: $modifyCol2Stmt")
-      spark.sql(modifyCol2Stmt)
     }
   }
 
