@@ -309,7 +309,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'dbu_rate,
       'state_dates,
       'days_in_state,
-      workerPotentialCoreS / lit(3600).alias("worker_potential_core_H"),
+      (workerPotentialCoreS / lit(3600)).alias("worker_potential_core_H"),
       driverDBUs,
       workerDBUs,
       (driverDBUs + workerDBUs).alias("total_dbus"),
