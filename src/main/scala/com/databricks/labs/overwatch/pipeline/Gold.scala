@@ -291,6 +291,41 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
+  private[overwatch] def refreshViews(): Unit = {
+    config.overwatchScope.foreach {
+      case OverwatchScope.accounts => {
+        GoldTargets.accountLoginViewTarget.publish(accountLoginViewColumnMappings)
+        GoldTargets.accountModsViewTarget.publish(accountModViewColumnMappings)
+      }
+      case OverwatchScope.notebooks => {
+        GoldTargets.notebookViewTarget.publish(notebookViewColumnMappings)
+      }
+      case OverwatchScope.pools => {
+        GoldTargets.poolsViewTarget.publish(poolsViewColumnMapping)
+      }
+      case OverwatchScope.clusters => {
+        GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping)
+      }
+      case OverwatchScope.clusterEvents => {
+        GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings)
+      }
+      case OverwatchScope.jobs => {
+        GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
+        GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
+        GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
+      }
+      case OverwatchScope.sparkEvents => {
+        GoldTargets.sparkJobViewTarget.publish(sparkJobViewColumnMapping)
+        GoldTargets.sparkStageViewTarget.publish(sparkStageViewColumnMapping)
+        GoldTargets.sparkTaskViewTarget.publish(sparkTaskViewColumnMapping)
+        GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
+        GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
+        GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+      }
+      case _ =>
+    }
+  }
+
 
   def run(): Pipeline = {
 
@@ -306,9 +341,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
 object Gold {
   def apply(workspace: Workspace): Gold = {
-    new Gold(workspace, workspace.database, workspace.getConfig)
-      .initPipelineRun()
-      .loadStaticDatasets()
+    apply(
+      workspace,
+      readOnly = false,
+      suppressReport = false,
+      suppressStaticDatasets = false
+    )
   }
 
   private[overwatch] def apply(
@@ -318,7 +356,7 @@ object Gold {
                                 suppressStaticDatasets: Boolean = false
                               ): Gold = {
     val goldPipeline = new Gold(workspace, workspace.database, workspace.getConfig)
-      .setReadOnly(readOnly)
+      .setReadOnly(if (workspace.isValidated) readOnly else true) // if workspace is not validated set it read only
       .suppressRangeReport(suppressReport)
       .initPipelineRun()
 

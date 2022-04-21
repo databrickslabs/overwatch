@@ -338,9 +338,12 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
 object Silver {
   def apply(workspace: Workspace): Silver = {
-    new Silver(workspace, workspace.database, workspace.getConfig)
-      .initPipelineRun()
-      .loadStaticDatasets()
+    apply(
+      workspace,
+      readOnly = false,
+      suppressReport = false,
+      suppressStaticDatasets = false
+    )
   }
 
   private[overwatch] def apply(
@@ -350,7 +353,7 @@ object Silver {
                                 suppressStaticDatasets: Boolean = false
                               ): Silver = {
     val silverPipeline = new Silver(workspace, workspace.database, workspace.getConfig)
-      .setReadOnly(readOnly)
+      .setReadOnly(if (workspace.isValidated) readOnly else true) // if workspace is not validated set it read only
       .suppressRangeReport(suppressReport)
       .initPipelineRun()
 

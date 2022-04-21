@@ -168,6 +168,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
+  private[overwatch] def refreshViews(): Unit = {
+    postProcessor.refreshPipReportView(pipelineStateViewTarget)
+    BronzeTargets.dbuCostDetailViewTarget.publish("*")
+    BronzeTargets.cloudMachineDetailViewTarget.publish("*")
+  }
+
   def run(): Pipeline = {
 
     restoreSparkConf()
@@ -188,9 +194,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
 object Bronze {
   def apply(workspace: Workspace): Bronze = {
-    new Bronze(workspace, workspace.database, workspace.getConfig)
-      .initPipelineRun()
-      .loadStaticDatasets()
+    apply(
+      workspace,
+      readOnly = false,
+      suppressReport = false,
+      suppressStaticDatasets = false
+    )
   }
 
   private[overwatch] def apply(
@@ -199,8 +208,9 @@ object Bronze {
                                 suppressReport: Boolean = false,
                                 suppressStaticDatasets: Boolean = false
                               ): Bronze = {
+
     val bronzePipeline = new Bronze(workspace, workspace.database, workspace.getConfig)
-      .setReadOnly(readOnly)
+      .setReadOnly(if (workspace.isValidated) readOnly else true) // if workspace is not validated set it read only
       .suppressRangeReport(suppressReport)
       .initPipelineRun()
 

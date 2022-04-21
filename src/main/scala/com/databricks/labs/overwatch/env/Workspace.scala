@@ -21,6 +21,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _database: Database = _
+  private var _validated: Boolean = false
   private[overwatch] val overwatchRunClusterId = spark.conf.get("spark.databricks.clusterUsageTags.clusterId")
 
   private[overwatch] def database: Database = _database
@@ -30,10 +31,17 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     this
   }
 
+  private def setValidated(value: Boolean): this.type = {
+    _validated = value
+    this
+  }
+
   def copy(_config: Config = config): Workspace = {
     val db = this.database
     Workspace(db, _config)
   }
+
+  def isValidated: Boolean = _validated
 
   /**
    * Most of the jobs data comes from the audit logs but there are several edge cases that result in incomplete
