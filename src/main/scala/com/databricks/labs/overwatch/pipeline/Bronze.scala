@@ -168,7 +168,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
-  private[overwatch] def refreshViews(): Unit = {
+  def refreshViews(): Unit = {
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
     BronzeTargets.dbuCostDetailViewTarget.publish("*")
     BronzeTargets.cloudMachineDetailViewTarget.publish("*")

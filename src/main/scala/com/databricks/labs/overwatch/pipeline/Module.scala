@@ -321,9 +321,15 @@ class Module(
         failWithRollback(e.target, PipelineFunctions.appendStackStrace(e, errMessage))
       case e: NoNewDataException =>
         // EMPTY prefix gets prepended in the errorHandler
-        val customMsg = s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
-          s"module will not progress until new data is received by this module.\n " +
-          s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        val customMsg = if (!e.allowModuleProgression) {
+          s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
+            s"module will not progress until new data is received by this module.\n " +
+            s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        } else {
+          s"$moduleId-$moduleName Module: No new data found. This does not appear to be an error but simply a " +
+            s"lack of data present for the module. Progressing module state.\n " +
+            s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        }
         val errMessage = PipelineFunctions.appendStackStrace(e, customMsg)
         logger.log(Level.ERROR, errMessage, e)
         noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
