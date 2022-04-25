@@ -315,6 +315,12 @@ private[overwatch] class UpgradeException(s: String, target: PipelineTable, step
   }
 }
 
+private[overwatch] class SimplifiedUpgradeException(s: String, db: String, table: String, step: Option[String] = None, failUpgrade: Boolean = false) extends Exception(s) {
+  def getUpgradeReport: UpgradeReport = {
+    UpgradeReport(db, table, Some(PipelineFunctions.appendStackStrace(this, s)), step, failUpgrade)
+  }
+}
+
 private[overwatch] class BronzeSnapException(
                                               s: String,
                                               target: PipelineTable,

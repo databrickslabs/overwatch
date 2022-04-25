@@ -422,8 +422,12 @@ object Helpers extends SparkSessionWrapper {
     }).toArray.toSeq
   }
 
-  def getLatestVersion(tablePath: String): Long = {
+  def getLatestTableVersionByPath(tablePath: String): Long = {
     DeltaTable.forPath(tablePath).history(1).select('version).as[Long].head
+  }
+
+  def getLatestTableVersionByName(tableName: String): Long = {
+    DeltaTable.forName(tableName).history(1).select('version).as[Long].head
   }
 
   def getURI(pathString: String): URI = {
