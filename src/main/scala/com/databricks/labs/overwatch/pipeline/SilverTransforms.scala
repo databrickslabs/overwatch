@@ -534,10 +534,31 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     val poolsRaw = auditIncrementalDF
+      .select(
+        'organization_id,
+        'serviceName,
+        'actionName,
+        'date,
+        'timestamp,
+//        lit(null).cast(MapType(StringType, StringType, true)).alias("aws_attributes"),
+//        lit(null).cast(MapType(StringType, StringType, true)).alias("azure_attributes"),
+        coalesce($"requestParams.aws_attributes", lit("""{"emptyKey": ""}""")).alias("aws_attributes"),
+        coalesce($"requestParams.azure_attributes", lit("""{"emptyKey": ""}""")).alias("azure_attributes"),
+        $"requestParams.instance_pool_id",
+        $"requestParams.preloaded_spark_versions",
+        $"requestParams.instance_pool_name",
+        $"requestParams.node_type_id",
+        $"requestParams.idle_instance_autotermination_minutes",
+        $"requestParams.min_idle_instances",
+        $"requestParams.max_capacity",
+        'requestId,
+        'response,
+        'sessionId,
+        'sourceIPAddress,
+        'userAgent,
+        'userIdentity
+      )
       .filter('serviceName === "instancePools")
-      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
-      .withColumn("aws_attributes", coalesce('aws_attributes, lit("""{"emptyKey": ""}""")))
-      .withColumn("azure_attributes", coalesce('azure_attributes, lit("""{"emptyKey": ""}""")))
 
     if (poolsRaw.isEmpty) throw new NoNewDataException("No updates to instance pools found in audit logs",
       Level.WARN, allowModuleProgression = true
@@ -912,7 +933,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       // given no anomaly, set on/off state to current state
       // if no current state use previous state
       // if no previous state found, assume opposite of next state switch
-      .withColumn("isRunning",coalesce(
+      .withColumn("isRunning", coalesce(
         when('imputedTerminationEvent, lit(false)).otherwise(lit(null).cast("boolean")),
         'runningSwitch,
         'lastRunningSwitch,
@@ -930,29 +951,29 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn(
         "current_num_workers",
         coalesce(
-        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .otherwise(
-            coalesce( // get current_num_workers no matter where the value is stored based on business rules
-              'current_num_workers,
-              $"cluster_size.num_workers",
-              $"cluster_size.autoscale.min_workers",
-              last(coalesce( // look for the last non-null value when current value isn't present
+          when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+            .otherwise(
+              coalesce( // get current_num_workers no matter where the value is stored based on business rules
                 'current_num_workers,
                 $"cluster_size.num_workers",
-                $"cluster_size.autoscale.min_workers"
-              ), true).over(stateUntilCurrentW)
-            )
-          ),
+                $"cluster_size.autoscale.min_workers",
+                last(coalesce( // look for the last non-null value when current value isn't present
+                  'current_num_workers,
+                  $"cluster_size.num_workers",
+                  $"cluster_size.autoscale.min_workers"
+                ), true).over(stateUntilCurrentW)
+              )
+            ),
           lit(0) // don't allow null returns
         )
       )
       .withColumn(
         "target_num_workers",
         coalesce(
-        when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
-          .when('state === "CREATING",
-            coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
-          .otherwise(coalesce('target_num_workers, 'current_num_workers)),
+          when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+            .when('state === "CREATING",
+              coalesce($"cluster_size.num_workers", $"cluster_size.autoscale.min_workers"))
+            .otherwise(coalesce('target_num_workers, 'current_num_workers)),
           lit(0) // don't allow null returns
         )
       )
@@ -1199,16 +1220,18 @@ trait SilverTransforms extends SparkSessionWrapper {
         "cluster_spec.new_cluster" -> structFromJson(spark, jobStatusBaseFilled, "cluster_spec.new_cluster"),
         "new_settings" -> structFromJson(spark, jobStatusBaseFilled, "new_settings"),
         "schedule" -> structFromJson(spark, jobStatusBaseFilled, "schedule")
-      )} else { // new_settings is not present from snapshot and is a struct thus it cannot be added with dynamic schema
+      )
+    } else { // new_settings is not present from snapshot and is a struct thus it cannot be added with dynamic schema
       Map(
         "cluster_spec.new_cluster" -> structFromJson(spark, jobStatusBaseFilled, "cluster_spec.new_cluster"),
         "schedule" -> structFromJson(spark, jobStatusBaseFilled, "schedule")
-      )}
+      )
+    }
 
     // create structs from json strings and cleanse schema
     val jobStatusEnhanced = jobStatusBaseFilled
-        .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
-        .scrubSchema
+      .select(SchemaTools.modifyStruct(jobStatusBaseFilled.schema, changeInventory): _*)
+      .scrubSchema
 
     // convert structs to maps where the structs' keys are allowed to be typed by the user to avoid
     // bad duplicate keys
