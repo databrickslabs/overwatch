@@ -945,8 +945,11 @@ object Upgrade extends SparkSessionWrapper {
     val initialSourceVersions: concurrent.Map[String, Long] = new ConcurrentHashMap[String, Long]().asScala
     val packageVersion = blankConfig.getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
     val startingSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName).split("\\.").takeRight(1).head.toInt
-    assert(startingSchemaVersion >= 600 && packageVersion >= 605, s"This schema upgrade is only necessary when upgrading from " +
-      s"Overwatch versions < 0605 but > 05x. If upgrading from 05x directly to 0605+ simply run the 'upgradeTo060' function.")
+    assert(startingSchemaVersion >= 600 && packageVersion >= 605,
+      s"""
+         |This schema upgrade is only necessary when upgrading from < 0605 but > 05x.
+         |If upgrading from 05x directly to 0605+ simply run the 'upgradeTo060' function.
+         |""".stripMargin)
     if (startStep <= 1) {
       val stepMsg = Some("Step 1: Upgrade Schema - Job Status Silver")
       println(stepMsg.get)
@@ -955,8 +958,10 @@ object Upgrade extends SparkSessionWrapper {
       try {
         if (!spark.catalog.tableExists(etlDatabaseName, targetName)) {
           throw new SimplifiedUpgradeException(
-            s"job_status_silver cannot be found in db $etlDatabaseName, proceeding with upgrade assuming no jobs " +
-              s"have been recorded.",
+            s"""
+               |job_status_silver cannot be found in db $etlDatabaseName, proceeding with upgrade assuming no jobs
+               |have been recorded.
+               |""".stripMargin,
             etlDatabaseName, "job_status_silver", Some("1"), failUpgrade = false
           )
         }
@@ -1027,8 +1032,10 @@ object Upgrade extends SparkSessionWrapper {
       try {
         if (!spark.catalog.tableExists(etlDatabaseName, targetName)) {
           throw new SimplifiedUpgradeException(
-            s"${targetName} cannot be found in db $etlDatabaseName, proceeding with upgrade assuming " +
-              s"sparkEvents module is disabled.",
+            s"""
+               |${targetName} cannot be found in db $etlDatabaseName, proceeding with upgrade assuming
+               |sparkEvents module is disabled.
+               |""".stripMargin,
             etlDatabaseName, "job_gold", Some("1"), failUpgrade = false
           )
         }
