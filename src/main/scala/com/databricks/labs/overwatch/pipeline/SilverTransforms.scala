@@ -445,6 +445,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'custom_tags,
       'ssh_public_keys,
       'cluster_source,
+      coalesce('aws_attributes, lit("""{"emptyKey": ""}""")).alias("aws_attributes"),
+      coalesce('azure_attributes, lit("""{"emptyKey": ""}""")).alias("azure_attributes"),
       'spark_env_vars,
       'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
@@ -460,12 +462,21 @@ trait SilverTransforms extends SparkSessionWrapper {
       'single_user_name
     )
 
-    auditRawDF
+    val clusterRaw = auditRawDF
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .select(clusterSummaryCols: _*)
       .withColumn("cluster_id", cluster_id_gen)
       .withColumn("cluster_name", cluster_name_gen)
+
+    val clusterWithStructs = clusterRaw
+      .withColumn("aws_attributes", SchemaTools.structFromJson(spark, clusterRaw, "aws_attributes"))
+      .withColumn("azure_attributes", SchemaTools.structFromJson(spark, clusterRaw, "azure_attributes"))
+      .scrubSchema
+
+    clusterWithStructs
+      .withColumn("aws_attributes", SchemaTools.structToMap(clusterWithStructs, "aws_attributes"))
+      .withColumn("azure_attributes", SchemaTools.structToMap(clusterWithStructs, "azure_attributes"))
   }
 
   protected def buildPoolsSpec(
@@ -677,17 +688,33 @@ trait SilverTransforms extends SparkSessionWrapper {
         .withColumn("spark_conf", to_json('spark_conf))
         .withColumn("custom_tags", to_json('custom_tags))
         .select(
-          'organization_id, 'cluster_id, lit("clusters").alias("serviceName"), lit("snapImpute").alias("actionName"), 'cluster_name, 'driver_node_type_id, 'node_type_id,
-          'num_workers, to_json('autoscale).alias("autoscale"), 'autotermination_minutes.cast("int").alias("autotermination_minutes"), 'enable_elastic_disk, 'state.alias("cluster_state"),
+          'organization_id,
+          'cluster_id,
+          lit("clusters").alias("serviceName"),
+          lit("snapImpute").alias("actionName"),
+          'cluster_name,
+          'driver_node_type_id,
+          'node_type_id,
+          'num_workers,
+          to_json('autoscale).alias("autoscale"),
+          'autotermination_minutes.cast("int").alias("autotermination_minutes"),
+          'enable_elastic_disk,
+          'state.alias("cluster_state"),
           isAutomated('cluster_name).alias("is_automated"),
           deriveClusterType,
           to_json('cluster_log_conf).alias("cluster_log_conf"),
           to_json('init_scripts).alias("init_scripts"),
-          'custom_tags, 'cluster_source,
+          'custom_tags,
+          'cluster_source,
+          'aws_attributes,
+          'azure_attributes,
           to_json('spark_env_vars).alias("spark_env_vars"),
-          'spark_conf, 'driver_instance_pool_id, 'instance_pool_id,
+          'spark_conf,
+          'driver_instance_pool_id,
+          'instance_pool_id,
           'spark_version,
-          (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"), 'Pipeline_SnapTS.cast("date").alias("date"),
+          (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
+          'Pipeline_SnapTS.cast("date").alias("date"),
           'creator_user_name.alias("createdBy")
         )
 
@@ -768,6 +795,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'init_scripts,
       'custom_tags,
       'cluster_source,
+      'aws_attributes,
+      'azure_attributes,
       'spark_env_vars,
       'spark_conf,
       'acl_path_prefix,
@@ -851,7 +880,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           struct(
             isSingleUser.alias("is_single_user"),
             'single_user_name
-          ).alias("single_user_profile")
+          ).alias("single_user_profile"),
+          'aws_attributes("instance_profile_arn").alias("instance_profile_arn")
         )
       )
       .withColumn("createdBy",
