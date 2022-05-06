@@ -524,7 +524,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     })
 
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
-    if (Helpers.pathExists(tmpClusterEventsPath)) {
+    if (Helpers.pathExists(s"${tmpClusterEventsPath}/_delta_log")) {
       val clusterEventsDF = spark.read.format("delta").load(tmpClusterEventsPath)
       val clusterEventsCaptured = clusterEventsDF.count
       val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
