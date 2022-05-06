@@ -937,6 +937,16 @@ object Upgrade extends SparkSessionWrapper {
                      tempDir: String = s"/tmp/overwatch/upgrade0605_status__ctrl_0x111/${System.currentTimeMillis()}"
                    ): DataFrame = {
     val blankConfig = new Config()
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName)
+    val numericalSchemaVersion = getNumericalSchemaVersion(currentSchemaVersion)
+    val targetSchemaVersion = "0.605"
+    validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
+    require(
+      numericalSchemaVersion >= 600 && numericalSchemaVersion < 605,
+      "This upgrade function is only for upgrading schema version 0600+ to new version 0605 " +
+        "Please first upgrade to at least schema version 0600 before proceeding. " +
+        "Upgrade documentation can be found in the change log."
+    )
     val upgradeStatus: ArrayBuffer[UpgradeReport] = ArrayBuffer()
     val dbrVersion = spark.conf.get("spark.databricks.clusterUsageTags.effectiveSparkVersion")
     val dbrMajorV = dbrVersion.split("\\.").head
@@ -959,13 +969,13 @@ object Upgrade extends SparkSessionWrapper {
         if (!spark.catalog.tableExists(etlDatabaseName, targetName)) {
           throw new SimplifiedUpgradeException(
             s"""
-               |job_status_silver cannot be found in db $etlDatabaseName, proceeding with upgrade assuming no jobs
+               |$targetName cannot be found in db $etlDatabaseName, proceeding with upgrade assuming no jobs
                |have been recorded.
                |""".stripMargin,
-            etlDatabaseName, "job_status_silver", Some("1"), failUpgrade = false
+            etlDatabaseName, targetName, Some("1"), failUpgrade = false
           )
         }
-        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(targetName))
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
         val jobSilverDF = spark.table(s"${etlDatabaseName}.${targetName}")
         SchemaTools.cullNestedColumns(jobSilverDF, "new_settings", Array("tasks", "job_clusters"))
           .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
@@ -992,16 +1002,16 @@ object Upgrade extends SparkSessionWrapper {
       val stepMsg = Some("Step 2: Upgrade Schema - Job Gold")
       println(stepMsg.get)
       logger.log(Level.INFO, stepMsg.get)
-      val targetName = "job_status_silver"
+      val targetName = "job_gold"
       try {
         if (!spark.catalog.tableExists(etlDatabaseName, targetName)) {
           throw new SimplifiedUpgradeException(
-            s"job_gold cannot be found in db $etlDatabaseName, proceeding with upgrade assuming no jobs " +
+            s"$targetName cannot be found in db $etlDatabaseName, proceeding with upgrade assuming no jobs " +
               s"have been recorded.",
-            etlDatabaseName, "job_gold", Some("1"), failUpgrade = false
+            etlDatabaseName, targetName, Some("1"), failUpgrade = false
           )
         }
-        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(targetName))
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
         val jobGoldDF = spark.table(s"${etlDatabaseName}.${targetName}")
         SchemaTools.cullNestedColumns(jobGoldDF, "new_settings", Array("tasks", "job_clusters"))
           .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
@@ -1036,10 +1046,10 @@ object Upgrade extends SparkSessionWrapper {
                |${targetName} cannot be found in db $etlDatabaseName, proceeding with upgrade assuming
                |sparkEvents module is disabled.
                |""".stripMargin,
-            etlDatabaseName, "job_gold", Some("1"), failUpgrade = false
+            etlDatabaseName, targetName, Some("1"), failUpgrade = false
           )
         }
-        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(targetName))
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
         spark.conf.set("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "500000")
         spark.conf.set("spark.databricks.delta.optimizeWrite.binSize", "2048")
         spark.conf.set("spark.sql.files.maxPartitionBytes", (1024 * 1024 * 64).toString)
