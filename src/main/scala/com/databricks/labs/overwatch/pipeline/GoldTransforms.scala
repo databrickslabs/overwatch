@@ -32,6 +32,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       'init_scripts,
       'custom_tags,
       'cluster_source,
+      'aws_attributes,
+      'azure_attributes,
       'spark_env_vars,
       'spark_conf,
       'acl_path_prefix,
