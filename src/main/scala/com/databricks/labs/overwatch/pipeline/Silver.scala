@@ -223,7 +223,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       dbJobsStatusSummary(
         BronzeTargets.jobsSnapshotTarget,
         jobStatusModule.isFirstRun,
-        SilverTargets.dbJobsStatusTarget.keys
+        SilverTargets.dbJobsStatusTarget.keys,
+        jobStatusModule.fromTime
       )),
     append(SilverTargets.dbJobsStatusTarget)
   )
@@ -248,7 +249,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     BronzeTargets.auditLogsTarget.asIncrementalDF(poolsSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(buildPoolsSpec(
       BronzeTargets.poolsSnapshotTarget.asDF,
-      SilverTargets.poolsSpecTarget.exists(dataValidation = true)
+      poolsSpecModule.isFirstRun,
+      poolsSpecModule.fromTime
     )),
     append(SilverTargets.poolsSpecTarget)
   )

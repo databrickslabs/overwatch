@@ -470,8 +470,17 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   protected def buildPoolsSpec(
                                 poolSnapDF: DataFrame,
-                                poolsSilverTargetHasData: Boolean
+                                isFirstRun: Boolean,
+                                fromTime: TimeTypes
                               )(auditIncrementalDF: DataFrame): DataFrame = {
+
+    // If no pools snap table present, fast fail
+    if (poolSnapDF.isEmpty) throw new NoNewDataException(
+      s"""
+         |No pools currently exist in this workspace. As such this module is being skipped and the pools module
+         |state will be moved forward. If this workspace is not using pools, it's recommended that the pools scope
+         |be disabled for performance improvements.
+         |""".stripMargin, Level.WARN, allowModuleProgression = true)
 
     val lastPoolValue = Window.partitionBy('organization_id, 'instance_pool_id)
       .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
@@ -558,42 +567,56 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
       .filter('serviceName === "instancePools")
 
-    if (poolsRawPruned.isEmpty) throw new NoNewDataException("No updates to instance pools found in audit logs",
+    val poolsRawPrunedIsEmpty = poolsRawPruned.isEmpty // bool - true == no pools data from
+
+    // not first run but no new pools records from audit -- fast fail OR
+    // is first run and no pools records or snapshot records -- fast fail
+    if (
+      (!isFirstRun && poolsRawPrunedIsEmpty) ||
+        (isFirstRun && poolSnapDF.isEmpty)
+    ) throw new NoNewDataException("No new instance pools data found. Progressing module state",
       Level.WARN, allowModuleProgression = true
     )
 
-    val poolsRawWithStructs = poolsRawPruned
-      .withColumn("aws_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "aws_attributes"))
-      .withColumn("azure_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "azure_attributes"))
+    val newPoolsRecords = if (!poolsRawPrunedIsEmpty) {
+      val poolsRawWithStructs = poolsRawPruned
+        .withColumn("aws_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "aws_attributes"))
+        .withColumn("azure_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "azure_attributes"))
 
-    val changeInventory = Map[String, Column](
-      "aws_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "aws_attributes"),
-      "azure_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "azure_attributes")
-    )
+      val changeInventory = Map[String, Column](
+        "aws_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "aws_attributes"),
+        "azure_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "azure_attributes")
+      )
 
-    val poolsBase = poolsRawWithStructs
-      .select(SchemaTools.modifyStruct(poolsRawWithStructs.schema, changeInventory): _*)
+      val poolsBase = poolsRawWithStructs
+        .select(SchemaTools.modifyStruct(poolsRawWithStructs.schema, changeInventory): _*)
 
-    val newPoolsRecords = poolsBase
-      .filter('actionName.isin("create", "edit", "delete"))
-      .withColumn("instance_pool_id", when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id")).otherwise('instance_pool_id))
-      .withColumn("preloaded_spark_versions", get_json_object('preloaded_spark_versions, "$."))
-      .withColumn("rnk", rank().over(exactlyOnceFilterW))
-      .withColumn("rn", row_number().over(exactlyOnceFilterW))
-      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-      .toTSDF("timestamp", "organization_id", "instance_pool_id")
-      .lookupWhen(
-        poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
-        maxLookAhead = Long.MaxValue
-      ).df
+      poolsBase
+        .filter('actionName.isin("create", "edit", "delete"))
+        .withColumn("instance_pool_id", when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id")).otherwise('instance_pool_id))
+        .withColumn("preloaded_spark_versions", get_json_object('preloaded_spark_versions, "$."))
+        .withColumn("rnk", rank().over(exactlyOnceFilterW))
+        .withColumn("rn", row_number().over(exactlyOnceFilterW))
+        .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+        .toTSDF("timestamp", "organization_id", "instance_pool_id")
+        .lookupWhen(
+          poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
+          maxLookAhead = Long.MaxValue
+        ).df
+    } else spark.emptyDataFrame
 
-    val newPoolsHasRecords = !newPoolsRecords.isEmpty
-    val poolsStatusFilled = if (!poolsSilverTargetHasData) { // initialize pool states for all existing pools
-      val missingPoolIds = if (newPoolsHasRecords) { // don't initialize from snapshot where audit records are present
+//    val newPoolsHasRecords = !newPoolsRecords.isEmpty
+    val poolsStatusFilled = if (isFirstRun) { // on first run initialize pools_silver from pools_snapshot data
+
+      // get missing pool ids
+      val missingPoolIds = if (!poolsRawPrunedIsEmpty) { // when pools audit has records, find missing pool_ids for snapImpute
         poolsSnapDFUntilCurrent.select('organization_id, 'instance_pool_id).distinct
-          .join(newPoolsRecords.select('organization_id, 'instance_pool_id).distinct, Seq("organization_id", "instance_pool_id"), "anti")
-      } else poolsSnapDFUntilCurrent.select('organization_id, 'instance_pool_id).distinct
+          .join(poolsRawPruned.select('organization_id, 'instance_pool_id).distinct, Seq("organization_id", "instance_pool_id"), "anti")
+      } else {
+        poolsSnapDFUntilCurrent.select('organization_id, 'instance_pool_id).distinct // no audit records, get all pools_snap IDs for impute
+      }
 
+      // impute records for pools in snapshot not in audit (i.e. pre-existing pools prior to audit logs capture)
       val lastPoolSnapW = Window.partitionBy('organization_id, 'instance_pool_id).orderBy('Pipeline_SnapTS.desc)
       val poolSnapMissingPools = poolsSnapDFUntilCurrent
         .join(missingPoolIds, Seq("organization_id", "instance_pool_id"))
@@ -603,7 +626,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           lit("instancePools").alias("serviceName"),
           lit("snapImpute").alias("actionName"),
           'organization_id,
-          (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
+          lit(fromTime.asUnixTimeMilli).alias("timestamp"), // set timestamp as fromtime so it will be included in downstream incrementals
           'Pipeline_SnapTS.cast("date").alias("date"),
           'instance_pool_id,
           'instance_pool_name,
@@ -618,10 +641,13 @@ trait SilverTransforms extends SparkSessionWrapper {
           lit(null).cast(Schema.poolsDeleteSchema).alias("delete_details"),
           lit(null).cast(Schema.poolsRequestDetails).alias("request_details")
         )
-      if (newPoolsHasRecords) { // first run and new audit records present -- union the two together
+
+      // union existing and missing (imputed) pool ids (when exists)
+      if (!poolsRawPrunedIsEmpty) { // first run and new audit records present -- union the two together
         unionWithMissingAsNull(newPoolsRecords, poolSnapMissingPools).select(poolsSelects: _*)
       } else poolSnapMissingPools // first run but no new audit records -- return only init
-    } else if (newPoolsHasRecords) { // not first run but new audit records exist, continue
+
+    } else if (!poolsRawPrunedIsEmpty) { // not first run but new audit records exist, continue
       newPoolsRecords.select(poolsSelects: _*)
     } else { // not first run and no new audit records -- break out -- nothing to update
       val msg = s"No new pools audit records found, progressing timeline and appending no new records"
@@ -1065,15 +1091,36 @@ trait SilverTransforms extends SparkSessionWrapper {
   protected def dbJobsStatusSummary(
                                      jobsSnapshotTargetComplete: PipelineTable,
                                      isFirstRun: Boolean,
-                                     targetKeys: Array[String]
+                                     targetKeys: Array[String],
+                                     fromTime: TimeTypes
                                    )(df: DataFrame): DataFrame = {
 
     if (!jobsSnapshotTargetComplete.exists(dataValidation = true)) {
       throw new NoNewDataException(s"${jobsSnapshotTargetComplete.tableFullName} has no data for this workspace. " +
         s"To continue please ensure that Overwatch has access to see the jobs and that there are jobs present in " +
-        s"this workspace. Otherwise, disable the jobs module completely.", Level.ERROR)
+        s"this workspace. Otherwise, disable the jobs module completely.", Level.WARN, allowModuleProgression = true)
     }
     val jobsBase = getJobsBase(df)
+      .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
+
+    val jobsBaseHasRecords = !jobsBase.isEmpty
+    // not first run but no new pools records from audit -- fast fail OR
+    // is first run and no pools records or snapshot records -- fast fail
+    if (
+      (!isFirstRun && !jobsBaseHasRecords) ||
+        (isFirstRun && !jobsSnapshotTargetComplete.exists(dataValidation = true))
+    ) {
+      throw new NoNewDataException(
+        s"""
+           |No new jobs data found for this workspace.
+           |If this is incorrect, please ensure that Overwatch has access to see the jobs and that there are
+           |jobs present in this workspace.
+           |Progressing module state
+           |""".stripMargin,
+        Level.WARN, allowModuleProgression = true
+      )
+    }
+
     val jobsSnapshotDFComplete = jobsSnapshotTargetComplete.asDF
 
     // Simplified DF for snapshot lookupWhen
@@ -1104,7 +1151,6 @@ trait SilverTransforms extends SparkSessionWrapper {
     val lastJobStatus = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     val jobStatusBase = jobsBase
-      .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
       .select(jobs_statusCols: _*)
       .toTSDF("timestamp", "organization_id", "jobId")
       .lookupWhen(
@@ -1165,19 +1211,21 @@ trait SilverTransforms extends SparkSessionWrapper {
      * lately. Several of the fields are unavailable through this method but many are and they are very valuable when
      * present in gold
      */
-    val jobStatusBaseHasRecords = !jobStatusBase.isEmpty
     val jobStatusBaseFilled = if (isFirstRun && !jobsSnapshotDFComplete.isEmpty) {
-      val missingJobIds = if (jobStatusBaseHasRecords) { // if job status records found in audit
+
+      // get missing job ids
+      val missingJobIds = if (jobsBaseHasRecords) { // if job status records found in audit
         jobsSnapshotDFComplete.select('organization_id, 'job_id).distinct
           .join(jobStatusBase.select('organization_id, 'jobId.alias("job_id")).distinct, Seq("organization_id", "job_id"), "anti")
       } else jobsSnapshotDFComplete.select('organization_id, 'job_id).distinct // otherwise just load what's available from snap
 
+      // impute records for jobs in snapshot not in audit (i.e. pre-existing pools prior to audit logs capture)
       val lastJobSnapW = Window.partitionBy('organization_id, 'job_id).orderBy('Pipeline_SnapTS.desc)
       val jSnapMissingJobs = jobsSnapshotDFComplete
         .join(missingJobIds, Seq("organization_id", "job_id")) // filter to only the missing job IDs
         .withColumn("rnk", rank().over(lastJobSnapW))
         .filter('rnk === 1).drop("rnk")
-        .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * 1000)
+        .withColumn("timestamp", lit(fromTime.asUnixTimeMilli)) // set timestamp as fromtime so it will be included in downstream incrementals
         .select(
           'organization_id,
           'timestamp,
@@ -1205,8 +1253,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           'creator_user_name.alias("created_by"),
           'created_time.alias("created_ts")
         )
-      if (jobStatusBaseHasRecords) unionWithMissingAsNull(jobStatusBase, jSnapMissingJobs) else jSnapMissingJobs
-    } else if (jobStatusBaseHasRecords) { // not first run but new audit records exist, continue
+      if (jobsBaseHasRecords) unionWithMissingAsNull(jobStatusBase, jSnapMissingJobs) else jSnapMissingJobs
+    } else if (jobsBaseHasRecords) { // not first run but new audit records exist, continue
       jobStatusBase
     } else { // not first run AND no new audit data break out and progress timeline
       val msg = s"No new jobs audit records found, progressing timeline and appending no new records"

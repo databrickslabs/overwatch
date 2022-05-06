@@ -437,7 +437,8 @@ class Pipeline(
 
     val rowsWritten = writeOpsMetrics.getOrElse("numOutputRows", "0")
     val execMins: Double = (endTime - startTime) / 1000.0 / 60.0
-    val msg = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: $execMins"
+    val simplifiedExecMins: Double = execMins - (execMins % 0.01)
+    val msg = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: $simplifiedExecMins"
     println(msg)
     logger.log(Level.INFO, msg)
 

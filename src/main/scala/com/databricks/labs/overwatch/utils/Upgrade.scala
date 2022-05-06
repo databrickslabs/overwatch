@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils.Helpers.fastDrop
@@ -936,6 +937,7 @@ object Upgrade extends SparkSessionWrapper {
                      enableUpgradeBelowDBR104: Boolean = false,
                      tempDir: String = s"/tmp/overwatch/upgrade0605_status__ctrl_0x111/${System.currentTimeMillis()}"
                    ): DataFrame = {
+    dbutils.fs.mkdirs(tempDir) // init tempDir -- if no errors it wouldn't be created
     val blankConfig = new Config()
     val currentSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName)
     val numericalSchemaVersion = getNumericalSchemaVersion(currentSchemaVersion)
@@ -985,7 +987,7 @@ object Upgrade extends SparkSessionWrapper {
           .mode("overwrite")
           .option("overwriteSchema", "true")
           .saveAsTable(s"${etlDatabaseName}.${targetName}")
-        UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg)
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
       } catch {
         case e: SimplifiedUpgradeException =>
           upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
@@ -1021,7 +1023,7 @@ object Upgrade extends SparkSessionWrapper {
           .mode("overwrite")
           .option("overwriteSchema", "true")
           .saveAsTable(s"${etlDatabaseName}.${targetName}")
-        UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg)
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
       } catch {
         case e: SimplifiedUpgradeException =>
           upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
@@ -1080,7 +1082,6 @@ object Upgrade extends SparkSessionWrapper {
               .partitionBy(partitionByCols: _*)
               .mode("overwrite").option("overwriteSchema", "true")
               .saveAsTable(s"${etlDatabaseName}.${targetName}")
-            UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg)
           }
         } else { // if dbr >= 10.4 -- rename and deprecate the column (perf savings)
           // spark_events_bronze must be upgraded to minimum delta reader/writer values
@@ -1094,7 +1095,7 @@ object Upgrade extends SparkSessionWrapper {
             spark.sql(modifyColStmt)
           })
         }
-        UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg)
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
       } catch {
         case e: SimplifiedUpgradeException =>
           upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
