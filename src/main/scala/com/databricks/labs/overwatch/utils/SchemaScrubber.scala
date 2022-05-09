@@ -80,7 +80,7 @@ class SchemaScrubber(
     if (dupCount == 0) { // if no dups, return the sanitized fields
       fields.map(_.sanitizedField)
     } else { // if dups are present, create a hash based on the original (bad / duplicated) field
-      // switched to hash (from random string) as of version 0605 to reduce cardinality of unique suffixes
+      // switched to hash (from random string) as of version 0610 to reduce cardinality of unique suffixes
       val warnMsg = s"SCHEMA WARNING: --> The following fields were not unique after schema cleansing and " +
         s"have been renamed in place but should be reviewed.\n" +
         s"DUPLICATE FIELDS:\n" +
