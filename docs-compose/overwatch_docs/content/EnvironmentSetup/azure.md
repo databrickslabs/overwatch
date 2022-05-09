@@ -94,15 +94,6 @@ Click Add button and select Listen option for generate policies
 ![sas3](/images/EnvironmentSetup/sas3.png)
 Copy the Connection string-primary key and create a secret using Key vault
 
-#### Validate Messages Are Flowing
-Now that you have configured you Overwatch EventHub Namespace and a named Event Hub inside of the namespace, it's
-time to validate that messages are flowing. You may have to wait several minutes to begin to see messages flowing
-depending on how busy the workspace is. There are two things that are commonly missed, please double check the
-two bullet points below, there are images to help clarify as well.
-* A named Event Hub has been created within the Namespace.
-* Messages are flowing into the named event hub
-![Named_EH_Visual](/images/EnvironmentSetup/Azure_EH_Example.png) ![EH_Validation](/images/EnvironmentSetup/EH_Validation.png)
-
 #### Step 3
 With your Event Hub Namespace and Named Event Hub created with data flowing, 
 Navigate to your the Azure Databricks workspace[s] (in the portal) for which you'd like 
@@ -121,6 +112,16 @@ event hub underneath the event hub namespace and give it a name. Reference the n
 {{% /notice %}}
 
 ![EH_Base_Setup](/images/EnvironmentSetup/EH_BaseConfig.png)
+
+#### Step 4: Validate Messages Are Flowing
+Now that you have configured you Overwatch EventHub Namespace, named Event Hub inside of the namespace, and 
+pointed diagnostic logging to the EventHub it's
+time to validate that messages are flowing. You may have to wait several minutes to begin to see messages flowing
+depending on how busy the workspace is. There are two things that are commonly missed, please double check the
+two bullet points below, there are images to help clarify as well.
+* A named Event Hub has been created within the Namespace.
+* Messages are flowing into the named event hub
+  ![Named_EH_Visual](/images/EnvironmentSetup/Azure_EH_Example.png) ![EH_Validation](/images/EnvironmentSetup/EH_Validation.png)
 
 ## Setting up Storage Accounts
 The following steps are meant to be a baseline reference for setting up the storage accounts for Overwatch targets.

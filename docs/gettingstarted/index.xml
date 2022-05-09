@@ -31,7 +31,7 @@
       <pubDate>Wed, 28 Oct 2020 13:43:52 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</guid>
-      <description>Quick Reference  Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD)  Externalize Optimize &amp;amp; Z-Order (as of 0.6.0) The Overwatch pipeline has always included the Optimize &amp;amp; Z-Order functions. By default all targets are set to be optimized once per week which resulted in very different runtimes once per week. As of 0.6.0, this can be externalized. Reasons to externalize include:</description>
+      <description>Quick Reference  Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch  Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run. For small/medium workspaces, 20-40 minutes should be expected for each run.</description>
     </item>
     
   </channel>

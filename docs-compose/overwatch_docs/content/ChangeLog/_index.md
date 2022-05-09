@@ -4,6 +4,41 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.6.1.0 (Upgrade Release)
+**Upgrade Process Required** for existing customers on 0.6.0.x
+The upgrade is small and quick but is very important. Some new Databricks features have resulted in some unsafe 
+columns (i.e. complex unbound structs) in bronze; thus, these need to be converted to map types to reduce 
+schema cardinality. There are three tables affected and the details can be found in the upgrade script linked below.
+
+You are strongly urged to **upgrade DBR version to 10.4LTS** (from 9.1LTS). If you do not upgrade DBR to 10.4LTS, the upgrade can be 
+quite compute intensive due to the need to fully rebuild one of the largest tables, `spark_events_bronze`. A new 
+feature called, [column mapping](https://docs.databricks.com/delta/delta-column-mapping.html) 
+is available in 10.4LTS that doesn't require a full table rebuild. The caveat is 
+that all future reads/writes to this table require 10.4LTS+. The ONLY customers not upgrading to 10.4LTS should be those 
+with a legitimate business blocker for upgrading to 10.4LTS.
+
+{{% notice note %}}
+When upgrading to 0.6.1 using 10.4LTS all future reads/writes to bronze table spark_events_bronze will require a 
+cluster with DBR 10.4LTS+
+{{% /notice%}}
+
+* **0610 Upgrade Script - 10.4LTS** [HTML](/assets/ChangeLog/Upgrade_0610.html) | [DBC](/assets/ChangeLog/Upgrade_0610.dbc)
+* **0610 Upgrade Script - 9.1LTS** [HTML](/assets/ChangeLog/Upgrade_0610_91LTS.html) | [DBC](/assets/ChangeLog/Upgrade_0610_91LTS.dbc)
+
+For questions / issues with the upgrade, please file a [git ticket](https://github.com/databrickslabs/overwatch/issues/new)
+
+* Noteworthy Features
+  * Add Overwatch databases and contents to a workspace not running Overwatch (i.e. remote only)
+  * Ability to specify custom temporary working directories
+    * Used to default to a dir in /tmp but due to some root policies allowing it to be overridden for more details 
+    see [Configs]({{%relref "GettingStarted/Configuration.md"%}}/#overwatchparams)
+  * Pipeline Management simplifications
+* Major Fixes
+  * Data Quality Enhancements
+  * Pipeline edge case stability improvements
+  
+The full list of fixes can be found on the [0610 Milestone](https://github.com/databrickslabs/overwatch/milestone/11?closed=1)
+
 ## 0.6.0.4 (Maintenance Release)
 * Bug fixes
   * [Issue 305](https://github.com/databrickslabs/overwatch/issues/305) - Silver_jobStatus timeout_seconds schema type
@@ -217,7 +252,7 @@ Below are the major feature and enhancements in 0.4.2
   * Costing for additional SKUs were added to the configuration such that they can be tracked. Note that as of 0.4.2 
   release, no calculation changes in costing as it relates to sku have yet been incorporated. These recalculations for
   jobs light and DatabricksSQL are in progress.
-* Enabled [Main class execution]({{%relref "GettingStarted"%}}/#via) to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily 
+* Enabled [Main class execution]({{%relref "GettingStarted"%}}/#via-main-class) to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily 
   enabled for future enablement with jobs pipelines and for development / testing purposes.
   * User can now pass 2 arguments to the databricks job where the first is 'bronze', 'silver', or 'gold' and the second
   is the escaped configuration string and only that pipeline layer will execute.

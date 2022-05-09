@@ -167,7 +167,33 @@ total_cost                  |double           |Total cost from Compute and DBUs 
 driverSpecs                 |struct           |Driver node details
 workerSpecs                 |struct           |Worker node details
 
-### InstanceDetails
+##### Cost Functions Explained
+**EXPECTATIONS** -- Note that Overwatch costs are derived. This is good and bad. Good as it allows for costs to be 
+broken down by any dimension at the millisecond level. Bad because there can be significant differences between the 
+derived costs and actual costs. These should generally be very close to equal but may differ within margin of error by 
+as much as 10%. To verify the cost functions and the elements therein feel free to review them in more detail. If 
+your costs are off by a large marine, please review all the components of the cost function and correct any configurations 
+as necessary to align your reality with the Overwatch config. The default costs are list price and often do not 
+accurately reflect a customer's costs.
+* **driver_compute_cost**: when cloudBillable --> Driver Node Compute Contract Price Hourly (instanceDetails) * Uptime_In_State_H --> otherwise 0
+* **worker_compute_cost**: when cloudBillable --> Worker Node Compute Contract Price Hourly (instanceDetails) * Uptime_In_State_H * target_num_workers --> otherwise 0
+  * target_num_workers used here is ambiguous. Assuming all targeted workers can be provisioned, the calculation is most accurate; 
+  however, if some workers cannot be provisioned the worker_compute_cost will be slightly higher than actual while
+  target_num_workers > current_num_workers. target_num_workers used here because the compute costs begin accumulating 
+  as soon as the node is provisioned, not at the time it is added to the cluster.
+* **driver_dbu_cost**: when databricks_billable --> driver_hourly_dbus (instancedetails.hourlyDBUs) * houry_dbu_rate for dbu type (dbuCostDetails.contract_price) *
+  uptime_in_state_H --> otherwise 0
+* **worker_dbu_cost**: when databricks_billable --> driver_hourly_dbus (instancedetails.hourlyDBUs) * houry_dbu_rate for dbu type (dbuCostDetails.contract_price) *
+  current_num_workers * uptime_in_state_H --> otherwise 0
+  * current_num_workers used here as dbu costs do not begin until the node able to receive workloads (i.e. node is 
+    moved from target_worker to current_worker / "upsize_complete" state)
+* **cloudBillable**: Cluster is in a running state
+  * GAP: Note that cloud billable ends at the time the cluster is terminated even though the nodes remain provisioned 
+    in the cloud provider for several more minutes; these additional minutes are not accounted for in this 
+    cost function.
+
+
+#### InstanceDetails
 [**AWS Sample**](/assets/TableSamples/instancedetails_aws.tab) | [**AZURE_Sample**](/assets/TableSamples/instancedetails_azure.tab)
 
 **KEY** -- Organization_ID + API_name

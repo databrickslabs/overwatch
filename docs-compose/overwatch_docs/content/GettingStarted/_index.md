@@ -23,8 +23,15 @@ and tables and manages all spark parameters and optimization requirements to ope
 and the job run setup, Overwatch runs best as a black box -- enable it and forget about it.
 
 ## Cluster Requirements
-* DBR 9.1LTS
-  * Overwatch will likely run on later versions but is built and tested on 9.1LTS
+* DBR 10.4LTS as of 0.6.1
+  * Overwatch will likely run on later versions but is built and tested on 10.4LTS since 0.6.1
+  * Overwatch < 0.6.1 -- DBR 9.1LTS
+  * Overwatch version 0.6.1+ -- DBR 10.4LTS
+* Do not use Photon
+  * Photon optimization will begin with DBR 11.x LTS please wait on photon
+* Disable Autoscaling - See [Notes On Autoscaling](#notes-on-autoscaling)
+  * External optimize cluster recommendations are different.
+    See [External Optimize]({{%relref "GettingStarted/advancedtopics.md"%}}/#externalize-optimize--z-order-as-of-060) for more details
 * Add the relevant [dependencies](#cluster-dependencies)
 
 ### Cluster Dependencies
@@ -32,8 +39,15 @@ Add the following dependencies to your cluster
 * Overwatch Assembly (fat jar): `com.databricks.labs:overwatch_2.12:<latest>`
 * **(Azure Only)** azure-eventhubs-spark - integration with Azure EventHubs
     * Maven Coordinate: `com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21`
+  
+### Cluster Config Recommendations
+* Azure
+  * Node Type (Driver & Worker) - Standard_D16s_v3
+  * Node Count - 2
+    * This may be increased if necessary but note that bronze is not linearly scalable; thus, increasing core count 
+    may not improve runtimes. Please see [Optimizing Overwatch]({{%relref "GettingStarted/advancedtopics.md"%}}/#optimizing-overwatch) for more information.
 
-### Notes on Autoscaling
+### Notes On Autoscaling
 * Auto-scaling compute -- **Not Recommended** Use [**Intelligent Scaling**]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling)
   * Note that autoscaling compute will not be extremely efficient due to some of the compute tails
   as a result of log file size skew and storage mediums. Additionally, some modules require thousands of API calls

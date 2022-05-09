@@ -52,17 +52,37 @@ Hot Notebooks | Heavy User Breakdown
 ![BatchReport1](/images/_index/Hot_Notebooks.png) | ![BatchReport2](/images/_index/outlierUserDetail.png)
 
 ### Realtime / Monitoring / Alerting
-Overwatch does have a configurable, near-realtime component that allows users to retrieve metrics at a configurable
-frequency (i.e. 5s/120s/etc). This is enabled through [DropWizard](https://spark.apache.org/docs/latest/monitoring.html) (a default spark monitoring platform) and a 
-time-series database (TSDB) called "whisper" which is wrapped by Graphite. Graphite offers many exposed APIs upon which 
-any front-end TSDB reporting tool can be used, such as Grafana. Graphite and Grafana are used by default as they do not
-require a license for basic use and Grafana is very common in the industry. Very powerful monitoring dashboards
-along with configured alerting can be enabled through Grafana.
+Overwatch is often integrated with real-time solutions to enhance the data provided as raw Spark Metrics. For example, 
+you may be monitoring jobs in real-time but want job_names instead of job_ids, Overwatch's slow-changing dimensions 
+can enhance this.
+
+Real-time monitoring usually comes from at least two different sources:
+* spark via [DropWizard](https://spark.apache.org/docs/latest/monitoring.html#metrics) (a default spark monitoring platform)
+* machine metrics via [collectd](https://collectd.org/) or some native cloud solutions such as CloudWatch or LogAnalytics.
+
+These real-time metrics can be captured as quickly as 5s intervals but it's critical to note that proper 
+historization is a must for higher intervals; furthermore, it's critical to configure the metrics at the "correct" 
+interval for your business needs. In other words, it can get quickly get expensive to load all metrics at 5s 
+intervals. All of these details are likely common knowledge to a team that manages a time-series database (TSDB).
+
+Below is a scalable, reference architecture using Graphite and Grafana to capture these metrics. Overwatch 
+creates several daily JSON time-series compatible exports to Grafana JSON that provide slow-changing dimensional 
+lookups between real-time keys and dimensional values through joins for enhanced dashboards.
+
+Below is a link to a notebook offering samples for integrating Spark and machine metrics to some real-time 
+infrastructure endpoint. The examples in this notebook offer examples to Prometheus, Graphite, and Log Analytics 
+for Spark Metrics and collectD for machine metrics. **Critical** this is just a sample for review, this 
+notebook is intended as a reference to guide you to creating your own implementation, you must 
+create a script to be valid for your requirements and capture the right metrics and the right intervals for 
+the namespaces from which you wish to capture metrics.
+
+Realtime Getting Started Reference Notebook [**HTML**](/assets/_index/realtime_helpers.html) | [**DBC**](/assets/_index/realtime_helpers.dbc)
 
 {{% notice note %}}
-The realtime architecture has been created but 1-click delivery has not yet been enabled. Currently, realtime 
-integration is up to the customer to integrate. For guidance / assistance in configuring the Overwatch real-time, 
-please reach out to your Databricks account team to set up an discovery meeting.
+The realtime reference architecture has been validated but 1-click delivery has not yet been enabled. The 
+time-series database / infrastructure setup is the responsibility of the customer; Databricks can assist with 
+integrating the spark metrics delivery with customer infrastructure but Databricks cannot offer much depth for 
+standing up / configuring the real-time infrastructure itself.
 {{% /notice %}}
 
 #### Example Realtime Architecture  

@@ -8,11 +8,66 @@ weight: 4
 * [Externalize Optimize & Z-Order](#externalize-optimize--z-order-as-of-060)
 * [Interacting With Overwatch and its State](#interacting-with-overwatch-and-its-state)
 * [Joining With Slow Changing Dimensions (SCD)](#joining-with-slow-changing-dimensions-scd)
+* [Optimizing Overwatch](#optimizing-overwatch)
+
+## Optimizing Overwatch
+**Expectation Check** Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline 
+among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some 
+time to run. For small/medium workspaces, 20-40 minutes should be expected for each run. Larger workspaces can take 
+longer, depending on the size of the cluster, the Overwatch configuration, and the workspace.
+
+The optimization tactics discussed below are aimed at the "large workspace"; however, many can be applied to 
+small / medium workspaces.
+
+**Large Workspace** is generally defined "large" due to one or more of the following factors
+* 250+ clusters created / day -- common with external orchestrators such as airflow, when pools are heavily used, 
+and many other reasons
+* All clusters logging and 5000+ compute hours / day
+
+### Optimization Limitations (Bronze)
+Note that there are two modules that simply cannot be linearly parallelized for reasons beyond the scope of this 
+write-up. These limiting factors are only present in Bronze and thus one optimization is to utilize one cluster 
+spec for bronze and another for silver/gold. To do this, utilize Databricks' [multi-task jobs feature](https://databricks.com/blog/2021/07/13/announcement-orchestrating-multiple-tasks-with-databricks-jobs-public-preview.html) 
+to run into three steps and specify two cluster. To split the Overwatch Pipeline into bronze/silver/gold steps 
+refer to the [Main Class Setup Configuration]({{%relref "GettingStarted"%}}/#via-main-class)
+* Bronze - small static (no autoscaling) cluster to trickle load slow modules
+* Silver/Gold - slightly larger (autoscaling enabled as needed) - cluster to blaze through the modules as 
+silver and gold modules are nearly linearly scalable. Overwatch developers will continue to strive for linear 
+scalability in silver/gold.
+  
+Below is a screenshot illustrating the job definition when broken apart into a multi-task job.
+![Multi-TaskJob](/images/GettingStarted/AdvancedTopics/Overwatch_multitaskJob.png)
+  
+### Utilize [External Optimize](#externalize-optimize--z-order-as-of-060)
+Externalizing the optimize and z-order functions is critical for reducing daily Overwatch runtimes and increasing 
+efficiency of the optimize and z-order functions. Optimize & z-order are more efficient the larger the dataset and 
+the larger the number of partitions to be optimized. Furthermore, optimize functions are very parallelizable and 
+thus should be run on a larger, autoscaling cluster. Lastly, by externalizing the optimize functions, this task only 
+need be carried out on a single workspace per Overwatch output target (i.e. storage prefix target).
+
+### Additional Optimization Considerations
+* As of 0.6.1 disable Photon
+  * Photon will be the focus of optimization in DBR 11.xLTS+
+* 0.6.1+ Use DBR 10.4 LTS
+* < 0.6.1 Use DBR 9.1 LTS 
+  * This is critical as there are some regressions in 10.4LTS that have been handled in Overwatch 0.6.1 but not 
+  in previous versions
+* (Azure) Follow recommendations for Event Hub. If using less than 32 partitions, increase this immediately.
+  * If workspace is VERY large or has 50+ concurrent users, suggest increasing `minEventsPerTrigger` in the audit 
+  log config. This is defaulted to 10, increase it to 100+. TLDR, this is the minimum number of events in Event Hub 
+  allowed before Overwatch will progress past the audit log events module. If the workspace is generating more than 10 
+  events faster than Overwatch can complete the streaming batch then the module may never complete or may get stuck 
+  here for some time.
+  * Consider increasing `maxEventsPerTrigger` from default of 10000 to 50000 to load more audit logs per batch. This 
+  will only help if there are 10K+ audit events per day on the workspace.
+* Ensure direct networking routes are used between storage and compute and that they are in the same region
+  * Overwatch target can be in separate region for multi-region architectures but sources should be co-located with 
+  compute.
 
 ## Externalize Optimize & Z-Order (as of 0.6.0)
 The Overwatch pipeline has always included the Optimize & Z-Order functions. By default all targets are set to 
 be optimized once per week which resulted in very different runtimes once per week.
-As of 0.6.0, this can be externalized. 
+As of 0.6.0, this can be removed from the Overwatch Pipeline (i.e. externalized). 
 Reasons to externalize include:
 * Lower job runtime variability and/or improve consistency to hit SLAs
 * Utilize a more efficient cluster type/size for the optimize job
@@ -58,7 +113,17 @@ print(JsonUtils.objToJson(params).compactString)
 ```
 
 ### Instantiating the Workspace
-Use the Overwatch parameters string to instantiate the workspace
+**As Of 0.6.0.4** Utilize Overwatch Helper functions get the workspace object for you. The workspace object returned 
+will be the Overwatch config and state of the current workspace at the time of the last successful run.
+{{% notice note %}}
+As of 0.6.1 this helper function is not expected to work across versions, meaning that if the last run was on 
+0.6.0.4 and the 0.6.1 JAR is attached, don't expect this method to work
+{{% /notice %}}
+
+```scala
+import com.databricks.labs.overwatch.utils.Helpers
+val prodWorkspace = Helpers.getWorkspaceByDatabase("overwatch_etl")
+```
 
 #### Azure
 {{% notice warning %}}

@@ -43,10 +43,10 @@ Detailed costs data
 [directly from Databricks](https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html). 
 This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn't support this just yet, 
 if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
-to load all the historical data from the day that you began receiving it. 
-{{% notice info %}}
-Targeted Q3 2021
-{{% /notice %}}
+to load all the historical data from the day that you began receiving it.
+
+In the meantime, it's easy to join these up with the Overwatch data for cost validation and / or exact cost break 
+down by dimensions not supported in the usage logs.
 
 ### With Cloud Provider Costs
 There can be substantial cloud provider costs associated with a cluster. Databricks (and Overwatch) has no visibility 

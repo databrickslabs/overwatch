@@ -12,21 +12,21 @@
     <title>Welcome To OverWatch :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1646072827" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1646072827" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1646072827" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1646072827" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1646072827" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1646072827" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1646072827" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1646072827" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1646072827" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1652123419" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1646072827" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1652123419" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1646072827"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1652123419"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1646072827"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1646072827"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1652123419"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1652123419"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1646072827"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1652123419"></script>
 
     
   </div>
@@ -536,16 +536,33 @@ to set up monitoring / alerts in the real-time modules.</p>
 </tbody>
 </table>
 <h3 id="realtime--monitoring--alerting">Realtime / Monitoring / Alerting</h3>
-<p>Overwatch does have a configurable, near-realtime component that allows users to retrieve metrics at a configurable
-frequency (i.e. 5s/120s/etc). This is enabled through <a href="https://spark.apache.org/docs/latest/monitoring.html">DropWizard</a> (a default spark monitoring platform) and a 
-time-series database (TSDB) called &ldquo;whisper&rdquo; which is wrapped by Graphite. Graphite offers many exposed APIs upon which 
-any front-end TSDB reporting tool can be used, such as Grafana. Graphite and Grafana are used by default as they do not
-require a license for basic use and Grafana is very common in the industry. Very powerful monitoring dashboards
-along with configured alerting can be enabled through Grafana.</p>
+<p>Overwatch is often integrated with real-time solutions to enhance the data provided as raw Spark Metrics. For example, 
+you may be monitoring jobs in real-time but want job_names instead of job_ids, Overwatch&rsquo;s slow-changing dimensions 
+can enhance this.</p>
+<p>Real-time monitoring usually comes from at least two different sources:</p>
+<ul>
+<li>spark via <a href="https://spark.apache.org/docs/latest/monitoring.html#metrics">DropWizard</a> (a default spark monitoring platform)</li>
+<li>machine metrics via <a href="https://collectd.org/">collectd</a> or some native cloud solutions such as CloudWatch or LogAnalytics.</li>
+</ul>
+<p>These real-time metrics can be captured as quickly as 5s intervals but it&rsquo;s critical to note that proper 
+historization is a must for higher intervals; furthermore, it&rsquo;s critical to configure the metrics at the &ldquo;correct&rdquo; 
+interval for your business needs. In other words, it can get quickly get expensive to load all metrics at 5s 
+intervals. All of these details are likely common knowledge to a team that manages a time-series database (TSDB).</p>
+<p>Below is a scalable, reference architecture using Graphite and Grafana to capture these metrics. Overwatch 
+creates several daily JSON time-series compatible exports to Grafana JSON that provide slow-changing dimensional 
+lookups between real-time keys and dimensional values through joins for enhanced dashboards.</p>
+<p>Below is a link to a notebook offering samples for integrating Spark and machine metrics to some real-time 
+infrastructure endpoint. The examples in this notebook offer examples to Prometheus, Graphite, and Log Analytics 
+for Spark Metrics and collectD for machine metrics. <strong>Critical</strong> this is just a sample for review, this 
+notebook is intended as a reference to guide you to creating your own implementation, you must 
+create a script to be valid for your requirements and capture the right metrics and the right intervals for 
+the namespaces from which you wish to capture metrics.</p>
+<p>Realtime Getting Started Reference Notebook <a href="https://databrickslabs.github.io/overwatch/assets/_index/realtime_helpers.html"><strong>HTML</strong></a> | <a href="https://databrickslabs.github.io/overwatch/assets/_index/realtime_helpers.dbc"><strong>DBC</strong></a></p>
 
-<div class="notices note" ><p>The realtime architecture has been created but 1-click delivery has not yet been enabled. Currently, realtime 
-integration is up to the customer to integrate. For guidance / assistance in configuring the Overwatch real-time, 
-please reach out to your Databricks account team to set up an discovery meeting.</p>
+<div class="notices note" ><p>The realtime reference architecture has been validated but 1-click delivery has not yet been enabled. The 
+time-series database / infrastructure setup is the responsibility of the customer; Databricks can assist with 
+integrating the spark metrics delivery with customer infrastructure but Databricks cannot offer much depth for 
+standing up / configuring the real-time infrastructure itself.</p>
 </div>
 
 <h4 id="example-realtime-architecture">Example Realtime Architecture</h4>
@@ -842,19 +859,19 @@ please reach out to your Databricks account team to set up an discovery meeting.
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1646072827"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1646072827"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1646072827"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1646072827"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1646072827"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1646072827"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1652123419"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1646072827"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1646072827"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1646072827"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1652123419"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1646072827" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1646072827"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1652123419" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1652123419"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
