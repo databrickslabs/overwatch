@@ -924,28 +924,28 @@ object Upgrade extends SparkSessionWrapper {
   }
 
   /**
-   * Upgrades Overwatch schema to version 0605
+   * Upgrades Overwatch schema to version 0610
    * @param etlDatabaseName overwatch_etl database name
    * @param startStep step from which to start (defaults to step 1)
    * @param enableUpgradeBelowDBR104 required boolean to allow user to upgrade using DBR < 10.4LTS
    * @param tempDir temporary dir in which to store metadata and upgrade status results
    * @return
    */
-  def upgradeTo0605(
+  def upgradeTo0610(
                      etlDatabaseName: String,
                      startStep: Int = 1,
                      enableUpgradeBelowDBR104: Boolean = false,
-                     tempDir: String = s"/tmp/overwatch/upgrade0605_status__ctrl_0x111/${System.currentTimeMillis()}"
+                     tempDir: String = s"/tmp/overwatch/upgrade0610_status__ctrl_0x111/${System.currentTimeMillis()}"
                    ): DataFrame = {
     dbutils.fs.mkdirs(tempDir) // init tempDir -- if no errors it wouldn't be created
     val blankConfig = new Config()
     val currentSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName)
     val numericalSchemaVersion = getNumericalSchemaVersion(currentSchemaVersion)
-    val targetSchemaVersion = "0.605"
+    val targetSchemaVersion = "0.610"
     validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
     require(
-      numericalSchemaVersion >= 600 && numericalSchemaVersion < 605,
-      "This upgrade function is only for upgrading schema version 0600+ to new version 0605 " +
+      numericalSchemaVersion >= 600 && numericalSchemaVersion < 610,
+      "This upgrade function is only for upgrading schema version 0600+ to new version 0610 " +
         "Please first upgrade to at least schema version 0600 before proceeding. " +
         "Upgrade documentation can be found in the change log."
     )
@@ -957,10 +957,10 @@ object Upgrade extends SparkSessionWrapper {
     val initialSourceVersions: concurrent.Map[String, Long] = new ConcurrentHashMap[String, Long]().asScala
     val packageVersion = blankConfig.getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
     val startingSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName).split("\\.").takeRight(1).head.toInt
-    assert(startingSchemaVersion >= 600 && packageVersion >= 605,
+    assert(startingSchemaVersion >= 600 && packageVersion >= 610,
       s"""
-         |This schema upgrade is only necessary when upgrading from < 0605 but > 05x.
-         |If upgrading from 05x directly to 0605+ simply run the 'upgradeTo060' function.
+         |This schema upgrade is only necessary when upgrading from < 0610 but > 05x.
+         |If upgrading from 05x directly to 0610+ simply run the 'upgradeTo060' function.
          |""".stripMargin)
     if (startStep <= 1) {
       val stepMsg = Some("Step 1: Upgrade Schema - Job Status Silver")
@@ -1114,16 +1114,16 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * Finalize the upgrade. This cleans up the temporary paths and upgrades the schema version
    * @param overwatchETLDBName overwatch_etl database name
-   * @param tempDir temporary directory used for the 0605 upgrade
+   * @param tempDir temporary directory used for the 0610 upgrade
    */
-  def finalize0605Upgrade(
+  def finalize0610Upgrade(
                            overwatchETLDBName: String,
-                           tempDir: String = "/tmp/overwatch/upgrade0605_status__ctrl_0x111/"
+                           tempDir: String = "/tmp/overwatch/upgrade0610_status__ctrl_0x111/"
                          ): Unit = {
     require(Helpers.pathExists(tempDir), s"The default temporary directory $tempDir does not exist. If you used a " +
       s"custom temporary directory please put add that path to the 'tempDir' parameter of this function and try again. " +
       s"Otherwise, nothing can be found in the upgrade temp path, WILL NOT upgrading the schema.")
-      finalizeUpgrade(overwatchETLDBName, tempDir, "0.605")
+      finalizeUpgrade(overwatchETLDBName, tempDir, "0.610")
   }
 
 }
