@@ -34,7 +34,7 @@ case class DatabricksContractPrices(
                                      jobsLightDBUCostUSD: Double = 0.10
                                    )
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=0,errorBatchSize:Int=0,runID:String="")
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String)
 
 /**
  * Class for storing the response from API call.
@@ -46,8 +46,6 @@ case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, pack
  * @param rawJsonObject     : Actual response as json object
  */
 case class ResponseMapper(rawStringResponse: String, responseCode: Int, rawJsonObject: JSONObject)
-
-case class ApiErrorDetail(cluster_id: String, from_epoch: String, until_epoch: String,error:String)
 
 
 case class ValidatedColumn(
