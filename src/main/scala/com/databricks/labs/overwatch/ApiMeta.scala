@@ -12,7 +12,8 @@ trait ApiMeta {
   var dataframeColumns:String="";
   var apiCallType:String="";
   var microBatchSize = 50
-  var tempLocation = "/local_disk0"
+  var tempLocation = "/local_disk0/OverWatch"
+  var storeInTempLocation=false
   val apiV = "api/2.0"
   var encodedToken=false
 
@@ -85,5 +86,7 @@ class ClusterEventsApi extends ApiMeta{
   paginationToken = "next_page"
   dataframeColumns = "events"
   apiCallType = "POST"
+  storeInTempLocation = true
+
 
 }

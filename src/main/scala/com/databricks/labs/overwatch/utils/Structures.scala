@@ -47,12 +47,6 @@ case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, pack
  */
 case class ResponseMapper(rawStringResponse: String, responseCode: Int, rawJsonObject: JSONObject)
 
-/**
- * Class for storing the final response from API call.
- * @param tempLocation location of the disk where the response has been written.
- * @param responseArray array containing all the responses.
- */
-case class APIResponse(tempLocation:String, responseArray:JSONArray)
 
 case class ValidatedColumn(
                             column: Column,
