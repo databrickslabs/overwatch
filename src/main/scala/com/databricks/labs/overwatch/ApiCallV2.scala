@@ -213,17 +213,13 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         patentTempPath=java.util.UUID.randomUUID.toString
       }
       val fineName = java.util.UUID.randomUUID.toString
-      dbutils.fs.put( apiMeta.tempLocation+"/"+patentTempPath+ "/" + fineName, resultJsonArray.toString(), true)
+      dbutils.fs.put( patentTempPath+ "/" + fineName, resultJsonArray.toString(), true)
       true
     } catch {
       case e: Throwable =>
         logger.log(Level.WARN, "Unable to write in local" + e.getMessage)
         false
     }
-  }
-
-  def getTempLocationPath():String={
-    apiMeta.tempLocation+"/"+patentTempPath+ "/"
   }
 
   /**
@@ -365,7 +361,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     } else if (apiResponse.length() != 0 && !apiMeta.storeInTempLocation) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
       apiResultDF = spark.read.json(Seq(apiResponse.toString).toDS())
     } else if (apiMeta.storeInTempLocation) {//Read the response from the Temp location/Disk and convert it to Dataframe.
-          apiResultDF = spark.read.json(getTempLocationPath)
+          apiResultDF = spark.read.json(patentTempPath)
 
     }
     processRawData(apiResultDF)
