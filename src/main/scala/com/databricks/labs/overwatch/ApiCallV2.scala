@@ -22,7 +22,13 @@ object ApiCallV2 extends SparkSessionWrapper {
     new ApiCallV2(apiEnv)
       .setApiName(apiName)
       .setQuery(queryJsonString)
+  }
 
+  def apply(apiEnv: ApiEnv, apiName: String, queryJsonString: String,tempPath:String) = {
+    new ApiCallV2(apiEnv)
+      .setApiName(apiName)
+      .setQuery(queryJsonString)
+      .setTempLocation(tempPath)
   }
 }
 
@@ -41,12 +47,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private var resultJsonArray = new JSONArray //JsonArray containing the responses from API call.
   private var serverBusyCount: Int = 0 // Keep track of 429 error occurrence.
   private var token = "" //Authentication token for API request.
-  private val runUUID: String = java.util.UUID.randomUUID.toString; //Unique String which is used as folder name in a temp location to save the responses.
+  private var patentTempPath: String = ""//Unique String which is used as folder name in a temp location to save the responses.
   private var unsafeSSLErrorCount = 0;//Keep track of SSL error occurrence.
-  private var persistentStorage = false //Flag to check for persistent storage.
   private var apiMeta: ApiMeta = null //Metadata for the API call.
   private var debugFlag = false //Debug flag to print the information when required.
-  private var apiResponse: APIResponse = null //Case class for the responses received.
+  private var apiResponse: JSONArray = null //Responses received.
   private var allowUnsafeSSL = false //Flag to make the unsafe ssl.
   private var jsonKey = "" //Key name for pagination.
   private var jsonValue = "" //Key value for pagination.
@@ -76,6 +81,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   def setQuery(query: String): this.type = {
     jsonQuery = query
     jsonToMap
+    this
+  }
+
+  def setTempLocation(path:String):this.type ={
+    patentTempPath=path
     this
   }
 
@@ -199,9 +209,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   def writeMicroBatchToTempLocation(resultJsonArray: JSONArray, apiMeta: ApiMeta): Boolean = {
     try {
+      if(patentTempPath==""){
+        patentTempPath=java.util.UUID.randomUUID.toString
+      }
       val fineName = java.util.UUID.randomUUID.toString
-      dbutils.fs.put(apiMeta.tempLocation + "/" + "OverWatchTemp" + "/" + runUUID + "/" + fineName, resultJsonArray.toString(), true)
-      persistentStorage = true
+      dbutils.fs.put( patentTempPath+ "/" + fineName, resultJsonArray.toString(), true)
       true
     } catch {
       case e: Throwable =>
@@ -342,18 +354,30 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   def asDF(): DataFrame = {
     var apiResultDF: DataFrame = null;
-    if (apiResponse.responseArray.length() == 0 && !persistentStorage) { //If response contains no Data.
+    if (apiResponse.length() == 0 && !apiMeta.storeInTempLocation) { //If response contains no Data.
       val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
         s"Details Below:\n$buildGenericErrorMessage"
       throw new ApiCallEmptyResponse(errMsg, true)
-    } else if (apiResponse.responseArray.length() != 0 && !persistentStorage) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
-      apiResultDF = spark.read.json(Seq(apiResponse.responseArray.toString).toDS())
-    } else if (apiResponse.tempLocation != null && persistentStorage) {//Read the response from the Temp location/Disk and convert it to Dataframe.
-      val path = apiMeta.tempLocation + "/" + "OverWatchTemp" + "/" + apiResponse.tempLocation + "/"
-      apiResultDF = spark.read.json(path)
+    } else if (apiResponse.length() != 0 && !apiMeta.storeInTempLocation) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
+      apiResultDF = spark.read.json(Seq(apiResponse.toString).toDS())
+    } else if (apiMeta.storeInTempLocation) {//Read the response from the Temp location/Disk and convert it to Dataframe.
+          apiResultDF = spark.read.json(patentTempPath)
 
     }
     processRawData(apiResultDF)
+  }
+
+
+  def asDF(path:String):DataFrame={
+    try {
+      val apiResultDF = spark.read.json(path)
+      processRawData(apiResultDF)
+    }catch {
+      case e:Exception=>
+        val expMsg:String="Unable to read from temp location "
+        logger.log(Level.ERROR,expMsg+e.getMessage)
+        throw new Exception(e)
+    }
   }
 
   /**
@@ -366,19 +390,21 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val responseMapper = parseJson(response)
       responseCodeHandler(responseMapper.responseCode, responseMapper.rawStringResponse)
       resultJsonArray.put(responseMapper.rawJsonObject)
-      if (apiMeta.microBatchSize <= resultJsonArray.length()) { //Checking if its right time to write the batches into persistent storage
-        val responseFlag = writeMicroBatchToTempLocation(resultJsonArray, apiMeta)
-        if (responseFlag) { //Clearing the resultArray in-case of successful write
-          resultJsonArray = new JSONArray
+      if(apiMeta.storeInTempLocation) {
+        if (apiMeta.microBatchSize <= resultJsonArray.length()) { //Checking if its right time to write the batches into persistent storage
+          val responseFlag = writeMicroBatchToTempLocation(resultJsonArray, apiMeta)
+          if (responseFlag) { //Clearing the resultArray in-case of successful write
+            resultJsonArray = new JSONArray
+          }
         }
       }
       paginate(responseMapper.rawJsonObject)
       if (lastCall) {//Check if it is the last call for recursion.
         lastCall = false
-        if (persistentStorage) {
+        if (apiMeta.storeInTempLocation) {
           writeMicroBatchToTempLocation(resultJsonArray, apiMeta)
         }
-        apiResponse = APIResponse(runUUID, resultJsonArray)
+        apiResponse = resultJsonArray
       }
       this
     } catch {
