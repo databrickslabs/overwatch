@@ -177,7 +177,12 @@ object SchemaTools extends SparkSessionWrapper {
   def structFromJson(spark: SparkSession, df: DataFrame, c: String): Column = {
     import spark.implicits._
     require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
-    require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
+    val lowestLevelColumnName = c.split("\\.").takeRight(1).head
+    val fields = df.select(c).schema.fields.filter(_.name == lowestLevelColumnName)
+    require(fields.length == 1, s"multiple fields matched the column name, $c")
+    val fieldTypeName = fields.head.dataType.typeName
+    require(fieldTypeName == "string",
+      s"The column to parse must be a string but found $fieldTypeName")
     val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
     if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
       println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
