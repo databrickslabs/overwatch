@@ -21,7 +21,11 @@ case class SparkDetail()
 
 case class GangliaDetail()
 
-case class TokenSecret(scope: String, key: String)
+trait TokenSecretContainer
+case class TokenSecret(scope: String, key: String) extends TokenSecretContainer
+case class AwsTokenSecret(secretId: String, region: String, tokenKey: String) extends TokenSecretContainer
+
+//case class TokenHolder(secretSource: String, tokenSecret: TokenSecret)
 
 case class DataTarget(databaseName: Option[String], databaseLocation: Option[String], etlDataPathPrefix: Option[String],
                       consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
@@ -75,7 +79,7 @@ case class AuditLogConfig(
 case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
 
 case class OverwatchParams(auditLogConfig: AuditLogConfig,
-                           tokenSecret: Option[TokenSecret] = None,
+                           tokenSecret: Option[TokenSecretContainer] = None,
                            dataTarget: Option[DataTarget] = None,
                            badRecordsPath: Option[String] = None,
                            overwatchScope: Option[Seq[String]] = None,

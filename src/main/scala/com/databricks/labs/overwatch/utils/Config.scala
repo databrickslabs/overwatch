@@ -312,7 +312,7 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecretContainer]): this.type = {
     var rawToken = ""
     var scope = ""
     var key = ""
@@ -321,9 +321,9 @@ class Config() {
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
         _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
-        scope = tokenSecret.get.scope
-        key = tokenSecret.get.key
-        rawToken = dbutils.secrets.get(scope, key)
+        //scope = tokenSecret.get.scope // getSecretToken(secretType, tokenSecretWrapper)
+        //key = tokenSecret.get.key // getSecretToken(secretType, tokenSecretWrapper)
+        rawToken = SecretTools.getToken(tokenSecret.get) //dbutils.secrets.get(scope, key) // getSecretToken(secretType, tokenSecretWrapper)
         val authMessage = s"Valid Secret Identified: Executing with token located in secret, $scope : $key"
         logger.log(Level.INFO, authMessage)
         _tokenType = "Secret"

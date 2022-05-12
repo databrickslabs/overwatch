@@ -11,7 +11,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.delta.tables.DeltaTable
 import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -149,7 +149,9 @@ object Helpers extends SparkSessionWrapper {
   def parListFiles(path: String, conf: SerializableConfiguration): Array[String] = {
     try {
       val fs = new Path(path).getFileSystem(conf.value)
-      fs.listStatus(new Path(path)).map(_.getPath.toString)
+      val out = fs.listStatus(new Path(path)).map(_.getPath.toString)
+      println(out.foreach(println))
+      out
     } catch {
       case _: Throwable => Array(path)
     }
@@ -185,11 +187,17 @@ object Helpers extends SparkSessionWrapper {
     globPath(path, conf.value, fromEpochMillis, untilEpochMillis)
   }
 
+
   def globPath(path: String, conf: Configuration, fromEpochMillis: Option[Long], untilEpochMillis: Option[Long]): Array[PathStringFileStatus] = {
     logger.log(Level.DEBUG, s"PATH PREFIX: $path")
     try {
-      val fs = new Path(path).getFileSystem(conf)
-      val paths = fs.globStatus(new Path(path))
+      val path1 = path.substring(0,9)+path.substring(9).replace(":","\\:")
+      val fs = new Path(path1).getFileSystem(conf)
+      println("FILESYSTEM=",fs)
+      println("PATH=",path1)
+      //val paths = fs.globStatus(new Path(path.substring(0,9)+path.substring(10).replace(":","\\:")))
+      val paths = fs.globStatus(new Path(path1))
+      println("paths=",paths.mkString(":"))
       logger.log(Level.DEBUG, s"$path expanded in ${paths.length} files")
       paths.map(wildString => {
         val path = wildString.getPath
