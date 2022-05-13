@@ -9,6 +9,7 @@ import org.apache.spark.sql.functions._
 import org.json.{JSONArray, JSONException, JSONObject}
 import scalaj.http.{Http, HttpOptions, HttpResponse}
 
+import java.io.File
 import java.util
 
 /**
@@ -27,14 +28,12 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQuery(queryJsonString)
   }
 
-  def apply(apiEnv: ApiEnv, apiName: String, queryJsonArray: Array[String],tempPath:String,successBatchSize:Int,errorTempPath:String,errorBatchSize:Int) = {
+  def apply(apiEnv: ApiEnv, apiName: String, queryJsonArray: Array[String],tempSuccessPath:String,errorTempPath:String) = {
     new ApiCallV2(apiEnv)
       .setApiName(apiName)
       .setQueryJsonArray(queryJsonArray)
-      .setTempLocation(tempPath)
-      .setSuccessBatchSize(successBatchSize)
+      .setTempLocation(tempSuccessPath)
       .setErrorTempLocation(errorTempPath)
-      .setErrorBatchSize(errorBatchSize )
 
   }
 }
@@ -237,8 +236,18 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   def writeMicroBatchToTempLocation(path:String,resultJsonArray: String): Boolean = {
     try {
-      val fineName = java.util.UUID.randomUUID.toString
-      dbutils.fs.put( path+ "/" + fineName, resultJsonArray, true)
+
+      val directory:File = new File(path)
+      if (!directory.exists()){
+        directory.mkdir();
+      }
+      val fileName:String = s"""${path}"""+java.util.UUID.randomUUID.toString+".json"
+      import java.io.PrintWriter
+      import java.io.File
+      val pw = new PrintWriter(new File(fileName ))
+      pw.write(resultJsonArray)
+      pw.close
+      logger.info("File Successfully written:"+fileName)
       true
     } catch {
       case e: Throwable =>
@@ -431,7 +440,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       responseCodeHandler(response)
       apiResponseArray.put(responseMapper.rawJsonObject)
       if (apiMeta.storeInTempLocation) {
-        if (successBatchSize <= apiResponseArray.length()) { //Checking if its right time to write the batches into persistent storage
+        if (apiEnv.successBatchSize <= apiResponseArray.length()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = writeMicroBatchToTempLocation(successTempPath, apiResponseArray.toString)
           if (responseFlag) { //Clearing the resultArray in-case of successful write
             apiResponseArray = new JSONArray
@@ -484,7 +493,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
     def writeErrorToTemp(e: Throwable): Unit = {
       errorArray.add(ApiErrorDetail(jsonQuery, 0l, 0l, e.getMessage))
-      if (errorBatchSize <= errorArray.size()) { //Checking if its right time to write the batches into persistent storage
+      if (apiEnv.errorBatchSize <= errorArray.size()) { //Checking if its right time to write the batches into persistent storage
         val responseFlag = writeMicroBatchToTempLocation(errorTempPath, new Gson().toJson(errorArray).toString)
         if (responseFlag) { //Clearing the resultArray in-case of successful write
           errorArray = new util.ArrayList[ApiErrorDetail]()
