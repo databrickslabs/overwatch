@@ -47,6 +47,8 @@ case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, pack
  */
 case class ResponseMapper(rawStringResponse: String, responseCode: Int, rawJsonObject: JSONObject)
 
+case class ApiErrorDetail(apiDetail: String, startTime: Long, endTime: Long,errorMsh:String)
+
 
 case class ValidatedColumn(
                             column: Column,
