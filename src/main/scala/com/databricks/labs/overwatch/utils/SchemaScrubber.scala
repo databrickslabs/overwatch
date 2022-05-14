@@ -143,7 +143,8 @@ object SchemaScrubber {
 
   private val _defaultSanitizationRules: List[SanitizeRule] = List[SanitizeRule](
     SanitizeRule("\\s", ""),
-    SanitizeRule("[^a-zA-Z0-9]", "_")
+    SanitizeRule("[^a-zA-Z0-9]", "_"),
+    SanitizeRule("_UNIQUESUFFIX_", "_UNIQUESUFFIX__")
   )
 
   private val _noExceptions: Array[SanitizeFieldException] = Array()

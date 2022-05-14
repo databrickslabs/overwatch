@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.utils.{SchemaScrubber, SchemaTools, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
@@ -191,6 +191,37 @@ object TransformFunctions {
     }
 
     /**
+     * fills metadata columns in a dataframe using windows
+     * the windows will use the keys and the incrementals to go back as far as needed to get a value
+     * if a value cannot be filled from previous data, first future value will be used to fill
+     * @param fieldsToFill Array of fields to fill
+     * @param keys keys by which to partition the window
+     * @param incrementalFields fields by which to order the window
+     * @param orderedLookups Seq of columns that provide a secondary lookup for the value within the row
+     * @return
+     */
+    def fillMeta(
+                  fieldsToFill: Array[String],
+                  keys: Seq[String],
+                  incrementalFields: Seq[String],
+                  orderedLookups: Seq[Column] = Seq[Column]()
+                ) : DataFrame = {
+      val dfFields = df.columns
+      val wRaw = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      val wPrev = wRaw.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+      val wNext = wRaw.rowsBetween(Window.currentRow, Window.unboundedFollowing)
+
+      val selectsWithFills = dfFields.map(f => {
+        if(fieldsToFill.map(_.toLowerCase).contains(f.toLowerCase)) { // field to fill
+          bidirectionalFill(f, wPrev, wNext, orderedLookups)
+        } else { // not a fill field just return original value
+          col(f)
+        }
+      })
+      df.select(selectsWithFills: _*)
+    }
+
+    /**
      * Supports strings, numericals, booleans. Defined keys don't contain any other types thus this function should
      * ensure no nulls present for keys
      * @return
@@ -217,6 +248,20 @@ object TransformFunctions {
 
 //    private[overwatch] def colByName(df: DataFrame)(colName: String): StructField =
 //      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
+  }
+
+  private def bidirectionalFill(colToFillName: String, wPrev: WindowSpec, wNext: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+    val colToFill = col(colToFillName)
+    if (orderedLookups.nonEmpty){ // TODO -- omit nulls from lookup
+      val coalescedLookup = Array(colToFill) ++ orderedLookups.map(lookupCol => {
+        last(lookupCol, true).over(wPrev)
+      }) ++ orderedLookups.map(lookupCol => {
+        first(lookupCol, true).over(wNext)
+      })
+      coalesce(coalescedLookup: _*).alias(colToFillName)
+    } else {
+      coalesce(colToFill, last(colToFill, true).over(wPrev), first(colToFill, true).over(wNext)).alias(colToFillName)
+    }
   }
 
   object Costs {
