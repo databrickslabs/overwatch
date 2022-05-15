@@ -222,6 +222,24 @@ object TransformFunctions {
     }
 
     /**
+     * remove dups via a window
+     * @param keys seq of keys for the df
+     * @param incrementalFields seq of incremental fields for the df
+     * @return
+     */
+    def dropDupsByKey(
+                     keys: Seq[String],
+                     incrementalFields: Seq[String]
+                     ): DataFrame = {
+      val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      df
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter(col("rnk") === 1  && col("rn") === 1)
+        .drop("rnk", "rn")
+    }
+
+    /**
      * Supports strings, numericals, booleans. Defined keys don't contain any other types thus this function should
      * ensure no nulls present for keys
      * @return

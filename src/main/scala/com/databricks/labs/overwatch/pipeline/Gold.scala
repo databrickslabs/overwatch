@@ -135,7 +135,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, GoldTargets.sparkJobTarget.incrementalColumns, 2),
         GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, GoldTargets.sparkTaskTarget.incrementalColumns, 2),
         jobRunCostPotentialFactModule.fromTime,
-        jobRunCostPotentialFactModule.untilTime
+        jobRunCostPotentialFactModule.untilTime,
+        GoldTargets.jobRunCostPotentialFactTarget.keys,
+        GoldTargets.jobRunCostPotentialFactTarget.incrementalColumns
       )),
     append(GoldTargets.jobRunCostPotentialFactTarget)
   )
