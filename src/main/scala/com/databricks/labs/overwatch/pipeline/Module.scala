@@ -4,6 +4,7 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
 
 class Module(
               val moduleId: Int,
@@ -172,10 +173,29 @@ class Module(
     initState
   }
 
+  private def normalizeToken(secretToken: TokenSecret, reportDf: DataFrame): DataFrame = {
+    println(secretToken)
+    val inputConfigCols = reportDf.select($"inputConfig.*")
+      .columns
+      .filter(_!="tokenSecret")
+      .map(name => col("inputConfig."+name))
+
+    reportDf
+      .withColumn(
+        "inputConfig",
+        struct(inputConfigCols:+struct(lit(secretToken.scope),lit(secretToken.key)).as("tokenSecret"):_*)
+      )
+  }
+
   private def finalizeModule(report: ModuleStatusReport): Unit = {
     pipeline.updateModuleState(report.simple)
     if (!pipeline.readOnly) {
-      pipeline.database.write(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
+      val secretToken =  SecretTools(report.inputConfig.tokenSecret.get).getTargetTableStruct //.getSecretTargetStruct(report.inputConfig.tokenSecret.get)
+      val targetDf = normalizeToken(secretToken, Seq(report).toDF)
+      println(secretToken)
+      pipeline.database.write(
+        targetDf,
+        pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
     }
   }
 

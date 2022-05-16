@@ -16,6 +16,7 @@ class ParamDeserializerTest extends AnyFunSpec {
       val incomplete = """
         |{"auditLogConfig":{"azureAuditLogEventhubConfig":{"connectionString":"test","eventHubName":"overwatch-evhub",
         |"auditRawEventsPrefix":"/tmp/overwatch_dev/overwatch_etl_dev","maxEventsPerTrigger":10001}},
+        |"tokenSecret":{"secretId":"overwatch","region":"us-east-2","tokenKey":"apiToken"},
         |"badRecordsPath":"/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords",
         |"overwatchScope":["audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools"],
         |"maxDaysToLoad":60,
@@ -40,7 +41,7 @@ class ParamDeserializerTest extends AnyFunSpec {
             maxEventsPerTrigger = 10001
           ))
         ),
-        None,
+        Some(AwsTokenSecret("overwatch", "us-east-2", "apiToken")), //None,
         None,
         Some("/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords"),
         Some(Seq("audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools")),

@@ -15,7 +15,7 @@ import java.util.Base64
 object AwsSecrets {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  println(readRawSecretFromAws("data-eng-secret","us-east-2"))
+  //println(readRawSecretFromAws("data-eng-secret","us-east-2"))
 
   def readApiToken(secretId: String, region: String, apiTokenKey: String = "apiToken"): String = {
     secretValueAsMap(secretId, region)
@@ -45,37 +45,5 @@ object AwsSecrets {
   def parseJsonToMap(jsonStr: String): Map[String, Any] = {
     implicit val formats: DefaultFormats.type = org.json4s.DefaultFormats
     parse(jsonStr).extract[Map[String, Any]]
-  }
-
-  /////////////////////////////////////////////////////////////////////////////////////////////////////////
-  def getAwsSecrets: Map[String,String] = {
-    val secretName = "data-eng-secret"
-    val endpoint = "secretsmanager.us-east-2.amazonaws.com"
-
-    val config = new AwsClientBuilder.EndpointConfiguration(endpoint, Regions.US_EAST_2.getName)
-    val clientBuilder = AWSSecretsManagerClientBuilder.standard()
-    clientBuilder.setEndpointConfiguration(config)
-
-    val client = clientBuilder.build()
-    val getSecretValueRequest = new GetSecretValueRequest().withSecretId(secretName).withVersionStage("AWSCURRENT")
-    val getSecretValueResult = client.getSecretValue(getSecretValueRequest)
-    val secret = getSecretValueResult.getSecretString
-
-    implicit val formats = DefaultFormats
-    JsonMethods.parse(secret).extract[Map[String, String]]
-  }
-
-  def test(): Unit = {
-    import com.databricks.labs.overwatch.ApiCall
-    import com.databricks.labs.overwatch.utils._
-    val endpoint = "jobs/list"
-    val secretsScope = "overwatch"
-    val overwatchVersion = "0.6.0.4"
-    val key = "overwatch-dev-key"
-    val apiEnv = ApiEnv(false,
-      dbutils.notebook.getContext.apiUrl.get,
-      dbutils.secrets.get(secretsScope, key), overwatchVersion)
-    val jobsList = ApiCall(endpoint, apiEnv, None).executeGet().asDF
-    jobsList.show(false)
   }
 }

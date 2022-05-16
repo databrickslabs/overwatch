@@ -88,6 +88,26 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
   override def deserialize(jp: JsonParser, ctxt: DeserializationContext): OverwatchParams = {
     val masterNode = jp.getCodec.readTree[JsonNode](jp)
 
+    val token = {
+      val databricksToken =
+        for {
+          scope <- Try(masterNode.get("tokenSecret").get("scope").asText())
+          key <- Try(masterNode.get("tokenSecret").get("key").asText())
+        } yield Some(TokenSecret(scope, key))
+
+      val awsToken = databricksToken.recoverWith {
+        case jp: NullPointerException =>
+          for {
+            secretId <- Try(masterNode.get("tokenSecret").get("secretId").asText())
+            region <- Try(masterNode.get("tokenSecret").get("region").asText())
+            apiToken <- Try(masterNode.get("tokenSecret").get("tokenKey").asText())
+          } yield Some(AwsTokenSecret(secretId, region, apiToken))
+      }
+
+      awsToken.getOrElse(throw new IllegalArgumentException("No secrets provided"))
+    }
+
+    /*
     val token = try {
       Some(TokenSecret(
         masterNode.get("tokenSecret").get("scope").asText(),
@@ -97,6 +117,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         println("No Token Secret Defined", e)
         None
     }
+
+     */
 
     val rawAuditPath = getOptionString(masterNode, "auditLogConfig.rawAuditPath")
     val auditLogFormat = getOptionString(masterNode, "auditLogConfig.auditLogFormat").getOrElse("json")

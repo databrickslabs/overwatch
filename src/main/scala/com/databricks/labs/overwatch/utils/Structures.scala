@@ -21,11 +21,9 @@ case class SparkDetail()
 
 case class GangliaDetail()
 
-trait TokenSecretContainer
+abstract class TokenSecretContainer extends Product with Serializable
 case class TokenSecret(scope: String, key: String) extends TokenSecretContainer
-case class AwsTokenSecret(secretId: String, region: String, tokenKey: String) extends TokenSecretContainer
-
-//case class TokenHolder(secretSource: String, tokenSecret: TokenSecret)
+case class AwsTokenSecret(secretId: String, region: String, tokenKey: String = "apiToken") extends TokenSecretContainer
 
 case class DataTarget(databaseName: Option[String], databaseLocation: Option[String], etlDataPathPrefix: Option[String],
                       consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
@@ -355,6 +353,9 @@ object OverwatchEncoders {
 
   implicit def tokenSecret: org.apache.spark.sql.Encoder[TokenSecret] =
     org.apache.spark.sql.Encoders.kryo[TokenSecret]
+
+  implicit def tokenSecretContainer: org.apache.spark.sql.Encoder[TokenSecretContainer] =
+    org.apache.spark.sql.Encoders.kryo[TokenSecretContainer]
 
   implicit def dataTarget: org.apache.spark.sql.Encoder[DataTarget] =
     org.apache.spark.sql.Encoders.kryo[DataTarget]

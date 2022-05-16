@@ -314,8 +314,8 @@ class Config() {
    */
   private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecretContainer]): this.type = {
     var rawToken = ""
-    var scope = ""
-    var key = ""
+   // var scope = ""
+   // var key = ""
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
@@ -323,9 +323,7 @@ class Config() {
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         //scope = tokenSecret.get.scope // getSecretToken(secretType, tokenSecretWrapper)
         //key = tokenSecret.get.key // getSecretToken(secretType, tokenSecretWrapper)
-        rawToken = SecretTools.getToken(tokenSecret.get) //dbutils.secrets.get(scope, key) // getSecretToken(secretType, tokenSecretWrapper)
-        val authMessage = s"Valid Secret Identified: Executing with token located in secret, $scope : $key"
-        logger.log(Level.INFO, authMessage)
+        rawToken = SecretTools(tokenSecret.get).getApiToken //SecretTools.getToken(tokenSecret.get) //dbutils.secrets.get(scope, key) // getSecretToken(secretType, tokenSecretWrapper)
         _tokenType = "Secret"
       } else {
         if (_isLocalTesting) { // Local testing env vars
@@ -344,7 +342,7 @@ class Config() {
         }
       }
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
-        s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
+        s"is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
       this
