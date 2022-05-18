@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
@@ -100,11 +100,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
                              orgId: String
                            ): Unit = {
     if (!errorsDF.isEmpty) {
+      logger.info("Errordf writing..."+errorsTarget.databaseName+"."+errorsTarget.tableFullName)
       database.write(
         errorsDF.withColumn("organization_id", lit(orgId)),
         errorsTarget,
         pipelineSnapTS.asColumnTS
       )
+      logger.info("Errordf writing...completed")
     }
   }
 
@@ -122,6 +124,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // removing parallelization for now to see if it fixes some weird errors
     // CONFIRMED -- Parallelizing this breaks the token cipher
     // TODO - Identify why parallel errors
+    logger.info("inside 2nd call")
     val results = ids.map(id => {
       val query = Map("cluster_id" -> id,
         "start_time" -> startTime.asUnixTimeMilli,
@@ -131,6 +134,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       callClusterEventApi(id, startTime.asUnixTimeMilli, endTime.asUnixTimeMilli, ApiCall("clusters/events", apiEnv, Some(query)))
     }) //.toArray // -- needed when using par
+
 
     val clusterEvents = results.filter(_.succeeded).flatMap(_.payload)
 
@@ -414,6 +418,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     }).toArray
 
+    for(i<-0 to lastEventByClusterResults.length-1){
+      logger.info("Data is:"+lastEventByClusterResults(i))
+    }
+
     val failedApiCalls = lastEventByClusterResults.filterNot(_.succeeded)
 
     val clusterEventsBuffer = lastEventByClusterResults.filter(_.succeeded).map(lastEventWrapper => {
@@ -462,7 +470,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
      */
     val batchSize = 500000D
     // TODO -- remove hard-coded path
-    val tmpClusterEventsPath = s"/tmp/overwatch/bronze/$organizationId/clusterEventsBatches"
+   /* val tmpClusterEventsPath = s"/tmp/overwatch/bronze/$organizationId/clusterEventsBatches"
     val (clusterEventsBuffer, failedBatchingCalls) = buildClusterEventBatches(apiEnv, batchSize, startTime, endTime, clusterIDs)
 
     persistErrors(
@@ -471,28 +479,45 @@ trait BronzeTransforms extends SparkSessionWrapper {
       erroredBronzeEventsTarget,
       pipelineSnapTS,
       organizationId
-    )
+    )*/
+    logger.info("calling new APIv2"+clusterIDs.length+" run id :"+apiEnv.runID)
+    val tmpClusterEventsSuccessPath ="/local_disk0/success"+apiEnv.runID
+    val tmpClusterEventsErrorPath ="/local_disk0/error"+apiEnv.runID
+    var jsonArray:Array[String]=new Array[String](clusterIDs.length);
 
-    logger.log(Level.INFO, s"NUMBER OF BATCHES: ${clusterEventsBuffer.length} \n" +
-      s"ESTIMATED EVENTS: ${clusterEventsBuffer.length * batchSize.toInt}")
+    for(i <- 0 to clusterIDs.length-1){
+      clusterIDs(i)
+      val jsonQuery = s"""{"cluster_id":"ABC${clusterIDs(i)}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
+      jsonArray(i) = jsonQuery
+    }
 
-    var batchCounter = 0
-    clusterEventsBuffer.foreach(clusterIdsBatch => {
-      batchCounter += 1
-      logger.log(Level.INFO, s"BEGINNING BATCH ${batchCounter} of ${clusterEventsBuffer.length}")
-      val (clusterEvents, erroredEventsLookupDF) = clusterEventsByClusterBatch(startTime, endTime, apiEnv, clusterIdsBatch)
+    ApiCallV2(apiEnv,"clusters/events",jsonArray,tmpClusterEventsSuccessPath,tmpClusterEventsErrorPath).executeBatch()
 
-      // persist errors from batch
-      persistErrors(erroredEventsLookupDF, database, erroredBronzeEventsTarget, pipelineSnapTS, organizationId)
 
-      if (clusterEvents.nonEmpty) {
+    if(Helpers.pathExists(tmpClusterEventsErrorPath)){
+      logger.info("writing error" +spark.read.json(tmpClusterEventsErrorPath).show(false ))
+      println("writing error start" )
+      spark.read.json(tmpClusterEventsErrorPath).show(false)
+      println("writing error start2" )
+      persistErrors(
+        spark.read.json(tmpClusterEventsErrorPath),
+        database,
+        erroredBronzeEventsTarget,
+        pipelineSnapTS,
+        organizationId
+      )
+    }
+
+      if(Helpers.pathExists(tmpClusterEventsSuccessPath)){
         try {
-          val tdf = SchemaScrubber.scrubSchema(
-            spark.read.json(Seq(clusterEvents: _*).toDS())
-              .select(explode('events).alias("events"))
-              .select(col("events.*"))
-          )
+          logger.info("Reading from path"+tmpClusterEventsSuccessPath)
+          val apiResultDF = spark.read.json(tmpClusterEventsSuccessPath)
+          apiResultDF.show()
+          val tdf = apiResultDF.select(explode('events).alias("events"))
+            .select(col("events.*"))
 
+          // persist errors from batch
+          // persistErrors(erroredEventsLookupDF, database, erroredBronzeEventsTarget, pipelineSnapTS, organizationId)
           val changeInventory = Map[String, Column](
             "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
             "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
@@ -506,23 +531,27 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("organization_id", lit(organizationId))
             .write.mode("append").format("delta")
             .option("mergeSchema", "true")
-            .save(tmpClusterEventsPath)
-
-        } catch {
+          return tdf
+        }
+        catch {
           case e: Throwable => {
+              throw new Exception(e)
             // persist errored events by clusterID
-            val errorsByClusterID = clusterIdsBatch.map(cluster_id => {
+          /*  val errorsByClusterID = clusterIdsBatch.map(cluster_id => {
               val errorDetail = ErrorDetail(e.getMessage, startTime.asUnixTimeMilli, endTime.asUnixTimeMilli)
               ClusterEventCall(cluster_id, Array[String](), succeeded = false, Some(errorDetail))
             })
             persistErrors(buildClusterEventsErrorDF(errorsByClusterID), database, erroredBronzeEventsTarget, pipelineSnapTS, organizationId)
-          }
+        */  }
         }
+      }else {
+        println("EMPTY MODULE: Cluster Events")
+        throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
+          s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
       }
 
-    })
-
-    logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
+    //logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
+/*
     if (Helpers.pathExists(tmpClusterEventsPath)) {
       val clusterEventsDF = spark.read.format("delta").load(tmpClusterEventsPath)
       val clusterEventsCaptured = clusterEventsDF.count
@@ -534,7 +563,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
         s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
     }
-
+*/
+  null
   }
 
   private def appendNewFilesToTracker(database: Database,
