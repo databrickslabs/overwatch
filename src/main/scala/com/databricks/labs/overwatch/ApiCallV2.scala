@@ -234,23 +234,20 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param resultJsonArray containing responses from the API call.
    * @return true encase of successfully write to the temp location.
    */
-  def writeMicroBatchToTempLocation(path:String,resultJsonArray: String): Boolean = {
+    def writeMicroBatchToTempLocation(path:String,resultJsonArray: String): Boolean = {
     try {
 
-      val directory:File = new File(path)
-      if (!directory.exists()){
-        directory.mkdir();
-      }
-      val fileName:String = s"""${path}"""+java.util.UUID.randomUUID.toString+".json"
-      import java.io.PrintWriter
-      import java.io.File
-      val pw = new PrintWriter(new File(fileName ))
-      pw.write(resultJsonArray)
-      pw.close
-      logger.info("File Successfully written:"+fileName)
+      logger.info("writing microbatch..."+resultJsonArray)
+      val fineName = java.util.UUID.randomUUID.toString+".json"
+      dbutils.fs.put( path+ "/" + fineName, resultJsonArray, true)
+      logger.info("File Successfully written:"+path+ "/" + fineName)
+     // spark.read.json(path).show(false)
+      spark.read.json(Seq(resultJsonArray).toDS()).show(false)
+      logger.info("writing completed")
       true
     } catch {
       case e: Throwable =>
+        logger.info("Unable to write in local" + e.getMessage)
         logger.log(Level.WARN, "Unable to write in local" + e.getMessage)
         true
     }
@@ -459,6 +456,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         throw new java.lang.NoClassDefFoundError
       }
       case e: ApiCallFailure => {
+        val excMsg = "Got the exception while performing get request "
+        logger.log(Level.WARN, excMsg + e.getMessage)
         if (apiMeta.storeInTempLocation) {
           writeErrorToTemp(e)
         }
@@ -492,7 +491,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param e
    */
     def writeErrorToTemp(e: Throwable): Unit = {
-      errorArray.add(ApiErrorDetail(jsonQuery, 0l, 0l, e.getMessage))
+      errorArray.add(parseJsonQuery(e))
+      logger.log(Level.WARN,"writeErrorToTemp")
       if (apiEnv.errorBatchSize <= errorArray.size()) { //Checking if its right time to write the batches into persistent storage
         val responseFlag = writeMicroBatchToTempLocation(errorTempPath, new Gson().toJson(errorArray).toString)
         if (responseFlag) { //Clearing the resultArray in-case of successful write
@@ -500,6 +500,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         }
       }
     }
+
+  def parseJsonQuery(e: Throwable):ApiErrorDetail={
+    val jsonObject = new JSONObject(jsonQuery)
+    ApiErrorDetail(jsonObject.getString("cluster_id")+"newAPI",jsonObject.getString("start_time"),
+      jsonObject.getString("end_time"),e.getMessage)
+  }
+
+
 
 
   }
