@@ -1,15 +1,17 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
+import com.databricks.labs.overwatch.utils.BadConfigException
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.apache.spark.sql.execution.streaming.MemoryStream
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, SQLContext}
+import org.scalatest.GivenWhenThen
 import org.scalatest.funspec.AnyFunSpec
 
-class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
+class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with GivenWhenThen {
 
   describe("Tests for add and subtract incremental ticks") {
 
@@ -182,6 +184,87 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
         spark.conf.get("unknown_key")
       )
 
+    }
+  }
+
+  /**
+   * Below tests are added as a part of OV-43
+   */
+
+  describe("Tests for parseEHConnectionString") {
+    it("should throw an exception - empty string") {
+      Given("an event hub connection string")
+      val ehConnString = ""
+
+      When("the connection string is not in correct format")
+
+      Then("the function throws an exception")
+      assertThrows[BadConfigException] (PipelineFunctions.parseEHConnectionString(ehConnString))
+    }
+    it("should throw an exception - incorrect format") {
+      Given("an event hub connection string")
+      val ehConnString = "Endpoint=sb:/<NamespaceName>.servicebus.windows.net/;SharedAccessKey=<KeyValue>"
+
+      When("the connection string is not in correct format")
+
+      Then("the function throws an exception")
+      assertThrows[BadConfigException] (PipelineFunctions.parseEHConnectionString(ehConnString))
+    }
+    it("should parse the connection string") {
+      Given("an event hub connection string")
+      val ehConnString = "Endpoint=sb://<NamespaceName>.servicebus.windows.net/;SharedAccessKey=<KeyValue>"
+
+      When("the connection string is in correct format")
+
+      Then("the function returns the connection string")
+      assertResult(ehConnString) (PipelineFunctions.parseEHConnectionString(ehConnString))
+    }
+  }
+
+  describe("Tests for cleansePathURI - Part 2") {
+    it("should work for S3 - double slashes") {
+      Given("URI path with double slashes")
+      val uriPath = "s3a://commoncrawl//path"
+
+      When("function is called")
+
+      Then("returns the cleansed URI path")
+      assertResult("s3a://commoncrawl/path")(
+        PipelineFunctions.cleansePathURI(uriPath)
+      )
+    }
+  }
+
+  describe("Tests for epochMilliToTs") {
+    it("should convert epoch time to timestamp and preserve milliseconds") {
+      Given("a dataframe with epoch milliseconds time of long type")
+      val df = spark.sql("select '1636663343887' as epoch_millisecond")
+
+      When("function is called on this column")
+
+      Then("returns a column of type timestamp and preserves milliseconds")
+      assertResult("TimestampType") (df
+        .withColumn("converted_string", PipelineFunctions.epochMilliToTs("epoch_millisecond"))
+        .dtypes.filter(_._1 == "converted_string").head._2
+      )
+      assertResult("887") (df
+        .withColumn("converted_column", PipelineFunctions.epochMilliToTs("epoch_millisecond"))
+        .select("converted_column")
+        .collect().head.get(0).toString.split("\\.").takeRight(1).head
+      )
+    }
+    it("should return null for unexpected timestamp format") {
+      Given("a dataframe with timestamp column of unexpected format")
+      val df = spark.sql("select '10/14/2016 09:28 PM' as ts")
+
+      When("function is called on this column")
+
+      Then("return a null value for the converted column")
+      assertResult(null) (df
+        .withColumn("converted_column", PipelineFunctions.epochMilliToTs("ts"))
+        .select("converted_column")
+        .collect().head.get(0)
+      )
     }
   }
 
