@@ -346,7 +346,7 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion,1,1,runID))
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
