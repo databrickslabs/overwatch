@@ -34,7 +34,7 @@ case class DatabricksContractPrices(
                                      jobsLightDBUCostUSD: Double = 0.10
                                    )
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=0,errorBatchSize:Int=0)
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=0,errorBatchSize:Int=0,runID:String="")
 
 /**
  * Class for storing the response from API call.
