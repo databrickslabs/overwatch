@@ -503,8 +503,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   def parseJsonQuery(e: Throwable):ApiErrorDetail={
     val jsonObject = new JSONObject(jsonQuery)
-    ApiErrorDetail(jsonObject.getString("cluster_id")+"newAPI",jsonObject.getString("start_time"),
-      jsonObject.getString("end_time"),e.getMessage)
+    ApiErrorDetail(jsonObject.getString("cluster_id")+"newAPI",jsonObject.getString("start_time").toLong,
+      jsonObject.getString("end_time").toLong,e.getMessage)
   }
 
 
