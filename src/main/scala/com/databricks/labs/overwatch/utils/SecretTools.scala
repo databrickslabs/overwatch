@@ -3,6 +3,12 @@ package com.databricks.labs.overwatch.utils
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
 
+/**
+ * SecretTools handles common functionality related to working with secrets:
+ * 1) Get Databricks API token stored in specified secret
+ * 2) Normalize secret structure to be stored at Delta table pipeline_report under inputConfig.tokenSecret nested struct column
+ * There are two secret types available now - AWS Secrets Manager, Databricks secrets
+ */
 trait SecretTools[T <: TokenSecretContainer] {
   def getApiToken : String
   def getTargetTableStruct: TokenSecret
@@ -16,7 +22,7 @@ object SecretTools {
     override def getApiToken: String = {
       val scope = tokenSecret.scope
       val key = tokenSecret.key
-      val authMessage = s"Executing with token located in secret, $scope : $key"
+      val authMessage = s"Executing with Databricks token located in secret, scope=$scope : key=$key"
       logger.log(Level.INFO, authMessage)
       dbutils.secrets.get(scope, key)
     }
@@ -30,39 +36,16 @@ object SecretTools {
     override def getApiToken: String = {
       val secretId = tokenSecret.secretId
       val region = tokenSecret.region
-      val authMessage = s"Executing with token located in secret, $secretId : $region"
+      val tokenKey = tokenSecret.tokenKey
+      val authMessage = s"Executing with AWS token located in secret, secretId=$secretId : region=$region : tokenKey=$tokenKey"
       logger.log(Level.INFO, authMessage)
-      AwsSecrets.readApiToken(secretId, region)
+      AwsSecrets.readApiToken(secretId, region, tokenSecret.tokenKey)
     }
 
     override def getTargetTableStruct: TokenSecret = {
-      TokenSecret(tokenSecret.region,tokenSecret.secretId)
+      TokenSecret(tokenSecret.region, tokenSecret.secretId)
     }
   }
-
-  /*
-  def getToken(secretSource: TokenSecretContainer): String = {
-    secretSource match {
-      case x: AwsTokenSecret => new AwsSecretHolder().getApiToken(x)
-      case y: DatabricksTokenSecret => new DatabricksSecretHolder().getApiToken(y)
-      case _ => throw new IllegalArgumentException(s"${secretSource.toString} not implemented")
-    }
-  }
-   */
-
-  /*
-  def getTokenStruct[T <: TokenSecretContainer](tokenSecret: T, getSecretStruct: (T => TokenSecret)): TokenSecret = {
-    getSecretStruct(tokenSecret)
-  }
-
-  def getSecretTargetStruct(secretSource: TokenSecretContainer): TokenSecret = {
-    secretSource match {
-      case x: AwsTokenSecret => getTokenStruct(x, (secretSource: AwsTokenSecret) => TokenSecret(x.region,x.secretId)) //new AwsSecretHolder().getTargetTableStruct(x)
-      case y: DatabricksTokenSecret => getTokenStruct(y, (secretSource: DatabricksTokenSecret) => TokenSecret(y.scope,y.key)) //new DatabricksSecretHolder().getTargetTableStruct(y)
-      case _ => throw new IllegalArgumentException(s"${secretSource.toString} not implemented")
-    }
-  }
-   */
 
   def apply(secretSource: TokenSecretContainer): SecretTools[_] = {
     secretSource match {

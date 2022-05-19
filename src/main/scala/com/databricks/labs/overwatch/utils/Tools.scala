@@ -149,9 +149,7 @@ object Helpers extends SparkSessionWrapper {
   def parListFiles(path: String, conf: SerializableConfiguration): Array[String] = {
     try {
       val fs = new Path(path).getFileSystem(conf.value)
-      val out = fs.listStatus(new Path(path)).map(_.getPath.toString)
-      println(out.foreach(println))
-      out
+      fs.listStatus(new Path(path)).map(_.getPath.toString)
     } catch {
       case _: Throwable => Array(path)
     }
@@ -187,17 +185,11 @@ object Helpers extends SparkSessionWrapper {
     globPath(path, conf.value, fromEpochMillis, untilEpochMillis)
   }
 
-
   def globPath(path: String, conf: Configuration, fromEpochMillis: Option[Long], untilEpochMillis: Option[Long]): Array[PathStringFileStatus] = {
     logger.log(Level.DEBUG, s"PATH PREFIX: $path")
     try {
-      val path1 = path.substring(0,9)+path.substring(9).replace(":","\\:")
-      val fs = new Path(path1).getFileSystem(conf)
-      println("FILESYSTEM=",fs)
-      println("PATH=",path1)
-      //val paths = fs.globStatus(new Path(path.substring(0,9)+path.substring(10).replace(":","\\:")))
-      val paths = fs.globStatus(new Path(path1))
-      println("paths=",paths.mkString(":"))
+      val fs = new Path(path).getFileSystem(conf)
+      val paths = fs.globStatus(new Path(path))
       logger.log(Level.DEBUG, s"$path expanded in ${paths.length} files")
       paths.map(wildString => {
         val path = wildString.getPath

@@ -1,25 +1,19 @@
 package com.databricks.labs.overwatch.utils
 
-import com.amazonaws.client.builder.AwsClientBuilder
-import com.amazonaws.regions.Regions
 import com.amazonaws.services.secretsmanager.AWSSecretsManagerClientBuilder
 import com.amazonaws.services.secretsmanager.model.GetSecretValueRequest
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import org.apache.log4j.{Level, Logger}
 import org.json4s.DefaultFormats
-import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.JsonMethods.parse
 
 import java.util.Base64
 
 object AwsSecrets {
-
   private val logger: Logger = Logger.getLogger(this.getClass)
-  //println(readRawSecretFromAws("data-eng-secret","us-east-2"))
 
   def readApiToken(secretId: String, region: String, apiTokenKey: String = "apiToken"): String = {
     secretValueAsMap(secretId, region)
-      .getOrElse(apiTokenKey ,throw new IllegalStateException("apiToken param not found"))
+      .getOrElse(apiTokenKey ,throw new IllegalStateException("apiTokenKey param not found"))
       .asInstanceOf[String]
   }
 

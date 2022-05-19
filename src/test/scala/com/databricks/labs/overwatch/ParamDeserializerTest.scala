@@ -12,11 +12,38 @@ class ParamDeserializerTest extends AnyFunSpec {
 
   describe("ParamDeserializer") {
 
+    val paramModule: SimpleModule = new SimpleModule()
+      .addDeserializer(classOf[OverwatchParams], new ParamDeserializer)
+    val mapper: ObjectMapper with ScalaObjectMapper = (new ObjectMapper() with ScalaObjectMapper)
+      .registerModule(DefaultScalaModule)
+      .registerModule(paramModule)
+      .asInstanceOf[ObjectMapper with ScalaObjectMapper]
+
+    it("should decode passed token string as AWS secrets") {
+      val AWSsecrets = """
+                         |{"tokenSecret":{"secretId":"overwatch","region":"us-east-2","tokenKey":"apiToken"}}
+                         |""".stripMargin
+
+
+      val expected = Some(AwsTokenSecret("overwatch", "us-east-2", "apiToken"))
+      val parsed = mapper.readValue[OverwatchParams](AWSsecrets)
+      assertResult(expected)(parsed.tokenSecret)
+    }
+
+    it("should decode passed token string as Databricks secrets") {
+      val Databrickssecrets = """
+                             |{"tokenSecret":{"scope":"overwatch", "key":"test-key"}}
+                             |""".stripMargin
+
+      val expected = Some(TokenSecret("overwatch", "test-key"))
+      val parsed = mapper.readValue[OverwatchParams](Databrickssecrets)
+      assertResult(expected)(parsed.tokenSecret)
+    }
+
     it("should decode incomplete parameters") {
       val incomplete = """
         |{"auditLogConfig":{"azureAuditLogEventhubConfig":{"connectionString":"test","eventHubName":"overwatch-evhub",
         |"auditRawEventsPrefix":"/tmp/overwatch_dev/overwatch_etl_dev","maxEventsPerTrigger":10001}},
-        |"tokenSecret":{"secretId":"overwatch","region":"us-east-2","tokenKey":"apiToken"},
         |"badRecordsPath":"/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords",
         |"overwatchScope":["audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools"],
         |"maxDaysToLoad":60,
@@ -24,13 +51,6 @@ class ParamDeserializerTest extends AnyFunSpec {
         |"intelligentScaling":{"enabled":false, "minimumCores":4 , "maximumCores":512 , "coeff":1.0},
         |"workspace_name":"myTestWorkspace", "externalizeOptimizations":"false"}
         |""".stripMargin
-
-      val paramModule: SimpleModule = new SimpleModule()
-        .addDeserializer(classOf[OverwatchParams], new ParamDeserializer)
-      val mapper: ObjectMapper with ScalaObjectMapper = (new ObjectMapper() with ScalaObjectMapper)
-        .registerModule(DefaultScalaModule)
-        .registerModule(paramModule)
-        .asInstanceOf[ObjectMapper with ScalaObjectMapper]
 
       val expected = OverwatchParams(
         AuditLogConfig(
@@ -41,7 +61,7 @@ class ParamDeserializerTest extends AnyFunSpec {
             maxEventsPerTrigger = 10001
           ))
         ),
-        Some(AwsTokenSecret("overwatch", "us-east-2", "apiToken")), //None,
+        None,
         None,
         Some("/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords"),
         Some(Seq("audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools")),
