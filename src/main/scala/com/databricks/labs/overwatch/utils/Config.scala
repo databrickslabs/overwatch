@@ -314,16 +314,12 @@ class Config() {
    */
   private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecretContainer]): this.type = {
     var rawToken = ""
-   // var scope = ""
-   // var key = ""
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
         _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
-        //scope = tokenSecret.get.scope // getSecretToken(secretType, tokenSecretWrapper)
-        //key = tokenSecret.get.key // getSecretToken(secretType, tokenSecretWrapper)
-        rawToken = SecretTools(tokenSecret.get).getApiToken //SecretTools.getToken(tokenSecret.get) //dbutils.secrets.get(scope, key) // getSecretToken(secretType, tokenSecretWrapper)
+        rawToken = SecretTools(tokenSecret.get).getApiToken
         _tokenType = "Secret"
       } else {
         if (_isLocalTesting) { // Local testing env vars

@@ -2,7 +2,7 @@ name: Publish
 on:
   push:
     branches:
-      - logging_v0604
+      - master
 
 jobs:
   publish_overwatch:

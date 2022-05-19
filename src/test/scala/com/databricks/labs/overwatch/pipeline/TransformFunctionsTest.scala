@@ -176,42 +176,5 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
       val actualDF = df.withColumn("col1", TransformFunctions.stringTsToUnixMillis($"col1"))
       assertSmallDataFrameEquality(actualDF, expectedDF)
     }
-
-    it("should extract log paths") {
-      val tempPath = System.getProperty("java.io.tmpdir")
-      val GoodlogDir = "cluster-logs/recommendations/feature-store/production/0825-194151-adapt687/eventlog"
-      val BadlogDir1 = "scribd-data-eng-logs-prod/databricks/kitchensink-etl/user_browser_uuids_partitioned_by_ds/2022-04-11T022100+0000/1/0412-041842-702htn9o/eventlog"
-      val BadlogDir = "scribd-data-eng-logs-prod/databricks/kitchensink-etl/user_browser_uuids_partitioned_by_ds/2022-04-11T02:21:00+00:00/1/0412-041842-702htn9o/eventlog"
-      val GoodlogSubDir = "/0825-194151-adapt687_10_230_54_88/2370849322415120956"
-      val BadlogSubdir = "/0412-041842-702htn9o_10_230_49_221/6516587549925865915"
-      val GoodfullPath = tempPath + GoodlogDir + GoodlogSubDir
-      val BadfullPath = tempPath + BadlogDir + BadlogSubdir
-      val Goodresult = new File(GoodfullPath).mkdirs()
-      val Badresult = new File(BadfullPath).mkdirs()
-      val GoodlogFile = GoodfullPath + "/eventlog-2021-08-29--08-00.gz"
-      val BadLogFile = BadfullPath + "/eventlog"
-      import java.io.PrintWriter
-      new PrintWriter(GoodlogFile) { write("file contents"); close }
-      println(GoodfullPath)
-      println("file://" + GoodlogFile)
-      new PrintWriter(BadLogFile) { write("file contents"); close }
-      println(BadfullPath)
-      println("file://" + BadLogFile)
-      val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
-      // "hdfs:/cluster-logs/recommendations/feature-store/production/0825-194151-adapt687/eventlog/0825-194151-adapt687_10_230_54_88/2370849322415120956/eventlog-2021-08-29--08-00.gz"
-      val allEventLogPrefixes = spark.createDataFrame(Seq(("" + tempPath + BadlogDir,1))).toDF("logPathPrefix","order")
-      allEventLogPrefixes
-        .select("logPathPrefix")
-        .as[String]
-        .map(x => Helpers.parListFiles(x, hadoopConf)) // parallelized file lister since large / shared / long-running (months) clusters will have MANy paths
-        .select(explode('value).alias("logPathPrefix"))
-        .withColumn("logPathPrefix", concat_ws("/", 'logPathPrefix, lit("*"), lit("eventlo*")))
-        .as[String]
-        .map(p => Helpers.globPath(p, hadoopConf, Some(1L), Some(999999999999999999L)))
-        .select(explode('value).alias("simpleFileStatus"))
-        .selectExpr("simpleFileStatus.*")
-        .withColumnRenamed("pathString", "filename")
-        .show(false)
-    }
   }
 }

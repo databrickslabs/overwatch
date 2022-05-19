@@ -265,7 +265,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setExternalizeOptimize(rawParams.externalizeOptimize)
 
     val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
-    val tokenSecret = SecretTools(rawParams.tokenSecret.get).getApiToken //.getToken(rawParams.tokenSecret.get)
+    val tokenSecret = SecretTools(rawParams.tokenSecret.get).getApiToken
     // TODO -- PRIORITY -- If data target is null -- default table gets dbfs:/null
     val dataTarget = rawParams.dataTarget.getOrElse(
       DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None))
