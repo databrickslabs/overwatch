@@ -34,9 +34,15 @@ class ApiMetaFactory{
        case "instance-profiles/list" => new InstanceProfileListApi
        case "workspace/list" => new WorkspaceListApi
        case "sql/history/queries" => new SqlHistoryQueriesApi
+       case "clusters/resize" => new ClusterResizeApi
+
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }
   }
+}
+
+class ClusterResizeApi extends ApiMeta{
+  apiCallType = "POST"
 }
 
 class SqlHistoryQueriesApi extends ApiMeta{
