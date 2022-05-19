@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.util.SerializableConfiguration
 
 /**
  * Take the config and validate the setup
@@ -209,6 +210,33 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   }
 
   /**
+   * defaults temp working dir to etlTargetPath/organizationId
+   * this is important to minimize bandwidth issues
+   * also setting temp target to be within the etl target minimizes liklihood for read/write permissions
+   * issues. Can be overridden in config
+   * @param tempPath defaults to "" (nullstring) in the config
+   * @param etlTargetPath target path for all overwatch data
+   */
+  private def prepAndSetTempWorkingDir(tempPath: String, etlTargetPath: String): Unit = {
+    val defaultTempPath = s"$etlTargetPath/tempWorkingDir/${config.organizationId}"
+    val workspaceTempWorkingDir = if (tempPath == "") { // default null string
+      defaultTempPath
+    }
+    else if (tempPath.split("/").takeRight(1).headOption.getOrElse("") == config.organizationId) { // if user defined value already ends in orgid don't append it
+      tempPath
+    } else { // if user configured value doesn't end with org id append it
+      s"$tempPath/${config.organizationId}"
+    }
+    val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
+    if (Helpers.pathExists(workspaceTempWorkingDir)) { // if temp path exists clean it
+      Helpers.fastrm(Helpers.parListFiles(workspaceTempWorkingDir, hadoopConf))
+    }
+    // ensure path exists at init
+    dbutils.fs.mkdirs(workspaceTempWorkingDir)
+    config.setTempWorkingDir(workspaceTempWorkingDir)
+  }
+
+  /**
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
    *
@@ -270,7 +298,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     val dataTarget = rawParams.dataTarget.getOrElse(
       DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None))
     val auditLogConfig = rawParams.auditLogConfig
-    val badRecordsPath = rawParams.badRecordsPath
 
     if (overwatchScope.head == "all") config.setOverwatchScope(config.orderedOverwatchScope)
     else config.setOverwatchScope(validateScope(overwatchScope))
@@ -325,8 +352,18 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     }
 
 
-    // Todo -- add validation to badRecordsPath
-    config.setBadRecordsPath(badRecordsPath.getOrElse("/tmp/overwatch/badRecordsPath"))
+    // must happen AFTER data target validation
+    // persistent location for corrupted spark event log files
+    val badRecordsPath = rawParams.badRecordsPath
+    config.setBadRecordsPath(badRecordsPath.getOrElse(
+      s"${dataTarget.etlDataPathPrefix}/spark_events_bad_records_files/${config.organizationId}")
+    )
+
+    // must happen AFTER data target validation
+    if (!disableValidations) { // temp working dir is not necessary for disabled validations as pipelines cannot be
+    // executed without validations
+      prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
+    }
 
     config.setMaxDays(rawParams.maxDaysToLoad)
 
@@ -539,43 +576,59 @@ object Initializer extends SparkSessionWrapper {
    *                      is more robust output when debug is enabled.
    * @return
    */
-  def apply(overwatchArgs: String, debugFlag: Boolean = false): Workspace = {
-
-    val config = initConfigState(debugFlag)
-
-    logger.log(Level.INFO, "Initializing Environment")
-    val initializer = new Initializer(config)
-    val database = initializer
-      .validateAndRegisterArgs(overwatchArgs)
-      .initializeDatabase()
-
-    logger.log(Level.INFO, "Initializing Workspace")
-    val workspace = Workspace(database, config)
-
-
-    workspace
+  def apply(overwatchArgs: String): Workspace = {
+    apply(
+      overwatchArgs,
+      debugFlag = false,
+      isSnap = false,
+      disableValidations = false
+    )
+  }
+  def apply(overwatchArgs: String, debugFlag: Boolean): Workspace = {
+    apply(
+      overwatchArgs,
+      debugFlag,
+      isSnap = false,
+      disableValidations = false
+    )
   }
 
+  /**
+   *
+   * @param overwatchArgs Json string of args -- When passing into args in Databricks job UI, the json string must
+   *                      be passed in as an escaped Json String. Use JsonUtils in Tools to build and extract the string
+   *                      to be used here.
+   * @param debugFlag manual Boolean setter to enable the debug flag. This is different than the log4j DEBUG Level
+   *                      When setting this to true it does enable the log4j DEBUG level but throughout the code there
+   *                      is more robust output when debug is enabled.
+   * @param isSnap internal only param to add specific snap metadata to initialized dataset
+   * @param disableValidations internal only whether or not to validate the parameters for the local Databricks workspace
+   *                           if this is set to true, pipelines cannot be run as they are set to read only mode
+   * @param initializeDatabase internal only parameter to disable the automatic creation of a database upon workspace
+   *                           init.
+   * @return
+   */
   private[overwatch] def apply(
                                 overwatchArgs: String,
-                                debugFlag: Boolean,
-                                isSnap: Boolean,
-                                disableValidations: Boolean
+                                debugFlag: Boolean = false,
+                                isSnap: Boolean = false,
+                                disableValidations: Boolean = false,
+                                initializeDatabase: Boolean = true
                               ): Workspace = {
 
     val config = initConfigState(debugFlag)
 
     logger.log(Level.INFO, "Initializing Environment")
     val initializer = new Initializer(config)
-    val database = initializer
       .setIsSnap(isSnap)
-      .setDisableValidations(true)
+      .setDisableValidations(disableValidations) // if true, will result in a read only pipeline
       .validateAndRegisterArgs(overwatchArgs)
-      .initializeDatabase()
+
+    val database = if (initializeDatabase) initializer.initializeDatabase() else Database(config)
 
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)
-
+      .setValidated(!disableValidations)
 
     workspace
   }

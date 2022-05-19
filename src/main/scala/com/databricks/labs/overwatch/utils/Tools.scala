@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Initializer, PipelineFunctions, PipelineTable}
+import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Pipeline, PipelineFunctions, PipelineTable, Silver}
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -422,8 +422,12 @@ object Helpers extends SparkSessionWrapper {
     }).toArray.toSeq
   }
 
-  def getLatestVersion(tablePath: String): Long = {
+  def getLatestTableVersionByPath(tablePath: String): Long = {
     DeltaTable.forPath(tablePath).history(1).select('version).as[Long].head
+  }
+
+  def getLatestTableVersionByName(tableName: String): Long = {
+    DeltaTable.forName(tableName).history(1).select('version).as[Long].head
   }
 
   def getURI(pathString: String): URI = {
@@ -527,6 +531,135 @@ object Helpers extends SparkSessionWrapper {
 
     val compactString = JsonUtils.objToJson(overwatchParams).compactString
     Initializer(compactString)
+  }
+
+  /**
+   * Enable Overwatch to retrieve a remote workspace as it's configured on a remote workspace.
+   * Key differences in the way this workspace is initialized is 1) all validations are disabled; thus no
+   * errors regarding remote keys not being present, etc. and 2) the database is not initialized since it's
+   * likely that the user doesn't want to start a new Overwatch database in the local workspace
+   * as it's defined in the remote workspace.
+   * Lastly, Pipelines that are build from this workspace instance cannot be run as all pipelines built from
+   * this workspace will be set to read only since validations have not been executed.
+   * @param pipelineReportPath path to remote "pipeline_report" table. Usually some_prefix/global_share/pipeline_report
+   * @param workspaceID A single organization_id that has been run and successfully completed and reported data
+   *                    to this pipeline_report output
+   * @return
+   */
+  def getRemoteWorkspaceByPath(pipelineReportPath: String, workspaceID: String): Workspace = {
+    // handle non-nullable field between azure and aws
+    val addNewConfigs = Map(
+      "auditLogConfig.azureAuditLogEventhubConfig" ->
+        when($"auditLogConfig.rawAuditPath".isNotNull, lit(null))
+          .otherwise($"auditLogConfig.azureAuditLogEventhubConfig")
+          .alias("azureAuditLogEventhubConfig")
+    )
+
+    // acquires the config for the workspaceId from the latest run
+    val orgRunDetailsBase = spark.read.format("delta").load(pipelineReportPath)
+      .filter('organization_id === workspaceID)
+      .select('organization_id, 'Pipeline_SnapTS, 'inputConfig)
+      .orderBy('Pipeline_SnapTS.desc)
+      .select($"inputConfig.*")
+
+    // get latest workspace config by org_id
+    val overwatchParams = orgRunDetailsBase
+      .select(SchemaTools.modifyStruct(orgRunDetailsBase.schema, addNewConfigs): _*)
+      .limit(1)
+      .as[OverwatchParams]
+      .first
+
+    val compactString = JsonUtils.objToJson(overwatchParams).compactString
+    Initializer(compactString, disableValidations = true, initializeDatabase = false)
+  }
+
+  /**
+   * Enables users to create a database with all the Overwatch datasets linked to their remote source WITHOUT needing
+   * to run Overwatch on the local workspace.
+   * Get the remote workspace using 'getRemoteWorkspaceByPath' function, build a localDataTarget to define the local
+   * etl and consumer database details
+   * @param remoteWorkspace remote workspace can be retrieved through getRemoteWorkspaceByPath
+   * @param localDataTarget DataTarget defined for local database names and locations
+   *                        the etlStoragePrefix must point to the existing Overwatch dataset whether it's mounted
+   *                        or direct access via s3:// or abfss:// or dbfs:/mnt/ etc.
+   * @return
+   */
+  def registerRemoteOverwatchIntoLocalMetastore(
+                                                 remoteWorkspace: Workspace,
+                                                 localDataTarget: DataTarget
+                                               ): Seq[WorkspaceMetastoreRegistrationReport] = {
+
+    val newConfigParams = remoteWorkspace.getConfig.inputConfig.copy(dataTarget = Some(localDataTarget))
+    val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
+    val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
+    val registrationReport = localTempWorkspace.addToMetastore()
+    val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
+    val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
+
+    b.refreshViews()
+    g.refreshViews()
+    registrationReport
+
+  }
+
+  def rollbackTargetToTimestamp(
+                                 workspace: Workspace,
+                                 targetName: String,
+                                 rollbackToEpochMS: Long,
+                                dryRun: Boolean = true
+                               ): Unit = {
+    val deleteLogger = Logger.getLogger("ROLLBACK Logger")
+    val config = workspace.getConfig
+    val rollbackToTime = Pipeline.createTimeDetail(rollbackToEpochMS)
+    val allTargets = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
+      Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
+      Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets
+    val targetToRollback = allTargets.find(_.name.toLowerCase == targetName)
+    assert(targetToRollback.nonEmpty, s"Target with name: $targetName not found")
+
+    val target = targetToRollback.get
+    val targetSchema = target.asDF.schema
+    val incrementalFields = targetSchema.filter(f => target.incrementalColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
+    val incrementalFilters = incrementalFields.map(f => {
+      f.dataType.typeName match {
+        case "long" => s"${f.name} >= ${rollbackToTime.asUnixTimeMilli}"
+        case "date" => s"${f.name} >= '${rollbackToTime.asDTString}'"
+        case "timestamp" => s"${f.name} >= '${rollbackToTime.asTSString}'"
+      }
+    })
+    val orgIdFilter = s" and organization_id = '${workspace.getConfig.organizationId}'"
+    val deleteClause = incrementalFilters.reduce((x, y) => s"$x and $y ") + orgIdFilter
+    val deleteStatement =
+      s"""
+         |delete from ${target.tableFullName}
+         |where $deleteClause
+         |""".stripMargin
+    deleteLogger.info(s"DELETE STATEMENT: $deleteStatement")
+    if (!dryRun) spark.sql(deleteStatement)
+
+  }
+
+  def rollbackPipelineStateToTimestamp(
+                                      workspace: Workspace,
+                                      fromEpochMS: Long,
+                                      moduleId: Int,
+                                      customRollbackStatus: String = "ROLLED BACK"
+                                      ): Unit = {
+    val rollbackLogger = Logger.getLogger("Overwatch_State: ROLLBACK Logger")
+    val config = workspace.getConfig
+    val b = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
+    val pipelineReportTarget = b.pipelineStateTarget
+    val updateClause =
+      s"""
+         |update ${pipelineReportTarget.tableFullName}
+         |set status = '$customRollbackStatus'
+         |where organization_id = '${config.organizationId}'
+         |and fromTS >= $fromEpochMS
+         |and moduleId = $moduleId
+         |and (status = 'SUCCESS' or status like 'EMPT%')
+         |""".stripMargin
+    rollbackLogger.info(updateClause)
+    spark.sql(updateClause)
   }
 
 }

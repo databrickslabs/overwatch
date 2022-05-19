@@ -551,6 +551,7 @@ object Schema extends SparkSessionWrapper {
       StructField("jobName", StringType, true),
       StructField("timeout_seconds", StringType, true),
       StructField("notebook_path", StringType, true),
+      StructField("schedule", minimumScheduleSchema, true),
       StructField("new_settings", minimumNewSettingsSchema, true),
       StructField("aclPermissionSet", StringType, true),
       StructField("grants", StringType, true),

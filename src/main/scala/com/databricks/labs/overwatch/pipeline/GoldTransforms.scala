@@ -32,6 +32,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       'init_scripts,
       'custom_tags,
       'cluster_source,
+      'aws_attributes,
+      'azure_attributes,
       'spark_env_vars,
       'spark_conf,
       'acl_path_prefix,
@@ -275,22 +277,14 @@ trait GoldTransforms extends SparkSessionWrapper {
             .between($"workerNodeDetails.activeFromEpochMillis", $"workerNodeDetails.activeUntilEpochMillis"),
         "left")
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup")
-      .withColumn("worker_potential_core_S", when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0)))
-      .withColumn("core_hours", when('isRunning,
-        round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
-          round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
-      ).otherwise(lit(0.0)))
-      .withColumn("isAutomated", isAutomated('cluster_name))
-      .withColumn("worker_potential_core_H", 'worker_potential_core_S / lit(3600))
-      .withColumn("driver_compute_cost", Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H))
-      .withColumn("worker_compute_cost", Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H))
-      .withColumn("driver_dbu_cost", Costs.dbu('databricks_billable, $"driverSpecs.Hourly_DBUs", 'dbu_rate, lit(1), 'uptime_in_state_H))
-      .withColumn("worker_dbu_cost", Costs.dbu('databricks_billable, $"workerSpecs.Hourly_DBUs", 'dbu_rate, 'current_num_workers, 'uptime_in_state_H))
-      .withColumn("total_compute_cost", 'driver_compute_cost + 'worker_compute_cost)
-      .withColumn("total_DBU_cost", 'driver_dbu_cost + 'worker_dbu_cost)
-      .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
-      .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
-      .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
+
+    val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
+    val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H).otherwise(lit(0)).alias("driver_dbus")
+    val workerDBUs = when('databricks_billable, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)).alias("worker_dbus")
+    val driverComputeCost = Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H).alias("driver_compute_cost")
+    val workerComputeCost = Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H).alias("worker_compute_cost")
+    val driverDBUCost = Costs.dbu('databricks_billable, $"driverSpecs.Hourly_DBUs", 'dbu_rate, lit(1), 'uptime_in_state_H).alias("driver_dbu_cost")
+    val workerDBUCost = Costs.dbu('databricks_billable, $"workerSpecs.Hourly_DBUs", 'dbu_rate, 'current_num_workers, 'uptime_in_state_H).alias("worker_dbu_cost")
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
@@ -312,24 +306,30 @@ trait GoldTransforms extends SparkSessionWrapper {
       'uptime_in_state_H,
       'cloud_billable,
       'databricks_billable,
-      'isAutomated,
+      isAutomated('cluster_name).alias("isAutomated"),
       'sku,
       'dbu_rate,
       'state_dates,
       'days_in_state,
-      'worker_potential_core_H,
-      'core_hours,
+      (workerPotentialCoreS / lit(3600)).alias("worker_potential_core_H"),
+      driverDBUs,
+      workerDBUs,
+      (driverDBUs + workerDBUs).alias("total_dbus"),
+      when('isRunning,
+        round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
+          round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
+      ).otherwise(lit(0.0)).alias("core_hours"),
       'driverSpecs,
       'workerSpecs,
-      'driver_compute_cost,
-      'worker_compute_cost,
-      'driver_dbu_cost,
-      'worker_dbu_cost,
-      'total_compute_cost,
-      'total_DBU_cost,
-      'total_driver_cost,
-      'total_worker_cost,
-      'total_cost
+      driverComputeCost,
+      workerComputeCost,
+      driverDBUCost,
+      workerDBUCost,
+      (driverComputeCost + workerComputeCost).alias("total_compute_cost"),
+      (driverDBUCost + workerDBUCost).alias("total_DBU_cost"),
+      (driverDBUCost + driverComputeCost).alias("total_driver_cost"),
+      (workerDBUCost + workerComputeCost).alias("total_worker_cost"),
+      (driverComputeCost + driverDBUCost + workerComputeCost + workerDBUCost).alias("total_cost")
     )
 
     clusterPotential
@@ -341,7 +341,8 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               clsfLag90D: DataFrame,
                                               sparkJobLag2D: DataFrame,
                                               sparkTaskLag2D: DataFrame,
-                                              fromTime: TimeTypes
+                                              fromTime: TimeTypes,
+                                              untilTime: TimeTypes
                                             )(jrGoldLag30D: DataFrame): DataFrame = {
 
     val clusterPotentialWCosts = if (clsfLag90D.isEmpty) {
@@ -356,6 +357,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
     }
 
+    // TODO -- review the neaAndOpenJobRuns with updated jobRun logic to ensure all open runs are accounted for
     val newJrLaunches = jrGoldLag30D
       .filter($"job_runtime.startEpochMS" >= fromTime.asUnixTimeMilli)
 
@@ -423,7 +425,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .lookupWhen(
         clusterPotentialInitialState
           .toTSDF("timestamp", "organization_id", "cluster_id"),
-        tsPartitionVal = 16, maxLookAhead = 1L
+        tsPartitionVal = 4, maxLookAhead = 1L
       ).df
       .drop("timestamp")
       .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
@@ -433,12 +435,12 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("lifecycleState", lit("init"))
 
     val jobRunTerminalState = newAndOpenJobRuns
-      .withColumn("timestamp", $"job_runtime.endEpochMS")
+      .withColumn("timestamp", coalesce($"job_runtime.endEpochMS", lit(untilTime.asUnixTimeMilli))) // include currently executing runs and calculate costs through module until time
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         clusterPotentialTerminalState
           .toTSDF("timestamp", "organization_id", "cluster_id"),
-        tsPartitionVal = 8, maxLookback = 0L, maxLookAhead = 1L
+        tsPartitionVal = 4, maxLookback = 0L, maxLookAhead = 1L
       ).df
       .drop("timestamp")
       .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull && 'unixTimeMS_state_end > $"job_runtime.endEpochMS")
@@ -917,7 +919,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, workspace_name, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
       |autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type, security_profile, cluster_log_conf,
-      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix,
+      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, aws_attributes, azure_attributes,
       |driver_instance_pool_id, instance_pool_id, driver_instance_pool_name, instance_pool_name,
       |spark_version, idempotency_token, deleted_by, created_by, last_edited_by
       |""".stripMargin

@@ -98,8 +98,9 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(),
                            primordialDateString: Option[String] = None,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
-                           workspace_name: Option[String],
-                           externalizeOptimize: Boolean
+                           workspace_name: Option[String] = None,
+                           externalizeOptimize: Boolean = false,
+                           tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )
 
 case class ParsedConfig(
@@ -326,6 +327,12 @@ private[overwatch] class BadSchemaException(s: String) extends Exception(s) {
 private[overwatch] class UpgradeException(s: String, target: PipelineTable, step: Option[String] = None, failUpgrade: Boolean = false) extends Exception(s) {
   def getUpgradeReport: UpgradeReport = {
     UpgradeReport(target.databaseName, target.name, Some(PipelineFunctions.appendStackStrace(this, s)), step, failUpgrade)
+  }
+}
+
+private[overwatch] class SimplifiedUpgradeException(s: String, db: String, table: String, step: Option[String] = None, failUpgrade: Boolean = false) extends Exception(s) {
+  def getUpgradeReport: UpgradeReport = {
+    UpgradeReport(db, table, Some(PipelineFunctions.appendStackStrace(this, s)), step, failUpgrade)
   }
 }
 
