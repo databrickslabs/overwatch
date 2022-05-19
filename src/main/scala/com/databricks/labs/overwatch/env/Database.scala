@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -10,6 +11,7 @@ import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, Streami
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
 import java.util
+import java.util.UUID
 
 class Database(config: Config) extends SparkSessionWrapper {
 
@@ -127,13 +129,49 @@ class Database(config: Config) extends SparkSessionWrapper {
     streamManager
   }
 
+  /**
+   * It's often more efficient to write a temporary version of the data to be merged than to compare complex
+   * pipelines multiple times. This function simplifies the logic to write the df to temp storage and
+   * read it back as a simple scan for deduping and merging
+   * NOTE: this may be moved outside of database.scala if usage is valuable in other contexts
+   * @param df Dataframe to persist and load as fresh
+   * @param target target the df represents
+   * @return
+   */
+  private def persistAndLoad(df: DataFrame, target: PipelineTable): DataFrame = {
+    val tempPrefix = target.config.tempWorkingDir
+    val tempSuffix = UUID.randomUUID().toString.replace("-", "")
+    val dfTempPath = s"${tempPrefix}/${target.name.toLowerCase}/$tempSuffix"
+
+    logger.info(
+      s"""
+         |Writing intermediate dataframe '${target.tableFullName}' to temporary path '$dfTempPath'
+         |to optimize downstream performance.
+         |""".stripMargin)
+    df.write.format("delta").save(dfTempPath)
+
+    spark.read.format("delta").load(dfTempPath)
+  }
+
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
   def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column): Boolean = {
-    var finalDF: DataFrame = df
-    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
-    finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
-    finalDF = if (target.workspaceName) finalDF.withColumn("workspace_name", lit(config.workspaceName)) else finalDF
+    var dataDF: DataFrame = df
+
+    // apend metadata to source DF
+    dataDF = if (target.withCreateDate) dataDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else dataDF
+    dataDF = if (target.withOverwatchRunID) dataDF.withColumn("Overwatch_RunID", lit(config.runID)) else dataDF
+    dataDF = if (target.workspaceName) dataDF.withColumn("workspace_name", lit(config.workspaceName)) else dataDF
+
+    // persist and load df if it is to be deduped and/or merged for perf optimization
+    var finalDF: DataFrame = if (!target.permitDuplicateKeys || target.writeMode == WriteMode.merge) {
+      persistAndLoad(dataDF, target)
+    } else {
+      dataDF
+    }
+
+    // if target is to be deduped, dedup it by keys
+    finalDF = if (!target.permitDuplicateKeys) finalDF.dedupByKey(target.keys, target.incrementalColumns) else finalDF
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT

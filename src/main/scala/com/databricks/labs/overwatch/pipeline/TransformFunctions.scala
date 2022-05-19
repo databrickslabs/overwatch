@@ -227,7 +227,7 @@ object TransformFunctions {
      * @param incrementalFields seq of incremental fields for the df
      * @return
      */
-    def dropDupsByKey(
+    def dedupByKey(
                      keys: Seq[String],
                      incrementalFields: Seq[String]
                      ): DataFrame = {

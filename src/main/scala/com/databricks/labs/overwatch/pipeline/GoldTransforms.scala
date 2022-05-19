@@ -106,7 +106,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       'requestDetails.alias("request_detail"),
       'timeDetails.alias("time_detail")
     )
-    jobRunsLag30D.select(jobRunCols: _*)
+    jobRunsLag30D
+      .select(jobRunCols: _*)
   }
 
   protected def buildNotebook()(df: DataFrame): DataFrame = {
@@ -351,9 +352,7 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               sparkJobLag2D: DataFrame,
                                               sparkTaskLag2D: DataFrame,
                                               fromTime: TimeTypes,
-                                              untilTime: TimeTypes,
-                                              jrcpKeys: Array[String],
-                                              jrcpIncrementalFields: Array[String]
+                                              untilTime: TimeTypes
                                             )(jrGoldLag30D: DataFrame): DataFrame = {
 
     val clusterPotentialWCosts = if (clsfLag90D.isEmpty) {
@@ -643,13 +642,11 @@ trait GoldTransforms extends SparkSessionWrapper {
         )
         .drop("db_job_id", "db_id_in_job", "orgId")
         .withColumn("job_run_cluster_util", round(('spark_task_runtime_H / 'worker_potential_core_H), 4))
-        .dropDupsByKey(jrcpKeys, jrcpIncrementalFields) // ensure no dups by key or gold merge can break
     } else {
       jobRunCostPotential
         .withColumn("spark_task_runtimeMS", lit(null).cast("long"))
         .withColumn("spark_task_runtime_H", lit(null).cast("double"))
         .withColumn("job_run_cluster_util", lit(null).cast("double"))
-        .dropDupsByKey(jrcpKeys, jrcpIncrementalFields) // ensure no dups by key or gold merge can break
     }
 
 
