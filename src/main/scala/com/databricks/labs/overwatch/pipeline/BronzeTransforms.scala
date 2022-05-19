@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
@@ -454,46 +454,37 @@ trait BronzeTransforms extends SparkSessionWrapper {
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
       s"properly. Skipping!", Level.ERROR)
 
-    /**
-     * NOTE *** IMPORTANT
-     * Large batches are more efficient but can result in OOM with driver.maxResultSize. To avoid this it's
-     * important to increase the driver.maxResultSize for non-periodic runs with this module
-     * Ensure large enough driver (memory) and add this to cluster config
-     * spark.driver.maxResultSize 32g
-     */
-    val batchSize = 500000D
-    // TODO -- remove hard-coded path
-    val tmpClusterEventsPath = s"$tempWorkingDir/bronze/clusterEventsBatches"
-    val (clusterEventsBuffer, failedBatchingCalls) = buildClusterEventBatches(apiEnv, batchSize, startTime, endTime, clusterIDs)
 
-    persistErrors(
-      buildClusterEventsErrorDF(failedBatchingCalls),
-      database,
-      erroredBronzeEventsTarget,
-      pipelineSnapTS,
-      organizationId
-    )
+    logger.info("Calling New APIv2"+clusterIDs.length+" run id :"+apiEnv.runID)
+    val tmpClusterEventsSuccessPath =s"$tempWorkingDir/success"+apiEnv.runID
+    val tmpClusterEventsErrorPath =s"$tempWorkingDir/error"+apiEnv.runID
+    var jsonArray:Array[String]=new Array[String](clusterIDs.length);
 
-    logger.log(Level.INFO, s"NUMBER OF BATCHES: ${clusterEventsBuffer.length} \n" +
-      s"ESTIMATED EVENTS: ${clusterEventsBuffer.length * batchSize.toInt}")
+    for(i <- 0 to clusterIDs.length-1){
+      clusterIDs(i)
+      val jsonQuery = s"""{"cluster_id":"${clusterIDs(i)}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
+      jsonArray(i) = jsonQuery
+    }
 
-    var batchCounter = 0
-    clusterEventsBuffer.foreach(clusterIdsBatch => {
-      batchCounter += 1
-      logger.log(Level.INFO, s"BEGINNING BATCH ${batchCounter} of ${clusterEventsBuffer.length}")
-      val (clusterEvents, erroredEventsLookupDF) = clusterEventsByClusterBatch(startTime, endTime, apiEnv, clusterIdsBatch)
+    ApiCallV2(apiEnv,"clusters/events",jsonArray,tmpClusterEventsSuccessPath,tmpClusterEventsErrorPath).executeBatch()
+    if(Helpers.pathExists(tmpClusterEventsErrorPath)){
+      persistErrors(
+        spark.read.json(tmpClusterEventsErrorPath),
+        database,
+        erroredBronzeEventsTarget,
+        pipelineSnapTS,
+        organizationId
+      )
+    }
 
-      // persist errors from batch
-      persistErrors(erroredEventsLookupDF, database, erroredBronzeEventsTarget, pipelineSnapTS, organizationId)
-
-      if (clusterEvents.nonEmpty) {
+    logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
+      if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
         try {
           val tdf = SchemaScrubber.scrubSchema(
-            spark.read.json(Seq(clusterEvents: _*).toDS())
+            spark.read.json(tmpClusterEventsSuccessPath)
               .select(explode('events).alias("events"))
               .select(col("events.*"))
           )
-
           val changeInventory = Map[String, Column](
             "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
             "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
@@ -503,33 +494,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
             "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
           )
 
-          SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+         val clusterEventsDF= SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
             .withColumn("organization_id", lit(organizationId))
-            .write.mode("append").format("delta")
-            .option("mergeSchema", "true")
-            .save(tmpClusterEventsPath)
+
+           val clusterEventsCaptured = clusterEventsDF.count
+          val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
+          logger.log(Level.INFO, logEventsMSG)
+          clusterEventsDF
 
         } catch {
           case e: Throwable => {
-            // persist errored events by clusterID
-            val errorsByClusterID = clusterIdsBatch.map(cluster_id => {
-              val errorDetail = ErrorDetail(e.getMessage, startTime.asUnixTimeMilli, endTime.asUnixTimeMilli)
-              ClusterEventCall(cluster_id, Array[String](), succeeded = false, Some(errorDetail))
-            })
-            persistErrors(buildClusterEventsErrorDF(errorsByClusterID), database, erroredBronzeEventsTarget, pipelineSnapTS, organizationId)
-          }
+            throw new Exception(e)
         }
       }
 
-    })
-
-    logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
-    if (Helpers.pathExists(s"${tmpClusterEventsPath}/_delta_log")) {
-      val clusterEventsDF = spark.read.format("delta").load(tmpClusterEventsPath)
-      val clusterEventsCaptured = clusterEventsDF.count
-      val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
-      logger.log(Level.INFO, logEventsMSG)
-      clusterEventsDF
     } else {
       println("EMPTY MODULE: Cluster Events")
       throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
