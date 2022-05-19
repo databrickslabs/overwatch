@@ -50,7 +50,7 @@ case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, pack
  */
 case class ResponseMapper(rawStringResponse: String, responseCode: Int, rawJsonObject: JSONObject)
 
-case class ApiErrorDetail(cluster_id: String, from_epoch: String, until_epoch: String,error:String)
+case class ApiErrorDetail(cluster_id: String, from_epoch: Long, until_epoch: Long,error:String)
 
 
 case class ValidatedColumn(
