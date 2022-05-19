@@ -123,6 +123,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   def getWorkspaceUsersDF: DataFrame = {
     val workspaceEndpoint = "workspace/list"
     ApiCallV2(config.apiEnv,workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv,workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
   def getClusterLibraries: DataFrame = {
