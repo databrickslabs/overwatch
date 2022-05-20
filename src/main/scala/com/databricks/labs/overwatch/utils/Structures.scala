@@ -351,11 +351,14 @@ object OverwatchEncoders {
   implicit def overwatchScope: org.apache.spark.sql.Encoder[OverwatchScope] =
     org.apache.spark.sql.Encoders.kryo[OverwatchScope]
 
+  /*
   implicit def tokenSecret: org.apache.spark.sql.Encoder[TokenSecret] =
     org.apache.spark.sql.Encoders.kryo[TokenSecret]
 
   implicit def tokenSecretContainer: org.apache.spark.sql.Encoder[TokenSecretContainer] =
     org.apache.spark.sql.Encoders.kryo[TokenSecretContainer]
+
+   */
 
   implicit def dataTarget: org.apache.spark.sql.Encoder[DataTarget] =
     org.apache.spark.sql.Encoders.kryo[DataTarget]

@@ -278,10 +278,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
     rawParams.tokenSecret.map {
         case databricksSecret: TokenSecret =>
-          val apiToken = SecretTools(databricksSecret).getApiToken
           // validate token secret requirements
           // TODO - Validate if databricks token has access to necessary assets. Warn/Fail if not
-          if (apiToken.nonEmpty && !disableValidations && !config.isLocalTesting) {
+          if (!disableValidations && !config.isLocalTesting) {
             if (databricksSecret.scope.isEmpty || databricksSecret.key.isEmpty) {
               throw new BadConfigException(s"Secret AND Key must be provided together or neither of them. " +
                 s"Either supply both or neither.")
@@ -300,7 +299,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
           } else config.registerWorkspaceMeta(None)
 
         case awsSecret: AwsTokenSecret => config.registerWorkspaceMeta(Some(awsSecret))
-        case _ => config.registerWorkspaceMeta(None)
     }
 
     // Validate data Target

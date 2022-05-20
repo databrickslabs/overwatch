@@ -96,17 +96,17 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         for {
           scope <- getOptionString(masterNode,"tokenSecret.scope")
           key <- getOptionString(masterNode, "tokenSecret.key")
-        } yield Some(TokenSecret(scope, key))
+        } yield TokenSecret(scope, key)
 
       val finalToken = if (databricksToken.isEmpty)
         for {
           secretId <- getOptionString(masterNode,"tokenSecret.secretId")
           region <- getOptionString(masterNode,"tokenSecret.region")
           apiToken <- getOptionString(masterNode,"tokenSecret.tokenKey")
-        } yield Some(AwsTokenSecret(secretId, region, apiToken))
+        } yield AwsTokenSecret(secretId, region, apiToken)
       else databricksToken
 
-      finalToken.flatten
+      finalToken
     }
 
     val rawAuditPath = getOptionString(masterNode, "auditLogConfig.rawAuditPath")
