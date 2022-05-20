@@ -1,19 +1,14 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
-import com.databricks.labs.overwatch.utils.Helpers
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.functions.{col, concat_ws, explode, lit}
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
-import org.apache.spark.util.SerializableConfiguration
 import org.scalatest.funspec.AnyFunSpec
 
-import java.io.File
-import java.nio.file.{Files, Paths}
 import java.sql.{Date, Timestamp}
 import java.time.Instant
-import scala.reflect.io.Path
 
 class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
   import spark.implicits._

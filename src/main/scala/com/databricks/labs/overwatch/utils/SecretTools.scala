@@ -18,7 +18,7 @@ object SecretTools {
   private val logger: Logger = Logger.getLogger(this.getClass)
   type DatabricksTokenSecret = TokenSecret
 
-  private class DatabricksSecretHolder(tokenSecret : DatabricksTokenSecret) extends SecretTools[DatabricksTokenSecret] {
+  private class DatabricksSecretTools(tokenSecret : DatabricksTokenSecret) extends SecretTools[DatabricksTokenSecret] {
     override def getApiToken: String = {
       val scope = tokenSecret.scope
       val key = tokenSecret.key
@@ -32,7 +32,7 @@ object SecretTools {
     }
   }
 
-  private class AwsSecretHolder(tokenSecret : AwsTokenSecret) extends SecretTools[AwsTokenSecret] {
+  private class AwsSecretTools(tokenSecret : AwsTokenSecret) extends SecretTools[AwsTokenSecret] {
     override def getApiToken: String = {
       val secretId = tokenSecret.secretId
       val region = tokenSecret.region
@@ -49,8 +49,8 @@ object SecretTools {
 
   def apply(secretSource: TokenSecretContainer): SecretTools[_] = {
     secretSource match {
-      case x: AwsTokenSecret => new AwsSecretHolder(x)
-      case y: DatabricksTokenSecret => new DatabricksSecretHolder(y)
+      case x: AwsTokenSecret => new AwsSecretTools(x)
+      case y: DatabricksTokenSecret => new DatabricksSecretTools(y)
       case _ => throw new IllegalArgumentException(s"${secretSource.toString} not implemented")
     }
   }

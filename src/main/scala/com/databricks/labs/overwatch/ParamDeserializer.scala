@@ -91,21 +91,22 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     // TODO: consider keeping enum with specific secrets inner structure and below
     //  transform to function processing the enum in a loop
     val token = {
+
       val databricksToken =
         for {
-          scope <- Try(masterNode.get("tokenSecret").get("scope").asText())
-          key <- Try(masterNode.get("tokenSecret").get("key").asText())
+          scope <- getOptionString(masterNode,"tokenSecret.scope")
+          key <- getOptionString(masterNode, "tokenSecret.key")
         } yield Some(TokenSecret(scope, key))
 
-      val awsToken = databricksToken.recoverWith {
-        case dt: NullPointerException =>
-          for {
-            secretId <- Try(masterNode.get("tokenSecret").get("secretId").asText())
-            region <- Try(masterNode.get("tokenSecret").get("region").asText())
-            apiToken <- Try(masterNode.get("tokenSecret").get("tokenKey").asText())
-          } yield Some(AwsTokenSecret(secretId, region, apiToken))
-      }
-      awsToken.getOrElse(None)
+      val finalToken = if (databricksToken.isEmpty)
+        for {
+          secretId <- getOptionString(masterNode,"tokenSecret.secretId")
+          region <- getOptionString(masterNode,"tokenSecret.region")
+          apiToken <- getOptionString(masterNode,"tokenSecret.tokenKey")
+        } yield Some(AwsTokenSecret(secretId, region, apiToken))
+      else databricksToken
+
+      finalToken.flatten
     }
 
     val rawAuditPath = getOptionString(masterNode, "auditLogConfig.rawAuditPath")

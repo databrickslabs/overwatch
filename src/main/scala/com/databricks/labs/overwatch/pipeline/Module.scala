@@ -174,7 +174,6 @@ class Module(
   }
 
   private def normalizeToken(secretToken: TokenSecret, reportDf: DataFrame): DataFrame = {
-    println(secretToken)
     val inputConfigCols = reportDf.select($"inputConfig.*")
       .columns
       .filter(_!="tokenSecret")
@@ -192,7 +191,6 @@ class Module(
     if (!pipeline.readOnly) {
       val secretToken =  SecretTools(report.inputConfig.tokenSecret.get).getTargetTableStruct //.getSecretTargetStruct(report.inputConfig.tokenSecret.get)
       val targetDf = normalizeToken(secretToken, Seq(report).toDF)
-      println(secretToken)
       pipeline.database.write(
         targetDf,
         pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
