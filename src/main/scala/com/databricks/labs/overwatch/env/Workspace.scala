@@ -125,23 +125,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv,workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
-  private def clusterState(apiEnv: ApiEnv): String = {
-    val endpoint = "clusters/get"
-    val query = Map(
-      "cluster_id" -> overwatchRunClusterId
-    )
-    try {
-      val stateJsonString = ApiCall(endpoint, apiEnv, Some(query)).executeGet().asStrings.head
-      JsonUtils.defaultObjectMapper.readTree(stateJsonString).get("state").asText()
-    } catch {
-      case e: Throwable => {
-        val msg = s"Cluster State Error: Cannot determine state of cluster: $overwatchRunClusterId\n$e"
-        logger.log(Level.ERROR, msg, e)
-        if(config.debugFlag) println(msg)
-        "ERROR"
-      }
-    }
-  }
+
 
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {
     val endpoint = "clusters/resize"
