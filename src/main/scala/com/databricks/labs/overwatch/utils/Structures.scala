@@ -22,7 +22,6 @@ case class SparkDetail()
 case class GangliaDetail()
 
 abstract class TokenSecretContainer extends Product with Serializable
-//sealed trait TokenSecretContainer extends Product with Serializable
 case class TokenSecret(scope: String, key: String) extends TokenSecretContainer
 case class AwsTokenSecret(secretId: String, region: String, tokenKey: String = "apiToken") extends TokenSecretContainer
 

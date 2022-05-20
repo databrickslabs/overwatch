@@ -189,7 +189,7 @@ class Module(
   private def finalizeModule(report: ModuleStatusReport): Unit = {
     pipeline.updateModuleState(report.simple)
     if (!pipeline.readOnly) {
-      val secretToken =  SecretTools(report.inputConfig.tokenSecret.get).getTargetTableStruct //.getSecretTargetStruct(report.inputConfig.tokenSecret.get)
+      val secretToken =  SecretTools(report.inputConfig.tokenSecret.get).getTargetTableStruct
       val targetDf = normalizeToken(secretToken, Seq(report).toDF)
       pipeline.database.write(
         targetDf,
