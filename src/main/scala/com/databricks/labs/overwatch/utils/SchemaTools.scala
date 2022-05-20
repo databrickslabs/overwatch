@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.utils.StringExt._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -97,6 +98,8 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+                                       //> containsNoSpecialChars: (string: String)Boolean
+
   /**
    * Removes nested columns within a struct and returns the Dataframe with the struct less the columns
    * @param df df containing struct with cols to remove
@@ -106,6 +109,15 @@ object SchemaTools extends SparkSessionWrapper {
    * @return
    */
   def cullNestedColumns(df: DataFrame, structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
+    //Exception Block
+    if (nestedFieldsToCull.filter(_.contains(".")).size != 0) {
+      throw new BadSchemaException("Recursive culling of nested columns is not yet supported (nestedFieldsToCull)")
+    }
+    if (!structToModify.containsNoSpecialChars) {
+      throw new BadSchemaException("Struct To Modify doesn't support column with special characters except _")
+    }
+
+
     val originalFieldNames = df.select(s"$structToModify.*").columns
     val remainingFieldNames = if (spark.conf.get("spark.sql.caseSensitive") == "true") {
       originalFieldNames.diff(nestedFieldsToCull)
