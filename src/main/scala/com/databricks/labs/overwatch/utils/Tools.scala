@@ -1,9 +1,8 @@
 package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Pipeline, PipelineFunctions, PipelineTable, Silver}
+import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -44,6 +43,27 @@ object JsonUtils {
         .setInclude(Value.construct(Include.NON_EMPTY, Include.NON_EMPTY))
     }
     obj
+  }
+
+  /**
+   * Extracts the key and value from Json String
+   * @param jsonString
+   * @return
+   */
+   def getJsonKeyValue(jsonString:String):(String,String)={
+     try {
+       val mapper = new ObjectMapper()
+       val actualObj = mapper.readTree(jsonString);
+       val key = actualObj.fields().next().getKey
+       val value = actualObj.fields().next().getValue.asText()
+       (key, value)
+     }catch {
+       case e:Throwable => {
+         logger.log(Level.ERROR, s"ERROR: Could not extract key and value from json. \nJSON: $jsonString", e)
+         throw e
+       }
+     }
+
   }
 
   private[overwatch] lazy val defaultObjectMapper: ObjectMapper =

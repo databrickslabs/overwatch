@@ -9,7 +9,6 @@ import org.apache.spark.sql.functions._
 import org.json.{JSONArray, JSONException, JSONObject}
 import scalaj.http.{Http, HttpOptions, HttpResponse}
 
-import java.io.File
 import java.util
 
 /**
@@ -64,8 +63,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private val connTimeoutMS = 10000 //Connection timeout.
   private var errorTempPath:String=""
   private var queryJsonArray:Array[String]=null
-  private var successBatchSize:Int=0
-  private var errorBatchSize:Int=0
   private var errorArray:util.ArrayList[ApiErrorDetail] = new util.ArrayList[ApiErrorDetail]();
 
   /**
@@ -74,7 +71,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param value
    * @return
    */
-  def setApiName(value: String): this.type = {
+  private def setApiName(value: String): this.type = {
     endPoint = value
     token = apiEnv.rawToken
     apiMeta = new ApiMetaFactory().getApiClass(endPoint)
@@ -87,41 +84,23 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param query
    * @return
    */
-  def setQuery(query: String): this.type = {
+  private def setQuery(query: String): this.type = {
     jsonQuery = query
     jsonToMap
     this
   }
 
-  def setTempLocation(path:String):this.type ={
+  private def setTempLocation(path:String):this.type ={
     successTempPath=path
     this
   }
 
-  def setErrorTempLocation(errorTempPath:String):this.type ={
+  private def setErrorTempLocation(errorTempPath:String):this.type ={
     this.errorTempPath=errorTempPath
     this
   }
-  def setQueryJsonArray(queryJsonArray:Array[String]):this.type ={
+  private def setQueryJsonArray(queryJsonArray:Array[String]):this.type ={
     this.queryJsonArray=queryJsonArray
-    this
-  }
- def setSuccessBatchSize(successBatchSize:Int):this.type ={
-    this.successBatchSize=successBatchSize
-    this
-  }
-  def setErrorBatchSize(errorBatchSize:Int):this.type ={
-    this.errorBatchSize=errorBatchSize
-    this
-  }
-
-  /**
-   * Setting up the debug flag which can be useful to print certain things.
-   * @param value
-   * @return
-   */
-  private def setDebugFlag(value: Boolean): this.type = {
-    debugFlag = value
     this
   }
 
@@ -130,9 +109,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   def jsonToMap: Unit = {
     try {
-      val jsonObject = new JSONObject(jsonQuery)
-      jsonKey = jsonObject.keySet().iterator().next().toString
-      jsonValue = jsonObject.getString(jsonKey)
+       val (jsonKey,jsonValue) = JsonUtils.getJsonKeyValue(jsonQuery)
+      this.jsonKey=jsonKey
+      this.jsonValue=jsonValue
     }catch {
       case e:Exception=>{
         val excMsg = "Got the exception while parsing provided query json "
@@ -146,7 +125,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    *Hibernate in-case of too many API call request.
    * @param response
    */
-  def hibernate( response: HttpResponse[String]): Unit = {
+  private def hibernate( response: HttpResponse[String]): Unit = {
     logger.log(Level.WARN, "Too many request per second")
     serverBusyCount += 1
     serverBusyCount match {
@@ -236,20 +215,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
     def writeMicroBatchToTempLocation(path:String,resultJsonArray: String): Boolean = {
     try {
-
-      logger.info("writing microbatch..."+resultJsonArray)
       val fineName = java.util.UUID.randomUUID.toString+".json"
       dbutils.fs.put( path+ "/" + fineName, resultJsonArray, true)
       logger.info("File Successfully written:"+path+ "/" + fineName)
-     // spark.read.json(path).show(false)
-      spark.read.json(Seq(resultJsonArray).toDS()).show(false)
-      logger.info("writing completed")
       true
     } catch {
       case e: Throwable =>
-        logger.info("Unable to write in local" + e.getMessage)
         logger.log(Level.WARN, "Unable to write in local" + e.getMessage)
-        true
+        false
     }
   }
 

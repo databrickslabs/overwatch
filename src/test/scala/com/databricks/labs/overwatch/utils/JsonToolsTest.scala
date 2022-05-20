@@ -157,5 +157,17 @@ class JsonToolsTest extends AnyFunSpec {
         "{ }".stripMargin)(js.prettyString)
     }
 
+    it("Should parse the json string and return key and value of that input string "){
+      assertResult(("path","/tmp"),"")(JsonUtils.getJsonKeyValue("""{"path":"/tmp"}"""))
+     // assertResult("")(JsonUtils.getJsonKeyValue(""))
+    }
+    it("Should throw error"){
+      assertThrows[NoSuchElementException](JsonUtils.getJsonKeyValue(""))
+    }
+    it("Should throw error for corrupted json"){
+      assertThrows[Throwable](JsonUtils.getJsonKeyValue("""{"path":/missing"}"""))
+    }
+
+
   }
 }

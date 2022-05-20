@@ -44,6 +44,8 @@ class Config() {
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
   private var _contractJobsLightDBUPrice: Double = _
+  private var _successBatchSize:Int= 50
+  private var _errorBatchSize:Int= 50
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -193,6 +195,16 @@ class Config() {
 
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value
+    this
+  }
+
+  private[overwatch] def setSuccessBatchSize(value: Int): this.type = {
+    _successBatchSize = value
+    this
+  }
+
+  private[overwatch] def setErrorBatchSize(value: Int): this.type = {
+    _errorBatchSize = value
     this
   }
 
@@ -355,7 +367,7 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion,1,1,runID))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion,_successBatchSize,_errorBatchSize,runID))
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
