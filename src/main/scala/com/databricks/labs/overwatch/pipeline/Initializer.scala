@@ -275,31 +275,31 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     if (overwatchScope.head == "all") config.setOverwatchScope(config.orderedOverwatchScope)
     else config.setOverwatchScope(validateScope(overwatchScope))
 
-
-    rawParams.tokenSecret.map {
+    if (rawParams.tokenSecret.nonEmpty && !disableValidations && !config.isLocalTesting) {
+      rawParams.tokenSecret.map {
         case databricksSecret: TokenSecret =>
           // validate token secret requirements
           // TODO - Validate if databricks token has access to necessary assets. Warn/Fail if not
-          if (!disableValidations && !config.isLocalTesting) {
-            if (databricksSecret.scope.isEmpty || databricksSecret.key.isEmpty) {
-              throw new BadConfigException(s"Secret AND Key must be provided together or neither of them. " +
-                s"Either supply both or neither.")
-            }
-            val scopeCheck = dbutils.secrets.listScopes().map(_.getName()).toArray.filter(_ == databricksSecret.scope)
-            if (scopeCheck.length == 0) throw new BadConfigException(s"Scope ${databricksSecret.scope} does not exist " +
-              s"in this workspace. Please provide a scope available and accessible to this account.")
-            val scopeName = scopeCheck.head
 
-            val keyCheck = dbutils.secrets.list(scopeName).toArray.filter(_.key == databricksSecret.key)
-            if (keyCheck.length == 0) throw new BadConfigException(s"Key ${databricksSecret.key} does not exist " +
-              s"within the provided scope: ${databricksSecret.scope}. Please provide a scope and key " +
-              s"available and accessible to this account.")
+          if (databricksSecret.scope.isEmpty || databricksSecret.key.isEmpty) {
+            throw new BadConfigException(s"Secret AND Key must be provided together or neither of them. " +
+              s"Either supply both or neither.")
+          }
+          val scopeCheck = dbutils.secrets.listScopes().map(_.getName()).toArray.filter(_ == databricksSecret.scope)
+          if (scopeCheck.length == 0) throw new BadConfigException(s"Scope ${databricksSecret.scope} does not exist " +
+            s"in this workspace. Please provide a scope available and accessible to this account.")
+          val scopeName = scopeCheck.head
 
-            config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)))
-          } else config.registerWorkspaceMeta(None)
+          val keyCheck = dbutils.secrets.list(scopeName).toArray.filter(_.key == databricksSecret.key)
+          if (keyCheck.length == 0) throw new BadConfigException(s"Key ${databricksSecret.key} does not exist " +
+            s"within the provided scope: ${databricksSecret.scope}. Please provide a scope and key " +
+            s"available and accessible to this account.")
+
+          config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)))
 
         case awsSecret: AwsTokenSecret => config.registerWorkspaceMeta(Some(awsSecret))
-    }
+      }
+    } else config.registerWorkspaceMeta(None)
 
     // Validate data Target
     if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
