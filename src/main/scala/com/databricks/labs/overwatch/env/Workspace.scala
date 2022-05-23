@@ -188,9 +188,12 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   /**
    * Create a backup of the Overwatch datasets
-   * @param targetPrefix
-   * @param cloneLevel
-   * @param asOfTS
+   * @param targetPrefix prefix of path target to send the snap
+   * @param cloneLevel Deep or Shallow
+   * @param asOfTS appends asOfTimestamp option to Delta reader to limit data on clone. This will only go back as
+   *               far as the latest vacuum by design.
+   * @param excludes Array of table names to exclude from the snapshot
+   *                 this is the table name only - without the database prefix
    * @return
    */
   def snap(

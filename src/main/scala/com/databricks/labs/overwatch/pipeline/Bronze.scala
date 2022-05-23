@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
+import com.databricks.labs.overwatch.utils.{CloneDetail, Config, Helpers, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
 
 
@@ -40,6 +40,53 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.sparkEvents => Array(sparkEventLogsModule)
       case _ => Array[Module]()
     }
+  }
+
+  /**
+   * Simplified method for the common task of deep cloning bronze targets.
+   * This function will perform a deep clone on all existing bronze targets
+   * If not overwriting, it's important for customer to set up lifecycle management to ensure
+   * max age of backups as this data can grow quite large
+   * @param targetPrefix where to store the backups -- subdir handling is done automatically
+   * @param overwrite whether or not to overwrite the backups
+   *                  if choosing to overwrite, only one backup will be maintained
+   * @param excludes which bronze targets to exclude from the snapshot
+   */
+  def snapshot(
+                targetPrefix: String,
+                overwrite: Boolean,
+                excludes: Array[String] = Array()
+              ): Unit = {
+    val bronzeTargets = getAllTargets :+ pipelineStateTarget
+    val currTime = Pipeline.createTimeDetail(System.currentTimeMillis())
+    val timestampedTargetPrefix = s"$targetPrefix/${currTime.asDTString}/${currTime.asUnixTimeMilli.toString}"
+
+    // if user provides dot path to table -- remove dot path and lower case the name
+    val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
+      if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
+    })
+
+    // remove excludes
+    // remove non-existing bronze targets
+    val targetsToSnap = bronzeTargets
+      .filter(_.exists()) // source path must exist
+      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
+
+    val finalTargetPathPrefix = if (overwrite) { // Overwrite - clean paths and reuse prefix
+      val dirsToClean = targetsToSnap.map(t => s"${targetPrefix}/${t.name.toLowerCase}")
+      Helpers.fastrm(dirsToClean)
+      targetPrefix
+    } else timestampedTargetPrefix // !Overwrite - targetPrefix/currDateString/timestampMillisString
+
+    // build clone details
+    val cloneSpecs = targetsToSnap.map(t => {
+      val targetPath = s"${finalTargetPathPrefix}/${t.name.toLowerCase}"
+      CloneDetail(t.tableLocation, targetPath)
+    })
+
+    // par clone
+    Helpers.parClone(cloneSpecs)
+
   }
 
   private val logger: Logger = Logger.getLogger(this.getClass)
