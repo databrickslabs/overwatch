@@ -6,6 +6,7 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
 import org.scalatest.funspec.AnyFunSpec
+import TransformFunctions._
 
 import java.sql.{Date, Timestamp}
 import java.time.Instant
@@ -69,7 +70,7 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
     it("should removeNullCols") {
       val sourceData = sc.parallelize(Seq(Row("jobs", null, Row("t1", 1)),Row("non-jobs", null, Row("t2", 2))))
       val sourceDF = spark.createDataFrame(sourceData, schema)
-      val (_, df) = TransformFunctions.removeNullCols(sourceDF)
+      val df = sourceDF.cullNull
       assertResult("`serviceName` STRING,`requestParams` STRUCT<`par1`: STRING, `par2`: INT>")(df.schema.toDDL)
       assertResult(2)(df.count())
       val first = df.first()
@@ -152,7 +153,7 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
     it("should moveColumnsToFront") {
       assertResult(Seq("field3", "field2", "field1")){
         val df = spark.createDataFrame(Seq((1,2,3))).toDF("field1", "field2", "field3")
-        TransformFunctions.moveColumnsToFront(df, Array("field3", "field2")).schema.names.toSeq
+        df.moveColumnsToFront(Array("field3", "field2")).schema.names.toSeq
       }
     }
   }

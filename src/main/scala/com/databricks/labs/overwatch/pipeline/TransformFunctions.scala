@@ -23,6 +23,32 @@ object TransformFunctions {
       }
     }
 
+    /**
+     *
+     * Warning Does not remove null structs, arrays, etc.
+     *
+     * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
+     * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
+     * disregards structs
+     *
+     * Another helpful user function not utilized in the code base.
+     *
+     * @param df dataframe to more data
+     * @return
+     *
+     */
+    def cullNull(): DataFrame = {
+      val cntsDF = df.summary("count").drop("summary")
+      val nonNullCols = cntsDF.collect()
+        .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
+        .map(col)
+      val complexTypeFields = df.schema.fields
+        .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType]  || f.dataType.isInstanceOf[MapType])
+        .map(_.name).map(col)
+      val columns = nonNullCols ++ complexTypeFields
+      df.select(columns: _*)
+    }
+
     def suffixDFCols(
                       suffix: String,
                       columnsToSuffix: Array[String] = Array(),
@@ -264,6 +290,35 @@ object TransformFunctions {
       }
     }
 
+    /**
+     * Delta, by default, calculates statistics on the first 32 columns and there's no way to specify which columns
+     * on which to calc stats. Delta can be configured to calc stats on less than 32 columns but it still starts
+     * from left to right moving to the nth position as configured. This simplifies the migration of columns to the
+     * front of the dataframe to allow them to be "indexed" in front of others.
+     *
+     * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
+     * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
+     * array should be reversed before progressing through the logic
+     *
+     * TODO -- change colsToMove to the Seq[String]....
+     * TODO: checks for empty list, for existence of columns, etc.
+     *
+     * @param df         Input dataframe
+     * @param colsToMove Array of column names to be moved to front of schema
+     * @return
+     */
+    def moveColumnsToFront(colsToMove: Array[String]): DataFrame = {
+      val allNames = df.schema.names
+      val newColumns = (colsToMove ++ allNames.diff(colsToMove)).map(col)
+      df.select(newColumns: _*)
+    }
+
+    def moveColumnsToFront(colsToMove: String*): DataFrame = {
+      val allNames = df.schema.names
+      val newColumns = (colsToMove ++ allNames.diff(colsToMove)).map(col)
+      df.select(newColumns: _*)
+    }
+
 //    private[overwatch] def colByName(df: DataFrame)(colName: String): StructField =
 //      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
   }
@@ -443,33 +498,6 @@ object TransformFunctions {
 
   /**
    *
-   * Warning Does not remove null structs, arrays, etc.
-   *
-   * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
-   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
-   * disregards structs
-   *
-   * Another helpful user function not utilized in the code base.
-   *
-   * @param df dataframe to more data
-   * @return
-   *
-   */
-  def removeNullCols(df: DataFrame): (Seq[Column], DataFrame) = {
-    val cntsDF = df.summary("count").drop("summary")
-    val nonNullCols = cntsDF.collect()
-      .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
-      .map(col)
-    val complexTypeFields = df.schema.fields
-      .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType] || f.dataType.isInstanceOf[MapType])
-      .map(_.name).map(col)
-    val columns = nonNullCols ++ complexTypeFields
-    val cleanDF = df.select(columns: _*)
-    (columns, cleanDF)
-  }
-
-  /**
-   *
    * @param baseDF
    * @param lookupDF
    * @return
@@ -489,29 +517,6 @@ object TransformFunctions {
     }
 
     df1Complete.unionByName(df2Complete)
-  }
-
-  /**
-   * Delta, by default, calculates statistics on the first 32 columns and there's no way to specify which columns
-   * on which to calc stats. Delta can be configured to calc stats on less than 32 columns but it still starts
-   * from left to right moving to the nth position as configured. This simplifies the migration of columns to the
-   * front of the dataframe to allow them to be "indexed" in front of others.
-   *
-   * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
-   * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
-   * array should be reversed before progressing through the logic
-   *
-   * TODO -- change colsToMove to the Seq[String]....
-   * TODO: checks for empty list, for existence of columns, etc.
-   *
-   * @param df         Input dataframe
-   * @param colsToMove Array of column names to be moved to front of schema
-   * @return
-   */
-  def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val allNames = df.schema.names
-    val newColumns = (colsToMove ++ (allNames.diff(colsToMove))).map(col)
-    df.select(newColumns: _*)
   }
 
   /**
