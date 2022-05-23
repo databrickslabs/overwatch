@@ -286,7 +286,8 @@ trait GoldTransforms extends SparkSessionWrapper {
         "left")
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup")
       // filling data is critical here to ensure jrcp dups don't occur
-      .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals) // scan back then forward to fill all
+      // using noise generators to fill with two passes to reduce skew
+      .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores) // scan back then forward to fill all
 
     val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
     val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H).otherwise(lit(0)).alias("driver_dbus")
