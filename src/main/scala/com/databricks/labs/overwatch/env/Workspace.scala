@@ -193,12 +193,18 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * @param asOfTS
    * @return
    */
-  def snap(targetPrefix: String, cloneLevel: String = "DEEP", asOfTS: Option[String] = None): Seq[CloneReport] = {
+  def snap(
+            targetPrefix: String,
+            cloneLevel: String = "DEEP",
+            asOfTS: Option[String] = None,
+            excludes: Array[String] = Array()
+          ): Seq[CloneReport] = {
     val acceptableCloneLevels = Array("DEEP", "SHALLOW")
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
     val sourcesToSnap = getWorkspaceDatasets
+      .filterNot(dataset => excludes.map(_.toLowerCase).contains(dataset.name.toLowerCase))
     val cloneSpecs = sourcesToSnap.map(dataset => {
       val sourceName = dataset.name
       val sourcePath = dataset.path
