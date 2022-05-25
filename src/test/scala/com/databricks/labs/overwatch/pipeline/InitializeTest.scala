@@ -14,16 +14,31 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setOrganizationId("demo")
       val init = new Initializer(conf)
-      val isPVC =PrivateMethod[Initializer]('isPVC)
-      Initializer invokePrivate isPVC()
-    }
 
-    /*it("should validate isPVC as true when org id if have ilb") {
+      val isPVC = init.getClass.getDeclaredMethod("isPVC")
+      init.getClass.getDeclaredMethods.foreach(x=>println(x.getName))
+      isPVC.setAccessible(true)
+      val actual = isPVC.invoke(init)
+      println(isPVC.invoke(init))
+
+      assert(actual == false)
+    }
+  }
+
+  describe("Tests for initialize database") {
+    it("initializeDatabase function should create both elt and consumer database") {
+      import spark.implicits._
       val conf = new Config
-      conf.setOrganizationId("demoilb")
-      conf.setWorkspaceName("demo")
+      conf.setDatabaseNameAndLoc("overwatch_etl", "/dblocation", "/datalocation")
+      conf.setConsumerDatabaseNameandLoc("overwatch", "/consumer/dblocation")
       val init = new Initializer(conf)
-      assert(init.isPVC === true)
-    }*/
+      val database =  init.getClass.getDeclaredMethod("initializeDatabase")
+      database.setAccessible(true)
+      database.invoke(init)
+      val databases = spark.sql("show databases").select("databaseName").map(f=>f.getString(0)).collect()
+      databases.foreach(println)
+      assert(databases.contains("overwatch_etl"))
+      assert(databases.contains("overwatch"))
+    }
   }
 }

@@ -46,7 +46,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    *
    * @return
    */
-  private[overwatch] def initializeDatabase(): Database = {
+  private def initializeDatabase(): Database = {
     // TODO -- Add metadata table
     // TODO -- refactor and clean up duplicity
     val dbMeta = if (isSnap) {
@@ -87,7 +87,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     Database(config)
   }
 
-  private[overwatch] def validateIntelligentScaling(intelligentScaling: IntelligentScaling): IntelligentScaling = {
+  private def validateIntelligentScaling(intelligentScaling: IntelligentScaling): IntelligentScaling = {
     if (intelligentScaling.enabled) {
       if (intelligentScaling.minimumCores < 1)
         throw new BadConfigException(s"Intelligent Scaling: Minimum cores must be > 0. Set to ${intelligentScaling.minimumCores}")
@@ -243,7 +243,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * @param overwatchArgs JSON string of input args from input into main class.
    * @return
    */
-  private[overwatch] def validateAndRegisterArgs(overwatchArgs: String): this.type = {
+  private def validateAndRegisterArgs(overwatchArgs: String): this.type = {
 
     /**
      * Register custom deserializer to create OverwatchParams object
@@ -361,7 +361,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
     // must happen AFTER data target validation
     if (!disableValidations) { // temp working dir is not necessary for disabled validations as pipelines cannot be
-    // executed without validations
+      // executed without validations
       prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
     }
 
@@ -484,7 +484,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * @return
    */
   @throws(classOf[BadConfigException])
-  private[overwatch] def validateScope(scopes: Seq[String]): Seq[OverwatchScope.OverwatchScope] = {
+  private def validateScope(scopes: Seq[String]): Seq[OverwatchScope.OverwatchScope] = {
     val lcScopes = scopes.map(_.toLowerCase)
 
     if ((lcScopes.contains("clusterevents") || lcScopes.contains("clusters")) && !lcScopes.contains("audit")) {
@@ -544,7 +544,7 @@ object Initializer extends SparkSessionWrapper {
     } else dbutils.notebook.getContext.tags("orgId")
   }
 
-  private[overwatch] def initConfigState(debugFlag: Boolean): Config = {
+  private def initConfigState(debugFlag: Boolean): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
     val orgId = if (config.isLocalTesting) System.getenv("ORGID") else {
@@ -635,4 +635,3 @@ object Initializer extends SparkSessionWrapper {
 
 
 }
-
