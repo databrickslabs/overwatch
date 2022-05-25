@@ -102,7 +102,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         for {
           secretId <- getOptionString(masterNode,"tokenSecret.secretId")
           region <- getOptionString(masterNode,"tokenSecret.region")
-          apiToken <- getOptionString(masterNode,"tokenSecret.tokenKey")
+          apiToken = getOptionString(masterNode,"tokenSecret.tokenKey")
         } yield AwsTokenSecret(secretId, region, apiToken)
       else databricksToken
 
