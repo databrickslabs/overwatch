@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.utils.BadConfigException
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.apache.spark.sql.execution.streaming.MemoryStream
-import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, SQLContext}
@@ -268,4 +268,36 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
     }
   }
 
+  describe("Tests for tsToEpochMilli") {
+    it("should convert timestamp to epoch time and preserve milliseconds") {
+      Given("a dataframe with timestamp ")
+      val df = spark.sql("select '2021-11-12 02:12:23.8870' as ts")
+
+      When("function is called on this column")
+
+      Then("convert timestamp to epoch time and preserve milliseconds")
+      assertResult("DoubleType") (df
+        .withColumn("epoch_milliseconds", PipelineFunctions.tsToEpochMilli("ts"))
+        .dtypes.filter(_._1 == "epoch_milliseconds").head._2
+      )
+      assertResult("887") (df
+        .withColumn("epoch_milliseconds", PipelineFunctions.tsToEpochMilli("ts").cast("Long").cast("String"))
+        .select("epoch_milliseconds").collect().head.get(0).toString.takeRight(3)
+      )
+    }
+    it("should return null for unexpected values") {
+      Given("a dataframe with unexpected timestamp value")
+      val df = spark.sql("select '1636663343887' as ts")
+
+      When("function is called on this column")
+
+      Then("return a null value for the converted column")
+      assertResult(null) (df
+        .withColumn("epoch_milliseconds", PipelineFunctions.tsToEpochMilli("ts"))
+        .select("epoch_milliseconds")
+        .collect().head.get(0)
+      )
+
+    }
+  }
 }
