@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.PrivateMethodTester
-import com.databricks.labs.overwatch.utils.Config
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config}
 
 
 class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with PrivateMethodTester {
@@ -34,11 +34,24 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val init = new Initializer(conf)
       val database =  init.getClass.getDeclaredMethod("initializeDatabase")
       database.setAccessible(true)
-      database.invoke(init)
-      val databases = spark.sql("show databases").select("databaseName").map(f=>f.getString(0)).collect()
-      databases.foreach(println)
+      val data = database.invoke(init)
+      val databases = spark.sql("show databases").select("namespace").map(f=>f.getString(0)).collect()
       assert(databases.contains("overwatch_etl"))
       assert(databases.contains("overwatch"))
+    }
+  }
+
+  describe("Tests for validateIntelligentScaling configs") {
+    it("for intelligentScaling function minimumCores should not be less than 1 ") {
+      import com.databricks.labs.overwatch.utils.IntelligentScaling
+
+      val intelligentScaling = IntelligentScaling(true, 0,123,1.0)
+      val conf = new Config
+      val init = new Initializer(conf)
+      val validateIntelligentScaling =  init.getClass.getDeclaredMethod("validateIntelligentScaling")
+      validateIntelligentScaling.setAccessible(true)
+
+      assertThrows[BadConfigException](validateIntelligentScaling.invoke(init, intelligentScaling))
     }
   }
 }

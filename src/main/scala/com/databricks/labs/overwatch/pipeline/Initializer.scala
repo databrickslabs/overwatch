@@ -77,8 +77,12 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     if (config.consumerDatabaseName != config.databaseName) {
       logger.log(Level.INFO, "Initializing Consumer Database")
       if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
-        val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
-          s"location '${config.consumerDatabaseLocation}'"
+        val createConsumerDBSTMT = if (!config.isLocalTesting) {
+          s"create database if not exists ${config.consumerDatabaseName} " +
+            s"location '${config.consumerDatabaseLocation}'"
+        } else {
+          s"create database if not exists ${config.consumerDatabaseName} "
+        }
         spark.sql(createConsumerDBSTMT)
         logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
       }
