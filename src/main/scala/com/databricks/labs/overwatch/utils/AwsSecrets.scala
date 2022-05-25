@@ -11,17 +11,20 @@ import java.util.Base64
 object AwsSecrets {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def readApiToken(secretId: String, region: String, apiTokenKey: String = "apiToken"): String = {
-    secretValueAsMap(secretId, region)
-      .getOrElse(apiTokenKey ,throw new IllegalStateException("apiTokenKey param not found"))
-      .asInstanceOf[String]
+  def readApiToken(secretId: String, region: String, apiTokenKey: Option[String]): String = {
+    apiTokenKey match {
+      case Some(key) => secretValueAsMap(secretId, region)
+        .getOrElse(key, throw new IllegalStateException("apiTokenKey param not found"))
+        .asInstanceOf[String]
+      case None =>  readRawSecretFromAws(secretId, region)
+    }
   }
 
   def secretValueAsMap(secretId: String, region: String = "us-east-2"): Map[String, Any] =
-    parseJsonToMap(readRawSecretFromAws(secretId,region))
+    parseJsonToMap(readRawSecretFromAws(secretId, region))
 
   def readRawSecretFromAws(secretId: String, region: String): String = {
-    logger.log(Level.INFO,s"Looking up secret $secretId in AWS Secret Manager")
+    logger.log(Level.INFO, s"Looking up secret $secretId in AWS Secret Manager")
 
     val secretsClient = AWSSecretsManagerClientBuilder
       .standard()
