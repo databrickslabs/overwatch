@@ -25,7 +25,7 @@ class ParamDeserializerTest extends AnyFunSpec {
                          |""".stripMargin
 
 
-      val expected = Some(AwsTokenSecret("overwatch", "us-east-2", None))
+      val expected = Some(AwsTokenSecret("overwatch", "us-east-2"))
       val parsed = mapper.readValue[OverwatchParams](AWSsecrets)
       assertResult(expected)(parsed.tokenSecret)
     }

@@ -23,7 +23,7 @@ case class GangliaDetail()
 
 abstract class TokenSecretContainer extends Product with Serializable
 case class TokenSecret(scope: String, key: String) extends TokenSecretContainer
-case class AwsTokenSecret(secretId: String, region: String, tokenKey: Option[String]) extends TokenSecretContainer
+case class AwsTokenSecret(secretId: String, region: String, tokenKey: Option[String] = None) extends TokenSecretContainer
 
 case class DataTarget(databaseName: Option[String], databaseLocation: Option[String], etlDataPathPrefix: Option[String],
                       consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
