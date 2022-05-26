@@ -26,7 +26,7 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQuery(queryJsonString)
   }
 
-  def apply(apiEnv: ApiEnv, apiName: String, queryJsonArray: Array[String],tempSuccessPath:String,errorTempPath:String) = {
+  def apply(apiEnv: ApiEnv, apiName: String, queryJsonArray: Array[String], tempSuccessPath: String, errorTempPath: String) = {
     new ApiCallV2(apiEnv)
       .setApiName(apiName)
       .setQueryJsonArray(queryJsonArray)
@@ -46,23 +46,23 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private var endPoint = ""  //API end point.
+  private var endPoint = "" //API end point.
   private var jsonQuery: String = "EMPTY" //Extra parameters for API request.
   private var apiResponseArray = new util.ArrayList[String]() //JsonArray containing the responses from API call.
   private var serverBusyCount: Int = 0 // Keep track of 429 error occurrence.
   private var token = "" //Authentication token for API request.
-  private var successTempPath: String = ""//Unique String which is used as folder name in a temp location to save the responses.
-  private var unsafeSSLErrorCount = 0;//Keep track of SSL error occurrence.
+  private var successTempPath: String = "" //Unique String which is used as folder name in a temp location to save the responses.
+  private var unsafeSSLErrorCount = 0; //Keep track of SSL error occurrence.
   private var apiMeta: ApiMeta = null //Metadata for the API call.
-  private var debugFlag = false //Debug flag to print the information when required. d
+  private val debugFlag = false //Debug flag to print the information when required. d
   private var allowUnsafeSSL = false //Flag to make the unsafe ssl.
   private var jsonKey = "" //Key name for pagination.
   private var jsonValue = "" //Key value for pagination.
   private val readTimeoutMS = 60000 //Read timeout.
   private val connTimeoutMS = 10000 //Connection timeout.
-  private var errorTempPath:String=""
-  private var queryJsonArray:Array[String]=null
-  private var errorArray:util.ArrayList[String] = new util.ArrayList[String]();
+  private var errorTempPath: String = ""
+  private var queryJsonArray: Array[String] = null
+  private var errorArray: util.ArrayList[String] = new util.ArrayList[String]();
 
   /**
    * Setting up the api name and api metadata for that api.
@@ -89,30 +89,31 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     this
   }
 
-  private def setTempLocation(path:String):this.type ={
-    successTempPath=path
+  private def setTempLocation(path: String): this.type = {
+    successTempPath = path
     this
   }
 
-  private def setErrorTempLocation(errorTempPath:String):this.type ={
-    this.errorTempPath=errorTempPath
+  private def setErrorTempLocation(errorTempPath: String): this.type = {
+    this.errorTempPath = errorTempPath
     this
   }
-  private def setQueryJsonArray(queryJsonArray:Array[String]):this.type ={
-    this.queryJsonArray=queryJsonArray
+
+  private def setQueryJsonArray(queryJsonArray: Array[String]): this.type = {
+    this.queryJsonArray = queryJsonArray
     this
   }
 
   /**
    * Parse the json string and get the data in the form of key and value.
    */
-  def jsonToMap: Unit = {
+  private def jsonToMap: Unit = {
     try {
-      val (jsonKey,jsonValue) = JsonUtils.getJsonKeyValue(jsonQuery)
-      this.jsonKey=jsonKey
-      this.jsonValue=jsonValue
-    }catch {
-      case e:Exception=>{
+      val (jsonKey, jsonValue) = JsonUtils.getJsonKeyValue(jsonQuery)
+      this.jsonKey = jsonKey
+      this.jsonValue = jsonValue
+    } catch {
+      case e: Exception => {
         val excMsg = "Got the exception while parsing provided query json "
         logger.log(Level.WARN, excMsg + e.getMessage)
         throw new Exception(e)
@@ -121,10 +122,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   }
 
   /**
-   *Hibernate in-case of too many API call request.
+   * Hibernate in-case of too many API call request.
+   *
    * @param response
    */
-  private def hibernate( response: HttpResponse[String]): Unit = {
+  private def hibernate(response: HttpResponse[String]): Unit = {
     logger.log(Level.WARN, "Too many request per second")
     serverBusyCount += 1
     serverBusyCount match {
@@ -149,10 +151,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Check the response code from the response which got received from the API request and perform actions accordingly.
+   *
    * @param responseCode
    * @param response
    */
-  def responseCodeHandler( response: HttpResponse[String]): Unit = {
+  private def responseCodeHandler(response: HttpResponse[String]): Unit = {
 
     response.code match {
       case 200 => { //200 for all good
@@ -171,12 +174,13 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Check if the response contains the key for next page and creates the required variable which can be used to create the API call for next page.
+   *
    * @param jsonObject response as jsonObject received from API call.
    */
-  def paginate(response: String): Unit = {
+  private def paginate(response: String): Unit = {
     val mapper = new ObjectMapper()
-    val  jsonObject= mapper.readTree(response);
-    if( jsonObject.get(apiMeta.paginationKey)!=null){
+    val jsonObject = mapper.readTree(response);
+    if (jsonObject.get(apiMeta.paginationKey) != null) {
       if (endPoint.equals("sql/history/queries")) { //For sql/history/queries api we have a different mechanism to get the next page token
         if (jsonObject.get(apiMeta.paginationKey).asBoolean()) { //Pagination key for sql/history/queries can return true or false
           jsonKey = "page_token"
@@ -196,14 +200,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Write the responses to a temp location if API call has pagination.
+   *
    * @param resultJsonArray containing responses from the API call.
    * @return true encase of successfully write to the temp location.
    */
-  def writeMicroBatchToTempLocation(path:String,resultJsonArray: String): Boolean = {
+  private def writeMicroBatchToTempLocation(path: String, resultJsonArray: String): Boolean = {
     try {
-      val fineName = java.util.UUID.randomUUID.toString+".json"
-      dbutils.fs.put( path+ "/" + fineName, resultJsonArray, true)
-      logger.info("File Successfully written:"+path+ "/" + fineName)
+      val fineName = java.util.UUID.randomUUID.toString + ".json"
+      dbutils.fs.put(path + "/" + fineName, resultJsonArray, true)
+      logger.info("File Successfully written:" + path + "/" + fineName)
       true
     } catch {
       case e: Throwable =>
@@ -224,6 +229,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Options for the API call.
+   *
    * @return
    */
   private def reqOptions: Seq[HttpOptions.HttpOption] = {
@@ -237,9 +243,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Perform the API call and get the response.
+   *
    * @return response which is received on performing the API call.
    */
-  def getResponse: HttpResponse[String] = {
+  private def getResponse: HttpResponse[String] = {
     var response: HttpResponse[String] = null
     apiMeta.apiCallType match {
       case "POST" => {
@@ -295,7 +302,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
             } else {
               throw new Exception(sslMSG)
             }
-          case e:Exception=> throw e
+          case e: Exception => throw e
         }
       }
 
@@ -307,6 +314,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Creating a generic error message
+   *
    * @return
    */
   private def buildGenericErrorMessage: String = {
@@ -318,10 +326,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Get the required columns from the received dataframe.
+   *
    * @param rawDF The raw dataframe which is received as part of API response.
    * @return Dataframe which contains the required columns.
    */
-  def processRawData(rawDF: DataFrame): DataFrame = {
+  private def processRawData(rawDF: DataFrame): DataFrame = {
     val resultDFFieldNames = rawDF.schema.fieldNames
     if (!resultDFFieldNames.contains(apiMeta.dataframeColumns) && apiMeta.dataframeColumns != "*") { // if known API but return column doesn't exist
       val asDFErrMsg = s"The API endpoint is not returning the " +
@@ -342,6 +351,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Converting the API response to Dataframe.
+   *
    * @return Dataframe which is created from the API response.
    */
   def asDF(): DataFrame = {
@@ -352,7 +362,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       throw new ApiCallEmptyResponse(errMsg, true)
     } else if (apiResponseArray.size != 0 && !apiMeta.storeInTempLocation) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
       apiResultDF = spark.read.json(Seq(apiResponseArray.toString).toDS())
-    } else if (apiMeta.storeInTempLocation) {//Read the response from the Temp location/Disk and convert it to Dataframe.
+    } else if (apiMeta.storeInTempLocation) { //Read the response from the Temp location/Disk and convert it to Dataframe.
       apiResultDF = spark.read.json(successTempPath)
 
     }
@@ -362,24 +372,24 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Function make the API call for given list of clusterIds
+   *
    * @return
    */
-  def executeBatch():this.type ={
+  def executeBatch(): this.type = {
     try {
-      for(i <- 0 to queryJsonArray.length-1)
-      {
+      for (i <- 0 to queryJsonArray.length - 1) {
         jsonQuery = queryJsonArray(i)
         execute()
       }
       if (apiResponseArray.size() > 0) {
-        writeMicroBatchToTempLocation(successTempPath,apiResponseArray.toString)
+        writeMicroBatchToTempLocation(successTempPath, apiResponseArray.toString)
       }
-      if(errorArray.size()>0) {
+      if (errorArray.size() > 0) {
         writeMicroBatchToTempLocation(errorTempPath, errorArray.toString)
       }
 
-    }catch {
-      case e:Throwable =>
+    } catch {
+      case e: Throwable =>
         throw e
     }
     this
@@ -387,6 +397,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Function responsible for making the API request.
+   *
    * @return
    */
   def execute(): this.type = {
@@ -440,9 +451,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Write the errors to the temp location.
+   *
    * @param e
    */
-  def writeErrorToTemp(e: Throwable): Unit = {
+  private def writeErrorToTemp(e: Throwable): Unit = {
     errorArray.add(parseJsonQuery(e))
     if (apiEnv.errorBatchSize <= errorArray.size()) { //Checking if its right time to write the batches into persistent storage
       val responseFlag = writeMicroBatchToTempLocation(errorTempPath, errorArray.toString)
@@ -452,17 +464,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
-  def parseJsonQuery(e: Throwable):String={
+  private def parseJsonQuery(e: Throwable): String = {
     val mapper = new ObjectMapper()
-    val  jsonObject= mapper.readTree(jsonQuery);
-    val clusterId= jsonObject.get("cluster_id").toString
-    val start_time=jsonObject.get("start_time").asLong()
-    val end_time =jsonObject.get("end_time").asLong()
+    val jsonObject = mapper.readTree(jsonQuery);
+    val clusterId = jsonObject.get("cluster_id").toString
+    val start_time = jsonObject.get("start_time").asLong()
+    val end_time = jsonObject.get("end_time").asLong()
     val errorData = s"""{"cluster_id":${clusterId},"from_epoch":${start_time},"until_epoch":${end_time},"error":${e.getMessage}}"""
     errorData
   }
-
-
 
 
 }
