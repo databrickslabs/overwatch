@@ -15,10 +15,6 @@ libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5" % Provide
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
 libraryDependencies += "io.delta" % "delta-core_2.12" % "1.0.0" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
-//For API Modernization
-libraryDependencies += "com.tdunning" % "json" % "1.8"
-libraryDependencies += "log4j" % "log4j" % "1.2.17"
-libraryDependencies += "org.powermock" % "powermock-module-junit4" % "2.0.2" % Test
 
 //libraryDependencies += "org.apache.hive" % "hive-metastore" % "2.3.9"
 
