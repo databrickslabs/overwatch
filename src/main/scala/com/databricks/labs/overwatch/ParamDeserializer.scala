@@ -88,14 +88,25 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
   override def deserialize(jp: JsonParser, ctxt: DeserializationContext): OverwatchParams = {
     val masterNode = jp.getCodec.readTree[JsonNode](jp)
 
-    val token = try {
-      Some(TokenSecret(
-        masterNode.get("tokenSecret").get("scope").asText(),
-        masterNode.get("tokenSecret").get("key").asText()))
-    } catch {
-      case e: Throwable =>
-        println("No Token Secret Defined", e)
-        None
+    // TODO: consider keeping enum with specific secrets inner structure and below
+    //  transform to function processing the enum in a loop
+    val token = {
+
+      val databricksToken =
+        for {
+          scope <- getOptionString(masterNode,"tokenSecret.scope")
+          key <- getOptionString(masterNode, "tokenSecret.key")
+        } yield TokenSecret(scope, key)
+
+      val finalToken = if (databricksToken.isEmpty)
+        for {
+          secretId <- getOptionString(masterNode,"tokenSecret.secretId")
+          region <- getOptionString(masterNode,"tokenSecret.region")
+          apiToken = getOptionString(masterNode,"tokenSecret.tokenKey")
+        } yield AwsTokenSecret(secretId, region, apiToken)
+      else databricksToken
+
+      finalToken
     }
 
     val rawAuditPath = getOptionString(masterNode, "auditLogConfig.rawAuditPath")

@@ -321,20 +321,14 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecretContainer]): this.type = {
     var rawToken = ""
-    var scope = ""
-    var key = ""
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
         _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
-        scope = tokenSecret.get.scope
-        key = tokenSecret.get.key
-        rawToken = dbutils.secrets.get(scope, key)
-        val authMessage = s"Valid Secret Identified: Executing with token located in secret, $scope : $key"
-        logger.log(Level.INFO, authMessage)
+        rawToken = SecretTools(tokenSecret.get).getApiToken
         _tokenType = "Secret"
       } else {
         if (_isLocalTesting) { // Local testing env vars
@@ -353,7 +347,7 @@ class Config() {
         }
       }
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
-        s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
+        s"is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
       this
