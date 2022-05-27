@@ -1,15 +1,19 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
-import com.databricks.labs.overwatch.utils.BadConfigException
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config}
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
+import io.delta.tables.DeltaTable
 import org.apache.spark.sql.execution.streaming.MemoryStream
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.functions.{col, lit, row_number}
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, SQLContext}
+import org.apache.spark.sql.{Column, DataFrame, SQLContext}
 import org.scalatest.GivenWhenThen
 import org.scalatest.funspec.AnyFunSpec
+
+import scala.reflect.io.Directory
+
 
 class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with GivenWhenThen {
 
@@ -298,6 +302,88 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
         .collect().head.get(0)
       )
 
+    }
+  }
+
+  describe("Tests for getDeltaHistory") {
+    it("should get the history of delta table") {
+      Given("a delta table")
+      val df = spark.range(10).withColumn("c1", lit("c1"))
+      df.write.format("delta").mode("overwrite").save("/tmp/overwatch/tests/table1")
+
+      val dummyConfig = new Config()
+      dummyConfig.setDatabaseNameAndLoc("dummy", "dummy", "/tmp/overwatch/tests")
+
+      val testTable: PipelineTable = PipelineTable(name = "table1", _keys = Array("id"), config = dummyConfig)
+
+      When("function is called on the given delta table")
+      val functionOutputDf: DataFrame = PipelineFunctions.getDeltaHistory(spark, testTable)
+
+      Then("returns a dataframe with detal table history")
+      val expectedDf: DataFrame = DeltaTable.forPath(testTable.tableLocation).history(9999)
+        .select("version", "timestamp", "operation", "clusterId", "operationMetrics", "userMetadata")
+
+      assertApproximateDataFrameEquality(functionOutputDf, expectedDf, 0.001)
+
+      // delete the delta table
+      val dir = Directory("/tmp/overwatch/tests/table1")
+      dir.deleteRecursively()
+    }
+    it("should throw an exception when path is not a delta table") {
+      Given("a delta table")
+      val df = spark.range(10).withColumn("c1", lit("c1"))
+      df.write.format("delta").mode("overwrite").save("/tmp/overwatch/tests/table1")
+
+      val dummyConfig = new Config()
+      dummyConfig.setDatabaseNameAndLoc("dummy", "dummy", "/tmp/overwatch/test")
+
+      val testTable: PipelineTable = PipelineTable(name = "table1", _keys = Array("id"), config = dummyConfig)
+
+      When("function is called on incorrect delta table path")
+
+      Then("throws an exception")
+      assertThrows[org.apache.spark.sql.AnalysisException] (PipelineFunctions.getDeltaHistory(spark, testTable))
+    }
+  }
+
+  describe("Tests for getLastOptimized") {
+    it("should return 0 as long type when the table is never optimized") {
+      Given("a delta table")
+      val df = spark.range(10).withColumn("c1", lit("c1"))
+      df.write.format("delta").mode("overwrite").save("/tmp/overwatch/tests/table1")
+
+      val dummyConfig = new Config()
+      dummyConfig.setDatabaseNameAndLoc("dummy", "dummy", "/tmp/overwatch/tests")
+
+      val testTable: PipelineTable = PipelineTable(name = "table1", _keys = Array("id"), config = dummyConfig)
+
+      When("function is called on the delta table that is never optimized")
+
+      Then("return 0")
+      assertResult(0L) (PipelineFunctions.getLastOptimized(spark, testTable))
+
+      // delete the delta table
+      val dir = Directory("/tmp/overwatch/tests/table1")
+      dir.deleteRecursively()
+    }
+    it("should throw an exception when path is not a delta table") {
+      Given("a delta table")
+      val df = spark.range(10).withColumn("c1", lit("c1"))
+      df.write.format("delta").mode("overwrite").save("/tmp/overwatch/tests/table1")
+
+      val dummyConfig = new Config()
+      dummyConfig.setDatabaseNameAndLoc("dummy", "dummy", "/tmp/overwatch/test")
+
+      val testTable: PipelineTable = PipelineTable(name = "table1", _keys = Array("id"), config = dummyConfig)
+
+      When("function is called on the delta table that is never optimized")
+
+      Then("return 0")
+      assertThrows[org.apache.spark.sql.AnalysisException] (PipelineFunctions.getLastOptimized(spark, testTable))
+
+      // delete the delta table
+      val dir = Directory("/tmp/overwatch/tests/table1")
+      dir.deleteRecursively()
     }
   }
 }
