@@ -211,7 +211,7 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
       Row("25379","11-s111","454",2,Date.valueOf("2016-11-01"),Row("/stc/46-00.gz"))))
 
 
-    it("should join dataframes with lag - jointype: left, laggingside: left") {
+    it("should join dataframes with lag - jointype: left,laggingside: left") {
       val joinKeys = Seq("organization_id", "clusterId", "SparkContextID", "ExecutorID")
       val lagDays = 30
       val lagColumn = "Date"
