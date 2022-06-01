@@ -448,7 +448,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
       .as[String]
-      .collect()
+      .collect().par
 
     if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
@@ -458,15 +458,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.info("Calling New APIv2"+clusterIDs.length+" run id :"+apiEnv.runID)
     val tmpClusterEventsSuccessPath =s"$tempWorkingDir/success"+apiEnv.runID
     val tmpClusterEventsErrorPath =s"$tempWorkingDir/error"+apiEnv.runID
-    var jsonArray:Array[String]=new Array[String](clusterIDs.length);
 
-    for(i <- 0 to clusterIDs.length-1){
-      clusterIDs(i)
-      val jsonQuery = s"""{"cluster_id":"${clusterIDs(i)}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
-      jsonArray(i) = jsonQuery
-    }
+    clusterIDs.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(4))
+    clusterIDs.foreach(x=>{
+      logger.info("calling for api:"+x)
+      val jsonQuery = s"""{"cluster_id":"${x}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
+      ApiCallV2(apiEnv,"clusters/events",jsonQuery,tmpClusterEventsSuccessPath,tmpClusterEventsErrorPath).execute()
+    })
 
-    ApiCallV2(apiEnv,"clusters/events",jsonArray,tmpClusterEventsSuccessPath,tmpClusterEventsErrorPath).executeBatch()
     if(Helpers.pathExists(tmpClusterEventsErrorPath)){
       persistErrors(
         spark.read.json(tmpClusterEventsErrorPath),

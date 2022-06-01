@@ -26,6 +26,14 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQuery(queryJsonString)
   }
 
+  def apply(apiEnv: ApiEnv, apiName: String, queryJsonString: String, tempSuccessPath: String, errorTempPath: String) = {
+    new ApiCallV2(apiEnv)
+      .setApiName(apiName)
+      .setQuery(queryJsonString)
+      .setTempLocation(tempSuccessPath)
+      .setErrorTempLocation(errorTempPath)
+  }
+
   def apply(apiEnv: ApiEnv, apiName: String, queryJsonArray: Array[String], tempSuccessPath: String, errorTempPath: String) = {
     new ApiCallV2(apiEnv)
       .setApiName(apiName)
@@ -414,6 +422,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         }
       }
       paginate(response.body)
+      if (apiMeta.storeInTempLocation && queryJsonArray == null && apiResponseArray.size() > 0) {
+        writeMicroBatchToTempLocation(successTempPath, apiResponseArray.toString)
+        apiResponseArray = new util.ArrayList[String]()
+      }
       this
     } catch {
       case e: java.lang.NoClassDefFoundError => {
