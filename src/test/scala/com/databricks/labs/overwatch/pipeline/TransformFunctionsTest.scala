@@ -333,6 +333,67 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
       assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
     }
 
+    it("should join dataframes with lag - jointype: right, laggingside: left") {
+      val joinKeys = Seq("organization_id", "clusterId", "SparkContextID", "ExecutorID")
+      val lagDays = 30
+      val lagColumn = "Date"
+      val df1 = spark.createDataFrame(dfData1,dfSchema1)
+      val df2 = spark.createDataFrame(dfData2,dfSchema2)
+
+      val expectedDFSchema = StructType(
+        Seq(StructField("event_log_1",
+          StructType(Seq(
+            StructField("filename", StringType, true)))),
+          StructField("organization_id", StringType, true),
+          StructField("clusterId", StringType, true),
+          StructField("SparkContextID",StringType, true),
+          StructField("ExecutorID", IntegerType, true),
+          StructField("Date", DateType, true),
+          StructField("event_log_2",
+            StructType(Seq(
+              StructField("filename", StringType, true)))
+          )))
+      var expectedDf= spark.createDataFrame(sc.parallelize(Seq(
+        Row(Row("/abc/15-00.gz"),"25379","09-s796","386",1,Date.valueOf("2016-10-30"),Row("/ijk/52-00.gz")),
+        Row(Row("/edv/5-00.gz"),"25379","09-s891","387",0,Date.valueOf("2016-09-29"), Row("/lmn/53-00.gz")),
+        Row(Row("/hfg/16-00.gz"),"25379","09-s999","388",2,Date.valueOf("2016-09-29"),Row("/faq/55-00.gz")),
+        Row(null, "25379","11-s111","454",2,Date.valueOf("2016-11-01"),Row("/stc/46-00.gz"))))
+        ,expectedDFSchema)
+
+      var actualDF = df1.joinWithLag(df2,joinKeys, lagColumn,laggingSide="left", lagDays = lagDays, joinType = "right")
+      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
+    }
+
+    it("should join dataframes with lag - jointype: right, laggingside: right") {
+      val joinKeys = Seq("organization_id", "clusterId", "SparkContextID", "ExecutorID")
+      val lagDays = 30
+      val lagColumn = "Date"
+      val df1 = spark.createDataFrame(dfData1,dfSchema1)
+      val df2 = spark.createDataFrame(dfData2,dfSchema2)
+
+      var expectedDFSchema = StructType(
+        Seq(StructField("event_log_2",
+          StructType(Seq(
+            StructField("filename", StringType, true)))),
+          StructField("organization_id", StringType, true),
+          StructField("clusterId", StringType, true),
+          StructField("SparkContextID",StringType, true),
+          StructField("ExecutorID", IntegerType, true),
+          StructField("Date", DateType, true),
+          StructField("event_log_1",
+            StructType(Seq(
+              StructField("filename", StringType, true)))
+          )))
+      var expectedDf= spark.createDataFrame(sc.parallelize(Seq(
+        Row(Row("/ijk/52-00.gz"),"25379","09-s796","386",1,Date.valueOf("2016-09-30"),Row("/abc/15-00.gz")),
+        Row(null ,"25379","09-s888","385",1,Date.valueOf("2016-09-30"),Row("/abc/75-00.gz")),
+        Row(Row("/lmn/53-00.gz"),"25379","09-s891","387",0,Date.valueOf("2016-09-29"), Row("/edv/5-00.gz")),
+        Row(Row("/faq/55-00.gz"),"25379","09-s999","388",2,Date.valueOf("2016-09-28"),Row("/hfg/16-00.gz"))))
+        ,expectedDFSchema)
+      var actualDF = df2.joinWithLag(df1,joinKeys, lagColumn,laggingSide="right", lagDays = lagDays, joinType = "right")
+      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
+    }
+
     it("should not work for missing laggingcolumn in either dataframes") {
       val joinKeys = Seq("organization_id", "clusterId", "SparkContextID", "ExecutorID")
       val lagDays = 30
@@ -341,13 +402,9 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
       val df2 = spark.createDataFrame(dfData2,dfSchema2)
       var actualResult= ""
       val expectedResult = "IllegalArgumentException"
-      try{
+      assertThrows[IllegalArgumentException]{
         val actualDF = df1.joinWithLag(df2,joinKeys, lagColumn,laggingSide="left", lagDays = lagDays, joinType = "left")
       }
-      catch{
-        case e:IllegalArgumentException => actualResult ="IllegalArgumentException"
-      }
-      assertResult(expectedResult)(actualResult)
     }
   }
 
