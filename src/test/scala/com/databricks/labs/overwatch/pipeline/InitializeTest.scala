@@ -5,7 +5,7 @@ import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.PrivateMethodTester
 import com.databricks.labs.overwatch.utils.{BadConfigException, Config}
-
+import com.databricks.labs.overwatch.env.Database
 
 class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with PrivateMethodTester {
 
@@ -15,13 +15,10 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setOrganizationId("demo")
       val init = new Initializer(conf)
 
-      val isPVC = init.getClass.getDeclaredMethod("isPVC")
-      init.getClass.getDeclaredMethods.foreach(x=>println(x.getName))
-      isPVC.setAccessible(true)
-      val actual = isPVC.invoke(init)
-      println(isPVC.invoke(init))
-
-      assert(actual == false)
+      val isPVC = PrivateMethod[Boolean]('isPVC)
+      val actual = init invokePrivate isPVC()
+      println("value: " + actual)
+      assert(!actual)
     }
   }
 
@@ -32,26 +29,62 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setDatabaseNameAndLoc("overwatch_etl", "/dblocation", "/datalocation")
       conf.setConsumerDatabaseNameandLoc("overwatch", "/consumer/dblocation")
       val init = new Initializer(conf)
-      val database =  init.getClass.getDeclaredMethod("initializeDatabase")
-      database.setAccessible(true)
-      val data = database.invoke(init)
-      val databases = spark.sql("show databases").select("namespace").map(f=>f.getString(0)).collect()
+      val database = PrivateMethod[Database]('initializeDatabase)
+      init invokePrivate database()
+      val databases = spark.sql("show databases").select("namespace").map(f => f.getString(0)).collect()
       assert(databases.contains("overwatch_etl"))
       assert(databases.contains("overwatch"))
     }
   }
 
   describe("Tests for validateIntelligentScaling configs") {
-    it("for intelligentScaling function minimumCores should not be less than 1 ") {
+    it("for intelligentScaling minimumCores should not be less than 1 ") {
       import com.databricks.labs.overwatch.utils.IntelligentScaling
 
-      val intelligentScaling = IntelligentScaling(true, 0,123,1.0)
+      val intelligentScaling = IntelligentScaling(enabled = true, 0, 123, 1.0)
       val conf = new Config
       val init = new Initializer(conf)
-      val validateIntelligentScaling =  init.getClass.getDeclaredMethod("validateIntelligentScaling")
-      validateIntelligentScaling.setAccessible(true)
+      val validateIntelligentScaling = PrivateMethod[IntelligentScaling]('validateIntelligentScaling)
 
-      assertThrows[BadConfigException](validateIntelligentScaling.invoke(init, intelligentScaling))
+      assertThrows[BadConfigException](init invokePrivate validateIntelligentScaling(intelligentScaling))
     }
+
+    it("for intelligentScaling minimumCores can not be greater than maximum cores ") {
+      import com.databricks.labs.overwatch.utils.IntelligentScaling
+
+      val intelligentScaling = IntelligentScaling(enabled = true, 4, 1, 1.0)
+      val conf = new Config
+      val init = new Initializer(conf)
+      val validateIntelligentScaling = PrivateMethod[IntelligentScaling]('validateIntelligentScaling)
+
+      assertThrows[BadConfigException](init invokePrivate validateIntelligentScaling(intelligentScaling))
+
+    }
+
+    it("for intelligentScaling coeff must be with in 0 to 10") {
+      import com.databricks.labs.overwatch.utils.IntelligentScaling
+
+      val intelligentScaling = IntelligentScaling(enabled = true, 4, 1, 12.0)
+      val conf = new Config
+      val init = new Initializer(conf)
+      val validateIntelligentScaling = PrivateMethod[IntelligentScaling]('validateIntelligentScaling)
+
+      assertThrows[BadConfigException](init invokePrivate validateIntelligentScaling(intelligentScaling))
+    }
+
+    it("validateIntelligentScaling function should return IntelligentScaling case class upon correct validation") {
+      import com.databricks.labs.overwatch.utils.IntelligentScaling
+
+      val intelligentScaling = IntelligentScaling(enabled = true, 1, 10, 1.0)
+      val conf = new Config
+      val init = new Initializer(conf)
+      val validateIntelligentScaling = PrivateMethod[IntelligentScaling]('validateIntelligentScaling)
+
+      val actualIntelligentScaling = init invokePrivate validateIntelligentScaling(intelligentScaling)
+
+      assert(intelligentScaling == actualIntelligentScaling)
+    }
+
   }
 }
+
