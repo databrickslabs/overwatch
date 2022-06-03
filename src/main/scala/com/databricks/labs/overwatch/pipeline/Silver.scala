@@ -159,7 +159,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
   )
-  lazy private[overwatch] val executionsModule = Module(2005, "Silver_SPARK_Executions", this, Array(1006), 8.0)
+  lazy private[overwatch] val executionsModule = Module(2005, "Silver_SPARK_Executions", this, Array(1006), 8.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkExecutionsSparkOverrides)
   lazy private val appendExecutionsProcess = ETLDefinition(
     sparkEventsTarget.asIncrementalDF(executionsModule, sparkEventsTarget.incrementalColumns: _*),
@@ -175,7 +175,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
     "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString
   )
-  lazy private[overwatch] val sparkJobsModule = Module(2006, "Silver_SPARK_Jobs", this, Array(1006), 8.0)
+  lazy private[overwatch] val sparkJobsModule = Module(2006, "Silver_SPARK_Jobs", this, Array(1006), 8.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkJobsSparkOverrides)
   lazy private val appendSparkJobsProcess = ETLDefinition(
     sparkEventsTarget.asIncrementalDF(sparkJobsModule, sparkEventsTarget.incrementalColumns: _*),
@@ -190,7 +190,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
   )
-  lazy private[overwatch] val sparkStagesModule = Module(2007, "Silver_SPARK_Stages", this, Array(1006), 8.0)
+  lazy private[overwatch] val sparkStagesModule = Module(2007, "Silver_SPARK_Stages", this, Array(1006), 8.0, shuffleFactor = 4.0)
     .withSparkOverrides(sparkStagesSparkOverrides)
   lazy private val appendSparkStagesProcess = ETLDefinition(
     sparkEventsTarget.asIncrementalDF(sparkStagesModule, sparkEventsTarget.incrementalColumns: _*),
@@ -203,9 +203,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkTasksSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
-    "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
+    "spark.databricks.delta.optimizeWrite.binSize" -> "2048", // output is very dense, shrink output file size
+    "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
+    "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 4).toString
   )
-  lazy private[overwatch] val sparkTasksModule = Module(2008, "Silver_SPARK_Tasks", this, Array(1006), 8.0)
+  lazy private[overwatch] val sparkTasksModule = Module(2008, "Silver_SPARK_Tasks", this, Array(1006), 8.0, shuffleFactor = 8.0)
     .withSparkOverrides(sparkTasksSparkOverrides)
   lazy private val appendSparkTasksProcess = ETLDefinition(
     sparkEventsTarget.asIncrementalDF(sparkTasksModule, sparkEventsTarget.incrementalColumns: _*),

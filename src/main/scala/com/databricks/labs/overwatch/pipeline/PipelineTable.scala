@@ -29,7 +29,6 @@ case class PipelineTable(
                           autoCompact: Boolean = false,
                           partitionBy: Seq[String] = Seq(),
                           statsColumns: Array[String] = Array(),
-                          shuffleFactor: Double = 1.0,
                           optimizeFrequency_H: Int = 24 * 7,
                           zOrderBy: Array[String] = Array(),
                           vacuum_H: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
@@ -87,23 +86,23 @@ case class PipelineTable(
 
   def permitDuplicateKeys: Boolean = if (writeMode == WriteMode.merge) false else _permitDuplicateKeys
 
-  private[overwatch] def applySparkOverrides(updates: Map[String, String] = Map()): Unit = {
+  private def applyAutoOptimizeConfigs(): Unit = {
 
+    var overrides = Map[String, String]()
 
     if (autoOptimize) {
       logger.log(Level.INFO, s"enabling optimizeWrite on $tableFullName")
-      spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+      overrides = overrides ++ Map("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite" -> "true")
       if (config.debugFlag) println(s"Setting Auto Optimize for ${name}")
-    }
-    else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false")
+    } else overrides = overrides ++ Map("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite" -> "false")
 
     if (autoCompact) {
       logger.log(Level.INFO, s"enabling autoCompact on $tableFullName")
-      spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "true")
+      overrides = overrides ++ Map("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact" -> "true")
       if (config.debugFlag) println(s"Setting Auto Compact for ${name}")
-    }
-    else spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false")
+    } else overrides = overrides ++ Map("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact" -> "false")
 
+    PipelineFunctions.setSparkOverrides(spark, overrides, config.debugFlag)
   }
 
   def tableIdentifier: Option[TableIdentifier] = {
@@ -327,6 +326,7 @@ case class PipelineTable(
   }
 
   def writer(df: DataFrame): Any = { // TODO -- don't return any, return instance of trait
+    applyAutoOptimizeConfigs()
     if (writeMode != WriteMode.merge) { // DELTA Writer Built at write time
       if (checkpointPath.nonEmpty) { // IS STREAMING
         val streamWriterMessage = s"DEBUG: PipelineTable - Checkpoint for ${tableFullName} == ${checkpointPath.get}"

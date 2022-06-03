@@ -778,7 +778,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
-                                      cloudProvider: String,
+                                      daysToProcess: Int,
                                       historicalAuditLookupDF: DataFrame,
                                       clusterSnapshotTable: PipelineTable,
                                       sparkLogClusterScaleCoefficient: Double
@@ -794,10 +794,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val coreCount = (getTotalCores * sparkLogClusterScaleCoefficient).toInt
     val fromTimeEpochMillis = fromTime.asUnixTimeMilli
     val untilTimeEpochMillis = untilTime.asUnixTimeMilli
-    val fromDate = fromTime.asLocalDateTime.toLocalDate
-    val untilDate = untilTime.asLocalDateTime.toLocalDate
-    val daysToProcess = Duration.between(fromDate.atStartOfDay(), untilDate.plusDays(1L).atStartOfDay())
-      .toDays.toInt
 
     val clusterSnapshot = clusterSnapshotTable.asDF
     // Shoot for partitions coreCount < 16 partitions per day < 576

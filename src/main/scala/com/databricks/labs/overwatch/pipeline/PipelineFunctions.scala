@@ -151,83 +151,83 @@ object PipelineFunctions {
       .alias(defaultAlias)
   }
 
-  def optimizeWritePartitions(
-                               df: DataFrame,
-                               target: PipelineTable,
-                               spark: SparkSession,
-                               config: Config,
-                               moduleName: String,
-                               currentClusterCoreCount: Int
-                             ): DataFrame = {
-
-    var mutationDF = df
-    mutationDF = if (target.zOrderBy.nonEmpty) {
-      mutationDF.moveColumnsToFront(target.zOrderBy ++ target.statsColumns)
-    } else mutationDF
-
-   val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
-      val targetShufflePartitionSizeMB = 128.0
-      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes")
-        .replace("b", "").toDouble / 1024 / 1024
-
-      val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
-
-      val sourceDFParts = getSourceDFParts(df)
-      // TODO -- handle streaming until Module refactor with source -> target mappings
-      val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
-        target.name match {
-          case "audit_log_bronze" => // TODO -- check to ensure this should be audit_log_bronze, not audit_log_raw_events
-            target.asDF.rdd.partitions.length * target.shuffleFactor
-          case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
-        }
-      } else {
-        sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
-      }
-
-      val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
-      val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
-
-      if (config.debugFlag) {
-        println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
-        println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
-        println(s"DEBUG: Max PartitionBytes (MB): $readMaxPartitionBytesMB")
-      }
-
-      logger.log(Level.INFO, s"$moduleName: " +
-        s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
-        s"\nShufflePartitions: ${targetShufflePartitionCount}")
-
-      targetShufflePartitionCount
-    } else {
-      Math.max(currentClusterCoreCount * 2, spark.conf.get("spark.sql.shuffle.partitions").toInt)
-    }
-
-    spark.conf.set("spark.sql.shuffle.partitions",targetShufflePartitions)
-
-    /**
-     * repartition partitioned tables that are not auto-optimized into the range partitions for writing
-     * without this the file counts of partitioned tables will be extremely high
-     * also generate noise to prevent skewed partition writes into extremely low cardinality
-     * organization_ids/dates per run -- usually 1:1
-     * noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
-     */
-
-    if (target.partitionBy.nonEmpty) {
-      if (target.partitionBy.contains("__overwatch_ctrl_noise") && !target.autoOptimize) {
-        logger.log(Level.INFO, s"${target.tableFullName}: generating partition noise")
-        mutationDF = mutationDF.withColumn("__overwatch_ctrl_noise", (rand() * lit(32)).cast("int"))
-      }
-
-      if (!target.autoOptimize) {
-        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into $targetShufflePartitions " +
-          s" output partitions defined as ${target.partitionBy.mkString(", ")}")
-        mutationDF = mutationDF.repartition(targetShufflePartitions, target.partitionBy map col: _*)
-      }
-    }
-
-    mutationDF
-
-  }
+//  def optimizeWritePartitions(
+//                               df: DataFrame,
+//                               target: PipelineTable,
+//                               spark: SparkSession,
+//                               config: Config,
+//                               moduleName: String,
+//                               currentClusterCoreCount: Int
+//                             ): DataFrame = {
+//
+//    var mutationDF = df
+//    mutationDF = if (target.zOrderBy.nonEmpty) {
+//      mutationDF.moveColumnsToFront(target.zOrderBy ++ target.statsColumns)
+//    } else mutationDF
+//
+//   val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
+//      val targetShufflePartitionSizeMB = 128.0
+//      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes")
+//        .replace("b", "").toDouble / 1024 / 1024
+//
+//      val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
+//
+//      val sourceDFParts = getSourceDFParts(df)
+//      // TODO -- handle streaming until Module refactor with source -> target mappings
+//      val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
+//        target.name match {
+//          case "audit_log_bronze" => // TODO -- check to ensure this should be audit_log_bronze, not audit_log_raw_events
+//            target.asDF.rdd.partitions.length * target.shuffleFactor
+//          case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
+//        }
+//      } else {
+//        sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
+//      }
+//
+//      val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
+//      val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
+//
+//      if (config.debugFlag) {
+//        println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
+//        println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
+//        println(s"DEBUG: Max PartitionBytes (MB): $readMaxPartitionBytesMB")
+//      }
+//
+//      logger.log(Level.INFO, s"$moduleName: " +
+//        s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
+//        s"\nShufflePartitions: ${targetShufflePartitionCount}")
+//
+//      targetShufflePartitionCount
+//    } else {
+//      Math.max(currentClusterCoreCount * 2, spark.conf.get("spark.sql.shuffle.partitions").toInt)
+//    }
+//
+//    spark.conf.set("spark.sql.shuffle.partitions",targetShufflePartitions)
+//
+//    /**
+//     * repartition partitioned tables that are not auto-optimized into the range partitions for writing
+//     * without this the file counts of partitioned tables will be extremely high
+//     * also generate noise to prevent skewed partition writes into extremely low cardinality
+//     * organization_ids/dates per run -- usually 1:1
+//     * noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
+//     */
+//
+//    if (target.partitionBy.nonEmpty) {
+//      if (target.partitionBy.contains("__overwatch_ctrl_noise") && !target.autoOptimize) {
+//        logger.log(Level.INFO, s"${target.tableFullName}: generating partition noise")
+//        mutationDF = mutationDF.withColumn("__overwatch_ctrl_noise", (rand() * lit(32)).cast("int"))
+//      }
+//
+//      if (!target.autoOptimize) {
+//        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into $targetShufflePartitions " +
+//          s" output partitions defined as ${target.partitionBy.mkString(", ")}")
+//        mutationDF = mutationDF.repartition(targetShufflePartitions, target.partitionBy map col: _*)
+//      }
+//    }
+//
+//    mutationDF
+//
+//  }
 
   def applyFilters(df: DataFrame, filters: Seq[Column], debugFlag: Boolean, module: Option[Module] = None): DataFrame = {
     if (module.nonEmpty) {
@@ -310,7 +310,11 @@ object PipelineFunctions {
 
   def setSparkOverrides(spark: SparkSession, sparkOverrides: Map[String, String],
                         debugFlag: Boolean = false): Unit = {
-    logger.log(Level.INFO, s"SETTING SPARK OVERRIDES:\n${sparkOverrides.mkString(", ")}")
+    logger.info(
+      s"""
+         |SPARK OVERRIDES BEING SET:
+         |${sparkOverrides.mkString("\n")}
+         |""".stripMargin)
     sparkOverrides foreach { case (k, v) =>
       try {
         val opt = spark.conf.getOption(k)

@@ -166,7 +166,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
   )
 
-  lazy private[overwatch] val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006), 6.0)
+  lazy private[overwatch] val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006), 6.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkJobProcess = ETLDefinition(
     SilverTargets.jobsTarget.asIncrementalDF(sparkJobModule, SilverTargets.jobsTarget.incrementalColumns),
@@ -174,7 +174,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkJobTarget)
   )
 
-  lazy private[overwatch] val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007), 6.0)
+  lazy private[overwatch] val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007), 6.0, shuffleFactor = 4.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkStageProcess = ETLDefinition(
     SilverTargets.stagesTarget.asIncrementalDF(sparkStageModule, SilverTargets.stagesTarget.incrementalColumns),
@@ -182,7 +182,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkStageTarget)
   )
 
-  lazy private[overwatch] val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008), 6.0)
+  lazy private[overwatch] val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008), 6.0, shuffleFactor = 8.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkTaskProcess = ETLDefinition(
     SilverTargets.tasksTarget.asIncrementalDF(sparkTaskModule, SilverTargets.tasksTarget.incrementalColumns),
@@ -190,7 +190,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkTaskTarget)
   )
 
-  lazy private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005), 6.0)
+  lazy private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005), 6.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkExecutionProcess = ETLDefinition(
     SilverTargets.executionsTarget.asIncrementalDF(sparkExecutionModule, SilverTargets.executionsTarget.incrementalColumns),
@@ -198,7 +198,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkExecutionTarget)
   )
 
-  lazy private[overwatch] val sparkStreamModule = Module(3016, "Gold_SparkStream", this, Array(1006, 2005), 6.0)
+  lazy private[overwatch] val sparkStreamModule = Module(3016, "Gold_SparkStream", this, Array(1006, 2005), 6.0, shuffleFactor = 4.0)
     .withSparkOverrides(sparkBaseSparkOverrides ++ Map("spark.sql.caseSensitive" -> "true"))
   lazy private val appendSparkStreamProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget.asIncrementalDF(sparkStreamModule, BronzeTargets.sparkEventLogsTarget.incrementalColumns),
