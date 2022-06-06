@@ -145,6 +145,7 @@ class Config() {
         value.getOrElse("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "50000"),
       "spark.databricks.delta.optimizeWrite.binSize" ->
         value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
+      "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
       "spark.sql.caseSensitive" -> "false",
       "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
       "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365

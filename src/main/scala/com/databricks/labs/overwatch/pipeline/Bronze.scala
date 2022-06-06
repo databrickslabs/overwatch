@@ -148,7 +148,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private val sparkEventLogsSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
-    "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString
+    "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
+    "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 8).toString
     // very large schema to imply, too much parallelism and schema result size is too large to
     // serialize, 64m seems to be a good middle ground.
   )
@@ -161,7 +162,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       collectEventLogPaths(
         sparkEventLogsModule.fromTime,
         sparkEventLogsModule.untilTime,
-        config.cloudProvider,
+        sparkEventLogsModule.daysToProcess,
         BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, 30),
         BronzeTargets.clustersSnapshotTarget,
         sparkLogClusterScaleCoefficient
@@ -190,13 +191,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       config.runID
     )
 
-    val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
-      rawAzureAuditEvents,
-      BronzeTargets.auditLogAzureLandRaw,
-      spark, config, "azure_audit_log_preProcessing", getTotalCores
-    )
-
-    database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
+    database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
 
     val rawProcessCompleteMsg = "Azure audit ingest process complete"
     if (config.debugFlag) println(rawProcessCompleteMsg)

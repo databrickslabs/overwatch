@@ -405,13 +405,13 @@ class Pipeline(
 
     val localSafeTotalCores = if (config.isLocalTesting) spark.conf.getOption("spark.sql.shuffle.partitions").getOrElse("200").toInt
     else getTotalCores
-    val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, localSafeTotalCores)
+//    val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, localSafeTotalCores)
 
     val startLogMsg = s"Beginning append to ${target.tableFullName}"
     logger.log(Level.INFO, startLogMsg)
 
     // Append the output -- don't apply spark overrides, applied at top of function
-    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
+    if (!readOnly) database.write(df, target, pipelineSnapTime.asColumnTS)
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
       println(readOnlyMsg)

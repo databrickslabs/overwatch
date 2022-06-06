@@ -176,8 +176,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("addedTimestamp"),
-      autoOptimize = true,
-      shuffleFactor = 0.25
+      autoOptimize = true
     )
 
     lazy private[overwatch] val executionsTarget: PipelineTable = PipelineTable(
@@ -187,8 +186,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("startTimestamp"),
-      autoOptimize = true,
-      shuffleFactor = 0.25
+      autoOptimize = true
     )
 
     lazy private[overwatch] val jobsTarget: PipelineTable = PipelineTable(
@@ -198,8 +196,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
-      autoOptimize = true,
-      shuffleFactor = 0.75
+      autoOptimize = true
     )
 
     lazy private[overwatch] val stagesTarget: PipelineTable = PipelineTable(
@@ -209,8 +206,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
-      autoOptimize = true,
-      shuffleFactor = 0.25
+      autoOptimize = true
     )
 
     lazy private[overwatch] val tasksTarget: PipelineTable = PipelineTable(
@@ -220,7 +216,6 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
-      shuffleFactor = 5,
       autoOptimize = true
     )
 
@@ -473,7 +468,6 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "date"),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("date", "unixTimeMS"),
-      shuffleFactor = 5,
       autoOptimize = true
     )
 
@@ -522,7 +516,6 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "date"),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("date", "stream_timestamp"),
-      shuffleFactor = 3,
       autoOptimize = true
     )
 
