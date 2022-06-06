@@ -614,7 +614,7 @@ object Helpers extends SparkSessionWrapper {
     val allTargets = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets
-    val targetToRollback = allTargets.find(_.name.toLowerCase == targetName)
+    val targetToRollback = allTargets.find(_.name.toLowerCase == targetName.toLowerCase)
     assert(targetToRollback.nonEmpty, s"Target with name: $targetName not found")
 
     val target = targetToRollback.get

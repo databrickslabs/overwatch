@@ -699,7 +699,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'JobGroupID.alias("job_group_id"),
       'ExecutionID.alias("execution_id"),
       'StageIDs.alias("stage_ids"),
-      $"PowerProperties.ClusterDetails.ClusterID".alias("cluster_id"),
+      'clusterId.alias("cluster_id"),
       $"PowerProperties.NotebookID".alias("notebook_id"),
       $"PowerProperties.NotebookPath".alias("notebook_path"),
       $"PowerProperties.SparkDBJobID".alias("db_job_id"),

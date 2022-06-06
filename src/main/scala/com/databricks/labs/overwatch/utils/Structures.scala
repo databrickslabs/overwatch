@@ -176,7 +176,7 @@ case class WorkspaceDataset(path: String, name: String)
 
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
 
-case class CloneDetail(source: String, target: String, asOfTS: Option[String], cloneLevel: String = "DEEP")
+case class CloneDetail(source: String, target: String, asOfTS: Option[String] = None, cloneLevel: String = "DEEP")
 
 case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
 

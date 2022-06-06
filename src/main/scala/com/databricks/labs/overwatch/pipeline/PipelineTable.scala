@@ -3,12 +3,14 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.WriteMode.WriteMode
 import com.databricks.labs.overwatch.utils._
+import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{AnalysisException, DataFrame}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
 //noinspection ScalaCustomHdfsFormat
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
@@ -354,6 +356,76 @@ case class PipelineTable(
           .option("userMetadata", config.runID)
       }
     }
+  }
+
+  def getDups(): DataFrame = {
+    val df = this.asDF
+    val w = Window.partitionBy(keys map col: _*).orderBy(incrementalColumns map col: _*)
+    val dups = df
+      .withColumn("rnk", rank().over(w))
+      .withColumn("rn", row_number().over(w))
+      .filter('rnk > 1 || 'rn > 1)
+      .drop("rn", "rnk")
+      .select(keys map col: _*)
+    df
+      .join(dups, keys)
+      .orderBy(incrementalColumns map col: _*)
+  }
+
+//  def deleteDups(tableFullName: String, keyCols: Array[String], orderByCols: Array[String], tableFilters: Array[Column]): Unit = {
+  def deleteDups(tableFilters: Array[Column] = Array()): Unit = {
+    val completeKeySet = (keys ++ incrementalColumns).map(_.toLowerCase).distinct
+    val w = Window.partitionBy(completeKeySet map col: _*).orderBy(incrementalColumns map col: _*)
+    val wRank = Window.partitionBy((completeKeySet :+ "rnk") map col: _*).orderBy(incrementalColumns map col: _*)
+    val startVersion = spark.sql(s"desc history $tableFullName").select(max('version)).as[Long].first
+    val db = tableFullName.split("\\.")(0)
+    val tbl = tableFullName.split("\\.")(1)
+    val tblLocation = spark.sessionState.catalog.getTableMetadata(TableIdentifier(tbl, Some(db))).location.toString
+    val conditionalMatchClause = completeKeySet.map(c => col(s"source.$c") === col(s"target.$c")).reduce((x, y) => x && y)
+
+    val nonNullFilters = completeKeySet.map(k => col(k).isNotNull) ++ tableFilters
+    val currentDF = nonNullFilters.foldLeft(spark.table(tableFullName))((df, f) => df.filter(f))
+    val vnDF = nonNullFilters.foldLeft(spark.read.format("delta").option("versionAsOf", startVersion).load(tblLocation))((df, f) => df.filter(f))
+
+    val dupsToDelete = currentDF
+      .withColumn("rnk", rank().over(w))
+      .withColumn("rn", row_number().over(w))
+      .filter('rnk > 1 || 'rn > 1)
+
+    val dupsToRestore = vnDF
+      .withColumn("rnk", rank().over(w))
+      .withColumn("rn", row_number().over(wRank))
+      .filter('rnk === 1 && 'rn === 2)
+      .drop("rnk", "rn")
+
+    DeltaTable.forName(tableFullName)
+      .as("target")
+      .merge(
+        dupsToDelete.as("source"), conditionalMatchClause
+      )
+      .whenMatched
+      .delete()
+      .execute
+
+    DeltaTable.forName(tableFullName)
+      .as("target")
+      .merge(
+        dupsToRestore.as("source"), conditionalMatchClause
+      )
+      .whenNotMatched()
+      .insertAll()
+      .execute
+
+    val wHist = Window.orderBy('version.desc)
+    val hist = spark.sql(s"desc history $tableFullName")
+      .filter('operation === "MERGE")
+      .withColumn("rnk", rank().over(wHist))
+      .withColumn("rn", row_number().over(wHist))
+
+    val dupsFound = hist.filter('rnk === 2).select($"operationMetrics.numTargetRowsDeleted".cast("long")).as[Long].first
+    val originalsRecovered = hist.filter('rnk === 1).select($"operationMetrics.numTargetRowsInserted".cast("long")).as[Long].first
+    val dupsDropped = dupsFound- originalsRecovered
+    println(s"DROPPED $dupsDropped duplicate records from $tableFullName")
   }
 
 

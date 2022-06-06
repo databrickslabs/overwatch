@@ -224,6 +224,9 @@ object TransformFunctions {
      * @param keys keys by which to partition the window
      * @param incrementalFields fields by which to order the window
      * @param orderedLookups Seq of columns that provide a secondary lookup for the value within the row
+     * @param noiseBuckets Optional number of buckets to split lookup window
+     *                     creates an intermediate step that can help shrink skew on large datasets with
+     *                     heavily skewed lookups
      * @return
      */
     def fillMeta(
