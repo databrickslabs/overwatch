@@ -97,6 +97,14 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+  /**
+   * Removes nested columns within a struct and returns the Dataframe with the struct less the columns
+   * @param df df containing struct with cols to remove
+   * @param structToModify name of struct field to modify -- currently must be a top level field
+   *                       recursion is not yet enabled
+   * @param nestedFieldsToCull fields to remove -- top leve fields only, recursion not yet enabled
+   * @return
+   */
   def cullNestedColumns(df: DataFrame, structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
     val originalFieldNames = df.select(s"$structToModify.*").columns
     val remainingFieldNames = if (spark.conf.get("spark.sql.caseSensitive") == "true") {
@@ -108,6 +116,16 @@ object SchemaTools extends SparkSessionWrapper {
     df.withColumn(structToModify, newStructCol)
   }
 
+  /**
+   * recurse through a struct and apply a transformation to all fields in the structed as noted in the
+   * changeInventory. Enabled for nested fields, they can be accessed through dot notation such as
+   * parent.child.grandchild
+   * @param structToModify which struct to modify, recursion supported through dot notation
+   * @param changeInventory Inventory of all changes to be made where the key is the dot map to the struct field
+   *                        to modify and the column is the columnar expression of the transform
+   * @param prefix initializes to null and appends as recursion drills down into the schema
+   * @return
+   */
   def modifyStruct(structToModify: StructType, changeInventory: Map[String, Column], prefix: String = null): Array[Column] = {
     structToModify.fields.map(f => {
       val fullFieldName = if (prefix == null) f.name else (prefix + "." + f.name)
@@ -120,6 +138,14 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+  /**
+   * Identifies whether a field exists in a struct. This supports recursion through dot map notation.
+   * parent.child.grandchild
+   * if parent.child.grandchild exists in the schema func will return true
+   * @param schema schema to analyze
+   * @param dotPathOfField dot map notation parent.child.grandchild to check field
+   * @return
+   */
   def nestedColExists(schema: StructType, dotPathOfField: String): Boolean = {
     val dotPathAr = dotPathOfField.split("\\.")
     val elder = dotPathAr.head
@@ -141,6 +167,13 @@ object SchemaTools extends SparkSessionWrapper {
     }
   }
 
+  /**
+   * Converts a string column containing valid JSON to a struct field
+   * @param spark sparkSession to use for json parsing
+   * @param df Dataframe containing column to parse
+   * @param c column name as a string -- supports recursion via dot map notation parent.child.grandchild
+   * @return
+   */
   def structFromJson(spark: SparkSession, df: DataFrame, c: String): Column = {
     import spark.implicits._
     require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
@@ -156,33 +189,24 @@ object SchemaTools extends SparkSessionWrapper {
     }
   }
 
-  def structFromJson(spark: SparkSession, df: DataFrame, cs: String*): Column = {
-    import spark.implicits._
-    val dfFields = df.schema.fields
-    cs.foreach(c => {
-      require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
-      require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
-    })
-    array(
-      cs.map(c => {
-        val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-        if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-          println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
-        }
-        from_json(col(c), jsonSchema).alias(c)
-      }): _*
-    )
-  }
-
   // TODO -- Remove keys with nulls from maps?
   //  Add test to ensure that null/"" key and null/"" value are both handled
   //  as of 0.4.1 failed with key "" in spark_conf
   //  TEST for multiple null/"" cols / keynames in same struct/record
+
+  /**
+   * Converts a struct field to a map of string,string
+   * @param df Dataframe containing column to convert
+   * @param colToConvert name of struct column to be converted from struct to map
+   *                     must reference a struct field and the fields contained in the struct must be simple types,
+   *                     types that can be implicitly cast to a string
+   * @param dropEmptyKeys whether or not to remove keys that have a null value. This is defaulted to true as
+   *                      it's most common to remove keys without a value and there are often many of these
+   * @return
+   */
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
 
     val mapColName = colToConvert.split("\\.").takeRight(1).head
-    val removeEmptyKeys = udf((m: Map[String, String]) => m.filterNot(_._2 == null))
-
     val dfFlatColumnNames = getAllColumnNames(df.schema)
     if (dfFlatColumnNames.exists(_.startsWith(colToConvert))) { // if column exists within schema
       df.select(colToConvert).schema.fields.head.dataType.typeName match {
@@ -204,7 +228,7 @@ object SchemaTools extends SparkSessionWrapper {
           val newRawMap = map(mapCols.toSeq: _*)
           if (dropEmptyKeys) {
             when(newRawMap.isNull, lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)))
-              .otherwise(removeEmptyKeys(newRawMap)).alias(mapColName)
+              .otherwise(map_filter(newRawMap, (_,v) => v.isNotNull)).alias(mapColName)
           } else newRawMap.alias(mapColName)
         case "null" =>
           lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
@@ -316,6 +340,20 @@ object SchemaTools extends SparkSessionWrapper {
     new BadSchemaException(msg)
   }
 
+  /**
+   * Build validationRunner for Schema validation. Provides the input schema vs. the minimum required schema
+   * to ensure rules are met. Input schema must conform to the minimum required schema or otherwise be able to
+   * be implicitly altered to meet the requirements
+   * @param dfSchema source schema to validate
+   * @param minRequiredSchema minimum required schema against which to validate
+   *                          fields of null type will be removed from the schema, this is different than
+   *                          enforce nonNullableColumns
+   * @param enforceNonNullCols Whether or not to implicitly convert nonNullable columns identified in the
+   *                           minimum schema where the input schema may otherwise allow nulls
+   * @param isDebug if enabled enables more robust logging
+   * @param cPrefix defaults to None -- used to map location within the schema through recursion
+   * @return
+   */
   def buildValidationRunner(
                              dfSchema: StructType,
                              minRequiredSchema: StructType,
@@ -364,6 +402,16 @@ object SchemaTools extends SparkSessionWrapper {
 
   }
 
+  /**
+   * validates the minimum required schema against the schema provided in the validator
+   * all rules in the validator must be met to return a ValidatedColumn
+   * @param validator Validation rule set and input schema
+   * @param cPrefix defaults to None -- used to map location within the schema through recursion
+   * @param enforceNonNullCols Whether or not to implicitly convert nonNullable columns identified in the
+   *                           minimum schema where the input schema may otherwise allow nulls
+   * @param isDebug if enabled enables more robust logging
+   * @return
+   */
   def validateSchema(
                       validator: ValidatedColumn,
                       cPrefix: Option[String] = None,
