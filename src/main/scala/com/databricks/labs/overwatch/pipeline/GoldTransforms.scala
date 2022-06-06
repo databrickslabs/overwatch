@@ -106,7 +106,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       'requestDetails.alias("request_detail"),
       'timeDetails.alias("time_detail")
     )
-    jobRunsLag30D.select(jobRunCols: _*)
+    jobRunsLag30D
+      .select(jobRunCols: _*)
   }
 
   protected def buildNotebook()(df: DataFrame): DataFrame = {
@@ -246,6 +247,13 @@ trait GoldTransforms extends SparkSessionWrapper {
       .lookupWhen(dbuCostDetailsTSDF)
       .df
 
+    val clusterPotMetaToFill = Array(
+      "cluster_name", "custom_tags", "driver_node_type_id",
+      "node_type_id", "spark_version", "sku", "dbu_rate", "driverSpecs", "workerSpecs"
+    )
+    val clusterPotKeys = Seq("organization_id", "cluster_id")
+    val clusterPotIncrementals = Seq("state_start_date", "unixTimeMS_state_start")
+
     val clusterPotential = clusterStateDetail
       .withColumn("timestamp", 'unixTimeMS_state_start) // time control temporary column
       .toTSDF("timestamp", "organization_id", "cluster_id")
@@ -277,6 +285,9 @@ trait GoldTransforms extends SparkSessionWrapper {
             .between($"workerNodeDetails.activeFromEpochMillis", $"workerNodeDetails.activeUntilEpochMillis"),
         "left")
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup")
+      // filling data is critical here to ensure jrcp dups don't occur
+      // using noise generators to fill with two passes to reduce skew
+      .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores) // scan back then forward to fill all
 
     val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
     val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H).otherwise(lit(0)).alias("driver_dbus")

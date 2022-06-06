@@ -21,6 +21,7 @@ case class PipelineTable(
                           incrementalColumns: Array[String] = Array(),
                           format: String = "delta", // TODO -- Convert to Enum
                           private val _mode: WriteMode = WriteMode.append,
+                          private val _permitDuplicateKeys: Boolean = true,
                           private val _databaseName: String = "default",
                           autoOptimize: Boolean = false,
                           autoCompact: Boolean = false,
@@ -81,6 +82,8 @@ case class PipelineTable(
       WriteMode.append
     } else _mode
   }
+
+  def permitDuplicateKeys: Boolean = if (writeMode == WriteMode.merge) false else _permitDuplicateKeys
 
   private[overwatch] def applySparkOverrides(updates: Map[String, String] = Map()): Unit = {
 

@@ -9,6 +9,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
+import TransformFunctions._
 
 import java.util.concurrent.{ConcurrentHashMap, ForkJoinPool}
 import scala.collection.JavaConverters._
@@ -1074,10 +1075,9 @@ object Upgrade extends SparkSessionWrapper {
           if (sparkEventsSchema.fields.exists(f => fieldsRequiringRebuild.contains(f.name))) {
             logger.info(s"Beginning full rebuild of $targetName table. This could take some time. Recommend " +
               s"monitoring of cluster size and ensure autoscaling enabled.")
-            TransformFunctions.moveColumnsToFront(
-              sparkEventsBronzeDF.drop(fieldsRequiringRebuild: _*),
-              statsColumns
-            )
+            sparkEventsBronzeDF
+              .drop(fieldsRequiringRebuild: _*)
+              .moveColumnsToFront(statsColumns)
               .write.format("delta")
               .partitionBy(partitionByCols: _*)
               .mode("overwrite").option("overwriteSchema", "true")

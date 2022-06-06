@@ -218,7 +218,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * @param etlTargetPath target path for all overwatch data
    */
   private def prepAndSetTempWorkingDir(tempPath: String, etlTargetPath: String): Unit = {
-    val defaultTempPath = s"$etlTargetPath/tempWorkingDir/${config.organizationId}"
+    val defaultTempPath = s"$etlTargetPath/tempworkingdir/${config.organizationId}"
     val workspaceTempWorkingDir = if (tempPath == "") { // default null string
       defaultTempPath
     }

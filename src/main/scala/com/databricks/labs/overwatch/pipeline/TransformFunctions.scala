@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.utils.{SchemaScrubber, SchemaTools, TSDF, ValidatedColumn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
@@ -21,6 +21,32 @@ object TransformFunctions {
           mutDF.drop(col(s"${dropAlias}.${k}"))
         }
       }
+    }
+
+    /**
+     *
+     * Warning Does not remove null structs, arrays, etc.
+     *
+     * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
+     * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
+     * disregards structs
+     *
+     * Another helpful user function not utilized in the code base.
+     *
+     * @param df dataframe to more data
+     * @return
+     *
+     */
+    def cullNull(): DataFrame = {
+      val cntsDF = df.summary("count").drop("summary")
+      val nonNullCols = cntsDF.collect()
+        .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
+        .map(col)
+      val complexTypeFields = df.schema.fields
+        .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType]  || f.dataType.isInstanceOf[MapType])
+        .map(_.name).map(col)
+      val columns = nonNullCols ++ complexTypeFields
+      df.select(columns: _*)
     }
 
     def suffixDFCols(
@@ -191,6 +217,79 @@ object TransformFunctions {
     }
 
     /**
+     * fills metadata columns in a dataframe using windows
+     * the windows will use the keys and the incrementals to go back as far as needed to get a value
+     * if a value cannot be filled from previous data, first future value will be used to fill
+     * @param fieldsToFill Array of fields to fill
+     * @param keys keys by which to partition the window
+     * @param incrementalFields fields by which to order the window
+     * @param orderedLookups Seq of columns that provide a secondary lookup for the value within the row
+     * @return
+     */
+    def fillMeta(
+                  fieldsToFill: Array[String],
+                  keys: Seq[String],
+                  incrementalFields: Seq[String],
+                  orderedLookups: Seq[Column] = Seq[Column](),
+                  noiseBuckets: Int = 0
+                ) : DataFrame = {
+      val dfFields = df.columns
+
+      // generate noise as per the number of noise buckets created
+      val stepDF = if (noiseBuckets > 0)  {
+        val keysWithNoise = keys :+ "__overwatch_ctrl_noiseBucket"
+        val wNoise = Window.partitionBy(keysWithNoise map col: _*).orderBy(incrementalFields map col: _*)
+        val wNoisePrev = wNoise.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+        val wNoiseNext = wNoise.rowsBetween(Window.currentRow, Window.unboundedFollowing)
+
+        val selectsWithFills = dfFields.map(f => {
+          if(fieldsToFill.map(_.toLowerCase).contains(f.toLowerCase)) { // field to fill
+            bidirectionalFill(f, wNoisePrev, wNoiseNext, orderedLookups)
+          } else { // not a fill field just return original value
+            col(f)
+          }
+        })
+        df
+          .withColumn("__overwatch_ctrl_noiseBucket", round(rand() * noiseBuckets, 0))
+          .select(selectsWithFills: _*)
+
+      } else df
+
+      val wRaw = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      val wPrev = wRaw.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+      val wNext = wRaw.rowsBetween(Window.currentRow, Window.unboundedFollowing)
+
+      val selectsWithFills = dfFields.map(f => {
+        if(fieldsToFill.map(_.toLowerCase).contains(f.toLowerCase)) { // field to fill
+          bidirectionalFill(f, wPrev, wNext, orderedLookups)
+        } else { // not a fill field just return original value
+          col(f)
+        }
+      })
+      stepDF
+        .drop("__overwatch_ctrl_noiseBucket") // drop noise col if exists
+        .select(selectsWithFills: _*)
+    }
+
+    /**
+     * remove dups via a window
+     * @param keys seq of keys for the df
+     * @param incrementalFields seq of incremental fields for the df
+     * @return
+     */
+    def dedupByKey(
+                     keys: Seq[String],
+                     incrementalFields: Seq[String]
+                     ): DataFrame = {
+      val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      df
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter(col("rnk") === 1  && col("rn") === 1)
+        .drop("rnk", "rn")
+    }
+
+    /**
      * Supports strings, numericals, booleans. Defined keys don't contain any other types thus this function should
      * ensure no nulls present for keys
      * @return
@@ -215,8 +314,51 @@ object TransformFunctions {
       }
     }
 
+    /**
+     * Delta, by default, calculates statistics on the first 32 columns and there's no way to specify which columns
+     * on which to calc stats. Delta can be configured to calc stats on less than 32 columns but it still starts
+     * from left to right moving to the nth position as configured. This simplifies the migration of columns to the
+     * front of the dataframe to allow them to be "indexed" in front of others.
+     *
+     * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
+     * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
+     * array should be reversed before progressing through the logic
+     *
+     * TODO -- change colsToMove to the Seq[String]....
+     * TODO: checks for empty list, for existence of columns, etc.
+     *
+     * @param df         Input dataframe
+     * @param colsToMove Array of column names to be moved to front of schema
+     * @return
+     */
+    def moveColumnsToFront(colsToMove: Array[String]): DataFrame = {
+      val allNames = df.schema.names
+      val newColumns = (colsToMove ++ allNames.diff(colsToMove)).map(col)
+      df.select(newColumns: _*)
+    }
+
+    def moveColumnsToFront(colsToMove: String*): DataFrame = {
+      val allNames = df.schema.names
+      val newColumns = (colsToMove ++ allNames.diff(colsToMove)).map(col)
+      df.select(newColumns: _*)
+    }
+
 //    private[overwatch] def colByName(df: DataFrame)(colName: String): StructField =
 //      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
+  }
+
+  private def bidirectionalFill(colToFillName: String, wPrev: WindowSpec, wNext: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+    val colToFill = col(colToFillName)
+    if (orderedLookups.nonEmpty){ // TODO -- omit nulls from lookup
+      val coalescedLookup = Array(colToFill) ++ orderedLookups.map(lookupCol => {
+        last(lookupCol, true).over(wPrev)
+      }) ++ orderedLookups.map(lookupCol => {
+        first(lookupCol, true).over(wNext)
+      })
+      coalesce(coalescedLookup: _*).alias(colToFillName)
+    } else {
+      coalesce(colToFill, last(colToFill, true).over(wPrev), first(colToFill, true).over(wNext)).alias(colToFillName)
+    }
   }
 
   object Costs {
@@ -380,33 +522,6 @@ object TransformFunctions {
 
   /**
    *
-   * Warning Does not remove null structs, arrays, etc.
-   *
-   * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
-   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
-   * disregards structs
-   *
-   * Another helpful user function not utilized in the code base.
-   *
-   * @param df dataframe to more data
-   * @return
-   *
-   */
-  def removeNullCols(df: DataFrame): (Seq[Column], DataFrame) = {
-    val cntsDF = df.summary("count").drop("summary")
-    val nonNullCols = cntsDF.collect()
-      .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
-      .map(col)
-    val complexTypeFields = df.schema.fields
-      .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType] || f.dataType.isInstanceOf[MapType])
-      .map(_.name).map(col)
-    val columns = nonNullCols ++ complexTypeFields
-    val cleanDF = df.select(columns: _*)
-    (columns, cleanDF)
-  }
-
-  /**
-   *
    * @param baseDF
    * @param lookupDF
    * @return
@@ -426,29 +541,6 @@ object TransformFunctions {
     }
 
     df1Complete.unionByName(df2Complete)
-  }
-
-  /**
-   * Delta, by default, calculates statistics on the first 32 columns and there's no way to specify which columns
-   * on which to calc stats. Delta can be configured to calc stats on less than 32 columns but it still starts
-   * from left to right moving to the nth position as configured. This simplifies the migration of columns to the
-   * front of the dataframe to allow them to be "indexed" in front of others.
-   *
-   * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
-   * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
-   * array should be reversed before progressing through the logic
-   *
-   * TODO -- change colsToMove to the Seq[String]....
-   * TODO: checks for empty list, for existence of columns, etc.
-   *
-   * @param df         Input dataframe
-   * @param colsToMove Array of column names to be moved to front of schema
-   * @return
-   */
-  def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val allNames = df.schema.names
-    val newColumns = (colsToMove ++ (allNames.diff(colsToMove))).map(col)
-    df.select(newColumns: _*)
   }
 
   /**

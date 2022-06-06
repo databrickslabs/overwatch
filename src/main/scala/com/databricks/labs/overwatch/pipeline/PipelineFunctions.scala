@@ -8,6 +8,7 @@ import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import TransformFunctions._
 
 import java.io.{PrintWriter, StringWriter}
 import java.net.URI
@@ -161,7 +162,7 @@ object PipelineFunctions {
 
     var mutationDF = df
     mutationDF = if (target.zOrderBy.nonEmpty) {
-      TransformFunctions.moveColumnsToFront(mutationDF, target.zOrderBy ++ target.statsColumns)
+      mutationDF.moveColumnsToFront(target.zOrderBy ++ target.statsColumns)
     } else mutationDF
 
    val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
