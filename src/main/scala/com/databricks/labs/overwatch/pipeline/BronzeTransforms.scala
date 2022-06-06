@@ -751,6 +751,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
           .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
+          .withColumnRenamed("executorId", "blackListedExecutorIds")
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
         //TODO -- use map_filter to remove massive redundant useless column to save space
