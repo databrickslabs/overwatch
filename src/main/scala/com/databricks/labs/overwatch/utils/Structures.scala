@@ -52,6 +52,8 @@ case class ResponseMapper(rawStringResponse: String, responseCode: Int, rawJsonO
 
 case class ApiErrorDetail(cluster_id: String, from_epoch: Long, until_epoch: Long,error:String)
 
+case class APIResponse(successArray:util.ArrayList[String],errorArray:util.ArrayList[String])
+
 
 case class ValidatedColumn(
                             column: Column,
