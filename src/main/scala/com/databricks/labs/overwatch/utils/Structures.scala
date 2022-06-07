@@ -14,6 +14,7 @@ import scalaj.http.HttpResponse
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
+import java.util
 import java.util.Date
 
 case class DBDetail()
@@ -48,6 +49,8 @@ case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, pack
 case class ResponseMapper(rawStringResponse: String, responseCode: Int, rawJsonObject: JSONObject)
 
 case class ApiErrorDetail(cluster_id: String, from_epoch: Long, until_epoch: Long,error:String)
+
+case class APIResponse(successArray:util.ArrayList[String],errorArray:util.ArrayList[String])
 
 
 case class ValidatedColumn(
@@ -236,6 +239,8 @@ private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 private[overwatch] class IncompleteFilterException(s: String) extends Exception(s) {}
 
 private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val allowModuleProgression: Boolean) extends Exception(apiCallDetail)
+
+private[overwatch] class ApiCallFailureV2(s: String) extends Exception(s) {}
 
 private[overwatch] class ApiCallFailure(
                                          val httpResponse: HttpResponse[String],

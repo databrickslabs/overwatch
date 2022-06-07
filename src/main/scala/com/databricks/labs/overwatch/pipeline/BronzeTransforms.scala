@@ -17,8 +17,13 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
 import java.time.{Duration, LocalDateTime}
+import java.util
+import java.util.Collections
+import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.util.{Failure, Success}
 
 
 trait BronzeTransforms extends SparkSessionWrapper {
@@ -455,18 +460,66 @@ trait BronzeTransforms extends SparkSessionWrapper {
       s"properly. Skipping!", Level.ERROR)
 
 
-    logger.info("Calling New APIv2"+clusterIDs.length+" run id :"+apiEnv.runID)
-    val tmpClusterEventsSuccessPath =s"$tempWorkingDir/success"+apiEnv.runID
-    val tmpClusterEventsErrorPath =s"$tempWorkingDir/error"+apiEnv.runID
+    logger.info("Calling New APIv2" + clusterIDs.length + " run id :" + apiEnv.runID)
+    val tmpClusterEventsSuccessPath = s"$tempWorkingDir/success" + apiEnv.runID
+    val tmpClusterEventsErrorPath = s"$tempWorkingDir/error" + apiEnv.runID
+    val finalResponseCount = clusterIDs.size
+    logger.info(" response count " + finalResponseCount)
+    var responseCounter = 0;
+    var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+    var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+    implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4))
+    val start1 = System.currentTimeMillis();
+    for (i <- 0 to clusterIDs.length - 1) {
+      val jsonQuery = s"""{"cluster_id":"${clusterIDs(i)}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
 
-    clusterIDs.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(4))
-    clusterIDs.foreach(x=>{
-      logger.info("calling for api:"+x)
-      val jsonQuery = s"""{"cluster_id":"${x}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
-      ApiCallV2(apiEnv,"clusters/events",jsonQuery,tmpClusterEventsSuccessPath,tmpClusterEventsErrorPath).execute()
-    })
+      val future = Future {
+        var apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath, tmpClusterEventsErrorPath).executeMultiThread()
+        synchronized {
+          apiResponseArray.addAll(apiObj)
+          if (apiResponseArray.size() >= apiEnv.successBatchSize) {
+            Helpers.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
+            apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+          }
+        }
 
-    if(Helpers.pathExists(tmpClusterEventsErrorPath)){
+      }
+      future.onComplete(x => x match {
+        case Success(x) => {
+          responseCounter = responseCounter + 1
+        }
+        case Failure(e) => {
+          if (e.isInstanceOf[ApiCallFailureV2]) {
+            synchronized {
+              apiErrorArray.add(e.getMessage)
+              if (apiErrorArray.size() >= apiEnv.errorBatchSize) {
+                Helpers.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
+                apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+              }
+            }
+
+          }
+          responseCounter = responseCounter + 1
+          logger.info("Future failure message: " + e.getMessage)
+        }
+      })
+
+
+    }
+    while (responseCounter < finalResponseCount) {
+      Thread.sleep(5000)
+      println("sleeping ...current response count:" + responseCounter + " response count to reach :" + finalResponseCount)
+    }
+    if (apiResponseArray.size() > 0) {
+      Helpers.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
+      apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+    }
+    if (apiErrorArray.size() > 0) {
+      Helpers.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
+      apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+    }
+
+    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
         spark.read.json(tmpClusterEventsErrorPath),
         database,
@@ -477,38 +530,41 @@ trait BronzeTransforms extends SparkSessionWrapper {
     }
 
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
-      if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
-        try {
-          val tdf = SchemaScrubber.scrubSchema(
-            spark.read.json(tmpClusterEventsSuccessPath)
-              .select(explode('events).alias("events"))
-              .select(col("events.*"))
-          )
-          val changeInventory = Map[String, Column](
-            "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
-            "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
-            "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
-            "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
-            "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
-            "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
-          )
+    if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
+      try {
+        val tdf = SchemaScrubber.scrubSchema(
+          spark.read.json(tmpClusterEventsSuccessPath)
+            .select(explode('events).alias("events"))
+            .select(col("events.*"))
+        )
+        val changeInventory = Map[String, Column](
+          "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
+          "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
+          "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
+          "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
+          "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
+          "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
+        )
 
-         val clusterEventsDF= SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
-            .withColumn("organization_id", lit(organizationId))
+        val clusterEventsDF = SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+          .withColumn("organization_id", lit(organizationId))
 
-           val clusterEventsCaptured = clusterEventsDF.count
-          val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
-          logger.log(Level.INFO, logEventsMSG)
-          clusterEventsDF
+        val clusterEventsCaptured = clusterEventsDF.count
+        val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
+        logger.log(Level.INFO, logEventsMSG)
+        val start2 = System.currentTimeMillis();
+        logger.info(" Duration in millis :" + (start2 - start1))
+        clusterEventsDF
 
-        } catch {
-          case e: Throwable => {
-            throw new Exception(e)
+      } catch {
+        case e: Throwable => {
+          throw new Exception(e)
         }
       }
 
+
     } else {
-      println("EMPTY MODULE: Cluster Events")
+      logger.info("EMPTY MODULE: Cluster Events")
       throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
         s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
     }

@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.log4j.{Level, Logger}
@@ -26,7 +25,7 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQuery(queryJsonString)
   }
 
-  def apply(apiEnv: ApiEnv, apiName: String, queryJsonString: String, tempSuccessPath: String, errorTempPath: String) = {
+  def apply(apiEnv: ApiEnv, apiName: String,queryJsonString:String, tempSuccessPath: String, errorTempPath: String) = {
     new ApiCallV2(apiEnv)
       .setApiName(apiName)
       .setQuery(queryJsonString)
@@ -34,14 +33,6 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setErrorTempLocation(errorTempPath)
   }
 
-  def apply(apiEnv: ApiEnv, apiName: String, queryJsonArray: Array[String], tempSuccessPath: String, errorTempPath: String) = {
-    new ApiCallV2(apiEnv)
-      .setApiName(apiName)
-      .setQueryJsonArray(queryJsonArray)
-      .setTempLocation(tempSuccessPath)
-      .setErrorTempLocation(errorTempPath)
-
-  }
 }
 
 /**
@@ -69,8 +60,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private val readTimeoutMS = 60000 //Read timeout.
   private val connTimeoutMS = 10000 //Connection timeout.
   private var errorTempPath: String = ""
-  private var queryJsonArray: Array[String] = null
-  private var errorArray: util.ArrayList[String] = new util.ArrayList[String]();
+
 
   /**
    * Setting up the api name and api metadata for that api.
@@ -104,11 +94,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   private def setErrorTempLocation(errorTempPath: String): this.type = {
     this.errorTempPath = errorTempPath
-    this
-  }
-
-  private def setQueryJsonArray(queryJsonArray: Array[String]): this.type = {
-    this.queryJsonArray = queryJsonArray
     this
   }
 
@@ -206,24 +191,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   }
 
 
-  /**
-   * Write the responses to a temp location if API call has pagination.
-   *
-   * @param resultJsonArray containing responses from the API call.
-   * @return true encase of successfully write to the temp location.
-   */
-  private def writeMicroBatchToTempLocation(path: String, resultJsonArray: String): Boolean = {
-    try {
-      val fineName = java.util.UUID.randomUUID.toString + ".json"
-      dbutils.fs.put(path + "/" + fineName, resultJsonArray, true)
-      logger.info("File Successfully written:" + path + "/" + fineName)
-      true
-    } catch {
-      case e: Throwable =>
-        logger.log(Level.WARN, "Unable to write in local" + e.getMessage)
-        false
-    }
-  }
+
 
   /**
    * Headers for the API call.
@@ -378,30 +346,50 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   }
 
 
-  /**
-   * Function make the API call for given list of clusterIds
-   *
-   * @return
-   */
-  def executeBatch(): this.type = {
+
+
+  def executeMultiThread():util.ArrayList[String]= {
     try {
-      for (i <- 0 to queryJsonArray.length - 1) {
-        jsonQuery = queryJsonArray(i)
-        execute()
+      val response = getResponse
+      responseCodeHandler(response)
+      apiResponseArray.add(response.body)
+      if (apiMeta.storeInTempLocation) {
+        if (apiEnv.successBatchSize <= apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
+          println("going to write array size:"+ apiResponseArray.size()+" thread name "+Thread.currentThread().getName)
+          val responseFlag =  Helpers.writeMicroBatchToTempLocation(successTempPath, apiResponseArray.toString)
+          if (responseFlag) { //Clearing the resultArray in-case of successful write
+            println(" flushing ")
+            apiResponseArray = new util.ArrayList[String]()
+          }
+        }
       }
-      if (apiResponseArray.size() > 0) {
-        writeMicroBatchToTempLocation(successTempPath, apiResponseArray.toString)
+      paginate(response.body)
+      apiResponseArray
+    } catch {
+      case e: java.lang.NoClassDefFoundError => {
+        val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
+        println(msg, e)
+        throw new java.lang.NoClassDefFoundError
       }
-      if (errorArray.size() > 0) {
-        writeMicroBatchToTempLocation(errorTempPath, errorArray.toString)
+      case e: ApiCallFailure => {
+        val excMsg = "Got the exception while performing get request "
+        logger.log(Level.WARN, excMsg + e.getMessage)
+        if (e.failPipeline) {
+          throw new Exception(e)
+        }
+        logger.error(e.getMessage)
+        throw new ApiCallFailureV2(parseJsonQuery(e))
+      }
+      case e: Exception => {
+        val excMsg = "Got the exception while performing get request "
+        e.printStackTrace()
+        logger.log(Level.WARN, excMsg + e.getMessage)
+        throw new Exception(e)
       }
 
-    } catch {
-      case e: Throwable =>
-        throw e
     }
-    this
   }
+
 
   /**
    * Function responsible for making the API request.
@@ -413,68 +401,33 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       apiResponseArray.add(response.body)
-      if (apiMeta.storeInTempLocation) {
-        if (apiEnv.successBatchSize <= apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
-          val responseFlag = writeMicroBatchToTempLocation(successTempPath, apiResponseArray.toString)
-          if (responseFlag) { //Clearing the resultArray in-case of successful write
-            apiResponseArray = new util.ArrayList[String]()
-          }
-        }
-      }
       paginate(response.body)
-      if (apiMeta.storeInTempLocation && queryJsonArray == null && apiResponseArray.size() > 0) {
-        writeMicroBatchToTempLocation(successTempPath, apiResponseArray.toString)
-        apiResponseArray = new util.ArrayList[String]()
-      }
       this
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val msg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
         println(msg, e)
-        if (apiMeta.storeInTempLocation) {
-          writeErrorToTemp(e)
-        }
         throw new java.lang.NoClassDefFoundError
       }
       case e: ApiCallFailure => {
         val excMsg = "Got the exception while performing get request "
         logger.log(Level.WARN, excMsg + e.getMessage)
-        if (apiMeta.storeInTempLocation) {
-          writeErrorToTemp(e)
-        }
         if (e.failPipeline) {
           throw e
         }
         logger.error(e.getMessage)
-        this
+        throw new Exception(e)
       }
       case e: Exception => {
         val excMsg = "Got the exception while performing get request "
         e.printStackTrace()
         logger.log(Level.WARN, excMsg + e.getMessage)
-        if (apiMeta.storeInTempLocation) {
-          writeErrorToTemp(e)
-        }
-        throw new Exception(e)
+        throw new Exception(parseJsonQuery(e))
       }
 
     }
   }
 
-  /**
-   * Write the errors to the temp location.
-   *
-   * @param e
-   */
-  private def writeErrorToTemp(e: Throwable): Unit = {
-    errorArray.add(parseJsonQuery(e))
-    if (apiEnv.errorBatchSize <= errorArray.size()) { //Checking if its right time to write the batches into persistent storage
-      val responseFlag = writeMicroBatchToTempLocation(errorTempPath, errorArray.toString)
-      if (responseFlag) { //Clearing the resultArray in-case of successful write
-        errorArray = new util.ArrayList[String]()
-      }
-    }
-  }
 
   private def parseJsonQuery(e: Throwable): String = {
     val mapper = new ObjectMapper()
