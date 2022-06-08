@@ -117,8 +117,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val ehConfig = auditLogConfig.azureAuditLogEventhubConfig.get
       val ehPrefix = ehConfig.auditRawEventsPrefix
       val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
-      val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
-      val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
+      val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${cleanPrefix}/rawEventsCheckpoint")
+      val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${cleanPrefix}/auditLogBronzeCheckpoint")
       val ehFinalConfig = auditLogConfig.azureAuditLogEventhubConfig.get.copy(
         auditRawEventsPrefix = cleanPrefix,
         auditRawEventsChk = Some(rawEventsCheckpoint),
@@ -364,7 +364,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     )
 
     // must happen AFTER data target validation
-    if (!disableValidations) { // temp working dir is not necessary for disabled validations as pipelines cannot be
+    if (!disableValidations && !config.isLocalTesting) { // temp working dir is not necessary for disabled validations as pipelines cannot be
       // executed without validations
       prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
     }
