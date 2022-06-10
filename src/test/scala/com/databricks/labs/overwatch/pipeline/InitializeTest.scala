@@ -21,14 +21,26 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       println("value: " + actual)
       assert(!actual)
     }
+
+    it("should validate isPVC as true when org id contains ilb") {
+      val conf = new Config
+      conf.setOrganizationId("demoilb")
+      conf.setWorkspaceName("demoilbpvc")
+      val init = new Initializer(conf)
+
+      val isPVC = PrivateMethod[Boolean]('isPVC)
+      val actual = init invokePrivate isPVC()
+      println("value: " + actual)
+      assert(actual)
+    }
   }
 
   describe("Tests for initialize database") {
     it("initializeDatabase function should create both elt and consumer database") {
       import spark.implicits._
       val conf = new Config
-      conf.setDatabaseNameAndLoc("overwatch_etl", "/dblocation", "/datalocation")
-      conf.setConsumerDatabaseNameandLoc("overwatch", "/consumer/dblocation")
+      conf.setDatabaseNameAndLoc("overwatch_etl", "file:/src/test/resources/overwatch/spark-warehouse/overwatch_etl.db", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")
+      conf.setConsumerDatabaseNameandLoc("overwatch", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")
       val init = new Initializer(conf)
       val database = PrivateMethod[Database]('initializeDatabase)
       init invokePrivate database()
@@ -210,7 +222,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       assertThrows[IllegalArgumentException](init invokePrivate validateScope(Seq("jobs", "clusterEvents", "sparkEvents")))
     }
     it("validateScope function should return all scopes on validation") {
-
+      import spark.implicits._
       val conf = new Config
       val init = new Initializer(conf)
       val validateScope = PrivateMethod[Seq[OverwatchScope.OverwatchScope]]('validateScope)
