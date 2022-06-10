@@ -1,98 +1,177 @@
 package com.databricks.labs.overwatch
+
+import com.fasterxml.jackson.databind.JsonNode
 import org.apache.log4j.{Level, Logger}
+import com.fasterxml.jackson.databind.JsonNode
 
 /**
  * Configuration for each API.
  */
 trait ApiMeta {
 
-  private val logger: Logger = Logger.getLogger(this.getClass)
-  var paginationKey:String="";
-  var paginationToken:String="";
-  var dataframeColumns:String="";
-  var apiCallType:String="";
-  var microBatchSize = 50
-  var tempLocation = "/local_disk0/OverWatch"
-  var storeInTempLocation=false
-  val apiV = "api/2.0"
-  var encodedToken=false
+  val logger: Logger = Logger.getLogger(this.getClass)
+  protected var _paginationKey: String = _
+  protected var _paginationToken: String = _
+  protected var _dataframeColumns: String = "*"
+  protected var _apiCallType: String = _
+  protected var _storeInTempLocation = false
+  protected val _apiV = "api/2.0"
+  protected var _tuplePaginationObject = false
+
+  def paginationKey: String = _paginationKey
+
+  def paginationToken: String = _paginationToken
+
+  def dataframeColumns: String = _dataframeColumns
+
+  def apiCallType: String = _apiCallType
+
+  def storeInTempLocation: Boolean = _storeInTempLocation
+
+  def apiV: String = _apiV
+
+  def tuplePaginationObject: Boolean = _tuplePaginationObject
+
+  private[overwatch] def setStoreInTempLocation(value: Boolean): this.type = {
+    _storeInTempLocation = value
+    this
+  }
+
+  private[overwatch] def setTuplePaginationObject(value: Boolean): this.type = {
+    _tuplePaginationObject = value
+    this
+  }
+
+  private[overwatch] def setApiCallType(value: String): this.type = {
+    _apiCallType = value
+    this
+  }
+
+  private[overwatch] def setDataframeColumns(value: String): this.type = {
+    _dataframeColumns = value
+    this
+  }
+
+  private[overwatch] def setPaginationKey(value: String): this.type = {
+    _paginationKey = value
+    this
+  }
+
+  private[overwatch] def setPaginationToken(value: String): this.type = {
+    _paginationToken = value
+    this
+  }
+
+
+  def getPaginationLogicForSingleObject(jsonObject: JsonNode): (String) = {
+    jsonObject.get(this._paginationKey).toString
+  }
+
+  def getPaginationLogicForTuple(jsonObject: JsonNode): (String, String) = {
+    (null, null) //Implement logic according to the API call
+  }
+
+  def hasNextPage(jsonObject: JsonNode): Boolean = {
+    true
+  }
+
+  override def toString: String = {
+    s"""API Meta paginationKey: ${paginationKey}
+       |paginationToken: ${paginationToken}
+       |dataframeColumns: ${dataframeColumns}
+       |apiCallType: ${apiCallType}
+       |storeInTempLocation: ${storeInTempLocation}
+       |apiV: ${apiV}
+       |tuplePaginationObject: ${tuplePaginationObject}
+       |""".stripMargin
+  }
 
 }
 
 /**
  * Factory class for api Metadata.
  */
-class ApiMetaFactory{
+class ApiMetaFactory {
   private val logger: Logger = Logger.getLogger(this.getClass)
-  def getApiClass(_apiName:String): ApiMeta = {
-    _apiName match {
-       case "jobs/list" => new JobListApi
-       case "clusters/list" => new ClusterListApi
-       case "clusters/events" => new ClusterEventsApi
-       case "dbfs/list" => new DbfsListApi
-       case "instance-pools/list" => new InstancePoolsListApi
-       case "instance-profiles/list" => new InstanceProfileListApi
-       case "workspace/list" => new WorkspaceListApi
-       case "sql/history/queries" => new SqlHistoryQueriesApi
-       case "clusters/resize" => new ClusterResizeApi
 
+  def getApiClass(_apiName: String): ApiMeta = {
+    _apiName match {
+      case "jobs/list" => new JobListApi
+      case "clusters/list" => new ClusterListApi
+      case "clusters/events" => new ClusterEventsApi
+      case "dbfs/list" => new DbfsListApi
+      case "instance-pools/list" => new InstancePoolsListApi
+      case "instance-profiles/list" => new InstanceProfileListApi
+      case "workspace/list" => new WorkspaceListApi
+      case "sql/history/queries" => new SqlHistoryQueriesApi
+      case "clusters/resize" => new ClusterResizeApi
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }
   }
 }
 
-class ClusterResizeApi extends ApiMeta{
-  apiCallType = "POST"
+class ClusterResizeApi extends ApiMeta {
+  setApiCallType("POST")
 }
 
-class SqlHistoryQueriesApi extends ApiMeta{
-  paginationKey = "has_next_page"
-  paginationToken = "next_page_token"
-  dataframeColumns = "res"
-  apiCallType = "GET"
-  encodedToken=true
+class SqlHistoryQueriesApi extends ApiMeta {
+  setPaginationKey("has_next_page")
+  setPaginationToken("next_page_token")
+  setDataframeColumns("res")
+  setApiCallType("GET")
+  setTuplePaginationObject(true)
+
+  override def hasNextPage(jsonObject: JsonNode): Boolean = {
+    jsonObject.get(paginationKey).asBoolean()
+  }
+
+  override def getPaginationLogicForTuple(jsonObject: JsonNode): (String, String) = {
+    if (jsonObject.get(paginationKey).asBoolean()) { //Pagination key for sql/history/queries can return true or false
+      val _jsonKey = "page_token"
+      val _jsonValue = jsonObject.get(paginationToken).asText()
+      (_jsonKey, _jsonValue)
+    } else {
+      (null, null)
+    }
+  }
 }
 
-class WorkspaceListApi extends ApiMeta{
-  dataframeColumns = "objects"
-  apiCallType = "GET"
+class WorkspaceListApi extends ApiMeta {
+  setDataframeColumns("objects")
+  setApiCallType("GET")
 }
 
-class InstanceProfileListApi extends ApiMeta{
-  dataframeColumns = "instance_profiles"
-  apiCallType = "GET"
+class InstanceProfileListApi extends ApiMeta {
+  setDataframeColumns("instance_profiles")
+  setApiCallType("GET")
 }
 
-class InstancePoolsListApi extends ApiMeta{
-  dataframeColumns = "instance_pools"
-  apiCallType = "GET"
+class InstancePoolsListApi extends ApiMeta {
+  setDataframeColumns("instance_pools")
+  setApiCallType("GET")
 }
 
-class DbfsListApi extends ApiMeta{
-  dataframeColumns = "files"
-  apiCallType = "GET"
-}
-
-
-class ClusterListApi extends ApiMeta{
-  dataframeColumns = "clusters"
-  apiCallType = "GET"
+class DbfsListApi extends ApiMeta {
+  setDataframeColumns("files")
+  setApiCallType("GET")
 }
 
 
-class JobListApi extends ApiMeta{
-  dataframeColumns = "jobs"
-  apiCallType= "GET"
-
-
+class ClusterListApi extends ApiMeta {
+  setDataframeColumns("clusters")
+  setApiCallType("GET")
 }
 
-class ClusterEventsApi extends ApiMeta{
-  paginationKey = "next_page"
-  paginationToken = "next_page"
-  dataframeColumns = "events"
-  apiCallType = "POST"
-  storeInTempLocation = true
 
+class JobListApi extends ApiMeta {
+  setDataframeColumns("jobs")
+  setApiCallType("GET")
+}
 
+class ClusterEventsApi extends ApiMeta {
+  setPaginationKey("next_page")
+  setPaginationToken("next_page")
+  setDataframeColumns("events")
+  setApiCallType("POST")
+  setStoreInTempLocation(true)
 }
