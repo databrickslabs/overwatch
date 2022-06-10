@@ -3,15 +3,20 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.functions.{col, lit, struct}
 import org.apache.spark.sql.types._
 import org.scalatest.funspec.AnyFunSpec
 import TransformFunctions._
+import org.scalatest.GivenWhenThen
 
 import java.sql.{Date, Timestamp}
-import java.time.Instant
+import java.time.{Instant, LocalDate}
 
-class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
+class TransformFunctionsTest extends AnyFunSpec
+  with DataFrameComparer
+  with SparkSessionTestWrapper
+  with GivenWhenThen {
+
   import spark.implicits._
   spark.conf.set("spark.sql.session.timeZone", "UTC")
 
@@ -58,28 +63,79 @@ class TransformFunctionsTest extends AnyFunSpec with DataFrameComparer with Spar
 
   }
   describe("TransformFunctions.removeNullCols") {
-    val schema = StructType(
-      Seq(StructField("serviceName", StringType, true),
-        StructField("abc", LongType, true),
-        StructField("requestParams",
-          StructType(Seq(
-            StructField("par1", StringType, true),
-            StructField("par2", IntegerType, true)
-          )),true)))
+    case class BaseStruct(par1: Option[String], par2: Option[Int])
+    val myDate = Date.valueOf(LocalDate.of(2020,1,1))
+    val myTS = new Timestamp(System.currentTimeMillis)
+    val nullDate: Option[Date] = None
+    val nullTS: Option[Timestamp] = None
+    val nullMap: Option[Map[String, Int]] = None
+    val nullArray: Option[Array[Int]] = None
+    val nullBoolean: Option[Boolean] = None
+    val nullString: Option[String] = None
 
-    it("should removeNullCols") {
-      val sourceData = sc.parallelize(Seq(Row("jobs", null, Row("t1", 1)),Row("non-jobs", null, Row("t2", 2))))
-      val sourceDF = spark.createDataFrame(sourceData, schema)
-      val df = sourceDF.cullNull
-      assertResult("`serviceName` STRING,`requestParams` STRUCT<`par1`: STRING, `par2`: INT>")(df.schema.toDDL)
-      assertResult(2)(df.count())
-      val first = df.first()
-      assertResult("jobs")(first.getAs[String]("serviceName"))
-      assert(first.getAs[Row]("requestParams") != null)
+    val structDef = StructType(Seq(
+      StructField("sc1", StringType, true),
+      StructField("sc2", LongType, true),
+    ))
+    val nullStructCol = lit(null).cast(structDef).alias("myStruct")
+    val nonNullStructCol = struct(
+      lit("abc").alias("sc1"),
+      lit(0L).alias("sc2")
+    ).alias("myStruct")
+
+    val allNulls = Seq(
+      (nullString, nullMap, nullArray, nullBoolean, nullDate, nullTS)
+    ).toDF("myString", "myMap", "myArray", "myBoolean", "myDate", "myTimestamp")
+      .withColumn("myStruct", nullStructCol)
+
+    val noNulls = Seq(
+      ("someString", Map("a" -> 1), Array(1,2,3), false, myDate, myTS)
+    ).toDF("myString", "myMap", "myArray", "myBoolean", "myDate", "myTimestamp")
+      .withColumn("myStruct", nonNullStructCol)
+
+    it("should maintain columns with at least one non-null record") {
+      val noColumnsRemovedDDL = "`myMap` MAP<STRING, INT>,`myString` STRING,`myStruct` STRUCT<`sc1`: STRING, `sc2`: BIGINT>,`myBoolean` BOOLEAN,`myDate` DATE,`myTimestamp` TIMESTAMP,`myArray` ARRAY<INT>"
+
+      When("df is fully populated")
+      Then("removes no columns")
+      assertResult(noColumnsRemovedDDL)(noNulls.cullNull().schema.toDDL)
+
+      When("all df columns have at least one non-null")
+      Then("removes no columns")
+      assertResult(noColumnsRemovedDDL)(noNulls.unionByName(allNulls).cullNull().schema.toDDL)
+
     }
 
-    it("should not remove boolean column") {
-      // TODO: implement after the code is fixed
+    it("should remove only the null columns and leave the others"){
+
+      val onlyMyStringDDL = "`myString` STRING"
+      val structMapsDDL = "`myMap` MAP<STRING, INT>,`myStruct` STRUCT<`sc1`: STRING, `sc2`: BIGINT>"
+
+      When("df has boolean with all nulls and string with values")
+      Then("remove only the boolean field")
+      assertResult(onlyMyStringDDL)(
+        Seq(("someString", nullBoolean)).toDF("myString", "myBoolean")
+          .cullNull().schema.toDDL
+      )
+
+      When("df has struct with all nulls and string with values")
+      Then("remove only the struct field")
+      assertResult(onlyMyStringDDL)(
+        Seq(("someString")).toDF("myString")
+          .withColumn("myStruct", nullStructCol)
+          .cullNull().schema.toDDL
+      )
+
+      When("df has struct and map with no nulls but array with all nulls")
+      Then("remove only the array field")
+      assertResult(structMapsDDL)(
+        Seq((Map("a" -> 1), nullArray)).toDF("myMap", "myArray")
+          .withColumn("myStruct", nonNullStructCol)
+          .cullNull().schema.toDDL
+      )
+
+
+
     }
   }
 
