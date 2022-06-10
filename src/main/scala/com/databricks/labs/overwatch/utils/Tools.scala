@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
@@ -172,6 +173,25 @@ object Helpers extends SparkSessionWrapper {
       fs.listStatus(new Path(path)).map(_.getPath.toString)
     } catch {
       case _: Throwable => Array(path)
+    }
+  }
+
+  /**
+   * Write the any given string to given path..
+   *
+   * @param resultJsonArray containing responses from the API call.
+   * @return true encase of successfully write to the temp location.
+   */
+  def writeMicroBatchToTempLocation(path: String, resultJsonArray: String): Boolean = {
+    try {
+      val fineName = java.util.UUID.randomUUID.toString + ".json"
+      dbutils.fs.put(path + "/" + fineName, resultJsonArray, true)
+      logger.info("File Successfully written:" + path + "/" + fineName)
+      true
+    } catch {
+      case e: Throwable =>
+        logger.log(Level.WARN, "Unable to write " + e.getMessage)
+        false
     }
   }
 
