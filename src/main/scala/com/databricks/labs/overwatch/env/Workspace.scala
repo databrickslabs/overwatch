@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
+import com.databricks.labs.overwatch.{ApiCallV2}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame

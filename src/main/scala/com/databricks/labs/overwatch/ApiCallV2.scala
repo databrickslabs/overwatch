@@ -25,12 +25,11 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQuery(queryJsonString)
   }
 
-  def apply(apiEnv: ApiEnv, apiName: String,queryJsonString:String, tempSuccessPath: String, errorTempPath: String) = {
+  def apply(apiEnv: ApiEnv, apiName: String, queryJsonString: String, tempSuccessPath: String) = {
     new ApiCallV2(apiEnv)
       .setApiName(apiName)
       .setQuery(queryJsonString)
-      .setTempLocation(tempSuccessPath)
-      .setErrorTempLocation(errorTempPath)
+      .setSuccessTempPath(tempSuccessPath)
   }
 
 }
@@ -45,22 +44,105 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private var endPoint = "" //API end point.
-  private var jsonQuery: String = "EMPTY" //Extra parameters for API request.
+  private var _endPoint: String = _ //API end point.
+  private var _jsonQuery: String = _ //Extra parameters for API request.
   private var apiResponseArray = new util.ArrayList[String]() //JsonArray containing the responses from API call.
-  private var serverBusyCount: Int = 0 // Keep track of 429 error occurrence.
-  private var token = "" //Authentication token for API request.
-  private var successTempPath: String = "" //Unique String which is used as folder name in a temp location to save the responses.
-  private var unsafeSSLErrorCount = 0; //Keep track of SSL error occurrence.
-  private var apiMeta: ApiMeta = null //Metadata for the API call.
-  private val debugFlag = false //Debug flag to print the information when required. d
-  private var allowUnsafeSSL = false //Flag to make the unsafe ssl.
-  private var jsonKey = "" //Key name for pagination.
-  private var jsonValue = "" //Key value for pagination.
+  private var _serverBusyCount: Int = 0 // Keep track of 429 error occurrence.
+  private var _token: String = _ //Authentication token for API request.
+  private var _successTempPath: String = _ //Unique String which is used as folder name in a temp location to save the responses.
+  private var _unsafeSSLErrorCount = 0; //Keep track of SSL error occurrence.
+  private var _apiMeta: ApiMeta = null //Metadata for the API call.
+  private var _debugFlag = false //Debug flag to print the information when required. d
+  private var _allowUnsafeSSL = false //Flag to make the unsafe ssl.
+  private var _jsonKey: String = "" //Key name for pagination.
+  private var _jsonValue: String = "" //Key value for pagination.
   private val readTimeoutMS = 60000 //Read timeout.
   private val connTimeoutMS = 10000 //Connection timeout.
-  private var errorTempPath: String = ""
+  private var _printFlag:Boolean = true
 
+  def endPoint: String = _endPoint
+
+  def jsonQuery: String = _jsonQuery
+
+  def serverBusyCount: Int = _serverBusyCount
+
+  def printFlag: Boolean = _printFlag
+
+  def token: String = _token
+
+  def successTempPath: String = _successTempPath
+
+  def unsafeSSLErrorCount: Int = _unsafeSSLErrorCount
+
+  def apiMeta: ApiMeta = _apiMeta
+
+  def debugFlag: Boolean = _debugFlag
+
+  def allowUnsafeSSL: Boolean = _allowUnsafeSSL
+
+  def jsonKey: String = _jsonKey
+
+  def jsonValue: String = _jsonValue
+
+  private[overwatch] def setJsonValue(value: String): this.type = {
+    _jsonValue = value
+    this
+  }
+
+  private[overwatch] def setJsonKey(value: String): this.type = {
+    _jsonKey = value
+    this
+  }
+
+  private[overwatch] def setAllowUnsafeSSL(value: Boolean): this.type = {
+    _allowUnsafeSSL = value
+    this
+  }
+
+  private[overwatch] def setDebugFlag(value: Boolean): this.type = {
+    _debugFlag = value
+    this
+  }
+
+  private[overwatch] def setApiMeta(value: ApiMeta): this.type = {
+    _apiMeta = value
+    this
+  }
+
+  private[overwatch] def setUnsafeSSLErrorCount(value: Int): this.type = {
+    _unsafeSSLErrorCount = value
+    this
+  }
+
+  private[overwatch] def setSuccessTempPath(value: String): this.type = {
+    _successTempPath = value
+    this
+  }
+
+  private[overwatch] def setToken(value: String): this.type = {
+    _token = value
+    this
+  }
+
+  private[overwatch] def setEndPoint(value: String): this.type = {
+    _endPoint = value
+    this
+  }
+
+  private[overwatch] def setJsonQuery(value: String): this.type = {
+    _jsonQuery = value
+    this
+  }
+
+  private[overwatch] def setPrintFlag(value: Boolean): this.type = {
+    _printFlag = value
+    this
+  }
+
+  private[overwatch] def setServerBusyCount(value: Int): this.type = {
+    _serverBusyCount = value
+    this
+  }
 
   /**
    * Setting up the api name and api metadata for that api.
@@ -69,9 +151,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   private def setApiName(value: String): this.type = {
-    endPoint = value
-    token = apiEnv.rawToken
-    apiMeta = new ApiMetaFactory().getApiClass(endPoint)
+    setEndPoint(value)
+    setToken(apiEnv.rawToken)
+    setApiMeta(new ApiMetaFactory().getApiClass(endPoint))
+    logger.log(Level.INFO,apiMeta.toString)
     this
   }
 
@@ -82,20 +165,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   private def setQuery(query: String): this.type = {
-    jsonQuery = query
+    setJsonQuery(query)
     jsonToMap
     this
   }
 
-  private def setTempLocation(path: String): this.type = {
-    successTempPath = path
-    this
-  }
-
-  private def setErrorTempLocation(errorTempPath: String): this.type = {
-    this.errorTempPath = errorTempPath
-    this
-  }
 
   /**
    * Parse the json string and get the data in the form of key and value.
@@ -103,13 +177,13 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def jsonToMap: Unit = {
     try {
       val (jsonKey, jsonValue) = JsonUtils.getJsonKeyValue(jsonQuery)
-      this.jsonKey = jsonKey
-      this.jsonValue = jsonValue
+      setJsonKey(jsonKey)
+      setJsonValue(jsonValue)
     } catch {
-      case e: Exception => {
+      case e: Throwable => {
         val excMsg = "Got the exception while parsing provided query json "
         logger.log(Level.WARN, excMsg, e)
-        throw new Exception(e)
+        throw e
       }
     }
   }
@@ -121,23 +195,23 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   private def hibernate(response: HttpResponse[String]): Unit = {
     logger.log(Level.WARN, "Received response code 429: Too many request per second")
-    serverBusyCount += 1
-    serverBusyCount match {
+    _serverBusyCount += 1
+    _serverBusyCount match {
       case 1 => {
         logger.log(Level.INFO, "Sleeping..... for 2000 millis")
         Thread.sleep(2000)
       }
       case 2 => {
-        logger.log(Level.INFO, "Sleeping..... for 4000 millis")
-        Thread.sleep(4000)
+        logger.log(Level.INFO, "Sleeping..... for 5000 millis")
+        Thread.sleep(5000)
       }
       case 3 => {
-        logger.log(Level.INFO, "Sleeping..... for 8000 millis")
-        Thread.sleep(8000)
+        logger.log(Level.INFO, "Sleeping..... for 10000 millis")
+        Thread.sleep(10000)
       }
       case _ => {
         logger.log(Level.ERROR, " Too many request 429 error")
-        throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = debugFlag)
+        throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = _debugFlag)
       }
     }
   }
@@ -151,15 +225,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def responseCodeHandler(response: HttpResponse[String]): Unit = {
 
     response.code match {
-      case 200 => { //200 for all good
-        logger.log(Level.INFO,"Received success response")
-      }
+      case 200 => None //200 for all good
+
       case 429 => { //The Databricks REST API supports a maximum of 30 requests/second per workspace. Requests that exceed the rate limit will receive a 429 response status code.
         hibernate(response)
         execute()
       }
       case _ => {
-        throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = debugFlag)
+        throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = _debugFlag)
       }
     }
 
@@ -173,24 +246,25 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def paginate(response: String): Unit = {
     val mapper = new ObjectMapper()
     val jsonObject = mapper.readTree(response);
-    if (jsonObject.get(apiMeta.paginationKey) != null) {
-      if (endPoint.equals("sql/history/queries")) { //For sql/history/queries api we have a different mechanism to get the next page token
-        if (jsonObject.get(apiMeta.paginationKey).asBoolean()) { //Pagination key for sql/history/queries can return true or false
-          jsonKey = "page_token"
-          jsonValue = jsonObject.get(apiMeta.paginationToken).asText()
-          execute()
+    if (jsonObject.get(_apiMeta.paginationKey) != null) {
+        if (_apiMeta.hasNextPage(jsonObject)) { //Pagination key for sql/history/queries can return true or false
+         if( _apiMeta.tuplePaginationObject)
+           {
+            val (key,value) = _apiMeta.getPaginationLogicForTuple(jsonObject)
+             if(value != null){
+               _jsonKey= key
+               _jsonValue = value
+               execute()
+             }
+           }else{
+           _jsonQuery = _apiMeta.getPaginationLogicForSingleObject(jsonObject)
+           execute()
+         }
         }
-
-      } else {
-        jsonQuery = jsonObject.get(apiMeta.paginationKey).toString
-        execute()
-      }
 
     }
 
   }
-
-
 
 
   /**
@@ -213,8 +287,21 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       HttpOptions.connTimeout(connTimeoutMS),
       HttpOptions.connTimeout(readTimeoutMS)
     )
-    if (allowUnsafeSSL) baseOptions :+ HttpOptions.allowUnsafeSSL else baseOptions
+    if (_allowUnsafeSSL) baseOptions :+ HttpOptions.allowUnsafeSSL else baseOptions
 
+  }
+
+  private def buildGetDetailMessage: String = {
+    s"""Get API call Endpoint: ${apiEnv.workspaceURL}/${_apiMeta.apiV}/${_endPoint}
+       |Token Key : ${_jsonKey}
+       |Token Value: ${_jsonValue}
+       |""".stripMargin
+  }
+
+  private def buildPostDetailMessage: String = {
+    s"""Post API call Endpoint: ${apiEnv.workspaceURL}/${_apiMeta.apiV}/${_endPoint}
+       |queryString: ${_jsonQuery}
+       |""".stripMargin
   }
 
   /**
@@ -224,13 +311,26 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   private def getResponse: HttpResponse[String] = {
     var response: HttpResponse[String] = null
-    apiMeta.apiCallType match {
-      case "POST" => {
+    _apiMeta.apiCallType match {
+      case "POST" =>
+        if(printFlag){
+          var commonMsg =   buildPostDetailMessage
+          httpHeaders.foreach(x=>
+            if(x._2.contains("Bearer"))
+            { commonMsg = commonMsg+x._1+": REDACTED "}
+            else {
+              commonMsg = commonMsg+x._1+" : "+x._2+" "
+            }
+
+          ).toString
+          logger.log(Level.INFO,commonMsg)
+          _printFlag = false
+        }
         response =
           try {
-            Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
+            Http(s"""${apiEnv.workspaceURL}/${_apiMeta.apiV}/${_endPoint}""")
               .copy(headers = httpHeaders)
-              .postData(jsonQuery)
+              .postData(_jsonQuery)
               .options(reqOptions)
               .asString
           } catch {
@@ -238,13 +338,13 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
               val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
                 "ssl. If this is unexpected behavior, validate your ssl certs."
               logger.log(Level.WARN, sslMSG)
-              if (debugFlag) println(sslMSG)
-              if (unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
-                unsafeSSLErrorCount += 1
-                allowUnsafeSSL = true
-                Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
+              if (_debugFlag) println(sslMSG)
+              if (_unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
+                _unsafeSSLErrorCount += 1
+                _allowUnsafeSSL = true
+                Http(s"""${apiEnv.workspaceURL}/${_apiMeta.apiV}/${_endPoint}""")
                   .copy(headers = httpHeaders)
-                  .postData(jsonQuery)
+                  .postData(_jsonQuery)
                   .options(reqOptions)
                   .asString
               } else {
@@ -253,38 +353,47 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
 
           }
-      }
-      case "GET" => {
+
+      case "GET" =>
+        if(printFlag){
+          var commonMsg =   buildGetDetailMessage
+          httpHeaders.foreach(x=>
+            if(x._2.contains("Bearer"))
+              { commonMsg = commonMsg+x._1+" : REDACTED "}
+            else {
+              commonMsg = commonMsg+x._1+" : "+x._2+" "
+            }
+          ).toString
+          logger.log(Level.INFO,commonMsg)
+          _printFlag = false
+        }
         response = try {
-          Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
-            .param(jsonKey, jsonValue)
+          Http(s"""${apiEnv.workspaceURL}/${_apiMeta.apiV}/${_endPoint}""")
+            .param(_jsonKey, _jsonValue)
             .copy(headers = httpHeaders)
             .options(reqOptions)
             .asString
         } catch {
-          case e: javax.net.ssl.SSLHandshakeException if !allowUnsafeSSL => // for PVC with ssl errors
+          case e: javax.net.ssl.SSLHandshakeException if !_allowUnsafeSSL => // for PVC with ssl errors
             val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
               "ssl. If this is unexpected behavior, validate your ssl certs."
             logger.log(Level.WARN, sslMSG)
-            if (debugFlag) println(sslMSG)
-            if (unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
-              unsafeSSLErrorCount += 1
-              allowUnsafeSSL = true
-              Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
-                .param(jsonKey, jsonValue)
+            if (_debugFlag) println(sslMSG)
+            if (_unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
+              _unsafeSSLErrorCount += 1
+              _allowUnsafeSSL = true
+              Http(s"""${apiEnv.workspaceURL}/${_apiMeta.apiV}/${_endPoint}""")
+                .param(_jsonKey, _jsonValue)
                 .copy(headers = httpHeaders)
                 .options(reqOptions)
                 .asString
             } else {
-              logger.log(Level.ERROR,e)
+              logger.log(Level.ERROR, e)
               throw new Exception(sslMSG)
             }
-          case e: Exception => throw e
+          case e: Throwable => throw e
         }
       }
-
-
-    }
     response
   }
 
@@ -295,8 +404,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   private def buildGenericErrorMessage: String = {
-    s"""API CALL FAILED: Endpoint: ${endPoint}
-       |jsonQuery:${jsonQuery}
+    s"""API CALL FAILED: Endpoint: ${_endPoint}
+       |_jsonQuery:${_jsonQuery}
        |""".stripMargin
   }
 
@@ -307,22 +416,22 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param rawDF The raw dataframe which is received as part of API response.
    * @return Dataframe which contains the required columns.
    */
-  private def processRawData(rawDF: DataFrame): DataFrame = {
+  private def extrapolateSupportedStructed(rawDF: DataFrame): DataFrame = {
     val resultDFFieldNames = rawDF.schema.fieldNames
-    if (!resultDFFieldNames.contains(apiMeta.dataframeColumns) && apiMeta.dataframeColumns != "*") { // if known API but return column doesn't exist
+    if (!resultDFFieldNames.contains(_apiMeta.dataframeColumns) && _apiMeta.dataframeColumns != "*") { // if known API but return column doesn't exist
       val asDFErrMsg = s"The API endpoint is not returning the " +
-        s"expected structure, column $apiMeta.dataframeColumns is expected and is not present in the dataframe.\nIf this module " +
+        s"expected structure, column ${_apiMeta.dataframeColumns} is expected and is not present in the dataframe.\nIf this module " +
         s"references data that does not exist or to which the Overwatch account does have access, please remove the " +
         s"scope. For example: if you have 'pools' scope enabled but there are no pools or Overwatch PAT doesn't " +
         s"have access to any pools, this scope must be removed."
       logger.log(Level.ERROR, asDFErrMsg)
-      if (debugFlag) println(asDFErrMsg)
+      if (_debugFlag) println(asDFErrMsg)
       throw new Exception(asDFErrMsg)
-    } else if (apiMeta.dataframeColumns == "*") { //Selecting all of the column.
+    } else if (_apiMeta.dataframeColumns == "*") { //Selecting all of the column.
       rawDF
     }
     else { //Selecting specific columns as per the metadata.
-      rawDF.select(explode(col(apiMeta.dataframeColumns)).alias(apiMeta.dataframeColumns)).select(col(apiMeta.dataframeColumns + ".*"))
+      rawDF.select(explode(col(_apiMeta.dataframeColumns)).alias(_apiMeta.dataframeColumns)).select(col(_apiMeta.dataframeColumns + ".*"))
     }
   }
 
@@ -333,30 +442,28 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   def asDF(): DataFrame = {
     var apiResultDF: DataFrame = null;
-    if (apiResponseArray.size == 0 && !apiMeta.storeInTempLocation) { //If response contains no Data.
+    if (apiResponseArray.size == 0 && !_apiMeta.storeInTempLocation) { //If response contains no Data.
       val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
         s"Details Below:\n$buildGenericErrorMessage"
       throw new ApiCallEmptyResponse(errMsg, true)
-    } else if (apiResponseArray.size != 0 && !apiMeta.storeInTempLocation) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
+    } else if (apiResponseArray.size != 0 && !_apiMeta.storeInTempLocation) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
       apiResultDF = spark.read.json(Seq(apiResponseArray.toString).toDS())
-    } else if (apiMeta.storeInTempLocation) { //Read the response from the Temp location/Disk and convert it to Dataframe.
-      apiResultDF = spark.read.json(successTempPath)
+    } else if (_apiMeta.storeInTempLocation) { //Read the response from the Temp location/Disk and convert it to Dataframe.
+      apiResultDF = spark.read.json(_successTempPath)
 
     }
-    processRawData(apiResultDF)
+    extrapolateSupportedStructed(apiResultDF)
   }
 
 
-
-
-  def executeMultiThread():util.ArrayList[String]= {
+  def executeMultiThread(): util.ArrayList[String] = {
     try {
       val response = getResponse
       responseCodeHandler(response)
       apiResponseArray.add(response.body)
-      if (apiMeta.storeInTempLocation) {
+      if (_apiMeta.storeInTempLocation) {
         if (apiEnv.successBatchSize <= apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
-          val responseFlag =  Helpers.writeMicroBatchToTempLocation(successTempPath, apiResponseArray.toString)
+          val responseFlag = Helpers.writeMicroBatchToTempLocation(_successTempPath, apiResponseArray.toString)
           if (responseFlag) { //Clearing the resultArray in-case of successful write
             apiResponseArray = new util.ArrayList[String]()
           }
@@ -367,21 +474,21 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
-        logger.log(Level.ERROR,excMsg,e)
+        logger.log(Level.ERROR, excMsg, e)
         throw e
       }
       case e: ApiCallFailure => {
         val excMsg = "Got the exception while performing get request "
-        logger.log(Level.WARN, excMsg , e)
+        logger.log(Level.WARN, excMsg, e)
         if (e.failPipeline) {
-          throw new Exception(e)
+          throw e
         }
-        logger.log(Level.ERROR,excMsg,e)
-        throw new ApiCallFailureV2(parseJsonQuery(e))
+        logger.log(Level.ERROR, excMsg, e)
+        throw new ApiCallFailureV2(jsonQueryToApiErrorDetail(e))
       }
-      case e: Exception => {
+      case e: Throwable => {
         val excMsg = "Got the exception while performing get request "
-        logger.log(Level.WARN, excMsg , e)
+        logger.log(Level.WARN, excMsg, e)
         throw e
       }
 
@@ -404,7 +511,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
-        logger.log(Level.ERROR,excMsg,e)
+        logger.log(Level.ERROR, excMsg, e)
         throw e
       }
       case e: ApiCallFailure => {
@@ -415,10 +522,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         }
         throw new Exception(e)
       }
-      case e: Exception => {
+      case e: Throwable => {
         val excMsg = "Got the exception while performing get request "
         e.printStackTrace()
-        logger.log(Level.WARN, excMsg,e)
+        logger.log(Level.WARN, excMsg, e)
         throw e
       }
 
@@ -426,9 +533,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   }
 
 
-  private def parseJsonQuery(e: Throwable): String = {
+  private def jsonQueryToApiErrorDetail(e: Throwable): String = {
     val mapper = new ObjectMapper()
-    val jsonObject = mapper.readTree(jsonQuery);
+    val jsonObject = mapper.readTree(_jsonQuery);
     val clusterId = jsonObject.get("cluster_id").toString
     val start_time = jsonObject.get("start_time").asLong()
     val end_time = jsonObject.get("end_time").asLong()
