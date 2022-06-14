@@ -133,6 +133,22 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
+  def getClusterLibraries: DataFrame = {
+    val libsEndpoint = "libraries/all-cluster-statuses"
+    ApiCall(libsEndpoint, config.apiEnv, debugFlag = config.debugFlag)
+      .executeGet()
+      .asDF
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getClusterPolicies: DataFrame = {
+    val policiesEndpoint = "policies/clusters/list"
+    ApiCall(policiesEndpoint, config.apiEnv, debugFlag = config.debugFlag)
+      .executeGet()
+      .asDF
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
   private def clusterState(apiEnv: ApiEnv): String = {
     val endpoint = "clusters/get"
     val query = Map(

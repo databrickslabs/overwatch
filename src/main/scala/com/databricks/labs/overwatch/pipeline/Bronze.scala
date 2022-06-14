@@ -112,6 +112,18 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.poolsSnapshotTarget)
   )
 
+  lazy private[overwatch] val libsSnapshotModule = Module(1007, "Bronze_Libraries_Snapshot", this)
+  lazy private val appendLibsProcess = ETLDefinition(
+    workspace.getClusterLibraries,
+    append(BronzeTargets.libsSnapshotTarget)
+  )
+
+  lazy private[overwatch] val policiesSnapshotModule = Module(1008, "Bronze_Libraries_Snapshot", this)
+  lazy private val appendPoliciesProcess = ETLDefinition(
+    workspace.getClusterPolicies,
+    append(BronzeTargets.policiesSnapshotTarget)
+  )
+
   lazy private[overwatch] val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
   lazy private val appendAuditLogsProcess = ETLDefinition(
     getAuditLogsDF(
@@ -201,7 +213,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private def executeModules(): Unit = {
     config.overwatchScope.foreach {
       case OverwatchScope.audit => auditLogsModule.execute(appendAuditLogsProcess)
-      case OverwatchScope.clusters => clustersSnapshotModule.execute(appendClustersAPIProcess)
+      case OverwatchScope.clusters =>
+        clustersSnapshotModule.execute(appendClustersAPIProcess)
+        libsSnapshotModule.execute(appendLibsProcess)
+        policiesSnapshotModule.execute(appendPoliciesProcess)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
