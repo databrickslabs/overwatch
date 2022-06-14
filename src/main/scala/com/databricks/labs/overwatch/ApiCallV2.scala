@@ -201,27 +201,18 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    *
    * @param response
    */
-  private def hibernate(response: HttpResponse[String]): Unit = {
-    logger.log(Level.WARN, "Received response code 429: Too many request per second")
+  private def hibernate(response: HttpResponse[String]): Unit = {//TODO work in progress
+    println("Received response code 429: Too many request per second")
     _serverBusyCount += 1
-    _serverBusyCount match {
-      case 1 => {
-        logger.log(Level.INFO, "Sleeping..... for 2000 millis")
-        Thread.sleep(2000)
-      }
-      case 2 => {
-        logger.log(Level.INFO, "Sleeping..... for 5000 millis")
-        Thread.sleep(5000)
-      }
-      case 3 => {
-        logger.log(Level.INFO, "Sleeping..... for 10000 millis")
-        Thread.sleep(10000)
-      }
-      case _ => {
-        logger.log(Level.ERROR, " Too many request 429 error")
-        throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = _debugFlag)
-      }
+    if (_serverBusyCount < 100) { //40 and expose it  10 sec sleep 5 mints ,failuer count and success count  broth in log in println warn.
+      val sleepFactor = 1 + _serverBusyCount % 3
+      Thread.sleep(sleepFactor * 1000)
+    } else {
+      println(" Too many request 429 error, Total waiting time ")
+      throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = _debugFlag)
+
     }
+
   }
 
   /**
@@ -231,7 +222,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param response
    */
   private def responseCodeHandler(response: HttpResponse[String]): Unit = {
-
     response.code match {
       case 200 => setServerBusyCount(0)
         println("resetting server-busy count") //200 for all good
