@@ -142,6 +142,18 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.globalInitScSnapshotTarget)
   )
 
+  lazy private[overwatch] val libsSnapshotModule = Module(1007, "Bronze_Libraries_Snapshot", this)
+  lazy private val appendLibsProcess = ETLDefinition(
+    workspace.getClusterLibraries,
+    append(BronzeTargets.libsSnapshotTarget)
+  )
+
+  lazy private[overwatch] val policiesSnapshotModule = Module(1008, "Bronze_Libraries_Snapshot", this)
+  lazy private val appendPoliciesProcess = ETLDefinition(
+    workspace.getClusterPolicies,
+    append(BronzeTargets.policiesSnapshotTarget)
+  )
+
   lazy private[overwatch] val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
   lazy private val appendAuditLogsProcess = ETLDefinition(
     getAuditLogsDF(
@@ -220,17 +232,17 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
-
+    val isFirstAuditRun = !BronzeTargets.auditLogsTarget.exists(dataValidation = true)
     val rawAzureAuditEvents = landAzureAuditLogDF(
       BronzeTargets.auditLogAzureLandRaw,
       config.auditLogConfig.azureAuditLogEventhubConfig.get,
       config.etlDataPathPrefix, config.databaseLocation, config.consumerDatabaseLocation,
-      auditLogsModule.isFirstRun,
+      isFirstAuditRun,
       config.organizationId,
       config.runID
     )
 
-    database.writeWithRetry(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
+    database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
 
     val rawProcessCompleteMsg = "Azure audit ingest process complete"
     if (config.debugFlag) println(rawProcessCompleteMsg)

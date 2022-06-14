@@ -372,7 +372,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   /**
    * get EXISTING dataset[s] metadata within the configured Overwatch workspace
-   *
    * @return Seq[WorkspaceDataset]
    */
   def getWorkspaceDatasets: Seq[WorkspaceDataset] = {
