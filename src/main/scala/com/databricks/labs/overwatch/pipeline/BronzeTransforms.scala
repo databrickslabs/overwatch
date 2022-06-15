@@ -460,11 +460,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
       s"properly. Skipping!", Level.ERROR)
 
 
-    logger.info("Calling New APIv2" + clusterIDs.length + " run id :" + apiEnv.runID)
+    logger.log(Level.INFO, "Calling New APIv2, Number of cluster id:" + clusterIDs.size + " run id :" + apiEnv.runID)
     val tmpClusterEventsSuccessPath = s"$tempWorkingDir/success" + apiEnv.runID
     val tmpClusterEventsErrorPath = s"$tempWorkingDir/error" + apiEnv.runID
     val finalResponseCount = clusterIDs.size
-    logger.info(" response count " + finalResponseCount)
     var responseCounter = 0;
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
@@ -472,9 +471,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val start1 = System.currentTimeMillis();
     for (i <- 0 to clusterIDs.length - 1) {
       val jsonQuery = s"""{"cluster_id":"${clusterIDs(i)}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
-
       val future = Future {
-        var apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
+        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
         synchronized {
           apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= apiEnv.successBatchSize) {
@@ -485,10 +483,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       }
       future.onComplete(x => x match {
-        case Success(x) => {
+        case Success(x) =>
           responseCounter = responseCounter + 1
-        }
-        case Failure(e) => {
+
+        case Failure(e) =>
           if (e.isInstanceOf[ApiCallFailureV2]) {
             synchronized {
               apiErrorArray.add(e.getMessage)
@@ -500,8 +498,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
           }
           responseCounter = responseCounter + 1
-          logger.info("Future failure message: " + e.getMessage)
-        }
+          logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
+
       })
 
 
@@ -553,16 +551,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
         logger.log(Level.INFO, logEventsMSG)
         val start2 = System.currentTimeMillis();
-        logger.info(" Duration in millis :" + (start2 - start1))
+        logger.log(Level.INFO, " Duration in millis :" + (start2 - start1))
         clusterEventsDF
 
       } catch {
-        case e: Throwable => {
+        case e: Throwable =>
           throw new Exception(e)
-        }
       }
-
-
     } else {
       logger.info("EMPTY MODULE: Cluster Events")
       throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
