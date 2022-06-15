@@ -396,7 +396,7 @@ object Helpers extends SparkSessionWrapper {
    * Be VERY CAREFUL with this function as it's a nuke. There's a different methodology to make this work depending
    * on the cloud platform. At present Azure and AWS are both supported
    *
-   * @param target        target table
+   * @param target target table
    * @param cloudProvider - name of the cloud provider
    */
   @throws(classOf[UnhandledException])
@@ -426,7 +426,6 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * Execute a parallelized clone to follow the instructions provided through CloneDetail class
-   *
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
