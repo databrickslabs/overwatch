@@ -59,6 +59,18 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private val readTimeoutMS = 60000 //Read timeout.
   private val connTimeoutMS = 10000 //Connection timeout.
   private var _printFlag: Boolean = true
+  private var _totalSleepTime: Int = 0
+  private var _apiSuccessCount: Int = 0
+  private var _apiFailureCount: Int = 0
+  private var _printStatsFlag: Boolean = true
+
+  def apiSuccessCount: Int = _apiSuccessCount
+
+  def printStatsFlag: Boolean = _printStatsFlag
+
+  def apiFailureCount: Int = _apiFailureCount
+
+  def totalSleepTime: Int = _totalSleepTime
 
   def endPoint: String = _endPoint
 
@@ -106,6 +118,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     this
   }
 
+ private[overwatch] def setPrintStatsFlag(value: Boolean): this.type = {
+   _printStatsFlag = value
+    this
+  }
+
   private[overwatch] def setDebugFlag(value: Boolean): this.type = {
     _debugFlag = value
     this
@@ -118,6 +135,21 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   private[overwatch] def setUnsafeSSLErrorCount(value: Int): this.type = {
     _unsafeSSLErrorCount = value
+    this
+  }
+
+  private[overwatch] def setApiSuccessCount(value: Int): this.type = {
+    _apiSuccessCount = value
+    this
+  }
+
+  private[overwatch] def setApiFailureCount(value: Int): this.type = {
+    _apiFailureCount = value
+    this
+  }
+
+  private[overwatch] def setTotalSleepTime(value: Int): this.type = {
+    _totalSleepTime = value
     this
   }
 
@@ -196,20 +228,45 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
+  private def buildSleepDetailMessage(): String = {
+    s"""API call Endpoint: ${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}
+       |queryString: ${jsonQuery}
+       |Token Key : ${jsonKey}
+       |Token Value: ${jsonValue}
+       |Server Busy Count:${serverBusyCount}
+       |Total Sleep Time:${totalSleepTime} seconds
+       |Successful api response count:${apiSuccessCount}
+       |""".stripMargin
+  }
+
+
   /**
    * Hibernate in-case of too many API call request.
    *
    * @param response
    */
-  private def hibernate(response: HttpResponse[String]): Unit = {//TODO work in progress
+  private def hibernate(response: HttpResponse[String]): Unit = { //TODO work in progress
     println("Received response code 429: Too many request per second")
-    _serverBusyCount += 1
-    if (_serverBusyCount < 100) { //40 and expose it  10 sec sleep 5 mints ,failuer count and success count  broth in log in println warn.
-      val sleepFactor = 1 + _serverBusyCount % 3
-      Thread.sleep(sleepFactor * 1000)
+    setServerBusyCount(serverBusyCount + 1)
+    if (serverBusyCount < 40) { //40 and expose it  10 sec sleep 5 mints ,failuer count and success count  broth in log in println warn.
+      val sleepFactor = 1 + serverBusyCount % 5
+      if (serverBusyCount > 5) {
+        setTotalSleepTime(totalSleepTime + 10)
+        println(buildSleepDetailMessage()+"Current action: Sleeping for 10 seconds")
+        logger.log(Level.WARN,buildSleepDetailMessage()+"Current action: Sleeping for 10seconds")
+        Thread.sleep(10 * 1000)//Sleeping for 10 secs
+      }
+      else {
+        setTotalSleepTime(totalSleepTime + sleepFactor)
+        println(buildSleepDetailMessage()+"Current action: Sleeping for "+sleepFactor+" seconds")
+        logger.log(Level.WARN,buildSleepDetailMessage()+"Current action: Sleeping for "+sleepFactor+" seconds")
+        Thread.sleep(sleepFactor * 1000)
+      }
+
     } else {
-      println(" Too many request 429 error, Total waiting time ")
-      throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = _debugFlag)
+      println("Too many request 429 error, Total waiting time " + totalSleepTime)
+      logger.log(Level.ERROR,buildSleepDetailMessage()+"Current action: Shutting Down...")
+      throw new ApiCallFailure(response, buildSleepDetailMessage()+"Current action: Shutting Down...", debugFlag = _debugFlag)
 
     }
 
@@ -222,11 +279,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param response
    */
   private def responseCodeHandler(response: HttpResponse[String]): Unit = {
-    response.code match {
-      case 200 => setServerBusyCount(0)
-        println("resetting server-busy count") //200 for all good
+    response.code
+     match {
+      case 200 => //200 for all good
+        setServerBusyCount(0)
+        setApiSuccessCount(apiSuccessCount + 1)
+
 
       case 429 => //The Databricks REST API supports a maximum of 30 requests/second per workspace. Requests that exceed the rate limit will receive a 429 response status code.
+        setApiFailureCount(apiFailureCount + 1)
         hibernate(response)
         execute()
 
@@ -289,16 +350,13 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   }
 
-  private def buildGetDetailMessage: String = {
-    s"""Get API call Endpoint: ${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}
+
+  private def buildApiDetailMessage: String = {
+    s"""API call Endpoint: ${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}
+       |Api call type: ${apiMeta.apiCallType}
+       |queryString: ${jsonQuery}
        |Token Key : ${jsonKey}
        |Token Value: ${jsonValue}
-       |""".stripMargin
-  }
-
-  private def buildPostDetailMessage: String = {
-    s"""Post API call Endpoint: ${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}
-       |queryString: ${jsonQuery}
        |""".stripMargin
   }
 
@@ -309,22 +367,21 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   private def getResponse: HttpResponse[String] = {
     var response: HttpResponse[String] = null
+    if (printFlag) {
+      var commonMsg = buildApiDetailMessage
+      httpHeaders.foreach(x =>
+        if (x._2.contains("Bearer")) {
+          commonMsg = commonMsg + x._1 + " : REDACTED "
+        }
+        else {
+          commonMsg = commonMsg + x._1 + " : " + x._2 + " "
+        }
+      ).toString
+      logger.log(Level.INFO, commonMsg)
+      setPrintFlag(false)
+    }
     apiMeta.apiCallType match {
       case "POST" =>
-        if (printFlag) {
-          var commonMsg = buildPostDetailMessage
-          httpHeaders.foreach(x =>
-            if (x._2.contains("Bearer")) {
-              commonMsg = commonMsg + x._1 + ": REDACTED "
-            }
-            else {
-              commonMsg = commonMsg + x._1 + " : " + x._2 + " "
-            }
-
-          ).toString
-          logger.log(Level.INFO, commonMsg)
-          setPrintFlag(false)
-        }
         response =
           try {
             Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
@@ -339,7 +396,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
               logger.log(Level.WARN, sslMSG)
               if (debugFlag) println(sslMSG)
               if (unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
-                setUnsafeSSLErrorCount(unsafeSSLErrorCount+1)
+                setUnsafeSSLErrorCount(unsafeSSLErrorCount + 1)
                 setAllowUnsafeSSL(true)
                 Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
                   .copy(headers = httpHeaders)
@@ -354,19 +411,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
           }
 
       case "GET" =>
-        if (printFlag) {
-          var commonMsg = buildGetDetailMessage
-          httpHeaders.foreach(x =>
-            if (x._2.contains("Bearer")) {
-              commonMsg = commonMsg + x._1 + " : REDACTED "
-            }
-            else {
-              commonMsg = commonMsg + x._1 + " : " + x._2 + " "
-            }
-          ).toString
-          logger.log(Level.INFO, commonMsg)
-          setPrintFlag(false)
-        }
+
         response = try {
           Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
             .param(jsonKey, jsonValue)
@@ -380,7 +425,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
             logger.log(Level.WARN, sslMSG)
             if (debugFlag) println(sslMSG)
             if (unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
-              setUnsafeSSLErrorCount(unsafeSSLErrorCount+1)
+              setUnsafeSSLErrorCount(unsafeSSLErrorCount + 1)
               setAllowUnsafeSSL(true)
               Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
                 .param(jsonKey, jsonValue)
@@ -416,22 +461,22 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param rawDF The raw dataframe which is received as part of API response.
    * @return Dataframe which contains the required columns.
    */
-  private def extrapolateSupportedStructed(rawDF: DataFrame): DataFrame = {
+  private def extrapolateSupportedStructure(rawDF: DataFrame): DataFrame = {
     val resultDFFieldNames = rawDF.schema.fieldNames
-    if (!resultDFFieldNames.contains(apiMeta.dataframeColumns) && apiMeta.dataframeColumns != "*") { // if known API but return column doesn't exist
+    if (!resultDFFieldNames.contains(apiMeta.dataframeColumn) && apiMeta.dataframeColumn != "*") { // if known API but return column doesn't exist
       val asDFErrMsg = s"The API endpoint is not returning the " +
-        s"expected structure, column ${apiMeta.dataframeColumns} is expected and is not present in the dataframe.\nIf this module " +
+        s"expected structure, column ${apiMeta.dataframeColumn} is expected and is not present in the dataframe.\nIf this module " +
         s"references data that does not exist or to which the Overwatch account does have access, please remove the " +
         s"scope. For example: if you have 'pools' scope enabled but there are no pools or Overwatch PAT doesn't " +
         s"have access to any pools, this scope must be removed."
       logger.log(Level.ERROR, asDFErrMsg)
       if (debugFlag) println(asDFErrMsg)
       throw new Exception(asDFErrMsg)
-    } else if (apiMeta.dataframeColumns == "*") { //Selecting all of the column.
+    } else if (apiMeta.dataframeColumn == "*") { //Selecting all of the column.
       rawDF
     }
     else { //Selecting specific columns as per the metadata.
-      rawDF.select(explode(col(apiMeta.dataframeColumns)).alias(apiMeta.dataframeColumns)).select(col(apiMeta.dataframeColumns + ".*"))
+      rawDF.select(explode(col(apiMeta.dataframeColumn)).alias(apiMeta.dataframeColumn)).select(col(apiMeta.dataframeColumn + ".*"))
     }
   }
 
@@ -452,7 +497,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       apiResultDF = spark.read.json(successTempPath)
 
     }
-    extrapolateSupportedStructed(apiResultDF)
+    extrapolateSupportedStructure(apiResultDF)
   }
 
 
@@ -470,6 +515,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         }
       }
       paginate(response.body)
+      if(printStatsFlag) {
+        println(buildSleepDetailMessage)
+        logger.log(Level.INFO, buildSleepDetailMessage)
+        setPrintStatsFlag(false)
+      }
       apiResponseArray
     } catch {
       case e: java.lang.NoClassDefFoundError => {
@@ -507,6 +557,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       responseCodeHandler(response)
       apiResponseArray.add(response.body)
       paginate(response.body)
+      if(printStatsFlag) {
+        println(buildSleepDetailMessage)
+        logger.log(Level.INFO, buildSleepDetailMessage)
+        setPrintStatsFlag(false)
+      }
       this
     } catch {
       case e: java.lang.NoClassDefFoundError => {

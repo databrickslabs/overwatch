@@ -12,7 +12,7 @@ trait ApiMeta {
   val logger: Logger = Logger.getLogger(this.getClass)
   protected var _paginationKey: String = _
   protected var _paginationToken: String = _
-  protected var _dataframeColumns: String = "*"
+  protected var _dataframeColumn: String = "*"
   protected var _apiCallType: String = _
   protected var _storeInTempLocation = false
   protected val _apiV = "api/2.0"
@@ -22,7 +22,7 @@ trait ApiMeta {
 
   def paginationToken: String = _paginationToken
 
-  def dataframeColumns: String = _dataframeColumns
+  def dataframeColumn: String = _dataframeColumn
 
   def apiCallType: String = _apiCallType
 
@@ -47,8 +47,8 @@ trait ApiMeta {
     this
   }
 
-  private[overwatch] def setDataframeColumns(value: String): this.type = {
-    _dataframeColumns = value
+  private[overwatch] def setDataframeColumn(value: String): this.type = {
+    _dataframeColumn = value
     this
   }
 
@@ -78,7 +78,7 @@ trait ApiMeta {
   override def toString: String = {
     s"""API Meta paginationKey: ${paginationKey}
        |paginationToken: ${paginationToken}
-       |dataframeColumns: ${dataframeColumns}
+       |dataframeColumns: ${dataframeColumn}
        |apiCallType: ${apiCallType}
        |storeInTempLocation: ${storeInTempLocation}
        |apiV: ${apiV}
@@ -117,7 +117,7 @@ class ClusterResizeApi extends ApiMeta {
 class SqlHistoryQueriesApi extends ApiMeta {
   setPaginationKey("has_next_page")
   setPaginationToken("next_page_token")
-  setDataframeColumns("res")
+  setDataframeColumn("res")
   setApiCallType("GET")
   setTuplePaginationObject(true)
 
@@ -137,41 +137,41 @@ class SqlHistoryQueriesApi extends ApiMeta {
 }
 
 class WorkspaceListApi extends ApiMeta {
-  setDataframeColumns("objects")
+  setDataframeColumn("objects")
   setApiCallType("GET")
 }
 
 class InstanceProfileListApi extends ApiMeta {
-  setDataframeColumns("instance_profiles")
+  setDataframeColumn("instance_profiles")
   setApiCallType("GET")
 }
 
 class InstancePoolsListApi extends ApiMeta {
-  setDataframeColumns("instance_pools")
+  setDataframeColumn("instance_pools")
   setApiCallType("GET")
 }
 
 class DbfsListApi extends ApiMeta {
-  setDataframeColumns("files")
+  setDataframeColumn("files")
   setApiCallType("GET")
 }
 
 
 class ClusterListApi extends ApiMeta {
-  setDataframeColumns("clusters")
+  setDataframeColumn("clusters")
   setApiCallType("GET")
 }
 
 
 class JobListApi extends ApiMeta {
-  setDataframeColumns("jobs")
+  setDataframeColumn("jobs")
   setApiCallType("GET")
 }
 
 class ClusterEventsApi extends ApiMeta {
   setPaginationKey("next_page")
   setPaginationToken("next_page")
-  setDataframeColumns("events")
+  setDataframeColumn("events")
   setApiCallType("POST")
   setStoreInTempLocation(true)
 }

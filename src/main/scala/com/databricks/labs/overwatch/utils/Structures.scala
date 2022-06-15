@@ -14,6 +14,7 @@ import scalaj.http.HttpResponse
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
+import java.util
 import java.util.Date
 
 case class DBDetail()
@@ -36,18 +37,6 @@ case class DatabricksContractPrices(
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="")
 
-/**
- * Class for storing the response from API call.
- * Response will have two parts 1)response which the api has sent which contains actual data
- * 2)response_code which we append to the actual response which we got
- *
- * @param rawStringResponse : For storing the actual response from the api call
- * @param responseCode      : Response code from api call
- * @param rawJsonObject     : Actual response as json object
- */
-case class ResponseMapper(rawStringResponse: String, responseCode: Int, rawJsonObject: JSONObject)
-
-case class ApiErrorDetail(cluster_id: String, from_epoch: Long, until_epoch: Long,error:String)
 
 
 case class ValidatedColumn(
