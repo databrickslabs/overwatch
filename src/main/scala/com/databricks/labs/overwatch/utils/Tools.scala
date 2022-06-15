@@ -187,7 +187,7 @@ object Helpers extends SparkSessionWrapper {
     try {
       val fileName = java.util.UUID.randomUUID.toString + ".json"
       dbutils.fs.put(path + "/" + fileName, resultJsonArray, true)
-      logger.info("File Successfully written:" + path + "/" + fileName)
+      logger.log(Level.INFO,"File Successfully written:" + path + "/" + fileName)
       true
     } catch {
       case e: Throwable =>
