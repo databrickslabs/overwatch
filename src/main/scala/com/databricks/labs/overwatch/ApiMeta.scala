@@ -63,15 +63,15 @@ trait ApiMeta {
   }
 
 
-  def getPaginationLogicForSingleObject(jsonObject: JsonNode): (String) = {
+  private[overwatch] def getPaginationLogicForSingleObject(jsonObject: JsonNode): (String) = {
     jsonObject.get(this._paginationKey).toString
   }
 
-  def getPaginationLogicForTuple(jsonObject: JsonNode): (String, String) = {
+  private[overwatch] def getPaginationLogicForTuple(jsonObject: JsonNode): (String, String) = {
     (null, null) //Implement logic according to the API call
   }
 
-  def hasNextPage(jsonObject: JsonNode): Boolean = {
+  private[overwatch] def hasNextPage(jsonObject: JsonNode): Boolean = {
     true
   }
 
@@ -121,11 +121,11 @@ class SqlHistoryQueriesApi extends ApiMeta {
   setApiCallType("GET")
   setTuplePaginationObject(true)
 
-  override def hasNextPage(jsonObject: JsonNode): Boolean = {
+  private[overwatch]  override def hasNextPage(jsonObject: JsonNode): Boolean = {
     jsonObject.get(paginationKey).asBoolean()
   }
 
-  override def getPaginationLogicForTuple(jsonObject: JsonNode): (String, String) = {
+  private[overwatch] override def getPaginationLogicForTuple(jsonObject: JsonNode): (String, String) = {
     if (jsonObject.get(paginationKey).asBoolean()) { //Pagination key for sql/history/queries can return true or false
       val _jsonKey = "page_token"
       val _jsonValue = jsonObject.get(paginationToken).asText()

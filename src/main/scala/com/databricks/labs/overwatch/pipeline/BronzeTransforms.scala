@@ -21,7 +21,7 @@ import java.util
 import java.util.Collections
 import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.forkjoin.ForkJoinPool
 import scala.util.{Failure, Success}
 
@@ -439,37 +439,18 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def prepClusterEventLogs(
-                                      filteredAuditLogDF: DataFrame,
-                                      startTime: TimeTypes,
-                                      endTime: TimeTypes,
-                                      pipelineSnapTS: TimeTypes,
-                                      apiEnv: ApiEnv,
-                                      organizationId: String,
-                                      database: Database,
-                                      erroredBronzeEventsTarget: PipelineTable,
-                                      tempWorkingDir: String
-                                    )(clusterSnapshotDF: DataFrame): DataFrame = {
-
-    val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
-      .as[String]
-      .collect()
-
-    if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
-      s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
-      s"properly. Skipping!", Level.ERROR)
-
-
-    logger.log(Level.INFO, "Calling New APIv2, Number of cluster id:" + clusterIDs.size + " run id :" + apiEnv.runID)
-    val tmpClusterEventsSuccessPath = s"$tempWorkingDir/success" + apiEnv.runID
-    val tmpClusterEventsErrorPath = s"$tempWorkingDir/error" + apiEnv.runID
-    val finalResponseCount = clusterIDs.size
+  private def landClusterEvents(clusterIDs:Array[String],
+                                startTime: TimeTypes,
+                                endTime: TimeTypes,
+                                apiEnv: ApiEnv,
+                                tmpClusterEventsSuccessPath:String,
+                                tmpClusterEventsErrorPath:String)={
+    val finalResponseCount = clusterIDs.length
     var responseCounter = 0;
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
-    implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4))
-    val start1 = System.currentTimeMillis();
-    for (i <- 0 to clusterIDs.length - 1) {
+    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4))
+    for (i <- clusterIDs.indices) {
       val jsonQuery = s"""{"cluster_id":"${clusterIDs(i)}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
       val future = Future {
         val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
@@ -482,8 +463,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
         }
 
       }
-      future.onComplete(x => x match {
-        case Success(x) =>
+      future.onComplete {
+        case Success(_) =>
           responseCounter = responseCounter + 1
 
         case Failure(e) =>
@@ -499,34 +480,25 @@ trait BronzeTransforms extends SparkSessionWrapper {
           }
           responseCounter = responseCounter + 1
           logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
-
-      })
-
-
+      }
     }
     while (responseCounter < finalResponseCount) {
+      //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
+      // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
+      println("Sleeping for 5 seconds...Response received count : " + responseCounter + ",Expected Response count : " + finalResponseCount)
       Thread.sleep(5000)
-      println("sleeping ...current response count:" + responseCounter + " response count to reach :" + finalResponseCount)
     }
-    if (apiResponseArray.size() > 0) {
+    if (apiResponseArray.size() > 0) {//In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
       Helpers.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
       apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
-    if (apiErrorArray.size() > 0) {
+    if (apiErrorArray.size() > 0) {//In case of error array didn't hit the batch-size as a final step we will write it to the persistent storage.
       Helpers.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
+  }
 
-    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
-      persistErrors(
-        spark.read.json(tmpClusterEventsErrorPath),
-        database,
-        erroredBronzeEventsTarget,
-        pipelineSnapTS,
-        organizationId
-      )
-    }
-
+  private def processClusterEvents(tmpClusterEventsSuccessPath:String, organizationId: String,erroredBronzeEventsTarget: PipelineTable):DataFrame={
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
       try {
@@ -550,8 +522,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val clusterEventsCaptured = clusterEventsDF.count
         val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
         logger.log(Level.INFO, logEventsMSG)
-        val start2 = System.currentTimeMillis();
-        logger.log(Level.INFO, " Duration in millis :" + (start2 - start1))
         clusterEventsDF
 
       } catch {
@@ -563,7 +533,47 @@ trait BronzeTransforms extends SparkSessionWrapper {
       throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
         s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
     }
+  }
 
+  protected def prepClusterEventLogs(
+                                      filteredAuditLogDF: DataFrame,
+                                      startTime: TimeTypes,
+                                      endTime: TimeTypes,
+                                      pipelineSnapTS: TimeTypes,
+                                      apiEnv: ApiEnv,
+                                      organizationId: String,
+                                      database: Database,
+                                      erroredBronzeEventsTarget: PipelineTable,
+                                      tempWorkingDir: String
+                                    )(clusterSnapshotDF: DataFrame): DataFrame = {
+
+    val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
+      .as[String]
+      .collect()
+
+    if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
+      s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
+      s"properly. Skipping!", Level.ERROR)
+
+    val processingStartTime = System.currentTimeMillis();
+    logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
+    val tmpClusterEventsSuccessPath = s"$tempWorkingDir/clusterEventsBronze/success" + apiEnv.runID
+    val tmpClusterEventsErrorPath = s"$tempWorkingDir/clusterEventsBronze/error" + apiEnv.runID
+
+    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath, tmpClusterEventsErrorPath)
+    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
+      persistErrors(
+        spark.read.json(tmpClusterEventsErrorPath),
+        database,
+        erroredBronzeEventsTarget,
+        pipelineSnapTS,
+        organizationId
+      )
+    }
+   val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
+    val processingEndTime = System.currentTimeMillis();
+    logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
+    clusterEventDf
   }
 
 

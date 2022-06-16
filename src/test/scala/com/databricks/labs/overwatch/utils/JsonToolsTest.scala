@@ -167,6 +167,15 @@ class JsonToolsTest extends AnyFunSpec {
     it("Should throw error for corrupted json"){
       assertThrows[Throwable](JsonUtils.getJsonKeyValue("""{"path":/missing"}"""))
     }
+    it("Should return first pair of key and value"){
+      assertResult(("path","/tmp"),"")(JsonUtils.getJsonKeyValue("""{"path":"/tmp","path2":"/tmp2"}"""))
+    }
+    it("Should throw error for unsupported json"){
+      assertThrows[NoSuchElementException](JsonUtils.getJsonKeyValue("""[{"path":"/tmp"},{"path2":"/tmp2"}]"""))
+    }
+    it("Should throw error for unsupported nested json"){
+      assertThrows[NoSuchElementException](JsonUtils.getJsonKeyValue("""[{"path":"/tmp"},{"nestedParent":{"nestedChildKey": "nestedChildValue"}}]"""))
+    }
 
 
   }

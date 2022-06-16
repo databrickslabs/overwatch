@@ -47,12 +47,12 @@ object JsonUtils {
   }
 
   /**
-   * Extracts the key and value from Json String
-   *
+   * Extracts the key and value from Json String.This function only extracts the key and value if jsonString contains only one key and value.
+   * If the Json contains more then one key and value then this function will return the first pair of key and value.
    * @param jsonString
    * @return
    */
-  def getJsonKeyValue(jsonString: String): (String, String) = {
+  private[overwatch] def getJsonKeyValue(jsonString: String): (String, String) = {
     try {
       val mapper = new ObjectMapper()
       val actualObj = mapper.readTree(jsonString);

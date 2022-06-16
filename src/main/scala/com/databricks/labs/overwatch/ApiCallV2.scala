@@ -51,8 +51,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private var _successTempPath: String = _ //Unique String which is used as folder name in a temp location to save the responses.
   private var _unsafeSSLErrorCount = 0; //Keep track of SSL error occurrence.
   private var _apiMeta: ApiMeta = null //Metadata for the API call.
-  private var _debugFlag = false //Debug flag to print the information when required. d
-  private var _allowUnsafeSSL = false //Flag to make the unsafe ssl.
+  private var _allowUnsafeSSL: Boolean = _ //Flag to make the unsafe ssl.
   private var _jsonKey: String = "" //Key name for pagination.
   private var _jsonValue: String = "" //Key value for pagination.
   private val readTimeoutMS = 60000 //Read timeout.
@@ -81,7 +80,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   def apiMeta: ApiMeta = _apiMeta
 
-  def debugFlag: Boolean = _debugFlag
 
 
   private[overwatch] def setApiResponseArray(value: util.ArrayList[String]): this.type = {
@@ -104,13 +102,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     this
   }
 
- private[overwatch] def setPrintFinalStatsFlag(value: Boolean): this.type = {
-   _printFinalStatusFlag = value
-    this
-  }
-
-  private[overwatch] def setDebugFlag(value: Boolean): this.type = {
-    _debugFlag = value
+  private[overwatch] def setPrintFinalStatsFlag(value: Boolean): this.type = {
+    _printFinalStatusFlag = value
     this
   }
 
@@ -174,6 +167,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     setEndPoint(value)
     setApiMeta(new ApiMetaFactory().getApiClass(endPoint))
     setApiResponseArray(new util.ArrayList[String]())
+    setAllowUnsafeSSL(apiEnv.enableUnsafeSSL)
     logger.log(Level.INFO, apiMeta.toString)
     this
   }
@@ -197,7 +191,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def jsonToMap: Unit = {
     try {
       val (jsonKey, jsonValue) = JsonUtils.getJsonKeyValue(jsonQuery)
-      setJsonKey(jsonKey)
+        setJsonKey(jsonKey)
       setJsonValue(jsonValue)
     } catch {
       case e: Throwable => {
@@ -230,21 +224,21 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val sleepFactor = 1 + serverBusyCount % 5
       if (serverBusyCount > 5) {
         setTotalSleepTime(totalSleepTime + 10)
-        println(buildSleepDetailMessage()+"Current action: Sleeping for 10 seconds")
-        logger.log(Level.WARN,buildSleepDetailMessage()+"Current action: Sleeping for 10seconds")
-        Thread.sleep(10 * 1000)//Sleeping for 10 secs
+        println(buildSleepDetailMessage() + "Current action: Sleeping for 10 seconds")
+        logger.log(Level.WARN, buildSleepDetailMessage() + "Current action: Sleeping for 10seconds")
+        Thread.sleep(10 * 1000) //Sleeping for 10 secs
       }
       else {
         setTotalSleepTime(totalSleepTime + sleepFactor)
-        println(buildSleepDetailMessage()+"Current action: Sleeping for "+sleepFactor+" seconds")
-        logger.log(Level.WARN,buildSleepDetailMessage()+"Current action: Sleeping for "+sleepFactor+" seconds")
+        println(buildSleepDetailMessage() + "Current action: Sleeping for " + sleepFactor + " seconds")
+        logger.log(Level.WARN, buildSleepDetailMessage() + "Current action: Sleeping for " + sleepFactor + " seconds")
         Thread.sleep(sleepFactor * 1000)
       }
 
     } else {
       println("Too many request 429 error, Total waiting time " + totalSleepTime)
-      logger.log(Level.ERROR,buildSleepDetailMessage()+"Current action: Shutting Down...")
-      throw new ApiCallFailure(response, buildSleepDetailMessage()+"Current action: Shutting Down...", debugFlag = _debugFlag)
+      logger.log(Level.ERROR, buildSleepDetailMessage() + "Current action: Shutting Down...")
+      throw new ApiCallFailure(response, buildSleepDetailMessage() + "Current action: Shutting Down...", debugFlag = false)
 
     }
 
@@ -258,7 +252,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   private def responseCodeHandler(response: HttpResponse[String]): Unit = {
     response.code
-     match {
+    match {
       case 200 => //200 for all good
         setServerBusyCount(0)
         setApiSuccessCount(apiSuccessCount + 1)
@@ -270,7 +264,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         execute()
 
       case _ =>
-        throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = _debugFlag)
+        throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = false)
 
     }
 
@@ -347,12 +341,12 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     var response: HttpResponse[String] = null
     if (_printFlag) {
       var commonMsg = buildApiDetailMessage
-      httpHeaders.foreach(x =>
-        if (x._2.contains("Bearer")) {
-          commonMsg = commonMsg + x._1 + " : REDACTED "
+      httpHeaders.foreach(header =>
+        if (header._2.contains("Bearer")) {
+          commonMsg = commonMsg + header._1 + " : REDACTED "
         }
         else {
-          commonMsg = commonMsg + x._1 + " : " + x._2 + " "
+          commonMsg = commonMsg + header._1 + " : " + header._2 + " "
         }
       ).toString
       logger.log(Level.INFO, commonMsg)
@@ -368,28 +362,12 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
               .options(reqOptions)
               .asString
           } catch {
-            case _: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
-              val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
-                "ssl. If this is unexpected behavior, validate your ssl certs."
-              logger.log(Level.WARN, sslMSG)
-              if (debugFlag) println(sslMSG)
-              if (unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
-                setUnsafeSSLErrorCount(unsafeSSLErrorCount + 1)
-                setAllowUnsafeSSL(true)
-                Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
-                  .copy(headers = httpHeaders)
-                  .postData(jsonQuery)
-                  .options(reqOptions)
-                  .asString
-              } else {
-                throw new Exception(sslMSG)
-              }
-
-
+            case e: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
+              handleSSLHandShakeException(e)
+            case e: Throwable => throw e
           }
 
       case "GET" =>
-
         response = try {
           Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
             .param(_jsonKey, _jsonValue)
@@ -397,27 +375,26 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
             .options(reqOptions)
             .asString
         } catch {
-          case e: javax.net.ssl.SSLHandshakeException if !_allowUnsafeSSL => // for PVC with ssl errors
-            val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
-              "ssl. If this is unexpected behavior, validate your ssl certs."
-            logger.log(Level.WARN, sslMSG)
-            if (debugFlag) println(sslMSG)
-            if (unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
-              setUnsafeSSLErrorCount(unsafeSSLErrorCount + 1)
-              setAllowUnsafeSSL(true)
-              Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
-                .param(_jsonKey, _jsonValue)
-                .copy(headers = httpHeaders)
-                .options(reqOptions)
-                .asString
-            } else {
-              logger.log(Level.ERROR, e)
-              throw new Exception(sslMSG)
-            }
+          case e: javax.net.ssl.SSLHandshakeException => // for PVC with ssl errors
+            handleSSLHandShakeException(e)
           case e: Throwable => throw e
         }
     }
     response
+  }
+
+  def handleSSLHandShakeException(e: Exception): HttpResponse[String] = {
+    val sslMSG = "ALERT: DROPPING BACK TO UNSAFE SSL: SSL handshake errors were detected, allowing unsafe " +
+      "ssl. If this is unexpected behavior, validate your ssl certs."
+    logger.log(Level.WARN, sslMSG)
+    if (unsafeSSLErrorCount == 0) { //Check for 1st occurrence of SSL Handshake error.
+      setUnsafeSSLErrorCount(unsafeSSLErrorCount + 1)
+      setAllowUnsafeSSL(true)
+      getResponse
+    } else {
+      logger.log(Level.ERROR, e)
+      throw new Exception(sslMSG)
+    }
   }
 
 
@@ -448,7 +425,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         s"scope. For example: if you have 'pools' scope enabled but there are no pools or Overwatch PAT doesn't " +
         s"have access to any pools, this scope must be removed."
       logger.log(Level.ERROR, asDFErrMsg)
-      if (debugFlag) println(asDFErrMsg)
       throw new Exception(asDFErrMsg)
     } else if (apiMeta.dataframeColumn == "*") { //Selecting all of the column.
       rawDF
@@ -493,9 +469,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         }
       }
       paginate(response.body)
-      if(_printFinalStatusFlag) {
-        println(buildSleepDetailMessage)
-        logger.log(Level.INFO, buildSleepDetailMessage)
+      if (_printFinalStatusFlag) {
+        println(buildSleepDetailMessage())
+        logger.log(Level.INFO, buildSleepDetailMessage())
         setPrintFinalStatsFlag(false)
       }
       _apiResponseArray
@@ -535,9 +511,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
       paginate(response.body)
-      if(_printFinalStatusFlag) {
-        println(buildSleepDetailMessage)
-        logger.log(Level.INFO, buildSleepDetailMessage)
+      if (_printFinalStatusFlag) {
+        println(buildSleepDetailMessage())
+        logger.log(Level.INFO, buildSleepDetailMessage())
         setPrintFinalStatsFlag(false)
       }
       this

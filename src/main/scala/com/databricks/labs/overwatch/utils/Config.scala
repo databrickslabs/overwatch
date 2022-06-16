@@ -57,6 +57,10 @@ class Config() {
 
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
+  def successBatchSize : Int = _successBatchSize
+
+  def errorBatchSize : Int = _errorBatchSize
+
   def isLocalTesting: Boolean = _isLocalTesting
 
   def debugFlag: Boolean = _debugFlag
@@ -367,7 +371,7 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion,_successBatchSize,_errorBatchSize,runID))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion,successBatchSize,errorBatchSize,runID))
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
