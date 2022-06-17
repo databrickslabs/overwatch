@@ -95,7 +95,7 @@ class ApiMetaFactory {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   def getApiClass(_apiName: String): ApiMeta = {
-    _apiName match {
+   val meta = _apiName match {
       case "jobs/list" => new JobListApi
       case "clusters/list" => new ClusterListApi
       case "clusters/events" => new ClusterEventsApi
@@ -107,6 +107,8 @@ class ApiMetaFactory {
       case "clusters/resize" => new ClusterResizeApi
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }
+    logger.log(Level.INFO, meta.toString)
+    meta
   }
 }
 

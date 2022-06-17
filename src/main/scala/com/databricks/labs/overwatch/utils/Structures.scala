@@ -35,7 +35,7 @@ case class DatabricksContractPrices(
                                      jobsLightDBUCostUSD: Double = 0.10
                                    )
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="",enableUnsafeSSL:Boolean=false)
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="",enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4)
 
 
 
