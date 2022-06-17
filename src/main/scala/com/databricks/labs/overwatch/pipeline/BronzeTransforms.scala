@@ -446,10 +446,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 tmpClusterEventsSuccessPath:String,
                                 tmpClusterEventsErrorPath:String)={
     val finalResponseCount = clusterIDs.length
-    var responseCounter = 0;
+    var responseCounter = 0
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4))
+    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
+    //TODO identify the best practice to implement the future.
     for (i <- clusterIDs.indices) {
       val jsonQuery = s"""{"cluster_id":"${clusterIDs(i)}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
       val future = Future {

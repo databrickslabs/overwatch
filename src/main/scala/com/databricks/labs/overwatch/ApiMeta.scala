@@ -18,19 +18,19 @@ trait ApiMeta {
   protected val _apiV = "api/2.0"
   protected var _tuplePaginationObject = false
 
-  def paginationKey: String = _paginationKey
+  protected def paginationKey: String = _paginationKey
 
-  def paginationToken: String = _paginationToken
+  protected def paginationToken: String = _paginationToken
 
-  def dataframeColumn: String = _dataframeColumn
+  protected def dataframeColumn: String = _dataframeColumn
 
-  def apiCallType: String = _apiCallType
+  protected def apiCallType: String = _apiCallType
 
-  def storeInTempLocation: Boolean = _storeInTempLocation
+  protected def storeInTempLocation: Boolean = _storeInTempLocation
 
-  def apiV: String = _apiV
+  protected def apiV: String = _apiV
 
-  def tuplePaginationObject: Boolean = _tuplePaginationObject
+  protected def tuplePaginationObject: Boolean = _tuplePaginationObject
 
   private[overwatch] def setStoreInTempLocation(value: Boolean): this.type = {
     _storeInTempLocation = value
@@ -95,7 +95,7 @@ class ApiMetaFactory {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   def getApiClass(_apiName: String): ApiMeta = {
-    _apiName match {
+   val meta = _apiName match {
       case "jobs/list" => new JobListApi
       case "clusters/list" => new ClusterListApi
       case "clusters/events" => new ClusterEventsApi
@@ -107,6 +107,8 @@ class ApiMetaFactory {
       case "clusters/resize" => new ClusterResizeApi
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }
+    logger.log(Level.INFO, meta.toString)
+    meta
   }
 }
 

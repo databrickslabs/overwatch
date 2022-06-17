@@ -31,6 +31,11 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQuery(queryJsonString)
       .setSuccessTempPath(tempSuccessPath)
   }
+  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String]) = {
+    new ApiCallV2(apiEnv)
+      .buildApi(apiName)
+      .setQueryMap(queryMap)
+  }
 
 }
 
@@ -61,26 +66,32 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private var _apiSuccessCount: Int = 0
   private var _apiFailureCount: Int = 0
   private var _printFinalStatusFlag: Boolean = true
+  private var _queryMap : Map[String, String] =  _
 
-  def apiSuccessCount: Int = _apiSuccessCount
+  protected def apiSuccessCount: Int = _apiSuccessCount
 
-  def apiFailureCount: Int = _apiFailureCount
+  protected def apiFailureCount: Int = _apiFailureCount
 
-  def totalSleepTime: Int = _totalSleepTime
+  protected def totalSleepTime: Int = _totalSleepTime
 
-  def endPoint: String = _endPoint
+  protected def endPoint: String = _endPoint
 
-  def jsonQuery: String = _jsonQuery
+  protected def jsonQuery: String = _jsonQuery
 
-  def serverBusyCount: Int = _serverBusyCount
+  protected def serverBusyCount: Int = _serverBusyCount
 
-  def successTempPath: String = _successTempPath
+  protected def successTempPath: String = _successTempPath
 
-  def unsafeSSLErrorCount: Int = _unsafeSSLErrorCount
+  protected def unsafeSSLErrorCount: Int = _unsafeSSLErrorCount
 
-  def apiMeta: ApiMeta = _apiMeta
+  protected def apiMeta: ApiMeta = _apiMeta
 
+  protected def queryMap: Map[String, String] = _queryMap
 
+  private[overwatch] def setQueryMap(value: Map[String, String]): this.type = {
+    _queryMap = value
+    this
+  }
 
   private[overwatch] def setApiResponseArray(value: util.ArrayList[String]): this.type = {
     _apiResponseArray = value
@@ -168,7 +179,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     setApiMeta(new ApiMetaFactory().getApiClass(endPoint))
     setApiResponseArray(new util.ArrayList[String]())
     setAllowUnsafeSSL(apiEnv.enableUnsafeSSL)
-    logger.log(Level.INFO, apiMeta.toString)
+    setQueryMap(Map[String, String]())
     this
   }
 
@@ -180,27 +191,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   private def setQuery(query: String): this.type = {
     setJsonQuery(query)
-    jsonToMap
+    setQueryMap(Map[String, String]())
     this
   }
 
-
-  /**
-   * Parse the json string and get the data in the form of key and value.
-   */
-  private def jsonToMap: Unit = {
-    try {
-      val (jsonKey, jsonValue) = JsonUtils.getJsonKeyValue(jsonQuery)
-        setJsonKey(jsonKey)
-      setJsonValue(jsonValue)
-    } catch {
-      case e: Throwable => {
-        val excMsg = "Got the exception while parsing provided query json "
-        logger.log(Level.WARN, excMsg, e)
-        throw e
-      }
-    }
-  }
 
   private def buildSleepDetailMessage(): String = {
     s"""API call Endpoint: ${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}
@@ -285,6 +279,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
           if (value != null) {
             setJsonKey(key)
             setJsonValue(value)
+            setQueryMap(Map[String, String]())
             execute()
           }
         } else {
@@ -327,8 +322,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     s"""API call Endpoint: ${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}
        |Api call type: ${apiMeta.apiCallType}
        |queryString: ${jsonQuery}
-       |Token Key : ${_jsonKey}
-       |Token Value: ${_jsonValue}
+       |queryMap: ${queryMap}
        |""".stripMargin
   }
 
@@ -369,8 +363,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
       case "GET" =>
         response = try {
-          Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
-            .param(_jsonKey, _jsonValue)
+          Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")//.params(JsonUtils.jsonToMap(jsonQuery).mapValues(_.toString).toSeq)
+            .params(queryMap.toSeq)
+            .param(_jsonKey,_jsonValue)
             .copy(headers = httpHeaders)
             .options(reqOptions)
             .asString
@@ -508,6 +503,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   def execute(): this.type = {
     try {
       val response = getResponse
+      println(response.body)
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
       paginate(response.body)
