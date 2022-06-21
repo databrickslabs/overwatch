@@ -18,19 +18,19 @@ trait ApiMeta {
   protected val _apiV = "api/2.0"
   protected var _tuplePaginationObject = false
 
-  def paginationKey: String = _paginationKey
+  protected[overwatch] def paginationKey: String = _paginationKey
 
-  def paginationToken: String = _paginationToken
+  protected[overwatch]  def paginationToken: String = _paginationToken
 
-  def dataframeColumn: String = _dataframeColumn
+  protected[overwatch] def dataframeColumn: String = _dataframeColumn
 
-  def apiCallType: String = _apiCallType
+  protected[overwatch] def apiCallType: String = _apiCallType
 
-  def storeInTempLocation: Boolean = _storeInTempLocation
+  protected[overwatch] def storeInTempLocation: Boolean = _storeInTempLocation
 
-  def apiV: String = _apiV
+  protected[overwatch] def apiV: String = _apiV
 
-  def tuplePaginationObject: Boolean = _tuplePaginationObject
+  protected[overwatch] def tuplePaginationObject: Boolean = _tuplePaginationObject
 
   private[overwatch] def setStoreInTempLocation(value: Boolean): this.type = {
     _storeInTempLocation = value
