@@ -18,19 +18,19 @@ trait ApiMeta {
   protected val _apiV = "api/2.0"
   protected var _tuplePaginationObject = false
 
-  protected def paginationKey: String = _paginationKey
+  def paginationKey: String = _paginationKey
 
-  protected def paginationToken: String = _paginationToken
+  def paginationToken: String = _paginationToken
 
-  protected def dataframeColumn: String = _dataframeColumn
+  def dataframeColumn: String = _dataframeColumn
 
-  protected def apiCallType: String = _apiCallType
+  def apiCallType: String = _apiCallType
 
-  protected def storeInTempLocation: Boolean = _storeInTempLocation
+  def storeInTempLocation: Boolean = _storeInTempLocation
 
-  protected def apiV: String = _apiV
+  def apiV: String = _apiV
 
-  protected def tuplePaginationObject: Boolean = _tuplePaginationObject
+  def tuplePaginationObject: Boolean = _tuplePaginationObject
 
   private[overwatch] def setStoreInTempLocation(value: Boolean): this.type = {
     _storeInTempLocation = value
@@ -95,7 +95,7 @@ class ApiMetaFactory {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   def getApiClass(_apiName: String): ApiMeta = {
-   val meta = _apiName match {
+    val meta = _apiName match {
       case "jobs/list" => new JobListApi
       case "clusters/list" => new ClusterListApi
       case "clusters/events" => new ClusterEventsApi
@@ -123,7 +123,7 @@ class SqlHistoryQueriesApi extends ApiMeta {
   setApiCallType("GET")
   setTuplePaginationObject(true)
 
-  private[overwatch]  override def hasNextPage(jsonObject: JsonNode): Boolean = {
+  private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
     jsonObject.get(paginationKey).asBoolean()
   }
 
