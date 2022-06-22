@@ -1,9 +1,11 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.BatchRunner.spark
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
-import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
+import com.databricks.labs.overwatch.utils._
+import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -12,7 +14,6 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
@@ -21,8 +22,8 @@ import java.util
 import java.util.Collections
 import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 
@@ -452,13 +453,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
     //TODO identify the best practice to implement the future.
     for (i <- clusterIDs.indices) {
-      val jsonQuery = s"""{"cluster_id":"${clusterIDs(i)}","start_time":${startTime.asUnixTimeMilli},"end_time":${endTime.asUnixTimeMilli},"limit":500}"""
+     val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
+        "start_time"->s"""${startTime.asUnixTimeMilli}""",
+        "end_time"->s"""${endTime.asUnixTimeMilli}""",
+        "limit" -> "500"
+      )
       val future = Future {
         val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
         synchronized {
           apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= apiEnv.successBatchSize) {
-            Helpers.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
+            PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
             apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
           }
         }
@@ -473,33 +478,48 @@ trait BronzeTransforms extends SparkSessionWrapper {
             synchronized {
               apiErrorArray.add(e.getMessage)
               if (apiErrorArray.size() >= apiEnv.errorBatchSize) {
-                Helpers.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
+                PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
                 apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
               }
             }
-
+            logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
           }
           responseCounter = responseCounter + 1
-          logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
       }
     }
-    while (responseCounter < finalResponseCount) {
+    val timeoutThreshold = 300000 // 5 minutes
+    var currentSleepTime = 0
+    var responseStateWhileSleeping = responseCounter
+    while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
       //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
       // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
-      println("Sleeping for 5 seconds...Response received count : " + responseCounter + ",Expected Response count : " + finalResponseCount)
+      if (currentSleepTime > 120000) //printing the waiting message only if the waiting time is more than 2 minutes.
+      {
+        println(s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000} seconds; Api response yet to receive ${finalResponseCount - responseCounter}""")
+      }
       Thread.sleep(5000)
+      currentSleepTime += 5000
+      if (responseStateWhileSleeping < responseCounter) { //new API response received while waiting.
+        currentSleepTime = 0 //resetting the sleep time.
+        responseStateWhileSleeping = responseCounter
+      }
     }
-    if (apiResponseArray.size() > 0) {//In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
-      Helpers.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
+    if (responseCounter != finalResponseCount) { // Checking whether all the api responses has been received or not.
+      logger.log(Level.ERROR,s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
+      throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
+    }
+    if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
+      PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
       apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
-    if (apiErrorArray.size() > 0) {//In case of error array didn't hit the batch-size as a final step we will write it to the persistent storage.
-      Helpers.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
+    if (apiErrorArray.size() > 0) { //In case of error array didn't hit the batch-size as a final step we will write it to the persistent storage.
+      PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
+    logger.log(Level.INFO, " Cluster event landing completed")
   }
 
-  private def processClusterEvents(tmpClusterEventsSuccessPath:String, organizationId: String,erroredBronzeEventsTarget: PipelineTable):DataFrame={
+  private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
       try {
@@ -564,14 +584,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
     landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath, tmpClusterEventsErrorPath)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
-        spark.read.json(tmpClusterEventsErrorPath),
+        spark.read.json(tmpClusterEventsErrorPath)
+          .withColumn("from_ts", toTS(col("from_epoch")))
+          .withColumn("until_ts", toTS(col("until_epoch"))),
         database,
         erroredBronzeEventsTarget,
         pipelineSnapTS,
         organizationId
       )
+      logger.log(Level.INFO,"Persist error completed")
     }
-   val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
+    val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
     clusterEventDf
