@@ -178,25 +178,6 @@ object Helpers extends SparkSessionWrapper {
   }
 
   /**
-   * Write the any given string to given path..
-   *
-   * @param resultJsonArray containing responses from the API call.
-   * @return true encase of successfully write to the temp location.
-   */
-  def writeMicroBatchToTempLocation(path: String, resultJsonArray: String): Boolean = {
-    try {
-      val fileName = java.util.UUID.randomUUID.toString + ".json"
-      dbutils.fs.put(path + "/" + fileName, resultJsonArray, true)
-      logger.log(Level.INFO,"File Successfully written:" + path + "/" + fileName)
-      true
-    } catch {
-      case e: Throwable =>
-        logger.info(Level.ERROR, "Unable to write in " + path + "/", e)
-        false
-    }
-  }
-
-  /**
    * Serializable path expander from wildcard paths. Given an input like /path/to/<asterisk>/wildcards/<asterisk>
    * all paths in that wildcard path will be returned in the array. The key to the performance of this function
    * is ensuring spark is used to serialize it meaning make sure that it's called from the lambda of a Dataset

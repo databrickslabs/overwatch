@@ -1,9 +1,17 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.utils.ApiEnv
-import org.scalatest.BeforeAndAfterAll
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv}
+import org.scalatest.{BeforeAndAfterAll, Ignore, Tag}
 import org.scalatest.funspec.AnyFunSpec
 
+import java.util
+import java.util.Collections
+import java.util.concurrent.Executors
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success}
+
+@Ignore
 class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
 
   var apiEnv: ApiEnv = null
@@ -16,11 +24,14 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
   }
 
   describe("API v2 test ") {
-    it("Consume data from clusters/events API") {
-      val jsonQuery = """{"cluster_id":"0804-220509-stead130","limit":500}"""
+
+    it("Consume data from clusters/events API" )  {
       val endPoint = "clusters/events"
       val t1 = System.nanoTime
-      ApiCallV2(apiEnv, endPoint, jsonQuery).executeMultiThread()
+      val query = Map("cluster_id" -> "0804-220509-stead130",
+        "limit"->"500"
+      )
+      ApiCallV2(apiEnv, endPoint, query).execute()
       val duration = (System.nanoTime - t1) / 1e9d
       print(duration)
     }
@@ -55,6 +66,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       val endPoint = "workspace/list"
       val query = Map("path" -> "/Users"
       )
+      //ApiCallV2(apiEnv, endPoint, query).execute().asDF().show(false)
       assert(ApiCallV2(apiEnv, endPoint, query).execute().asDF() != null)
     }
 
@@ -67,6 +79,16 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       )
       assert(ApiCallV2(apiEnv, endPoint, query).execute().asDF() != null)
     }
+
+    it("Consume data from clusters/resize API") {
+      val endpoint = "clusters/resize"
+      val query = Map(
+        "cluster_id" -> "0511-074343-c456edtd",
+        "num_workers" -> "4"
+      )
+      ApiCallV2(apiEnv, endpoint, query).execute()
+    }
+
 
   }
 
@@ -154,7 +176,82 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       val newAPI = ApiCallV2(apiEnv, endPoint, query).execute().asDF()
       assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
     }
+    it("test multithreading") {
+      val endPoint = "clusters/list"
+      val clusterIDsDf = ApiCallV2(apiEnv, endPoint).execute().asDF().select("cluster_id")
+      clusterIDsDf.show(false)
+      val timeoutThreshold = 300000 // 5 minutes
+      val clusterIDs = clusterIDsDf.collect()
+      val finalResponseCount = clusterIDs.length
+      var responseCounter = 0
+      var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+      var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+      implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
+      val tmpClusterEventsSuccessPath = ""
+      val tmpClusterEventsErrorPath = ""
+
+      for (i <- clusterIDs.indices) {
+       val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i).get(0)}""",
+          "start_time"->"1052775426000",
+          "end_time"->"1655453826000",
+          "limit" -> "500"
+        )
+        println(jsonQuery)
+        val future = Future {
+          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
+          synchronized {
+            apiResponseArray.addAll(apiObj)
+            if (apiResponseArray.size() >= apiEnv.successBatchSize) {
+              PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
+              apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+            }
+          }
+
+        }
+        future.onComplete {
+          case Success(_) =>
+            responseCounter = responseCounter + 1
+
+          case Failure(e) =>
+            if (e.isInstanceOf[ApiCallFailureV2]) {
+              synchronized {
+                apiErrorArray.add(e.getMessage)
+                if (apiErrorArray.size() >= apiEnv.errorBatchSize) {
+                  PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
+                  apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+                }
+              }
+
+            }
+            responseCounter = responseCounter + 1
+            println("Future failure message: " + e.getMessage, e)
+        }
+      }
+      var currentSleepTime = 0;
+      var responseStateWhileSleeping = responseCounter
+      while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
+        //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
+        // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
+        // println("Sleeping for 5 seconds...Total sleep time in millis : "+currentSleepTime+" Response received count : " + responseCounter + ",Expected Response count : " + finalResponseCount)
+        if (currentSleepTime > 120000) //printing the waiting message only if the waiting time is more than 2 minutes
+        {
+          println(s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000} seconds; Api response yet to receive ${finalResponseCount - responseCounter}""")
+        }
+        Thread.sleep(5000)
+        currentSleepTime += 5000
+        if (responseStateWhileSleeping < responseCounter) {//new API response received while waiting
+          currentSleepTime = 0 //resetting the sleep time
+          responseStateWhileSleeping = responseCounter
+        }
+      }
+      if (responseCounter != finalResponseCount) {
+        throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
+      }
+      println("responseStateWhileSleeping "+responseStateWhileSleeping)
+    }
+
   }
 
 
 }
+

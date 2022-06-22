@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.utils.Helpers.logger
 import com.databricks.labs.overwatch.utils._
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -498,6 +499,25 @@ object PipelineFunctions {
       .collect()
       .head
       .getOrElse(0L)
+  }
+
+  /**
+   * Write the any given string to given path..
+   *
+   * @param resultJsonArray containing responses from the API call.
+   * @return true encase of successfully write to the temp location.
+   */
+  private[overwatch] def writeMicroBatchToTempLocation(path: String, resultJsonArray: String): Boolean = {
+    try {
+      val fileName = java.util.UUID.randomUUID.toString + ".json"
+      dbutils.fs.put(path + "/" + fileName, resultJsonArray, true)
+      logger.log(Level.INFO,"File Successfully written:" + path + "/" + fileName)
+      true
+    } catch {
+      case e: Throwable =>
+        logger.info(Level.ERROR, "Unable to write in " + path + "/", e)
+        false
+    }
   }
 
 }

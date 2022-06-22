@@ -1,7 +1,9 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -25,12 +27,13 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQuery(queryJsonString)
   }
 
-  def apply(apiEnv: ApiEnv, apiName: String, queryJsonString: String, tempSuccessPath: String) = {
+  def apply(apiEnv: ApiEnv, apiName: String,  queryMap: Map[String, String], tempSuccessPath: String) = {
     new ApiCallV2(apiEnv)
       .buildApi(apiName)
-      .setQuery(queryJsonString)
+      .setQueryMap(queryMap)
       .setSuccessTempPath(tempSuccessPath)
   }
+
   def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String]) = {
     new ApiCallV2(apiEnv)
       .buildApi(apiName)
@@ -66,7 +69,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private var _apiSuccessCount: Int = 0
   private var _apiFailureCount: Int = 0
   private var _printFinalStatusFlag: Boolean = true
-  private var _queryMap : Map[String, String] =  _
+  private var _queryMap: Map[String, String] = _
 
   protected def apiSuccessCount: Int = _apiSuccessCount
 
@@ -90,6 +93,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   private[overwatch] def setQueryMap(value: Map[String, String]): this.type = {
     _queryMap = value
+    val mapper = new ObjectMapper()
+    mapper.registerModule(DefaultScalaModule)
+    _jsonQuery = mapper.writeValueAsString(value)
     this
   }
 
@@ -196,7 +202,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   }
 
 
-  private def buildSleepDetailMessage(): String = {
+  private def buildDetailMessage(): String = {
     s"""API call Endpoint: ${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}
        |queryString: ${jsonQuery}
        |Server Busy Count:${serverBusyCount}
@@ -218,21 +224,21 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val sleepFactor = 1 + serverBusyCount % 5
       if (serverBusyCount > 5) {
         setTotalSleepTime(totalSleepTime + 10)
-        println(buildSleepDetailMessage() + "Current action: Sleeping for 10 seconds")
-        logger.log(Level.WARN, buildSleepDetailMessage() + "Current action: Sleeping for 10seconds")
+        println(buildDetailMessage() + "Current action: Sleeping for 10 seconds")
+        logger.log(Level.WARN, buildDetailMessage() + "Current action: Sleeping for 10seconds")
         Thread.sleep(10 * 1000) //Sleeping for 10 secs
       }
       else {
         setTotalSleepTime(totalSleepTime + sleepFactor)
-        println(buildSleepDetailMessage() + "Current action: Sleeping for " + sleepFactor + " seconds")
-        logger.log(Level.WARN, buildSleepDetailMessage() + "Current action: Sleeping for " + sleepFactor + " seconds")
+        println(buildDetailMessage() + "Current action: Sleeping for " + sleepFactor + " seconds")
+        logger.log(Level.WARN, buildDetailMessage() + "Current action: Sleeping for " + sleepFactor + " seconds")
         Thread.sleep(sleepFactor * 1000)
       }
 
     } else {
       println("Too many request 429 error, Total waiting time " + totalSleepTime)
-      logger.log(Level.ERROR, buildSleepDetailMessage() + "Current action: Shutting Down...")
-      throw new ApiCallFailure(response, buildSleepDetailMessage() + "Current action: Shutting Down...", debugFlag = false)
+      logger.log(Level.ERROR, buildDetailMessage() + "Current action: Shutting Down...")
+      throw new ApiCallFailure(response, buildDetailMessage() + "Current action: Shutting Down...", debugFlag = false)
 
     }
 
@@ -363,9 +369,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
       case "GET" =>
         response = try {
-          Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")//.params(JsonUtils.jsonToMap(jsonQuery).mapValues(_.toString).toSeq)
-            .params(queryMap.toSeq)
-            .param(_jsonKey,_jsonValue)
+          Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
+            .params(queryMap)
+            .param(_jsonKey, _jsonValue)
             .copy(headers = httpHeaders)
             .options(reqOptions)
             .asString
@@ -446,6 +452,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       apiResultDF = spark.read.json(successTempPath)
 
     }
+    if (apiResultDF.columns.length == 0) {
+      val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
+        s"Details Below:\n$buildGenericErrorMessage"
+      throw new ApiCallEmptyResponse(errMsg, true)
+    }
     extrapolateSupportedStructure(apiResultDF)
   }
 
@@ -457,7 +468,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
-          val responseFlag = Helpers.writeMicroBatchToTempLocation(successTempPath, _apiResponseArray.toString)
+          val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath, _apiResponseArray.toString)
           if (responseFlag) { //Clearing the resultArray in-case of successful write
             setApiResponseArray(new util.ArrayList[String]())
           }
@@ -465,8 +476,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       }
       paginate(response.body)
       if (_printFinalStatusFlag) {
-        println(buildSleepDetailMessage())
-        logger.log(Level.INFO, buildSleepDetailMessage())
+        logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
       _apiResponseArray
@@ -503,13 +513,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   def execute(): this.type = {
     try {
       val response = getResponse
-      println(response.body)
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
       paginate(response.body)
       if (_printFinalStatusFlag) {
-        println(buildSleepDetailMessage())
-        logger.log(Level.INFO, buildSleepDetailMessage())
+        logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
       this
