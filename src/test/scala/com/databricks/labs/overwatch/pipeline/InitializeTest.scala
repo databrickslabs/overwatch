@@ -7,9 +7,9 @@ import org.scalatest.PrivateMethodTester
 import com.databricks.labs.overwatch.utils.{BadConfigException, Config, OverwatchScope}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.OverwatchScope._
-
+import com.fasterxml.jackson.core.io.JsonEOFException
+import com.fasterxml.jackson.core.JsonParseException
 class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with PrivateMethodTester {
-
   describe("Tests for Initializer.isPVC") {
     it("should validate isPVC as false when org id if doesn't have ilb") {
       val conf = new Config
@@ -181,6 +181,55 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       assert(conf.databaseName == "overwatch_etl_test")
     }
 
+    it("validateAndRegisterArgs function should fail when a parameter is missing") {
+      val incomplete = "{\"auditLogConfig\":{\"rawAuditPath\":\"/mnt/logs/test/audit_delivery\"}," +
+        "\"dataTarget\":{" +
+        "\"databaseLocation\":\"dbfs:/mnt/overwatch_global/consume/overwatch_etl.db\",\"consumerDatabaseName\":\"overwatch\"" +
+        ",\"consumerDatabaseLocation\":\"dbfs:/mnt/overwatch_global/consume/overwatch.db\"}," +
+        "\"badRecordsPath\":\"/mnt/overwatch/workspace-1029/sparkEventsBadrecords\",\"overwatchScope\":[\"all\"]," +
+        "\"maxDaysToLoad\":60,\"databricksContractPrices\":{\"interactiveDBUCostUSD\":0.56,\"automatedDBUCostUSD\":0.26}}"
+
+      val conf = new Config
+      conf.setOrganizationId("dummyorgifid")
+      val init = new Initializer(conf)
+      val validateAndRegisterArgs = PrivateMethod[Initializer]('validateAndRegisterArgs)
+
+      assertThrows[NoSuchElementException](init invokePrivate validateAndRegisterArgs(incomplete))
+    }
+
+    it("validateAndRegisterArgs function should through exception when the json is malfunctioned ") {
+      val incomplete = "{\"auditLogConfig\":{\"rawAuditPath\":\"/mnt/logs/test/audit_delivery\"," +
+        "\"tokenSecret\":{\"scope\":\"overwatch\",\"key\":\"1212\"},\"dataTarget\":{\"databaseName\":\"overwatch_etl_test\"," +
+        "\"databaseLocation\":\"dbfs:/mnt/overwatch_global/consume/overwatch_etl.db\",\"consumerDatabaseName\":\"overwatch\"" +
+        ",\"consumerDatabaseLocation\":\"dbfs:/mnt/overwatch_global/consume/overwatch.db\"}," +
+        "\"badRecordsPath\":\"/mnt/overwatch/workspace-1029/sparkEventsBadrecords\",\"overwatchScope\":[\"all\"]," +
+        "\"maxDaysToLoad\":60,\"databricksContractPrices\":{\"interactiveDBUCostUSD\":0.56,\"automatedDBUCostUSD\":0.26}," +
+        "\"primordialDateString\":\"2021-01-16\""
+
+      val conf = new Config
+      conf.setOrganizationId("dummyorgifid")
+      val init = new Initializer(conf)
+      val validateAndRegisterArgs = PrivateMethod[Initializer]('validateAndRegisterArgs)
+
+      assertThrows[JsonEOFException](init invokePrivate validateAndRegisterArgs(incomplete))
+    }
+
+    it("validateAndRegisterArgs function should fail if json is non escaped") {
+      val incomplete = "{'auditLogConfig':{'rawAuditPath':'/mnt/logs/test/audit_delivery'}," +
+        "'tokenSecret':{'scope':'overwatch','key':'1212'},'dataTarget':{'databaseName':'overwatch_etl_test'," +
+        "'databaseLocation':'dbfs:/mnt/overwatch_global/consume/overwatch_etl.db,consumerDatabaseName:overwatch'" +
+        ",'consumerDatabaseLocation':'dbfs:/mnt/overwatch_global/consume/overwatch.db'}," +
+        "'badRecordsPath':'/mnt/overwatch/workspace-1029/sparkEventsBadrecords','overwatchScope':['all']," +
+        "'maxDaysToLoad':60,'databricksContractPrices':{'interactiveDBUCostUSD':0.56,'automatedDBUCostUSD':0.26}," +
+        "'primordialDateString':'2021-01-16'}"
+      val conf = new Config
+      conf.setOrganizationId("dummyorgifid")
+      val init = new Initializer(conf)
+      val validateAndRegisterArgs = PrivateMethod[Initializer]('validateAndRegisterArgs)
+
+      assertThrows[JsonParseException](init invokePrivate validateAndRegisterArgs(incomplete))
+    }
+
   }
 
   describe("Tests for dataTargetIsValid function") {
@@ -221,13 +270,29 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val validateScope = PrivateMethod[Seq[OverwatchScope.OverwatchScope]]('validateScope)
       assertThrows[IllegalArgumentException](init invokePrivate validateScope(Seq("jobs", "clusterEvents", "sparkEvents")))
     }
+
     it("validateScope function should return all scopes on validation") {
-      import spark.implicits._
       val conf = new Config
       val init = new Initializer(conf)
       val validateScope = PrivateMethod[Seq[OverwatchScope.OverwatchScope]]('validateScope)
       val expectedScopeList = init invokePrivate validateScope(Seq("audit", "notebooks", "accounts", "pools", "clusters", "clusterEvents", "sparkEvents", "jobs"))
       val actualScopeList = Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
+      assert(expectedScopeList == actualScopeList)
+    }
+    it("validateScope function should not be case sensitive") {
+      val conf = new Config
+      val init = new Initializer(conf)
+      val validateScope = PrivateMethod[Seq[OverwatchScope.OverwatchScope]]('validateScope)
+      val expectedScopeList = init invokePrivate validateScope(Seq("Audit", "notebooks", "accounts", "pools", "CLUSTERS", "clusterEvents", "sparkEvents", "jobs"))
+      val actualScopeList = Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
+      assert(expectedScopeList == actualScopeList)
+    }
+    it("validateScope function should work irrespective of order of scope") {
+      val conf = new Config
+      val init = new Initializer(conf)
+      val validateScope = PrivateMethod[Seq[OverwatchScope.OverwatchScope]]('validateScope)
+      val expectedScopeList = init invokePrivate validateScope(Seq("CLUSTERS", "clusterEvents", "sparkEvents", "jobs", "Audit", "notebooks", "accounts", "pools"))
+      val actualScopeList = Seq(clusters, clusterEvents, sparkEvents, jobs, audit, notebooks, accounts, pools)
       assert(expectedScopeList == actualScopeList)
     }
   }
