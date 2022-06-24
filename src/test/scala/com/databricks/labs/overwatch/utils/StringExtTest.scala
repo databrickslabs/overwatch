@@ -1,10 +1,9 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.utils.StringExt.StringHelpers
 import org.scalatest.funspec.AnyFunSpec
 
-class StringExtTest extends AnyFunSpec with SparkSessionTestWrapper {
+class StringExtTest extends AnyFunSpec {
 
   describe("StringHelpers Test") {
     it("Simple String Test No Special Characters") {
@@ -28,11 +27,11 @@ class StringExtTest extends AnyFunSpec with SparkSessionTestWrapper {
     }
 
     it("String with white % characters") {
-      assert(!"""Business %Name""".containsNoSpecialChars)
+      assert("""Business %Name""".containsNoSpecialChars)
     }
 
     it("String with white $ characters") {
-      assert(!"""Business $Name""".containsNoSpecialChars)
+      assert("""Business $Name""".containsNoSpecialChars)
     }
   }
 }
