@@ -1,9 +1,9 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
-import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
+import com.databricks.labs.overwatch.utils._
+import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -12,7 +12,6 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
@@ -21,8 +20,8 @@ import java.util
 import java.util.Collections
 import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 
@@ -583,7 +582,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath, tmpClusterEventsErrorPath)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
-        spark.read.json(tmpClusterEventsErrorPath),
+        spark.read.json(tmpClusterEventsErrorPath)
+          .withColumn("from_ts", toTS(col("from_epoch")))
+          .withColumn("until_ts", toTS(col("until_epoch"))),
         database,
         erroredBronzeEventsTarget,
         pipelineSnapTS,
