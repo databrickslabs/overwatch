@@ -110,7 +110,7 @@ object SchemaTools extends SparkSessionWrapper {
    */
   def cullNestedColumns(df: DataFrame, structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
     //Exception Block
-    if (nestedFieldsToCull.filter(_.contains(".")).size != 0) {
+    if (nestedFieldsToCull.exists(_.contains("."))) {
       throw new BadSchemaException("Recursive culling of nested columns is not yet supported (nestedFieldsToCull)")
     }
     if (!structToModify.containsNoSpecialChars) {
