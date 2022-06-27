@@ -113,11 +113,21 @@ object TransformFunctions {
         (df, df2.suffixDFCols(rightSuffix, allJoinCols, caseSensitive = true))
       } else (df.suffixDFCols(leftSuffix, allJoinCols, caseSensitive = true), df2)
 
-      val baseJoinCondition = usingColumns.map(k => s"$k = ${k}${rightSuffix}").mkString(" AND ")
-      val joinConditionWLag = if (laggingSide == "left") {
+      val baseJoinCondition = if (joinType == "left" || joinType == "inner"){
+        usingColumns.map(k => s"$k = ${k}${rightSuffix}").mkString(" AND ")
+      } else usingColumns.map(k => s"$k = ${k}${leftSuffix}").mkString(" AND ")
+
+      val joinConditionWLag = if (joinType == "left" || joinType == "inner") {
+        if (laggingSide == "left") {
         expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${rightSuffix}, $lagDays)")
       } else {
         expr(s"$baseJoinCondition AND ${lagDateColumnName}${rightSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
+      }} else {
+        if (laggingSide == "left") {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName}${leftSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
+        } else {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${leftSuffix}, $lagDays)")
+        }
       }
 
       logger.log(Level.INFO, s"LagJoin Condition: $joinConditionWLag")
