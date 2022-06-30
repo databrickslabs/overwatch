@@ -124,6 +124,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.policiesSnapshotTarget)
   )
 
+  lazy private[overwatch] val instanceProfileSnapshotModule = Module(1009, "Bronze_Instance_Profile_Snapshot", this)
+  lazy private val appendInstanceProfileProcess = ETLDefinition(
+    workspace.getProfilesDF,
+    append(BronzeTargets.instanceProfileSnapshotTarget)
+  )
+
   lazy private[overwatch] val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
   lazy private val appendAuditLogsProcess = ETLDefinition(
     getAuditLogsDF(
@@ -217,6 +223,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         clustersSnapshotModule.execute(appendClustersAPIProcess)
         libsSnapshotModule.execute(appendLibsProcess)
         policiesSnapshotModule.execute(appendPoliciesProcess)
+        instanceProfileSnapshotModule.execute(appendInstanceProfileProcess)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
