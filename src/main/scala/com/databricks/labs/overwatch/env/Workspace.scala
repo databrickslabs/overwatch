@@ -141,6 +141,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
+  def getTokens: DataFrame = {
+    val tokenEndpoint = "token/list"
+    ApiCall(tokenEndpoint, config.apiEnv, debugFlag = config.debugFlag)
+      .executeGet()
+      .asDF
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
   private def clusterState(apiEnv: ApiEnv): String = {
     val endpoint = "clusters/get"
     val query = Map(
