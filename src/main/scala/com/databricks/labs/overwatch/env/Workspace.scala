@@ -157,6 +157,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
+  def getGlobalInitScripts: DataFrame = {
+    val globalInitScEndpoint = "global-init-scripts"
+    ApiCall(globalInitScEndpoint, config.apiEnv, debugFlag = config.debugFlag)
+      .executeGet()
+      .asDF
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
   private def clusterState(apiEnv: ApiEnv): String = {
     val endpoint = "clusters/get"
     val query = Map(
