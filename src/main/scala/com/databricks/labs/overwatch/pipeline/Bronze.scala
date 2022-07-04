@@ -223,7 +223,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         clustersSnapshotModule.execute(appendClustersAPIProcess)
         libsSnapshotModule.execute(appendLibsProcess)
         policiesSnapshotModule.execute(appendPoliciesProcess)
+        if (config.cloudProvider== "aws") {
         instanceProfileSnapshotModule.execute(appendInstanceProfileProcess)
+        }
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
