@@ -128,6 +128,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendInstanceProfileProcess = ETLDefinition(
     workspace.getProfilesDF,
     append(BronzeTargets.instanceProfileSnapshotTarget)
+  )
 
   lazy private[overwatch] val tokenSnapshotModule = Module(1009, "Bronze_Token_Snapshot", this)
   lazy private val appendTokenProcess = ETLDefinition(
