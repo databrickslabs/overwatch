@@ -550,7 +550,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
     val mapper = new ObjectMapper()
     val jsonObject = mapper.readTree(jsonQuery);
-    val clusterId = jsonObject.get("cluster_id").toString
+    val clusterId = jsonObject.get("cluster_id").toString.replace("\"","")
     val start_time = jsonObject.get("start_time").asLong()
     val end_time = jsonObject.get("end_time").asLong()
     val errorObj = mapper.readTree(e.getMessage);
@@ -558,7 +558,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     newJsonObject.put("cluster_id",clusterId)
     newJsonObject.put("from_epoch",start_time)
     newJsonObject.put("until_epoch",end_time)
-    newJsonObject.put("error",errorObj.get("error_code").toString +" "+ errorObj.get("message").toString)
+    newJsonObject.put("error",errorObj.get("error_code").toString.replace("\"","") +" "+ errorObj.get("message").toString.replace("\"",""))
     newJsonObject.toString
   }
 

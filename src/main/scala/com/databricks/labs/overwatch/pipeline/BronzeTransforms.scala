@@ -1,5 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.BatchRunner.spark
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
@@ -449,6 +451,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
+    spark.conf.set("spark.databricks.delta.formatCheck.enabled", false)
     //TODO identify the best practice to implement the future.
     for (i <- clusterIDs.indices) {
      val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
@@ -480,10 +483,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
                 apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
               }
             }
-
+            logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
           }
           responseCounter = responseCounter + 1
-          logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
       }
     }
     val timeoutThreshold = 300000 // 5 minutes
@@ -515,6 +517,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
+    logger.log(Level.INFO, " Cluster event landing completed")
   }
 
   private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
@@ -590,6 +593,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         pipelineSnapTS,
         organizationId
       )
+      logger.log(Level.INFO,"Persist error completed")
     }
     val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
     val processingEndTime = System.currentTimeMillis();
