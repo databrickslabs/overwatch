@@ -131,7 +131,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getJobRunsDF: DataFrame = {
     val jobsRunsEndpoint = "jobs/runs/list"
-    ApiCallV2(config.apiEnv,jobsRunsEndpoint)
+    val jsonQuery = """{"expand_tasks":true}"""
+    ApiCallV2(config.apiEnv,jobsRunsEndpoint, jsonQuery)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
