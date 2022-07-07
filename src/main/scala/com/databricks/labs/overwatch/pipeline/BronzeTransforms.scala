@@ -451,7 +451,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
-    spark.conf.set("spark.databricks.delta.formatCheck.enabled", false)
     //TODO identify the best practice to implement the future.
     for (i <- clusterIDs.indices) {
      val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
