@@ -440,12 +440,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  private def landClusterEvents(clusterIDs:Array[String],
+  private def landClusterEvents(clusterIDs: Array[String],
                                 startTime: TimeTypes,
                                 endTime: TimeTypes,
                                 apiEnv: ApiEnv,
-                                tmpClusterEventsSuccessPath:String,
-                                tmpClusterEventsErrorPath:String)={
+                                tmpClusterEventsSuccessPath: String,
+                                tmpClusterEventsErrorPath: String) = {
     val finalResponseCount = clusterIDs.length
     var responseCounter = 0
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
@@ -453,9 +453,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
     //TODO identify the best practice to implement the future.
     for (i <- clusterIDs.indices) {
-     val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
-        "start_time"->s"""${startTime.asUnixTimeMilli}""",
-        "end_time"->s"""${endTime.asUnixTimeMilli}""",
+      val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
+        "start_time" -> s"""${startTime.asUnixTimeMilli}""",
+        "end_time" -> s"""${endTime.asUnixTimeMilli}""",
         "limit" -> "500"
       )
       val future = Future {
@@ -505,7 +505,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     }
     if (responseCounter != finalResponseCount) { // Checking whether all the api responses has been received or not.
-      logger.log(Level.ERROR,s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
+      logger.log(Level.ERROR, s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
       throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
     }
     if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
@@ -522,32 +522,39 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
-      try {
-        val tdf = SchemaScrubber.scrubSchema(
-          spark.read.json(tmpClusterEventsSuccessPath)
-            .select(explode('events).alias("events"))
-            .select(col("events.*"))
-        )
-        val changeInventory = Map[String, Column](
-          "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
-          "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
-          "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
-          "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
-          "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
-          "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
-        )
+      if (spark.read.json(tmpClusterEventsSuccessPath).columns.contains("events")) {
+        try {
+          val tdf = SchemaScrubber.scrubSchema(
+            spark.read.json(tmpClusterEventsSuccessPath)
+              .select(explode('events).alias("events"))
+              .select(col("events.*"))
+          )
+          val changeInventory = Map[String, Column](
+            "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
+            "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
+            "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
+            "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
+            "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
+            "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
+          )
 
-        val clusterEventsDF = SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
-          .withColumn("organization_id", lit(organizationId))
+          val clusterEventsDF = SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+            .withColumn("organization_id", lit(organizationId))
 
-        val clusterEventsCaptured = clusterEventsDF.count
-        val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
-        logger.log(Level.INFO, logEventsMSG)
-        clusterEventsDF
+          val clusterEventsCaptured = clusterEventsDF.count
+          val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
+          logger.log(Level.INFO, logEventsMSG)
+          clusterEventsDF
 
-      } catch {
-        case e: Throwable =>
-          throw new Exception(e)
+        } catch {
+          case e: Throwable =>
+            throw new Exception(e)
+        }
+      }
+      else {
+        logger.info("Events column not found in dataset")
+        throw new NoNewDataException(s"EMPTY: No New Cluster Events.Events column not found in dataset, Progressing module but it's recommended you " +
+          s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
       }
     } else {
       logger.info("EMPTY MODULE: Cluster Events")
@@ -592,7 +599,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         pipelineSnapTS,
         organizationId
       )
-      logger.log(Level.INFO,"Persist error completed")
+      logger.log(Level.INFO, "Persist error completed")
     }
     val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
     val processingEndTime = System.currentTimeMillis();
