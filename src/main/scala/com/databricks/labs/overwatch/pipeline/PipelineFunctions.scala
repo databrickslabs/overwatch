@@ -151,6 +151,42 @@ object PipelineFunctions {
       .alias(defaultAlias)
   }
 
+  def optimizeDFForWrite(
+                        df: DataFrame,
+                        target: PipelineTable
+                        ): DataFrame = {
+
+    var mutationDF = df
+
+    mutationDF = if (target.zOrderBy.nonEmpty) {
+      mutationDF.moveColumnsToFront(target.zOrderBy ++ target.statsColumns)
+    } else mutationDF
+
+    /**
+     * repartition partitioned tables that are not auto-optimized into the range partitions for writing
+     * without this the file counts of partitioned tables will be extremely high
+     * also generate noise to prevent skewed partition writes into extremely low cardinality
+     * organization_ids/dates per run -- usually 1:1
+     * noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
+     */
+
+    if (target.partitionBy.nonEmpty) {
+      if (target.partitionBy.contains("__overwatch_ctrl_noise") && !target.autoOptimize) {
+        logger.log(Level.INFO, s"${target.tableFullName}: generating partition noise")
+        mutationDF = mutationDF.withColumn("__overwatch_ctrl_noise", (rand() * lit(32)).cast("int"))
+      }
+
+      if (!target.autoOptimize) {
+        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into" +
+          s" output partitions defined as ${target.partitionBy.mkString(", ")}")
+        mutationDF = mutationDF.repartition(target.partitionBy map col: _*)
+      }
+    }
+
+    mutationDF
+
+  }
+
 //  def optimizeWritePartitions(
 //                               df: DataFrame,
 //                               target: PipelineTable,

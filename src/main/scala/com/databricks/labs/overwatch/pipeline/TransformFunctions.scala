@@ -24,29 +24,28 @@ object TransformFunctions {
     }
 
     /**
-     *
-     * Warning Does not remove null structs, arrays, etc.
-     *
-     * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
-     * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
-     * disregards structs
-     *
-     * Another helpful user function not utilized in the code base.
-     *
+     * drops columns that contain only nulls
      * @param df dataframe to more data
      * @return
      *
      */
     def cullNull(): DataFrame = {
-      val cntsDF = df.summary("count").drop("summary")
+      val dfSchema = df.schema
+      // df.summary doesn't display summaries for all data types, so the types that aren't displayed need to be
+      // converted to a string to be analyzed by df.summary
+      val summarySelects = dfSchema.map(f => {
+        f.dataType.typeName match {
+          case "struct" | "array" | "map" => to_json(col(f.name)).alias(f.name)
+          case "date" | "timestamp" | "boolean" => col(f.name).cast("string").alias(f.name)
+          case _ => col(f.name).alias(f.name)
+        }
+      })
+
+      val cntsDF = df.select(summarySelects: _*).summary("count").drop("summary")
       val nonNullCols = cntsDF.collect()
         .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
         .map(col)
-      val complexTypeFields = df.schema.fields
-        .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType]  || f.dataType.isInstanceOf[MapType])
-        .map(_.name).map(col)
-      val columns = nonNullCols ++ complexTypeFields
-      df.select(columns: _*)
+      df.select(nonNullCols: _*)
     }
 
     def suffixDFCols(

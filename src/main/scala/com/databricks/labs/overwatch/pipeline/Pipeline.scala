@@ -400,29 +400,18 @@ class Pipeline(
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
 
-    //      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
-    //        s"Module ${module.moduleName} has a defined state but the target to which it writes is missing.", Some(target))
-
-    val localSafeTotalCores = if (config.isLocalTesting) spark.conf.getOption("spark.sql.shuffle.partitions").getOrElse("200").toInt
-    else getTotalCores
-//    val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, localSafeTotalCores)
+    val finalDF = PipelineFunctions.optimizeDFForWrite(df, target)
 
     val startLogMsg = s"Beginning append to ${target.tableFullName}"
     logger.log(Level.INFO, startLogMsg)
 
     // Append the output -- don't apply spark overrides, applied at top of function
-    if (!readOnly) database.write(df, target, pipelineSnapTime.asColumnTS)
+    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
       println(readOnlyMsg)
       logger.log(Level.WARN, readOnlyMsg)
     }
-
-    // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
-    // of attempting to re-read the very inefficient json.gz files.
-//    val dfCount = if (target.name == "spark_events_bronze") {
-//      target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
-//    } else finalDF.count()
 
     val writeOpsMetrics = PipelineFunctions.getTargetWriteMetrics(spark, target, pipelineSnapTime, config.runID)
 
