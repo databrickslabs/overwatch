@@ -69,6 +69,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
+
   }
 
   /**
