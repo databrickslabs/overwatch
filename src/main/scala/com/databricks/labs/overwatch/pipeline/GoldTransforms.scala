@@ -663,8 +663,6 @@ trait GoldTransforms extends SparkSessionWrapper {
     val isolationIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBIsolationID")
     val replIDW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.SparkDBREPLID")
       .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    val notebookW = Window.partitionBy('organization_id, 'SparkContextID, $"PowerProperties.NotebookID")
-      .orderBy('startTimestamp).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     val cloudSpecificUserImputations = if (cloudProvider == "azure") {
       df.withColumn("user_email", $"PowerProperties.UserEmail")
@@ -688,9 +686,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("user_email",
         when('user_email.isNull,
           last('user_email, ignoreNulls = true).over(replIDW)).otherwise('user_email))
-      .withColumn("user_email",
-        when('user_email.isNull,
-          last('user_email, ignoreNulls = true).over(notebookW)).otherwise('user_email))
 
     val sparkJobCols: Array[Column] = Array(
       'organization_id,
