@@ -3,8 +3,8 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
-import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Pipeline, PipelineFunctions, PipelineTable, Silver}
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -46,6 +46,28 @@ object JsonUtils {
         .setInclude(Value.construct(Include.NON_EMPTY, Include.NON_EMPTY))
     }
     obj
+  }
+
+  /**
+   * Extracts the key and value from Json String.This function only extracts the key and value if jsonString contains only one key and value.
+   * If the Json contains more then one key and value then this function will return the first pair of key and value.
+   * @param jsonString
+   * @return
+   */
+  private[overwatch] def getJsonKeyValue(jsonString: String): (String, String) = {
+    try {
+      val mapper = new ObjectMapper()
+      val actualObj = mapper.readTree(jsonString);
+      val key = actualObj.fields().next().getKey
+      val value = actualObj.fields().next().getValue.asText()
+      (key, value)
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"ERROR: Could not extract key and value from json. \nJSON: $jsonString", e)
+        throw e
+      }
+    }
+
   }
 
   private[overwatch] lazy val defaultObjectMapper: ObjectMapper =
@@ -506,6 +528,7 @@ object Helpers extends SparkSessionWrapper {
    * Requires that the ETLDB exists and has had successful previous runs
    * As of 0.6.0.4
    * Cannot derive schemas < 0.6.0.3
+   *
    * @param etlDB Overwatch ETL database
    * @return
    */
@@ -553,9 +576,10 @@ object Helpers extends SparkSessionWrapper {
    * as it's defined in the remote workspace.
    * Lastly, Pipelines that are build from this workspace instance cannot be run as all pipelines built from
    * this workspace will be set to read only since validations have not been executed.
+   *
    * @param pipelineReportPath path to remote "pipeline_report" table. Usually some_prefix/global_share/pipeline_report
-   * @param workspaceID A single organization_id that has been run and successfully completed and reported data
-   *                    to this pipeline_report output
+   * @param workspaceID        A single organization_id that has been run and successfully completed and reported data
+   *                           to this pipeline_report output
    * @return
    */
   def getRemoteWorkspaceByPath(pipelineReportPath: String, workspaceID: String): Workspace = {
@@ -590,6 +614,7 @@ object Helpers extends SparkSessionWrapper {
    * to run Overwatch on the local workspace.
    * Get the remote workspace using 'getRemoteWorkspaceByPath' function, build a localDataTarget to define the local
    * etl and consumer database details
+   *
    * @param remoteWorkspace remote workspace can be retrieved through getRemoteWorkspaceByPath
    * @param localDataTarget DataTarget defined for local database names and locations
    *                        the etlStoragePrefix must point to the existing Overwatch dataset whether it's mounted
@@ -618,7 +643,7 @@ object Helpers extends SparkSessionWrapper {
                                  workspace: Workspace,
                                  targetName: String,
                                  rollbackToEpochMS: Long,
-                                dryRun: Boolean = true
+                                 dryRun: Boolean = true
                                ): Unit = {
     val deleteLogger = Logger.getLogger("ROLLBACK Logger")
     val config = workspace.getConfig
@@ -652,10 +677,10 @@ object Helpers extends SparkSessionWrapper {
   }
 
   def rollbackPipelineStateToTimestamp(
-                                      workspace: Workspace,
-                                      fromEpochMS: Long,
-                                      moduleId: Int,
-                                      customRollbackStatus: String = "ROLLED BACK"
+                                        workspace: Workspace,
+                                        fromEpochMS: Long,
+                                        moduleId: Int,
+                                        customRollbackStatus: String = "ROLLED BACK"
                                       ): Unit = {
     val rollbackLogger = Logger.getLogger("Overwatch_State: ROLLBACK Logger")
     val config = workspace.getConfig

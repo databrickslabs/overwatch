@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.ApiCall
+import com.databricks.labs.overwatch.{ApiCallV2}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -53,12 +53,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   def getJobsDF: DataFrame = {
 
     val jobsEndpoint = "jobs/list"
-
-    ApiCall(jobsEndpoint, config.apiEnv, debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
+    ApiCallV2(config.apiEnv,jobsEndpoint)
+      .execute()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
-
   }
 
   /**
@@ -71,9 +69,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   def getClustersDF: DataFrame = {
     val clustersEndpoint = "clusters/list"
-    ApiCall(clustersEndpoint, config.apiEnv, debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
+    ApiCallV2(config.apiEnv,clustersEndpoint)
+      .execute()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -85,13 +83,12 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getDBFSPaths(dbfsPath: String): DataFrame = {
     val dbfsEndpoint = "dbfs/list"
-    val queryMap = Map[String, Any](
-      "path" -> dbfsPath
-    )
-    ApiCall(dbfsEndpoint, config.apiEnv, Some(queryMap), debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
+    val jsonQuery = s"""{"path":"${dbfsPath}"}"""
+    ApiCallV2(config.apiEnv,dbfsEndpoint,jsonQuery)
+      .execute()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
+
   }
 
   /**
@@ -101,9 +98,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getPoolsDF: DataFrame = {
     val poolsEndpoint = "instance-pools/list"
-    ApiCall(poolsEndpoint, config.apiEnv, debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
+    ApiCallV2(config.apiEnv,poolsEndpoint)
+      .execute()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -114,10 +111,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getProfilesDF: DataFrame = {
     val profilesEndpoint = "instance-profiles/list"
-    ApiCall(profilesEndpoint, config.apiEnv, debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
-      .withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv,profilesEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
+
   }
 
   /**
@@ -127,39 +122,16 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getWorkspaceUsersDF: DataFrame = {
     val workspaceEndpoint = "workspace/list"
-    ApiCall(workspaceEndpoint, config.apiEnv, Some(Map("path" -> "/Users")), debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
-      .withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv,workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
-  private def clusterState(apiEnv: ApiEnv): String = {
-    val endpoint = "clusters/get"
-    val query = Map(
-      "cluster_id" -> overwatchRunClusterId
-    )
-    try {
-      val stateJsonString = ApiCall(endpoint, apiEnv, Some(query)).executeGet().asStrings.head
-      JsonUtils.defaultObjectMapper.readTree(stateJsonString).get("state").asText()
-    } catch {
-      case e: Throwable => {
-        val msg = s"Cluster State Error: Cannot determine state of cluster: $overwatchRunClusterId\n$e"
-        logger.log(Level.ERROR, msg, e)
-        if(config.debugFlag) println(msg)
-        "ERROR"
-      }
-    }
-  }
+
 
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {
     val endpoint = "clusters/resize"
-    val query = Map(
-      "cluster_id" -> overwatchRunClusterId,
-      "num_workers" -> numWorkers
-    )
-
+    val jsonQuery = s"""{"cluster_id":"${overwatchRunClusterId}","num_workers":${numWorkers}}"""
     try {
-      ApiCall(endpoint, apiEnv, Some(query), paginate = false, debugFlag = config.debugFlag).executePost()
+      ApiCallV2(apiEnv,endpoint,jsonQuery).execute()
     } catch {
       case e: ApiCallFailure if e.httpResponse.code == 400 &&
         e.httpResponse.body.contains("cannot transition from Reconfiguring to Reconfiguring") =>

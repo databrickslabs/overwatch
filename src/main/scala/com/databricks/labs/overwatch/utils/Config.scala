@@ -47,6 +47,7 @@ class Config() {
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
   /**
    * BEGIN GETTERS
    * The next section is getters that provide access to local configuration variables. Only adding details where
@@ -102,8 +103,11 @@ class Config() {
   def runID: String = _runID
 
   def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
+
   def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
+
   def contractSQLComputeDBUPrice: Double = _contractSQLComputeDBUPrice
+
   def contractJobsLightDBUPrice: Double = _contractJobsLightDBUPrice
 
   def primordialDateString: Option[String] = _primordialDateString
@@ -129,7 +133,7 @@ class Config() {
     Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
   }
 
-  def  overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
+  def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
     val manualOverrides = Map(
@@ -197,6 +201,7 @@ class Config() {
     this
   }
 
+
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
     this
@@ -215,6 +220,7 @@ class Config() {
   /**
    * Set the Overwatch Scope in the correct order as per the ordered Seq. This is important for processing the
    * modules in the correct order inside the pipeline
+   *
    * @param value
    * @return
    */
@@ -254,7 +260,7 @@ class Config() {
     this
   }
 
-  private [overwatch] def setIntelligentScaling(value: IntelligentScaling): this.type = {
+  private[overwatch] def setIntelligentScaling(value: IntelligentScaling): this.type = {
     _intelligentScaling = value
     this
   }
@@ -356,7 +362,7 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, 200, 500, runID, false, 4))
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
