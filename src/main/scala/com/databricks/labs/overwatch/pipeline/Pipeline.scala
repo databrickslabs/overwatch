@@ -397,16 +397,25 @@ class Pipeline(
     else false
   }
 
+  private def getMaxMergeScanDates(fromTime: TimeTypes, untilTime: TimeTypes, maxMergeScanDays: Int): Array[String] = {
+    val startDate = fromTime.asLocalDateTime.minusDays(maxMergeScanDays)
+    Helpers.getDatesGlob(startDate.toLocalDate, untilTime.asLocalDateTime.plusDays(1).toLocalDate)
+  }
+
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
 
     val finalDF = PipelineFunctions.optimizeDFForWrite(df, target)
 
+    val maxMergeScanDates = if (target.writeMode == WriteMode.merge) {
+      getMaxMergeScanDates(module.fromTime, module.untilTime, target.maxMergeScanDates)
+    } else Array[String]()
+
     val startLogMsg = s"Beginning append to ${target.tableFullName}"
     logger.log(Level.INFO, startLogMsg)
 
     // Append the output -- don't apply spark overrides, applied at top of function
-    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
+    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS, maxMergeScanDates)
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
       println(readOnlyMsg)

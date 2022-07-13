@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -12,7 +13,6 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
@@ -333,7 +333,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val datesGlob = if (fromDT == untilDT) {
         Array(s"${auditLogConfig.rawAuditPath.get}/date=${fromDT.toString}")
       } else {
-        datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
+        getDatesGlob(fromDT, untilDT)
           .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
           .filter(Helpers.pathExists)
       }
