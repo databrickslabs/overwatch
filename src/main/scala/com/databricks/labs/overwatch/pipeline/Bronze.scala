@@ -136,6 +136,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.tokenSnapshotTarget)
   )
 
+  lazy private[overwatch] val globalInitScSnapshotModule = Module(1011, "Bronze_Global_Init_Scripts_Snapshot", this)
+  lazy private val appendGlobalInitScProcess = ETLDefinition(
+    workspace.getGlobalInitScripts,
+    append(BronzeTargets.globalInitScSnapshotTarget)
+  )
+
   lazy private[overwatch] val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
   lazy private val appendAuditLogsProcess = ETLDefinition(
     getAuditLogsDF(
@@ -236,7 +242,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
-      case OverwatchScope.accounts => tokenSnapshotModule.execute(appendTokenProcess)
+      case OverwatchScope.accounts =>
+        tokenSnapshotModule.execute(appendTokenProcess)
+        globalInitScSnapshotModule.execute(appendGlobalInitScProcess)
       case _ =>
     }
   }
