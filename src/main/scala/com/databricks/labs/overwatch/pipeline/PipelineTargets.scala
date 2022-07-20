@@ -196,6 +196,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
+      maxMergeScanDates = 4,
       autoOptimize = true
     )
 
@@ -206,6 +207,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
+      maxMergeScanDates = 4,
       autoOptimize = true
     )
 
@@ -216,6 +218,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
+      maxMergeScanDates = 4,
       autoOptimize = true
     )
 
@@ -259,7 +262,8 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
-      partitionBy = Seq("organization_id", "state_start_date")
+      partitionBy = Seq("organization_id", "state_start_date"),
+      maxMergeScanDates = 8,
     )
 
     lazy private[overwatch] val poolsSpecTarget: PipelineTable = PipelineTable(
@@ -416,6 +420,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "state_start_date", "__overwatch_ctrl_noise"),
+      maxMergeScanDates = 7,
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
       zOrderBy = Array("cluster_id", "unixTimeMS_state_start")
     )
@@ -431,6 +436,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("spark_context_id", "job_id", "unixTimeMS"),
       config,
       _mode = WriteMode.merge,
+      maxMergeScanDates = 4,
       partitionBy = Seq("organization_id", "date"),
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true,
@@ -449,6 +455,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "date"),
+      maxMergeScanDates = 4,
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true,
       zOrderBy = Array("cluster_id")
@@ -466,6 +473,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "date"),
+      maxMergeScanDates = 4,
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true
@@ -482,6 +490,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("spark_context_id", "execution_id", "date", "unixTimeMS"),
       config,
       _mode = WriteMode.merge,
+      maxMergeScanDates = 4,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true
@@ -498,6 +507,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("spark_context_id", "executor_id", "date", "unixTimeMS"),
       config,
       _mode = WriteMode.merge,
+      maxMergeScanDates = 4,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("date", "unixTimeMS")
     )
@@ -513,6 +523,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("organization_id", "spark_context_id", "cluster_id", "stream_id", "stream_run_id", "stream_batch_id", "stream_timestamp"),
       config,
       _mode = WriteMode.merge,
+      maxMergeScanDates = 30,
       partitionBy = Seq("organization_id", "date"),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("date", "stream_timestamp"),

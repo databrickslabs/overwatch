@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
 import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Initializer, Pipeline, PipelineFunctions, PipelineTable, Silver}
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
@@ -17,6 +18,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
 
 import java.net.URI
+import java.time.LocalDate
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
@@ -153,6 +155,16 @@ object Helpers extends SparkSessionWrapper {
     } catch {
       case _: Throwable => Array(path)
     }
+  }
+
+  /**
+   *
+   * @param fromDT inclusive
+   * @param untilDT until date is exclusive
+   * @return array of strings of dates between fromDT and untilDT in YYYY-mm-dd format
+   */
+  def getDatesGlob(fromDT: LocalDate, untilDT: LocalDate): Array[String] = {
+    datesStream(fromDT).takeWhile(_.isBefore(untilDT)).map(_.toString).toArray
   }
 
   /**

@@ -155,22 +155,21 @@ class Database(config: Config) extends SparkSessionWrapper {
     spark.read.format("delta").load(dfTempPath)
   }
 
+  private def getPartitionedDateField(df: DataFrame, partitionFields: Seq[String]): Option[String] = {
+    df.schema.filter(f => partitionFields.map(_.toLowerCase).contains(f.name.toLowerCase))
+      .filter(_.dataType.typeName == "date")
+      .map(_.name).headOption
+  }
+
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
-  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column): Boolean = {
-    var dataDF: DataFrame = df
+  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array()): Boolean = {
+    var finalDF: DataFrame = df
 
     // apend metadata to source DF
-    dataDF = if (target.withCreateDate) dataDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else dataDF
-    dataDF = if (target.withOverwatchRunID) dataDF.withColumn("Overwatch_RunID", lit(config.runID)) else dataDF
-    dataDF = if (target.workspaceName) dataDF.withColumn("workspace_name", lit(config.workspaceName)) else dataDF
-
-    // persist and load df if it is to be deduped and/or merged for perf optimization
-    var finalDF: DataFrame = if (!target.permitDuplicateKeys || target.writeMode == WriteMode.merge) {
-      persistAndLoad(dataDF, target)
-    } else {
-      dataDF
-    }
+    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
+    finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
+    finalDF = if (target.workspaceName) finalDF.withColumn("workspace_name", lit(config.workspaceName)) else finalDF
 
     // if target is to be deduped, dedup it by keys
     finalDF = if (!target.permitDuplicateKeys) finalDF.dedupByKey(target.keys, target.incrementalColumns) else finalDF
@@ -179,18 +178,16 @@ class Database(config: Config) extends SparkSessionWrapper {
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
       val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")
-//      val targetColumns = deltaTarget.toDF.columns
-      val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
-//      val columnsToUpdateOnMatch = targetColumns.filterNot(c => immutableColumns.contains(c))
 
+      val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
+
+      val datePartitionFields = getPartitionedDateField(finalDF, target.partitionBy)
+      val explicitDatePartitionCondition = if (datePartitionFields.nonEmpty & maxMergeScanDates.nonEmpty) {
+        s" AND target.${datePartitionFields.get} in (${maxMergeScanDates.mkString("'", "', '", "'")})"
+      } else ""
       val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")  + " " +
-        s"AND target.organization_id = '${config.organizationId}'" // force partition filter for concurrent merge
-//      val updateExpr: Map[String, String] = columnsToUpdateOnMatch.map(updateCol => {
-//        s"target.$updateCol" -> s"updates.$updateCol"
-//      }).toMap
-//      val insertExpr: Map[String, String] = targetColumns.map(insertCol => {
-//        s"target.$insertCol" -> s"updates.$insertCol"
-//      }).toMap
+        s"AND target.organization_id = '${config.organizationId}'" +  // force partition filter for concurrent merge
+        explicitDatePartitionCondition // force right side scan to only scan relevant dates
 
       val mergeDetailMsg =
         s"""
