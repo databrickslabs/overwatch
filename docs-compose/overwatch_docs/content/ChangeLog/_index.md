@@ -4,6 +4,20 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.6.1.1 (Maintenance Release)
+To upgrade from 0.6.1.0, simply swap the JAR from 0.6.1.0 to this version, no upgrade script necessary
+
+* Enhancements
+  * Extreme performance improvement (~75% for large workspaces) for several of the largest silver/gold modules.
+  * Increased reliability on AQE for further perf improvements
+  * Perf improvements for CLSF windows
+  * Bronze workspace snapshot helper function created to backup bronze
+  * Duplicates hunter / dropper functions enabled
+  
+* Bug Fixes
+  * Full list of bug fixes for this release can be found [here](https://github.com/databrickslabs/overwatch/issues?q=is%3Aissue+milestone%3A0.6.1.1+)
+  
+
 ## 0.6.1.0 (Upgrade Release)
 **Upgrade Process Required** for existing customers on 0.6.0.x
 The upgrade is small and quick but is very important. Some new Databricks features have resulted in some unsafe 

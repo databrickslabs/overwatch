@@ -9,7 +9,7 @@
 
     <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
 
-    <title>Tags :: Overwatch</title>
+    <title>Productionizing :: Overwatch</title>
 
     
     <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1658349015" rel="stylesheet">
@@ -38,7 +38,7 @@
 
 <script async defer src="https://buttons.github.io/buttons.js"></script>
   </head>
-  <body class="" data-url="https://databrickslabs.github.io/overwatch/tags/">
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/">
     <nav id="sidebar" class="">
 
 
@@ -92,7 +92,7 @@
   
     
     <li data-nav-id="/gettingstarted/" title="Getting Started" class="dd-item
-        
+        parent
         
         
         ">
@@ -181,7 +181,7 @@
  
   
     
-      <li data-nav-id="/gettingstarted/productionizing/" title="Productionizing" class="dd-item ">
+      <li data-nav-id="/gettingstarted/productionizing/" title="Productionizing" class="dd-item active">
         <a href="https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/">
         Productionizing
         
@@ -505,7 +505,13 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > Tags
+            
+            
+          
+          
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/gettingstarted/'>Getting Started</a> > Productionizing
+          
+        
           
         
           
@@ -516,7 +522,17 @@
                 
                     <div class="progress">
     <div class="wrapper">
-
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#moving-to-production">Moving To Production</a>
+      <ul>
+        <li><a href="#cluster-logging">Cluster Logging</a></li>
+        <li><a href="#backups">Backups</a></li>
+        <li><a href="#alerting-on-failures">Alerting On Failures</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
     </div>
 </div>
 
@@ -532,24 +548,68 @@
           
             <h1>
               
-                taxonomy ::
-              
-              Tags
+              Productionizing
             </h1>
           
 
         
 
 
-
-
-
+<h2 id="moving-to-production">Moving To Production</h2>
+<p>When you&rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to 
+get the most out of Overwatch</p>
+<h3 id="cluster-logging">Cluster Logging</h3>
+<p><strong>Simplify and Unify your cluster logging directories</strong></p>
 <ul>
-	
+<li>Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook,
+job, user so it&rsquo;s critical that all clusters have clusters logs enabled</li>
+<li>If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all 
+over the place. These will be very challenging to clean up and can eat up a significant amount of storage over time.</li>
+<li>Utilize cluster policies to ensure the logging location is always set and done so consistently</li>
+<li>Set up a lifecycle policy (i.e. TTL) on your cluster logging directory in your cloud storage so the logs don&rsquo;t 
+pile up indefinitely. Suggested time to live time is 30 days.</li>
 </ul>
+<h3 id="backups">Backups</h3>
+<p><strong>Perform Bronze Backups</strong>
+I know we don&rsquo;t hear a lot about backups in big data world but often times the cluster logs and / or 
+the audit logs are transient (especially Azure deployments as Event Hub only maintains 7 days). This means that if
+something happened to the bronze data your Overwatch history could be lost forever. To guard against this it&rsquo;s
+strongly recommended that you periodically backup the Bronze data. As of 0.6.1.1 this has been made very easy through
+the <code>snapshot</code> helper function.</p>
+<p>Now just schedule a notebook like this to run once a week and you&rsquo;ll always have at 1 week of backups</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Bronze
+<span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Helpers
+<span style="color:#66d9ef">val</span> workspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>getWorkspaceByDatabase<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;overwatch_etl&#34;</span><span style="color:#f92672">)</span> <span style="color:#75715e">// can be used after pipeline is running successfully
+</span><span style="color:#75715e"></span>
+<span style="color:#75715e">// alternative method for getting a workspace is 
+</span><span style="color:#75715e">// import com.databricks.labs.overwatch.pipeline.Initializer
+</span><span style="color:#75715e">// val workspace = Initializer(&#34;&#34;&#34;&lt;compact config string&gt;&#34;&#34;&#34;)
+</span><span style="color:#75715e"></span>
+<span style="color:#75715e">// simple method
+</span><span style="color:#75715e"></span><span style="color:#a6e22e">Bronze</span><span style="color:#f92672">(</span>workspace<span style="color:#f92672">).</span>snapshot<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;/path/to/my/backups/sourceFolder&#34;</span><span style="color:#f92672">,</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">)</span>
+
+<span style="color:#75715e">// alternative method with more customized configs
+</span><span style="color:#75715e"></span><span style="color:#a6e22e">Bronze</span><span style="color:#f92672">(</span>workspace<span style="color:#f92672">).</span>snapshot<span style="color:#f92672">(</span>
+  targetPrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/path/to/my/backups/sourceFolder&#34;</span><span style="color:#f92672">,</span>
+  overwrite <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">,</span>
+  excludes <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Array</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;audit_log_raw_events&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;clusters_snapshot_bronze&#34;</span><span style="color:#f92672">)</span> <span style="color:#75715e">// not recommended but here for example purposes
+</span><span style="color:#75715e"></span><span style="color:#f92672">)</span>
+</code></pre></div><h4 id="overwrite-option">Overwrite Option</h4>
+<p>Note that the snapshot function performs a deep clone for all bronze tables except the tables in the excludes
+array. As such, these are complete backups each time. If the <em>overwrite</em> option is set to true you will have a backup
+created each run but it will be replaced on each subsequent run. If you would like to maintain more than one backup 
+you must set <em>overwrite = false</em>. If you set overwrite to false, you may want to consider a cleanup function to ensure 
+you don&rsquo;t have 52 copies of bronze per year (assuming 1X / week).</p>
+<h3 id="alerting-on-failures">Alerting On Failures</h3>
+<p>Overwatch modules are designed to fail softly. This means that if your silver jobs module fails the job will still 
+succeed but the silver jobs module will not progress and neither will any downstream modules that depend on it. To 
+be alerted when a specific module fails you need to configure a DBSQL alert to monitor the pipReport output and 
+fire an alert when conditions are met.</p>
+<h4 id="how-to-set-up-module-level-alerting">How To Set Up Module Level Alerting</h4>
+<p>Documentation in progress &ndash; publishing soon</p>
 
 
-<footer class=" footline" >
+<footer class="footline">
 	
 </footer>
 
@@ -584,8 +644,6 @@
             
                 
                     
-                        
-                        
                     
                 
                 
@@ -599,6 +657,9 @@
             
             
                 
+                    
+                        
+                        
                     
                 
                 
@@ -648,6 +709,7 @@
             
                 
                     
+                    
                 
                 
 
@@ -666,6 +728,9 @@
             
             
                 
+                    
+                        
+                        
                     
                 
                 
@@ -831,8 +896,10 @@
 	 
 	 
 		
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/" title="Advanced Topics"> <i class="fa fa-chevron-left"></i></a>
 		
-			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/gettingstarted/" title="Getting Started" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/environmentsetup/" title="Environment Setup" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
 		
 	
     </div>
@@ -862,3 +929,4 @@
 
   </body>
 </html>
+

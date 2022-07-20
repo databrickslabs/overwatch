@@ -12,21 +12,21 @@
     <title>Advanced Topics :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1652123419" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1652123419" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1652123419" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1652123419" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1652123419" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1652123419" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1652123419" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1652123419" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1658349015" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1658349015" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1658349015" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1658349015" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1658349015" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1658349015" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1658349015" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1658349015" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1658349015" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1652123419" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1658349015" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1658349015"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1652123419"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1652123419"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1658349015"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1658349015"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1652123419"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1658349015"></script>
 
     
   </div>
@@ -163,6 +163,27 @@
       <li data-nav-id="/gettingstarted/advancedtopics/" title="Advanced Topics" class="dd-item active">
         <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">
         Advanced Topics
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/productionizing/" title="Productionizing" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/">
+        Productionizing
         
         </a>
     </li>
@@ -511,6 +532,7 @@
         <li><a href="#additional-optimization-considerations">Additional Optimization Considerations</a></li>
       </ul>
     </li>
+    <li><a href="#using-external-metastores">Using External Metastores</a></li>
     <li><a href="#externalize-optimize--z-order-as-of-060">Externalize Optimize &amp; Z-Order (as of 0.6.0)</a></li>
     <li><a href="#interacting-with-overwatch-and-its-state">Interacting With Overwatch and its State</a>
       <ul>
@@ -616,7 +638,25 @@ compute.</li>
 </ul>
 </li>
 </ul>
-<h2 id="externalize-optimize--z-order-as-of-060">Externalize Optimize &amp; Z-Order (as of 0.6.0)</h2>
+<h2 id="using-external-metastores">Using External Metastores</h2>
+<p>If you&rsquo;re using an external metastore for your workspaces, pay close attention to the Database Paths configured in 
+the <em>DataTarget</em>. Notice that the <strong>workspaceID</strong> has been removed for the external metastore in the db paths. This 
+is because when using internal metastores and creating databases in multiple workspaces you are actually creating 
+different instances of databases with the same name; conversely, when you use an external metastore, the database truly 
+is the same and will already exist in subsequent workspaces. This is why we remove the workspaceID from the path 
+so that the one instance of the database truly only has one path, not one per workspace.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#75715e">// DEFAULT
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>etlDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/global_share&#34;</span><span style="color:#f92672">),</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>workspaceID<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>consumerDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#f92672">)</span>
+
+<span style="color:#75715e">// EXTERNAL METASTORE
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">private</span> <span style="color:#66d9ef">val</span> dataTarget <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">DataTarget</span><span style="color:#f92672">(</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>etlDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>etlDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/global_share&#34;</span><span style="color:#f92672">),</span>
+  <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span>consumerDB<span style="color:#f92672">),</span> <span style="color:#a6e22e">Some</span><span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;</span><span style="color:#e6db74">${</span>storagePrefix<span style="color:#e6db74">}</span><span style="color:#e6db74">/</span><span style="color:#e6db74">${</span>consumerDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.db&#34;</span><span style="color:#f92672">)</span>
+<span style="color:#f92672">)</span>
+</code></pre></div><h2 id="externalize-optimize--z-order-as-of-060">Externalize Optimize &amp; Z-Order (as of 0.6.0)</h2>
 <p>The Overwatch pipeline has always included the Optimize &amp; Z-Order functions. By default all targets are set to 
 be optimized once per week which resulted in very different runtimes once per week.
 As of 0.6.0, this can be removed from the Overwatch Pipeline (i.e. externalized). 
@@ -690,22 +730,12 @@ will be the Overwatch config and state of the current workspace at the time of t
 </p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Helpers
 <span style="color:#66d9ef">val</span> prodWorkspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>getWorkspaceByDatabase<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;overwatch_etl&#34;</span><span style="color:#f92672">)</span>
-</code></pre></div><h4 id="azure">Azure</h4>
 
-<div class="notices warning" ><p><strong>IMPORTANT</strong>: The EventHub connection string needs to be input as a string but it contains sensitive information
-thus we want to reference the secret. To do so, simply use the format {{secrets/scope/key}} and replace words 
-&ldquo;scope&rdquo; and &ldquo;key&rdquo; with the names of the scope and key where the EH connection string is stored. This will be parsed 
-within Overwatch and never stored in clear text. Note, this is a <a href="https://docs.databricks.com/security/secrets/secrets.html#path-value">standard created and supported by Databricks</a></p>
-</div>
-
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">val</span> ehConString <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;{{secrets/mySecretScope/myEHConnStringKeyName}}&#34;</span>
-
-<span style="color:#66d9ef">val</span> prodArgs <span style="color:#66d9ef">=</span> <span style="color:#e6db74">s&#34;&#34;&#34;{&#34;auditLogConfig&#34;:{&#34;auditLogFormat&#34;:&#34;json&#34;,&#34;azureAuditLogEventhubConfig&#34;:{&#34;connectionString&#34;:&#34;</span><span style="color:#e6db74">${</span>ehConString<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;,&#34;eventHubName&#34;:&#34;EHName&#34;,&#34;auditRawEventsPrefix&#34;:&#34;EHChkDir&#34;,&#34;maxEventsPerTrigger&#34;:10000}},&#34;tokenSecret&#34;:{&#34;scope&#34;:&#34;mySecretScope&#34;,&#34;key&#34;:&#34;PATKeyName&#34;},&#34;dataTarget&#34;:{&#34;databaseName&#34;:&#34;overwatch_etl&#34;,&#34;databaseLocation&#34;:&#34;/path/to/etl.db&#34;,&#34;etlDataPathPrefix&#34;:&#34;/path/to/global_share&#34;,&#34;consumerDatabaseName&#34;:&#34;overwatch&#34;,&#34;consumerDatabaseLocation&#34;:&#34;/path/to/consumer.db&#34;},&#34;badRecordsPath&#34;:&#34;/path/to/bad/recordsTracker&#34;,&#34;overwatchScope&#34;:[&#34;audit&#34;,&#34;accounts&#34;,&#34;jobs&#34;,&#34;sparkEvents&#34;,&#34;clusters&#34;,&#34;clusterEvents&#34;,&#34;notebooks&#34;,&#34;pools&#34;],&#34;maxDaysToLoad&#34;:60,&#34;databricksContractPrices&#34;:{&#34;interactiveDBUCostUSD&#34;:0.55,&#34;automatedDBUCostUSD&#34;:0.15,&#34;sqlComputeDBUCostUSD&#34;:0.22,&#34;jobsLightDBUCostUSD&#34;:0.1},&#34;primordialDateString&#34;:&#34;2021-01-01&#34;,&#34;intelligentScaling&#34;:{&#34;enabled&#34;:true,&#34;minimumCores&#34;:8,&#34;maximumCores&#34;:64,&#34;coeff&#34;:1.0}}&#34;&#34;&#34;</span>
-</code></pre></div><h4 id="aws">AWS</h4>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">val</span> prodArgs <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;&#34;&#34;{&#34;auditLogConfig&#34;:{&#34;rawAuditPath&#34;:&#34;/path/to/AuditLogs&#34;,&#34;auditLogFormat&#34;:&#34;json&#34;},&#34;tokenSecret&#34;:{&#34;scope&#34;:&#34;mySecretScope&#34;,&#34;key&#34;:&#34;PATKeyName&#34;},&#34;dataTarget&#34;:{&#34;databaseName&#34;:&#34;overwatch_etl&#34;,&#34;databaseLocation&#34;:&#34;/path/to/etl.db&#34;,&#34;etlDataPathPrefix&#34;:&#34;/path/to/global_share&#34;,&#34;consumerDatabaseName&#34;:&#34;overwatch&#34;,&#34;consumerDatabaseLocation&#34;:&#34;/path/to/consumer.db&#34;},&#34;badRecordsPath&#34;:&#34;/tmp/overwatch_etl/sparkEventsBadrecords&#34;,&#34;overwatchScope&#34;:[&#34;audit&#34;,&#34;sparkEvents&#34;,&#34;jobs&#34;,&#34;clusters&#34;,&#34;clusterEvents&#34;,&#34;notebooks&#34;,&#34;pools&#34;],&#34;maxDaysToLoad&#34;:30,&#34;databricksContractPrices&#34;:{&#34;interactiveDBUCostUSD&#34;:0.56,&#34;automatedDBUCostUSD&#34;:0.26,&#34;sqlComputeDBUCostUSD&#34;:0.22,&#34;jobsLightDBUCostUSD&#34;:0.1},&#34;primordialDateString&#34;:&#34;2021-01-01&#34;,&#34;intelligentScaling&#34;:{&#34;enabled&#34;:false,&#34;minimumCores&#34;:4,&#34;maximumCores&#34;:512,&#34;coeff&#34;:1.0}}&#34;&#34;&#34;</span>
-</code></pre></div><h4 id="instantiate-the-workspace">Instantiate the Workspace</h4>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">val</span> prodWorkspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Initializer</span><span style="color:#f92672">(</span>prodArgs<span style="color:#f92672">,</span> debugFlag <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">)</span>
-</code></pre></div><h3 id="using-the-workspace">Using the Workspace</h3>
+<span style="color:#75715e">// for olderVersions use the compact String
+</span><span style="color:#75715e">// import com.databricks.labs.overwatch.pipeline.Initializer
+</span><span style="color:#75715e">// Get the compactString from the runner notebook you used for your first run example BE SURE your configs are the same as they are in prod
+</span><span style="color:#75715e">// val workspace = Initializer(&#34;&#34;&#34;&lt;compact config string&gt;&#34;&#34;&#34;)
+</span></code></pre></div><h3 id="using-the-workspace">Using the Workspace</h3>
 <p>Now that you have the workspace you can interact with Overwatch very intuitively.</p>
 <h4 id="exploring-the-config">Exploring the Config</h4>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala">prodWorkspace<span style="color:#f92672">.</span>getConfig<span style="color:#f92672">.*</span>
@@ -783,8 +813,6 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
 </ul>
 </li>
 <li>Job Run Optimizations</li>
-<li>Best Practices</li>
-<li>Enabling Debug</li>
 </ul>
 
 
@@ -884,9 +912,6 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
             
         
                     
-            
-        
-                    
                         
             
             
@@ -894,6 +919,25 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
                     
                         
                         
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
                     
                 
                 
@@ -1062,7 +1106,7 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
 			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/gettingstarted/modules/" title="Modules"> <i class="fa fa-chevron-left"></i></a>
 		
 		
-			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/environmentsetup/" title="Environment Setup" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/" title="Productionizing" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
 		
 	
     </div>
@@ -1072,19 +1116,19 @@ metricDf<span style="color:#f92672">.</span>toTSDF<span style="color:#f92672">(<
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1652123419"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1652123419"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1652123419"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1652123419"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1652123419"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1658349015"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1658349015"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1658349015"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1658349015"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1658349015"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1658349015"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1652123419"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1652123419"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1652123419"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1658349015"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1658349015"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1658349015"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1652123419" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1652123419"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1658349015" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1658349015"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

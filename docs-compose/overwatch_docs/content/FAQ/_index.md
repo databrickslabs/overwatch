@@ -136,4 +136,14 @@ or the log4j.
 
 ## Q6: I'd like to add or update workspace_name on my Overwatch deployment, is there an easy way to do that?
 Yes, follow the instructions in the script posted below.
-[DBC](/assets/FAQ/update_workspace_name.dbc) | [HTML](/assets/FAQ/update_workspace_name.html) 
+[DBC](/assets/FAQ/update_workspace_name.dbc) | [HTML](/assets/FAQ/update_workspace_name.html)
+
+## Q7: I'd like to have cluster policies to ensure all future interactive and automated clusters have an appropriate logging location
+Use the [Databricks Docs on Cluster Policies](https://docs.databricks.com/administration-guide/clusters/policies.html) 
+to define appropriate cluster policies as per your requirements. To enforce logging location on interactive, automated, 
+or both use the examples below and apply them to your cluster policies appropriately.
+* [Interactive Cluster Policy Only](/assets/FAQ/interactive_logs_policy_rule.json)
+* [Automated Cluster Policy Only](/assets/FAQ/automated_logs_policy_rule.json)
+* [Interactive AND Automated Cluster Policy](/assets/FAQ/global_logs_policy_rule.json)
+
+Remember to remove user ability to create unrestricted clusters and assign appropriate permissions to the policies

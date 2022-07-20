@@ -52,6 +52,15 @@ Hot Notebooks | Heavy User Breakdown
 ![BatchReport1](/images/_index/Hot_Notebooks.png) | ![BatchReport2](/images/_index/outlierUserDetail.png)
 
 ### Realtime / Monitoring / Alerting
+{{% notice note %}}
+A supported **TSDB** (time-series database) is required to enable and integrate this. Databricks cannot provide 
+support for deployment / configuration of TSDBs but can assist in integrating Databricks clusters 
+with supported TSDBs. Supported TSDBs include:
+* Graphite
+* Prometheus
+* LogAnalytics (Azure)
+{{% /notice %}}
+
 Overwatch is often integrated with real-time solutions to enhance the data provided as raw Spark Metrics. For example, 
 you may be monitoring jobs in real-time but want job_names instead of job_ids, Overwatch's slow-changing dimensions 
 can enhance this.
