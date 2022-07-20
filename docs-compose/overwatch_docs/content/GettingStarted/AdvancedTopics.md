@@ -63,6 +63,29 @@ need be carried out on a single workspace per Overwatch output target (i.e. stor
 * Ensure direct networking routes are used between storage and compute and that they are in the same region
   * Overwatch target can be in separate region for multi-region architectures but sources should be co-located with 
   compute.
+    
+## Using External Metastores
+If you're using an external metastore for your workspaces, pay close attention to the Database Paths configured in 
+the *DataTarget*. Notice that the **workspaceID** has been removed for the external metastore in the db paths. This 
+is because when using internal metastores and creating databases in multiple workspaces you are actually creating 
+different instances of databases with the same name; conversely, when you use an external metastore, the database truly 
+is the same and will already exist in subsequent workspaces. This is why we remove the workspaceID from the path 
+so that the one instance of the database truly only has one path, not one per workspace.
+
+```scala
+// DEFAULT
+private val dataTarget = DataTarget(
+  Some(etlDB), Some(s"${storagePrefix}/${workspaceID}/${etlDB}.db"), Some(s"${storagePrefix}/global_share"),
+  Some(consumerDB), Some(s"${storagePrefix}/${workspaceID}/${consumerDB}.db")
+)
+
+// EXTERNAL METASTORE
+private val dataTarget = DataTarget(
+  Some(etlDB), Some(s"${storagePrefix}/${etlDB}.db"), Some(s"${storagePrefix}/global_share"),
+  Some(consumerDB), Some(s"${storagePrefix}/${consumerDB}.db")
+)
+```
+
 
 ## Externalize Optimize & Z-Order (as of 0.6.0)
 The Overwatch pipeline has always included the Optimize & Z-Order functions. By default all targets are set to 
@@ -123,30 +146,11 @@ As of 0.6.1 this helper function is not expected to work across versions, meanin
 ```scala
 import com.databricks.labs.overwatch.utils.Helpers
 val prodWorkspace = Helpers.getWorkspaceByDatabase("overwatch_etl")
-```
 
-#### Azure
-{{% notice warning %}}
-**IMPORTANT**: The EventHub connection string needs to be input as a string but it contains sensitive information
-thus we want to reference the secret. To do so, simply use the format {{secrets/scope/key}} and replace words 
-"scope" and "key" with the names of the scope and key where the EH connection string is stored. This will be parsed 
-within Overwatch and never stored in clear text. Note, this is a [standard created and supported by Databricks](https://docs.databricks.com/security/secrets/secrets.html#path-value)
-{{% /notice %}}
-
-```scala
-val ehConString = "{{secrets/mySecretScope/myEHConnStringKeyName}}"
-
-val prodArgs = s"""{"auditLogConfig":{"auditLogFormat":"json","azureAuditLogEventhubConfig":{"connectionString":"${ehConString}","eventHubName":"EHName","auditRawEventsPrefix":"EHChkDir","maxEventsPerTrigger":10000}},"tokenSecret":{"scope":"mySecretScope","key":"PATKeyName"},"dataTarget":{"databaseName":"overwatch_etl","databaseLocation":"/path/to/etl.db","etlDataPathPrefix":"/path/to/global_share","consumerDatabaseName":"overwatch","consumerDatabaseLocation":"/path/to/consumer.db"},"badRecordsPath":"/path/to/bad/recordsTracker","overwatchScope":["audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools"],"maxDaysToLoad":60,"databricksContractPrices":{"interactiveDBUCostUSD":0.55,"automatedDBUCostUSD":0.15,"sqlComputeDBUCostUSD":0.22,"jobsLightDBUCostUSD":0.1},"primordialDateString":"2021-01-01","intelligentScaling":{"enabled":true,"minimumCores":8,"maximumCores":64,"coeff":1.0}}"""
-```
-
-#### AWS
-```scala
-val prodArgs = """{"auditLogConfig":{"rawAuditPath":"/path/to/AuditLogs","auditLogFormat":"json"},"tokenSecret":{"scope":"mySecretScope","key":"PATKeyName"},"dataTarget":{"databaseName":"overwatch_etl","databaseLocation":"/path/to/etl.db","etlDataPathPrefix":"/path/to/global_share","consumerDatabaseName":"overwatch","consumerDatabaseLocation":"/path/to/consumer.db"},"badRecordsPath":"/tmp/overwatch_etl/sparkEventsBadrecords","overwatchScope":["audit","sparkEvents","jobs","clusters","clusterEvents","notebooks","pools"],"maxDaysToLoad":30,"databricksContractPrices":{"interactiveDBUCostUSD":0.56,"automatedDBUCostUSD":0.26,"sqlComputeDBUCostUSD":0.22,"jobsLightDBUCostUSD":0.1},"primordialDateString":"2021-01-01","intelligentScaling":{"enabled":false,"minimumCores":4,"maximumCores":512,"coeff":1.0}}"""
-```
-
-#### Instantiate the Workspace
-```scala
-val prodWorkspace = Initializer(prodArgs, debugFlag = true)
+// for olderVersions use the compact String
+// import com.databricks.labs.overwatch.pipeline.Initializer
+// Get the compactString from the runner notebook you used for your first run example BE SURE your configs are the same as they are in prod
+// val workspace = Initializer("""<compact config string>""")
 ```
 
 ### Using the Workspace
@@ -248,6 +252,4 @@ metricDf.toTSDF("timestamp", "cluster_id")
 ## Coming Soon
 * Getting through the historical load (first run)
   * Overwatch unavoidable bottlenecks
-* Job Run Optimizations 
-* Best Practices
-* Enabling Debug
+* Job Run Optimizations

@@ -1,0 +1,12 @@
+{
+  "cluster_log_conf.path": {
+    "hidden": false,
+    "type": "fixed",
+    "value": "dbfs:/mnt/cluster-logs"
+  },
+  "cluster_log_conf.type": {
+    "hidden": true,
+    "type": "fixed",
+    "value": "DBFS"
+  }
+}

@@ -35,7 +35,21 @@ Manipulating this table will change the way Overwatch executes so be sure to rea
 altering this table.
 
 The Pipeline Report is very useful for identifying issues in the pipeline. Each module, each run is detailed here. 
-The structure of the table is outlined below.
+The structure of the table is outlined [below](#pipeline_report-structure).
+
+A *pipReport* view has been created atop the pipeline_report table to simplify reviewing the historical runs. The 
+query most commonly used is below. If you are asked for the pipReport, please provide the output from the following
+
+**SCALA**
+```scala
+table("overwatch_etl.pipReport")
+  .orderBy('Pipeline_SnapTS.desc)
+```
+**SQL**
+```sql
+select * from overwatch_etl.pipReport
+    order by Pipeline_SnapTS.desc
+```
 
 ### Pipeline_Report Structure
 [**SAMPLE**](/assets/TableSamples/pipeline_report.tab)

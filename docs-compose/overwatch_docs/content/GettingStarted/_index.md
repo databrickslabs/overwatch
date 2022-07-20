@@ -43,17 +43,24 @@ Add the following dependencies to your cluster
 ### Cluster Config Recommendations
 * Azure
   * Node Type (Driver & Worker) - Standard_D16s_v3
+    * Use n Standard_E*d[s]_v4 for workers for historical loads
+    * Large / Very Large workspaces may see a significant improvement using Standard_E16d[s]_v4 workers but mileage varies, cost/benefit analysis required 
   * Node Count - 2
     * This may be increased if necessary but note that bronze is not linearly scalable; thus, increasing core count 
     may not improve runtimes. Please see [Optimizing Overwatch]({{%relref "GettingStarted/advancedtopics.md"%}}/#optimizing-overwatch) for more information.
+* AWS
+  * Node Type (Driver & Worker) - R5.4xlarge
+    * Use n i3.*xlarge for workers for historical loads
+    * Large / Very Large workspaces may see a significant improvement using i3.4xlarge workers but mileage varies, cost/benefit analysis required
+  * Node Count - 2
+    * This may be increased if necessary but note that bronze is not linearly scalable; thus, increasing core count
+      may not improve runtimes. Please see [Optimizing Overwatch]({{%relref "GettingStarted/advancedtopics.md"%}}/#optimizing-overwatch) for more information.
 
 ### Notes On Autoscaling
-* Auto-scaling compute -- **Not Recommended** Use [**Intelligent Scaling**]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling)
+* Auto-scaling compute -- **Not Recommended**
   * Note that autoscaling compute will not be extremely efficient due to some of the compute tails
   as a result of log file size skew and storage mediums. Additionally, some modules require thousands of API calls
-  (for historical loads) and have to be throttled to protect the workspace. As such, it's recommended to not use
-  autoscaling; use [Intelligent Scaling]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling) 
-  instead as it is Overwatch aware and will make better autoscaling decisions.
+  (for historical loads) and have to be throttled to protect the workspace.
 * Auto-scaling Local Storage -- **Strongly Recommended** for historical loads
   * Some of the data sources can grow to be quite large and require very large shuffle stages which requires
     sufficient local disk. If you choose not to use auto-scaling storage be sure you provision sufficient local

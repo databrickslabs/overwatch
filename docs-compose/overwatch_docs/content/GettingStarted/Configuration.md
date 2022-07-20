@@ -67,7 +67,7 @@ val params = OverwatchParams(
   maxDaysToLoad = maxDaysToLoad,
   databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice, DatabricksSQLDBUPrice, automatedJobsLightDBUPrice),
   primordialDateString = Some(primordialDateString),
-  intelligentScaling = IntelligentScaling(enabled = true, minimumCores = 16, maximumCores = 64, coeff = 1.0),
+  intelligentScaling = IntelligentScaling(enabled = true, minimumCores = 16, maximumCores = 64, coeff = 1.0), // Until further notice, recommend this to be disabled. Intelligent scaling is being re-examined as of 0.6.1.2
   workspace_name = Some(customWorkspaceName), // as of 0.6.0
   externalizeOptimize = false // as of 0.6.0
 )
@@ -139,7 +139,7 @@ Config | Required Override | Default Value | Type | AsOfVersion | Description
 **maxDaysToLoad**|N|60|Int|0.5.x|On large, busy workspaces 60 days of data may amount in 10s of TB of raw data. This parameter allows the job to be broken out into several smaller runs. Pipeline will load previous pipeline end time (or primordial_date if first_run) until lesser of \[current timestamp or previous pipeline end time + maxDaysToLoad\]. Ex: 1 year historical load, first run, don't want to load full year, set maxDaysToLoad to 14 to test / validate load, when that works increase to 60 or 365 depending on confidence level and data size.  
 **primordialDateString**|N|Today's date minus 60 days, format = "yyyy-mm-dd"|String|0.5.x|Date from which data collection was to begin. This is the earliest date for which data should attempted to be collected.
 **databricksContractPrices**|N|DatabricksContractPrices()|[DatabricksContractPrices](#databrickscontractprices)|0.5.x|Allows the user to globally configure Databricks contract prices to improve dollar cost estimates where referenced. Additionally, these values will be added to the *instanceDetails* consumer table for custom use. They are also available in com.databricks.labs.overwatch.utils.DBContractPrices().
-**IntelligentScaling**|N|IntelligentScaling()|[IntelligentScaling](#intelligentscaling)|0.5.x|Allows the user to enable / disable intelligent scaling and configure min/max core counts to be used when scaling the cluster
+**IntelligentScaling**|N|IntelligentScaling()|[IntelligentScaling](#intelligentscaling)|0.5.x|Until further notice, recommend this to be disabled. Intelligent scaling is being re-examined as of 0.6.1.2
 **workspace_name**|N|<organization_id>|Option\[String\]|0.6.x|Allows the user to specify the workspace_name to be different than the default, canonical workspace_id (i.e. organization_id). This is helpful during analysis as it provides a human-legible reference for the workspace
 **externalizeOptimize**|N|false|Boolean|0.6.x|Allows the user to externalize the optimize and zorders done on the delta tables. This can be run as a secondary job with different cluster configs at different intervals increasing efficiency
 **tempWorkingDir**|N|<etlDataPathPrefix>/tempWorkingDir/<organization_id>|String|0.6.1|Provides ability to override temporary working directory. This directory gets cleaned up before and after each run.
@@ -208,6 +208,7 @@ Config | Required Override | Default Value | Type | Description
 **jobsLightDBUCostUSD**|N|0.10|Double|Approximate list price of JobsLight Automated DBU
 
 ### IntelligentScaling
+Until further notice, recommend this to be disabled. Intelligent scaling is being re-examined as of 0.6.1.2
 Config | Required Override | Default Value | Type | Description
 :--------------------------|:---|:----------|:----------|:--------------------------------------------------
 **enabled**|N|false|Double|Approximate list price of interactive DBU
