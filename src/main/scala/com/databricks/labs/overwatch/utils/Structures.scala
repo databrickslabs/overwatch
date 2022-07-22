@@ -37,24 +37,6 @@ case class DatabricksContractPrices(
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="",enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4)
 
-
-
-/**
- * Class for storing the response from API call.
- * Response will have two parts 1)response which the api has sent which contains actual data
- * 2)response_code which we append to the actual response which we got
- *
- * @param rawStringResponse : For storing the actual response from the api call
- * @param responseCode      : Response code from api call
- * @param rawJsonObject     : Actual response as json object
- */
-case class ResponseMapper(rawStringResponse: String, responseCode: Int, rawJsonObject: JSONObject)
-
-case class ApiErrorDetail(cluster_id: String, from_epoch: Long, until_epoch: Long,error:String)
-
-case class APIResponse(successArray:util.ArrayList[String],errorArray:util.ArrayList[String])
-
-
 case class ValidatedColumn(
                             column: Column,
                             fieldToValidate: Option[StructField] = None,
