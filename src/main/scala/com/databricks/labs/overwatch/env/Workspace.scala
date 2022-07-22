@@ -1,8 +1,7 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.ApiCallV2
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.{ApiCallV2}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -135,6 +134,38 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   def getWorkspaceUsersDF: DataFrame = {
     val workspaceEndpoint = "workspace/list"
     ApiCallV2(config.apiEnv, workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getClusterLibraries: DataFrame = {
+    val libsEndpoint = "libraries/all-cluster-statuses"
+    ApiCallV2(config.apiEnv, libsEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getClusterPolicies: DataFrame = {
+    val policiesEndpoint = "policies/clusters/list"
+    ApiCallV2(config.apiEnv, policiesEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getTokens: DataFrame = {
+    val tokenEndpoint = "token/list"
+    ApiCallV2(config.apiEnv, tokenEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getGlobalInitScripts: DataFrame = {
+    val globalInitScEndpoint = "global-init-scripts"
+    ApiCallV2(config.apiEnv, globalInitScEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   def getSqlQueryHistoryDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
