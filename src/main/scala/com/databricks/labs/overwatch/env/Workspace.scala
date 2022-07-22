@@ -127,53 +127,57 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   def getClusterLibraries: DataFrame = {
     val libsEndpoint = "libraries/all-cluster-statuses"
-    ApiCall(libsEndpoint, config.apiEnv, debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
+    ApiCallV2(config.apiEnv, libsEndpoint)
+      .execute()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
   def getClusterPolicies: DataFrame = {
     val policiesEndpoint = "policies/clusters/list"
-    ApiCall(policiesEndpoint, config.apiEnv, debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
+    ApiCallV2(config.apiEnv, policiesEndpoint)
+      .execute()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
   def getTokens: DataFrame = {
     val tokenEndpoint = "token/list"
-    ApiCall(tokenEndpoint, config.apiEnv, debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
+    ApiCallV2(config.apiEnv, tokenEndpoint)
+      .execute()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
   def getGlobalInitScripts: DataFrame = {
     val globalInitScEndpoint = "global-init-scripts"
-    ApiCall(globalInitScEndpoint, config.apiEnv, debugFlag = config.debugFlag)
-      .executeGet()
-      .asDF
+    ApiCallV2(config.apiEnv, globalInitScEndpoint)
+      .execute()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  private def clusterState(apiEnv: ApiEnv): String = {
-    val endpoint = "clusters/get"
-    val query = Map(
-      "cluster_id" -> overwatchRunClusterId
-    )
-    try {
-      val stateJsonString = ApiCall(endpoint, apiEnv, Some(query)).executeGet().asStrings.head
-      JsonUtils.defaultObjectMapper.readTree(stateJsonString).get("state").asText()
-    } catch {
-      case e: Throwable => {
-        val msg = s"Cluster State Error: Cannot determine state of cluster: $overwatchRunClusterId\n$e"
-        logger.log(Level.ERROR, msg, e)
-        if(config.debugFlag) println(msg)
-        "ERROR"
-      }
-    }
-  }
+  /**
+   * TODO - Need to find author of the below code
+   *
+   */
+  //  private def clusterState(apiEnv: ApiEnv): String = {
+//    val endpoint = "clusters/get"
+//    val query = Map(
+//      "cluster_id" -> overwatchRunClusterId
+//    )
+//    try {
+//      val stateJsonString = ApiCallV2(endpoint, apiEnv, Some(query)).executeGet().asStrings.head
+//      JsonUtils.defaultObjectMapper.readTree(stateJsonString).get("state").asText()
+//    } catch {
+//      case e: Throwable => {
+//        val msg = s"Cluster State Error: Cannot determine state of cluster: $overwatchRunClusterId\n$e"
+//        logger.log(Level.ERROR, msg, e)
+//        if(config.debugFlag) println(msg)
+//        "ERROR"
+//      }
+//    }
+//  }
 
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {
     val endpoint = "clusters/resize"
