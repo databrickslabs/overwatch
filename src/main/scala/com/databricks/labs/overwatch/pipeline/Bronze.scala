@@ -209,6 +209,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.sparkEventLogsTarget) // Not new data only -- date filters handled in function logic
   )
 
+  lazy private[overwatch] val jobRunsSnapshotModule = Module(1012, "Bronze_Job_Runs_Snapshot", this) // check module number
+  lazy private val appendJobRunsProcess = ETLDefinition(
+    workspace.getJobRunsDF,
+    append(BronzeTargets.jobRunsSnapshotTarget)
+  )
+
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
     val isFirstAuditRun = !BronzeTargets.auditLogsTarget.exists(dataValidation = true)
@@ -239,7 +245,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         instanceProfileSnapshotModule.execute(appendInstanceProfileProcess)
         }
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
-      case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
+      case OverwatchScope.jobs =>
+        jobsSnapshotModule.execute(appendJobsProcess)
+        jobRunsSnapshotModule.execute(appendJobRunsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
       case OverwatchScope.accounts =>

@@ -125,6 +125,18 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv,workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
+  /**
+   * Function to get the the list of Job Runs
+   * @return
+   */
+  def getJobRunsDF: DataFrame = {
+    val jobsRunsEndpoint = "jobs/runs/list"
+    val jsonQuery = """{"expand_tasks":true}"""
+    ApiCallV2(config.apiEnv,jobsRunsEndpoint, jsonQuery)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
   def getClusterLibraries: DataFrame = {
     val libsEndpoint = "libraries/all-cluster-statuses"
     ApiCallV2(config.apiEnv, libsEndpoint)

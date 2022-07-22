@@ -37,8 +37,6 @@ case class DatabricksContractPrices(
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="",enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4)
 
-
-
 case class ValidatedColumn(
                             column: Column,
                             fieldToValidate: Option[StructField] = None,
