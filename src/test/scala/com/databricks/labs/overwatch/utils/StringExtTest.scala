@@ -5,8 +5,6 @@ import com.databricks.labs.overwatch.utils.StringExt.StringHelpers
 import org.scalatest.funspec.AnyFunSpec
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
 
-class StringExtTest extends AnyFunSpec {
-
 class StringExtTest extends AnyFunSpec with SparkSessionTestWrapper {
 
   describe("StringHelpers Test") {
