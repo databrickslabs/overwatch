@@ -98,10 +98,19 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getPoolsDF: DataFrame = {
     val poolsEndpoint = "instance-pools/list"
-    ApiCallV2(config.apiEnv,poolsEndpoint)
-      .execute()
-      .asDF()
-      .withColumn("organization_id", lit(config.organizationId))
+    try {
+      ApiCallV2(config.apiEnv, poolsEndpoint)
+        .execute()
+        .asDF()
+        .withColumn("organization_id", lit(config.organizationId))
+    }
+    catch {
+      case e: Exception =>
+        val message = s"Exceotion in reading pool list ${e}"
+        println(message)
+        logger.error(message)
+        spark.emptyDataFrame
+    }
   }
 
   /**
