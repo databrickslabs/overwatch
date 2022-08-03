@@ -1118,6 +1118,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("job_clusters", collect_list('job_clusters).over(jobStatusByKeyW))
   }
 
+  // init commit
   protected def dbJobsStatusSummary(
                                      jobsSnapshotTargetComplete: PipelineTable,
                                      isFirstRun: Boolean,
