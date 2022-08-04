@@ -1080,7 +1080,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
 
     val jobsBaseHasRecords = !jobsBase.isEmpty
-    validateNewJobsStatusHasNewData(isFirstRun, jobsSnapshotTargetComplete, jobsBaseHasRecords)
+    jobStatusValidateNewJobsStatusHasNewData(isFirstRun, jobsSnapshotTargetComplete, jobsBaseHasRecords)
 
     val jobsSnapshotDFComplete = jobsSnapshotTargetComplete.asDF
 
@@ -1224,167 +1224,15 @@ trait SilverTransforms extends SparkSessionWrapper {
                                   etlUntilTime: TimeTypes
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
+    // TODO -- add runTriggered
     val jobRunActions = Array("runSucceeded", "runFailed", "runNow", "runStart", "submitRun", "cancel")
     val jobRunsLag30D = getJobsBase(auditLogLag30D)
       .filter('actionName.isin(jobRunActions: _*))
+      .repartition(getTotalCores * 4)
+      .cache()
 
-    // TODO -- identify the subset of jobs that need to be updated in the final merge
-    //  this includes newly completed runs, newly started runs, and ongoing runs from previous run
-    //  this requires additional testing and is generally for perf so putting this off until a bit later.
-    //  look at jrcp logic as it seems to handle this
-    val newJobRuns = jobRunsLag30D
-      .filter('date >= etlStartTime.asColumnTS.cast("date") && 'timestamp >= lit(etlStartTime.asUnixTimeMilli))
-
-    /**
-     * JOBS-1709 -- JAWS team should fix multiple event emissions. If they do, this can be removed for a perf gain
-     * but for now, this is required or multiple records will be created in the fact due to the multiple events.
-     * Confirmed that the first event emitted is the correct event as per ES-65402
-     */
-    val firstRunSemanticsW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
-
-    // Completes must be >= etlStartTime as it is the driver endpoint
-    // All joiners to Completes may be from the past up to N days as defined in the incremental df
-    // Identify all completed jobs in scope for this overwatch run
-    val allCompletes = jobRunsLag30D
-      .filter('actionName.isin("runSucceeded", "runFailed"))
-      .select(
-        'serviceName, 'actionName,
-        'organization_id,
-        'date,
-        'timestamp,
-        'runId,
-        'jobId.alias("completedJobId"),
-        'idInJob, 'clusterId,
-        'jobClusterType.alias("jobClusterType_Completed"),
-        'jobTaskType.alias("jobTaskType_Completed"),
-        'jobTriggerType.alias("jobTriggerType_Completed"),
-        'jobTerminalState,
-        'requestId.alias("completionRequestID"),
-        'response.alias("completionResponse"),
-        'timestamp.alias("completionTime")
-      )
-      .filter('runId.isNotNull)
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
-      .drop("rnk", "rn", "timestamp")
-
-    // CancelRequests are still lookups from the driver "complete" as a cancel request is a request and still
-    // results in a runFailed after the cancellation
-    // Identify all cancelled jobs in scope for this overwatch run
-    val allCancellations = jobRunsLag30D
-      .filter('actionName.isin("cancel"))
-      .select(
-        'organization_id, 'date, 'timestamp,
-        'run_id.cast("long").alias("runId"),
-        'requestId.alias("cancellationRequestId"),
-        'response.alias("cancellationResponse"),
-        'sessionId.alias("cancellationSessionId"),
-        'sourceIPAddress.alias("cancellationSourceIP"),
-        'timestamp.alias("cancellationTime"),
-        'userAgent.alias("cancelledUserAgent"),
-        'userIdentity.alias("cancelledBy")
-      )
-      .filter('runId.isNotNull)
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
-      .drop("rnk", "rn", "timestamp")
-
-    // DF for jobs launched with actionName == "runNow"
-    // Lookback 30 days for laggard starts prior to current run
-    // only field from runNow that we care about is the response.result.runId
-    val runNowStart = jobRunsLag30D
-      .filter('actionName.isin("runNow"))
-      .select(
-        'organization_id, 'date, 'timestamp,
-        'job_id.cast("long").alias("runNowJobId"),
-        get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
-        lit(null).cast("string").alias("run_name"),
-        'timestamp.alias("submissionTime"),
-        lit(null).cast("string").alias("new_cluster"),
-        lit(null).cast("string").alias("existing_cluster_id"),
-        'notebook_params, 'workflow_context,
-        struct(
-          lit(null).cast("string").alias("notebook_task"),
-          lit(null).cast("string").alias("spark_python_task"),
-          lit(null).cast("string").alias("spark_jar_task"),
-          lit(null).cast("string").alias("shell_command_task")
-        ).alias("taskDetail"),
-        lit(null).cast("string").alias("libraries"),
-        lit(null).cast("string").alias("timeout_seconds"),
-        'sourceIPAddress.alias("submitSourceIP"),
-        'sessionId.alias("submitSessionId"),
-        'requestId.alias("submitRequestID"),
-        'response.alias("submitResponse"),
-        'userAgent.alias("submitUserAgent"),
-        'userIdentity.alias("submittedBy")
-      )
-      .filter('runId.isNotNull)
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
-      .drop("rnk", "rn", "timestamp")
-
-    // DF for jobs launched with actionName == "submitRun"
-    // Lookback 30 days for laggard starts prior to current run
-
-    // TODO: move taskDetail and libraries to jobStatus as it only exists for create and submitRun actions
-    //  it will be much more complete over there
-    val runSubmitStart = jobRunsLag30D
-      .filter('actionName.isin("submitRun"))
-      .select(
-        'organization_id, 'date, 'timestamp,
-        lit(null).cast("long").alias("runNowJobId"),
-        get_json_object($"response.result", "$.run_id").cast("long").alias("runId"),
-        'run_name,
-        'timestamp.alias("submissionTime"),
-        'new_cluster, 'existing_cluster_id,
-        'notebook_params, 'workflow_context,
-        struct(
-          'notebook_task,
-          'spark_python_task,
-          'spark_jar_task,
-          'shell_command_task
-        ).alias("taskDetail"),
-        'libraries,
-        'timeout_seconds.cast("string").alias("timeout_seconds"),
-        'sourceIPAddress.alias("submitSourceIP"),
-        'sessionId.alias("submitSessionId"),
-        'requestId.alias("submitRequestID"),
-        'response.alias("submitResponse"),
-        'userAgent.alias("submitUserAgent"),
-        'userIdentity.alias("submittedBy")
-      )
-      .filter('runId.isNotNull)
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
-      .drop("rnk", "rn", "timestamp")
-
-    // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
-    val allSubmissions = runNowStart
-      .unionByName(runSubmitStart)
-
-    // Find the corresponding runStart action for the completed jobs
-    // Lookback 30 days for laggard starts prior to current run
-    val runStarts = jobRunsLag30D
-      .filter('actionName.isin("runStart"))
-      .select(
-        'organization_id, 'date, 'timestamp,
-        'jobId.alias("runStartJobId").cast("long"),
-        'runId,
-        'jobClusterType.alias("jobClusterType_Started"),
-        'jobTaskType.alias("jobTaskType_Started"),
-        'jobTriggerType.alias("jobTriggerType_Started"),
-        'clusterId.alias("startClusterId"),
-        'timestamp.alias("startTime"),
-        'requestId.alias("startRequestID")
-      )
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
-      .drop("rnk", "rn", "timestamp")
+    // eagerly force this highly reused DF into cache()
+    jobRunsLag30D.count()
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
     lazy val clusterSpecLookup = clusterSpec.asDF
@@ -1398,186 +1246,53 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
+    // TODO -- is this necessary? Seems like all job run on existing clusters already have a clusterId
+    //  validate on large customer with submitRuns
     lazy val existingClusterLookup = jobsStatus.asDF
       .select('organization_id, 'timestamp, 'jobId, $"cluster_spec.existing_cluster_id".alias("clusterId"))
       .filter('clusterId.isNotNull)
 
-    // Ensure the lookups have data -- this will be improved when the module unification occurs during the next
-    // scheduled refactor
-    val clusterLookups: scala.collection.mutable.Map[String, DataFrame] = scala.collection.mutable.Map()
-    val jobStatusClusterLookups: scala.collection.mutable.Map[String, DataFrame] = scala.collection.mutable.Map()
-
-    if (clusterSpec.exists) clusterLookups.put("clusterSpecLookup", clusterSpecLookup)
-    if (clusterSnapshot.exists) clusterLookups.put("clusterSnapLookup", clusterSnapLookup)
-    if (jobsStatus.exists) jobStatusClusterLookups.put("jobStatusLookup", existingClusterLookup)
+    val jobRunsLookups = jobRunsInitializeLookups(
+      (clusterSpec, clusterSpecLookup),
+      (clusterSnapshot, clusterSnapLookup),
+      (jobsStatus, existingClusterLookup)
+    )
 
     // match all completed and cancelled (i.e. terminated) jobRuns with their launch assuming launch was in now - 30d
-    val jobRunsBase = allCompletes
-      .join(allCancellations, Seq("runId", "organization_id"), "full")
-      .join(allSubmissions, Seq("runId", "organization_id"), "full")
-      .join(runStarts, Seq("runId", "organization_id"), "full")
-      .withColumn("jobId", coalesce('completedJobId, 'runStartJobId, 'runNowJobId).cast("long"))
-      .withColumn("idInJob", coalesce('idInJob, 'runId))
-      .withColumn("jobClusterType", coalesce('jobClusterType_Completed, 'jobClusterType_Started))
-      .withColumn("jobTerminalState", when('cancellationRequestId.isNotNull, "Cancelled").otherwise('jobTerminalState)) //.columns.sorted
-      .withColumn("cluster_name", when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob)).otherwise(lit(null).cast("string")))
-      .select(
-        'runId.cast("long"),
-        'jobId,
-        'idInJob,
-        TransformFunctions.subtractTime(array_min(array('startTime, 'submissionTime)), coalesce(array_max(array('completionTime, 'cancellationTime)), lit(etlUntilTime.asUnixTimeMilli))).alias("JobRunTime"),
-        'run_name,
-        'jobClusterType,
-        coalesce('jobTaskType_Completed, 'jobTaskType_Started).alias("jobTaskType"),
-        coalesce('jobTriggerType_Completed, 'jobTriggerType_Started).alias("jobTriggerType"),
-        'jobTerminalState,
-        'new_cluster,
-        coalesce('clusterId, 'startClusterId, 'existing_cluster_id).alias("clusterId"),
-        'cluster_name,
-        'organization_id,
-        'notebook_params, 'libraries,
-        'workflow_context, 'taskDetail,
-        struct(
-          'startTime,
-          'submissionTime,
-          'cancellationTime,
-          'completionTime,
-          'timeout_seconds
-        ).alias("timeDetails"),
-        struct(
-          struct(
-            'submitRequestId,
-            'submitResponse,
-            'submitSessionId,
-            'submitSourceIP,
-            'submitUserAgent,
-            'submittedBy
-          ).alias("submissionRequest"),
-          struct(
-            'cancellationRequestId,
-            'cancellationResponse,
-            'cancellationSessionId,
-            'cancellationSourceIP,
-            'cancelledUserAgent,
-            'cancelledBy
-          ).alias("cancellationRequest"),
-          struct(
-            'completionRequestId,
-            'completionResponse
-          ).alias("completionRequest"),
-          struct(
-            'startRequestId
-          ).alias("startRequest")
-        ).alias("requestDetails")
-      )
-      .withColumn("timestamp", $"JobRunTime.startEpochMS")
+    /**
+     * Unify all event types into a single row by keys (run) such that each key has only a single row with all the data
+     * from all the events tied together for each key
+     */
+    val jobRunsBase = jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
 
+    // Runs on existing clusters
     val jrBaseExisting = jobRunsBase.filter('jobClusterType === "existing")
 
+    // jobs with a new cluster (legacy)
     val automatedJobRunsBase = jobRunsBase
       .filter('jobClusterType === "new")
 
+    // jobs with tasks that utilize a "job_cluster"
     val jobsClusterJobRunsBase = jobRunsBase
       .filter('jobClusterType === "job_cluster")
 
-    // LOOKUP - ClusterID By JobID -- EXISTING CLUSTER JOB RUNS
-    // JobRuns with interactive clusters
-    // If the lookups are present (likely will be unless is first run or modules are turned off somehow)
-    // use the lookups to populate the null clusterIds and cluster_names
-    val interactiveRunsWID = if (jobStatusClusterLookups.nonEmpty) {
-      var jrBaseExistingBuilder = jrBaseExisting
-
-      if (jobStatusClusterLookups.contains("jobStatusLookup")) {
-        jrBaseExistingBuilder = jrBaseExistingBuilder
-          .toTSDF("timestamp", "organization_id", "jobId")
-          .lookupWhen(
-            jobStatusClusterLookups("jobStatusLookup")
-              .toTSDF("timestamp", "organization_id", "jobId")
-          ).df
-      }
-
-      jrBaseExistingBuilder
-
-    } else jrBaseExisting
+    // lookup cluster details for existing clusters
+    val interactiveRunsWID = jobRunsDeriveRunsOnInteractiveClusters(jrBaseExisting, jobRunsLookups)
 
     // Re-Combine Interactive and Automated Job Run Clusters
-    val jobRunsBaseWIDs = interactiveRunsWID
+    val jobRunsWIdsAndNames = interactiveRunsWID
+      .transform(jobRunsFillMissingInteractiveClusterIDsAndJobNames(jobsStatus))
       .unionByName(automatedJobRunsBase)
       .unionByName(jobsClusterJobRunsBase)
 
-    // Get JobName for All Jobs
-
-    val jobNameLookupFromStatus = jobsStatus.asDF
-      .select('organization_id, 'timestamp, 'jobId, 'jobName
-      )
-
-    // jobNames from MLFlow Runs
-    val experimentName = get_json_object($"taskDetail.notebook_task", "$.base_parameters.EXPERIMENT_NAME")
-
-    val jobRunsWIdsAndNames = jobRunsBaseWIDs
-      .toTSDF("timestamp", "organization_id", "jobId")
-      .lookupWhen(
-        jobNameLookupFromStatus.toTSDF("timestamp", "organization_id", "jobId")
-      ).df
-      .withColumn("jobName", when('jobName.isNull && experimentName.isNotNull, experimentName).otherwise('jobName))
-      .withColumn("jobName", when('jobName.isNull && 'run_name.isNotNull, 'run_name).otherwise('jobName))
-
     /**
-     * Child job run times are double counted when kept at the top level with their parents, thus this step is to
-     * nest the children under the parent. Currently, only nesting one layer.
+     * Child runs must be removed and nested into the parent runs so as not to be double counted
+     * This is done here because children must run on the same compute as their parents
+     * Child == dbutils.notebook.run executions, not tasks with dependencies
      */
-    val jobRunsWJobMetaWithoutChildren = jobRunsWIdsAndNames
+    val jobRunsWMetaWithoutChildren = jobRunsWIdsAndNames
       .filter(get_json_object('workflow_context, "$.root_run_id").isNull)
-
-    val jobRunsWJobMetaWithoutChildrenInteractive = jobRunsWJobMetaWithoutChildren.filter('jobClusterType === "existing")
-    val jobRunsWJobMetaWithoutChildrenAutomated = jobRunsWJobMetaWithoutChildren.filter('jobClusterType === "new")
-
-    // clusters -- get clusterID by derived name AND/OR clusterName by clusterID
-    val (interactiveRunsWJobClusterMeta, automatedRunsWJobClusterMeta) = if (clusterLookups.nonEmpty) {
-
-      var interactiveClusterMetaLookupBuilder = jobRunsWJobMetaWithoutChildrenInteractive
-      var automatedClusterMetaLookupBuilder = jobRunsWJobMetaWithoutChildrenAutomated
-
-      if (clusterLookups.contains("clusterSpecLookup")) {
-        // GET cluster_name by clusterID for interactive clusters
-        interactiveClusterMetaLookupBuilder = interactiveClusterMetaLookupBuilder
-          .toTSDF("timestamp", "organization_id", "clusterId")
-          .lookupWhen(
-            clusterLookups("clusterSpecLookup")
-              .toTSDF("timestamp", "organization_id", "clusterId")
-          ).df
-
-        // get cluster_id by cluster_name (derived)
-        automatedClusterMetaLookupBuilder = automatedClusterMetaLookupBuilder
-          .toTSDF("timestamp", "organization_id", "cluster_name")
-          .lookupWhen(
-            clusterLookups("clusterSpecLookup")
-              .toTSDF("timestamp", "organization_id", "cluster_name")
-          ).df
-      }
-
-      // look in run snapshots when values still null attempt to fill them from the snapshots
-      if (clusterLookups.contains("clusterSnapLookup")) {
-        interactiveClusterMetaLookupBuilder = interactiveClusterMetaLookupBuilder
-          .toTSDF("timestamp", "organization_id", "clusterId")
-          .lookupWhen(
-            clusterLookups("clusterSnapLookup")
-              .toTSDF("timestamp", "organization_id", "clusterId")
-          ).df
-
-        automatedClusterMetaLookupBuilder = automatedClusterMetaLookupBuilder
-          .toTSDF("timestamp", "organization_id", "cluster_name")
-          .lookupWhen(
-            clusterLookups("clusterSnapLookup")
-              .toTSDF("timestamp", "organization_id", "cluster_name")
-          ).df
-      }
-
-      (interactiveClusterMetaLookupBuilder, automatedClusterMetaLookupBuilder)
-    } else (jobRunsWJobMetaWithoutChildrenInteractive, jobRunsWJobMetaWithoutChildrenAutomated)
-
-    // Union the interactive and automated back together with the cluster ids and names
-    val jobRunsWMeta = interactiveRunsWJobClusterMeta.unionByName(automatedRunsWJobClusterMeta)
+      .transform(jobRunsFillClusterIDsAndClusterNames(jobRunsLookups))
 
     // Get Ephemeral Notebook Job Run Details to be nested into the parent job runs
     val childJobRuns = jobRunsWIdsAndNames
@@ -1591,7 +1306,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .groupBy('runId)
       .agg(collect_list('child).alias("children"))
 
-    val jobRunsFinal = jobRunsWMeta
+    val jobRunsFinal = jobRunsWMetaWithoutChildren
       .join(childRunsForNesting, Seq("runId"), "left")
       .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
       .withColumn("startEpochMS", $"JobRunTime.startEpochMS") // for incremental downstream after job termination
