@@ -106,20 +106,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     }
     catch {
       /**In case if there is no cluster pools available in workspace .asDF() call throws ApiCallEmptyResponse exception.
-       * Handle the ApiCallEmptyResponse exception and move on to the rest of the modules
+       * Handle the ApiCallEmptyResponse exception and move on to the rest of the modules.
+       * Not handling any other exceptions.
        */
       case emptyResponseError: ApiCallEmptyResponse =>
         val message = s"Exceotion in reading pool list ${emptyResponseError}"
         println(message)
         logger.error(message)
         spark.emptyDataFrame
-
-      /**
-       * Any other exception other than ApiCallEmptyResponse exception. raise the exception and exit the process
-       */
-      case ex: Exception =>
-        logger.error(ex)
-        throw new Exception(ex)
     }
   }
 
