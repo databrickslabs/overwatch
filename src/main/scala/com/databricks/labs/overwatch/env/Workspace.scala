@@ -105,7 +105,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         .withColumn("organization_id", lit(config.organizationId))
     }
     catch {
-      case e: Exception =>
+      case e: ApiCallEmptyResponse =>
         val message = s"Exceotion in reading pool list ${e}"
         println(message)
         logger.error(message)
