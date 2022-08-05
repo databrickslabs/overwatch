@@ -20,24 +20,37 @@ object PipelineFunctions {
   private val uriSchemeRegex = "^([a-zA-Z][-.+a-zA-Z0-9]*):/.*".r
 
   /**
-   * parses the value for the connection string from the scope/key defined if the pattern matches {{secrets/scope/key}}
+   * parses the value for the string from the scope/key defined if the pattern matches {{secrets/scope/key}}
    * otherwise return the true string value
    * https://docs.databricks.com/security/secrets/secrets.html#store-the-path-to-a-secret-in-a-spark-configuration-property
-   * @param connectionString
-   * @return
+   * @param str input string
+   * @return string from secrets, or original string
    */
-  def parseEHConnectionString(connectionString: String): String = {
+  def maybeGetSecret(str: String): String = {
     val secretsRE = "\\{\\{secrets/([^/]+)/([^}]+)\\}\\}".r
 
-    val retrievedConnectionString = secretsRE.findFirstMatchIn(connectionString) match {
+    secretsRE.findFirstMatchIn(str) match {
       case Some(i) =>
         dbutils.secrets.get(i.group(1), i.group(2))
       case None =>
-        connectionString
+        str
     }
-    if (!retrievedConnectionString.matches("^Endpoint=sb://.*;SharedAccessKey=.*$")) {
-      throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
-    } else retrievedConnectionString
+  }
+
+  /**
+   * parses the value for the connection string from the scope/key defined if the pattern matches {{secrets/scope/key}}
+   * otherwise return the true string value
+   * @param connectionString EventHubs connection string
+   * @return
+   */
+  def parseAndValidateEHConnectionString(connectionString: String, withSAS: Boolean): String = {
+    val retrievedConnectionString = maybeGetSecret(connectionString)
+    if ((withSAS && !retrievedConnectionString.matches("^Endpoint=sb://.*;SharedAccessKey=.*$")) ||
+      !retrievedConnectionString.matches("^Endpoint=sb://.*$")) {
+        throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
+    }
+
+    retrievedConnectionString
   }
 
   /**

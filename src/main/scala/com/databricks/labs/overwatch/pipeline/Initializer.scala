@@ -172,14 +172,14 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         println(s"ehPrefix = ${ehPrefix}")
       }
 
-      val ehFinalConfig = auditLogConfig.azureAuditLogEventhubConfig.get.copy(
+      val ehFinalConfig = ehConfig.copy(
         auditRawEventsPrefix = cleanPrefix,
         auditRawEventsChk = Some(rawEventsCheckpoint),
         auditLogChk = Some(auditLogBronzeChk)
       )
 
       // parse the connection string to validate format
-      PipelineFunctions.parseEHConnectionString(ehFinalConfig.connectionString)
+      PipelineFunctions.parseAndValidateEHConnectionString(ehFinalConfig.connectionString, ehFinalConfig.azureClientId.isEmpty)
       // return validated auditLogConfig for Azure
       auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig))
     }

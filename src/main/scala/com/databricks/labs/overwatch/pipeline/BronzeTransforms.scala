@@ -210,14 +210,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     consumerDBLocation: String,
                                     isFirstRun: Boolean,
                                     organizationId: String,
-                                    runID: String
-                                   ): DataFrame = {
+                                    runID: String): DataFrame = {
 
-    val connectionString = ConnectionStringBuilder(PipelineFunctions.parseEHConnectionString(ehConfig.connectionString))
+    val connectionString = ConnectionStringBuilder(
+      PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
       .setEventHubName(ehConfig.eventHubName)
       .build
 
-    val eventHubsConf = try {
+    val ehConf = try {
       validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
 
       if (isFirstRun) {
@@ -240,6 +240,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
+
+    val eventHubsConf = if (ehConfig.azureClientId.isDefined) {
+      val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
+        "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
+        "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
+        "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
+      ehConf.setAadAuthCallbackParams(aadParams)
+        .setAadAuthCallback(new com.databricks.labs.overwatch.utils.AadClientAuthentication(aadParams))
+    } else
+      ehConf
 
     spark.readStream
       .format("eventhubs")
