@@ -98,9 +98,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getPoolsDF: DataFrame = {
     val poolsEndpoint = "instance-pools/list"
-    try {
-      ApiCallV2(config.apiEnv, poolsEndpoint)
+    val apiResponse = ApiCallV2(config.apiEnv, poolsEndpoint)
         .execute()
+    try{
+    apiResponse
         .asDF()
         .withColumn("organization_id", lit(config.organizationId))
     }
@@ -113,7 +114,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         val message = s"Exceotion in reading pool list ${emptyResponseError}"
         println(message)
         logger.error(message)
-        spark.emptyDataFrame
+        spark.emptyDataFrame.withColumn("organization_id", lit(config.organizationId))
     }
   }
 
