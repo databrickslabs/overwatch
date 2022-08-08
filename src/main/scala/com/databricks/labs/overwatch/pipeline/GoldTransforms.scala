@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
 import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes}
 import org.apache.log4j.Level
 import org.apache.spark.sql.expressions.Window
@@ -356,7 +357,10 @@ trait GoldTransforms extends SparkSessionWrapper {
                                               untilTime: TimeTypes
                                             )(jrGoldLag30D: DataFrame): DataFrame = {
 
-    val clusterPotentialWCosts = if (clsfLag90D.isEmpty) {
+    val clsfLag90IsEmpty = clsfLag90D.isEmpty
+    val jrcpLag30IsEmpty = jrcpLag30D.isEmpty
+
+    val clusterPotentialWCosts = if (clsfLag90IsEmpty) {
       val emptyMsg = s"Dependent on clusterStateFact -- Dependent on clusterEventLogs which only has 30d of data " +
         s"available. You're likely not getting source data for 1 of 2 reasons. 1) the Overwatch account doesn't " +
         s"have access to any clusters or 2) the Overwatch Pipeline this module is loading historical data and only 30d " +
@@ -372,277 +376,119 @@ trait GoldTransforms extends SparkSessionWrapper {
     val newJrLaunches = jrGoldLag30D
       .filter($"job_runtime.startEpochMS" >= fromTime.asUnixTimeMilli)
 
-    val newAndOpenJobRuns = if (!jrcpLag30D.isEmpty) { // jrcp will be empty if is first run for org_id
-      // scan jrcp for records where jobRun has started but not completed to stage for the upsert changes
-      // limiting scan here to 30 days to reduce load
-      // don't reprocess all 30 days of jobRuns each Overwatch run, only the open records
-      val openJRCPRecordsRunIDs = jrcpLag30D
-        .filter($"job_runtime.endEpochMS".isNull) // open jrcp records (i.e. not incomplete job runs)
-        .select('organization_id, 'run_id).distinct // org_id left to force partition pruning
-      val outstandingJrRecordsToClose = jrGoldLag30D.join(openJRCPRecordsRunIDs, Seq("organization_id", "run_id"))
-      newJrLaunches.unionByName(outstandingJrRecordsToClose) // combine open records (updates) with new records (inserts)
-    } else newJrLaunches
+    val newAndOpenJobRuns = if (!jrcpLag30IsEmpty) jrcpDeriveNewAndOpenRuns(jrcpLag30D, fromTime) else newJrLaunches
 
-    val clsfKeyColNames = Array("organization_id", "cluster_id", "timestamp")
-    val clsfKeys: Array[Column] = Array(clsfKeyColNames map col: _*)
-    val clsfLookups: Array[Column] = Array(
-      'cluster_name, 'custom_tags, 'unixTimeMS_state_start, 'unixTimeMS_state_end, 'timestamp_state_start,
-      'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
-      $"driverSpecs.API_Name".alias("driver_node_type_id"),
-      $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
-      $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
-      $"workerSpecs.API_Name".alias("node_type_id"),
-      $"workerSpecs.Compute_Contract_Price".alias("worker_compute_hourly"),
-      $"workerSpecs.Hourly_DBUs".alias("worker_dbu_hourly"),
-      $"workerSpecs.vCPUs".alias("worker_cores"),
-      'isAutomated,
-      'dbu_rate,
-      'worker_potential_core_H,
-      'driver_compute_cost,
-      'worker_compute_cost,
-      'driver_dbu_cost,
-      'worker_dbu_cost,
-      'total_compute_cost,
-      'total_DBU_cost,
-      'total_driver_cost,
-      'total_worker_cost,
-      'total_cost
-    )
-
-    // Get cluster potential with costs by state relative to job run
-    // Manipulate "timestamp" column to reflect state handle relative to job run
-    val clusterPotentialInitialState = clusterPotentialWCosts
-      .withColumn("timestamp", 'unixTimeMS_state_start)
-      .select(clsfKeys ++ clsfLookups: _*)
-
-    val clusterPotentialIntermediateStates = clusterPotentialWCosts
-      .select((clsfKeyColNames.filterNot(_ == "timestamp") map col) ++ clsfLookups: _*)
-
-    val clusterPotentialTerminalState = clusterPotentialWCosts
-      .withColumn("timestamp", 'unixTimeMS_state_end)
-      .select(clsfKeys ++ clsfLookups: _*)
-
-    // Adjust the uptimeInState to smooth the runtimes over the runPeriod across concurrent runs
-    val stateLifecycleKeys = Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start")
 
     // for states (CREATING and STARTING) OR automated cluster runstate start is same as cluster state start
     // (i.e. not discounted to runStateStart)
-    val runStateLastToStartStart = array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))
+    val runStateLastToStart = array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))
     val runStateFirstToEnd = array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS"))
 
-    val jobRunInitialState = newAndOpenJobRuns //jobRun_gold
-      .withColumn("timestamp", $"job_runtime.startEpochMS")
-      .toTSDF("timestamp", "organization_id", "cluster_id")
-      .lookupWhen(
-        clusterPotentialInitialState
-          .toTSDF("timestamp", "organization_id", "cluster_id"),
-        tsPartitionVal = 4, maxLookAhead = 1L
-      ).df
-      .drop("timestamp")
-      .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
-      .withColumn("runtime_in_cluster_state",
-        when('state.isin("CREATING", "STARTING") || 'job_cluster_type === "new", 'uptime_in_state_H * 1000 * 3600) // get true cluster time when state is guaranteed fully initial
-          .otherwise(runStateFirstToEnd - $"job_runtime.startEpochMS")) // otherwise use jobStart as beginning time and min of stateEnd or jobEnd for end time )
-      .withColumn("lifecycleState", lit("init"))
+    val jobRunByClusterState = jrcpDeriveRunsByClusterState(
+      clusterPotentialWCosts,
+      newAndOpenJobRuns,
+      untilTime,
+      runStateFirstToEnd,
+      runStateLastToStart
+    )
 
-    val jobRunTerminalState = newAndOpenJobRuns
-      .withColumn("timestamp", coalesce($"job_runtime.endEpochMS", lit(untilTime.asUnixTimeMilli))) // include currently executing runs and calculate costs through module until time
-      .toTSDF("timestamp", "organization_id", "cluster_id")
-      .lookupWhen(
-        clusterPotentialTerminalState
-          .toTSDF("timestamp", "organization_id", "cluster_id"),
-        tsPartitionVal = 4, maxLookback = 0L, maxLookAhead = 1L
-      ).df
-      .drop("timestamp")
-      .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull && 'unixTimeMS_state_end > $"job_runtime.endEpochMS")
-      .join(jobRunInitialState.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti") // filter out beginning states
-      .withColumn("runtime_in_cluster_state", $"job_runtime.endEpochMS" - runStateLastToStartStart)
-      .withColumn("lifecycleState", lit("terminal"))
-
-    // PERF -- identify top 40 job counts by cluster to be provided to SKEW JOIN hint
-    // Some interactive clusters may receive 90%+ of job runs causing massive skew, skew hint resolves
-    val topClusters = newAndOpenJobRuns
-      .filter('organization_id.isNotNull && 'cluster_id.isNotNull)
-      .groupBy('organization_id, 'cluster_id).count
-      .orderBy('count.desc).limit(40)
-      .select(array('organization_id, 'cluster_id)).as[Seq[String]].collect.toSeq
-
-    val jobRunIntermediateStates = newAndOpenJobRuns.alias("jr")
-      .join(clusterPotentialIntermediateStates.alias("cpot").hint("SKEW", Seq("organization_id", "cluster_id"), topClusters),
-        $"jr.organization_id" === $"cpot.organization_id" &&
-          $"jr.cluster_id" === $"cpot.cluster_id" &&
-          $"cpot.unixTimeMS_state_start" > $"jr.job_runtime.startEpochMS" && // only states beginning after job start and ending before
-          $"cpot.unixTimeMS_state_end" < $"jr.job_runtime.endEpochMS"
-      )
-      .drop($"cpot.cluster_id").drop($"cpot.organization_id")
-      .join(jobRunInitialState.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti") // filter out beginning states
-      .join(jobRunTerminalState.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti") // filter out ending states
-      .withColumn("runtime_in_cluster_state", 'unixTimeMS_state_end - 'unixTimeMS_state_start)
-      .withColumn("lifecycleState", lit("intermediate"))
-
-
-    val jobRunByClusterState = jobRunInitialState
-      .unionByName(jobRunIntermediateStates)
-      .unionByName(jobRunTerminalState)
+//    // simplified rules
+//    val startDuring = $"state_runtime.startTS".between($"hourOfDayWindow.startTS", $"hourOfDayWindow.endTS")
+//    val endDuring = $"state_runtime.endTS".between($"hourOfDayWindow.startTS", $"hourOfDayWindow.endTS")
+//    val startBefore = $"state_runtime.startTS" < $"hourOfDayWindow.startTS"
+//    val endAfter = $"state_runtime.endTS" > $"hourOfDayWindow.endTS"
+//
+//    // composite rules
+//    val withinHour = startDuring && endDuring
+//    val startDuringEndAfter = startDuring && endAfter
+//    val startBeforeEndDuring = startBefore && endDuring
+//    val startBeforeEndAfter = startBefore && endAfter
 
     // Derive runStateConcurrency to derive runState fair share or utilization
     // runStateUtilization = runtimeInRunState / sum(overlappingRuntimesInState)
 
-    val runstateKeys = $"obs.organization_id" === $"lookup.organization_id" &&
-      $"obs.cluster_id" === $"lookup.cluster_id" &&
-      $"obs.unixTimeMS_state_start" === $"lookup.unixTimeMS_state_start" &&
-      $"obs.unixTimeMS_state_end" === $"lookup.unixTimeMS_state_end"
+//    val runstateKeys = $"obs.organization_id" === $"lookup.organization_id" &&
+//      $"obs.cluster_id" === $"lookup.cluster_id" &&
+//      $"obs.unixTimeMS_state_start" === $"lookup.unixTimeMS_state_start" &&
+//      $"obs.unixTimeMS_state_end" === $"lookup.unixTimeMS_state_end"
+//
+//    val startsBefore = $"lookup.run_state_start_epochMS" < $"obs.run_state_start_epochMS"
+//    val startsDuring = $"lookup.run_state_start_epochMS" > $"obs.run_state_start_epochMS" && $"lookup.run_state_start_epochMS" < $"obs.run_state_end_epochMS" // exclusive
+//    val endsDuring = $"lookup.run_state_end_epochMS" > $"obs.run_state_start_epochMS" && $"lookup.run_state_end_epochMS" < $"obs.run_state_end_epochMS" // exclusive
+//    val endsAfter = $"lookup.run_state_end_epochMS" > $"obs.run_state_end_epochMS"
+//    val startsEndsWithin = $"lookup.run_state_start_epochMS".between($"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS") &&
+//      $"lookup.run_state_end_epochMS".between($"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS") // inclusive
+//
+//    val simplifiedJobRunByClusterState = jobRunByClusterState
+//      .filter('job_cluster_type === "existing") // only relevant for interactive clusters
+//      .withColumn("run_state_start_epochMS", runStateLastToStart)
+//      .withColumn("run_state_end_epochMS", runStateFirstToEnd)
+//      .select(
+//        'organization_id, 'run_id, 'cluster_id, 'run_state_start_epochMS, 'run_state_end_epochMS, 'unixTimeMS_state_start, 'unixTimeMS_state_end
+//      )
+//
+//    // sum of run_state_times starting before ending during
+//    val runStateBeforeEndsDuring = simplifiedJobRunByClusterState.alias("obs")
+//      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsBefore && endsDuring)
+//      .withColumn("relative_runtime_in_runstate", $"lookup.run_state_end_epochMS" - $"obs.unixTimeMS_state_start") // runStateEnd minus clusterStateStart
+//      .select(
+//        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS",
+//        $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end",
+//        'relative_runtime_in_runstate
+//      )
+//
+//    // sum of run_state_times starting during ending after
+//    val runStateAfterBeginsDuring = simplifiedJobRunByClusterState.alias("obs")
+//      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsDuring && endsAfter)
+//      .withColumn("relative_runtime_in_runstate", $"lookup.unixTimeMS_state_end" - $"obs.run_state_start_epochMS") // clusterStateEnd minus runStateStart
+//      .select(
+//        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS",
+//        $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end",
+//        'relative_runtime_in_runstate
+//      )
+//
+//    // sum of run_state_times starting and ending during
+//    val runStateBeginEndDuring = simplifiedJobRunByClusterState.alias("obs")
+//      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsEndsWithin)
+//      .withColumn("relative_runtime_in_runstate", $"lookup.run_state_end_epochMS" - $"obs.run_state_start_epochMS") // runStateEnd minus runStateStart
+//      .select(
+//        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS",
+//        $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end",
+//        'relative_runtime_in_runstate
+//      )
+//
+//    val cumulativeRunStateRunTimeByRunState = runStateBeforeEndsDuring
+//      .unionByName(runStateAfterBeginsDuring)
+//      .unionByName(runStateBeginEndDuring)
+//      .groupBy('organization_id, 'run_id, 'cluster_id, 'unixTimeMS_state_start, 'unixTimeMS_state_end) // runstate
+//      .agg(
+//        sum('relative_runtime_in_runstate).alias("cum_runtime_in_cluster_state"), // runtime in clusterState
+//        (sum(lit(1)) - lit(1)).alias("overlapping_run_states") // subtract one for self run
+//      )
 
-    val startsBefore = $"lookup.run_state_start_epochMS" < $"obs.run_state_start_epochMS"
-    val startsDuring = $"lookup.run_state_start_epochMS" > $"obs.run_state_start_epochMS" && $"lookup.run_state_start_epochMS" < $"obs.run_state_end_epochMS" // exclusive
-    val endsDuring = $"lookup.run_state_end_epochMS" > $"obs.run_state_start_epochMS" && $"lookup.run_state_end_epochMS" < $"obs.run_state_end_epochMS" // exclusive
-    val endsAfter = $"lookup.run_state_end_epochMS" > $"obs.run_state_end_epochMS"
-    val startsEndsWithin = $"lookup.run_state_start_epochMS".between($"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS") &&
-      $"lookup.run_state_end_epochMS".between($"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS") // inclusive
+    val cumulativeRunStateRunTimeByRunState = jrcpDeriveCumulativeRuntimeByRunState(
+      jobRunByClusterState,
+      runStateLastToStart,
+      runStateFirstToEnd
+    )
 
-    val simplifiedJobRunByClusterState = jobRunByClusterState
-      .filter('job_cluster_type === "existing") // only relevant for interactive clusters
-      .withColumn("run_state_start_epochMS", runStateLastToStartStart)
-      .withColumn("run_state_end_epochMS", runStateFirstToEnd)
-      .select(
-        'organization_id, 'run_id, 'cluster_id, 'run_state_start_epochMS, 'run_state_end_epochMS, 'unixTimeMS_state_start, 'unixTimeMS_state_end
+    val jobRunCostPotential = jobRunByClusterState
+      .join(
+        cumulativeRunStateRunTimeByRunState,
+        Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start", "unixTimeMS_state_end"),
+        "left"
       )
-
-    // sum of run_state_times starting before ending during
-    val runStateBeforeEndsDuring = simplifiedJobRunByClusterState.alias("obs")
-      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsBefore && endsDuring)
-      .withColumn("relative_runtime_in_runstate", $"lookup.run_state_end_epochMS" - $"obs.unixTimeMS_state_start") // runStateEnd minus clusterStateStart
-      .select(
-        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end", 'relative_runtime_in_runstate
-      )
-
-    // sum of run_state_times starting during ending after
-    val runStateAfterBeginsDuring = simplifiedJobRunByClusterState.alias("obs")
-      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsDuring && endsAfter)
-      .withColumn("relative_runtime_in_runstate", $"lookup.unixTimeMS_state_end" - $"obs.run_state_start_epochMS") // clusterStateEnd minus runStateStart
-      .select(
-        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end", 'relative_runtime_in_runstate
-      )
-
-    // sum of run_state_times starting and ending during
-    val runStateBeginEndDuring = simplifiedJobRunByClusterState.alias("obs")
-      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsEndsWithin)
-      .withColumn("relative_runtime_in_runstate", $"lookup.run_state_end_epochMS" - $"obs.run_state_start_epochMS") // runStateEnd minus runStateStart
-      .select(
-        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end", 'relative_runtime_in_runstate
-      )
-
-    val cumulativeRunStateRunTimeByRunState = runStateBeforeEndsDuring
-      .unionByName(runStateAfterBeginsDuring)
-      .unionByName(runStateBeginEndDuring)
-      .groupBy('organization_id, 'run_id, 'cluster_id, 'unixTimeMS_state_start, 'unixTimeMS_state_end) // runstate
-      .agg(
-        sum('relative_runtime_in_runstate).alias("cum_runtime_in_cluster_state"), // runtime in clusterState
-        (sum(lit(1)) - lit(1)).alias("overlapping_run_states") // subtract one for self run
-      )
-      .repartition()
-      .cache
-
-    val runStateWithUtilizationAndCosts = jobRunByClusterState
-      .join(cumulativeRunStateRunTimeByRunState, Seq("organization_id", "run_id", "cluster_id", "unixTimeMS_state_start", "unixTimeMS_state_end"), "left")
-      .withColumn("cluster_type", when('job_cluster_type === "new", lit("automated")).otherwise(lit("interactive")))
-      .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time
-      .withColumn("run_state_utilization",
-        when('cluster_type === "interactive", least('runtime_in_cluster_state / 'cum_runtime_in_cluster_state, lit(1.0)))
-          .otherwise(lit(1.0))
-      ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
-      .withColumn("overlapping_run_states", when('cluster_type === "interactive", 'overlapping_run_states).otherwise(lit(0)))
-      //        .withColumn("overlapping_run_states", when('cluster_type === "automated", lit(0)).otherwise('overlapping_run_states)) // removed 4.2
-      .withColumn("running_days", sequence($"job_runtime.startTS".cast("date"), $"job_runtime.endTS".cast("date")))
-      .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
-      .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'state_utilization_percent * 'run_state_utilization)
-      .withColumn("worker_compute_cost", 'worker_compute_cost * 'state_utilization_percent * 'run_state_utilization)
-      .withColumn("worker_dbu_cost", 'worker_dbu_cost * 'state_utilization_percent * 'run_state_utilization)
-      .withColumn("total_driver_cost", 'driver_compute_cost + 'driver_dbu_cost)
-      .withColumn("total_worker_cost", 'worker_compute_cost + 'worker_dbu_cost)
-      .withColumn("total_compute_cost", 'driver_compute_cost + 'worker_compute_cost)
-      .withColumn("total_dbu_cost", 'driver_dbu_cost + 'worker_dbu_cost)
-      .withColumn("total_cost", 'total_driver_cost + 'total_worker_cost)
-
-    val jobRunCostPotential = runStateWithUtilizationAndCosts
-      .groupBy(
-        'organization_id,
-        'run_id,
-        'job_id,
-        'id_in_job,
-        'startEpochMS,
-        'job_runtime,
-        'job_terminal_state.alias("run_terminal_state"),
-        'job_trigger_type.alias("run_trigger_type"),
-        'job_task_type.alias("run_task_type"),
-        'cluster_id,
-        'cluster_name,
-        'cluster_type,
-        'custom_tags,
-        'driver_node_type_id,
-        'node_type_id,
-        'dbu_rate
-      )
-      .agg(
-        first('running_days).alias("running_days"),
-        greatest(round(avg('run_state_utilization), 4), lit(0.0)).alias("avg_cluster_share"),
-        greatest(round(avg('overlapping_run_states), 2), lit(0.0)).alias("avg_overlapping_runs"),
-        greatest(max('overlapping_run_states), lit(0.0)).alias("max_overlapping_runs"),
-        sum(lit(1)).alias("run_cluster_states"),
-        greatest(round(sum('worker_potential_core_H), 6), lit(0)).alias("worker_potential_core_H"),
-        greatest(round(sum('driver_compute_cost), 6), lit(0)).alias("driver_compute_cost"),
-        greatest(round(sum('driver_dbu_cost), 6), lit(0)).alias("driver_dbu_cost"),
-        greatest(round(sum('worker_compute_cost), 6), lit(0)).alias("worker_compute_cost"),
-        greatest(round(sum('worker_dbu_cost), 6), lit(0)).alias("worker_dbu_cost"),
-        greatest(round(sum('total_driver_cost), 6), lit(0)).alias("total_driver_cost"),
-        greatest(round(sum('total_worker_cost), 6), lit(0)).alias("total_worker_cost"),
-        greatest(round(sum('total_compute_cost), 6), lit(0)).alias("total_compute_cost"),
-        greatest(round(sum('total_dbu_cost), 6), lit(0)).alias("total_dbu_cost"),
-        greatest(round(sum('total_cost), 6), lit(0)).alias("total_cost")
-      )
+      .transform(jrcpAppendUtilAndCosts)
+      .transform(jrcpAggMetricsToRun)
 
     // GET UTILIZATION BY KEY
     // IF incremental spark events are present calculate utilization, otherwise just return with NULLS
     // Spark events are commonly missing if no clusters are logging and/or in test environments
     if (!sparkJobLag2D.isEmpty && !sparkTaskLag2D.isEmpty) {
-      val sparkJobMini = sparkJobLag2D
-        .select('organization_id, 'date, 'spark_context_id, 'job_group_id,
-          'job_id, explode('stage_ids).alias("stage_id"), 'db_job_id, 'db_id_in_job)
-        .filter('db_job_id.isNotNull && 'db_id_in_job.isNotNull)
 
-      val sparkTaskMini = sparkTaskLag2D
-        .select('organization_id, 'date, 'spark_context_id, 'stage_id,
-          'stage_attempt_id, 'task_id, 'task_attempt_id,
-          $"task_runtime.runTimeMS", $"task_runtime.endTS".cast("date").alias("spark_task_termination_date"))
+      jrcpDeriveSparkJobUtil(sparkJobLag2D, sparkTaskLag2D)
+        .transform(jrcpJoinWithJobRunCostPotential(jobRunCostPotential))
 
-      val jobRunUtilRaw = sparkJobMini.alias("sparkJobMini")
-        .joinWithLag(
-          sparkTaskMini,
-          Seq("organization_id", "date", "spark_context_id", "stage_id"),
-          "date"
-        )
-        .withColumn("spark_task_runtime_H", 'runtimeMS / lit(1000) / lit(3600))
-        .withColumnRenamed("job_id", "spark_job_id")
-        .withColumnRenamed("stage_id", "spark_stage_id")
-        .withColumnRenamed("task_id", "spark_task_id")
-
-      val jobRunSparkUtil = jobRunUtilRaw
-        .groupBy('organization_id, 'db_job_id, 'db_id_in_job)
-        .agg(
-          sum('runTimeMS).alias("spark_task_runtimeMS"),
-          round(sum('spark_task_runtime_H), 4).alias("spark_task_runtime_H")
-        )
-
-      jobRunCostPotential.alias("jrCostPot")
-        .join(
-          jobRunSparkUtil.withColumnRenamed("organization_id", "orgId").alias("jrSparkUtil"),
-          $"jrCostPot.organization_id" === $"jrSparkUtil.orgId" &&
-            $"jrCostPot.job_id" === $"jrSparkUtil.db_job_id" &&
-            $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job",
-          "left"
-        )
-        .drop("db_job_id", "db_id_in_job", "orgId")
-        .withColumn("job_run_cluster_util", round(('spark_task_runtime_H / 'worker_potential_core_H), 4))
     } else {
       jobRunCostPotential
         .withColumn("spark_task_runtimeMS", lit(null).cast("long"))
