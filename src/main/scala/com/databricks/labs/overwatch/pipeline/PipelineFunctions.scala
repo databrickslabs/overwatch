@@ -14,7 +14,7 @@ import TransformFunctions._
 import java.io.{PrintWriter, StringWriter}
 import java.net.URI
 
-object PipelineFunctions {
+object PipelineFunctions extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   private val uriSchemeRegex = "^([a-zA-Z][-.+a-zA-Z0-9]*):/.*".r
@@ -320,6 +320,85 @@ object PipelineFunctions {
 
       df.withColumn("requestParams", struct(cleanRPFields: _*))
     } else df
+  }
+
+  def casedSeqCompare(seq1: Seq[String], s2: String): Boolean = {
+    if ( // make lower case if column names are case insensitive
+      spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
+    ) seq1.contains(s2) else seq1.exists(s1 => s1.equalsIgnoreCase(s2))
+  }
+
+  def buildIncrementalFilters(
+                              target: PipelineTable,
+                               df: DataFrame,
+                               fromTime: TimeTypes,
+                               untilTime: TimeTypes,
+                              additionalLagDays: Long = 0,
+                              moduleName: String = "UNDEFINED"
+                             ): Array[IncrementalFilter] = {
+    if (target.exists) {
+      val dfFields = df.schema.fields
+      val cronFields = dfFields.filter(f => casedSeqCompare(target.incrementalColumns, f.name))
+
+      if (additionalLagDays > 0) require(
+        dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
+        "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
+
+      val filterMsg = s"FILTERING: ${moduleName} using cron columns: ${cronFields.map(_.name).mkString(", ")}"
+      logger.log(Level.INFO, filterMsg)
+      if (target.config.debugFlag) println(filterMsg)
+      cronFields.map(field => {
+
+        field.dataType match {
+          case dt: DateType => {
+            if (!target.partitionBy.map(_.toLowerCase).contains(field.name.toLowerCase)) {
+              val errmsg = s"Date filters are inclusive on both sides and are used for partitioning. Date filters " +
+                s"should not be used in the Overwatch package alone. Date filters must be accompanied by a more " +
+                s"granular filter to utilize df.asIncrementalDF.\nERROR: ${field.name} not in partition columns: " +
+                s"${target.partitionBy.mkString(", ")}"
+              throw new IncompleteFilterException(errmsg)
+            }
+
+            // Nothing in Overwatch is incremental at the date level thus until date should always be inclusive
+            // so add 1 day to follow the rule value >= date && value < date
+            // but still keep it inclusive
+            val untilDate = PipelineFunctions.addNTicks(untilTime.asColumnTS, 1, DateType)
+            IncrementalFilter(
+              field,
+              date_sub(fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
+              untilDate.cast(dt)
+            )
+          }
+          case dt: TimestampType => {
+            val start = if (additionalLagDays > 0) {
+              val epochMillis = fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)
+              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000.0).cast(dt)
+            } else {
+              fromTime.asColumnTS
+            }
+            IncrementalFilter(
+              field,
+              start,
+              untilTime.asColumnTS
+            )
+          }
+          case dt: LongType => {
+            val start = if (additionalLagDays > 0) {
+              lit(fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)).cast(dt)
+            } else {
+              lit(fromTime.asUnixTimeMilli)
+            }
+            IncrementalFilter(
+              field,
+              start,
+              lit(untilTime.asUnixTimeMilli)
+            )
+          }
+          case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
+            s"a filter containing a ${field.dataType.typeName} type. ONLY Timestamp, Date, and Long types are supported.")
+        }
+      })
+    } else Array[IncrementalFilter]()
   }
 
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"

@@ -1282,8 +1282,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Re-Combine Interactive and Automated Job Run Clusters
     val jobRunsWIdsAndNames = interactiveRunsWID
       .transform(jobRunsFillMissingInteractiveClusterIDsAndJobNames(jobsStatus))
-      .unionByName(automatedJobRunsBase)
-      .unionByName(jobsClusterJobRunsBase)
+      .unionByName(automatedJobRunsBase, allowMissingColumns = true)
+      .unionByName(jobsClusterJobRunsBase, allowMissingColumns = true)
 
     /**
      * Child runs must be removed and nested into the parent runs so as not to be double counted
