@@ -30,7 +30,7 @@ class Database(config: Config) extends SparkSessionWrapper {
    */
   def registerTarget(target: PipelineTable): Unit = {
     if (!target.exists(catalogValidation = true) && target.exists(pathValidation = true)) {
-      val createStatement = s"create table ${target.tableFullName} " +
+      val createStatement = s"create table if not exists ${target.tableFullName} " +
         s"USING DELTA location '${target.tableLocation}'"
       val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
       logger.log(Level.INFO, logMessage)

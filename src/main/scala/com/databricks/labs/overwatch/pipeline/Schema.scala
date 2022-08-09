@@ -751,4 +751,26 @@ object Schema extends SparkSessionWrapper {
   def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleId)
 
   def get(moduleId: Int): Option[StructType] = minimumSchemasByModule.get(moduleId)
+
+  val deployementMinimumSchema:StructType = StructType(Seq(
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("workspace_id", StringType, nullable = true),
+    StructField("workspace_url", StringType, nullable = true),
+    StructField("api_url", StringType, nullable = true),
+    StructField("cloud", StringType, nullable = true),
+    StructField("primordial_date", DateType, nullable = true),
+    StructField("etl_storage_prefix", StringType, nullable = true),
+    StructField("etl_database_name", StringType, nullable = true),
+    StructField("consumer_database_name", StringType, nullable = true),
+    StructField("secret_scope", StringType, nullable = true),
+    StructField("secret_key_dbpat", StringType, nullable = true),
+    StructField("auditlogprefix_source_aws", StringType, nullable = true),
+    StructField("eh_name", StringType, nullable = true),
+    StructField("eh_scope_key", StringType, nullable = true),
+    StructField("interactive_dbu_price", DoubleType, nullable = true),
+    StructField("automated_dbu_price", DoubleType, nullable = true),
+    StructField("max_date", IntegerType, nullable = true),
+    StructField("excluded_scopes", StringType, nullable = true),
+    StructField("active", BooleanType, nullable = true),
+  ))
 }
