@@ -93,6 +93,8 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
                            workspace_name: Option[String] = None,
                            externalizeOptimize: Boolean = false,
+                           apiURL: Option[String] = None,
+                           organizationID: Option[String] = None,
                            tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )
 
@@ -181,6 +183,20 @@ case class UpgradeReport(
                         )
 
 case class WorkspaceDataset(path: String, name: String)
+
+case class DeploymentValidationReport(
+                                       validated: Boolean = false,
+                                       simpleMsg:  String,
+                                       validationRule: String,
+                                       validationMsg: Option[String] = None,
+                                       workspaceId: Option[String]
+                                     )
+
+case class MultiWSDeploymentReport(
+                                    workspaceDetails: Option[String],
+                                    errorMsg:  String,
+                                    deploymentId: Option[String]
+                                  )
 
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
 

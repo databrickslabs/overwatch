@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ParamDeserializer
 import com.databricks.labs.overwatch.env.{Database, Workspace}
+import com.databricks.labs.overwatch.pipeline.Initializer.getOrgId
 import com.databricks.labs.overwatch.utils.OverwatchScope._
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -23,6 +24,14 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _isSnap: Boolean = false
   private var _disableValidations: Boolean = false
+  private var _isMultiworkspaceDeployment: Boolean = false
+
+  private def setIsMultiworkspaceDeployment(value: Boolean): this.type = {
+    _isMultiworkspaceDeployment = value
+    this
+  }
+
+  private def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
 
   private def setIsSnap(value: Boolean): this.type = {
     _isSnap = value
@@ -236,6 +245,15 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setTempWorkingDir(workspaceTempWorkingDir)
   }
 
+
+  private def multiWorkspaceOverrideOrganizationId(orgId: String): Unit = {
+    val overrideMsg = s"Multiworkspace Deployment Overriding organization_id from ${config.organizationId} to " +
+      s"${orgId} to accommodate data continuity across deployments"
+    if (config.debugFlag) println(overrideMsg)
+    logger.log(Level.INFO, overrideMsg)
+    config.setOrganizationId(orgId)
+  }
+
   /**
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
@@ -264,17 +282,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      *
      * Otherwise -- read from the args passed in and serialize into OverwatchParams
      */
-    val rawParams = if (config.isLocalTesting) {
-      //      config.buildLocalOverwatchParams()
-      //      val synthArgs = config.buildLocalOverwatchParams()
-      //      mapper.readValue[OverwatchParams](synthArgs)
-      mapper.readValue[OverwatchParams](overwatchArgs)
-    } else {
-      logger.log(Level.INFO, "Validating Input Parameters")
-      mapper.readValue[OverwatchParams](overwatchArgs)
-    }
-
-    // Now that the input parameters have been parsed -- set them in the config
+    logger.log(Level.INFO, "Validating Input Parameters")
+    val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
+    if (isMultiworkspaceDeployment) multiWorkspaceOverrideOrganizationId(rawParams.organizationID.get)
     config.setInputConfig(rawParams)
 
 
@@ -318,9 +328,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       if (keyCheck.length == 0) throw new BadConfigException(s"Key ${tokenSecret.get.key} does not exist " +
         s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
         s"available and accessible to this account.")
-
-      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)))
-    } else config.registerWorkspaceMeta(None)
+      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)), rawParams.apiURL)
+    } else config.registerWorkspaceMeta(None, None)
 
     // Validate data Target
     if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
@@ -361,7 +370,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
 
     // must happen AFTER data target validation
     if (!disableValidations) { // temp working dir is not necessary for disabled validations as pipelines cannot be
-    // executed without validations
+      // executed without validations
       prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
     }
 
@@ -544,13 +553,13 @@ object Initializer extends SparkSessionWrapper {
     } else dbutils.notebook.getContext.tags("orgId")
   }
 
-  private def initConfigState(debugFlag: Boolean): Config = {
+  private def initConfigState(debugFlag: Boolean,isMultiworkspaceDeployment:Boolean): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-    val orgId = if (config.isLocalTesting) System.getenv("ORGID") else {
-      getOrgId
+    if(!isMultiworkspaceDeployment) {
+      val orgId = getOrgId
+      config.setOrganizationId(orgId)
     }
-    config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
@@ -593,6 +602,17 @@ object Initializer extends SparkSessionWrapper {
     )
   }
 
+  def apply(overwatchArgs: String, debugFlag: Boolean, isMultiworkspaceDeployment: Boolean): Workspace = {
+    apply(
+      overwatchArgs,
+      debugFlag,
+      isSnap = false,
+      disableValidations = false,
+      initializeDatabase = true,
+      isMultiworkspaceDeployment
+    )
+  }
+
   /**
    *
    * @param overwatchArgs Json string of args -- When passing into args in Databricks job UI, the json string must
@@ -613,14 +633,16 @@ object Initializer extends SparkSessionWrapper {
                                 debugFlag: Boolean = false,
                                 isSnap: Boolean = false,
                                 disableValidations: Boolean = false,
-                                initializeDatabase: Boolean = true
+                                initializeDatabase: Boolean = true,
+                                isMultiworkspaceDeployment: Boolean = false
                               ): Workspace = {
 
-    val config = initConfigState(debugFlag)
+    val config = initConfigState(debugFlag,isMultiworkspaceDeployment)
 
     logger.log(Level.INFO, "Initializing Environment")
     val initializer = new Initializer(config)
       .setIsSnap(isSnap)
+      .setIsMultiworkspaceDeployment(isMultiworkspaceDeployment)
       .setDisableValidations(disableValidations) // if true, will result in a read only pipeline
       .validateAndRegisterArgs(overwatchArgs)
 

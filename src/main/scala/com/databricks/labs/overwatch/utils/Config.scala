@@ -328,14 +328,17 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret],apiURL:Option[String]): this.type = {
     var rawToken = ""
     var scope = ""
     var key = ""
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
-        _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+        //For multiworksspace deployment get api url from config file
+        //For single deployment get the api url from notebook context.
+        _workspaceUrl = apiURL.getOrElse(dbutils.notebook.getContext().apiUrl.get)
+        println("setting workspace URL"+_workspaceUrl)
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key
@@ -442,25 +445,4 @@ class Config() {
     this
   }
 
-  /**
-   * Manual setters for DB Remote and Local Testing. This is not used if "isLocalTesting" == false
-   * This function allows for hard coded parameters for rapid integration testing and prototyping
-   *
-   * @return
-   */
-  def buildLocalOverwatchParams(): String = {
-
-    registerWorkspaceMeta(None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters)
-    _databaseName = "overwatch_local"
-    _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
-    //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
-
-    // AWS TEST
-    _cloudProvider = "azure"
-    """
-      |{String for testing. Run string without escape chars. Do not commit secrets to git}
-      |""".stripMargin
-
-  }
 }
