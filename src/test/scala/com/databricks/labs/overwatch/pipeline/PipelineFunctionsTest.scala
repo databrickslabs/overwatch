@@ -223,6 +223,16 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       Then("the function returns the connection string")
       assertResult(ehConnString) (PipelineFunctions.parseEHConnectionString(ehConnString))
     }
+    it("should parse the connection string with special characters") {
+      Given("an event hub connection string")
+      val ehConnString = "Endpoint=sb://<NamespaceName>.servicebus.windows.net/;SharedAccessKey=$+<abcdefgh+1234+>"
+
+      When("the connection string is in correct format")
+
+      Then("the function returns the connection string")
+      assertResult(ehConnString) (PipelineFunctions.parseEHConnectionString(ehConnString))
+    }
+
   }
 
   describe("Tests for cleansePathURI - Part 2") {
@@ -242,19 +252,20 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
   describe("Tests for epochMilliToTs") {
     it("should convert epoch time to timestamp and preserve milliseconds") {
       Given("a dataframe with epoch milliseconds time of long type")
-      val df = spark.sql("select '1636663343887' as epoch_millisecond")
+      //Reference for epoch millis https://currentmillis.com/
+      val df = spark.sql("select '1660109379388' as epoch_millisecond")
 
       When("function is called on this column")
 
       Then("returns a column of type timestamp and preserves milliseconds")
       assertResult("TimestampType") (df
         .withColumn("converted_string", PipelineFunctions.epochMilliToTs("epoch_millisecond"))
-        .dtypes.filter(_._1 == "converted_string").head._2
+        .schema.filter( x => x.name == "converted_string").head.dataType.toString
       )
-      assertResult("887") (df
+      assertResult("2022-08-10 10:59:39.388") (df
         .withColumn("converted_column", PipelineFunctions.epochMilliToTs("epoch_millisecond"))
         .select("converted_column")
-        .collect().head.get(0).toString.split("\\.").takeRight(1).head
+        .collect().head.get(0).toString
       )
     }
     it("should return null for unexpected timestamp format") {
@@ -282,11 +293,11 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       Then("convert timestamp to epoch time and preserve milliseconds")
       assertResult("DoubleType") (df
         .withColumn("epoch_milliseconds", PipelineFunctions.tsToEpochMilli("ts"))
-        .dtypes.filter(_._1 == "epoch_milliseconds").head._2
+        .schema.filter( x => x.name == "epoch_milliseconds").head.dataType.toString
       )
-      assertResult("887") (df
+      assertResult("1636663343887") (df
         .withColumn("epoch_milliseconds", PipelineFunctions.tsToEpochMilli("ts").cast("Long").cast("String"))
-        .select("epoch_milliseconds").collect().head.get(0).toString.takeRight(3)
+        .select("epoch_milliseconds").collect().head.getAs[String](0)
       )
     }
     it("should return null for unexpected values") {
@@ -323,7 +334,7 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       val expectedDf: DataFrame = DeltaTable.forPath(testTable.tableLocation).history(9999)
         .select("version", "timestamp", "operation", "clusterId", "operationMetrics", "userMetadata")
 
-      assertApproximateDataFrameEquality(functionOutputDf, expectedDf, 0.001)
+      assertSmallDatasetEquality(functionOutputDf, expectedDf)
 
       // delete the delta table
       val dir = Directory("/tmp/overwatch/tests/table1")
