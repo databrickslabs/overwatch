@@ -98,24 +98,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getPoolsDF: DataFrame = {
     val poolsEndpoint = "instance-pools/list"
-    val apiResponse = ApiCallV2(config.apiEnv, poolsEndpoint)
-        .execute()
-    try{
-    apiResponse
-        .asDF()
-        .withColumn("organization_id", lit(config.organizationId))
-    }
-    catch {
-      /**In case if there is no cluster pools available in workspace .asDF() call throws ApiCallEmptyResponse exception.
-       * Handle the ApiCallEmptyResponse exception and move on to the rest of the modules.
-       * Not handling any other exceptions.
-       */
-      case emptyResponseError: ApiCallEmptyResponse =>
-        val message = s"Exceotion in reading pool list ${emptyResponseError}"
-        println(message)
-        logger.error(message)
-        spark.emptyDataFrame.withColumn("organization_id", lit(config.organizationId))
-    }
+    ApiCallV2(config.apiEnv,poolsEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
   }
 
   /**
