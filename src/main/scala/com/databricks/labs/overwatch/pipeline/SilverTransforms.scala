@@ -1185,7 +1185,7 @@ trait SilverTransforms extends SparkSessionWrapper {
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
     // TODO -- add runTriggered
-    val jobRunActions = Array("runSucceeded", "runFailed", "runNow", "runStart", "submitRun", "cancel")
+    val jobRunActions = Array("runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel")
     val jobRunsLag30D = getJobsBase(auditLogLag30D)
       .filter('actionName.isin(jobRunActions: _*))
       .repartition(getTotalCores * 4)
