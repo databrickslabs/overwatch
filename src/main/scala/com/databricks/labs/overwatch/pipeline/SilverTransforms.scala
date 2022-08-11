@@ -1114,10 +1114,15 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobStatusBase = jobsBase
       .select(jobs_statusCols: _*)
+      .filter('job_id.isNotNull) // create errors and delete errors will be filtered out
       .transform(jobStatusLookupJobMeta(jobSnapLookup))
-      .transform(jobStatusAppendClusterDetails)
-      .transform(jobStatusBuildAndAppendTemporalClusterSpec(lastJobStatus))
       .transform(jobStatusLookupAndFillForwardMetaData(lastJobStatus))
+      .transform(jobStatusUnifyNewCluster)
+      .transform(jobStatusConvertJsonColsToStructs(jobsBaseHasRecords))
+      .transform(jobStatusCleanseForPublication(targetKeys))
+      .transform(jobStatusAppendClusterDetails)
+      .transform(jobStatusAppendAndFillTemporalClusterSpec)
+
 
     /**
      * jobStatusBaseFilled - if first run, baseline jobs statuses for existing jobs that haven't been edited since
@@ -1126,7 +1131,7 @@ trait SilverTransforms extends SparkSessionWrapper {
      * present in gold
      */
     val isFirstRunAndJobsSnapshotHasRecords = isFirstRun && !jobsSnapshotDFComplete.isEmpty
-    val jobStatusBaseFilled = if (isFirstRunAndJobsSnapshotHasRecords) {
+    val jobStatusBaseFilled = if (isFirstRunAndJobsSnapshotHasRecords) { // TODO -- implement after jobs_snapshot 2.1 enabled
 
       // get job ids that are present in snapshot but not present in historical audit logs
       val missingJobIds = jobStatusDeriveFirstRunMissingJobIDs(jobsBaseHasRecords, jobsSnapshotDFComplete, jobStatusBase)
@@ -1143,53 +1148,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       throw new NoNewDataException(msg, Level.WARN, allowModuleProgression = true)
     }
 
-    // create structs from json strings and cleanse schema
-    val jobStatusEnhanced = jobStatusBaseFilled
-      .transform(jobStatusConvertJsonColsToStructs(jobsBaseHasRecords))
-
-    // TODO - as part of mtjs support this logic will change to appropriately handle tasks and keys
-    // convert structs to maps where the structs' keys are allowed to be typed by the user to avoid
-    // bad duplicate keys
-    val structsCleaner = collection.mutable.Map(
-      "new_settings.new_cluster.custom_tags" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.custom_tags"),
-      "new_settings.new_cluster.spark_conf" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.spark_conf"),
-      "new_settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.spark_env_vars"),
-      s"new_settings.new_cluster.aws_attributes" -> SchemaTools.structToMap(jobStatusEnhanced, s"new_settings.new_cluster.aws_attributes"),
-      s"new_settings.new_cluster.azure_attributes" -> SchemaTools.structToMap(jobStatusEnhanced, s"new_settings.new_cluster.azure_attributes"),
-      "new_settings.notebook_task.base_parameters" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.notebook_task.base_parameters"),
-      "cluster_spec.new_cluster.custom_tags" -> SchemaTools.structToMap(jobStatusEnhanced, "cluster_spec.new_cluster.custom_tags"),
-      "cluster_spec.new_cluster.spark_conf" -> SchemaTools.structToMap(jobStatusEnhanced, "cluster_spec.new_cluster.spark_conf"),
-      "cluster_spec.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobStatusEnhanced, "cluster_spec.new_cluster.spark_env_vars"),
-      s"cluster_spec.new_cluster.aws_attributes" -> SchemaTools.structToMap(jobStatusEnhanced, s"cluster_spec.new_cluster.aws_attributes"),
-      s"cluster_spec.new_cluster.azure_attributes" -> SchemaTools.structToMap(jobStatusEnhanced, s"cluster_spec.new_cluster.azure_attributes")
-    )
-
-    // if new tasks are used cleanse the nested tasks columns as they contain additional nested structs
-    // with user-defined keys -- they should be converted to a map and the new_settings column rebuilt
-    val withCleansedTasks = if (SchemaTools.getAllColumnNames(jobStatusEnhanced.schema).contains("new_settings.tasks")) {
-      val cleansedNewSettingsTasksDF = jobStatusCleanseNewSettingsTasks(jobStatusEnhanced, targetKeys)
-
-      structsCleaner("new_settings.tasks") = col("newSettingsTask")
-
-      jobStatusEnhanced
-        .join(cleansedNewSettingsTasksDF, targetKeys.toSeq, "left")
-
-    } else { // new_settings.tasks column doesn't exist (i.e. jobs pipelines not used in workspace)
-      jobStatusEnhanced
-    }
-
-    val withCleansedJobClusters = if (SchemaTools.getAllColumnNames(jobStatusEnhanced.schema).contains("new_settings.job_clusters")) {
-      val cleansedJobClustersDF = jobStatusCleanseJobClusters(jobStatusEnhanced, targetKeys)
-      structsCleaner("new_settings.job_clusters") = col("job_clusters")
-      withCleansedTasks
-        .join(cleansedJobClustersDF, targetKeys.toSeq, "left")
-    } else {
-      withCleansedTasks
-    }
-
-    withCleansedJobClusters
-      .select(SchemaTools.modifyStruct(withCleansedJobClusters.schema, structsCleaner.toMap): _*)
-      .drop("newSettingsTask", "job_clusters")
+    // TODO -- if first run union for missing keys -- apply jobStatusBaseFilled to jobStatusBase
+    jobStatusBase
   }
 
   /**

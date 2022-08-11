@@ -65,6 +65,10 @@ object TransformFunctions {
       }): _*)
     }
 
+    def modifyStruct(changeInventory: Map[String, Column]): DataFrame = {
+      df.select(SchemaTools.modifyStruct(df.schema, changeInventory): _*)
+    }
+
     /**
      * Join left and right as normal with the added feature that "lagDays" will be allowed to match on the join
      * condition of the "laggingSide"

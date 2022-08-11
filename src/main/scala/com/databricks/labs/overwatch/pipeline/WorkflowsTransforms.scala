@@ -70,68 +70,61 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       ).df
   }
 
+  def jobStatusUnifyNewCluster(df: DataFrame): DataFrame = {
+    df
+      .withColumn("new_cluster", coalesce('new_cluster, get_json_object('new_settings, "$.new_cluster")))
+  }
+
   /**
    * Extract and append the cluster details from the new_settings field
    * This will be present if it was recorded on the log event, otherwise it will be appended in the
    * next step
    */
   def jobStatusAppendClusterDetails(df: DataFrame): DataFrame = {
+//    val newCluster = coalesce('new_cluster, get_json_object('new_settings, "$.new_cluster"))
+//    df
+//      .withColumn("existing_cluster_id",
+//        coalesce('existing_cluster_id, get_json_object('new_settings, "$.existing_cluster_id"))
+//      )
+//      .withColumn("new_cluster", newCluster)
+//      .withColumn("job_clusters", get_json_object('new_settings, "$.job_clusters"))
     df
       .withColumn("existing_cluster_id",
-        coalesce('existing_cluster_id, get_json_object('new_settings, "$.existing_cluster_id"))
+        coalesce('existing_cluster_id, $"new_settings.existing_cluster_id")
       )
-      .withColumn("new_cluster",
-        coalesce('new_cluster, get_json_object('new_settings, "$.new_cluster"))
-      )
+      .withColumn("job_clusters", $"new_settings.job_clusters")
   }
 
   /**
-   * When the cluster spec
+   * Generate cluster_spec field and fill it temporally with the last value when
+   * the details are not provided
    */
-  def jobStatusBuildAndAppendTemporalClusterSpec(lastJobStatus: WindowSpec)(df: DataFrame): DataFrame = {
-    // Following section builds out a "clusterSpec" as it is defined at the timestamp. existing_cluster_id
-    // and new_cluster should never both be populated as a job must be one or the other at a timestamp
+  def jobStatusAppendAndFillTemporalClusterSpec(df: DataFrame): DataFrame = {
+    val temporalJobClusterSpec = df
+      .select('organization_id, 'jobId, 'timestamp,
+        struct(
+          'existing_cluster_id,
+          'new_cluster,
+          'job_clusters
+          // TODO - tasks.new_clusters?
+        ).alias("temporal_cluster_spec")
+      )
+      .toTSDF("timestamp", "organization_id", "jobId")
 
-    val existingClusterMoreRecent = $"x2.last_existing.timestamp" > coalesce($"x2.last_new.timestamp", lit(0))
-    val newClusterMoreRecent = $"x2.last_new.timestamp" > coalesce($"x2.last_existing.timestamp", lit(0))
-    val existingAndNewClusterNull = $"cluster_spec.existing_cluster_id".isNull && $"cluster_spec.new_cluster".isNull
     df
-      .withColumn( // initialize cluster_spec at record timestamp
-        "x",
-        struct(
-          when('existing_cluster_id.isNotNull, struct('timestamp, 'existing_cluster_id))
-            .otherwise(lit(null)).alias("last_existing"),
-          when('new_cluster.isNotNull, struct('timestamp, 'new_cluster))
-            .otherwise(lit(null)).alias("last_new")
-        )
-      )
-      .withColumn( // last non_null cluster id / spec i.e. fill forward
-        "x2",
-        struct(
-          last($"x.last_existing", true).over(lastJobStatus).alias("last_existing"),
-          last($"x.last_new", true).over(lastJobStatus).alias("last_new"),
-        )
-      )
-      .withColumn( // derive the latest existing / new cluster spec at log event time
-        "cluster_spec",
-        struct(
-          when(existingClusterMoreRecent, $"x2.last_existing.existing_cluster_id")
-            .otherwise(lit(null))
-            .alias("existing_cluster_id"),
-          when(newClusterMoreRecent, $"x2.last_new.new_cluster")
-            .otherwise(lit(null))
-            .alias("new_cluster")
-        )
-      )
-      .withColumn( // when both are null in the audit logs fallback to the jobSnapshot lookup in lookup_settings
-        "cluster_spec",
-        struct(
-          when(existingAndNewClusterNull, get_json_object('lookup_settings, "$.existing_cluster_id"))
-            .otherwise($"cluster_spec.existing_cluster_id").alias("existing_cluster_id"),
-          when(existingAndNewClusterNull, get_json_object('lookup_settings, "$.new_cluster"))
-            .otherwise($"cluster_spec.new_cluster").alias("new_cluster")
-        )
-      ).drop("existing_cluster_id", "new_cluster", "x", "x2") // drop temp columns and old version of clusterSpec components
+      .drop("existing_cluster_id", "new_cluster", "job_clusters")
+      .toTSDF("timestamp", "organization_id", "jobId")
+      .lookupWhen(temporalJobClusterSpec)
+      .df
+      .selectExpr("*", "temporal_cluster_spec.existing_cluster_id", "temporal_cluster_spec.new_cluster", "temporal_cluster_spec.job_clusters")
+      .drop("temporal_cluster_spec")
+      .withColumn("cluster_spec", struct(
+        'existing_cluster_id,
+        'new_cluster,
+        'job_clusters
+      ))
+      .scrubSchema // cleans schema after creating structs
+      .drop("existing_cluster_id", "new_cluster", "job_clusters")
   }
 
   /**
@@ -202,7 +195,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         $"settings.name".alias("jobName"),
         $"settings.timeout_seconds".cast("string").alias("timeout_seconds"),
         to_json($"settings.schedule").alias("schedule"),
-        $"settings.notebook_task.notebook_path",
+        $"settings.notebook_task.notebook_path", // TODO -- this is now inside $"settings.tasks[*] -- return all tasks
+        // TODO -- existing_cluster_id and new_cluster and job_cluster_key are now inside of tasks
         when($"settings.existing_cluster_id".isNotNull,
           struct( // has existing cluster_id, no new_cluster_spec
             $"settings.existing_cluster_id",
@@ -227,12 +221,12 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   def jobStatusConvertJsonColsToStructs(jobsBaseHasRecords: Boolean)(df: DataFrame): DataFrame = {
     val changeInventory = if (jobsBaseHasRecords) {
       Map(
-        "cluster_spec.new_cluster" -> structFromJson(spark, df, "cluster_spec.new_cluster"),
+        "new_cluster" -> structFromJson(spark, df, "new_cluster"),
         "new_settings" -> structFromJson(spark, df, "new_settings"),
         "schedule" -> structFromJson(spark, df, "schedule")
       )
     } else { // new_settings is not present from snapshot and is a struct thus it cannot be added with dynamic schema
-      Map(
+      Map( // TODO -- rebuild the way new_cluster gets created from new jobs/list snapshot v2.1
         "cluster_spec.new_cluster" -> structFromJson(spark, df, "cluster_spec.new_cluster"),
         "schedule" -> structFromJson(spark, df, "schedule")
       )
@@ -281,6 +275,48 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     tasksExplodedWKeys
       .select(SchemaTools.modifyStruct(tasksExplodedWKeys.schema, tasksChangeInventory): _*)
       .withColumn("newSettingsTask", collect_list('newSettingsTask).over(jobStatusByKeyW))
+  }
+
+  def jobStatusCleanseForPublication(keys: Array[String])(df: DataFrame): DataFrame = {
+    val containsMTJTasks = SchemaTools.getAllColumnNames(df.schema).contains("new_settings.tasks")
+    val containsMTJJobClusters = SchemaTools.getAllColumnNames(df.schema).contains("new_settings.job_clusters")
+    var cleansedDF = df
+
+    val structsCleaner = collection.mutable.Map(
+      "new_settings.tags" -> SchemaTools.structToMap(df, "new_settings.tags"),
+      "new_cluster.custom_tags" -> SchemaTools.structToMap(df, "new_cluster.custom_tags"),
+      "new_cluster.spark_conf" -> SchemaTools.structToMap(df, "new_cluster.spark_conf"),
+      "new_cluster.spark_env_vars" -> SchemaTools.structToMap(df, "new_cluster.spark_env_vars"),
+      "new_cluster.aws_attributes" -> SchemaTools.structToMap(df, s"new_cluster.aws_attributes"),
+      "new_cluster.azure_attributes" -> SchemaTools.structToMap(df, s"new_cluster.azure_attributes"),
+      "new_settings.new_cluster.custom_tags" -> SchemaTools.structToMap(df, "new_settings.new_cluster.custom_tags"),
+      "new_settings.new_cluster.spark_conf" -> SchemaTools.structToMap(df, "new_settings.new_cluster.spark_conf"),
+      "new_settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(df, "new_settings.new_cluster.spark_env_vars"),
+      "new_settings.new_cluster.aws_attributes" -> SchemaTools.structToMap(df, s"new_settings.new_cluster.aws_attributes"),
+      "new_settings.new_cluster.azure_attributes" -> SchemaTools.structToMap(df, s"new_settings.new_cluster.azure_attributes"),
+      "new_settings.notebook_task.base_parameters" -> SchemaTools.structToMap(df, "new_settings.notebook_task.base_parameters"),
+      "cluster_spec.new_cluster.custom_tags" -> SchemaTools.structToMap(df, "cluster_spec.new_cluster.custom_tags"),
+      "cluster_spec.new_cluster.spark_conf" -> SchemaTools.structToMap(df, "cluster_spec.new_cluster.spark_conf"),
+      "cluster_spec.new_cluster.spark_env_vars" -> SchemaTools.structToMap(df, "cluster_spec.new_cluster.spark_env_vars"),
+      "cluster_spec.new_cluster.aws_attributes" -> SchemaTools.structToMap(df, s"cluster_spec.new_cluster.aws_attributes"),
+      "cluster_spec.new_cluster.azure_attributes" -> SchemaTools.structToMap(df, s"cluster_spec.new_cluster.azure_attributes")
+    )
+
+    cleansedDF = if (containsMTJTasks) {
+      structsCleaner("new_settings.tasks") = col("newSettingsTask")
+      val cleansedMTJTasksDF = jobStatusCleanseNewSettingsTasks(cleansedDF, keys)
+      cleansedDF.join(cleansedMTJTasksDF, keys.toSeq, "left")
+    } else cleansedDF
+
+    cleansedDF = if (containsMTJJobClusters) {
+      structsCleaner("new_settings.job_clusters") = col("job_clusters")
+      val cleansedMTJJobClustersDF = jobStatusCleanseJobClusters(cleansedDF, keys)
+      cleansedDF.join(cleansedMTJJobClustersDF, keys.toSeq, "left")
+    } else cleansedDF
+
+    cleansedDF
+      .modifyStruct(structsCleaner.toMap)
+      .drop("newSettingsTask", "job_clusters")
   }
 
   /**
