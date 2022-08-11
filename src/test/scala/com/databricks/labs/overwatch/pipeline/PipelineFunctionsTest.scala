@@ -203,7 +203,7 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       When("the connection string is not in correct format")
 
       Then("the function throws an exception")
-      assertThrows[BadConfigException] (PipelineFunctions.parseEHConnectionString(ehConnString))
+      assertThrows[BadConfigException] (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, true))
     }
     it("should throw an exception - incorrect format") {
       Given("an event hub connection string")
@@ -212,7 +212,7 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       When("the connection string is not in correct format")
 
       Then("the function throws an exception")
-      assertThrows[BadConfigException] (PipelineFunctions.parseEHConnectionString(ehConnString))
+      assertThrows[BadConfigException] (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, true))
     }
     it("should parse the connection string") {
       Given("an event hub connection string")
@@ -221,7 +221,16 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       When("the connection string is in correct format")
 
       Then("the function returns the connection string")
-      assertResult(ehConnString) (PipelineFunctions.parseEHConnectionString(ehConnString))
+      assertResult(ehConnString) (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, true))
+    }
+    it("should parse the connection string without SAS") {
+      Given("an event hub connection string")
+      val ehConnString = "Endpoint=sb://<NamespaceName>.servicebus.windows.net/;"
+
+      When("the connection string is in correct format")
+
+      Then("the function returns the connection string")
+      assertResult(ehConnString) (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, false))
     }
     it("should parse the connection string with special characters") {
       Given("an event hub connection string")
@@ -230,7 +239,7 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       When("the connection string is in correct format")
 
       Then("the function returns the connection string")
-      assertResult(ehConnString) (PipelineFunctions.parseEHConnectionString(ehConnString))
+      assertResult(ehConnString) (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, true))
     }
 
   }
