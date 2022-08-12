@@ -12,108 +12,82 @@ import org.apache.spark.sql.functions.{col, lit, size, struct}
 class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with GivenWhenThen {
   import spark.implicits._
 
-  describe("nestedColExists") {
 
-    it("Basic Nested Col Test Simple") {
+  describe("cullNestedColumns") {
+    it("return struct with all original columns except list of fields defined") {
       val strings = Seq(
         "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
         "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
       ).toDS
       val df = spark.read.json(strings)
-
-      assertResult(true) {
-        SchemaTools.nestedColExists(df.schema, "value.c3")
-      }
-    }
-
-    it("Basic Nested Col Test 2 Level") {
-      val strings = Seq(
-        "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
-        "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
-      ).toDS
-      val df = spark.read.json(strings)
-
-      assertResult(true) {
-        SchemaTools.nestedColExists(df.schema, "value.c3.c3_2")
-      }
-    }
-
-    it("Basic Nested Col Test 3 Level") {
-      val strings = Seq(
-        "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
-        "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
-      ).toDS
-      val df = spark.read.json(strings)
-
-      assertResult(true) {
-        SchemaTools.nestedColExists(df.schema, "value.c3.c3_3.c3_3_2")
-      }
-    }
-
-    it("Column Doesn't Exist Nested Col Test ") {
-      val strings = Seq(
-        "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
-        "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
-      ).toDS
-      val df = spark.read.json(strings)
-
-      assertResult(false) {
-        SchemaTools.nestedColExists(df.schema, "value.c4")
-      }
-    }
-    it("Non Nested Column used") {
-      val strings = Seq(
-        "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
-        "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
-      ).toDS
-      val df = spark.read.json(strings)
-
-      assertResult(true) {
-        SchemaTools.nestedColExists(df.schema, "id")
-      }
-    }
-  }
-
-
-  describe("flattenSchema") {
-    it("Flatten Schema Recursive") {
-      val strings = Seq(
-        "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
-        "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
-      ).toDS
-      val df = spark.read.json(strings)
-      val expectedSchema = Seq("id AS `id`", "value.c1 AS `value_c1`", "value.c2 AS `value_c2`", "value.c3.c3_1 AS `value_c3_c3_1`", "value.c3.c3_2 AS `value_c3_c3_2`", "value.c3.c3_3.c3_3_1 AS `value_c3_c3_3_c3_3_1`", "value.c3.c3_3.c3_3_2 AS `value_c3_c3_3_c3_3_2`")
+      val expectedSchema = s"""`id` BIGINT,`value` STRUCT<`c3`: STRUCT<`c3_1`: BIGINT, `c3_2`: STRING, `c3_3`: STRUCT<`c3_3_1`: STRING, `c3_3_2`: STRING>>>"""
 
       assertResult(expectedSchema) {
-        SchemaTools.flattenSchema(df.schema).map(_.toString()).toSeq
+        val ndf = SchemaTools.cullNestedColumns(df, "value", Array("c1", "c2"))
+        ndf.schema.toDDL
       }
     }
 
-    it("Flatten Schema Recursive with Prefix") {
+    it("case sensitive return struct with all original columns except list of fields") {
       val strings = Seq(
         "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
         "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
       ).toDS
       val df = spark.read.json(strings)
-      val expectedSchema = Seq("col_struct.id AS `col_struct_id`", "col_struct.value.c1 AS `col_struct_value_c1`", "col_struct.value.c2 AS `col_struct_value_c2`", "col_struct.value.c3.c3_1 AS `col_struct_value_c3_c3_1`", "col_struct.value.c3.c3_2 AS `col_struct_value_c3_c3_2`", "col_struct.value.c3.c3_3.c3_3_1 AS `col_struct_value_c3_c3_3_c3_3_1`", "col_struct.value.c3.c3_3.c3_3_2 AS `col_struct_value_c3_c3_3_c3_3_2`")
+      val expectedSchema = s"""`id` BIGINT,`value` STRUCT<`c2`: STRING>"""
 
       assertResult(expectedSchema) {
-        SchemaTools.flattenSchema(df.schema,"col_struct").map(_.toString()).toSeq
+        val ndf = SchemaTools.cullNestedColumns(df, "value", Array("C1", "C3"))
+        ndf.schema.toDDL
       }
     }
 
-    it("Flatten Schema without nested columns") {
+    it("return a modfied struct with the same name as defined in structToModify") {
       val strings = Seq(
-        "{\"id\": 1, \"value\": \"abc\"}",
-        "{\"id\": 2, \"value\": \"xyz\"}"
+        "{\"id\": 1, \"val_ms\": {\"c1\": 123, \"c2\": \"ttt\", \"C3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
+        "{\"id\": 2, \"val_ms\": {\"c1\": 234, \"c2\": \"bbb\", \"C3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
       ).toDS
       val df = spark.read.json(strings)
-      val expectedSchema = Seq("id AS `id`", "value AS `value`")
+      val expectedSchema = s"""`id` BIGINT,`VAL_MS` STRUCT<`c1`: BIGINT, `c2`: STRING>"""
 
-      df.printSchema()
       assertResult(expectedSchema) {
-        SchemaTools.flattenSchema(df.schema).map(_.toString()).toSeq
+        val ndf = SchemaTools.cullNestedColumns(df, "VAL_MS", Array("c3"))
+        ndf.schema.toDDL
       }
+    }
+
+    it("throw immediate exception if structToModify contains a specialCharacter other than -_") {
+      val strings = Seq(
+        "{\"id\": 1, \"val-\\\\ms\": {\"c1-1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
+        "{\"id\": 2, \"val-\\\\ms\": {\"c1-1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
+      ).toDS
+      val df = spark.read.json(strings)
+
+      assertThrows[com.databricks.labs.overwatch.utils.BadSchemaException](
+        SchemaTools.cullNestedColumns(df, "val-\\ms", Array("c3")).schema.toDDL
+      )
+    }
+
+    it("throw immediate exception if structToModify column doesn't exists") {
+      val strings = Seq(
+        "{\"id\": 1, \"val_ms\": {\"c1-1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
+        "{\"id\": 2, \"val_ms\": {\"c1-1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
+      ).toDS
+      val df = spark.read.json(strings)
+      assertThrows[org.apache.spark.sql.AnalysisException](
+        SchemaTools.cullNestedColumns(df, "value", Array("c3")).schema.toDDL
+      )
+    }
+
+    it("Culling Nested Column in depth") {
+      val strings = Seq(
+        "{\"id\": 1, \"val_ms\": {\"c1-1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
+        "{\"id\": 2, \"val_ms\": {\"c1-1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
+      ).toDS
+      val df = spark.read.json(strings)
+    assertThrows[com.databricks.labs.overwatch.utils.BadSchemaException](
+      SchemaTools.cullNestedColumns(df, "val_ms", Array("c3.c3_3")).schema.toDDL
+    )
     }
   }
 

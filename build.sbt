@@ -15,9 +15,11 @@ libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5" % Provide
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
 libraryDependencies += "io.delta" % "delta-core_2.12" % "1.0.0" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
+
 //libraryDependencies += "org.apache.hive" % "hive-metastore" % "2.3.9"
 
 libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" % "2.3.21" % Provided
+libraryDependencies += "com.microsoft.azure" % "msal4j" % "1.10.1" % Provided exclude("com.fasterxml.jackson.core", "jackson-databind")
 libraryDependencies += "com.databricks.labs" %% "dataframe-rules-engine" % "0.2.0"
 
 libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.23.0" % Test
@@ -57,13 +59,13 @@ assemblyMergeStrategy in assembly := {
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
 
 // exclude scala-library dependency
-assemblyExcludedJars in assembly := {
-  val cp = (fullClasspath in assembly).value
-  cp filter { f =>
-    f.data.getName.contains("dbutils-api_2.12") ||
-      f.data.getName.contains("spark-core") ||
-      f.data.getName.contains("spark-sql") ||
-      f.data.getName.contains("delta-core") ||
-      f.data.getName.contains("com.amazonaws")
-  }
-}
+// assemblyExcludedJars in assembly := {
+//   val cp = (fullClasspath in assembly).value
+//   cp filter { f =>
+//     f.data.getName.contains("dbutils-api_2.12") ||
+//       f.data.getName.contains("spark-core") ||
+//       f.data.getName.contains("spark-sql") ||
+//       f.data.getName.contains("delta-core") ||
+//       f.data.getName.contains("com.amazonaws")
+//   }
+// }

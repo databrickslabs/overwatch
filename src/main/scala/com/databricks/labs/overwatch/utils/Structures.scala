@@ -8,11 +8,13 @@ import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
+import org.json.{JSONArray, JSONObject}
 import scalaj.http.HttpResponse
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
+import java.util
 import java.util.Date
 
 case class DBDetail()
@@ -33,7 +35,9 @@ case class DatabricksContractPrices(
                                      jobsLightDBUCostUSD: Double = 0.10
                                    )
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String)
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="",enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4)
+
+
 
 case class ValidatedColumn(
                             column: Column,
@@ -63,7 +67,11 @@ case class AzureAuditLogEventhubConfig(
                                         maxEventsPerTrigger: Int = 10000,
                                         minEventsPerTrigger: Int = 10,
                                         auditRawEventsChk: Option[String] = None,
-                                        auditLogChk: Option[String] = None
+                                        auditLogChk: Option[String] = None,
+                                        azureClientId: Option[String] = None,
+                                        azureClientSecret: Option[String] = None,
+                                        azureTenantId: Option[String] = None,
+                                        azureAuthEndpoint: String = "https://login.microsoftonline.com/"
                                       )
 
 case class AuditLogConfig(
@@ -221,6 +229,8 @@ private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 private[overwatch] class IncompleteFilterException(s: String) extends Exception(s) {}
 
 private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val allowModuleProgression: Boolean) extends Exception(apiCallDetail)
+
+private[overwatch] class ApiCallFailureV2(s: String) extends Exception(s) {}
 
 private[overwatch] class ApiCallFailure(
                                          val httpResponse: HttpResponse[String],

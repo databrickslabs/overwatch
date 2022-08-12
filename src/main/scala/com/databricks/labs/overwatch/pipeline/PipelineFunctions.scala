@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.utils.Helpers.logger
 import com.databricks.labs.overwatch.utils._
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -19,24 +20,37 @@ object PipelineFunctions {
   private val uriSchemeRegex = "^([a-zA-Z][-.+a-zA-Z0-9]*):/.*".r
 
   /**
-   * parses the value for the connection string from the scope/key defined if the pattern matches {{secrets/scope/key}}
+   * parses the value for the string from the scope/key defined if the pattern matches {{secrets/scope/key}}
    * otherwise return the true string value
    * https://docs.databricks.com/security/secrets/secrets.html#store-the-path-to-a-secret-in-a-spark-configuration-property
-   * @param connectionString
-   * @return
+   * @param str input string
+   * @return string from secrets, or original string
    */
-  def parseEHConnectionString(connectionString: String): String = {
+  def maybeGetSecret(str: String): String = {
     val secretsRE = "\\{\\{secrets/([^/]+)/([^}]+)\\}\\}".r
 
-    val retrievedConnectionString = secretsRE.findFirstMatchIn(connectionString) match {
+    secretsRE.findFirstMatchIn(str) match {
       case Some(i) =>
         dbutils.secrets.get(i.group(1), i.group(2))
       case None =>
-        connectionString
+        str
     }
-    if (!retrievedConnectionString.matches("^Endpoint=sb://.*;SharedAccessKey=.*$")) {
-      throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
-    } else retrievedConnectionString
+  }
+
+  /**
+   * parses the value for the connection string from the scope/key defined if the pattern matches {{secrets/scope/key}}
+   * otherwise return the true string value
+   * @param connectionString EventHubs connection string
+   * @return
+   */
+  def parseAndValidateEHConnectionString(connectionString: String, withSAS: Boolean): String = {
+    val retrievedConnectionString = maybeGetSecret(connectionString)
+    if ((withSAS && !retrievedConnectionString.matches("^Endpoint=sb://.*;SharedAccessKey=.*$")) ||
+      !retrievedConnectionString.matches("^Endpoint=sb://.*$")) {
+        throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
+    }
+
+    retrievedConnectionString
   }
 
   /**
@@ -149,6 +163,42 @@ object PipelineFunctions {
     ((unix_timestamp(col(c).cast("timestamp")) +
       (substring(col(c), -4, 3).cast("double") / 1000))*1000)
       .alias(defaultAlias)
+  }
+
+  def optimizeDFForWrite(
+                        df: DataFrame,
+                        target: PipelineTable
+                        ): DataFrame = {
+
+    var mutationDF = df
+
+    mutationDF = if (target.zOrderBy.nonEmpty) {
+      mutationDF.moveColumnsToFront(target.zOrderBy ++ target.statsColumns)
+    } else mutationDF
+
+    /**
+     * repartition partitioned tables that are not auto-optimized into the range partitions for writing
+     * without this the file counts of partitioned tables will be extremely high
+     * also generate noise to prevent skewed partition writes into extremely low cardinality
+     * organization_ids/dates per run -- usually 1:1
+     * noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
+     */
+
+    if (target.partitionBy.nonEmpty) {
+      if (target.partitionBy.contains("__overwatch_ctrl_noise") && !target.autoOptimize) {
+        logger.log(Level.INFO, s"${target.tableFullName}: generating partition noise")
+        mutationDF = mutationDF.withColumn("__overwatch_ctrl_noise", (rand() * lit(32)).cast("int"))
+      }
+
+      if (!target.autoOptimize) {
+        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into" +
+          s" output partitions defined as ${target.partitionBy.mkString(", ")}")
+        mutationDF = mutationDF.repartition(target.partitionBy map col: _*)
+      }
+    }
+
+    mutationDF
+
   }
 
 //  def optimizeWritePartitions(
@@ -503,6 +553,25 @@ object PipelineFunctions {
       .collect()
       .head
       .getOrElse(0L)
+  }
+
+  /**
+   * Write the any given string to given path..
+   *
+   * @param resultJsonArray containing responses from the API call.
+   * @return true encase of successfully write to the temp location.
+   */
+  private[overwatch] def writeMicroBatchToTempLocation(path: String, resultJsonArray: String): Boolean = {
+    try {
+      val fileName = java.util.UUID.randomUUID.toString + ".json"
+      dbutils.fs.put(path + "/" + fileName, resultJsonArray, true)
+      logger.log(Level.INFO,"File Successfully written:" + path + "/" + fileName)
+      true
+    } catch {
+      case e: Throwable =>
+        logger.info(Level.ERROR, "Unable to write in " + path + "/", e)
+        false
+    }
   }
 
 }
