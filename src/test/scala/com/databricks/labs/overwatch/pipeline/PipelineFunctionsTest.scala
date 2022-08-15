@@ -239,13 +239,18 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
       When("function is called on this column")
 
       Then("returns a column of type timestamp and preserves milliseconds")
-      assertResult("TimestampType") (df
-        .withColumn("converted_string", PipelineFunctions.epochMilliToTs("epoch_millisecond"))
-        .schema.filter( x => x.name == "converted_string").head.dataType.toString
-      )
-      assertResult("2022-08-10 10:59:39.388") (df
+
+      val result = df
         .withColumn("converted_column", PipelineFunctions.epochMilliToTs("epoch_millisecond"))
-        .select("converted_column")
+
+      assertResult("TimestampType") (result.schema.filter( x => x.name == "converted_column")
+        .head.dataType.toString
+      )
+
+      result.select(col("converted_column").cast("String")).show(false)
+
+      assertResult("2022-08-10 05:29:39.388") (result
+        .select(col("converted_column").cast("String"))
         .collect().head.get(0).toString
       )
     }
