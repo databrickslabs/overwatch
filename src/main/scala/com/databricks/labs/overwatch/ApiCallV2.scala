@@ -41,6 +41,13 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQueryMap(queryMap)
   }
 
+  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], apiVersion: Double = 2.0) = {
+    new ApiCallV2(apiEnv)
+      .buildApi(apiName)
+      .setQueryMap(queryMap)
+      .setApiV(apiVersion)
+  }
+
 }
 
 /**
@@ -91,6 +98,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   protected def apiMeta: ApiMeta = _apiMeta
 
   protected def queryMap: Map[String, String] = _queryMap
+
+  private[overwatch] def setApiV(value: Double): this.type = {
+    apiMeta.setApiV("api/"+value)
+    this
+  }
 
   private[overwatch] def setQueryMap(value: Map[String, String]): this.type = {
     _queryMap = value
@@ -281,12 +293,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     val jsonObject = mapper.readTree(response);
     if (jsonObject.get(apiMeta.paginationKey) != null) {
       if (apiMeta.hasNextPage(jsonObject)) { //Pagination key for sql/history/queries can return true or false
-        if (apiMeta.tuplePaginationObject) {
-          val (key, value) = apiMeta.getPaginationLogicForTuple(jsonObject)
-          if (value != null) {
-            setJsonKey(key)
-            setJsonValue(value)
-            setQueryMap(Map[String, String]())
+        if (apiMeta.isDerivePaginationLogic) {
+          val nextPageParams = apiMeta.getPaginationLogic(jsonObject, queryMap)
+          if (nextPageParams != null) {
+            setQueryMap(nextPageParams)
             execute()
           }
         } else {
@@ -550,15 +560,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
     val mapper = new ObjectMapper()
     val jsonObject = mapper.readTree(jsonQuery);
-    val clusterId = jsonObject.get("cluster_id").toString.replace("\"","")
+    val clusterId = jsonObject.get("cluster_id").toString.replace("\"", "")
     val start_time = jsonObject.get("start_time").asLong()
     val end_time = jsonObject.get("end_time").asLong()
     val errorObj = mapper.readTree(e.getMessage);
     val newJsonObject = new JSONObject();
-    newJsonObject.put("cluster_id",clusterId)
-    newJsonObject.put("from_epoch",start_time)
-    newJsonObject.put("until_epoch",end_time)
-    newJsonObject.put("error",errorObj.get("error_code").toString.replace("\"","") +" "+ errorObj.get("message").toString.replace("\"",""))
+    newJsonObject.put("cluster_id", clusterId)
+    newJsonObject.put("from_epoch", start_time)
+    newJsonObject.put("until_epoch", end_time)
+    newJsonObject.put("error", errorObj.get("error_code").toString.replace("\"", "") + " " + errorObj.get("message").toString.replace("\"", ""))
     newJsonObject.toString
   }
 
