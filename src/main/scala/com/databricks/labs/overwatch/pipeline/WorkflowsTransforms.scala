@@ -325,28 +325,28 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
 //  val jobRunsLookups: Map[String, DataFrame] =
   def jobRunsInitializeLookups(lookups: (PipelineTable, DataFrame)*): Map[String, DataFrame] = {
-    lookups.map(lookup => {
+    lookups
+      .filter(_._1.exists)
+      .map(lookup => {
       (lookup._1.name, lookup._2)
     }).toMap
   }
 
   def jobRunsDeriveCompletedRuns(df: DataFrame, firstRunSemanticsW: WindowSpec): DataFrame = {
-    val parentRunId = coalesce('multitaskParentRunId, 'parentRunId)
     df
       .filter('actionName.isin("runSucceeded", "runFailed"))
       .select(
-        'serviceName, 'actionName,
         'organization_id,
-        'date,
         'timestamp,
-        when(parentRunId.isNull, 'runId).otherwise(parentRunId.cast("long")).alias("jobRunId"),
-        'runId.alias("taskRunId"),
-        'jobId.alias("completedJobId"),
-        parentRunId.alias("parentRunId_Completed"),
+        when('multitaskParentRunId.isNull, 'runId.cast("long")).otherwise('multitaskParentRunId.cast("long")).alias("jobRunId"),
+        'runId.cast("long").alias("taskRunId"),
+        'jobId.cast("long").alias("completedJobId"),
+        'multitaskParentRunId.alias("multitaskParentRunId_Completed"),
+        'parentRunId.alias("parentRunId_Completed"),
         'taskKey.alias("taskKey_Completed"),
         'taskDependencies.alias("taskDependencies_Completed"),
         'repairId.alias("repairId_Completed"),
-        'idInJob,
+        'idInJob.cast("long"),
         'jobClusterType.alias("jobClusterType_Completed"),
         'jobTaskType.alias("jobTaskType_Completed"),
         'jobTriggerType.alias("jobTriggerType_Completed"),
@@ -366,8 +366,9 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     df
       .filter('actionName.isin("cancel"))
       .select(
-        'organization_id, 'date, 'timestamp,
-        'run_id.cast("long").alias("jobRunId"), // TODO -- verify -- assume correct since user cannot cancel a taskRun
+        'organization_id,
+        'timestamp,
+        'run_id.cast("long").alias("jobRunId"), // TODO -- add task_run_id and add to the join -- but we need DBR to emit multitask_parent_id before we can do this
         'requestId.alias("cancellationRequestId"),
         'response.alias("cancellationResponse"),
         'sessionId.alias("cancellationSessionId"),
@@ -390,7 +391,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     df
       .filter('actionName.isin("runNow"))
       .select(
-        'organization_id, 'date, 'timestamp,
+        'organization_id,
+        'timestamp,
         'job_id.cast("long").alias("submissionJobId"),
         get_json_object($"response.result", "$.run_id").cast("long").alias("jobRunId"),
         'timestamp.alias("submissionTime"),
@@ -423,7 +425,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     df
       .filter('actionName.isin("runTriggered"))
       .select(
-        'organization_id, 'date, 'timestamp,
+        'organization_id,
+        'timestamp,
         'jobId.cast("long").alias("submissionJobId"),
         'runId.alias("jobRunId"),
         'timestamp.alias("submissionTime"),
@@ -443,7 +446,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     df
       .filter('actionName.isin("submitRun"))
       .select(
-        'organization_id, 'date, 'timestamp,
+        'organization_id,
+        'timestamp,
         lit(null).cast("long").alias("submissionJobId"),
         get_json_object($"response.result", "$.run_id").cast("long").alias("jobRunId"),
         'run_name,
@@ -479,14 +483,17 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   def jobRunsDeriveRunStarts(df: DataFrame, firstRunSemanticsW: WindowSpec): DataFrame = {
-    val parentRunId = coalesce('multitaskParentRunId, 'parentRunId)
+    // TODO -- ISSUE 488 -- SQL runStarts do not emit clusterId (i.e. sqlEndpointId) need this for run costs
+    // TODO -- ISSUE 479 -- DLT runStarts do not emit clusterId -- need this for run costs
     df.filter('actionName.isin("runStart"))
       .select(
-        'organization_id, 'date, 'timestamp,
+        'organization_id,
+        'timestamp,
         'jobId.cast("long").alias("runStartJobId"),
-        when(parentRunId.isNull, 'runId).otherwise(parentRunId.cast("long")).alias("jobRunId"),
-        'runId.alias("taskRunId"),
-        parentRunId.alias("parentRunId_Started"),
+        when('multitaskParentRunId.isNull, 'runId).otherwise('multitaskParentRunId.cast("long")).alias("jobRunId"),
+        'runId.cast("long").alias("taskRunId"),
+        'multitaskParentRunId.alias("multitaskParentRunId_Started"),
+        'parentRunId.alias("parentRunId_Started"),
         'taskKey.alias("taskKey_runStart"),
         'taskDependencies.alias("taskDependencies_runStart"), // json array string
         'repairId.alias("repairId_runStart"),
@@ -537,7 +544,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     val runSubmitStart = jobRunsDeriveSubmittedRuns(df, firstJobRunSemanticsW)
 
     // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
-    // TODO -- add runTriggered events
     val allSubmissions = runNowStart
       .unionByName(runTriggered, allowMissingColumns = true)
       .unionByName(runSubmitStart, allowMissingColumns = true)
@@ -548,13 +554,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
     // TODO -- add repairRuns action
     allCompletes
-      .join(allCancellations, Seq("organization_id", "jobRunId"), "full")
-      .join(allSubmissions, Seq("organization_id", "jobRunId"), "full")
-      .join(runStarts, Seq("organization_id", "jobRunId", "taskRunId"), "full")
-//      .withColumn("cluster_name", // TODO -- look this up later
-//        when('jobClusterType === "new", concat(lit("job-"), 'jobId, lit("-run-"), 'idInJob))
-//          .otherwise(lit(null).cast("string"))
-//      )
+      .join(runStarts, Seq("organization_id", "jobRunId", "taskRunId"), "left")
+      .join(allSubmissions, Seq("organization_id", "jobRunId"), "left")
+      .join(allCancellations, Seq("organization_id", "jobRunId"), "left") // todo -- add support for cancelled tasks (i.e. join on taskRunId??) waiting on DBR update
+      .withColumn("runId", coalesce('taskRunId, 'jobRunId).cast("long"))
       .select(
         'organization_id,
         coalesce('runStartJobId, 'completedJobId, 'submissionJobId).cast("long").alias("jobId"),
@@ -562,10 +565,11 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'taskRunId.cast("long"),
         coalesce('taskKey_runStart, 'taskKey_Completed).alias("taskKey"),
         coalesce('taskDependencies_runStart, 'taskDependencies_Completed).alias("taskDependencies"),
-        coalesce('taskRunId, 'jobRunId).cast("long").alias("runid"), // DEPRECATED 0620
-        coalesce('parentRunId_Started, 'parentRunId_Completed).alias("parentJobRunId"),
-        coalesce('repairId_runStart, 'repairId_Completed).alias("repairId"),
-        coalesce('taskRunId, 'idInJob).alias("idInJob"),
+        'runId,
+        coalesce('multitaskParentRunId_Started, 'multitaskParentRunId_Completed).cast("long").alias("multitaskParentRunId"),
+        coalesce('parentRunId_Started, 'parentRunId_Completed).cast("long").alias("parentRunId"),
+        coalesce('repairId_runStart, 'repairId_Completed).cast("long").alias("repairId"),
+        coalesce('taskRunId, 'idInJob).cast("long").alias("idInJob"),
         TransformFunctions.subtractTime(
           'submissionTime,
           coalesce(array_max(array('completionTime, 'cancellationTime)), lit(etlUntilTime.asUnixTimeMilli))
@@ -574,7 +578,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           'startTime,
           coalesce(array_max(array('completionTime, 'cancellationTime)), lit(etlUntilTime.asUnixTimeMilli))
         ).alias("JobExecutionRunTime"), // from cluster up and run begin until terminal event
-        'run_name, // TODO -- set == to jobName later if runName is Null
+        'run_name,
         coalesce('jobClusterType_Started, 'jobClusterType_Completed).alias("jobClusterType"),
         coalesce('jobTaskType_Started, 'jobTaskType_Completed).alias("jobTaskType"),
         coalesce('jobTriggerType_Started, 'jobTriggerType_Completed, 'jobTriggerType_runNow).alias("jobTriggerType"),
@@ -583,8 +587,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           .alias("jobTerminalState"),
         'new_cluster.alias("submitRun_newCluster"),
         'existing_cluster_id.alias("submitRun_existing_cluster_id"),
-        'clusterId, // TODO -- fill this for each taskRun
-//        'cluster_name, // TODO -- look this up later
+        'clusterId,
         'libraries, // TODO -- potentially lookup from jobs or remove completely
         'submission_params,
         coalesce('workflow_context_runNow, 'workflow_context_submitRun).alias("workflow_context"),
@@ -625,14 +628,42 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           ).alias("startRequest")
         ).alias("requestDetails")
       )
-      .withColumn("timestamp", $"JobRunTime.startEpochMS")
+      .withColumn("timestamp", $"JobRunTime.startEpochMS") // TS lookup key added for next steps (launch time)
   }
 
   /**
-   * Populate existing cluster ids and cluster_names for scheduled jobs present in job_status_silver target
+   * looks up the cluster_name based on id first from job_status_silver and if not present there fallback to latest
+   * snapshot prior to the run
    */
-  def jobRunsDeriveRunsOnInteractiveClusters(df: DataFrame, lookups: Map[String, DataFrame]): DataFrame = {
-    if (lookups.contains("job_status_silver")) {
+  def jobRunsAppendClusterName(lookups: Map[String, DataFrame])(df: DataFrame): DataFrame = {
+
+    val runsWClusterNames1 = if (lookups.contains("cluster_spec_silver")) {
+      df.toTSDF("timestamp", "organization_id", "clusterId")
+        .lookupWhen(
+          lookups("cluster_spec_silver")
+            .toTSDF("timestamp", "organization_id", "clusterId")
+        ).df
+    } else df
+
+    val runsWClusterNames2 = if (lookups.contains("clusters_snapshot_bronze")) {
+      runsWClusterNames1
+        .toTSDF("timestamp", "organization_id", "clusterId")
+        .lookupWhen(
+          lookups("clusters_snapshot_bronze")
+            .toTSDF("timestamp", "organization_id", "clusterId")
+        ).df
+    } else runsWClusterNames1
+
+    runsWClusterNames2
+  }
+
+  /**
+   * looks up the job name based on id first from job_status_silver and if not present there fallback to latest
+   * snapshot prior to the run
+   */
+  def jobRunsAppendJobName(lookups: Map[String, DataFrame])(df: DataFrame): DataFrame = {
+
+    val runsWithJobName1 = if (lookups.contains("job_status_silver")) {
       df
         .toTSDF("timestamp", "organization_id", "jobId")
         .lookupWhen(
@@ -640,86 +671,82 @@ object WorkflowsTransforms extends SparkSessionWrapper {
             .toTSDF("timestamp", "organization_id", "jobId")
         ).df
     } else df
+
+    val runsWithJobName2 = if (lookups.contains("jobs_snapshot_bronze")) {
+      runsWithJobName1
+        .toTSDF("timestamp", "organization_id", "jobId")
+        .lookupWhen(
+          lookups("jobs_snapshot_bronze")
+            .toTSDF("timestamp", "organization_id", "jobId")
+        ).df
+    } else df
+
+    runsWithJobName2
+      .withColumn("jobName", coalesce('jobName, 'run_name))
+
   }
 
   /**
-   * Lookup and append job names for jobs without names
-   * TODO -- append runName if it's a submitRun or job_name is null and run_name is not
+   * It's imperative that all nested runs be nested within the jobRun record to ensure cost accuracy downstream in
+   * jrcp -- without it jrcp will double count costs as both the parent and the child will have an associated cost
+   *
+   * A "workflow" in this context isa dbutils.notebook.run execution -- it does spin up a job run in the back end
+   * and will have a workflow_context (field) with root_run_id and parent_run_id. All of these are rolled to the root
+   * to avoid the need to multi-layer joining. It's up to the customer to complete this as needed as the depths can
+   * get very large.
+   *
+   * An multi-task job (mtj) is a job that has at least one task identified (all jobs runs after the change in 2022).
+   * MTJs can execute notebooks which can also run nested workflows using dbutils.notebook.run.
+   *
+   * Workflows can be launched interactively from a notebook or through an mtj; thus it's necessary to account for
+   * both scenarios hence the double join in the last DF.
+   *
+   * Nested runs DO NOT mean tasks inside a jobrun as these are still considered root level tasks. A nested run
+   * is only launched via dbutils.notebook.run either manually or through an MTJ.
+   *
+   * It may be possible to utilize a single field to report both of these as it appears there can never be a child
+   * without a workflow child but the reverse is not true. This can be reviewed with customer to determine if this
+   * is a valid assumption and these can be coalesced, but for now, for safety, they are being kept separate until
+   * all scenarios can be identified
    */
-  def jobRunsFillMissingInteractiveClusterIDsAndJobNames(jobStatusLookupTarget: PipelineTable)(df: DataFrame): DataFrame = {
+  def jobRunsRollupWorkflowsAndChildren(df: DataFrame): DataFrame = {
 
-    // jobNames from MLFlow Runs
-    val experimentName = get_json_object($"taskDetail.notebook_task", "$.base_parameters.EXPERIMENT_NAME")
-    // Get JobName for All Jobs runs
-    val jobNameLookupFromStatus = jobStatusLookupTarget.asDF
-      .select('organization_id, 'timestamp, 'jobId, 'jobName
+    // identify root level task runs
+    val rootTaskRuns = df
+      .filter('parentRunId.isNull && get_json_object('workflow_context, "$.root_run_id").isNull)
+
+    // pull only workflow children as defined by having a workflow_context.root_run_id
+    val workflowChildren = df
+      .filter(get_json_object('workflow_context, "$.root_run_id").isNotNull)
+
+    // prepare the nesting by getting keys and the entire record as a nested record
+    val workflowChildrenForNesting = workflowChildren
+      .withColumn("parentRunId", get_json_object('workflow_context, "$.root_run_id").cast("long"))
+      .withColumn("workflowChild", struct(workflowChildren.schema.fieldNames map col: _*))
+      .groupBy('organization_id, 'parentRunId)
+      .agg(collect_list('workflowChild).alias("workflow_children"))
+
+    // get all the children identified as having a parentRunId as they need to be rolled up
+    val children = df
+      .filter('parentRunId.isNotNull)
+      .join(workflowChildrenForNesting, Seq("organization_id", "parentRunId"), "left")
+
+    // prepare the nesting by getting keys and the entire record as a nested record
+    val childrenForNesting = children
+      .withColumn("child", struct(children.schema.fieldNames map col: _*))
+      .groupBy('organization_id, 'parentRunId)
+      .agg(collect_list('child).alias("children"))
+      .withColumnRenamed("parentRunId", "taskRunId") // for simple joining
+
+    // deliver root task runs with workflows and children nested within the root
+    rootTaskRuns
+      .join(childrenForNesting, Seq("organization_id", "taskRunId"), "left") // workflows in mtjs
+      .join(
+        workflowChildrenForNesting.withColumnRenamed("parentRunId", "taskRunId"), // for simple joining
+        Seq("organization_id", "taskRunId"),
+        "left"
       )
 
-    df
-      .toTSDF("timestamp", "organization_id", "jobId")
-      .lookupWhen(
-        jobNameLookupFromStatus.toTSDF("timestamp", "organization_id", "jobId")
-      ).df
-      .withColumn("jobName",
-        when('jobName.isNull && experimentName.isNotNull, experimentName)
-          .otherwise('jobName)
-      )
-      .withColumn("jobName",
-        when('jobName.isNull && 'run_name.isNotNull, 'run_name)
-          .otherwise('jobName)
-      )
-  }
-
-  /**
-   * fill missing cluster ids and cluster names for interactive and automated clusters
-   * automated clusters -- lookup cluster_id by cluster_name
-   * TODO -- automated cluster names -- ensure using job_run_id and not task_run_id
-   * interactive clusters -- lookup cluster_name by cluster_id
-   */
-  def jobRunsFillClusterIDsAndClusterNames(lookups: Map[String, DataFrame])(df: DataFrame): DataFrame = {
-    var interactiveRunsWClusterName = df.filter('jobClusterType === "existing")
-    var automatedRunsWClusterID = df.filter('jobClusterType === "new")
-
-    // fill missing cluster names for interactive clusters from cluster_spec by clusterId where exists
-    interactiveRunsWClusterName = if (lookups.contains("cluster_spec_silver")) {
-      interactiveRunsWClusterName
-        .toTSDF("timestamp", "organization_id", "clusterId")
-        .lookupWhen(
-          lookups("cluster_spec_silver")
-            .toTSDF("timestamp", "organization_id", "clusterId")
-        ).df
-    } else interactiveRunsWClusterName
-
-    // fill missing cluster names for interactive clusters from cluster_snapshot by clusterId where exists
-    interactiveRunsWClusterName = if (lookups.contains("clusters_snapshot_bronze")) {
-      interactiveRunsWClusterName
-        .toTSDF("timestamp", "organization_id", "clusterId")
-        .lookupWhen(
-          lookups("clusters_snapshot_bronze")
-            .toTSDF("timestamp", "organization_id", "clusterId")
-        ).df
-    } else interactiveRunsWClusterName
-
-    // fill missing cluster ids for automated clusters from cluster_spec by cluster_name where exists
-    automatedRunsWClusterID = if (lookups.contains("cluster_spec_silver")) {
-      automatedRunsWClusterID
-        .toTSDF("timestamp", "organization_id", "cluster_name")
-        .lookupWhen(
-          lookups("cluster_spec_silver")
-            .toTSDF("timestamp", "organization_id", "cluster_name")
-        ).df
-    } else automatedRunsWClusterID
-
-    // fill missing cluster ids for automated clusters from cluster_snap by cluster_name where exists
-    automatedRunsWClusterID = if (lookups.contains("clusters_snapshot_bronze")) {
-      automatedRunsWClusterID
-        .toTSDF("timestamp", "organization_id", "cluster_name")
-        .lookupWhen(
-          lookups("clusters_snapshot_bronze")
-            .toTSDF("timestamp", "organization_id", "cluster_name")
-        ).df
-    } else automatedRunsWClusterID
-    interactiveRunsWClusterName.unionByName(automatedRunsWClusterID)
   }
 
   /**

@@ -1195,86 +1195,48 @@ trait SilverTransforms extends SparkSessionWrapper {
     jobRunsLag30D.count()
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSpecLookup = clusterSpec.asDF
+    lazy val clusterSpecNameLookup = clusterSpec.asDF
       .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
       .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSnapLookup = clusterSnapshot.asDF
+    lazy val clusterSnapNameLookup = clusterSnapshot.asDF
       .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
       .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
       .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    // TODO -- is this necessary? Seems like all job run on existing clusters already have a clusterId
-    //  validate on large customer with submitRuns
-    lazy val existingClusterLookup = jobsStatus.asDF
-      .select('organization_id, 'timestamp, 'jobId, $"cluster_spec.existing_cluster_id".alias("clusterId"))
-      .filter('clusterId.isNotNull)
+    lazy val jobStatusNameLookup = jobsStatus.asDF
+      .select('organization_id, 'timestamp, 'jobId, 'jobName)
+
+    lazy val jobSnapNameLookup = jobsSnapshot.asDF
+      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
+      .select('organization_id, 'timestamp, 'job_id.alias("jobId"), $"settings.name".alias("jobName"))
 
     val jobRunsLookups = jobRunsInitializeLookups(
-      (clusterSpec, clusterSpecLookup),
-      (clusterSnapshot, clusterSnapLookup),
-      (jobsStatus, existingClusterLookup)
+      (clusterSpec, clusterSpecNameLookup),
+      (clusterSnapshot, clusterSnapNameLookup),
+      (jobsStatus, jobStatusNameLookup),
+      (jobsSnapshot, jobSnapNameLookup)
     )
 
     // match all completed and cancelled (i.e. terminated) jobRuns with their launch assuming launch was in now - 30d
     /**
-     * Unify all event types into a single row by keys (run) such that each key has only a single row with all the data
-     * from all the events tied together for each key
+     * Unify all event types into a single record by key
+     *
+     * Lookup and append cluster and job names temporally
+     *
+     * Remove children keys so as not to double count costs downstream -- this is done by rolling all children up
+     * to the root task so that only root task run ids are present
+     *
+     * Cleanup and key the ts as launch ts
      */
-    val jobRunsBase = jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
-
-    // Runs on existing clusters
-    val jrBaseExisting = jobRunsBase.filter('jobClusterType === "existing")
-
-    // jobs with a new cluster (legacy)
-    val automatedJobRunsBase = jobRunsBase
-      .filter('jobClusterType === "new")
-
-    // jobs with tasks that utilize a "job_cluster"
-    val jobsClusterJobRunsBase = jobRunsBase
-      .filter('jobClusterType === "job_cluster")
-
-    // lookup cluster details for existing clusters
-    val interactiveRunsWID = jobRunsDeriveRunsOnInteractiveClusters(jrBaseExisting, jobRunsLookups)
-
-    // Re-Combine Interactive and Automated Job Run Clusters
-    val jobRunsWIdsAndNames = interactiveRunsWID
-      .transform(jobRunsFillMissingInteractiveClusterIDsAndJobNames(jobsStatus))
-      .unionByName(automatedJobRunsBase, allowMissingColumns = true)
-      .unionByName(jobsClusterJobRunsBase, allowMissingColumns = true)
-
-    /**
-     * Child runs must be removed and nested into the parent runs so as not to be double counted
-     * This is done here because children must run on the same compute as their parents
-     * Child == dbutils.notebook.run executions, not tasks with dependencies
-     */
-    val jobRunsWMetaWithoutChildren = jobRunsWIdsAndNames
-      .filter(get_json_object('workflow_context, "$.root_run_id").isNull)
-      .transform(jobRunsFillClusterIDsAndClusterNames(jobRunsLookups))
-
-    // Get Ephemeral Notebook Job Run Details to be nested into the parent job runs
-    val childJobRuns = jobRunsWIdsAndNames
-      .filter(get_json_object('workflow_context, "$.root_run_id").isNotNull)
-
-    val childRunsForNesting = childJobRuns
-      .withColumn("child", struct(childJobRuns.schema.fieldNames map col: _*))
-      .select(
-        get_json_object('workflow_context, "$.root_run_id").cast("long").alias("runId"), 'child
-      )
-      .groupBy('runId)
-      .agg(collect_list('child).alias("children"))
-
-    val jobRunsFinal = jobRunsWMetaWithoutChildren
-      .join(childRunsForNesting, Seq("runId"), "left")
-      .drop("timestamp") // duplicated to enable asOf Lookups, dropping to clean up
-      .withColumn("startEpochMS", $"JobRunTime.startEpochMS") // for incremental downstream after job termination
-      .withColumn("runId", 'runId.cast("long"))
-      .withColumn("jobId", 'jobId.cast("long"))
-      .withColumn("idInJob", 'idInJob.cast("long"))
-
-    jobRunsFinal
+    jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
+      .transform(jobRunsAppendClusterName(jobRunsLookups))
+      .transform(jobRunsAppendJobName(jobRunsLookups))
+      .transform(jobRunsRollupWorkflowsAndChildren)
+      .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
+      .withColumn("startEpochMS", $"JobRunTime.startEpochMS") // set launch time as TS key
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {
