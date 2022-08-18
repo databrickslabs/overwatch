@@ -454,11 +454,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
     }
     if (apiResultDF.columns.length == 0) {
-      val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
-        s"Details Below:\n$buildGenericErrorMessage"
-      throw new ApiCallEmptyResponse(errMsg, true)
+      val errMsg =
+        s"""API CALL Resulting DF is empty BUT no errors detected, progressing module.
+           |Details Below:\n$buildGenericErrorMessage""".stripMargin
+      println(errMsg)
+      logger.error(errMsg)
+      spark.emptyDataFrame
+    }else {
+      extrapolateSupportedStructure(apiResultDF)
     }
-    extrapolateSupportedStructure(apiResultDF)
   }
 
 
