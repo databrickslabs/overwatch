@@ -7,7 +7,9 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{MapType, StringType}
 import org.apache.spark.sql.{Column, DataFrame}
+
 
 trait SilverTransforms extends SparkSessionWrapper {
 
@@ -550,7 +552,12 @@ trait SilverTransforms extends SparkSessionWrapper {
         'sessionId,
         'sourceIPAddress,
         'userAgent
-      ).alias("request_details")
+      ).alias("request_details"),
+      struct(
+        PipelineFunctions.fillForward(s"default_tags", lastPoolValue, Seq(col(s"poolSnapDetails.custom_tags"))),
+        PipelineFunctions.fillForward(s"custom_tags", lastPoolValue, Seq(col(s"poolSnapDetails.default_tags")))
+
+      ).alias("tags")
     )
 
     val poolsRawPruned = auditIncrementalDF
@@ -650,7 +657,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           'azure_attributes,
           lit(null).cast(Schema.poolsCreateSchema).alias("create_details"),
           lit(null).cast(Schema.poolsDeleteSchema).alias("delete_details"),
-          lit(null).cast(Schema.poolsRequestDetails).alias("request_details")
+          lit(null).cast(Schema.poolsRequestDetails).alias("request_details"),
+          struct('default_tags,'custom_tags).alias("tags")
         )
 
       // union existing and missing (imputed) pool ids (when exists)
