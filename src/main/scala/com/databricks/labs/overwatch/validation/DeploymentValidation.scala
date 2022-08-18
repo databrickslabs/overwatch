@@ -354,11 +354,10 @@ class DeploymentValidation() extends SparkSessionWrapper {
         .options(ehConf.toMap)
         .load()
         .withColumn("deserializedBody", 'body.cast("string"))
+      val timestamp = LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli
+      val tmpPersistDFPath = s"""$outputPath/${ehName.replaceAll("-", "")}/$timestamp/ehTest/rawDataDF"""
+      val tempPersistChk = s"""$outputPath/${ehName.replaceAll("-", "")}/$timestamp/ehTest/rawChkPoint"""
 
-      val tmpPersistDFPath = s"""$outputPath/${ehName.replaceAll("-", "")}/ehTest/rawDataDF"""
-      val tempPersistChk = s"""$outputPath/${ehName.replaceAll("-", "")}/ehTest/rawChkPoint"""
-      dbutils.fs.rm(s"""${tmpPersistDFPath}""",true)
-      dbutils.fs.rm(s"""${tempPersistChk}""",true)
 
       rawEHDF
         .writeStream
@@ -366,6 +365,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
         .option("checkpointLocation", tempPersistChk)
         .format("delta")
         .start(tmpPersistDFPath)
+        .awaitTermination()
 
       val rawBodyLookup = spark.read.format("delta").load(tmpPersistDFPath)
       val schemaBuilders = rawBodyLookup
