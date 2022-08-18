@@ -20,16 +20,14 @@ object MultiWorkspaceDeployment extends SparkSessionWrapper {
     new MultiWorkspaceDeployment()
       .setConfigCsvPath(configCsvPath)
       .setOutputPath(reportOutputPath)
-      .setDeploymentReport(ArrayBuffer())
-      .setDeploymentId(java.util.UUID.randomUUID.toString)
+      .initDeployment()
   }
 
   def apply(configCsvPath: String): MultiWorkspaceDeployment = {
     new MultiWorkspaceDeployment()
       .setConfigCsvPath(configCsvPath)
-      .setOutputPath("/tmp/overwatch") //TODO tempworking dir from config
-      .setDeploymentReport(ArrayBuffer())
-      .setDeploymentId(java.util.UUID.randomUUID.toString)
+      .setOutputPath("/mnt/tmp/overwatch")
+      .initDeployment()
   }
 }
 
@@ -60,6 +58,15 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   protected def configCsvPath: String = _configCsvPath
 
+  private var _pipelineSnapTime: Long = _
+
+  private def initDeployment(): this.type ={
+    setDeploymentReport(ArrayBuffer())
+    setDeploymentId(java.util.UUID.randomUUID.toString)
+    setPipelineSnapTime()
+    this
+  }
+
   private[overwatch] def setDeploymentId(value: String): this.type = {
     _deploymentId = value
     this
@@ -85,6 +92,15 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     this
   }
 
+  def pipelineSnapTime: TimeTypes = {
+    Pipeline.createTimeDetail(_pipelineSnapTime)
+  }
+
+  private[overwatch] def setPipelineSnapTime(): this.type = {
+    _pipelineSnapTime = LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli
+    logger.log(Level.INFO, s"INIT: Pipeline Snap TS: ${pipelineSnapTime.asUnixTimeMilli}-${pipelineSnapTime.asTSString}")
+    this
+  }
 
   def validate(parallelism: Int = 4): Unit = {
     val processingStartTime = System.currentTimeMillis();
@@ -170,9 +186,13 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       println(s"""Deployment started config params: ${args} , ThreadName: """ + Thread.currentThread().getName)
       val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
       Bronze(workspace).run()
+      deploymentReport.append(MultiWSDeploymentReport(Some(args),
+        "SUCCESS",
+        Some(deploymentId)
+      ))
     } catch {
       case exception: Exception =>
-        val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying")
+        val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
         deploymentReport.append(MultiWSDeploymentReport(Some(args),
           fullMsg,
@@ -206,12 +226,15 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   }
 
 
-  private[overwatch] def snapshotConfig(configDF: DataFrame) = { //TODO multiple prefix not allowd
+  private[overwatch] def snapshotConfig(configDF: DataFrame) = {
     var configWriteLocation = configDF.head().getAs(ConfigColumns.etl_storage_prefix.toString).toString
     if (!configWriteLocation.startsWith("dbfs:")) {
       configWriteLocation = s"""dbfs:${configWriteLocation}"""
     }
-    configDF.write.format("delta").mode("append").save(s"""${configWriteLocation}/report/configTable""")
+    configDF
+      .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
+      .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
+      .write.format("delta").mode("append").save(s"""${configWriteLocation}/report/configTable""")
   }
 
   private[overwatch] def snapShotValidation(validationDF: Dataset[DeploymentValidationReport], path: String, reportName: String): Unit = {
@@ -221,7 +244,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     }
     validationDF
       .withColumn("deploymentId", lit(deploymentId))
-      .withColumn("snapTS", lit(LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli))
+      .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
+      .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
       .write.format("delta").mode("append").save(s"""${validationPath}/report/${reportName}""")
   }
 
@@ -231,7 +255,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       reportPath = s"""dbfs:${path}"""
     }
     validationDF
-      .withColumn("snapTS", lit(LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli))
+      .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
+      .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
       .write.format("delta").mode("append").save(s"""${reportPath}/report/${reportName}""")
   }
 

@@ -135,7 +135,6 @@ class DeploymentValidation() extends SparkSessionWrapper {
         .verifyMinimumSchema(Schema.deployementMinimumSchema, enforceNonNullCols = false)
         .filter(ConfigColumns.active.toString)
         .withColumn("deploymentId", lit(deploymentId))
-        .withColumn("snapTS", lit(LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli))
       val columns = df.columns
       columns.foreach(columnName =>
         df = df.withColumnRenamed(columnName, columnName.replaceAll(" ", ""))
@@ -356,9 +355,11 @@ class DeploymentValidation() extends SparkSessionWrapper {
         .load()
         .withColumn("deserializedBody", 'body.cast("string"))
 
-
       val tmpPersistDFPath = s"""$outputPath/${ehName.replaceAll("-", "")}/ehTest/rawDataDF"""
       val tempPersistChk = s"""$outputPath/${ehName.replaceAll("-", "")}/ehTest/rawChkPoint"""
+      dbutils.fs.rm(s"""${tmpPersistDFPath}""",true)
+      dbutils.fs.rm(s"""${tempPersistChk}""",true)
+
       rawEHDF
         .writeStream
         .trigger(Trigger.Once)
@@ -396,6 +397,9 @@ class DeploymentValidation() extends SparkSessionWrapper {
       parsedEHDF
         .drop("response")
         .verifyMinimumSchema(Schema.auditMasterSchema)
+
+      dbutils.fs.rm(s"""${tmpPersistDFPath}""",true)
+      dbutils.fs.rm(s"""${tempPersistChk}""",true)
 
       validationStatus.append(DeploymentValidationReport(true,
         getSimpleMsg("Validate_EventHub"),
