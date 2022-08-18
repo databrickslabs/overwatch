@@ -44,6 +44,7 @@ class Config() {
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
   private var _contractJobsLightDBUPrice: Double = _
+  private var _isMultiworkspaceDeployment: Boolean = false
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -53,6 +54,7 @@ class Config() {
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
+  def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
 
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -196,6 +198,12 @@ class Config() {
     this
   }
 
+  private[overwatch] def setIsMultiworkspaceDeployment(value: Boolean): this.type = {
+    _isMultiworkspaceDeployment = value
+    this
+  }
+
+
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value
     this
@@ -328,7 +336,7 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret],apiURL:Option[String]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret], apiURL: Option[String]): this.type = {
     var rawToken = ""
     var scope = ""
     var key = ""
@@ -338,7 +346,7 @@ class Config() {
         //For multiworksspace deployment get api url from config file
         //For single deployment get the api url from notebook context.
         _workspaceUrl = apiURL.getOrElse(dbutils.notebook.getContext().apiUrl.get)
-        println("setting workspace URL"+_workspaceUrl)
+        println("setting workspace URL" + _workspaceUrl)
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key

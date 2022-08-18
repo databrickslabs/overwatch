@@ -286,7 +286,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
     if (isMultiworkspaceDeployment) multiWorkspaceOverrideOrganizationId(rawParams.organizationID.get)
     config.setInputConfig(rawParams)
-
+    config.setIsMultiworkspaceDeployment(isMultiworkspaceDeployment)
 
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
@@ -602,12 +602,12 @@ object Initializer extends SparkSessionWrapper {
     )
   }
 
-  def apply(overwatchArgs: String, debugFlag: Boolean, isMultiworkspaceDeployment: Boolean): Workspace = {
+  def apply(overwatchArgs: String, debugFlag: Boolean,disableValidations:Boolean, isMultiworkspaceDeployment: Boolean): Workspace = {
     apply(
       overwatchArgs,
       debugFlag,
       isSnap = false,
-      disableValidations = false,
+      disableValidations,
       initializeDatabase = true,
       isMultiworkspaceDeployment
     )

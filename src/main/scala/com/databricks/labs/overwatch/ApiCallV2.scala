@@ -7,6 +7,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+import org.apache.spark.util.LongAccumulator
 import org.json.JSONObject
 import scalaj.http.{Http, HttpOptions, HttpResponse}
 
@@ -33,6 +34,14 @@ object ApiCallV2 extends SparkSessionWrapper {
       .buildApi(apiName)
       .setQueryMap(queryMap)
       .setSuccessTempPath(tempSuccessPath)
+  }
+
+  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], tempSuccessPath: String,accumulator: LongAccumulator) = {
+    new ApiCallV2(apiEnv)
+      .buildApi(apiName)
+      .setQueryMap(queryMap)
+      .setSuccessTempPath(tempSuccessPath)
+      .setAccumulator(accumulator)
   }
 
   def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String]) = {
@@ -71,7 +80,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private var _apiFailureCount: Int = 0
   private var _printFinalStatusFlag: Boolean = true
   private var _queryMap: Map[String, String] = _
+  private var _accumulator: LongAccumulator = _
 
+  protected def accumulator: LongAccumulator = _accumulator
   protected def apiSuccessCount: Int = _apiSuccessCount
 
   protected def apiFailureCount: Int = _apiFailureCount
@@ -92,6 +103,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   protected def queryMap: Map[String, String] = _queryMap
 
+  private[overwatch] def setAccumulator(value: LongAccumulator): this.type = {
+    _accumulator = value
+    this
+  }
   private[overwatch] def setQueryMap(value: Map[String, String]): this.type = {
     _queryMap = value
     val mapper = new ObjectMapper()
@@ -462,13 +477,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   }
 
 
-  def executeMultiThread(): util.ArrayList[String] = {
+  def executeMultiThread(): (util.ArrayList[String]) = {
     try {
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation) {
-        if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
+        accumulator.add(1)
+        if (apiEnv.successBatchSize <= _apiResponseArray.size()) {//Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath, _apiResponseArray.toString)
           if (responseFlag) { //Clearing the resultArray in-case of successful write
             setApiResponseArray(new util.ArrayList[String]())
@@ -516,6 +532,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
+      if (apiMeta.storeInTempLocation) {
+        accumulator.add(1)
+        if (apiEnv.successBatchSize <= _apiResponseArray.size()) {//Checking if its right time to write the batches into persistent storage
+          val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath, _apiResponseArray.toString)
+          if (responseFlag) { //Clearing the resultArray in-case of successful write
+            setApiResponseArray(new util.ArrayList[String]())
+          }
+        }
+      }
       paginate(response.body)
       if (_printFinalStatusFlag) {
         logger.log(Level.INFO, buildDetailMessage())

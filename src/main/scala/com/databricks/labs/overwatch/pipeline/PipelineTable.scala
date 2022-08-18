@@ -334,7 +334,7 @@ case class PipelineTable(
         if (config.debugFlag) println(streamWriterMessage)
         logger.log(Level.INFO, streamWriterMessage)
         var streamWriter = df.writeStream.outputMode(writeMode.toString).format(format).option("checkpointLocation", checkpointPath.get)
-          .queryName(s"StreamTo_${name}")
+          .queryName(s"StreamTo_${name}_${config.organizationId}")
         streamWriter = if (partitionBy.nonEmpty) streamWriter.partitionBy(partitionBy: _*) else streamWriter // add partitions if exists
         streamWriter = if (writeMode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
           streamWriter.option("overwriteSchema", "true")

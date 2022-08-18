@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.delta.ProtocolChangedException
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.streaming.StreamingQueryListener._
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
@@ -26,6 +27,7 @@ class Database(config: Config) extends SparkSessionWrapper {
 
   /**
    * register an Overwatch target table in the configured Overwatch deployment
+   *
    * @param target Pipeline table (i.e. target) as per the Overwatch deployed config
    */
   def registerTarget(target: PipelineTable): Unit = {
@@ -134,7 +136,8 @@ class Database(config: Config) extends SparkSessionWrapper {
    * pipelines multiple times. This function simplifies the logic to write the df to temp storage and
    * read it back as a simple scan for deduping and merging
    * NOTE: this may be moved outside of database.scala if usage is valuable in other contexts
-   * @param df Dataframe to persist and load as fresh
+   *
+   * @param df     Dataframe to persist and load as fresh
    * @param target target the df represents
    * @return
    */
@@ -185,8 +188,8 @@ class Database(config: Config) extends SparkSessionWrapper {
       val explicitDatePartitionCondition = if (datePartitionFields.nonEmpty & maxMergeScanDates.nonEmpty) {
         s" AND target.${datePartitionFields.get} in (${maxMergeScanDates.mkString("'", "', '", "'")})"
       } else ""
-      val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")  + " " +
-        s"AND target.organization_id = '${config.organizationId}'" +  // force partition filter for concurrent merge
+      val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ") + " " +
+        s"AND target.organization_id = '${config.organizationId}'" + // force partition filter for concurrent merge
         explicitDatePartitionCondition // force right side scan to only scan relevant dates
 
       val mergeDetailMsg =
@@ -235,12 +238,59 @@ class Database(config: Config) extends SparkSessionWrapper {
         spark.streams.removeListener(streamManager)
 
       } else { // DF Standard Writer append/overwrite
-        target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
+        try {
+          target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
+        } catch {
+          case e: Throwable =>
+            logger.log(Level.ERROR, s"""Exception while writing to ${target.tableFullName}""""+Thread.currentThread().getName)
+            throw e
+        }
       }
       logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
     }
     registerTarget(target)
     true
+  }
+
+  def writeWithRetry(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array(), daysToProcess: Option[Int] = None): Boolean = {
+
+    if (daysToProcess != None) {
+      if (daysToProcess.get < 5 && !target.autoOptimize) {
+        logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
+        df.persist()
+        df.count()
+      }
+    }
+    var runFlag = true
+    var i = 0
+    val retryCount = 5
+    while (runFlag && i < 5) {
+      try {
+        write(df, target, pipelineSnapTime, maxMergeScanDates)
+        runFlag = false
+      }
+      catch {
+        case e: Throwable =>
+          logger.info("Database retry count" + i + " Table name:" + target.tableFullName + " Thread name: " + Thread.currentThread().getName)
+           if (i == retryCount) {
+            logger.log(Level.INFO, s"""Reached max retry current retry count:${i}""")
+            throw e
+          }
+          i = i + 1
+          coolDown(target.tableFullName)
+      }
+    }
+    println("Successfully written" + target.tableLocation)
+    true
+  }
+
+  private def coolDown(tableName: String): Unit = {
+    val start = 1
+    val end = 10
+    val rnd = new scala.util.Random
+    val number = start + rnd.nextInt((end - start) + 1)
+    logger.log(Level.INFO, "Slowing multithreaded writing for " + tableName + "sleeping..." + 10000 * number)
+    Thread.sleep(10000 * number)
   }
 
 }
