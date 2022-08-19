@@ -30,7 +30,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'security_profile,
       'cluster_log_conf,
       'init_scripts,
-      'custom_tags,
+      'tags,
       'cluster_source,
       'aws_attributes,
       'azure_attributes,
@@ -926,7 +926,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, workspace_name, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
       |autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type, security_profile, cluster_log_conf,
-      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, aws_attributes, azure_attributes,
+      |init_scripts, tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, aws_attributes, azure_attributes,
       |driver_instance_pool_id, instance_pool_id, driver_instance_pool_name, instance_pool_name,
       |spark_version, idempotency_token, deleted_by, created_by, last_edited_by
       |""".stripMargin
