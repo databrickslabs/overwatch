@@ -240,7 +240,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
-        jobRunsModule.fromTime, jobRunsModule.untilTime
+        jobRunsModule.fromTime, jobRunsModule.untilTime,
+        SilverTargets.dbJobRunsTarget.keys
       )
     ),
     append(SilverTargets.dbJobRunsTarget)

@@ -3,15 +3,21 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions.fillForward
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
-import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes}
+import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaScrubber, SchemaTools, SparkSessionWrapper, TimeTypes}
 import org.apache.log4j.Level
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{ArrayType, LongType, StringType}
 
 object WorkflowsTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
+
+  /**
+   * BEGIN Workflow generic functions
+   */
+
 
   def getJobsBase(df: DataFrame): DataFrame = {
     val onlyOnceJobRecW = Window.partitionBy('organization_id, 'timestamp, 'actionName, 'requestId, $"response.statusCode").orderBy('timestamp)
@@ -20,6 +26,61 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .withColumn("rnk", rank().over(onlyOnceJobRecW))
       .withColumn("rn", row_number.over(onlyOnceJobRecW))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+  }
+
+  def workflowsCleanseTasks(df: DataFrame, keys: Array[String], pathToTasksField: String): DataFrame = {
+    val emptyDFWKeysAndCleansedTasks = Seq.empty[(String, Long, Long)].toDF("organization_id", "runId", "startEpochMS")
+      .withColumn("cleansedTasks", lit(null).cast(Schema.minimumTasksSchema))
+
+    if (SchemaTools.getAllColumnNames(df.schema).exists(c => c.startsWith(pathToTasksField))) { // tasks field exists
+      if (df.select(col(pathToTasksField)).schema.fields.head.dataType.typeName == "array") { // tasks field is array
+        val jobStatusByKeyW = Window.partitionBy(keys map col: _*)
+        val tasksExplodedWKeys = df
+          .filter(size(col(pathToTasksField)) >= 1)
+          .select((keys map col) :+ explode(col(pathToTasksField)).alias("tasksToCleanse"): _*)
+
+        val tasksChangeInventory = Map(
+          "tasksToCleanse.new_cluster.custom_tags" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.new_cluster.custom_tags"),
+          "tasksToCleanse.new_cluster.aws_attributes" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.new_cluster.aws_attributes"),
+          "tasksToCleanse.new_cluster.azure_attributes" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.new_cluster.azure_attributes"),
+          "tasksToCleanse.new_cluster.spark_conf" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.new_cluster.spark_conf"),
+          "tasksToCleanse.new_cluster.spark_env_vars" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.new_cluster.spark_env_vars"),
+          "tasksToCleanse.notebook_task.base_parameters" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.notebook_task.base_parameters")
+        )
+
+        tasksExplodedWKeys
+          .select(SchemaTools.modifyStruct(tasksExplodedWKeys.schema, tasksChangeInventory): _*)
+          .groupBy(keys map col: _*)
+          .agg(collect_list('tasksToCleanse).alias("cleansedTasks"))
+      } else emptyDFWKeysAndCleansedTasks // build empty DF with keys to allow the subsequent joins
+    } else emptyDFWKeysAndCleansedTasks // build empty DF with keys to allow the subsequent joins
+  }
+
+  def workflowsCleanseJobClusters(df: DataFrame, keys: Array[String], pathToJobClustersField: String): DataFrame = {
+    val emptyDFWKeysAndCleansedJobClusters = Seq.empty[(String, Long, Long)].toDF("organization_id", "runId", "startEpochMS")
+      .withColumn("cleansedJobsClusters", lit(null).cast(Schema.minimumJobClustersSchema))
+
+    if (SchemaTools.getAllColumnNames(df.schema).exists(c => c.startsWith(pathToJobClustersField))) { // job_clusters field exists
+      if (df.select(col(pathToJobClustersField)).schema.fields.head.dataType.typeName == "array") { // job_clusters field is array
+        val jobStatusByKeyW = Window.partitionBy(keys map col: _*)
+        val jobClustersExplodedWKeys = df
+          .filter(size(col(pathToJobClustersField)) > 0)
+          .select((keys map col) :+ explode(col(pathToJobClustersField)).alias("jobClustersToCleanse"): _*)
+
+        val jobClustersChangeInventory = Map(
+          "jobClustersToCleanse.new_cluster.custom_tags" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "jobClustersToCleanse.new_cluster.custom_tags"),
+          "jobClustersToCleanse.new_cluster.aws_attributes" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "jobClustersToCleanse.new_cluster.aws_attributes"),
+          "jobClustersToCleanse.new_cluster.azure_attributes" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "jobClustersToCleanse.new_cluster.azure_attributes"),
+          "jobClustersToCleanse.new_cluster.spark_conf" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "jobClustersToCleanse.new_cluster.spark_conf"),
+          "jobClustersToCleanse.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "jobClustersToCleanse.new_cluster.spark_env_vars")
+        )
+
+        jobClustersExplodedWKeys
+          .select(SchemaTools.modifyStruct(jobClustersExplodedWKeys.schema, jobClustersChangeInventory): _*)
+          .groupBy(keys map col: _*)
+          .agg(collect_list('jobClustersToCleanse).alias("cleansedJobsClusters"))
+      } else emptyDFWKeysAndCleansedJobClusters // build empty DF with keys to allow the subsequent joins
+    } else emptyDFWKeysAndCleansedJobClusters // build empty DF with keys to allow the subsequent joins
   }
 
   /**
@@ -130,6 +191,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   /**
    * lookup and fill forward common metadata
    */
+  // todo -- add new fields to be filled (if there are new ones)
   def jobStatusLookupAndFillForwardMetaData(lastJobStatus: WindowSpec)(df: DataFrame): DataFrame = {
     df
       .withColumn("schedule", fillForward("schedule", lastJobStatus, Seq(get_json_object('lookup_settings, "$.schedule"))))
@@ -236,47 +298,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .scrubSchema
   }
 
-  //  def jobStatusCleanseComplexStructs
-
-  def jobStatusCleanseJobClusters(df: DataFrame, keys: Array[String]): DataFrame = {
-    val jobStatusByKeyW = Window.partitionBy(keys map col: _*)
-    val jobClustersExplodedWKeys = df
-      .filter(size($"new_settings.job_clusters") > 0)
-      .select((keys map col) :+ explode($"new_settings.job_clusters").alias("job_clusters"): _*)
-
-    val jobClustersChangeInventory = Map(
-      "job_clusters.new_cluster.custom_tags" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.custom_tags"),
-      "job_clusters.new_cluster.aws_attributes" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.aws_attributes"),
-      "job_clusters.new_cluster.azure_attributes" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.azure_attributes"),
-      "job_clusters.new_cluster.spark_conf" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.spark_conf"),
-      "job_clusters.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobClustersExplodedWKeys, "job_clusters.new_cluster.spark_env_vars")
-    )
-
-    jobClustersExplodedWKeys
-      .select(SchemaTools.modifyStruct(jobClustersExplodedWKeys.schema, jobClustersChangeInventory): _*)
-      .withColumn("job_clusters", collect_list('job_clusters).over(jobStatusByKeyW))
-  }
-
-  def jobStatusCleanseNewSettingsTasks(df: DataFrame, keys: Array[String]): DataFrame = {
-    val jobStatusByKeyW = Window.partitionBy(keys map col: _*)
-    val tasksExplodedWKeys = df
-      .filter(size($"new_settings.tasks") >= 1)
-      .select((keys map col) :+ explode($"new_settings.tasks").alias("newSettingsTask"): _*)
-
-    val tasksChangeInventory = Map(
-      "newSettingsTask.new_cluster.custom_tags" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.custom_tags"),
-      "newSettingsTask.new_cluster.aws_attributes" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.aws_attributes"),
-      "newSettingsTask.new_cluster.azure_attributes" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.azure_attributes"),
-      "newSettingsTask.new_cluster.spark_conf" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.spark_conf"),
-      "newSettingsTask.new_cluster.spark_env_vars" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.new_cluster.spark_env_vars"),
-      "newSettingsTask.notebook_task.base_parameters" -> SchemaTools.structToMap(tasksExplodedWKeys, "newSettingsTask.notebook_task.base_parameters")
-    )
-
-    tasksExplodedWKeys
-      .select(SchemaTools.modifyStruct(tasksExplodedWKeys.schema, tasksChangeInventory): _*)
-      .withColumn("newSettingsTask", collect_list('newSettingsTask).over(jobStatusByKeyW))
-  }
-
   def jobStatusCleanseForPublication(keys: Array[String])(df: DataFrame): DataFrame = {
     val containsMTJTasks = SchemaTools.getAllColumnNames(df.schema).contains("new_settings.tasks")
     val containsMTJJobClusters = SchemaTools.getAllColumnNames(df.schema).contains("new_settings.job_clusters")
@@ -303,20 +324,22 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     )
 
     cleansedDF = if (containsMTJTasks) {
-      structsCleaner("new_settings.tasks") = col("newSettingsTask")
-      val cleansedMTJTasksDF = jobStatusCleanseNewSettingsTasks(cleansedDF, keys)
+      // replace new_settings.tasks with cleansed tasks
+      structsCleaner("new_settings.tasks") = col("cleansedTasks")
+      val cleansedMTJTasksDF = workflowsCleanseTasks(cleansedDF, keys, "new_settings.tasks")
       cleansedDF.join(cleansedMTJTasksDF, keys.toSeq, "left")
     } else cleansedDF
 
     cleansedDF = if (containsMTJJobClusters) {
-      structsCleaner("new_settings.job_clusters") = col("job_clusters")
-      val cleansedMTJJobClustersDF = jobStatusCleanseJobClusters(cleansedDF, keys)
+      // replace new_settings.job_clusters with cleansed job_clusters
+      structsCleaner("new_settings.job_clusters") = col("cleansedJobsClusters")
+      val cleansedMTJJobClustersDF = workflowsCleanseJobClusters(cleansedDF, keys, "new_settings.job_clusters")
       cleansedDF.join(cleansedMTJJobClustersDF, keys.toSeq, "left")
     } else cleansedDF
 
     cleansedDF
       .modifyStruct(structsCleaner.toMap)
-      .drop("newSettingsTask", "job_clusters")
+      .drop("cleansedTasks", "cleansedJobsClusters") // cleanup temporary cleaner fields
   }
 
   /**
@@ -387,7 +410,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   /**
    * Primarily necessary to get runId from response and capture the submission time
    */
-  def jobRunsDeriveRunsLaunched(df: DataFrame, firstRunSemanticsW: WindowSpec): DataFrame = {
+  def jobRunsDeriveRunsLaunched(df: DataFrame, firstRunSemanticsW: WindowSpec, arrayStringSchema: ArrayType): DataFrame = {
     df
       .filter('actionName.isin("runNow"))
       .select(
@@ -399,10 +422,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         lit("manual").alias("jobTriggerType_runNow"),
         'workflow_context.alias("workflow_context_runNow"),
         struct(
-          'jar_params,
-          'python_params,
-          'spark_submit_params,
-          'notebook_params
+          from_json('jar_params, arrayStringSchema).alias("jar_params"),
+          from_json('python_params, arrayStringSchema).alias("python_params"),
+          from_json('spark_submit_params, arrayStringSchema).alias("spark_submit_params"),
+          from_json('notebook_params, arrayStringSchema).alias("notebook_params")
         ).alias("submission_params"),
         'sourceIPAddress.alias("submitSourceIP"),
         'sessionId.alias("submitSessionId"),
@@ -448,7 +471,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .select(
         'organization_id,
         'timestamp,
-        lit(null).cast("long").alias("submissionJobId"),
         get_json_object($"response.result", "$.run_id").cast("long").alias("jobRunId"),
         'run_name,
         'timestamp.alias("submissionTime"),
@@ -456,17 +478,15 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'new_cluster, // json struct string
         'existing_cluster_id,
         'workflow_context.alias("workflow_context_submitRun"),
-        struct(
-          'notebook_task,
-          'spark_python_task,
-          'spark_jar_task,
-          'shell_command_task,
-          'pipeline_task
-        ).alias("taskDetail"),
+        'notebook_task,
+        'spark_python_task,
+        'spark_jar_task,
+        'shell_command_task,
+        'pipeline_task,
         'tasks, // json array struct string
         'libraries,
-        'access_control_list.alias("submitRun_acls"),
-        'git_source.alias("submitRun_git_source"),
+        'access_control_list,
+        'git_source,
         'timeout_seconds.cast("string").alias("timeout_seconds"),
         'sourceIPAddress.alias("submitSourceIP"),
         'sessionId.alias("submitSessionId"),
@@ -475,11 +495,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'userAgent.alias("submitUserAgent"),
         'userIdentity.alias("submittedBy")
       )
-      .filter('jobRunId.isNotNull)
+      .filter('jobRunId.isNotNull) // removed to capture failed
       .withColumn("rnk", rank().over(firstRunSemanticsW))
       .withColumn("rn", row_number().over(firstRunSemanticsW))
       .filter('rnk === 1 && 'rn === 1)
       .drop("rnk", "rn", "timestamp")
+      .scrubSchema // required to remove nasty map chars from structified strings
+
   }
 
   def jobRunsDeriveRunStarts(df: DataFrame, firstRunSemanticsW: WindowSpec): DataFrame = {
@@ -513,6 +535,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
   def jobRunsDeriveRunsBase(df: DataFrame, etlUntilTime: TimeTypes): DataFrame = {
 
+    val arrayStringSchema = ArrayType(StringType, containsNull = true)
     val firstTaskRunSemanticsW = Window.partitionBy('organization_id, 'jobRunId, 'taskRunId).orderBy('timestamp)
     val firstJobRunSemanticsW = Window.partitionBy('organization_id, 'jobRunId).orderBy('timestamp)
 
@@ -529,7 +552,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     // DF for jobs launched with actionName == "runNow"
     // Lookback 30 days for laggard starts prior to current run
     // only field from runNow that we care about is the response.result.runId
-    val runNowStart = jobRunsDeriveRunsLaunched(df, firstJobRunSemanticsW)
+    val runNowStart = jobRunsDeriveRunsLaunched(df, firstJobRunSemanticsW, arrayStringSchema)
 
     val runTriggered = jobRunsDeriveRunsTriggered(df, firstJobRunSemanticsW)
 
@@ -552,19 +575,21 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     // Lookback 30 days for laggard starts prior to current run
     val runStarts = jobRunsDeriveRunStarts(df, firstTaskRunSemanticsW)
 
-    // TODO -- add repairRuns action
-    allCompletes
+    val jobRunsMaster = allCompletes
       .join(runStarts, Seq("organization_id", "jobRunId", "taskRunId"), "left")
       .join(allSubmissions, Seq("organization_id", "jobRunId"), "left")
       .join(allCancellations, Seq("organization_id", "jobRunId"), "left") // todo -- add support for cancelled tasks (i.e. join on taskRunId??) waiting on DBR update
       .withColumn("runId", coalesce('taskRunId, 'jobRunId).cast("long"))
+
+    // TODO -- add repairRuns action
+    jobRunsMaster
       .select(
         'organization_id,
         coalesce('runStartJobId, 'completedJobId, 'submissionJobId).cast("long").alias("jobId"),
         'jobRunId.cast("long"),
         'taskRunId.cast("long"),
         coalesce('taskKey_runStart, 'taskKey_Completed).alias("taskKey"),
-        coalesce('taskDependencies_runStart, 'taskDependencies_Completed).alias("taskDependencies"),
+        from_json(coalesce('taskDependencies_runStart, 'taskDependencies_Completed), arrayStringSchema).alias("taskDependencies"),
         'runId,
         coalesce('multitaskParentRunId_Started, 'multitaskParentRunId_Completed).cast("long").alias("multitaskParentRunId"),
         coalesce('parentRunId_Started, 'parentRunId_Completed).cast("long").alias("parentRunId"),
@@ -585,16 +610,23 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         when('cancellationRequestId.isNotNull, "Cancelled")
           .otherwise('jobTerminalState)
           .alias("jobTerminalState"),
-        'new_cluster.alias("submitRun_newCluster"),
-        'existing_cluster_id.alias("submitRun_existing_cluster_id"),
         'clusterId,
-        'libraries, // TODO -- potentially lookup from jobs or remove completely
+        struct(
+          'existing_cluster_id,
+          structFromJson(spark, jobRunsMaster, "new_cluster"),
+          structFromJson(spark, jobRunsMaster, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema),
+          structFromJson(spark, jobRunsMaster, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema),
+          structFromJson(spark, jobRunsMaster, "libraries", isArrayWrapped = true),
+          structFromJson(spark, jobRunsMaster, "access_control_list", isArrayWrapped = true),
+          structFromJson(spark, jobRunsMaster, "git_source")
+        ).alias("submitRun_details"),
         'submission_params,
         coalesce('workflow_context_runNow, 'workflow_context_submitRun).alias("workflow_context"),
-        'taskDetail,
-        'tasks, // TODO -- structify and cleanse later
-        'submitRun_acls,
-        'submitRun_git_source,
+        'notebook_task,
+        'spark_python_task,
+        'spark_jar_task,
+        'shell_command_task,
+        'pipeline_task,
         struct(
           'startTime,
           'submissionTime,
@@ -629,6 +661,51 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         ).alias("requestDetails")
       )
       .withColumn("timestamp", $"JobRunTime.startEpochMS") // TS lookup key added for next steps (launch time)
+      .withColumn("startEpochMS", $"JobRunTime.startEpochMS") // set launch time as TS key
+      .scrubSchema
+  }
+
+  def structifyLookupMeta(df: DataFrame): DataFrame = {
+    df
+      .withColumn("taskDetail",
+        struct(
+          structFromJson(spark, df, "notebook_task", allNullMinimumSchema = Schema.minimumNotebookTaskSchema),
+          structFromJson(spark, df, "spark_python_task"),
+          structFromJson(spark, df, "spark_jar_task"),
+//          structFromJson(spark, df, "shell_command_task"),
+          structFromJson(spark, df, "pipeline_task")
+        ).alias("taskDetail")
+      )
+      .drop("notebook_task", "spark_python_task", "spark_jar_task", "shell_command_task", "pipeline_task")
+      .scrubSchema
+  }
+
+  def cleanseCreatedNestedStructures(keys: Array[String])(df: DataFrame): DataFrame = {
+
+    val cleansedTasksDF = workflowsCleanseTasks(df, keys, "submitRun_details.tasks")
+    val cleansedJobClustersDF = workflowsCleanseJobClusters(df, keys, "submitRun_details.job_clusters")
+
+    val dfWCleansedJobsAndTasks = df
+      .join(cleansedTasksDF, keys.toSeq, "left")
+      .join(cleansedJobClustersDF, keys.toSeq, "left")
+
+    // todo -- implement the newClusterCleaner everywhere
+    val tasksAndJobClustersCleansingInventory = Map(
+      "submitRun_details.tasks" -> col("cleansedTasks"),
+      "submitRun_details.job_clusters" -> col("cleansedJobsClusters"),
+      "submitRun_details.tasks.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "submitRun_details.tasks.notebook_task.base_parameters"),
+      "submitRun_details.tasks.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "submitRun_details.tasks.shell_command_task.env_vars"),
+      "taskDetail.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "taskDetail.notebook_task.base_parameters"),
+      "taskDetail.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "taskDetail.shell_command_task.env_vars")
+    ) ++
+      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.new_cluster") ++
+      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.tasks.new_cluster")
+
+    dfWCleansedJobsAndTasks
+      .modifyStruct(tasksAndJobClustersCleansingInventory) // overwrite nested complex structures with cleansed structures
+      .drop("cleansedTasks", "cleansedJobsClusters") // cleanup temporary cleaner fields
+      .scrubSchema(SchemaScrubber(cullNullTypes = true))
+
   }
 
   /**
@@ -661,7 +738,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
    * looks up the job name based on id first from job_status_silver and if not present there fallback to latest
    * snapshot prior to the run
    */
-  def jobRunsAppendJobName(lookups: Map[String, DataFrame])(df: DataFrame): DataFrame = {
+  def jobRunsAppendJobMeta(lookups: Map[String, DataFrame])(df: DataFrame): DataFrame = {
 
     val runsWithJobName1 = if (lookups.contains("job_status_silver")) {
       df

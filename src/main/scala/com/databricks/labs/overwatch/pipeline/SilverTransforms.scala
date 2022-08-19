@@ -1181,7 +1181,8 @@ trait SilverTransforms extends SparkSessionWrapper {
                                   jobsStatus: PipelineTable,
                                   jobsSnapshot: PipelineTable,
                                   etlStartTime: TimeTypes,
-                                  etlUntilTime: TimeTypes
+                                  etlUntilTime: TimeTypes,
+                                  targetKeys: Array[String]
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
     // TODO -- add runTriggered
@@ -1206,9 +1207,22 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    lazy val jobStatusNameLookup = jobsStatus.asDF
-      .select('organization_id, 'timestamp, 'jobId, 'jobName)
+    // TODO -- add tags in lookup
+    lazy val jobStatusMetaLookup = jobsStatus.asDF
+      .select(
+        'organization_id,
+        'timestamp,
+        'jobId,
+        'jobName,
+        // TODO -- ensure these are in job_status_silver minimum schema
+        to_json($"new_settings.notebook_task").alias("notebook_task"),
+        to_json($"new_settings.spark_python_task").alias("spark_python_task"),
+        to_json($"new_settings.spark_jar_task").alias("spark_jar_task"),
+        //        to_json($"new_settings.shell_command_task").alias("shell_command_task"), // not in min schema yet
+        to_json($"new_settings.pipeline_task").alias("pipeline_task")
+      )
 
+    // TODO -- after v2.1 -- add task_detail lookups -- what else?
     lazy val jobSnapNameLookup = jobsSnapshot.asDF
       .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
       .select('organization_id, 'timestamp, 'job_id.alias("jobId"), $"settings.name".alias("jobName"))
@@ -1216,7 +1230,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobRunsLookups = jobRunsInitializeLookups(
       (clusterSpec, clusterSpecNameLookup),
       (clusterSnapshot, clusterSnapNameLookup),
-      (jobsStatus, jobStatusNameLookup),
+      (jobsStatus, jobStatusMetaLookup),
       (jobsSnapshot, jobSnapNameLookup)
     )
 
@@ -1231,12 +1245,15 @@ trait SilverTransforms extends SparkSessionWrapper {
      *
      * Cleanup and key the ts as launch ts
      */
+    // TODO -- schema
+    //  job_clusters minimum required [{"job_cluster_key":null (string)"]
     jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
       .transform(jobRunsAppendClusterName(jobRunsLookups))
-      .transform(jobRunsAppendJobName(jobRunsLookups))
+      .transform(jobRunsAppendJobMeta(jobRunsLookups))
+      .transform(structifyLookupMeta)
+      .transform(cleanseCreatedNestedStructures(targetKeys))
       .transform(jobRunsRollupWorkflowsAndChildren)
       .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
-      .withColumn("startEpochMS", $"JobRunTime.startEpochMS") // set launch time as TS key
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {
