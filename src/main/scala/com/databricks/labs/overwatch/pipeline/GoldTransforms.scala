@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaTools, Spa
 import org.apache.log4j.Level
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{MapType, StringType}
 import org.apache.spark.sql.{Column, DataFrame}
 
 trait GoldTransforms extends SparkSessionWrapper {
@@ -30,7 +31,10 @@ trait GoldTransforms extends SparkSessionWrapper {
       'security_profile,
       'cluster_log_conf,
       'init_scripts,
-      'tags,
+      struct(
+        'default_tags,
+        from_json(col("custom_tags"),MapType(StringType, StringType, valueContainsNull = true)).alias("custom_tags")
+      ).alias("tags"),
       'cluster_source,
       'aws_attributes,
       'azure_attributes,

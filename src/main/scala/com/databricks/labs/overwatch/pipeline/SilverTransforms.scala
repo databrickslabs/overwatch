@@ -739,7 +739,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .withColumn("rnk", rank().over(latestClusterSnapW))
         .filter('rnk === 1).drop("rnk")
         .withColumn("spark_conf", to_json('spark_conf))
-        .withColumn("tags", struct('default_tags,'custom_tags))
+        .withColumn("custom_tags", to_json('custom_tags))
         .select(
           'organization_id,
           'cluster_id,
@@ -757,7 +757,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           deriveClusterType,
           to_json('cluster_log_conf).alias("cluster_log_conf"),
           to_json('init_scripts).alias("init_scripts"),
-          'tags,
+          'custom_tags,
           'cluster_source,
           'aws_attributes,
           'azure_attributes,
@@ -768,7 +768,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           'spark_version,
           (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
           'Pipeline_SnapTS.cast("date").alias("date"),
-          'creator_user_name.alias("createdBy")
+          'creator_user_name.alias("createdBy"),
+          'default_tags
         )
 
       unionWithMissingAsNull(clusterBaseWMetaDF, missingClusterBaseFromSnap)
@@ -846,10 +847,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       startCluster.alias("start_cluster"),
       'cluster_log_conf,
       'init_scripts,
-      struct(
-        'default_tags,
-      'custom_tags
-      ).alias("tags"),
+      'custom_tags,
       'cluster_source,
       'aws_attributes,
       'azure_attributes,
@@ -867,7 +865,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'spark_version,
       'idempotency_token,
       'timestamp,
-      'userEmail)
+      'userEmail,
+    'default_tags)
 
     val clustersRemoved = clusterBaseDF
       .filter($"response.statusCode" === 200) // only successful delete statements get applied
@@ -947,6 +946,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
+      .withColumn("default_tags",'default_tags)
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
 
@@ -1324,7 +1324,6 @@ trait SilverTransforms extends SparkSessionWrapper {
     // bad duplicate keys
     val structsCleaner = collection.mutable.Map(
       "new_settings.new_cluster.custom_tags" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.custom_tags"),
-      "new_settings.new_cluster.tags" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.tags"),
       "new_settings.new_cluster.spark_conf" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.spark_conf"),
       "new_settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(jobStatusEnhanced, "new_settings.new_cluster.spark_env_vars"),
       s"new_settings.new_cluster.aws_attributes" -> SchemaTools.structToMap(jobStatusEnhanced, s"new_settings.new_cluster.aws_attributes"),
