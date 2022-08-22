@@ -768,8 +768,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'spark_version,
           (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
           'Pipeline_SnapTS.cast("date").alias("date"),
-          'creator_user_name.alias("createdBy"),
-          'default_tags
+          'creator_user_name.alias("createdBy")
         )
 
       unionWithMissingAsNull(clusterBaseWMetaDF, missingClusterBaseFromSnap)
@@ -865,8 +864,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'spark_version,
       'idempotency_token,
       'timestamp,
-      'userEmail,
-    'default_tags)
+      'userEmail)
 
     val clustersRemoved = clusterBaseDF
       .filter($"response.statusCode" === 200) // only successful delete statements get applied
@@ -877,7 +875,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("rnk", rank().over(lastClusterSnap))
       .withColumn("rn", row_number().over(lastClusterSnap))
       .filter('rnk === 1 && 'rn === 1)
-      .select('organization_id, 'cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
+      .select('organization_id, 'cluster_id,$"default_tags")
 
     // lookup pools node types from audit logs if records present
     val clusterBaseWithPools = if (driverPoolLookup.nonEmpty) {
@@ -943,11 +941,11 @@ trait SilverTransforms extends SparkSessionWrapper {
         when(isAutomated('cluster_name) && 'actionName === "create", lit("JobsService"))
           .when(!isAutomated('cluster_name) && 'actionName === "create", 'userEmail))
       .withColumn("createdBy", when(!isAutomated('cluster_name) && 'createdBy.isNull, last('createdBy, true).over(clusterBefore)).otherwise('createdBy))
-      .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
+      .withColumn("createdBy", when('createdBy.isNull && $"default_tags.Creator".isNotNull, $"default_tags.Creator").otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
       .withColumn("default_tags",'default_tags)
-      .drop("userEmail", "cluster_creator_lookup", "single_user_name")
+      .drop("userEmail", "single_user_name")
   }
 
   def buildClusterStateDetail(
