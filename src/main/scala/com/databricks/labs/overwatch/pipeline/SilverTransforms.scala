@@ -554,8 +554,8 @@ trait SilverTransforms extends SparkSessionWrapper {
         'userAgent
       ).alias("request_details"),
       struct(
-        PipelineFunctions.fillForward(s"default_tags", lastPoolValue, Seq(col(s"poolSnapDetails.custom_tags"))),
-        PipelineFunctions.fillForward(s"custom_tags", lastPoolValue, Seq(col(s"poolSnapDetails.default_tags")))
+        PipelineFunctions.fillForward(s"default_tags", lastPoolValue, Seq(col(s"poolSnapDetails.default_tags"))),
+        PipelineFunctions.fillForward(s"custom_tags", lastPoolValue, Seq(col(s"poolSnapDetails.custom_tags")))
 
       ).alias("tags")
     )
