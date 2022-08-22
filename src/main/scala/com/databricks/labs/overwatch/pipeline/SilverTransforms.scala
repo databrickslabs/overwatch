@@ -7,7 +7,9 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{MapType, StringType}
 import org.apache.spark.sql.{Column, DataFrame}
+
 
 trait SilverTransforms extends SparkSessionWrapper {
 
@@ -550,7 +552,12 @@ trait SilverTransforms extends SparkSessionWrapper {
         'sessionId,
         'sourceIPAddress,
         'userAgent
-      ).alias("request_details")
+      ).alias("request_details"),
+      struct(
+        PipelineFunctions.fillForward(s"default_tags", lastPoolValue, Seq(col(s"poolSnapDetails.default_tags"))),
+        PipelineFunctions.fillForward(s"custom_tags", lastPoolValue, Seq(col(s"poolSnapDetails.custom_tags")))
+
+      ).alias("tags")
     )
 
     val poolsRawPruned = auditIncrementalDF
@@ -650,7 +657,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           'azure_attributes,
           lit(null).cast(Schema.poolsCreateSchema).alias("create_details"),
           lit(null).cast(Schema.poolsDeleteSchema).alias("delete_details"),
-          lit(null).cast(Schema.poolsRequestDetails).alias("request_details")
+          lit(null).cast(Schema.poolsRequestDetails).alias("request_details"),
+          struct('default_tags,'custom_tags).alias("tags")
         )
 
       // union existing and missing (imputed) pool ids (when exists)
@@ -760,7 +768,8 @@ trait SilverTransforms extends SparkSessionWrapper {
           'spark_version,
           (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
           'Pipeline_SnapTS.cast("date").alias("date"),
-          'creator_user_name.alias("createdBy")
+          'creator_user_name.alias("createdBy"),
+          'default_tags
         )
 
       unionWithMissingAsNull(clusterBaseWMetaDF, missingClusterBaseFromSnap)
@@ -856,7 +865,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'spark_version,
       'idempotency_token,
       'timestamp,
-      'userEmail)
+      'userEmail,
+    'default_tags)
 
     val clustersRemoved = clusterBaseDF
       .filter($"response.statusCode" === 200) // only successful delete statements get applied
@@ -936,6 +946,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
+      .withColumn("default_tags",'default_tags)
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
 
