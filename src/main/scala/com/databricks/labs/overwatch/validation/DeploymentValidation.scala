@@ -139,7 +139,6 @@ class DeploymentValidation() extends SparkSessionWrapper {
       columns.foreach(columnName =>
         df = df.withColumnRenamed(columnName, columnName.replaceAll(" ", ""))
       )
-   //   df.show(false)
       setInputDataFrame(df)
       setConfigNumber(df.count())
       setValidationStatus(ArrayBuffer())
@@ -188,30 +187,30 @@ class DeploymentValidation() extends SparkSessionWrapper {
     }
   }
 
-  private[overwatch] def validateWorkspaceUrl(row: Row): Unit = {
+  private[overwatch] def validateApiUrl(row: Row): Unit = {
     val url = row.getAs(ConfigColumns.api_url.toString).toString
     val scope = row.getAs(ConfigColumns.secret_scope.toString).toString
     val patKey = row.getAs(ConfigColumns.secret_key_dbpat.toString).toString
     val workspaceId = row.getAs(ConfigColumns.workspace_id.toString).toString
-    val testDetails = s"""WorkSpaceURLConnectivityTest url:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
+    val testDetails = s"""WorkSpaceURLConnectivityTest APIURL:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
     try {
       val patToken = dbutils.secrets.get(scope = scope, key = patKey)
       val apiEnv = ApiEnv(false, url, patToken, "6.1.2.0")
       val endPoint = "clusters/list"
       ApiCallV2(apiEnv, endPoint).execute().asDF()
       validationStatus.append(DeploymentValidationReport(true,
-        getSimpleMsg("WorkspaceURL_Connectivity"),
+        getSimpleMsg("APIURL_Connectivity"),
         testDetails,
         Some("SUCCESS"),
         Some(workspaceId)
       ))
     } catch {
       case exception: Exception =>
-        val msg = s"""No Data retrieved workspaceId:${workspaceId} url:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
+        val msg = s"""No Data retrieved workspaceId:${workspaceId} APIURL:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
         validationStatus.append(DeploymentValidationReport(false,
-          getSimpleMsg("WorkspaceURL_Connectivity"),
+          getSimpleMsg("APIURL_Connectivity"),
           testDetails,
           Some(fullMsg),
           Some(workspaceId)
@@ -254,7 +253,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
   }
 
   private[overwatch] def validateMaxDays(): Rule = {
-    Rule("Valid_MaxDays", col(ConfigColumns.max_date.toString) >= 0 && col(ConfigColumns.max_date.toString).isNotNull)
+    Rule("Valid_MaxDays", col(ConfigColumns.max_days.toString) >= 0 && col(ConfigColumns.max_days.toString).isNotNull)
   }
 
   private[overwatch] def validateOWScope(): Rule = {
@@ -266,7 +265,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
 
     row.getAs(ConfigColumns.cloud.toString).toString match {
       case "AWS" =>
-        validateAuditLog(row.getAs(ConfigColumns.workspace_id.toString), row.getAs(ConfigColumns.auditlogprefix_source_aws.toString), row.getAs(ConfigColumns.primordial_date.toString), row.getAs(ConfigColumns.max_date.toString))
+        validateAuditLog(row.getAs(ConfigColumns.workspace_id.toString), row.getAs(ConfigColumns.auditlogprefix_source_aws.toString), row.getAs(ConfigColumns.primordial_date.toString), row.getAs(ConfigColumns.max_days.toString))
       case "Azure" =>
         validateEventHub(row.getAs(ConfigColumns.workspace_id.toString), row.getAs(ConfigColumns.secret_scope.toString), row.getAs(ConfigColumns.eh_scope_key.toString), row.getAs(ConfigColumns.eh_name.toString))
     }
@@ -469,7 +468,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
       case "NOTNULL_SecretKey_DBPAT" => "PAT key should not be empty."
       case "Valid_PrimordialDate" => "Primordial Date should be less than current date."
       case "Valid_MaxDays" => "Max Days should be a number."
-      case "WorkspaceURL_Connectivity" => "Workspace URL should give some response with provided scope and key."
+      case "APIURL_Connectivity" => "API URL should give some response with provided scope and key."
       case "Validate_AuditLogPrefix" => "Folder with Primordial date should be present inside AuditLogPrefix."
       case "Validate_EventHub" => "Consuming data from EventHub."
       case "Valid_Excluded_Scopes" => "Excluded scope can be audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts."
@@ -557,7 +556,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
     val inputRow = inputDataFrame.collect().par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     inputRow.tasksupport = taskSupport
-    inputRow.map(validateWorkspaceUrl)
+    inputRow.map(validateApiUrl)
     val processingEtURL = System.currentTimeMillis();
     println("URL validation Duration in sec :" + (processingEtURL - processingEndTime) / 1000)
 
@@ -578,5 +577,5 @@ object ConfigColumns extends Enumeration {
   val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,
   etl_storage_prefix, etl_database_name, consumer_database_name, secret_scope,
   secret_key_dbpat, auditlogprefix_source_aws, eh_name, eh_scope_key, scopes,
-  interactive_dbu_price, automated_dbu_price, max_date, excluded_scopes, active, deploymentId = Value
+  interactive_dbu_price, automated_dbu_price, max_days, excluded_scopes, active, deploymentId = Value
 }
