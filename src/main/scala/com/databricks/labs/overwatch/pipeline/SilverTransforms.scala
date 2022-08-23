@@ -1073,7 +1073,8 @@ trait SilverTransforms extends SparkSessionWrapper {
                                      jobsSnapshotTargetComplete: PipelineTable,
                                      isFirstRun: Boolean,
                                      targetKeys: Array[String],
-                                     fromTime: TimeTypes
+                                     fromTime: TimeTypes,
+                                     tempWorkingDir: String
                                    )(df: DataFrame): DataFrame = {
 
     val jobsBase = getJobsBase(df)
@@ -1093,63 +1094,26 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS))
       .drop("Overwatch_RunID", "settings")
 
-    val jobs_statusCols: Array[Column] = Array(
-      'organization_id, 'serviceName, 'actionName, 'timestamp,
-      when('actionName === "create", get_json_object($"response.result", "$.job_id").cast("long"))
-        .when('actionName === "changeJobAcl", 'resourceId.cast("long"))
-        .otherwise('job_id).cast("long").alias("jobId"),
-      when('actionName === "create", 'name)
-        .when('actionName.isin("update", "reset"), get_json_object('new_settings, "$.name"))
-        .otherwise(lit(null).cast("string")).alias("jobName"),
-      'job_type,
-      'timeout_seconds.cast("string").alias("timeout_seconds"),
-      'schedule,
-      get_json_object('notebook_task, "$.notebook_path").alias("notebook_path"),
-      'new_settings, 'existing_cluster_id, 'new_cluster, 'aclPermissionSet, 'grants, 'targetUserId,
-      'sessionId, 'requestId, 'userAgent, 'userIdentity, 'response, 'sourceIPAddress, 'version
-    )
+    val isFirstRunAndJobsSnapshotHasRecords = isFirstRun && !jobsSnapshotDFComplete.isEmpty
 
     val lastJobStatus = Window.partitionBy('organization_id, 'jobId).orderBy('timestamp)
       .rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
-    val jobStatusBase = jobsBase
-      .select(jobs_statusCols: _*)
-      .filter('job_id.isNotNull) // create errors and delete errors will be filtered out
+    jobStatusDeriveJobsStatusBase(jobsBase)
       .transform(jobStatusLookupJobMeta(jobSnapLookup))
-      .transform(jobStatusLookupAndFillForwardMetaData(lastJobStatus))
-      .transform(jobStatusUnifyNewCluster)
-      .transform(jobStatusConvertJsonColsToStructs(jobsBaseHasRecords))
+      .transform(jobStatusDeriveBaseLookupAndFillForward(lastJobStatus))
+      .transform(jobStatusStructifyJsonCols)
       .transform(jobStatusCleanseForPublication(targetKeys))
-      .transform(jobStatusAppendClusterDetails)
-      .transform(jobStatusAppendAndFillTemporalClusterSpec)
-
-
-    /**
-     * jobStatusBaseFilled - if first run, baseline jobs statuses for existing jobs that haven't been edited since
-     * commencement of audit logs. Allows for joins directly to gold jobs to work even if they haven't been modified
-     * lately. Several of the fields are unavailable through this method but many are and they are very valuable when
-     * present in gold
-     */
-    val isFirstRunAndJobsSnapshotHasRecords = isFirstRun && !jobsSnapshotDFComplete.isEmpty
-    val jobStatusBaseFilled = if (isFirstRunAndJobsSnapshotHasRecords) { // TODO -- implement after jobs_snapshot 2.1 enabled
-
-      // get job ids that are present in snapshot but not present in historical audit logs
-      val missingJobIds = jobStatusDeriveFirstRunMissingJobIDs(jobsBaseHasRecords, jobsSnapshotDFComplete, jobStatusBase)
-
-      // impute records for jobs in snapshot not in audit (i.e. pre-existing pools prior to audit logs capture)
-      val imputedFirstRunJobRecords = jobStatusDeriveFirstRunRecordImputesFromSnapshot(
-        jobsSnapshotDFComplete, missingJobIds, fromTime
+//      .transform(jobStatusAppendAndFillTemporalClusterSpec) // todo - is this needed here?
+      .transform(
+        jobStatusFirstRunImputeFromSnap(
+          isFirstRunAndJobsSnapshotHasRecords,
+          jobsBaseHasRecords,
+          jobsSnapshotDFComplete,
+          fromTime,
+          tempWorkingDir
+        )
       )
-      if (jobsBaseHasRecords) unionWithMissingAsNull(jobStatusBase, imputedFirstRunJobRecords) else imputedFirstRunJobRecords
-    } else if (jobsBaseHasRecords) { // not first run but new audit records exist, continue
-      jobStatusBase
-    } else { // not first run AND no new audit data break out and progress timeline
-      val msg = s"No new jobs audit records found, progressing timeline and appending no new records"
-      throw new NoNewDataException(msg, Level.WARN, allowModuleProgression = true)
-    }
-
-    // TODO -- if first run union for missing keys -- apply jobStatusBaseFilled to jobStatusBase
-    jobStatusBase
   }
 
   /**
@@ -1185,12 +1149,13 @@ trait SilverTransforms extends SparkSessionWrapper {
                                   targetKeys: Array[String]
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
-    // TODO -- add runTriggered
-    val jobRunActions = Array("runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel")
+    val jobRunActions = Array(
+      "runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel", "repairRun"
+    )
     val jobRunsLag30D = getJobsBase(auditLogLag30D)
       .filter('actionName.isin(jobRunActions: _*))
       .repartition(getTotalCores * 4)
-      .cache()
+      .cache() // cached df removed at end of module run
 
     // eagerly force this highly reused DF into cache()
     jobRunsLag30D.count()
@@ -1207,22 +1172,31 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    // TODO -- add tags in lookup
     lazy val jobStatusMetaLookup = jobsStatus.asDF
+      .verifyMinimumSchema(Schema.minimumJobStatusSilverMetaLookupSchema)
       .select(
         'organization_id,
         'timestamp,
         'jobId,
         'jobName,
-        // TODO -- ensure these are in job_status_silver minimum schema
-        to_json($"new_settings.notebook_task").alias("notebook_task"),
-        to_json($"new_settings.spark_python_task").alias("spark_python_task"),
-        to_json($"new_settings.spark_jar_task").alias("spark_jar_task"),
-        //        to_json($"new_settings.shell_command_task").alias("shell_command_task"), // not in min schema yet
-        to_json($"new_settings.pipeline_task").alias("pipeline_task")
+        to_json('tags).alias("tags"),
+        'schedule,
+        'max_concurrent_runs,
+        'run_as_user_name,
+        'timeout_seconds,
+        'created_by,
+        'last_edited_by,
+        'tasks,
+        'job_clusters,
+        to_json($"task_detail_legacy.notebook_task").alias("notebook_task"),
+        to_json($"task_detail_legacy.spark_python_task").alias("spark_python_task"),
+        to_json($"task_detail_legacy.python_wheel_task").alias("python_wheel_task"),
+        to_json($"task_detail_legacy.spark_jar_task").alias("spark_jar_task"),
+        to_json($"task_detail_legacy.spark_submit_task").alias("spark_submit_task"),
+        to_json($"task_detail_legacy.shell_command_task").alias("shell_command_task"), // not in min schema yet
+        to_json($"task_detail_legacy.pipeline_task").alias("pipeline_task")
       )
 
-    // TODO -- after v2.1 -- add task_detail lookups -- what else?
     lazy val jobSnapNameLookup = jobsSnapshot.asDF
       .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
       .select('organization_id, 'timestamp, 'job_id.alias("jobId"), $"settings.name".alias("jobName"))
@@ -1234,24 +1208,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       (jobsSnapshot, jobSnapNameLookup)
     )
 
-    // match all completed and cancelled (i.e. terminated) jobRuns with their launch assuming launch was in now - 30d
-    /**
-     * Unify all event types into a single record by key
-     *
-     * Lookup and append cluster and job names temporally
-     *
-     * Remove children keys so as not to double count costs downstream -- this is done by rolling all children up
-     * to the root task so that only root task run ids are present
-     *
-     * Cleanup and key the ts as launch ts
-     */
-    // TODO -- schema
-    //  job_clusters minimum required [{"job_cluster_key":null (string)"]
     jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
       .transform(jobRunsAppendClusterName(jobRunsLookups))
       .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(structifyLookupMeta)
-      .transform(cleanseCreatedNestedStructures(targetKeys))
+      .transform(jobRunsAppendTaskAndClusterDetails)
+      .transform(jobRunsStructifyLookupMeta)
+      .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
       .transform(jobRunsRollupWorkflowsAndChildren)
       .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
   }

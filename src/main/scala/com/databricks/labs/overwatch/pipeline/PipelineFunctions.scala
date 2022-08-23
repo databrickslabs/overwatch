@@ -515,10 +515,16 @@ object PipelineFunctions extends SparkSessionWrapper {
       .otherwise("unknown")
   }
 
-  def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+  def fillForward(
+                   colToFillName: String,
+                   w: WindowSpec,
+                   orderedLookups: Seq[Column] = Seq[Column](),
+                   colToFillHasPriority: Boolean = true
+                 ) : Column = {
     val colToFill = col(colToFillName)
     if (orderedLookups.nonEmpty){ // TODO -- omit nulls from lookup
-      val coalescedLookup = colToFill +: orderedLookups.map(lookupCol => {
+      val orderedLookupsFinal = if (colToFillHasPriority) colToFill +: orderedLookups else orderedLookups
+      val coalescedLookup = orderedLookupsFinal.map(lookupCol => {
         last(lookupCol, true).over(w)
       })
       coalesce(coalescedLookup: _*).alias(colToFillName)

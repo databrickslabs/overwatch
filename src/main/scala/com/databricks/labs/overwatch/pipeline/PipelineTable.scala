@@ -76,7 +76,7 @@ case class PipelineTable(
   }
 
   def writeMode: WriteMode = { // initialize to constructor value
-    if (!exists && _mode == WriteMode.merge) {
+    if (!exists(dataValidation = true) && _mode == WriteMode.merge) {
       val onetimeModeChangeMsg = s"MODE CHANGED from MERGE to APPEND. Target ${tableFullName} does not exist, first write will be " +
         s"performed as an append, subsequent writes will be written as merge to this target"
       if (config.debugFlag) println(onetimeModeChangeMsg)
