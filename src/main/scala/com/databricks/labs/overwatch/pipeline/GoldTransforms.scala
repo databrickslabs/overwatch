@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaTools, Spa
 import org.apache.log4j.Level
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{MapType, StringType}
 import org.apache.spark.sql.{Column, DataFrame}
 
 trait GoldTransforms extends SparkSessionWrapper {
@@ -30,7 +31,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'security_profile,
       'cluster_log_conf,
       'init_scripts,
-      'custom_tags,
+      'tags,
       'cluster_source,
       'aws_attributes,
       'azure_attributes,
@@ -169,7 +170,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       'azure_attributes,
       'create_details,
       'delete_details,
-      'request_details
+      'request_details,
+      'tags
     )
   }
 
@@ -925,7 +927,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, workspace_name, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
       |autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type, security_profile, cluster_log_conf,
-      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, aws_attributes, azure_attributes,
+      |init_scripts, tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, aws_attributes, azure_attributes,
       |driver_instance_pool_id, instance_pool_id, driver_instance_pool_name, instance_pool_name,
       |spark_version, idempotency_token, deleted_by, created_by, last_edited_by
       |""".stripMargin
@@ -934,7 +936,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, workspace_name, instance_pool_id, serviceName, timestamp, date, actionName, instance_pool_name, node_type_id,
       |idle_instance_autotermination_minutes, min_idle_instances, max_capacity, preloaded_spark_versions,
-      |azure_attributes, create_details, delete_details, request_details
+      |azure_attributes, create_details, delete_details, request_details,tags
       |""".stripMargin
 
   protected val jobViewColumnMapping: String =
