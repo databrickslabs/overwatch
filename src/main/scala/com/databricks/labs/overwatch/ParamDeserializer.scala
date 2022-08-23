@@ -111,7 +111,11 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         getOptionInt(node, "maxEventsPerTrigger").getOrElse(10000),
         getOptionInt(node, "minEventsPerTrigger").getOrElse(10),
         getOptionString(node, "auditRawEventsChk"),
-        getOptionString(node, "auditLogChk")
+        getOptionString(node, "auditLogChk"),
+        azureClientId = getOptionString(node, "azureClientId"),
+        azureClientSecret = getOptionString(node, "azureClientSecret"),
+        azureTenantId = getOptionString(node, "azureTenantId"),
+        azureAuthEndpoint = getOptionString(node, "azureAuthEndpoint").getOrElse("https://login.microsoftonline.com/"),
       ))
     } else {
       None

@@ -67,7 +67,11 @@ case class AzureAuditLogEventhubConfig(
                                         maxEventsPerTrigger: Int = 10000,
                                         minEventsPerTrigger: Int = 10,
                                         auditRawEventsChk: Option[String] = None,
-                                        auditLogChk: Option[String] = None
+                                        auditLogChk: Option[String] = None,
+                                        azureClientId: Option[String] = None,
+                                        azureClientSecret: Option[String] = None,
+                                        azureTenantId: Option[String] = None,
+                                        azureAuthEndpoint: String = "https://login.microsoftonline.com/"
                                       )
 
 case class AuditLogConfig(

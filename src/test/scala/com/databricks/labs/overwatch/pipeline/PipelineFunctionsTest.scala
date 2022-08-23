@@ -1,15 +1,21 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config}
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
+import io.delta.tables.DeltaTable
 import org.apache.spark.sql.execution.streaming.MemoryStream
-import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.functions.{col, lit, row_number}
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, SQLContext}
+import org.apache.spark.sql.{Column, DataFrame, SQLContext}
+import org.scalatest.GivenWhenThen
 import org.scalatest.funspec.AnyFunSpec
 
-class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
+import scala.reflect.io.Directory
+
+
+class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with GivenWhenThen {
 
   describe("Tests for add and subtract incremental ticks") {
 
@@ -185,4 +191,219 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
     }
   }
 
+  /**
+   * Below tests are added as a part of OV-43
+   */
+
+  describe("Tests for parseEHConnectionString") {
+    it("should throw an exception - empty string") {
+      Given("an event hub connection string")
+      val ehConnString = ""
+
+      When("the connection string is not in correct format")
+
+      Then("the function throws an exception")
+      assertThrows[BadConfigException] (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, true))
+    }
+    it("should throw an exception - incorrect format") {
+      Given("an event hub connection string")
+      val ehConnString = "Endpoint=sb:/<NamespaceName>.servicebus.windows.net/;SharedAccessKey=<KeyValue>"
+
+      When("the connection string is not in correct format")
+
+      Then("the function throws an exception")
+      assertThrows[BadConfigException] (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, true))
+    }
+    it("should parse the connection string") {
+      Given("an event hub connection string")
+      val ehConnString = "Endpoint=sb://<NamespaceName>.servicebus.windows.net/;SharedAccessKey=<KeyValue>"
+
+      When("the connection string is in correct format")
+
+      Then("the function returns the connection string")
+      assertResult(ehConnString) (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, true))
+    }
+    it("should parse the connection string without SAS") {
+      Given("an event hub connection string")
+      val ehConnString = "Endpoint=sb://<NamespaceName>.servicebus.windows.net/;"
+
+      When("the connection string is in correct format")
+
+      Then("the function returns the connection string")
+      assertResult(ehConnString) (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, false))
+    }
+    it("should parse the connection string with special characters") {
+      Given("an event hub connection string")
+      val ehConnString = "Endpoint=sb://<NamespaceName>.servicebus.windows.net/;SharedAccessKey=$+<abcdefgh+1234+>"
+
+      When("the connection string is in correct format")
+
+      Then("the function returns the connection string")
+      assertResult(ehConnString) (PipelineFunctions.parseAndValidateEHConnectionString(ehConnString, true))
+    }
+
+  }
+
+  describe("Tests for cleansePathURI - Part 2") {
+    it("should work for S3 - double slashes") {
+      Given("URI path with double slashes")
+      val uriPath = "s3a://commoncrawl//path"
+
+      When("function is called")
+
+      Then("returns the cleansed URI path")
+      assertResult("s3a://commoncrawl/path")(
+        PipelineFunctions.cleansePathURI(uriPath)
+      )
+    }
+  }
+
+  describe("Tests for epochMilliToTs") {
+    it("should convert epoch time to timestamp and preserve milliseconds") {
+      Given("a dataframe with epoch milliseconds time of long type")
+      //Reference for epoch millis https://currentmillis.com/
+      val df = spark.sql("select '1660109379388' as epoch_millisecond")
+
+      When("function is called on this column")
+
+      Then("returns a column of type timestamp and preserves milliseconds")
+      assertResult("TimestampType") (df
+        .withColumn("converted_string", PipelineFunctions.epochMilliToTs("epoch_millisecond"))
+        .schema.filter( x => x.name == "converted_string").head.dataType.toString
+      )
+      assertResult("2022-08-10 10:59:39.388") (df
+        .withColumn("converted_column", PipelineFunctions.epochMilliToTs("epoch_millisecond"))
+        .select("converted_column")
+        .collect().head.get(0).toString
+      )
+    }
+    it("should return null for unexpected timestamp format") {
+      Given("a dataframe with timestamp column of unexpected format")
+      val df = spark.sql("select '10/14/2016 09:28 PM' as ts")
+
+      When("function is called on this column")
+
+      Then("return a null value for the converted column")
+      assertResult(null) (df
+        .withColumn("converted_column", PipelineFunctions.epochMilliToTs("ts"))
+        .select("converted_column")
+        .collect().head.get(0)
+      )
+    }
+  }
+
+  describe("Tests for tsToEpochMilli") {
+    it("should convert timestamp to epoch time and preserve milliseconds") {
+      Given("a dataframe with timestamp ")
+      val df = spark.sql("select '2021-11-12 02:12:23.8870' as ts")
+
+      When("function is called on this column")
+
+      Then("convert timestamp to epoch time and preserve milliseconds")
+      assertResult("DoubleType") (df
+        .withColumn("epoch_milliseconds", PipelineFunctions.tsToEpochMilli("ts"))
+        .schema.filter( x => x.name == "epoch_milliseconds").head.dataType.toString
+      )
+      assertResult("1636663343887") (df
+        .withColumn("epoch_milliseconds", PipelineFunctions.tsToEpochMilli("ts").cast("Long").cast("String"))
+        .select("epoch_milliseconds").collect().head.getAs[String](0)
+      )
+    }
+    it("should return null for unexpected values") {
+      Given("a dataframe with unexpected timestamp value")
+      val df = spark.sql("select '1636663343887' as ts")
+
+      When("function is called on this column")
+
+      Then("return a null value for the converted column")
+      assertResult(null) (df
+        .withColumn("epoch_milliseconds", PipelineFunctions.tsToEpochMilli("ts"))
+        .select("epoch_milliseconds")
+        .collect().head.get(0)
+      )
+
+    }
+  }
+
+  describe("Tests for getDeltaHistory") {
+    it("should get the history of delta table") {
+      Given("a delta table")
+      val df = spark.range(10).withColumn("c1", lit("c1"))
+      df.write.format("delta").mode("overwrite").save("/tmp/overwatch/tests/table1")
+
+      val dummyConfig = new Config()
+      dummyConfig.setDatabaseNameAndLoc("dummy", "dummy", "/tmp/overwatch/tests")
+
+      val testTable: PipelineTable = PipelineTable(name = "table1", _keys = Array("id"), config = dummyConfig)
+
+      When("function is called on the given delta table")
+      val functionOutputDf: DataFrame = PipelineFunctions.getDeltaHistory(spark, testTable)
+
+      Then("returns a dataframe with detal table history")
+      val expectedDf: DataFrame = DeltaTable.forPath(testTable.tableLocation).history(9999)
+        .select("version", "timestamp", "operation", "clusterId", "operationMetrics", "userMetadata")
+
+      assertSmallDatasetEquality(functionOutputDf, expectedDf)
+
+      // delete the delta table
+      val dir = Directory("/tmp/overwatch/tests/table1")
+      dir.deleteRecursively()
+    }
+    it("should throw an exception when path is not a delta table") {
+      Given("a delta table")
+      val df = spark.range(10).withColumn("c1", lit("c1"))
+      df.write.format("delta").mode("overwrite").save("/tmp/overwatch/tests/table1")
+
+      val dummyConfig = new Config()
+      dummyConfig.setDatabaseNameAndLoc("dummy", "dummy", "/tmp/overwatch/test")
+
+      val testTable: PipelineTable = PipelineTable(name = "table1", _keys = Array("id"), config = dummyConfig)
+
+      When("function is called on incorrect delta table path")
+
+      Then("throws an exception")
+      assertThrows[org.apache.spark.sql.AnalysisException] (PipelineFunctions.getDeltaHistory(spark, testTable))
+    }
+  }
+
+  describe("Tests for getLastOptimized") {
+    it("should return 0 as long type when the table is never optimized") {
+      Given("a delta table")
+      val df = spark.range(10).withColumn("c1", lit("c1"))
+      df.write.format("delta").mode("overwrite").save("/tmp/overwatch/tests/table1")
+
+      val dummyConfig = new Config()
+      dummyConfig.setDatabaseNameAndLoc("dummy", "dummy", "/tmp/overwatch/tests")
+
+      val testTable: PipelineTable = PipelineTable(name = "table1", _keys = Array("id"), config = dummyConfig)
+
+      When("function is called on the delta table that is never optimized")
+
+      Then("return 0")
+      assertResult(0L) (PipelineFunctions.getLastOptimized(spark, testTable))
+
+      // delete the delta table
+      val dir = Directory("/tmp/overwatch/tests/table1")
+      dir.deleteRecursively()
+    }
+    it("should throw an exception when path is not a delta table") {
+      Given("a delta table")
+      val df = spark.range(10).withColumn("c1", lit("c1"))
+      df.write.format("delta").mode("overwrite").save("/tmp/overwatch/tests/table1")
+
+      val dummyConfig = new Config()
+      dummyConfig.setDatabaseNameAndLoc("dummy", "dummy", "/tmp/overwatch/test")
+
+      val testTable: PipelineTable = PipelineTable(name = "table1", _keys = Array("id"), config = dummyConfig)
+
+      When("function is called on the delta table that is never optimized")
+
+      Then("return 0")
+      assertThrows[org.apache.spark.sql.AnalysisException] (PipelineFunctions.getLastOptimized(spark, testTable))
+
+      // delete the delta table
+      val dir = Directory("/tmp/overwatch/tests/table1")
+      dir.deleteRecursively()
+    }
+  }
 }
