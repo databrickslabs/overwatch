@@ -38,7 +38,12 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
 
     it("Consume data from jobs/list API") {
       val endPoint = "jobs/list"
-      assert(ApiCallV2(apiEnv, endPoint).execute().asDF() != null)
+      val query = Map(
+        "limit" -> "25",
+        "expand_tasks" -> "true",
+        "offset" -> "0"
+      )
+      ApiCallV2(apiEnv, endPoint, query, 2.0).execute().asDF()
     }
 
     it("Consume data from clusters/list API") {
@@ -139,8 +144,16 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
     it("comparison test for jobs/list API") {
       val endPoint = "jobs/list"
       val oldAPI = ApiCall(endPoint, apiEnv).executeGet().asDF
-      val newAPI = ApiCallV2(apiEnv, endPoint).execute().asDF()
-      assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
+       val query = Map(
+         "limit"->"2",
+         "expand_tasks"->"true",
+         "offset"->"0"
+       )
+       val newAPI =  ApiCallV2(apiEnv, endPoint,query,2.1).execute().asDF()
+       println(oldAPI.count()+"old api count")
+       println(newAPI.count()+"new api count")
+       assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
+
     }
     it("comparison test for clusters/list API") {
       val endPoint = "clusters/list"
