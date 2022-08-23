@@ -944,8 +944,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("createdBy", when('createdBy.isNull && $"default_tags.Creator".isNotNull, $"default_tags.Creator").otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
-      .withColumn("default_tags",'default_tags)
-      .drop("userEmail", "single_user_name")
+      .withColumn("tags",
+        struct(
+          'default_tags,
+          from_json(col("custom_tags"),MapType(StringType, StringType, valueContainsNull = true)).alias("custom_tags")
+        ))
+      .drop("userEmail", "custom_tags","default_tags","single_user_name")
   }
 
   def buildClusterStateDetail(

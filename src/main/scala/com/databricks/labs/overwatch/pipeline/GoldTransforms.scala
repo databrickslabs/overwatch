@@ -31,10 +31,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'security_profile,
       'cluster_log_conf,
       'init_scripts,
-      struct(
-        'default_tags,
-        from_json(col("custom_tags"),MapType(StringType, StringType, valueContainsNull = true)).alias("custom_tags")
-      ).alias("tags"),
+      'tags,
       'cluster_source,
       'aws_attributes,
       'azure_attributes,
