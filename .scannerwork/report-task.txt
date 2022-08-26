@@ -1,0 +1,6 @@
+projectKey=TempDB
+serverUrl=http://localhost:9000
+serverVersion=8.4.2.36762
+dashboardUrl=http://localhost:9000/dashboard?id=TempDB
+ceTaskId=AYFc1lKA5mItm1cvpYsN
+ceTaskUrl=http://localhost:9000/api/ce/task?id=AYFc1lKA5mItm1cvpYsN
