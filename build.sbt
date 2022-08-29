@@ -7,6 +7,9 @@ version := "0.6.1.2"
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 
+fork in Test := true
+envVars in Test := Map("OVERWATCH_ENV" -> " ","OVERWATCH_TOKEN" -> " ","OVERWATCH" -> " ")
+
 val sparkVersion = "3.1.2"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided

@@ -3,12 +3,13 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.scalatest.funspec.AnyFunSpec
-import org.scalatest.PrivateMethodTester
+import org.scalatest.{Ignore, PrivateMethodTester}
 import com.databricks.labs.overwatch.utils.{BadConfigException, Config, OverwatchScope}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.OverwatchScope._
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.fasterxml.jackson.core.JsonParseException
+@Ignore
 class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with PrivateMethodTester {
   describe("Tests for Initializer.isPVC") {
     it("should validate isPVC as false when org id if doesn't have ilb") {
