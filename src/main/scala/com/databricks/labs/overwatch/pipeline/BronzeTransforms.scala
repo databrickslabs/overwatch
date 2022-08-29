@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import akka.actor.Actor
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.BatchRunner.spark
 import com.databricks.labs.overwatch.env.Database
@@ -28,11 +29,12 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 
-trait BronzeTransforms extends SparkSessionWrapper {
+trait BronzeTransforms extends SparkSessionWrapper  {
 
   import TransformFunctions._
   import spark.implicits._
-
+  @transient
+  var statusFlag:Int =0
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _newDataRetrieved: Boolean = true
 
@@ -46,6 +48,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                succeeded: Boolean,
                                error: Option[ErrorDetail]
                              )
+
 
   protected def setNewDataRetrievedFlag(value: Boolean): this.type = {
     _newDataRetrieved = value
@@ -463,6 +466,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
     //TODO identify the best practice to implement the future.
+    val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
     for (i <- clusterIDs.indices) {
       val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
         "start_time" -> s"""${startTime.asUnixTimeMilli}""",
@@ -470,7 +474,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         "limit" -> "500"
       )
       val future = Future {
-        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
+        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
         synchronized {
           apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= apiEnv.successBatchSize) {
@@ -500,7 +504,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     }
     val timeoutThreshold = 300000 // 5 minutes
     var currentSleepTime = 0
-    var responseStateWhileSleeping = responseCounter
+    var accumulatorCountWhileSleeping = accumulator.value
     while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
       //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
       // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
@@ -510,13 +514,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
       Thread.sleep(5000)
       currentSleepTime += 5000
-      if (responseStateWhileSleeping < responseCounter) { //new API response received while waiting.
+      if (accumulatorCountWhileSleeping < accumulator.value) { //new API response received while waiting.
         currentSleepTime = 0 //resetting the sleep time.
-        responseStateWhileSleeping = responseCounter
+        accumulatorCountWhileSleeping = accumulator.value
       }
     }
     if (responseCounter != finalResponseCount) { // Checking whether all the api responses has been received or not.
-      logger.log(Level.ERROR, s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
+      val msg = s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}"""
+      println(msg)
+      logger.log(Level.ERROR, msg)
       throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
     }
     if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
