@@ -9,7 +9,7 @@ import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.OverwatchScope._
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.fasterxml.jackson.core.JsonParseException
-@Ignore
+
 class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with PrivateMethodTester {
   describe("Tests for Initializer.isPVC") {
     it("should validate isPVC as false when org id if doesn't have ilb") {
@@ -37,7 +37,8 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
   }
 
   describe("Tests for initialize database") {
-    it("initializeDatabase function should create both elt and consumer database") {
+
+    ignore ("initializeDatabase function should create both elt and consumer database") {
       import spark.implicits._
       val conf = new Config
       conf.setDatabaseNameAndLoc("overwatch_etl", "file:/src/test/resources/overwatch/spark-warehouse/overwatch_etl.db", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")
@@ -136,7 +137,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
 
   describe("Tests for validateAuditLogConfigs configs") {
 
-    it("validateAuditLogConfigs function validate auditLogPath in the config ") {
+    ignore ("validateAuditLogConfigs function validate auditLogPath in the config ") {
       import com.databricks.labs.overwatch.utils.AuditLogConfig
 
       val configInput = AuditLogConfig(None, "Json", None)
@@ -148,7 +149,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       assertThrows[BadConfigException](init invokePrivate quickBuildAuditLogConfig(configInput))
     }
 
-    it("validateAuditLogConfigs function validate audit log format in the config ") {
+    ignore ("validateAuditLogConfigs function validate audit log format in the config ") {
       import com.databricks.labs.overwatch.utils.AuditLogConfig
 
       val configInput = AuditLogConfig(Some("path/to/audit/log"), "text", None)
@@ -163,7 +164,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
 
 
   describe("Tests for validateAndRegisterArgs function") {
-    it("validateAndRegisterArgs function should validate and register variables on the conf") {
+    ignore ("validateAndRegisterArgs function should validate and register variables on the conf") {
       val incomplete = "{\"auditLogConfig\":{\"rawAuditPath\":\"/mnt/logs/test/audit_delivery\"}," +
         "\"tokenSecret\":{\"scope\":\"overwatch\",\"key\":\"1212\"},\"dataTarget\":{\"databaseName\":\"overwatch_etl_test\"," +
         "\"databaseLocation\":\"dbfs:/mnt/overwatch_global/consume/overwatch_etl.db\",\"consumerDatabaseName\":\"overwatch\"" +
@@ -182,7 +183,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       assert(conf.databaseName == "overwatch_etl_test")
     }
 
-    it("validateAndRegisterArgs function should fail when a parameter is missing") {
+    ignore ("validateAndRegisterArgs function should fail when a parameter is missing") {
       val incomplete = "{\"auditLogConfig\":{\"rawAuditPath\":\"/mnt/logs/test/audit_delivery\"}," +
         "\"dataTarget\":{" +
         "\"databaseLocation\":\"dbfs:/mnt/overwatch_global/consume/overwatch_etl.db\",\"consumerDatabaseName\":\"overwatch\"" +

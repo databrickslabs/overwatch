@@ -1,6 +1,11 @@
 ## How to test InitializeTest.Scala in Overwatch environment?
-By default, all the test inside InitializeTest.Scala is ignored because it needs PAT which is highly confidential to execute and putting the
+By default, below test cases inside InitializeTest.Scala is ignored because those need PAT which is highly confidential to execute and putting the
 actual PAT inside the code is not recommended.
+
+1. "Tests for initialize database"
+2. "Tests for validateAuditLogConfigs configs"
+3. "Tests for validateAndRegisterArgs function"
+4. "validateAndRegisterArgs function should fail when a parameter is missing"
 
 ## How to Enable Test inside InitializeTest.scala
 Follow the below steps
