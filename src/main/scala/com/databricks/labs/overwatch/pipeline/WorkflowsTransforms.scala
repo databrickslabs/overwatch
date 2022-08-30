@@ -308,9 +308,9 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .withColumn("created_by", coalesce(fillForward("created_by", lastJobStatus), 'snap_lookup_created_by))
       .withColumn("created_ts", coalesce(fillForward("created_ts", lastJobStatus), 'snap_lookup_created_time))
       .withColumn("deleted_ts", when('actionName === "delete", 'timestamp))
-      .withColumn("last_edited_by", last('last_edited_by, true).over(lastJobStatus))
+      .withColumn("last_edited_by", coalesce(fillForward("last_edited_by", lastJobStatus, Seq('created_by))))
       .withColumn("last_edited_ts", when('actionName.isin("update", "reset"), 'timestamp))
-      .withColumn("last_edited_ts", last('last_edited_ts, true).over(lastJobStatus))
+      .withColumn("last_edited_ts", coalesce(fillForward("last_edited_ts", lastJobStatus, Seq('created_ts))))
       .drop("userIdentity", "snap_lookup_created_time", "snap_lookup_created_by", "lookup_settings")
   }
 
@@ -422,6 +422,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
    * Convert complex json columns to typed structs
    */
   def jobStatusStructifyJsonCols(df: DataFrame): DataFrame = {
+    df.cache() // persisting to speed up schema inference
+    df.count()
     val dfCols = df.columns
     val colsToRebuild = Array(
       "email_notifications", "tags", "schedule", "libraries", "job_clusters", "tasks", "new_cluster",
@@ -448,6 +450,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       structFromJson(spark, df, "shell_command_task", allNullMinimumSchema = Schema.minimumShellCommandTaskSchema),
       structFromJson(spark, df, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
     )
+
 
     // Done this way for performance -- using with columns creates massive plan
     df
@@ -768,13 +771,16 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
     val repairDetails = jobRunsDeriveRepairRunsDetail(df, firstRunSemanticsW)
 
-    val jobRunsMaster = allCompletes
-      .join(runStarts, Seq("organization_id", "jobRunId", "taskRunId"), "left")
-      .join(allSubmissions, Seq("organization_id", "jobRunId"), "left")
+    val jobRunsMaster = allSubmissions
+      .join(runStarts, Seq("organization_id", "jobRunId"), "left")
+      .join(allCompletes, Seq("organization_id", "jobRunId", "taskRunId"), "left")
       .withColumn("runId", coalesce('taskRunId, 'jobRunId).cast("long"))
       .join(allCancellations, Seq("organization_id", "runId"), "left")
       .withColumn("repairId", coalesce('repairId_runStart, 'repairId_Completed).cast("long"))
       .join(repairDetails, Seq("organization_id", "runId", "repairId"), "left")
+      .cache() // caching to speed up schema inference
+
+    jobRunsMaster.count
 
     jobRunsMaster
       .select(
@@ -790,19 +796,19 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         coalesce('taskRunId, 'idInJob).cast("long").alias("idInJob"),
         TransformFunctions.subtractTime(
           'submissionTime,
-          coalesce(array_max(array('completionTime, 'cancellationTime)), lit(etlUntilTime.asUnixTimeMilli))
-        ).alias("JobRunTime"), // run launch time until terminal event
+          array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
+        ).alias("TaskRunTime"), // run launch time until terminal event
         TransformFunctions.subtractTime(
           'startTime,
-          coalesce(array_max(array('completionTime, 'cancellationTime)), lit(etlUntilTime.asUnixTimeMilli))
-        ).alias("JobExecutionRunTime"), // from cluster up and run begin until terminal event
+          array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
+        ).alias("TaskExecutionRunTime"), // from cluster up and run begin until terminal event
         'run_name,
-        coalesce('jobClusterType_Started, 'jobClusterType_Completed).alias("jobClusterType"),
-        coalesce('jobTaskType_Started, 'jobTaskType_Completed).alias("jobTaskType"),
+        coalesce('jobClusterType_Started, 'jobClusterType_Completed).alias("clusterType"),
+        coalesce('jobTaskType_Started, 'jobTaskType_Completed).alias("taskType"),
         coalesce('jobTriggerType_Started, 'jobTriggerType_Completed, 'jobTriggerType_runNow).alias("jobTriggerType"),
         when('cancellationRequestId.isNotNull, "Cancelled")
           .otherwise('jobTerminalState)
-          .alias("jobTerminalState"),
+          .alias("terminalState"),
         'clusterId,
         struct(
           'existing_cluster_id,
@@ -857,12 +863,14 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           ).alias("startRequest")
         ).alias("requestDetails")
       )
-      .withColumn("timestamp", $"JobRunTime.startEpochMS") // TS lookup key added for next steps (launch time)
-      .withColumn("startEpochMS", $"JobRunTime.startEpochMS") // set launch time as TS key
+      .withColumn("timestamp", $"TaskRunTime.startEpochMS") // TS lookup key added for next steps (launch time)
+      .withColumn("startEpochMS", $"TaskRunTime.startEpochMS") // set launch time as TS key
       .scrubSchema
   }
 
   def jobRunsStructifyLookupMeta(df: DataFrame): DataFrame = {
+    df.cache() // caching to speed up schema infernece
+    df.count()
     df
       .withColumn("task_detail_legacy",
         struct(
@@ -969,43 +977,61 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   def jobRunsAppendTaskAndClusterDetails(df: DataFrame): DataFrame = {
-    val tasksExploded = df
-      .select('jobId, 'taskKey, 'runId, explode('tasks).alias("task"))
-      .filter('taskKey === $"task.task_key")
-      .selectExpr("*", "task.*").drop("task", "task_key")
-      .verifyMinimumSchema(Schema.minimumExplodedTaskLookupMetaSchema)
-      .select(
-        'jobId,
-        'taskKey,
-        'runId,
-        'job_cluster_key,
-        'libraries,
-        'max_retries,
-        'min_retry_interval_millis,
-        'retry_on_timeout,
-        struct(
-          'notebook_task,
-          'pipeline_task,
-          'spark_jar_task,
-          'spark_submit_task,
-          'spark_python_task,
-          'python_wheel_task,
-          'shell_command_task,
-          'sql_task
-        ).alias("task_detail")
-      )
-    val jobClustersExploded = df
-      .join(tasksExploded, Seq("jobId", "taskKey", "runId"))
-      .select('jobId, 'runId, 'job_cluster_key.alias("jobClusterKey"), explode('job_clusters).alias("job_cluster"))
-      .filter('jobClusterKey === $"job_cluster.job_cluster_key")
-      .selectExpr("*", "job_cluster.*").drop("job_cluster", "job_cluster_key")
-      .withColumnRenamed("jobClusterKey", "job_cluster_key")
-      .select('jobId, 'runId, 'job_cluster_key, 'new_cluster.alias("job_cluster"))
+    if (SchemaTools.nestedColExists(df.schema, "tasks")) {
+      val isSingleTaskMTJ = 'taskKey.isNull && size('tasks) === 1
+      val jobRunsWithImprovedKeys = df
+        .withColumn("taskKey", when(isSingleTaskMTJ, $"tasks"(0)("task_key")).otherwise('taskKey)) // ES-427957 -- singleTask MTJs don't emit taskKey as of 0.6.2.0
 
-    df
-      .join(tasksExploded, Seq("jobId", "taskKey", "runId"))
-      .join(jobClustersExploded, Seq("jobId", "runId", "job_cluster_key"))
-      .drop("tasks", "job_clusters")
+      val tasksExploded = jobRunsWithImprovedKeys
+        .select('jobId, 'taskKey, 'runId, explode('tasks).alias("task"))
+        .filter('taskKey === $"task.task_key")
+        .selectExpr("*", "task.*").drop("task", "task_key")
+        .verifyMinimumSchema(Schema.minimumExplodedTaskLookupMetaSchema)
+        .select(
+          'jobId,
+          'taskKey,
+          'runId,
+          'job_cluster_key,
+          'new_cluster,
+          'libraries,
+          'max_retries,
+          'min_retry_interval_millis,
+          'retry_on_timeout,
+          struct(
+            'notebook_task,
+            'pipeline_task,
+            'spark_jar_task,
+            'spark_submit_task,
+            'spark_python_task,
+            'python_wheel_task,
+            'shell_command_task,
+            'sql_task
+          ).alias("task_detail")
+        )
+
+      if (SchemaTools.nestedColExists(df.schema, "job_clusters")) { // has tasks AND job_clusters
+        val jobClustersExploded = jobRunsWithImprovedKeys
+          .join(tasksExploded, Seq("jobId", "taskKey", "runId"))
+          .select('jobId, 'runId, 'job_cluster_key.alias("jobClusterKey"), explode('job_clusters).alias("job_cluster"))
+          .filter('jobClusterKey === $"job_cluster.job_cluster_key")
+          .selectExpr("*", "job_cluster.*").drop("job_cluster", "job_cluster_key")
+          .withColumnRenamed("jobClusterKey", "job_cluster_key")
+          .select('jobId, 'runId, 'job_cluster_key, 'new_cluster.alias("job_cluster"))
+
+        jobRunsWithImprovedKeys
+          .join(tasksExploded, Seq("jobId", "taskKey", "runId"), "left")
+          .join(jobClustersExploded, Seq("jobId", "runId", "job_cluster_key"), "left")
+          .withColumn("cluster_name", coalesce('cluster_name, 'job_cluster_key, 'taskKey))
+          .withColumn("run_name", coalesce('run_name, 'taskKey))
+          .drop("tasks", "job_clusters")
+      } else { // has tasks BUT NO job_clusters in schema
+        df
+          .join(tasksExploded, Seq("jobId", "taskKey", "runId"), "left")
+          .withColumn("cluster_name", coalesce('cluster_name, 'job_cluster_key, 'taskKey))
+          .withColumn("run_name", coalesce('run_name, 'taskKey))
+          .drop("tasks")
+      }
+    } else df // tasks not present in schema
   }
 
   /**
@@ -1075,17 +1101,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
    * BEGIN JRCP Transforms
    */
 
-  def jrcpDeriveNewAndOpenRuns(df: DataFrame, fromTime: TimeTypes): DataFrame = {
-    // TODO -- review the neaAndOpenJobRuns with updated jobRun logic to ensure all open runs are accounted for
-    val newJrLaunches = df
-      .filter($"job_runtime.startEpochMS" >= fromTime.asUnixTimeMilli)
+  def jrcpDeriveNewAndOpenRuns(newJrLaunches: DataFrame, jrLag30: DataFrame, jrcpLag30: DataFrame, fromTime: TimeTypes): DataFrame = {
 
-    val openJRCPRecordsRunIDs = df
-      // TODO -- verify endEpochMS is null and not == fromTime -- I believe this is closed with untilTime on prev run
-      .filter($"job_runtime.endEpochMS".isNull) // open jrcp records (i.e. not incomplete job runs)
+    val openJRCPRecordsRunIDs = jrcpLag30
+      .filter('openRun) // open jrcp records (i.e. run was still executing at the start of the last jrcp execution)
       .select('organization_id, 'run_id).distinct // org_id left to force partition pruning
 
-    val outstandingJrRecordsToClose = df.join(openJRCPRecordsRunIDs, Seq("organization_id", "run_id"))
+    val outstandingJrRecordsToClose = jrLag30.join(openJRCPRecordsRunIDs, Seq("organization_id", "run_id"))
 
     // combine open records (updates) with new records (inserts)
     newJrLaunches.unionByName(outstandingJrRecordsToClose)
@@ -1105,7 +1127,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .select(clsfKeys ++ clsfLookupCols: _*)
 
     newAndOpenRuns //jobRun_gold
-      .withColumn("timestamp", $"job_runtime.startEpochMS")
+      .withColumn("openRun", when($"task_runtime.endEpochMS".isNull, lit(true)).otherwise(lit(false)))
+      .withColumn("timestamp", $"task_runtime.startEpochMS")
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         clusterPotentialInitialState
@@ -1113,10 +1136,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         tsPartitionVal = 4, maxLookAhead = 1L
       ).df
       .drop("timestamp")
-      .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
-      .withColumn("runtime_in_cluster_state",
-        when('state.isin("CREATING", "STARTING") || 'job_cluster_type === "new", 'uptime_in_state_H * 1000 * 3600) // get true cluster time when state is guaranteed fully initial
-          .otherwise(runStateFirstToEnd - $"job_runtime.startEpochMS")) // otherwise use jobStart as beginning time and min of stateEnd or jobEnd for end time )
+      .filter('unixTimeMS_state_start.isNotNull)
+      .withColumn("runtime_in_cluster_state", // all runs have an initial cluster state
+        when('state.isin("CREATING", "STARTING") || 'cluster_type === "new", 'uptime_in_state_H * 1000 * 3600) // get true cluster time when state is guaranteed fully initial
+          .otherwise(runStateFirstToEnd - $"task_runtime.startEpochMS")) // otherwise use jobStart as beginning time and min of stateEnd or jobEnd for end time )
       .withColumn("lifecycleState", lit("init"))
   }
 
@@ -1128,7 +1151,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
                                    stateLifecycleKeys: Seq[String],
                                    clsfKeys: Array[Column],
                                    clsfLookupCols: Array[Column],
-                                   untilTime: TimeTypes
+                                   taskRunEndOrPipelineEnd: Column
                                  ): DataFrame = {
 
     // use state_end_time for terminal states
@@ -1137,7 +1160,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .select(clsfKeys ++ clsfLookupCols: _*)
 
     newAndOpenRuns
-      .withColumn("timestamp", coalesce($"job_runtime.endEpochMS", lit(untilTime.asUnixTimeMilli))) // include currently executing runs and calculate costs through module until time
+      .withColumn("openRun", when($"task_runtime.endEpochMS".isNull, lit(true)).otherwise(lit(false)))
+      .withColumn("timestamp", taskRunEndOrPipelineEnd) // include currently executing runs and calculate costs through module until time
       .toTSDF("timestamp", "organization_id", "cluster_id")
       .lookupWhen(
         clusterPotentialTerminalState
@@ -1145,9 +1169,12 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         tsPartitionVal = 4, maxLookback = 0L, maxLookAhead = 1L
       ).df
       .drop("timestamp")
-      .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull && 'unixTimeMS_state_end > $"job_runtime.endEpochMS")
+      .filter( // cluster state end equal to or after task run and not in initialState (leftanti)
+        'unixTimeMS_state_start.isNotNull &&
+          'unixTimeMS_state_end >= taskRunEndOrPipelineEnd // >= in case both the state and the run are open and closed with untilTime
+      )
       .join(jobRunInitialStates.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti") // filter out beginning states
-      .withColumn("runtime_in_cluster_state", $"job_runtime.endEpochMS" - runStateLastToStart)
+      .withColumn("runtime_in_cluster_state", taskRunEndOrPipelineEnd - runStateLastToStart)
       .withColumn("lifecycleState", lit("terminal"))
   }
 
@@ -1158,7 +1185,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
                                        jobRunTerminalStates: DataFrame,
                                        stateLifecycleKeys: Seq[String],
                                        clsfKeyColNames: Array[String],
-                                       clsfLookupCols: Array[Column]
+                                       clsfLookupCols: Array[Column],
+                                       taskRunEndOrPipelineEnd: Column
                                      ): DataFrame = {
 
     // PERF -- identify top 40 job counts by cluster to be provided to SKEW JOIN hint
@@ -1174,11 +1202,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .select((clsfKeyColNames.filterNot(_ == "timestamp") map col) ++ clsfLookupCols: _*)
 
     newAndOpenRuns.alias("jr")
+      .withColumn("openRun", when($"task_runtime.endEpochMS".isNull, lit(true)).otherwise(lit(false)))
+      // cluster state started after and ended before task run
       .join(clusterPotentialIntermediateStates.alias("cpot").hint("SKEW", Seq("organization_id", "cluster_id"), topClusters),
         $"jr.organization_id" === $"cpot.organization_id" &&
           $"jr.cluster_id" === $"cpot.cluster_id" &&
-          $"cpot.unixTimeMS_state_start" > $"jr.job_runtime.startEpochMS" && // only states beginning after job start and ending before
-          $"cpot.unixTimeMS_state_end" < $"jr.job_runtime.endEpochMS"
+          $"cpot.unixTimeMS_state_start" > $"jr.task_runtime.startEpochMS" && // only states beginning after job start and ending before
+          $"cpot.unixTimeMS_state_end" < taskRunEndOrPipelineEnd
       )
       .drop($"cpot.cluster_id").drop($"cpot.organization_id")
       .join(jobRunInitialStates.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti") // filter out beginning states
@@ -1191,9 +1221,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   def jrcpDeriveRunsByClusterState(
                                     clusterPotentialWCosts: DataFrame,
                                     newAndOpenRuns: DataFrame,
-                                    untilTime: TimeTypes,
                                     runStateFirstToEnd: Column,
-                                    runStateLastToStart: Column
+                                    runStateLastToStart: Column,
+                                    taskRunEndOrPipelineEnd: Column,
+                                    clusterStateEndOrPipelineEnd: Column
                                   ): DataFrame = {
 
     // Adjust the uptimeInState to smooth the runtimes over the runPeriod across concurrent runs
@@ -1201,7 +1232,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     val clsfKeyColNames = Array("organization_id", "cluster_id", "timestamp")
     val clsfKeys: Array[Column] = Array(clsfKeyColNames map col: _*)
     val clsfLookups: Array[Column] = Array(
-      'cluster_name, 'custom_tags, 'unixTimeMS_state_start, 'unixTimeMS_state_end, 'timestamp_state_start,
+      'custom_tags.alias("cluster_tags"),
+      'unixTimeMS_state_start,
+      clusterStateEndOrPipelineEnd.alias("unixTimeMS_state_end"), // if clusterState still open -- close it for calculations
+      'timestamp_state_start,
       'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
       $"driverSpecs.API_Name".alias("driver_node_type_id"),
       $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
@@ -1239,7 +1273,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       stateLifecycleKeys,
       clsfKeys,
       clsfLookups,
-      untilTime
+      taskRunEndOrPipelineEnd
     )
     val jobRunIntermediateStates = jrcpDeriveRunIntermediateStates(
       clusterPotentialWCosts,
@@ -1248,7 +1282,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       jobRunTerminalStates,
       stateLifecycleKeys,
       clsfKeyColNames,
-      clsfLookups
+      clsfLookups,
+      taskRunEndOrPipelineEnd
     )
 
     jobRunInitialStates
@@ -1283,7 +1318,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       $"lookup.run_state_end_epochMS".between($"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS") // inclusive
 
     val simplifiedJobRunByClusterState = df
-      .filter('job_cluster_type === "existing") // only relevant for interactive clusters
+      .filter('cluster_type === "existing") // only relevant for interactive clusters
       .withColumn("run_state_start_epochMS", runStateLastToStart)
       .withColumn("run_state_end_epochMS", runStateFirstToEnd)
       .select(
@@ -1334,7 +1369,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   def jrcpAppendUtilAndCosts(df: DataFrame): DataFrame = {
     df
       .withColumn("cluster_type",
-        when('job_cluster_type === "new", lit("automated"))
+        when('cluster_type === "new", lit("automated"))
           .otherwise(lit("interactive"))
       )
       .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time
@@ -1343,7 +1378,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           .otherwise(lit(1.0))
       ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
       .withColumn("overlapping_run_states", when('cluster_type === "interactive", 'overlapping_run_states).otherwise(lit(0)))
-      .withColumn("running_days", sequence($"job_runtime.startTS".cast("date"), $"job_runtime.endTS".cast("date")))
+      .withColumn("running_days", sequence($"task_runtime.startTS".cast("date"), $"task_runtime.endTS".cast("date")))
       .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
       .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'state_utilization_percent * 'run_state_utilization)
       .withColumn("worker_compute_cost", 'worker_compute_cost * 'state_utilization_percent * 'run_state_utilization)
@@ -1359,21 +1394,33 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     df
       .groupBy(
         'organization_id,
-        'run_id,
+        'workspace_name,
         'job_id,
-        'id_in_job,
+        'job_name,
+        'run_id,
+        'job_run_id,
+        'task_run_id,
+        'task_key,
+        'repair_id,
+        'run_name,
         'startEpochMS,
-        'job_runtime,
-        'job_terminal_state.alias("run_terminal_state"),
-        'job_trigger_type.alias("run_trigger_type"),
-        'job_task_type.alias("run_task_type"),
         'cluster_id,
         'cluster_name,
+        'cluster_tags,
         'cluster_type,
-        'custom_tags,
         'driver_node_type_id,
         'node_type_id,
-        'dbu_rate
+        'dbu_rate,
+        'multitask_parent_run_id,
+        'parent_run_id,
+        'task_runtime,
+        'task_execution_runtime,
+        'terminal_state,
+        'job_trigger_type,
+        'task_type,
+        'created_by,
+        'last_edited_by,
+        'openRun
       )
       .agg(
         first('running_days).alias("running_days"),
@@ -1392,6 +1439,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         greatest(round(sum('total_dbu_cost), 6), lit(0)).alias("total_dbu_cost"),
         greatest(round(sum('total_cost), 6), lit(0)).alias("total_cost")
       )
+
   }
 
   def jrcpDeriveSparkJobUtil(sparkJobLag2D: DataFrame, sparkTaskLag2D: DataFrame): DataFrame = {

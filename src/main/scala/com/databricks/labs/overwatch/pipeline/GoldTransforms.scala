@@ -55,20 +55,33 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected def buildJobs()(df: DataFrame): DataFrame = {
     val jobCols: Array[Column] = Array(
       'organization_id,
+      'workspace_name,
       'jobId.alias("job_id"),
       'actionName.alias("action"),
       'timestamp.alias("unixTimeMS"),
       from_unixtime('timestamp.cast("double") / 1000).cast("timestamp").alias("timestamp"),
       from_unixtime('timestamp.cast("double") / 1000).cast("timestamp").cast("date").alias("date"),
       'jobName.alias("job_name"),
+      'tags,
       'job_type,
+      'format.alias("job_format"),
+      'existing_cluster_id,
+      'new_cluster,
+      'tasks,
+      'job_clusters,
+      'libraries,
+      'git_source,
       'timeout_seconds,
+      'max_concurrent_runs,
+      'max_retries,
+      'retry_on_timeout,
+      'min_retry_interval_millis,
       'schedule,
-      'notebook_path,
-      'new_settings,
-      'cluster_spec.alias("cluster"),
+      'task_detail_legacy,
+      'is_from_dlt,
+//      'access_control_list, TODO -- add back after 503 is resolved -- cannot verifyMinSchema for array<struct>
       'aclPermissionSet,
-      'grants,
+//      'grants, TODO -- add back after 503 is resolved -- cannot verifyMinSchema for array<struct>
       'targetUserId,
       'sessionId.alias("session_id"),
       'requestId.alias("request_id"),
@@ -87,25 +100,52 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected def buildJobRuns()(jobRunsLag30D: DataFrame): DataFrame = {
     val jobRunCols: Array[Column] = Array(
-      'runId.alias("run_id"),
-      'run_name,
-      $"JobRunTime.startEpochMS".alias("startEpochMS"),
-      'jobRunTime.alias("job_runtime"),
-      'jobId.alias("job_id"),
-      'idInJob.alias("id_in_job"),
-      'jobClusterType.alias("job_cluster_type"),
-      'jobTaskType.alias("job_task_type"),
-      'jobTerminalState.alias("job_terminal_state"),
-      'jobTriggerType.alias("job_trigger_type"),
-      'clusterId.alias("cluster_id"),
       'organization_id,
-      'notebook_params,
+      'workspace_name,
+      'jobId.alias("job_id"),
+      'jobName.alias("job_name"),
+      'tags,
+      'runId.alias("run_id"),
+      'jobRunId.alias("job_run_id"),
+      'taskRunId.alias("task_run_id"),
+      'taskKey.alias("task_key"),
+      'clusterId.alias("cluster_id"),
+      'cluster_name,
+      'multitaskParentRunId.alias("multitask_parent_run_id"),
+      'parentRunId.alias("parent_run_id"),
+      'task_detail,
+      'taskDependencies.alias("task_dependencies"),
+      'TaskRunTime.alias("task_runtime"),
+      'TaskExecutionRunTime.alias("task_execution_runtime"),
+      'job_cluster_key,
+      'clusterType.alias("cluster_type"),
+      'job_cluster.alias("job_cluster"),
+      'new_cluster,
+      'taskType.alias("task_type"),
+      'terminalState.alias("terminal_state"),
+      'jobTriggerType.alias("job_trigger_type"),
+      'schedule,
       'libraries,
+      'manual_override_params,
+      'repairId.alias("repair_id"),
+      'repair_details,
+      'run_name,
+      'timeout_seconds,
+      'retry_on_timeout,
+      'max_retries,
+      'min_retry_interval_millis,
+      'max_concurrent_runs,
+      'run_as_user_name,
       'children,
+      'workflow_children,
       'workflow_context,
-      'taskDetail.alias("task_detail"),
+      'task_detail_legacy,
+      'submitRun_details,
+      'created_by,
+      'last_edited_by,
       'requestDetails.alias("request_detail"),
-      'timeDetails.alias("time_detail")
+      'timeDetails.alias("time_detail"),
+      'startEpochMS
     )
     jobRunsLag30D
       .select(jobRunCols: _*)
@@ -359,7 +399,6 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val clsfLag90IsEmpty = clsfLag90D.isEmpty
     val jrcpLag30IsEmpty = jrcpLag30D.isEmpty
-
     val clusterPotentialWCosts = if (clsfLag90IsEmpty) {
       val emptyMsg = s"Dependent on clusterStateFact -- Dependent on clusterEventLogs which only has 30d of data " +
         s"available. You're likely not getting source data for 1 of 2 reasons. 1) the Overwatch account doesn't " +
@@ -372,99 +411,32 @@ trait GoldTransforms extends SparkSessionWrapper {
         .filter('unixTimeMS_state_start.isNotNull && 'unixTimeMS_state_end.isNotNull)
     }
 
-    // TODO -- review the neaAndOpenJobRuns with updated jobRun logic to ensure all open runs are accounted for
     val newJrLaunches = jrGoldLag30D
-      .filter($"job_runtime.startEpochMS" >= fromTime.asUnixTimeMilli)
+      .filter($"task_runtime.startEpochMS" >= fromTime.asUnixTimeMilli)
 
-    val newAndOpenJobRuns = if (!jrcpLag30IsEmpty) jrcpDeriveNewAndOpenRuns(jrcpLag30D, fromTime) else newJrLaunches
+    val newAndOpenJobRuns = if (!jrcpLag30IsEmpty) {
+      jrcpDeriveNewAndOpenRuns(newJrLaunches, jrGoldLag30D ,jrcpLag30D, fromTime)
+    } else newJrLaunches
 
 
     // for states (CREATING and STARTING) OR automated cluster runstate start is same as cluster state start
     // (i.e. not discounted to runStateStart)
-    val runStateLastToStart = array_max(array('unixTimeMS_state_start, $"job_runtime.startEpochMS"))
-    val runStateFirstToEnd = array_min(array('unixTimeMS_state_end, $"job_runtime.endEpochMS"))
+    val runStateLastToStart = array_max(array('unixTimeMS_state_start, $"task_runtime.startEpochMS"))
+
+    // use the untilTime for jobRun End if the run is still open
+    val taskRunEndOrPipelineEnd = coalesce($"task_runtime.endEpochMS", lit(untilTime.asUnixTimeMilli))
+    // use the untilTime for clusterState End if cluster state is still open
+    val clusterStateEndOrPipelineEnd = coalesce('unixTimeMS_state_end, lit(untilTime.asUnixTimeMilli))
+    val runStateFirstToEnd = array_min(array(clusterStateEndOrPipelineEnd, taskRunEndOrPipelineEnd))
 
     val jobRunByClusterState = jrcpDeriveRunsByClusterState(
       clusterPotentialWCosts,
       newAndOpenJobRuns,
-      untilTime,
       runStateFirstToEnd,
-      runStateLastToStart
+      runStateLastToStart,
+      taskRunEndOrPipelineEnd,
+      clusterStateEndOrPipelineEnd
     )
-
-//    // simplified rules
-//    val startDuring = $"state_runtime.startTS".between($"hourOfDayWindow.startTS", $"hourOfDayWindow.endTS")
-//    val endDuring = $"state_runtime.endTS".between($"hourOfDayWindow.startTS", $"hourOfDayWindow.endTS")
-//    val startBefore = $"state_runtime.startTS" < $"hourOfDayWindow.startTS"
-//    val endAfter = $"state_runtime.endTS" > $"hourOfDayWindow.endTS"
-//
-//    // composite rules
-//    val withinHour = startDuring && endDuring
-//    val startDuringEndAfter = startDuring && endAfter
-//    val startBeforeEndDuring = startBefore && endDuring
-//    val startBeforeEndAfter = startBefore && endAfter
-
-    // Derive runStateConcurrency to derive runState fair share or utilization
-    // runStateUtilization = runtimeInRunState / sum(overlappingRuntimesInState)
-
-//    val runstateKeys = $"obs.organization_id" === $"lookup.organization_id" &&
-//      $"obs.cluster_id" === $"lookup.cluster_id" &&
-//      $"obs.unixTimeMS_state_start" === $"lookup.unixTimeMS_state_start" &&
-//      $"obs.unixTimeMS_state_end" === $"lookup.unixTimeMS_state_end"
-//
-//    val startsBefore = $"lookup.run_state_start_epochMS" < $"obs.run_state_start_epochMS"
-//    val startsDuring = $"lookup.run_state_start_epochMS" > $"obs.run_state_start_epochMS" && $"lookup.run_state_start_epochMS" < $"obs.run_state_end_epochMS" // exclusive
-//    val endsDuring = $"lookup.run_state_end_epochMS" > $"obs.run_state_start_epochMS" && $"lookup.run_state_end_epochMS" < $"obs.run_state_end_epochMS" // exclusive
-//    val endsAfter = $"lookup.run_state_end_epochMS" > $"obs.run_state_end_epochMS"
-//    val startsEndsWithin = $"lookup.run_state_start_epochMS".between($"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS") &&
-//      $"lookup.run_state_end_epochMS".between($"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS") // inclusive
-//
-//    val simplifiedJobRunByClusterState = jobRunByClusterState
-//      .filter('job_cluster_type === "existing") // only relevant for interactive clusters
-//      .withColumn("run_state_start_epochMS", runStateLastToStart)
-//      .withColumn("run_state_end_epochMS", runStateFirstToEnd)
-//      .select(
-//        'organization_id, 'run_id, 'cluster_id, 'run_state_start_epochMS, 'run_state_end_epochMS, 'unixTimeMS_state_start, 'unixTimeMS_state_end
-//      )
-//
-//    // sum of run_state_times starting before ending during
-//    val runStateBeforeEndsDuring = simplifiedJobRunByClusterState.alias("obs")
-//      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsBefore && endsDuring)
-//      .withColumn("relative_runtime_in_runstate", $"lookup.run_state_end_epochMS" - $"obs.unixTimeMS_state_start") // runStateEnd minus clusterStateStart
-//      .select(
-//        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS",
-//        $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end",
-//        'relative_runtime_in_runstate
-//      )
-//
-//    // sum of run_state_times starting during ending after
-//    val runStateAfterBeginsDuring = simplifiedJobRunByClusterState.alias("obs")
-//      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsDuring && endsAfter)
-//      .withColumn("relative_runtime_in_runstate", $"lookup.unixTimeMS_state_end" - $"obs.run_state_start_epochMS") // clusterStateEnd minus runStateStart
-//      .select(
-//        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS",
-//        $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end",
-//        'relative_runtime_in_runstate
-//      )
-//
-//    // sum of run_state_times starting and ending during
-//    val runStateBeginEndDuring = simplifiedJobRunByClusterState.alias("obs")
-//      .join(simplifiedJobRunByClusterState.alias("lookup"), runstateKeys && startsEndsWithin)
-//      .withColumn("relative_runtime_in_runstate", $"lookup.run_state_end_epochMS" - $"obs.run_state_start_epochMS") // runStateEnd minus runStateStart
-//      .select(
-//        $"obs.organization_id", $"obs.run_id", $"obs.cluster_id", $"obs.run_state_start_epochMS",
-//        $"obs.run_state_end_epochMS", $"obs.unixTimeMS_state_start", $"obs.unixTimeMS_state_end",
-//        'relative_runtime_in_runstate
-//      )
-//
-//    val cumulativeRunStateRunTimeByRunState = runStateBeforeEndsDuring
-//      .unionByName(runStateAfterBeginsDuring)
-//      .unionByName(runStateBeginEndDuring)
-//      .groupBy('organization_id, 'run_id, 'cluster_id, 'unixTimeMS_state_start, 'unixTimeMS_state_end) // runstate
-//      .agg(
-//        sum('relative_runtime_in_runstate).alias("cum_runtime_in_cluster_state"), // runtime in clusterState
-//        (sum(lit(1)) - lit(1)).alias("overlapping_run_states") // subtract one for self run
-//      )
 
     val cumulativeRunStateRunTimeByRunState = jrcpDeriveCumulativeRuntimeByRunState(
       jobRunByClusterState,
@@ -785,25 +757,34 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val jobViewColumnMapping: String =
     """
-      |organization_id, workspace_name, job_id, action, unixTimeMS, timestamp, date, job_name, job_type, timeout_seconds, schedule,
-      |notebook_path, new_settings, cluster, aclPermissionSet, grants, targetUserId, session_id, request_id, user_agent,
-      |response, source_ip_address, created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
+      |organization_id, workspace_name, job_id, action, unixTimeMS, timestamp, date, job_name, tags, job_type,
+      |job_format, existing_cluster_id, new_cluster, tasks, job_clusters, libraries, git_source, timeout_seconds,
+      |max_concurrent_runs, max_retries, retry_on_timeout, min_retry_interval_millis, schedule, task_detail_legacy,
+      |is_from_dlt, aclPermissionSet, targetUserId, session_id, request_id, user_agent, response, source_ip_address,
+      |created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
       |""".stripMargin
 
   protected val jobRunViewColumnMapping: String =
     """
-      |organization_id, workspace_name, run_id, run_name, job_runtime, job_id, id_in_job, job_cluster_type, job_task_type,
-      |job_terminal_state, job_trigger_type, cluster_id, notebook_params, libraries, children, workflow_context,
-      |task_detail, request_detail, time_detail
+      |organization_id, workspace_name, job_id, job_name, tags, run_id, job_run_id, task_run_id, task_key,
+      |cluster_id, cluster_name, multitask_parent_run_id, parent_run_id, task_detail, task_dependencies,
+      |task_runtime, task_execution_runtime, job_cluster_key, cluster_type, job_cluster, task_type, terminal_state,
+      |job_trigger_type, schedule, libraries, manual_override_params, repair_id, repair_details, run_name,
+      |timeout_seconds, retry_on_timeout, max_retries, min_retry_interval_millis, max_concurrent_runs,
+      |run_as_user_name, workflow_context, task_detail_legacy, submitRun_details,
+      |created_by, last_edited_by, request_detail, time_detail
       |""".stripMargin
 
   protected val jobRunCostPotentialFactViewColumnMapping: String =
     """
-      |organization_id, workspace_name, run_id, job_id, id_in_job, job_runtime, run_terminal_state, run_trigger_type, run_task_type, cluster_id,
-      |cluster_name, cluster_type, custom_tags, driver_node_type_id, node_type_id, dbu_rate, running_days,
-      |run_cluster_states, avg_cluster_share, avg_overlapping_runs, max_overlapping_runs, worker_potential_core_H,
-      |driver_compute_cost, driver_dbu_cost, worker_compute_cost, worker_dbu_cost, total_driver_cost, total_worker_cost,
-      |total_compute_cost, total_dbu_cost, total_cost, spark_task_runtimeMS, spark_task_runtime_H, job_run_cluster_util
+      |organization_id, workspace_name, job_id, job_name, run_id, job_run_id, task_run_id, task_key, repair_id, run_name,
+      |startEpochMS, cluster_id, cluster_name, cluster_tags, driver_node_type_id, node_type_id, dbu_rate,
+      |multitask_parent_run_id, parent_run_id, task_runtime, task_execution_runtime, terminal_state,
+      |job_trigger_type, task_type, created_by, last_edited_by, running_days, avg_cluster_share,
+      |avg_overlapping_runs, max_overlapping_runs, run_cluster_states, worker_potential_core_H, driver_compute_cost,
+      |driver_dbu_cost, worker_compute_cost, worker_dbu_cost, total_driver_cost, total_worker_cost,
+      |total_compute_cost, total_dbu_cost, total_cost, spark_task_runtimeMS, spark_task_runtime_H,
+      |job_run_cluster_util
       |""".stripMargin
 
   protected val notebookViewColumnMappings: String =

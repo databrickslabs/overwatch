@@ -298,6 +298,25 @@ object Schema extends SparkSessionWrapper {
     )), containsNull = true
   )
 
+  val minimumManualOverrideParamsSchema: StructType = StructType(Seq(
+    StructField("jar_params",ArrayType(StringType, containsNull = true), nullable = true),
+    StructField("python_params",ArrayType(StringType, containsNull = true), nullable = true),
+    StructField("spark_submit_params",ArrayType(StringType, containsNull = true), nullable = true),
+    StructField("notebook_params",ArrayType(StringType, containsNull = true), nullable = true)
+  ))
+
+  val minimumSubmitRunDetailsSchema: StructType = StructType(Seq(
+    StructField("existing_cluster_id",StringType, nullable = true)
+  ))
+
+  val minimumRepairDetailsSchema: ArrayType = ArrayType(
+    StructType(Seq(
+      StructField("repair_timestamp",LongType, nullable = true),
+      StructField("rerun_tasks",StringType, nullable = true),
+      StructField("latest_repair_id",StringType, nullable = true)
+    ))
+  )
+
   val minimumNotebookTaskSchema: StructType = StructType(Seq(
     StructField("notebook_path",StringType, nullable = true),
     StructField("revision_timestamp",LongType, nullable = true)
@@ -348,6 +367,24 @@ object Schema extends SparkSessionWrapper {
     StructField("pipeline_task",minimumPipelineTaskSchema, nullable = true),
   ))
 
+  // minimum new cluster struct
+  val minimumNewClusterSchema: StructType = StructType(Seq(
+    StructField("autoscale",
+      StructType(Seq(
+        StructField("max_workers", LongType, true),
+        StructField("min_workers", LongType, true)
+      )), true),
+    StructField("cluster_name", StringType, true),
+    StructField("driver_instance_pool_id", StringType, true),
+    StructField("driver_node_type_id", StringType, true),
+    StructField("enable_elastic_disk", BooleanType, true),
+    StructField("instance_pool_id", StringType, true),
+    StructField("node_type_id", StringType, true),
+    StructField("num_workers", LongType, true),
+    StructField("policy_id", StringType, true),
+    StructField("spark_version", StringType, true)
+  ))
+
   // after tasks exploded
   val minimumExplodedTaskLookupMetaSchema: StructType = StructType(Seq(
     StructField("taskKey",StringType, nullable = true),
@@ -356,6 +393,7 @@ object Schema extends SparkSessionWrapper {
     StructField("max_retries", LongType, nullable = true),
     StructField("retry_on_timeout", BooleanType, nullable = true),
     StructField("min_retry_interval_millis", LongType, nullable = true),
+    StructField("new_cluster", minimumNewClusterSchema, nullable = true),
     StructField("notebook_task",minimumNotebookTaskSchema, nullable = true),
     StructField("spark_python_task",minimumSparkPythonTaskSchema, nullable = true),
     StructField("python_wheel_task",minimumPythonWheelTaskSchema, nullable = true),
@@ -398,24 +436,6 @@ object Schema extends SparkSessionWrapper {
     ))
     ,containsNull = true)
 
-  // minimum new cluster struct
-  val minimumNewClusterSchema: StructType = StructType(Seq(
-    StructField("autoscale",
-      StructType(Seq(
-        StructField("max_workers", LongType, true),
-        StructField("min_workers", LongType, true)
-      )), true),
-    StructField("cluster_name", StringType, true),
-    StructField("driver_instance_pool_id", StringType, true),
-    StructField("driver_node_type_id", StringType, true),
-    StructField("enable_elastic_disk", BooleanType, true),
-    StructField("instance_pool_id", StringType, true),
-    StructField("node_type_id", StringType, true),
-    StructField("num_workers", LongType, true),
-    StructField("policy_id", StringType, true),
-    StructField("spark_version", StringType, true)
-  ))
-
   val minimumJobClustersSchema: ArrayType = ArrayType(
     StructType(Seq(StructField("job_cluster_key",StringType,nullable = true))),
     containsNull = true
@@ -446,8 +466,8 @@ object Schema extends SparkSessionWrapper {
     StructField("timestamp", LongType, nullable = false),
     StructField("jobId", LongType, nullable = true),
     StructField("jobName", StringType, nullable = true),
-    StructField("tasks", minimumTasksSchema, nullable = true),
-    StructField("job_clusters", minimumJobClustersSchema, nullable = true),
+//    StructField("tasks", minimumTasksSchema, nullable = true), // TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+//    StructField("job_clusters", minimumJobClustersSchema, nullable = true), // TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
     StructField("tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
     StructField("schedule", minimumScheduleSchema, nullable = true),
     StructField("max_concurrent_runs", LongType, nullable = true),
@@ -701,38 +721,91 @@ object Schema extends SparkSessionWrapper {
     2018 -> auditMasterSchema,
     // jobStatus
     3002 -> StructType(Seq(
-      StructField("timestamp", LongType, true),
-      StructField("organization_id", StringType, false),
-      StructField("jobId", LongType, true),
-      StructField("serviceName", StringType, true),
-      StructField("actionName", StringType, true),
-      StructField("jobName", StringType, true),
-      StructField("timeout_seconds", LongType, true),
-      StructField("notebook_path", StringType, true),
-      StructField("schedule", minimumScheduleSchema, true),
-      StructField("new_settings", minimumNewSettingsSchema, true),
-      StructField("aclPermissionSet", StringType, true),
-      StructField("grants", StringType, true),
-      StructField("targetUserId", StringType, true),
-      StructField("sessionId", StringType, true),
-      StructField("requestId", StringType, true),
-      StructField("userAgent", StringType, true),
+      StructField("timestamp", LongType, nullable = false),
+      StructField("organization_id", StringType, nullable = false),
+      StructField("workspace_name", StringType, nullable = true),
+      StructField("jobId", LongType, nullable = false),
+      StructField("actionName", StringType, nullable = false),
+      StructField("jobName", StringType, nullable = true),
+      StructField("tags", MapType(StringType, StringType), nullable = true),
+      StructField("job_type", StringType, nullable = true),
+      StructField("format", StringType, nullable = true),
+      StructField("existing_cluster_id", StringType, nullable = true),
+      StructField("new_cluster", minimumNewClusterSchema, nullable = true),
+//      StructField("tasks", minimumTasksSchema, nullable = true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+//      StructField("job_clusters", minimumJobClustersSchema, nullable = true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+//      StructField("libraries", minimumLibrariesSchema, nullable = true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+      StructField("git_source", minimumGitSourceSchema, nullable = true),
+      StructField("timeout_seconds", LongType, nullable = true),
+      StructField("max_concurrent_runs", LongType, nullable = true),
+      StructField("max_retries", LongType, nullable = true),
+      StructField("retry_on_timeout", BooleanType, nullable = true),
+      StructField("min_retry_interval_millis", LongType, nullable = true),
+      StructField("schedule", minimumScheduleSchema, nullable = true),
+      StructField("task_detail_legacy", minimumTaskDetailSchema, nullable = true),
+      StructField("is_from_dlt", BooleanType, nullable = true),
+//      StructField("access_control_list", minimumAccessControlListSchema, nullable = true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+      StructField("aclPermissionSet", StringType, nullable = true),
+//      StructField("grants", minimumGrantsSchema, true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+      StructField("targetUserId", StringType, nullable = true),
+      StructField("sessionId", StringType, nullable = true),
+      StructField("requestId", StringType, nullable = true),
+      StructField("userAgent", StringType, nullable = true),
       common("response"),
-      StructField("sourceIPAddress", StringType, true),
-      StructField("version", StringType, true),
-      StructField("Pipeline_SnapTS", TimestampType, true),
-      StructField("job_type", StringType, true),
-      StructField("cluster_spec",
-        StructType(Seq(
-          StructField("existing_cluster_id", StringType, true),
-          StructField("new_cluster", minimumNewClusterSchema, true)
-        )), true),
-      StructField("created_by", StringType, true),
-      StructField("created_ts", StringType, true),
-      StructField("deleted_by", StringType, true),
-      StructField("deleted_ts", LongType, true),
-      StructField("last_edited_by", StringType, true),
-      StructField("last_edited_ts", LongType, true)
+      StructField("sourceIPAddress", StringType, nullable = true),
+      StructField("version", StringType, nullable = true),
+      StructField("Pipeline_SnapTS", TimestampType, nullable = true),
+      StructField("created_by", StringType, nullable = true),
+      StructField("created_ts", StringType, nullable = true),
+      StructField("deleted_by", StringType, nullable = true),
+      StructField("deleted_ts", LongType, nullable = true),
+      StructField("last_edited_by", StringType, nullable = true),
+      StructField("last_edited_ts", LongType, nullable = true)
+    )),
+    // jobRunGold
+    3003 -> StructType(Seq(
+      StructField("organization_id", StringType, nullable = false),
+      StructField("workspace_name", StringType, nullable = true),
+      StructField("jobId", LongType, nullable = true),
+      StructField("runId", LongType, nullable = false),
+      StructField("startEpochMS", LongType, nullable = false),
+      StructField("jobName", StringType, nullable = true),
+      StructField("tags", MapType(StringType, StringType), nullable = true),
+      StructField("jobRunId", LongType, nullable = true),
+      StructField("taskRunId", LongType, nullable = true),
+      StructField("taskKey", StringType, nullable = true),
+      StructField("clusterId", StringType, nullable = true),
+      StructField("cluster_name", StringType, nullable = true),
+      StructField("multitaskParentRunId", LongType, nullable = true),
+      StructField("parentRunId", LongType, nullable = true),
+      StructField("task_detail", minimumTaskDetailSchema, nullable = true),
+      StructField("taskDependencies", ArrayType(StringType), nullable = true),
+      runtimeField("TaskRunTime"),
+      runtimeField("TaskExecutionRunTime"),
+      StructField("job_cluster_key", StringType, nullable = true),
+      StructField("clusterType", StringType, nullable = true),
+//      StructField("job_cluster", minimumJobClustersSchema, nullable = true), // todo 503
+      StructField("new_cluster", minimumNewClusterSchema, nullable = true),
+      StructField("taskType", StringType, nullable = true),
+      StructField("terminalState", StringType, nullable = true),
+      StructField("jobTriggerType", StringType, nullable = true),
+      StructField("schedule", minimumScheduleSchema, nullable = true),
+//      StructField("libraries", minimumLibrariesSchema, nullable = true), // todo 503
+      StructField("manual_override_params", minimumManualOverrideParamsSchema, nullable = true),
+      StructField("repairId", LongType, nullable = true),
+//      StructField("repair_details", minimumRepairDetailsSchema, nullable = true), // todo 503
+      StructField("run_name", StringType, nullable = true),
+      StructField("timeout_seconds", LongType, nullable = true),
+      StructField("retry_on_timeout", BooleanType, nullable = true),
+      StructField("max_retries", LongType, nullable = true),
+      StructField("min_retry_interval_millis", LongType, nullable = true),
+      StructField("max_concurrent_runs", LongType, nullable = true),
+      StructField("run_as_user_name", StringType, nullable = true),
+      StructField("workflow_context", StringType, nullable = true),
+      StructField("task_detail_legacy", minimumTaskDetailSchema, nullable = true),
+      StructField("submitRun_details", minimumSubmitRunDetailsSchema, nullable = true),
+      StructField("created_by", StringType, nullable = true),
+      StructField("last_edited_by", StringType, nullable = true)
     )),
     // clusterStateFact
     3005 -> StructType(Seq(
