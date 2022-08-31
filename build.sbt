@@ -62,10 +62,7 @@ assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeSca
 // assemblyExcludedJars in assembly := {
 //   val cp = (fullClasspath in assembly).value
 //   cp filter { f =>
-//     f.data.getName.contains("dbutils-api_2.12") ||
-//       f.data.getName.contains("spark-core") ||
-//       f.data.getName.contains("spark-sql") ||
-//       f.data.getName.contains("delta-core") ||
-//       f.data.getName.contains("com.amazonaws")
+//     f.data.getName.contains("eventhubs") ||
+//     f.data.getName.contains("msal4j")
 //   }
 // }
