@@ -46,7 +46,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       'organization_id,
       'deleted_by,
       'createdBy.alias("created_by"),
-      'lastEditedBy.alias("last_edited_by")
+      'lastEditedBy.alias("last_edited_by"),
+      'runtime_engine
     )
     df.select(clusterCols: _*)
   }
@@ -232,7 +233,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
 
     val nodeTypeLookup = clusterSpec.asDF
-      .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
+      .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version, 'runtime_engine)
       .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version))
       .toTSDF("timestamp", "organization_id", "sku")
       .lookupWhen(dbuCostDetailsTSDF)
@@ -241,12 +242,11 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val nodeTypeLookup2 = clusterSnapshot.asDF
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
-      .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
+      .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version, 'runtime_engine)
       .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version))
       .toTSDF("timestamp", "organization_id", "sku")
       .lookupWhen(dbuCostDetailsTSDF)
       .df
-
     val clusterPotMetaToFill = Array(
       "cluster_name", "custom_tags", "driver_node_type_id",
       "node_type_id", "spark_version", "sku", "dbu_rate", "driverSpecs", "workerSpecs"
@@ -289,13 +289,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       // using noise generators to fill with two passes to reduce skew
       .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores) // scan back then forward to fill all
 
+
     val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
     val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H).otherwise(lit(0)).alias("driver_dbus")
     val workerDBUs = when('databricks_billable, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)).alias("worker_dbus")
     val driverComputeCost = Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H).alias("driver_compute_cost")
     val workerComputeCost = Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H).alias("worker_compute_cost")
-    val driverDBUCost = Costs.dbu('databricks_billable, $"driverSpecs.Hourly_DBUs", 'dbu_rate, lit(1), 'uptime_in_state_H).alias("driver_dbu_cost")
-    val workerDBUCost = Costs.dbu('databricks_billable, $"workerSpecs.Hourly_DBUs", 'dbu_rate, 'current_num_workers, 'uptime_in_state_H).alias("worker_dbu_cost")
+    val driverDBUCost = Costs.dbu('databricks_billable, $"driverSpecs.Hourly_DBUs", 'dbu_rate, lit(1), 'uptime_in_state_H, runtimeEngine = 'runtime_engine, sku = 'sku).alias("driver_dbu_cost")
+    val workerDBUCost = Costs.dbu('databricks_billable, $"workerSpecs.Hourly_DBUs", 'dbu_rate, 'current_num_workers, 'uptime_in_state_H, runtimeEngine = 'runtime_engine, sku = 'sku).alias("worker_dbu_cost")
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,

@@ -757,10 +757,11 @@ trait SilverTransforms extends SparkSessionWrapper {
           'spark_conf,
           'driver_instance_pool_id,
           'instance_pool_id,
-          'spark_version,
+          'effective_spark_version.alias("spark_version"),
           (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
           'Pipeline_SnapTS.cast("date").alias("date"),
-          'creator_user_name.alias("createdBy")
+          'creator_user_name.alias("createdBy"),
+          'runtime_engine
         )
 
       unionWithMissingAsNull(clusterBaseWMetaDF, missingClusterBaseFromSnap)
@@ -856,7 +857,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'spark_version,
       'idempotency_token,
       'timestamp,
-      'userEmail)
+      'userEmail,
+      'runtime_engine)
 
     val clustersRemoved = clusterBaseDF
       .filter($"response.statusCode" === 200) // only successful delete statements get applied
