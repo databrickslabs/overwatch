@@ -394,7 +394,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
       val dbProperties = dbMeta.properties
       val existingDBLocation = dbMeta.locationUri.toString
-      if (existingDBLocation != dbLocation) {
+      if (existingDBLocation != dbLocation && dbProperties.getOrElse("IS_UNITY_CATALOG", "FALSE") == "FALSE") {
         switch = false
         throw new BadConfigException(s"The DB: $dbName exists " +
           s"at location $existingDBLocation which is different than the location entered in the config. Ensure " +
