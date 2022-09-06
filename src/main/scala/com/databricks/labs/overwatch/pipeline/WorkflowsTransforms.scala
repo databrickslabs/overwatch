@@ -1478,7 +1478,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         df.withColumnRenamed("organization_id", "orgId").alias("jrSparkUtil"),
         $"jrCostPot.organization_id" === $"jrSparkUtil.orgId" &&
           $"jrCostPot.job_id" === $"jrSparkUtil.db_job_id" &&
-          $"jrCostPot.id_in_job" === $"jrSparkUtil.db_id_in_job",
+          $"jrCostPot.run_id" === $"jrSparkUtil.db_id_in_job",
         "left"
       )
       .drop("db_job_id", "db_id_in_job", "orgId")
