@@ -26,7 +26,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.accountModTarget,
       SilverTargets.clustersSpecTarget,
       SilverTargets.dbJobsStatusTarget,
-      SilverTargets.notebookStatusTarget
+      SilverTargets.notebookStatusTarget,
+      SilverTargets.sqlHistoryTarget
     )
   }
 
@@ -49,6 +50,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         Array(jobStatusModule, jobRunsModule)
       }
+      case OverwatchScope.sqlHistory => Array(sqlHistoryModule)
       case _ => Array[Module]()
     }
   }
@@ -301,6 +303,13 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.notebookStatusTarget)
   )
 
+  lazy private[overwatch] val sqlHistoryModule = Module(2019, "Silver_SqlHistory", this, Array(1004, 1016))
+  lazy private val appendSqlHistoryProcess = ETLDefinition(
+    BronzeTargets.sqlHistorySnapshotTarget.asIncrementalDF(sqlHistoryModule),
+    Seq(sqlHistoryTransform()),
+    append(SilverTargets.sqlHistoryTarget)
+  )
+
   private def processSparkEvents(): Unit = {
 
     executorsModule.execute(appendExecutorsProcess)
@@ -327,6 +336,10 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         jobStatusModule.execute(appendJobStatusProcess)
         jobRunsModule.execute(appendJobRunsProcess)
+      }
+      case OverwatchScope.sqlHistory => {
+        println("inside sql history module")
+        sqlHistoryModule.execute(appendSqlHistoryProcess)
       }
       case _ =>
     }

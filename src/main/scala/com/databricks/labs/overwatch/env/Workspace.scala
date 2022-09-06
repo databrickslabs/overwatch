@@ -125,6 +125,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv,workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
+  def getSqlHistoryDF: DataFrame = {
+    val sqlHistoryEndpoint = "sql/history/queries"
+//    val jsonQuery = s"""{"include_metrics":true}"""
+
+    val jsonQuery = Map("include_metrics" -> "true"
+    )
+    ApiCallV2(config.apiEnv,sqlHistoryEndpoint, jsonQuery).execute().asDF().withColumn("organization_id", lit(config.organizationId))
+  }
 
 
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {

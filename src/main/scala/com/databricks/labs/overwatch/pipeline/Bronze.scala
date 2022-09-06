@@ -26,7 +26,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.processedEventLogs,
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.dbuCostDetail,
-      BronzeTargets.clusterEventsErrorsTarget
+      BronzeTargets.clusterEventsErrorsTarget,
+      BronzeTargets.sqlHistorySnapshotTarget
     )
   }
 
@@ -38,6 +39,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => Array(jobsSnapshotModule)
       case OverwatchScope.pools => Array(poolsSnapshotModule)
       case OverwatchScope.sparkEvents => Array(sparkEventLogsModule)
+      case OverwatchScope.sqlHistory => Array(sqlHistorySnapshotModule)
       case _ => Array[Module]()
     }
   }
@@ -145,6 +147,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clusterEventsTarget)
   )
 
+  lazy private[overwatch] val sqlHistorySnapshotModule = Module(1016, "Bronze_Sql_History_Snapshot", this)
+  lazy private val appendSqlHistoryProcess = ETLDefinition(
+    workspace.getSqlHistoryDF,
+    append(BronzeTargets.sqlHistorySnapshotTarget)
+  )
+
   private val sparkEventLogsSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
@@ -199,6 +207,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   }
 
   private def executeModules(): Unit = {
+    config.overwatchScope.foreach(x=>println(x))
     config.overwatchScope.foreach {
       case OverwatchScope.audit => auditLogsModule.execute(appendAuditLogsProcess)
       case OverwatchScope.clusters => clustersSnapshotModule.execute(appendClustersAPIProcess)
@@ -206,6 +215,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
+      case OverwatchScope.sqlHistory => sqlHistorySnapshotModule.execute(appendSqlHistoryProcess)
       case _ =>
     }
   }

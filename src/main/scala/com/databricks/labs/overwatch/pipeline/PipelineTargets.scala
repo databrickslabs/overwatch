@@ -154,6 +154,16 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
+    lazy private[overwatch] val sqlHistorySnapshotTarget: PipelineTable = PipelineTable(
+      name = "sql_history_snapshot_bronze",
+      _keys = Array("endpoint_id", "warehouse_id", "query_id", "timestamp"), //need to change this
+      config,
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      incrementalColumns = Array("timestamp"), //need to change this
+      statsColumns = "endpoint_id, warehouse_id, query_id, Pipeline_SnapTS, Overwatch_RunID".split(", "), //need to change this
+      masterSchema = Some(Schema.clusterEventsMinimumSchema) //need to change this
+    )
+
   }
 
   /**
@@ -287,6 +297,14 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val notebookStatusTarget: PipelineTable = PipelineTable(
       name = "notebook_silver",
       _keys = Array("notebookId", "requestId", "actionName", "timestamp"),
+      config,
+      incrementalColumns = Array("timestamp"),
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+    )
+
+    lazy private[overwatch] val sqlHistoryTarget: PipelineTable = PipelineTable(
+      name = "sql_history_silver",
+      _keys = Array("endpoint_id", "warehouse_id", "query_id", "timestamp"),
       config,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
@@ -534,6 +552,14 @@ abstract class PipelineTargets(config: Config) {
       name = "sparkStream_Preview",
       sparkStreamTarget,
       config
+    )
+
+    lazy private[overwatch] val sqlHistoryTarget: PipelineTable = PipelineTable(
+      name = "sql_history_gold",
+      _keys = Array("endpoint_id", "warehouse_id", "query_id", "timestamp"),
+      config,
+      incrementalColumns = Array("timestamp"),
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
   }
