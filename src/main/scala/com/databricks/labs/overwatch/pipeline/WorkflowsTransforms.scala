@@ -812,12 +812,12 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'clusterId,
         struct(
           'existing_cluster_id,
-          structFromJson(spark, jobRunsMaster, "new_cluster"),
+          structFromJson(spark, jobRunsMaster, "new_cluster", allNullMinimumSchema = Schema.minimumNewClusterSchema),
           structFromJson(spark, jobRunsMaster, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema),
           structFromJson(spark, jobRunsMaster, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema),
-          structFromJson(spark, jobRunsMaster, "libraries", isArrayWrapped = true),
-          structFromJson(spark, jobRunsMaster, "access_control_list", isArrayWrapped = true),
-          structFromJson(spark, jobRunsMaster, "git_source")
+          structFromJson(spark, jobRunsMaster, "libraries", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumLibrariesSchema),
+          structFromJson(spark, jobRunsMaster, "access_control_list", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumAccessControlListSchema),
+          structFromJson(spark, jobRunsMaster, "git_source", allNullMinimumSchema = Schema.minimumGitSourceSchema)
         ).alias("submitRun_details"),
         'manual_override_params,
         coalesce('workflow_context_runNow, 'workflow_context_submitRun).alias("workflow_context"),
@@ -906,18 +906,28 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       "tags" -> handleRootNull(dfWCleansedJobsAndTasks, "tags", SchemaTools.structToMap(dfWCleansedJobsAndTasks, "tags"), MapType(StringType, StringType)),
       "submitRun_details.tasks" -> col("cleansedTasks"),
       "submitRun_details.job_clusters" -> col("cleansedJobsClusters"),
-      "submitRun_details.tasks.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "submitRun_details.tasks.notebook_task.base_parameters"),
-      "submitRun_details.tasks.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "submitRun_details.tasks.shell_command_task.env_vars"),
       "task_detail_legacy.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.notebook_task.base_parameters"),
       "task_detail_legacy.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.shell_command_task.env_vars")
     ) ++
-      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.new_cluster") ++
-      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.tasks.new_cluster")
+      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.new_cluster")
 
-    dfWCleansedJobsAndTasks
+    val dfWStructedTasksAndCleansedJobs = dfWCleansedJobsAndTasks
       .modifyStruct(tasksAndJobClustersCleansingInventory) // overwrite nested complex structures with cleansed structures
       .drop("cleansedTasks", "cleansedJobsClusters") // cleanup temporary cleaner fields
-      .scrubSchema(SchemaScrubber(cullNullTypes = true))
+
+    // after submitRun_details.tasks has been converted into a struct, cleanse the nested tasks columns
+    // if it still exists after the cullNullTypes
+    if (SchemaTools.getAllColumnNames(dfWStructedTasksAndCleansedJobs.schema).exists(c => c.startsWith("submitRun_details.tasks"))) {
+      val secondaryStructTasksCleanser = Map(
+        "submitRun_details.tasks.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.notebook_task.base_parameters"),
+        "submitRun_details.tasks.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.shell_command_task.env_vars"),
+      ) ++
+        PipelineFunctions.newClusterCleaner(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.new_cluster")
+
+      dfWStructedTasksAndCleansedJobs
+        .modifyStruct(secondaryStructTasksCleanser)
+        .scrubSchema
+    } else dfWStructedTasksAndCleansedJobs.scrubSchema
 
   }
 

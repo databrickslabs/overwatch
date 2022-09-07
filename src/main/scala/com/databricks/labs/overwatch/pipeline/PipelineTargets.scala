@@ -229,7 +229,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated
       zOrderBy = Array("runId", "jobId"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      persistBeforeWrite = true
     )
 
     lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(

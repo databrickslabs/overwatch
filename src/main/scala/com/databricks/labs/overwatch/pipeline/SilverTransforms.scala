@@ -1208,6 +1208,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       (jobsSnapshot, jobSnapNameLookup)
     )
 
+    // caching before structifying
     jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
       .transform(jobRunsAppendClusterName(jobRunsLookups))
       .transform(jobRunsAppendJobMeta(jobRunsLookups))

@@ -389,7 +389,7 @@ object Schema extends SparkSessionWrapper {
   val minimumExplodedTaskLookupMetaSchema: StructType = StructType(Seq(
     StructField("taskKey",StringType, nullable = true),
     StructField("job_cluster_key",StringType, nullable = true),
-    StructField("libraries",minimumLibrariesSchema, nullable = true),
+//    StructField("libraries",minimumLibrariesSchema, nullable = true), // 503
     StructField("max_retries", LongType, nullable = true),
     StructField("retry_on_timeout", BooleanType, nullable = true),
     StructField("min_retry_interval_millis", LongType, nullable = true),
@@ -419,13 +419,16 @@ object Schema extends SparkSessionWrapper {
   val minimumGitSourceSchema: StructType = StructType(Seq(
     StructField("git_branch",StringType, nullable = true),
     StructField("git_provider",StringType, nullable = true),
-    StructField("git_url",StringType, nullable = true))
-  )
+    StructField("git_url",StringType, nullable = true),
+    StructField("git_tag",StringType, nullable = true),
+    StructField("git_commit",StringType, nullable = true)
+  ))
 
   val minimumAccessControlListSchema: ArrayType = ArrayType(
       StructType(Seq(
+        StructField("user_name",StringType, nullable = true),
+        StructField("group_name",StringType, nullable = true),
         StructField("permission_level",StringType, nullable = true),
-        StructField("user_name",StringType, nullable = true)
       ))
     , containsNull = true)
 
@@ -656,7 +659,7 @@ object Schema extends SparkSessionWrapper {
 //      StructField("job_clusters", minimumJobClustersSchema, nullable = true), // TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
 //      StructField("tasks", minimumTasksSchema, nullable = true), // TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
       StructField("new_cluster", minimumNewClusterSchema, nullable = true),
-      StructField("libraries", minimumLibrariesSchema, nullable = true),
+//      StructField("libraries", minimumLibrariesSchema, nullable = true), // 503
       StructField("git_source", minimumGitSourceSchema, nullable = true),
       StructField("max_concurrent_runs", LongType, nullable = true),
       StructField("max_retries", LongType, nullable = true),
