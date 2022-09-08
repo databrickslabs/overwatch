@@ -447,8 +447,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'custom_tags,
       'ssh_public_keys,
       'cluster_source,
-      coalesce('aws_attributes, lit("""{"emptyKey": ""}""")).alias("aws_attributes"),
-      coalesce('azure_attributes, lit("""{"emptyKey": ""}""")).alias("azure_attributes"),
+      'aws_attributes,
+      'azure_attributes,
       'spark_env_vars,
       'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
@@ -544,6 +544,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       //   fillForward("preloaded_docker_images", lastPoolValue, Seq($"poolSnapDetails.preloaded_docker_images")), // SEC-6198 - DO NOT populate or test until closed
       PipelineFunctions.fillForward(s"aws_attributes", lastPoolValue, Seq(col(s"poolSnapDetails.aws_attributes"))),
       PipelineFunctions.fillForward(s"azure_attributes", lastPoolValue, Seq(col(s"poolSnapDetails.azure_attributes"))),
+      'custom_tags,
       createCol,
       deleteCol,
       struct(
@@ -561,14 +562,15 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     val poolsRawPruned = auditIncrementalDF
+      .filter('serviceName === "instancePools")
       .select(
         'organization_id,
         'serviceName,
         'actionName,
         'date,
         'timestamp,
-        coalesce($"requestParams.aws_attributes", lit("""{"emptyKey": ""}""")).alias("aws_attributes"),
-        coalesce($"requestParams.azure_attributes", lit("""{"emptyKey": ""}""")).alias("azure_attributes"),
+        $"requestParams.aws_attributes",
+        $"requestParams.azure_attributes",
         $"requestParams.instance_pool_id",
         $"requestParams.preloaded_spark_versions",
         $"requestParams.instance_pool_name",
@@ -576,6 +578,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         $"requestParams.idle_instance_autotermination_minutes",
         $"requestParams.min_idle_instances",
         $"requestParams.max_capacity",
+        $"requestParams.custom_tags",
         'requestId,
         'response,
         'sessionId,
@@ -583,7 +586,6 @@ trait SilverTransforms extends SparkSessionWrapper {
         'userAgent,
         'userIdentity
       )
-      .filter('serviceName === "instancePools")
 
     val poolsRawPrunedIsEmpty = poolsRawPruned.isEmpty // bool - true == no pools data from
 
@@ -600,10 +602,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       val poolsRawWithStructs = poolsRawPruned
         .withColumn("aws_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "aws_attributes"))
         .withColumn("azure_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "azure_attributes"))
+        .withColumn("custom_tags", SchemaTools.structFromJson(spark, poolsRawPruned, "custom_tags"))
 
       val changeInventory = Map[String, Column](
         "aws_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "aws_attributes"),
-        "azure_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "azure_attributes")
+        "azure_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "azure_attributes"),
+        "custom_tags" -> SchemaTools.structToMap(poolsRawWithStructs, "custom_tags")
       )
 
       val poolsBase = poolsRawWithStructs
@@ -655,6 +659,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'preloaded_spark_versions,
           'aws_attributes,
           'azure_attributes,
+          'custom_tags,
           lit(null).cast(Schema.poolsCreateSchema).alias("create_details"),
           lit(null).cast(Schema.poolsDeleteSchema).alias("delete_details"),
           lit(null).cast(Schema.poolsRequestDetails).alias("request_details"),
