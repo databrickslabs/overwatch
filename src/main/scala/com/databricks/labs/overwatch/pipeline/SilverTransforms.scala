@@ -553,12 +553,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'sessionId,
         'sourceIPAddress,
         'userAgent
-      ).alias("request_details"),
-      struct(
-        PipelineFunctions.fillForward(s"default_tags", lastPoolValue, Seq(col(s"poolSnapDetails.default_tags"))),
-        PipelineFunctions.fillForward(s"custom_tags", lastPoolValue, Seq(col(s"poolSnapDetails.custom_tags")))
-
-      ).alias("tags")
+      ).alias("request_details")
     )
 
     val poolsRawPruned = auditIncrementalDF
@@ -662,8 +657,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'custom_tags,
           lit(null).cast(Schema.poolsCreateSchema).alias("create_details"),
           lit(null).cast(Schema.poolsDeleteSchema).alias("delete_details"),
-          lit(null).cast(Schema.poolsRequestDetails).alias("request_details"),
-          struct('default_tags,'custom_tags).alias("tags")
+          lit(null).cast(Schema.poolsRequestDetails).alias("request_details")
         )
 
       // union existing and missing (imputed) pool ids (when exists)
@@ -880,7 +874,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("rnk", rank().over(lastClusterSnap))
       .withColumn("rn", row_number().over(lastClusterSnap))
       .filter('rnk === 1 && 'rn === 1)
-      .select('organization_id, 'cluster_id,$"default_tags")
+      .select('organization_id, 'cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
 
     // lookup pools node types from audit logs if records present
     val clusterBaseWithPools = if (driverPoolLookup.nonEmpty) {
@@ -946,15 +940,10 @@ trait SilverTransforms extends SparkSessionWrapper {
         when(isAutomated('cluster_name) && 'actionName === "create", lit("JobsService"))
           .when(!isAutomated('cluster_name) && 'actionName === "create", 'userEmail))
       .withColumn("createdBy", when(!isAutomated('cluster_name) && 'createdBy.isNull, last('createdBy, true).over(clusterBefore)).otherwise('createdBy))
-      .withColumn("createdBy", when('createdBy.isNull && $"default_tags.Creator".isNotNull, $"default_tags.Creator").otherwise('createdBy))
+      .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
-      .withColumn("tags",
-        struct(
-          'default_tags,
-          from_json(col("custom_tags"),MapType(StringType, StringType, valueContainsNull = true)).alias("custom_tags")
-        ))
-      .drop("userEmail", "custom_tags","default_tags","single_user_name")
+      .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
 
   def buildClusterStateDetail(
