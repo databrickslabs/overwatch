@@ -542,7 +542,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       //   fillForward("preloaded_docker_images", lastPoolValue, Seq($"poolSnapDetails.preloaded_docker_images")), // SEC-6198 - DO NOT populate or test until closed
       PipelineFunctions.fillForward(s"aws_attributes", lastPoolValue, Seq(col(s"poolSnapDetails.aws_attributes"))),
       PipelineFunctions.fillForward(s"azure_attributes", lastPoolValue, Seq(col(s"poolSnapDetails.azure_attributes"))),
-      'custom_tags,
       createCol,
       deleteCol,
       struct(
