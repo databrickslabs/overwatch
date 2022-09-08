@@ -447,8 +447,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'custom_tags,
       'ssh_public_keys,
       'cluster_source,
-      coalesce('aws_attributes, lit("""{"emptyKey": ""}""")).alias("aws_attributes"),
-      coalesce('azure_attributes, lit("""{"emptyKey": ""}""")).alias("azure_attributes"),
+      'aws_attributes,
+      'azure_attributes,
       'spark_env_vars,
       'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
@@ -767,8 +767,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'spark_version,
           (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
           'Pipeline_SnapTS.cast("date").alias("date"),
-          'creator_user_name.alias("createdBy"),
-          'default_tags
+          'creator_user_name.alias("createdBy")
         )
 
       unionWithMissingAsNull(clusterBaseWMetaDF, missingClusterBaseFromSnap)
@@ -864,8 +863,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'spark_version,
       'idempotency_token,
       'timestamp,
-      'userEmail,
-    'default_tags)
+      'userEmail)
 
     val clustersRemoved = clusterBaseDF
       .filter($"response.statusCode" === 200) // only successful delete statements get applied
@@ -945,7 +943,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
-      .withColumn("default_tags",'default_tags)
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
   }
 
