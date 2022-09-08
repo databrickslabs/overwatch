@@ -219,6 +219,7 @@ object SchemaTools extends SparkSessionWrapper {
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
 
     val mapColName = colToConvert.split("\\.").takeRight(1).head
+    val nullMapReturnCol = lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
     val dfFlatColumnNames = getAllColumnNames(df.schema)
     if (dfFlatColumnNames.exists(_.startsWith(colToConvert))) { // if column exists within schema
       df.select(colToConvert).schema.fields.head.dataType.typeName match {
@@ -243,12 +244,14 @@ object SchemaTools extends SparkSessionWrapper {
               .otherwise(map_filter(newRawMap, (_,v) => v.isNotNull)).alias(mapColName)
           } else newRawMap.alias(mapColName)
         case "null" =>
-          lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
+          nullMapReturnCol
+        case "void" =>
+          nullMapReturnCol
         case x =>
           throw new Exception(s"function structToMap, columnToConvert must be of type struct but found $x instead")
       }
     } else { // colToConvert doesn't exist within the schema return null map type
-      lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
+      nullMapReturnCol
     }
   }
 
