@@ -1083,7 +1083,18 @@ trait SilverTransforms extends SparkSessionWrapper {
     val jobsBaseHasRecords = !jobsBase.isEmpty
     jobStatusValidateNewJobsStatusHasNewData(isFirstRun, jobsSnapshotTargetComplete, jobsBaseHasRecords)
 
+    // TODO -- temp -- not necessary after 503 fix
+    //  adding arrays to lookup will ensure they are added on first run if they don't exist until 503 is resolved
+    val colsToAddIfNotExists = Array(
+      NamedColumn("tasks", lit(null).cast(Schema.minimumTasksSchema)),
+      NamedColumn("job_clusters", lit(null).cast(Schema.minimumJobClustersSchema)),
+      NamedColumn("libraries", lit(null).cast(Schema.minimumLibrariesSchema)),
+      NamedColumn("access_control_list", lit(null).cast(Schema.minimumAccessControlListSchema)),
+      NamedColumn("grants", lit(null).cast(Schema.minimumGrantsSchema)),
+    )
+
     val jobsSnapshotDFComplete = jobsSnapshotTargetComplete.asDF
+      .appendToStruct("settings", colsToAddIfNotExists)
 
     // Simplified DF for snapshot lookupWhen
     val jobSnapLookup = jobsSnapshotDFComplete
@@ -1104,7 +1115,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .transform(jobStatusDeriveBaseLookupAndFillForward(lastJobStatus))
       .transform(jobStatusStructifyJsonCols)
       .transform(jobStatusCleanseForPublication(targetKeys))
-//      .transform(jobStatusAppendAndFillTemporalClusterSpec) // todo - is this needed here?
       .transform(
         jobStatusFirstRunImputeFromSnap(
           isFirstRunAndJobsSnapshotHasRecords,

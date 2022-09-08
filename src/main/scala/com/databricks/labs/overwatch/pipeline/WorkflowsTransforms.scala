@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions.fillForward
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.SchemaTools.{structFromJson, structToMap}
-import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaScrubber, SchemaTools, SparkSessionWrapper, TimeTypes}
+import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.Level
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
@@ -995,6 +995,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       val tasksExploded = jobRunsWithImprovedKeys
         .select('jobId, 'taskKey, 'runId, explode('tasks).alias("task"))
         .filter('taskKey === $"task.task_key")
+        .appendToStruct("task", Array(NamedColumn("libraries", lit(null).cast(Schema.minimumLibrariesSchema)))) // todo -- temp until 503 resolved
         .selectExpr("*", "task.*").drop("task", "task_key")
         .verifyMinimumSchema(Schema.minimumExplodedTaskLookupMetaSchema)
         .select(
