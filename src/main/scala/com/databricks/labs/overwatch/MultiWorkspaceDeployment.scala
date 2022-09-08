@@ -47,6 +47,14 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private var _deploymentReport: ArrayBuffer[MultiWSDeploymentReport] = _
 
+  private var _parallelism: Int = _
+
+  private var _inputDataFrame: DataFrame = _
+
+  protected def inputDataFrame: DataFrame = _inputDataFrame
+
+  protected def parallelism: Int = _parallelism
+
   protected def deploymentId: String = _deploymentId
 
   protected def deploymentReport: ArrayBuffer[MultiWSDeploymentReport] = _deploymentReport
@@ -57,10 +65,20 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private var _pipelineSnapTime: Long = _
 
-  private def initDeployment(): this.type ={
+  private[overwatch] def setInputDataFrame(value: DataFrame): this.type = {
+    _inputDataFrame = value
+    this
+  }
+
+  private def initDeployment(): this.type = {
     setDeploymentReport(ArrayBuffer())
     setDeploymentId(java.util.UUID.randomUUID.toString)
     setPipelineSnapTime()
+    this
+  }
+
+  private def setParallelism(value: Int): this.type = {
+    _parallelism = value
     this
   }
 
@@ -144,6 +162,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val primordialDateString: Date = config.getAs(ConfigColumns.primordial_date.toString)
       val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
       val stringDate = dateFormat.format(primordialDateString)
+      //val apiEnv = ApiEnv()
       val params = OverwatchParams(
         auditLogConfig = AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig)),
         dataTarget = Some(dataTarget),
@@ -164,7 +183,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while building params")
         logger.log(Level.ERROR, fullMsg)
-        deploymentReport.append(MultiWSDeploymentReport(Some(s"""WorkspaceId: ${config.getAs(ConfigColumns.workspace_id.toString).toString}"""),
+        deploymentReport.append(MultiWSDeploymentReport("", Some(s"""WorkspaceId: ${config.getAs(ConfigColumns.workspace_id.toString).toString}"""),
           fullMsg,
           Some(deploymentId)
         ))
@@ -172,13 +191,36 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     }
   }
 
-  private def startDeployment(args: String) = {
+  private def startBronzeDeployment(args: String) = {
 
     try {
-      println(s"""Deployment started config params: ${args} , ThreadName: """ + Thread.currentThread().getName)
+      println(s"""Bronze Deployment started config params: ${args} , ThreadName: """ + Thread.currentThread().getName)
       val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
       Bronze(workspace).run()
-      deploymentReport.append(MultiWSDeploymentReport(Some(args),
+      println(s"""Bronze Deployment Completed******* config , ThreadName: """ + Thread.currentThread().getName)
+      deploymentReport.append(MultiWSDeploymentReport("Bronze", Some(args),
+        "SUCCESS",
+        Some(deploymentId)
+      ))
+
+    } catch {
+      case exception: Exception =>
+        val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
+        logger.log(Level.ERROR, fullMsg)
+        deploymentReport.append(MultiWSDeploymentReport("Bronze", Some(args),
+          fullMsg,
+          Some(deploymentId)
+        ))
+    }
+  }
+
+  private def startSilverDeployment(args: String) = {
+
+    try {
+      println(s"""Silver Deployment started config params: ${args} , ThreadName: """ + Thread.currentThread().getName)
+      val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
+      Silver(workspace).run()
+      deploymentReport.append(MultiWSDeploymentReport("Silver", Some(args),
         "SUCCESS",
         Some(deploymentId)
       ))
@@ -186,7 +228,28 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        deploymentReport.append(MultiWSDeploymentReport(Some(args),
+        deploymentReport.append(MultiWSDeploymentReport("Silver", Some(args),
+          fullMsg,
+          Some(deploymentId)
+        ))
+    }
+  }
+
+  private def startGoldDeployment(args: String) = {
+
+    try {
+      println(s"""Gold Deployment started config params: ${args} , ThreadName: """ + Thread.currentThread().getName)
+      val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
+      Gold(workspace).run()
+      deploymentReport.append(MultiWSDeploymentReport("Gold", Some(args),
+        "SUCCESS",
+        Some(deploymentId)
+      ))
+    } catch {
+      case exception: Exception =>
+        val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
+        logger.log(Level.ERROR, fullMsg)
+        deploymentReport.append(MultiWSDeploymentReport("Gold", Some(args),
           fullMsg,
           Some(deploymentId)
         ))
@@ -194,27 +257,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   }
 
   private def getWorkspace(row: Row): Workspace = {
-    Initializer(buildParams(row), debugFlag = true, isMultiworkspaceDeployment = true)
-  }
-
-  private def deploySilver(dataFrame: DataFrame) = {
-    val workspace = getWorkspace(dataFrame.head())
-    Silver(workspace).run()
-  }
-
-  private def deployGold(dataFrame: DataFrame) = {
-    val workspace = getWorkspace(dataFrame.head())
-    Gold(workspace).run()
-  }
-
-
-  private def deployBronze(parallelism: Int, dataFrame: DataFrame) = {
-
-    println("Parallelism " + parallelism + " DeploymentID:" + deploymentId)
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-    val prams = dataFrame.collect().map(buildParams).par //building arguments
-    prams.tasksupport = taskSupport
-    prams.filter(args => args != null).foreach(startDeployment)
+    Initializer(buildParams(row), debugFlag = true, disableValidations = true, isMultiworkspaceDeployment = true)
   }
 
 
@@ -239,7 +282,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
       .write.format("delta").mode("append").save(s"""${validationPath}/report/${reportName}""")
-    println("Validation report has been saved to "+s"""${validationPath}/report/${reportName}""")
+    println("Validation report has been saved to " + s"""${validationPath}/report/${reportName}""")
   }
 
   private def saveDeploymentReport(validationDF: Dataset[MultiWSDeploymentReport], path: String, reportName: String): Unit = {
@@ -253,30 +296,41 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       .write.format("delta").mode("append").save(s"""${reportPath}/report/${reportName}""")
   }
 
+
+
+
   def deploy(parallelism: Int = 4, zones: String = "Bronze"): Unit = {
     val processingStartTime = System.currentTimeMillis();
+    setParallelism(parallelism)
+    println("Pallalesism :" + parallelism)
     val deploymentValidation = DeploymentValidation(configCsvPath, outputPath, parallelism, deploymentId)
     deploymentValidation.performMandatoryValidation
-    val dataframe = deploymentValidation.makeDataFrame()
-    snapshotConfig(dataframe)
+    val dataFrame = deploymentValidation.makeDataFrame()
+    setInputDataFrame(dataFrame)
+    snapshotConfig(dataFrame)
+    val workspace = getWorkspace(dataFrame.head())
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    val mapParams = dataFrame.collect().map(buildParams).filter(args => args != null)
+    val prams =mapParams.par//building arguments
+    prams.tasksupport = taskSupport
     val zoneArray = zones.split(",")
     zoneArray.foreach(zone => {
       zone match {
         case "Bronze" =>
           println("*************Deploying BRONZE***********************")
-          deployBronze(parallelism, dataframe)
-          saveDeploymentReport(deploymentReport.toDS, deploymentValidation.makeDataFrame().head().getAs(ConfigColumns.etl_storage_prefix.toString), "deploymentReport")
+          prams.foreach(startBronzeDeployment)
           println("*************BRONZE Deployment Completed***********************")
         case "Silver" =>
           println("*************Deploying SILVER***********************")
-          deploySilver(dataframe)
+          prams.filter(args => args != null).map(startSilverDeployment)
           println("*************SILVER Deployment Completed***********************")
         case "Gold" =>
           println("*************Deploying GOLD***********************")
-          deployGold(dataframe)
+          prams.filter(args => args != null).map(startGoldDeployment)
           println("*************GOLD Deployment Completed***********************")
       }
     })
+    saveDeploymentReport(deploymentReport.toDS, deploymentValidation.makeDataFrame().head().getAs(ConfigColumns.etl_storage_prefix.toString), "deploymentReport")
     println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
 
   }

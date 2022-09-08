@@ -629,13 +629,14 @@ trait BronzeTransforms extends SparkSessionWrapper  {
                                       newFiles: DataFrame,
                                       trackerTarget: PipelineTable,
                                       orgId: String,
-                                      pipelineSnapTime: Column
+                                      pipelineSnapTime: Column,
+                                      daysToProcess:Int
                                      ): Unit = {
     val fileTrackerDF = newFiles
       .withColumn("failed", lit(false))
       .withColumn("organization_id", lit(orgId))
     //      .coalesce(4) // narrow, short table -- each append will == spark event log files processed
-    database.write(fileTrackerDF, trackerTarget, pipelineSnapTime)
+    database.writeWithRetry(fileTrackerDF, trackerTarget, pipelineSnapTime,Array(),Some(daysToProcess)) //needs retry
   }
 
   /**
@@ -688,7 +689,8 @@ trait BronzeTransforms extends SparkSessionWrapper  {
                           processedLogFilesTracker: PipelineTable,
                           organizationId: String,
                           runID: String,
-                          pipelineSnapTime: Column
+                          pipelineSnapTime: Column,
+                          daysToProcess: Int
                          )(eventLogsDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Searching for Event logs")
@@ -716,7 +718,7 @@ trait BronzeTransforms extends SparkSessionWrapper  {
           logger.log(Level.INFO, "Updating Tracker with new files")
           // appends all newly scanned files including files that were scanned but not loaded due to OutOfTime window
           // and/or failed during lookup -- these are kept for tracking
-          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime)
+          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime,daysToProcess)
         } catch {
           case e: Throwable => {
             val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +

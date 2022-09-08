@@ -238,7 +238,7 @@ class Pipeline(
       .withColumn("isActive", lit(true))
       .coalesce(1)
 
-    database.write(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
+    database.writeWithRetry(finalInstanceDetailsDF, BronzeTargets.cloudMachineDetail, pipelineSnapTime.asColumnTS)
     if (config.databaseName != config.consumerDatabaseName) BronzeTargets.cloudMachineDetailViewTarget.publish("*")
   }
 
@@ -415,7 +415,8 @@ class Pipeline(
     logger.log(Level.INFO, startLogMsg)
 
     // Append the output -- don't apply spark overrides, applied at top of function
-    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS, maxMergeScanDates)
+    //
+    if (!readOnly) database.writeWithRetry(finalDF, target, pipelineSnapTime.asColumnTS, maxMergeScanDates,Some(module.daysToProcess))
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
       println(readOnlyMsg)

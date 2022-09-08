@@ -602,12 +602,12 @@ object Initializer extends SparkSessionWrapper {
     )
   }
 
-  def apply(overwatchArgs: String, debugFlag: Boolean, isMultiworkspaceDeployment: Boolean): Workspace = {
+  def apply(overwatchArgs: String, debugFlag: Boolean,disableValidations:Boolean, isMultiworkspaceDeployment: Boolean): Workspace = {
     apply(
       overwatchArgs,
       debugFlag,
       isSnap = false,
-      disableValidations = false,
+      disableValidations,
       initializeDatabase = true,
       isMultiworkspaceDeployment
     )
