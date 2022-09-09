@@ -156,12 +156,12 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sqlHistorySnapshotTarget: PipelineTable = PipelineTable(
       name = "sql_history_snapshot_bronze",
-      _keys = Array("endpoint_id", "warehouse_id", "query_id", "timestamp"), //need to change this
+      _keys = Array("endpoint_id", "warehouse_id", "query_id", "Pipeline_SnapTS"), //need to change this
       config,
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
-      incrementalColumns = Array("timestamp"), //need to change this
-      statsColumns = "endpoint_id, warehouse_id, query_id, Pipeline_SnapTS, Overwatch_RunID".split(", "), //need to change this
-      masterSchema = Some(Schema.clusterEventsMinimumSchema) //need to change this
+      partitionBy = Seq("organization_id"),
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      statsColumns = "endpoint_id, warehouse_id, query_id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
+      masterSchema = Some(Schema.sqlHistorySnapMinimumSchema)
     )
 
   }
@@ -304,10 +304,10 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sqlHistoryTarget: PipelineTable = PipelineTable(
       name = "sql_history_silver",
-      _keys = Array("endpoint_id", "warehouse_id", "query_id", "timestamp"),
+      _keys = Array("endpoint_id", "warehouse_id", "query_id", "Pipeline_SnapTS"),
       config,
-      incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id")
     )
 
   }
@@ -556,10 +556,16 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sqlHistoryTarget: PipelineTable = PipelineTable(
       name = "sql_history_gold",
-      _keys = Array("endpoint_id", "warehouse_id", "query_id", "timestamp"),
+      _keys = Array("endpoint_id", "warehouse_id", "query_id", "Pipeline_SnapTS"),
       config,
-      incrementalColumns = Array("timestamp"),
+      incrementalColumns = Array("Pipeline_SnapTS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+    )
+
+    lazy private[overwatch] val sqlHistoryViewTarget: PipelineView = PipelineView(
+      name = "sqlHistory_",
+      sqlHistoryTarget,
+      config
     )
 
   }

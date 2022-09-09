@@ -30,7 +30,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkTaskTarget,
       GoldTargets.sparkExecutionTarget,
       GoldTargets.sparkStreamTarget,
-      GoldTargets.sparkExecutorTarget
+      GoldTargets.sparkExecutorTarget,
+      GoldTargets.sqlHistoryTarget
     )
   }
 
@@ -240,6 +241,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
     GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
     GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+    GoldTargets.sqlHistoryViewTarget.publish(sqlHistoryViewColumnMapping)
 
   }
 
@@ -281,6 +283,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case OverwatchScope.sqlHistory => {
         sqlHistoryModule.execute(appendSqlHistoryProcess)
+        GoldTargets.sqlHistoryViewTarget.publish(sqlHistoryViewColumnMapping)
       }
       case _ =>
     }

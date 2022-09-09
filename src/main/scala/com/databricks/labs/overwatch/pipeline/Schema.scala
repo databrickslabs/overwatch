@@ -503,6 +503,60 @@ object Schema extends SparkSessionWrapper {
     StructField("job_type",StringType,nullable = true),
     StructField("workspace_name",StringType,nullable = true)
   ))
+
+  val sqlHistorySnapMinimumSchema: StructType = StructType(Seq(
+    StructField("canSubscribeToLiveQuery", BooleanType, nullable = true),
+    StructField("channel_used",
+      StructType(Seq(
+      StructField("dbsql_version", StringType, nullable = true),
+      StructField("name", StringType, nullable = true)
+      )),nullable = true),
+    StructField("duration", LongType, nullable = true),
+    StructField("endpoint_id", StringType, nullable = true),
+    StructField("error_message", StringType, nullable = true),
+    StructField("executed_as_user_id", LongType, nullable = true),
+    StructField("executed_as_user_name", StringType, nullable = true),
+    StructField("execution_end_time_ms", LongType, nullable = true),
+    StructField("is_final", BooleanType, nullable = true),
+    StructField("lookup_key", StringType, nullable = true),
+    StructField("plans_state", StringType, nullable = true),
+    StructField("query_end_time_ms", LongType, nullable = true),
+    StructField("query_id", StringType, nullable = true),
+    StructField("query_start_time_ms", LongType, nullable = true),
+    StructField("query_text", StringType, nullable = true),
+    StructField("rows_produced", LongType, nullable = true),
+    StructField("spark_ui_url", StringType, nullable = true),
+    StructField("statement_type", StringType, nullable = true),
+    StructField("status", StringType, nullable = true),
+    StructField("user_id", LongType, nullable = true),
+    StructField("user_name", StringType, nullable = true),
+    StructField("warehouse_id", StringType, nullable = true),
+    StructField("organization_id", StringType, nullable = true),
+    StructField("__overwatch_ctrl_noise", IntegerType, nullable = true),
+    StructField("Pipeline_SnapTS", TimestampType, nullable = true),
+    StructField("Overwatch_RunID", StringType, nullable = true),
+    StructField("workspace_name", StringType, nullable = true),
+    StructField("compilation_time_ms", LongType, nullable = true),
+    StructField("execution_time_ms", LongType, nullable = true),
+    StructField("network_sent_bytes", LongType, nullable = true),
+    StructField("photon_total_time_ms", LongType, nullable = true),
+    StructField("pruned_bytes", LongType, nullable = true),
+    StructField("pruned_files_count", LongType, nullable = true),
+    StructField("read_bytes", LongType, nullable = true),
+    StructField("read_cache_bytes", LongType, nullable = true),
+    StructField("read_files_count", LongType, nullable = true),
+    StructField("read_partitions_count", LongType, nullable = true),
+    StructField("read_remote_bytes", LongType, nullable = true),
+    StructField("result_fetch_time_ms", LongType, nullable = true),
+    StructField("result_from_cache", BooleanType, nullable = true),
+    StructField("rows_produced_count", LongType, nullable = true),
+    StructField("rows_read_count", LongType, nullable = true),
+    StructField("spill_to_disk_bytes", LongType, nullable = true),
+    StructField("task_total_time_ms", LongType, nullable = true),
+    StructField("total_time_ms", LongType, nullable = true),
+    StructField("write_remote_bytes", LongType, true)
+  ))
+
   /**
    * Minimum required schema by module. "Minimum Requierd Schema" means that at least these columns of these types
    * must exist for the downstream ETLs to function.
@@ -541,6 +595,8 @@ object Schema extends SparkSessionWrapper {
     2017 -> auditMasterSchema,
     // Notebook Summary
     2018 -> auditMasterSchema,
+    // sqlHistory
+    2019 -> sqlHistorySnapMinimumSchema,
     // jobStatus
     3002 -> StructType(Seq(
       StructField("timestamp", LongType, true),
