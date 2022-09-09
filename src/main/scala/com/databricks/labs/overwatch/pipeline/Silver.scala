@@ -303,7 +303,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.notebookStatusTarget)
   )
 
-  lazy private[overwatch] val sqlHistoryModule = Module(2019, "Silver_SqlHistory", this, Array(1016))
+  lazy private[overwatch] val sqlHistoryModule = Module(2020, "Silver_SqlHistory", this, Array(1016))
   lazy private val appendSqlHistoryProcess = ETLDefinition(
     BronzeTargets.sqlHistorySnapshotTarget.asIncrementalDF(sqlHistoryModule, cronColumns = "Pipeline_SnapTS"),
     Seq(sqlHistoryTransform()),
