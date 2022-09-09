@@ -116,6 +116,10 @@ object Schema extends SparkSessionWrapper {
         StructField("python_params", StringType, nullable = true),
         StructField("spark_submit_params", StringType, nullable = true),
         StructField("notebook_params", StringType, nullable = true),
+        StructField("python_named_params", StringType, nullable = true),
+        StructField("pipeline_params", StringType, nullable = true),
+        StructField("sql_params", StringType, nullable = true),
+        StructField("dbt_commands", StringType, nullable = true),
         StructField("tasks", StringType, nullable = true),
         StructField("access_control_list", StringType, nullable = true),
         StructField("git_source", StringType, nullable = true),
@@ -138,7 +142,6 @@ object Schema extends SparkSessionWrapper {
         StructField("email_notifications", StringType, nullable = true),
         StructField("notebook_task", StringType, nullable = true),
         StructField("spark_python_task", StringType, nullable = true),
-        StructField("python_wheel_task", StringType, nullable = true),
         StructField("spark_jar_task", StringType, nullable = true),
         StructField("spark_submit_task", StringType, nullable = true),
         StructField("shell_command_task", StringType, nullable = true),
@@ -355,6 +358,10 @@ object Schema extends SparkSessionWrapper {
     StructField("query",StructType(Seq(
       StructField("query_id",StringType, nullable = true))
     ), nullable = true)
+  ))
+
+  val minimumDBTTask: StructType = StructType(Seq(
+    StructField("commands", ArrayType(StringType, containsNull = true), nullable = true)
   ))
 
   val minimumTaskDetailSchema: StructType = StructType(Seq(

@@ -30,7 +30,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   def getJobsBase(df: DataFrame): DataFrame = {
-    val onlyOnceJobRecW = Window.partitionBy('organization_id, 'timestamp, 'actionName, 'requestId, $"response.statusCode").orderBy('timestamp)
+    val onlyOnceJobRecW = Window.partitionBy('organization_id, 'timestamp, 'actionName, 'requestId, $"response.statusCode", 'runId).orderBy('timestamp)
     df.filter(col("serviceName") === "jobs")
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .withColumn("rnk", rank().over(onlyOnceJobRecW))
@@ -58,7 +58,9 @@ object WorkflowsTransforms extends SparkSessionWrapper {
             .select((keys map col) :+ explode(col(pathToTasksField)).alias("tasksToCleanse"): _*)
 
           val tasksChangeInventory = Map(
-            "tasksToCleanse.notebook_task.base_parameters" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.notebook_task.base_parameters")
+            "tasksToCleanse.notebook_task.base_parameters" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.notebook_task.base_parameters"),
+            "tasksToCleanse.python_wheel_task.named_parameters" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.python_wheel_task.named_parameters"),
+            "tasksToCleanse.sql_task.parameters" -> SchemaTools.structToMap(tasksExplodedWKeys, "tasksToCleanse.sql_task.parameters")
           ) ++ PipelineFunctions.newClusterCleaner(tasksExplodedWKeys, "tasksToCleanse.new_cluster")
 
           tasksExplodedWKeys
@@ -201,7 +203,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   //  }
 
   /**
-   *
+   * Fill the column using many lookups but take into account fields_to_remove
+   * fields_to_remove convert an update into a reset but is optional
+   * if field name is not present in the array and action is update fill it in logical order (new_settings.x, secondary lookups)
+   * if field name IS present in the array do not fill it as it is a reset and must == new_settings.x
    * @param colToFillName Name of column to fill
    * @param w windowSpec for fillForward
    * @param snapLookupSettingsColName Snapshot lookup settings struct col name. If this is left empty no lookup will be performed
@@ -221,30 +226,25 @@ object WorkflowsTransforms extends SparkSessionWrapper {
                                ): Column = {
     val drivingColType = sourceDFSchema.filter(_.name == colToFillName).head.dataType
     val lookupColName = altLookupColName.getOrElse(colToFillName)
+    val newSettingValue = get_json_object('new_settings, "$." + lookupColName).cast(drivingColType)
     val updateCreateResetFillLogic = if (fillForwardColToFill) {
       coalesce(
-        get_json_object('new_settings, "$." + lookupColName).cast(drivingColType),
+        newSettingValue,
         col(colToFillName)
       )
-    } else get_json_object('new_settings, "$." + lookupColName).cast(drivingColType)
+    } else newSettingValue
 
-    val fieldsIsToBeTruncated = array_contains(from_json('fields_to_remove, ArrayType(StringType)), lookupColName)
-
-    val updateLookupLogic =
-      when('actionName.isin("update") && fieldsIsToBeTruncated, lit(null))
-        .when('actionName.isin("update", "create", "reset") && !fieldsIsToBeTruncated,
-          updateCreateResetFillLogic
-        )
-        .otherwise(col(colToFillName))
+    val fieldIsReset = array_contains(from_json('fields_to_remove, ArrayType(StringType)), lookupColName)
 
     val orderedLookups = if (snapLookupSettingsColName.nonEmpty) {
       val snapLookupLogic = get_json_object(col(snapLookupSettingsColName.get), "$." + lookupColName).cast(drivingColType)
-      Seq(updateLookupLogic, snapLookupLogic) ++ extraLookupCols
+      Seq(updateCreateResetFillLogic, snapLookupLogic) ++ extraLookupCols
     } else {
-      Seq(updateLookupLogic) ++ extraLookupCols
+      Seq(updateCreateResetFillLogic) ++ extraLookupCols
     }
-    fillForward(colToFillName, w, orderedLookups, colToFillHasPriority = false)
-
+    when('actionName.isin("update") && fieldIsReset, newSettingValue)
+      .otherwise(fillForward(colToFillName, w, orderedLookups, colToFillHasPriority = false))
+      .alias(colToFillName)
   }
 
   /**
@@ -254,6 +254,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   // TODO -- when reset -- do not fill forward
   def jobStatusDeriveBaseLookupAndFillForward(lastJobStatus: WindowSpec)(df: DataFrame): DataFrame = {
     val rawDFSchema = df.schema
+
     df
       .select(
         'organization_id,
@@ -444,7 +445,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       structFromJson(spark, df, "grants", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumGrantsSchema),
       structFromJson(spark, df, "notebook_task", allNullMinimumSchema = Schema.minimumNotebookTaskSchema),
       structFromJson(spark, df, "spark_python_task", allNullMinimumSchema = Schema.minimumSparkPythonTaskSchema),
-      structFromJson(spark, df, "python_wheel_task", allNullMinimumSchema = Schema.minimumPythonWheelTaskSchema),
       structFromJson(spark, df, "spark_jar_task", allNullMinimumSchema = Schema.minimumSparkJarTaskSchema),
       structFromJson(spark, df, "spark_submit_task", allNullMinimumSchema = Schema.minimumSparkSubmitTaskSchema),
       structFromJson(spark, df, "shell_command_task", allNullMinimumSchema = Schema.minimumShellCommandTaskSchema),
@@ -461,7 +461,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         struct(
           'notebook_task,
           'spark_python_task,
-          'python_wheel_task,
           'spark_jar_task,
           'spark_submit_task,
           'shell_command_task,
@@ -586,7 +585,11 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           from_json('jar_params, arrayStringSchema).alias("jar_params"),
           from_json('python_params, arrayStringSchema).alias("python_params"),
           from_json('spark_submit_params, arrayStringSchema).alias("spark_submit_params"),
-          from_json('notebook_params, arrayStringSchema).alias("notebook_params")
+          'pipeline_params,
+          'notebook_params,
+          'python_named_params,
+          'sql_params,
+          from_json('dbt_commands, arrayStringSchema).alias("dbt_commands")
         ).alias("manual_override_params"),
         'sourceIPAddress.alias("submitSourceIP"),
         'sessionId.alias("submitSessionId"),
@@ -869,7 +872,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   def jobRunsStructifyLookupMeta(df: DataFrame): DataFrame = {
-    df.cache() // caching to speed up schema infernece
+    df.cache() // caching to speed up schema inference
     df.count()
     df
       .withColumn("task_detail_legacy",
@@ -883,6 +886,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           structFromJson(spark, df, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
         )
       )
+      .withColumn("notebook_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.notebook_params"))
+      .withColumn("python_named_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.python_named_params"))
+      .withColumn("sql_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.sql_params"))
+      .withColumn("pipeline_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.pipeline_params"))
       .withColumn("tags", structFromJson(spark, df, "tags"))
       .drop(
         "notebook_task", "spark_python_task", "spark_jar_task", "python_wheel_task",
@@ -907,13 +914,24 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       "submitRun_details.tasks" -> col("cleansedTasks"),
       "submitRun_details.job_clusters" -> col("cleansedJobsClusters"),
       "task_detail_legacy.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.notebook_task.base_parameters"),
-      "task_detail_legacy.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.shell_command_task.env_vars")
+      "task_detail_legacy.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.shell_command_task.env_vars"),
+      "manual_override_params.notebook_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "notebook_params_overwatch_ctrl"),
+      "manual_override_params.python_named_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "python_named_params_overwatch_ctrl"),
+      "manual_override_params.sql_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "sql_params_overwatch_ctrl"),
+      "manual_override_params.pipeline_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "pipeline_params_overwatch_ctrl")
     ) ++
       PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.new_cluster")
 
     val dfWStructedTasksAndCleansedJobs = dfWCleansedJobsAndTasks
       .modifyStruct(tasksAndJobClustersCleansingInventory) // overwrite nested complex structures with cleansed structures
-      .drop("cleansedTasks", "cleansedJobsClusters") // cleanup temporary cleaner fields
+      .drop(
+        "cleansedTasks",
+        "cleansedJobsClusters",
+        "notebook_params_overwatch_ctrl",
+        "python_named_params_overwatch_ctrl",
+        "sql_params_overwatch_ctrl",
+        "pipeline_params_overwatch_ctrl"
+      ) // cleanup temporary cleaner fields
 
     // after submitRun_details.tasks has been converted into a struct, cleanse the nested tasks columns
     // if it still exists after the cullNullTypes

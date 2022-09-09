@@ -515,6 +515,15 @@ object PipelineFunctions extends SparkSessionWrapper {
       .otherwise("unknown")
   }
 
+  /**
+   * Fill a column according to the window spec
+   * @param colToFillName name of column to fill
+   * @param w window spec by which the fill should be executed
+   * @param orderedLookups ordered sequence of subsequent columns from which to attempt to fill the collTofill
+   * @param colToFillHasPriority whether or not to consider colToFill's own history to complete the fill or whether to
+   *                             only consider the ordered lookups when filling
+   * @return
+   */
   def fillForward(
                    colToFillName: String,
                    w: WindowSpec,
