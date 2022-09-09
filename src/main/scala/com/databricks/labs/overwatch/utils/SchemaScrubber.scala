@@ -4,11 +4,12 @@ import com.databricks.labs.overwatch.utils.SchemaScrubber.SanitizedField
 import com.databricks.labs.overwatch.utils.SchemaTools.uniqueRandomStrings
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
+import org.apache.spark.sql.types.{ArrayType, DataType, NullType, StructField, StructType}
 
 class SchemaScrubber(
                       sanitizationRules: List[SanitizeRule],
-                      sanitizationExceptions: Array[SanitizeFieldException]
+                      sanitizationExceptions: Array[SanitizeFieldException],
+                      cullNullTypes: Boolean
                     ) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   // TODO -- Delta writer is schema case sensitive and will fail on write if column case is not identical on both sides
@@ -109,14 +110,18 @@ class SchemaScrubber(
    * @param dataType
    * @return
    */
-  private def sanitizeSchema(dataType: DataType, parentSanitizations: List[SanitizeRule] = List()): DataType = {
+  private def sanitizeSchema(
+                              dataType: DataType,
+                              parentSanitizations: List[SanitizeRule] = List()
+                            ): DataType = {
     dataType match {
       case dt: StructType =>
-        val dtStruct = dt.asInstanceOf[StructType]
-        dtStruct.copy(fields = generateUniques(dtStruct.fields.map(f => sanitizeFields(f, parentSanitizations))))
+        val fieldsToCleanse = if (cullNullTypes) {
+          dt.fields.filterNot(_.dataType == NullType)
+        } else dt.fields
+        dt.copy(fields = generateUniques(fieldsToCleanse.map(f => sanitizeFields(f, parentSanitizations))))
       case dt: ArrayType =>
-        val dtArray = dt.asInstanceOf[ArrayType]
-        dtArray.copy(elementType = sanitizeSchema(dtArray.elementType))
+        dt.copy(elementType = sanitizeSchema(dt.elementType))
       case _ => dataType
     }
   }
@@ -159,10 +164,11 @@ object SchemaScrubber {
    */
   def apply(
              sanitizationRules: List[SanitizeRule] = _defaultSanitizationRules,
-             exceptions: Array[SanitizeFieldException] = _noExceptions
+             exceptions: Array[SanitizeFieldException] = _noExceptions,
+             cullNullTypes: Boolean = false
            ): SchemaScrubber = {
     new SchemaScrubber(
-      sanitizationRules, exceptions
+      sanitizationRules, exceptions, cullNullTypes
     )
   }
 
