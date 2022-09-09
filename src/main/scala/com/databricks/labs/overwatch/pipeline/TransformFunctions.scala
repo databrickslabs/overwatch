@@ -362,15 +362,17 @@ object TransformFunctions {
      * @param newStructFieldName If not provided, the original struct will be morphed, if a secondary struct is desired
      *                           provide a name here and the original struct will not be altered.
      *                           New, named struct will be added to the top level
+     * @param caseSensitive whether or not the field names are case sensitive
      * @return
      */
     def appendToStruct(
                         structFieldName: String,
                         namedColumns: Array[NamedColumn],
                         overrideExistingStructCols: Boolean = false,
-                        newStructFieldName: Option[String] = None
+                        newStructFieldName: Option[String] = None,
+                        caseSensitive: Boolean = false
                       ): DataFrame = {
-      require(df.hasFieldNamed(structFieldName),
+      require(df.hasFieldNamed(structFieldName, caseSensitive),
         s"ERROR: Dataframe must contain the struct field to be altered. " +
         s"$structFieldName was not found. Struct fields include " +
         s"${df.schema.fields.filter(_.dataType.typeName == "struct").map(_.name).mkString(", ")}"
