@@ -36,7 +36,7 @@ developers := List(Developer("geeksheikh", "Daniel Tomes", "daniel@databricks.co
 licenses += ("Databricks", url("https://github.com/databrickslabs/overwatch/blob/develop/LICENSE"))
 publishMavenStyle := true
 
-parallelExecution in ThisBuild := false //TO avoid object collision happening in PipelineFunctionsTest
+parallelExecution in Test := false //TO avoid object collision happening in PipelineFunctionsTest
 
 publishTo := Some(
   if (version.value.endsWith("SNAPSHOT"))
