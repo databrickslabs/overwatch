@@ -110,7 +110,7 @@ trait BronzeTransforms extends SparkSessionWrapper  {
                              orgId: String
                            ): Unit = {
     if (!errorsDF.isEmpty) {
-      database.write(
+      database.writeWithRetry(
         errorsDF.withColumn("organization_id", lit(orgId)),
         errorsTarget,
         pipelineSnapTS.asColumnTS
@@ -181,7 +181,7 @@ trait BronzeTransforms extends SparkSessionWrapper  {
       }
 
       if (exists && isFirstRun) { // Path cannot already exist on first run
-        val errMsg = s"$baseErrMsg\nPATH: ${p} is not empty. First run requires empty checkpoints."
+        val errMsg = s"$baseErrMsg\nPATH: ${p} is not empty. First run requires empty checkpoints. exists:${exists}, isFirstRun:${isFirstRun}"
         logger.log(Level.ERROR, errMsg)
         println(errMsg)
         throw new BadConfigException(errMsg)
@@ -502,7 +502,7 @@ trait BronzeTransforms extends SparkSessionWrapper  {
           responseCounter = responseCounter + 1
       }
     }
-    val timeoutThreshold = 300000 // 5 minutes
+    val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
     var currentSleepTime = 0
     var accumulatorCountWhileSleeping = accumulator.value
     while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
@@ -636,7 +636,7 @@ trait BronzeTransforms extends SparkSessionWrapper  {
       .withColumn("failed", lit(false))
       .withColumn("organization_id", lit(orgId))
     //      .coalesce(4) // narrow, short table -- each append will == spark event log files processed
-    database.writeWithRetry(fileTrackerDF, trackerTarget, pipelineSnapTime,Array(),Some(daysToProcess)) //needs retry
+    database.writeWithRetry(fileTrackerDF, trackerTarget, pipelineSnapTime,Array(),Some(daysToProcess))
   }
 
   /**

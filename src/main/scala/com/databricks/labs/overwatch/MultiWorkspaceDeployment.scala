@@ -11,9 +11,9 @@ import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.util.Date
+import java.util.concurrent.Executors
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.forkjoin.ForkJoinPool
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 object MultiWorkspaceDeployment extends SparkSessionWrapper {
 
@@ -162,7 +162,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val primordialDateString: Date = config.getAs(ConfigColumns.primordial_date.toString)
       val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
       val stringDate = dateFormat.format(primordialDateString)
-      //val apiEnv = ApiEnv()
+      val apiEnvConfig = ApiEnvConfig(successBatchSize = 10)
+
       val params = OverwatchParams(
         auditLogConfig = AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig)),
         dataTarget = Some(dataTarget),
@@ -176,8 +177,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         externalizeOptimize = true,
         apiURL = Some(config.getAs(ConfigColumns.workspace_url.toString)),
         organizationID = Some(config.getAs(ConfigColumns.workspace_id.toString)),
+        apiEnvConfig = Some(apiEnvConfig),
         tempWorkingDir = ""
       )
+      println( JsonUtils.objToJson(params).compactString)
       JsonUtils.objToJson(params).compactString
     } catch {
       case exception: Exception =>
@@ -302,32 +305,41 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   def deploy(parallelism: Int = 4, zones: String = "Bronze"): Unit = {
     val processingStartTime = System.currentTimeMillis();
     setParallelism(parallelism)
-    println("Pallalesism :" + parallelism)
+    println("ParallelismLevel :" + parallelism)
     val deploymentValidation = DeploymentValidation(configCsvPath, outputPath, parallelism, deploymentId)
     deploymentValidation.performMandatoryValidation
     val dataFrame = deploymentValidation.makeDataFrame()
     setInputDataFrame(dataFrame)
     snapshotConfig(dataFrame)
-    val workspace = getWorkspace(dataFrame.head())
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-    val mapParams = dataFrame.collect().map(buildParams).filter(args => args != null)
-    val prams =mapParams.par//building arguments
-    prams.tasksupport = taskSupport
+    val prams = dataFrame.collect().map(buildParams).filter(args => args != null)
     val zoneArray = zones.split(",")
     zoneArray.foreach(zone => {
-      zone match {
-        case "Bronze" =>
-          println("*************Deploying BRONZE***********************")
-          prams.foreach(startBronzeDeployment)
-          println("*************BRONZE Deployment Completed***********************")
-        case "Silver" =>
-          println("*************Deploying SILVER***********************")
-          prams.filter(args => args != null).map(startSilverDeployment)
-          println("*************SILVER Deployment Completed***********************")
-        case "Gold" =>
-          println("*************Deploying GOLD***********************")
-          prams.filter(args => args != null).map(startGoldDeployment)
-          println("*************GOLD Deployment Completed***********************")
+      var responseCounter = 0
+      implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
+      prams.foreach(compactString => {
+        val future = Future {
+          zone match {
+            case "Bronze" =>
+              println("*************Deploying BRONZE***********************")
+              startBronzeDeployment(compactString)
+              println("*************BRONZE Deployment Completed***********************")
+            case "Silver" =>
+              println("*************Deploying SILVER***********************")
+              startSilverDeployment(compactString)
+              println("*************SILVER Deployment Completed***********************")
+            case "Gold" =>
+              println("*************Deploying GOLD***********************")
+              startGoldDeployment(compactString)
+              println("*************GOLD Deployment Completed***********************")
+          }
+        }
+        future.onComplete {
+          case _ =>
+            responseCounter = responseCounter + 1
+        }
+      })
+      while (responseCounter < prams.length) {
+        Thread.sleep(5000)
       }
     })
     saveDeploymentReport(deploymentReport.toDS, deploymentValidation.makeDataFrame().head().getAs(ConfigColumns.etl_storage_prefix.toString), "deploymentReport")

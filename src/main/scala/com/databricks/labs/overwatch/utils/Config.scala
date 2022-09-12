@@ -328,7 +328,7 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret],apiURL:Option[String]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret], apiURL: Option[String], apiEnvConfig: Option[ApiEnvConfig]): this.type = {
     var rawToken = ""
     var scope = ""
     var key = ""
@@ -338,7 +338,7 @@ class Config() {
         //For multiworksspace deployment get api url from config file
         //For single deployment get the api url from notebook context.
         _workspaceUrl = apiURL.getOrElse(dbutils.notebook.getContext().apiUrl.get)
-        println("setting workspace URL"+_workspaceUrl)
+        println("setting workspace URL" + _workspaceUrl)
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key
@@ -365,7 +365,10 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, 200, 500, runID, false, 4))
+      val derivedApiConfig = apiEnvConfig.getOrElse(ApiEnvConfig(successBatchSize = 200, errorBatchSize = 500))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion,
+        derivedApiConfig.successBatchSize, derivedApiConfig.errorBatchSize, runID,
+        derivedApiConfig.enableUnsafeSSL, derivedApiConfig.threadPoolSize, derivedApiConfig.apiWaitingTime))
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>

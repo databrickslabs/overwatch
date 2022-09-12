@@ -200,7 +200,7 @@ class Pipeline(
         withCreateDate = false,
         _mode = WriteMode.overwrite
       )
-      database.write(updatedDBUCostDetail, overwriteTarget, lit(null).cast("timestamp"))
+      database.writeWithRetry(updatedDBUCostDetail, overwriteTarget, lit(null).cast("timestamp"))
     }
 
   }
@@ -213,7 +213,7 @@ class Pipeline(
       DBUCostDetail(config.organizationId, "jobsLight", config.contractJobsLightDBUPrice, primordialTime.asLocalDateTime.toLocalDate, None, true),
     ).toDF().coalesce(1)
 
-    database.write(costDetailDF, BronzeTargets.dbuCostDetail, pipelineSnapTime.asColumnTS)
+    database.writeWithRetry(costDetailDF, BronzeTargets.dbuCostDetail, pipelineSnapTime.asColumnTS)//
     if (config.databaseName != config.consumerDatabaseName) BronzeTargets.dbuCostDetailViewTarget.publish("*")
   }
 

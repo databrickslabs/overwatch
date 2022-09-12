@@ -217,7 +217,7 @@ class Module(
   private def finalizeModule(report: ModuleStatusReport): Unit = {
     pipeline.updateModuleState(report.simple)
     if (!pipeline.readOnly) {
-      pipeline.database.write(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
+      pipeline.database.writeWithRetry(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
     }
   }
 

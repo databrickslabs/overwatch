@@ -35,9 +35,9 @@ case class DatabricksContractPrices(
                                      jobsLightDBUCostUSD: Double = 0.10
                                    )
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="",enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4)
+case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="",enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4,apiWaitingTime:Long=300000)
 
-
+case class ApiEnvConfig(successBatchSize:Int=50,errorBatchSize:Int=50,enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4,apiWaitingTime:Long=300000)
 
 case class ValidatedColumn(
                             column: Column,
@@ -95,6 +95,7 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            externalizeOptimize: Boolean = false,
                            apiURL: Option[String] = None,
                            organizationID: Option[String] = None,
+                           apiEnvConfig: Option[ApiEnvConfig]= None,
                            tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )
 
@@ -193,6 +194,7 @@ case class DeploymentValidationReport(
                                      )
 
 case class MultiWSDeploymentReport(
+                                    zone:String,
                                     workspaceDetails: Option[String],
                                     errorMsg:  String,
                                     deploymentId: Option[String]

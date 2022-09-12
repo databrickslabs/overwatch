@@ -192,7 +192,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       config.runID
     )
 
-    database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
+    database.writeWithRetry(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
 
     val rawProcessCompleteMsg = "Azure audit ingest process complete"
     if (config.debugFlag) println(rawProcessCompleteMsg)
