@@ -49,7 +49,11 @@ class ParamDeserializerTest extends AnyFunSpec {
         None,
         IntelligentScaling(),
         Some("myTestWorkspace"),
-        false
+        false,
+        None,
+        None,
+        None,
+        ""
       )
       assertResult(expected)(mapper.readValue[OverwatchParams](incomplete))
 
