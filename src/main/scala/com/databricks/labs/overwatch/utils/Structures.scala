@@ -37,7 +37,7 @@ case class DatabricksContractPrices(
 
 case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String,successBatchSize:Int=50,errorBatchSize:Int=50,runID:String="",enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4,apiWaitingTime:Long=300000)
 
-case class ApiEnvConfig(successBatchSize:Int=50,errorBatchSize:Int=50,enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4,apiWaitingTime:Long=300000)
+case class ApiEnvConfig(successBatchSize:Int=200,errorBatchSize:Int=500,enableUnsafeSSL:Boolean=false,threadPoolSize:Int=4,apiWaitingTime:Long=300000)
 
 case class ValidatedColumn(
                             column: Column,

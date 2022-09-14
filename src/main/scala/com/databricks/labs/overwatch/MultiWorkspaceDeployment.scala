@@ -17,10 +17,20 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 object MultiWorkspaceDeployment extends SparkSessionWrapper {
 
-  def apply(configCsvPath: String, reportOutputPath: String): MultiWorkspaceDeployment = {
+
+  def apply(configCsvPath: String, tempOutputPath: String,apiEnvConfig: ApiEnvConfig): MultiWorkspaceDeployment = {
     new MultiWorkspaceDeployment()
       .setConfigCsvPath(configCsvPath)
-      .setOutputPath(reportOutputPath)
+      .setOutputPath(tempOutputPath)
+      .setApiEnvConfig(apiEnvConfig)
+      .initDeployment()
+  }
+
+
+  def apply(configCsvPath: String, tempOutputPath: String): MultiWorkspaceDeployment = {
+    new MultiWorkspaceDeployment()
+      .setConfigCsvPath(configCsvPath)
+      .setOutputPath(tempOutputPath)
       .initDeployment()
   }
 
@@ -51,6 +61,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private var _inputDataFrame: DataFrame = _
 
+  private var _apiEnvConfig: ApiEnvConfig = _
+
+  protected def apiEnvConfig:ApiEnvConfig = _apiEnvConfig
+
   protected def inputDataFrame: DataFrame = _inputDataFrame
 
   protected def parallelism: Int = _parallelism
@@ -65,6 +79,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private var _pipelineSnapTime: Long = _
 
+  private[overwatch] def setApiEnvConfig(value: ApiEnvConfig): this.type = {
+    _apiEnvConfig = value
+    this
+  }
   private[overwatch] def setInputDataFrame(value: DataFrame): this.type = {
     _inputDataFrame = value
     this
@@ -162,8 +180,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val primordialDateString: Date = config.getAs(ConfigColumns.primordial_date.toString)
       val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
       val stringDate = dateFormat.format(primordialDateString)
-      val apiEnvConfig = ApiEnvConfig(successBatchSize = 10)
-
+      if(apiEnvConfig==null){
+         println("apienvconfig is resetting")
+         setApiEnvConfig( ApiEnvConfig(successBatchSize = 200, errorBatchSize = 500))
+      }
       val params = OverwatchParams(
         auditLogConfig = AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig)),
         dataTarget = Some(dataTarget),
@@ -180,7 +200,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         apiEnvConfig = Some(apiEnvConfig),
         tempWorkingDir = ""
       )
-      println( JsonUtils.objToJson(params).compactString)
       JsonUtils.objToJson(params).compactString
     } catch {
       case exception: Exception =>
@@ -272,6 +291,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     configDF
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
+      .withColumn("configFile",lit(configCsvPath))
       .write.format("delta").mode("append").save(s"""${configWriteLocation}/report/configTable""")
   }
 
