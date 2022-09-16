@@ -1,8 +1,5 @@
 package com.databricks.labs.overwatch.pipeline
 
-import akka.actor.Actor
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.BatchRunner.spark
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
@@ -19,7 +16,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
-import java.time.{Duration, LocalDateTime}
+import java.time.LocalDateTime
 import java.util
 import java.util.Collections
 import java.util.concurrent.Executors
