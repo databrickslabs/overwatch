@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.BatchRunner.spark
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
@@ -210,14 +211,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     consumerDBLocation: String,
                                     isFirstRun: Boolean,
                                     organizationId: String,
-                                    runID: String
-                                   ): DataFrame = {
+                                    runID: String): DataFrame = {
+    import com.databricks.labs.overwatch.eventhubs.AadClientAuthentication
 
-    val connectionString = ConnectionStringBuilder(PipelineFunctions.parseEHConnectionString(ehConfig.connectionString))
+    val connectionString = ConnectionStringBuilder(
+      PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
       .setEventHubName(ehConfig.eventHubName)
       .build
 
-    val eventHubsConf = try {
+    val ehConf = try {
       validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
 
       if (isFirstRun) {
@@ -240,6 +242,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setMaxEventsPerTrigger(ehConfig.maxEventsPerTrigger)
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
+
+    val eventHubsConf = if (ehConfig.azureClientId.isDefined) {
+      val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
+        "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
+        "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
+        "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
+      AadAuthInstance.addAadAuthParams(ehConf, aadParams)
+    } else
+      ehConf
 
     spark.readStream
       .format("eventhubs")

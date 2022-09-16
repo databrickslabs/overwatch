@@ -15,12 +15,12 @@ trait ApiMeta {
   protected var _dataframeColumn: String = "*"
   protected var _apiCallType: String = _
   protected var _storeInTempLocation = false
-  protected val _apiV = "api/2.0"
-  protected var _tuplePaginationObject = false
+  protected var _apiV = "api/2.0"
+  protected var _isDerivePaginationLogic = false
 
   protected[overwatch] def paginationKey: String = _paginationKey
 
-  protected[overwatch]  def paginationToken: String = _paginationToken
+  protected[overwatch] def paginationToken: String = _paginationToken
 
   protected[overwatch] def dataframeColumn: String = _dataframeColumn
 
@@ -30,15 +30,20 @@ trait ApiMeta {
 
   protected[overwatch] def apiV: String = _apiV
 
-  protected[overwatch] def tuplePaginationObject: Boolean = _tuplePaginationObject
+  protected[overwatch] def isDerivePaginationLogic: Boolean = _isDerivePaginationLogic
+
+  private[overwatch] def setApiV(value: String): this.type = {
+    _apiV = value
+    this
+  }
 
   private[overwatch] def setStoreInTempLocation(value: Boolean): this.type = {
     _storeInTempLocation = value
     this
   }
 
-  private[overwatch] def setTuplePaginationObject(value: Boolean): this.type = {
-    _tuplePaginationObject = value
+  private[overwatch] def setIsDerivePaginationLogic(value: Boolean): this.type = {
+    _isDerivePaginationLogic = value
     this
   }
 
@@ -67,8 +72,8 @@ trait ApiMeta {
     jsonObject.get(this._paginationKey).toString
   }
 
-  private[overwatch] def getPaginationLogicForTuple(jsonObject: JsonNode): (String, String) = {
-    (null, null) //Implement logic according to the API call
+  private[overwatch] def getPaginationLogic(jsonObject: JsonNode, requestMap: Map[String, String]): Map[String, String] = {
+    null
   }
 
   private[overwatch] def hasNextPage(jsonObject: JsonNode): Boolean = {
@@ -82,7 +87,7 @@ trait ApiMeta {
        |apiCallType: ${apiCallType}
        |storeInTempLocation: ${storeInTempLocation}
        |apiV: ${apiV}
-       |tuplePaginationObject: ${tuplePaginationObject}
+       |isDerivePaginationLogic: ${isDerivePaginationLogic}
        |""".stripMargin
   }
 
@@ -126,19 +131,21 @@ class SqlHistoryQueriesApi extends ApiMeta {
   setPaginationToken("next_page_token")
   setDataframeColumn("res")
   setApiCallType("GET")
-  setTuplePaginationObject(true)
+  setIsDerivePaginationLogic(true)
 
   private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
     jsonObject.get(paginationKey).asBoolean()
   }
 
-  private[overwatch] override def getPaginationLogicForTuple(jsonObject: JsonNode): (String, String) = {
+  private[overwatch] override def getPaginationLogic(jsonObject: JsonNode, requestMap: Map[String, String]): Map[String, String] = {
     if (jsonObject.get(paginationKey).asBoolean()) { //Pagination key for sql/history/queries can return true or false
       val _jsonKey = "page_token"
       val _jsonValue = jsonObject.get(paginationToken).asText()
-      (_jsonKey, _jsonValue)
+      Map(
+        s"${_jsonKey}" -> s"${_jsonValue}"
+      )
     } else {
-      (null, null)
+      null
     }
   }
 }
@@ -173,6 +180,25 @@ class ClusterListApi extends ApiMeta {
 class JobListApi extends ApiMeta {
   setDataframeColumn("jobs")
   setApiCallType("GET")
+  setPaginationKey("has_more")
+  setIsDerivePaginationLogic(true)
+
+  private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
+    jsonObject.get(paginationKey).asBoolean()
+  }
+
+  private[overwatch] override def getPaginationLogic(jsonObject: JsonNode, requestMap: Map[String, String]): Map[String, String] = {
+    val limit = Integer.parseInt(requestMap.get("limit").get)
+    var offset = Integer.parseInt(requestMap.get("offset").get)
+    val expand_tasks = requestMap.get("expand_tasks").get
+    offset = offset + limit
+    Map(
+      "limit" -> s"${limit}",
+      "expand_tasks" -> s"${expand_tasks}",
+      "offset" -> s"${offset}"
+    )
+  }
+
 }
 
 class ClusterEventsApi extends ApiMeta {
