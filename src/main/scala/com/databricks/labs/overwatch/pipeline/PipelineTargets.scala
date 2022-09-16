@@ -191,9 +191,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("job_id", "run_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      statsColumns = "created_time, creator_user_name, job_id, run_id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
-      partitionBy = Seq("organization_id"),
-      masterSchema = Some(Schema.jobSnapMinimumSchema)
+      partitionBy = Seq("organization_id")
     )
 
     lazy private[overwatch] val instanceProfileSnapshotTarget: PipelineTable = PipelineTable(
