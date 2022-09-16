@@ -557,14 +557,15 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val sqlHistoryTarget: PipelineTable = PipelineTable(
       name = "sql_history_gold",
-      _keys = Array("endpoint_id", "warehouse_id", "query_id", "Pipeline_SnapTS"),
+      _keys = Array("warehouse_id", "query_id", "query_start_time_ms"),
       config,
-      incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      _mode = WriteMode.merge,
+      incrementalColumns = Array("query_start_time_ms"),
+      partitionBy = Seq("organization_id")
     )
 
     lazy private[overwatch] val sqlHistoryViewTarget: PipelineView = PipelineView(
-      name = "sqlHistory_",
+      name = "sqlHistory",
       sqlHistoryTarget,
       config
     )

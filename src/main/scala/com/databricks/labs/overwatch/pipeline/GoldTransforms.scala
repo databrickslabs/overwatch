@@ -1028,9 +1028,9 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val sqlHistoryViewColumnMapping: String =
     """
-      |organization_id,workspace_name,canSubscribeToLiveQuery,channel_used,dbsql_version,name,duration,endpoint_id,error_message,executed_as_user_id,
-      |executed_as_user_name,execution_end_time_ms,is_final,lookup_key,plans_state,query_end_time_ms,query_id,
-      |query_start_time_ms,query_text,rows_produced,spark_ui_url,statement_type,status,user_id,user_name,warehouse_id,
+      |organization_id,workspace_name,warehouse_id,query_id,query_end_time_ms,user_name,user_id,
+      |executed_as_user_id,executed_as_user_name,duration,error_message,execution_end_time_ms,
+      |query_start_time_ms,query_text,rows_produced,spark_ui_url,statement_type,status,
       |compilation_time_ms,execution_time_ms,network_sent_bytes,photon_total_time_ms,
       |pruned_bytes,pruned_files_count,read_bytes,read_cache_bytes,read_files_count,read_partitions_count,
       |read_remote_bytes,result_fetch_time_ms,result_from_cache,rows_produced_count,rows_read_count,

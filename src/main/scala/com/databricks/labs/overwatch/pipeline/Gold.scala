@@ -65,6 +65,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           sparkStreamModule
         )
       }
+      case OverwatchScope.sqlHistory => {
+        Array(sqlHistoryModule)
+      }
       case _ => Array[Module]()
     }
   }
@@ -222,7 +225,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sqlHistoryModule = Module(3020, "Gold_SqlHistory", this, Array(2020), 6.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSqlHistoryProcess = ETLDefinition(
-    SilverTargets.sqlHistoryTarget.asIncrementalDF(sqlHistoryModule),
+    SilverTargets.sqlHistoryTarget.asIncrementalDF(sqlHistoryModule, GoldTargets.sqlHistoryTarget.incrementalColumns),
     append(GoldTargets.sqlHistoryTarget)
   )
 
@@ -333,6 +336,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
         GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
         GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+      }
+      case OverwatchScope.sqlHistory => {
+        GoldTargets.sqlHistoryViewTarget.publish(sqlHistoryViewColumnMapping)
       }
       case _ =>
     }
