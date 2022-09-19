@@ -505,9 +505,9 @@ object Schema extends SparkSessionWrapper {
   ))
 
   val sqlHistorySnapMinimumSchema: StructType = StructType(Seq(
-    StructField("warehouse_id", StringType, nullable = true),
-    StructField("organization_id", StringType, nullable = true),
-    StructField("query_id", StringType, nullable = true),
+    StructField("warehouse_id", StringType, nullable = false),
+    StructField("organization_id", StringType, nullable = false),
+    StructField("query_id", StringType, nullable = false),
     StructField("query_start_time_ms", LongType, nullable = true),
     StructField("metrics",
       StructType(Seq(
