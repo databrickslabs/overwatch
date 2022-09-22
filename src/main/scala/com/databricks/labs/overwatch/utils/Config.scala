@@ -44,6 +44,7 @@ class Config() {
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
   private var _contractJobsLightDBUPrice: Double = _
+  private var _isMultiworkspaceDeployment: Boolean = false
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -53,6 +54,7 @@ class Config() {
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
+  def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
 
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -196,6 +198,12 @@ class Config() {
     this
   }
 
+  private[overwatch] def setIsMultiworkspaceDeployment(value: Boolean): this.type = {
+    _isMultiworkspaceDeployment = value
+    this
+  }
+
+
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value
     this
@@ -328,7 +336,7 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret], apiURL: Option[String], apiEnvConfig: Option[ApiEnvConfig]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret], apiURL: Option[String]): this.type = {
     var rawToken = ""
     var scope = ""
     var key = ""
@@ -365,10 +373,7 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      val derivedApiConfig = apiEnvConfig.getOrElse(ApiEnvConfig(successBatchSize = 200, errorBatchSize = 500))
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion,
-        derivedApiConfig.successBatchSize, derivedApiConfig.errorBatchSize, runID,
-        derivedApiConfig.enableUnsafeSSL, derivedApiConfig.threadPoolSize, derivedApiConfig.apiWaitingTime))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, 200, 500, runID, false, 4))
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>

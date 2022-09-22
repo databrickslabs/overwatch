@@ -769,6 +769,8 @@ object Schema extends SparkSessionWrapper {
     StructField("eh_scope_key", StringType, nullable = true),
     StructField("interactive_dbu_price", DoubleType, nullable = true),
     StructField("automated_dbu_price", DoubleType, nullable = true),
+    StructField("sql_compute_dbu_price", DoubleType, nullable = true),
+    StructField("jobs_light_dbu_price", DoubleType, nullable = true),
     StructField("max_days", IntegerType, nullable = true),
     StructField("excluded_scopes", StringType, nullable = true),
     StructField("active", BooleanType, nullable = true),

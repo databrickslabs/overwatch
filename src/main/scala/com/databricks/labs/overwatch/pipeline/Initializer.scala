@@ -286,7 +286,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
     if (isMultiworkspaceDeployment) multiWorkspaceOverrideOrganizationId(rawParams.organizationID.get)
     config.setInputConfig(rawParams)
-
+    config.setIsMultiworkspaceDeployment(isMultiworkspaceDeployment)
 
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
@@ -328,8 +328,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       if (keyCheck.length == 0) throw new BadConfigException(s"Key ${tokenSecret.get.key} does not exist " +
         s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
         s"available and accessible to this account.")
-      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)), rawParams.apiURL,rawParams.apiEnvConfig)
-    } else config.registerWorkspaceMeta(None, None,None)
+      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)), rawParams.apiURL)
+    } else config.registerWorkspaceMeta(None, None)
 
     // Validate data Target
     if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)

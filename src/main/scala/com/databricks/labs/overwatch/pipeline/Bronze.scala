@@ -165,7 +165,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         sparkEventLogsModule.daysToProcess,
         BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, 30),
         BronzeTargets.clustersSnapshotTarget,
-        sparkLogClusterScaleCoefficient
+        sparkLogClusterScaleCoefficient,
+        config.apiEnv,
+        config.isMultiworkspaceDeployment
       ),
       generateEventLogsDF(
         database,
