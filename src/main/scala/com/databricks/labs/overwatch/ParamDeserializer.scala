@@ -168,7 +168,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val tempWorkingDir = getOptionString(masterNode, "tempWorkingDir").getOrElse("") // will be set after data target validated if not overridden
     val apiURL = getOptionString(masterNode,"apiURL")
     val organizationID = getOptionString(masterNode,"organizationID")
-    val apiEnvConfig = if (masterNode.has("apiEnvConfig")) {
+    /*val apiEnvConfig = if (masterNode.has("apiEnvConfig")) {
       Some(ApiEnvConfig(
         getOptionInt(masterNode, "apiEnvConfig.successBatchSize").getOrElse(50),
         getOptionInt(masterNode, "apiEnvConfig.errorBatchSize").getOrElse(50),
@@ -179,7 +179,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     } else {
       None
     }
-
+*/
     OverwatchParams(
       auditLogConfig,
       token,
@@ -194,7 +194,6 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       externalizeOptimize,
       apiURL,
       organizationID,
-      apiEnvConfig,
       tempWorkingDir
     )
   }

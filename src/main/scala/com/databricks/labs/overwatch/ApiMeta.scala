@@ -105,12 +105,18 @@ class ApiMetaFactory {
       case "workspace/list" => new WorkspaceListApi
       case "sql/history/queries" => new SqlHistoryQueriesApi
       case "clusters/resize" => new ClusterResizeApi
+      case "/jobs/runs/get" => new JobRunGetApi
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }
     logger.log(Level.INFO, meta.toString)
     meta
   }
 }
+
+class JobRunGetApi extends ApiMeta{
+  setApiCallType("GET")
+}
+
 
 class ClusterResizeApi extends ApiMeta {
   setApiCallType("POST")

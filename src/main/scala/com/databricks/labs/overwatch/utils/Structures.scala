@@ -95,7 +95,6 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            externalizeOptimize: Boolean = false,
                            apiURL: Option[String] = None,
                            organizationID: Option[String] = None,
-                           apiEnvConfig: Option[ApiEnvConfig]= None,
                            tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )
 

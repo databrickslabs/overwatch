@@ -15,6 +15,12 @@ import java.util.concurrent.Executors
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
+/***
+ * MultiWorkspaceDeployment class is the main class which runs the deployment for multiple workspaces.
+ * @params configCsvPath: path of the csv file which will contain the different configs for the workspaces.
+ * @params tempOutputPath: location which will be used as a temp storage.It will be automatically cleaned after each run.
+ * @params apiEnvConfig: configs related to api call.
+ */
 object MultiWorkspaceDeployment extends SparkSessionWrapper {
 
 
@@ -169,6 +175,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.getAs(ConfigColumns.eh_name.toString), auditRawEventsPrefix = ehStatePath)
       val interactiveDBUPrice: Double = config.getAs(ConfigColumns.interactive_dbu_price.toString)
       val automatedDBUPrice: Double = config.getAs(ConfigColumns.automated_dbu_price.toString)
+      val sqlComputerDBUPrice: Double = config.getAs(ConfigColumns.sql_compute_dbu_price.toString)
+      val jobsLightDBUPrice: Double = config.getAs(ConfigColumns.jobs_light_dbu_price.toString)
       val customWorkspaceName: String = config.getAs(ConfigColumns.workspace_name.toString)
       val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts".split(",").toBuffer //TODO add scope exclusing and active flag
       if (config.getAs(ConfigColumns.excluded_scopes.toString) != null) {
@@ -191,13 +199,12 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         badRecordsPath = Some(badRecordsPath),
         overwatchScope = Some(standardScopes),
         maxDaysToLoad = maxDaysToLoad,
-        databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice),
+        databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice,sqlComputerDBUPrice , jobsLightDBUPrice),
         primordialDateString = Some(stringDate),
         workspace_name = Some(customWorkspaceName),
         externalizeOptimize = true,
         apiURL = Some(config.getAs(ConfigColumns.workspace_url.toString)),
         organizationID = Some(config.getAs(ConfigColumns.workspace_id.toString)),
-        apiEnvConfig = Some(apiEnvConfig),
         tempWorkingDir = ""
       )
       JsonUtils.objToJson(params).compactString
@@ -285,7 +292,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private def snapshotConfig(configDF: DataFrame) = {
     var configWriteLocation = configDF.head().getAs(ConfigColumns.etl_storage_prefix.toString).toString
-    if (!configWriteLocation.startsWith("dbfs:")) {
+    if (!configWriteLocation.startsWith("dbfs:") && !configWriteLocation.startsWith("s3") && !configWriteLocation.startsWith("abfss")) {
       configWriteLocation = s"""dbfs:${configWriteLocation}"""
     }
     configDF
@@ -297,7 +304,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private def snapShotValidation(validationDF: Dataset[DeploymentValidationReport], path: String, reportName: String): Unit = {
     var validationPath = path
-    if (!path.startsWith("dbfs:")) {
+    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
       validationPath = s"""dbfs:${path}"""
     }
     validationDF
@@ -310,7 +317,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private def saveDeploymentReport(validationDF: Dataset[MultiWSDeploymentReport], path: String, reportName: String): Unit = {
     var reportPath = path
-    if (!path.startsWith("dbfs:")) {
+    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
       reportPath = s"""dbfs:${path}"""
     }
     validationDF
@@ -340,7 +347,9 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         val future = Future {
           zone match {
             case "Bronze" =>
-              println("*************Deploying BRONZE***********************")
+              var runNotifyMsg ="*************Deploying BRONZE***********************"
+              println(runNotifyMsg)
+              logger.log(Level.INFO, runNotifyMsg)
               startBronzeDeployment(compactString)
               println("*************BRONZE Deployment Completed***********************")
             case "Silver" =>

@@ -302,7 +302,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
       } else {
         val msg =
           s"""ReValidate the folder existence
-             | Make sure folder with required date folder exist inside ${auditlogprefix_source_aws}
+             | Make sure folder with required date folder exist inside ${auditlogprefix_source_aws}/workspaceId=${workspace_id}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
@@ -577,5 +577,5 @@ object ConfigColumns extends Enumeration {
   val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,
   etl_storage_prefix, etl_database_name, consumer_database_name, secret_scope,
   secret_key_dbpat, auditlogprefix_source_aws, eh_name, eh_scope_key, scopes,
-  interactive_dbu_price, automated_dbu_price, max_days, excluded_scopes, active, deploymentId = Value
+  interactive_dbu_price, automated_dbu_price,sql_compute_dbu_price,jobs_light_dbu_price, max_days, excluded_scopes, active, deploymentId = Value
 }

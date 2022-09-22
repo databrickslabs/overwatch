@@ -328,7 +328,7 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret], apiURL: Option[String], apiEnvConfig: Option[ApiEnvConfig]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret], apiURL: Option[String]): this.type = {
     var rawToken = ""
     var scope = ""
     var key = ""
@@ -365,10 +365,7 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      val derivedApiConfig = apiEnvConfig.getOrElse(ApiEnvConfig(successBatchSize = 200, errorBatchSize = 500))
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion,
-        derivedApiConfig.successBatchSize, derivedApiConfig.errorBatchSize, runID,
-        derivedApiConfig.enableUnsafeSSL, derivedApiConfig.threadPoolSize, derivedApiConfig.apiWaitingTime))
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, 200, 500, runID, false, 4))
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
