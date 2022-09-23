@@ -296,8 +296,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   // Failed tasks lose association with their chain
   protected def sparkTasks(
                             sparkEventsLag3D: DataFrame,
-                            fromTime: TimeTypes,
-                            untilTime: TimeTypes
+                            fromTime: TimeTypes
                           )(newSparkEvents: DataFrame): DataFrame = {
     val taskStart = simplifyTaskStart(sparkEventsLag3D).alias("taskStart")
     val taskEnd = simplifyTaskEnd(newSparkEvents).alias("taskEnd")

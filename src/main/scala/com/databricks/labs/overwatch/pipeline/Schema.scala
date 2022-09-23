@@ -743,6 +743,10 @@ object Schema extends SparkSessionWrapper {
           StructField("DiskBytesSpilled", LongType, nullable = true),
           StructField("ResultSize", LongType, nullable = true)
         )), nullable = true),
+      StructField("TaskExecutorMetrics",
+        StructType(Seq(
+          StructField("JVMHeapMemory", LongType, nullable = true)
+        )), nullable = true),
       StructField("TaskType", StringType, nullable = true),
       StructField("startDate", DateType, nullable = false),
       runtimeField("TaskRunTime"),

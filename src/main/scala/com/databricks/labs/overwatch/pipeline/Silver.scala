@@ -213,7 +213,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     sparkEventsTarget.asIncrementalDF(sparkTasksModule, sparkEventsTarget.incrementalColumns: _*),
     Seq(sparkTasks(
       sparkEventsTarget.asIncrementalDF(sparkTasksModule, 3, sparkEventsTarget.incrementalColumns: _*),
-      sparkTasksModule.fromTime, sparkTasksModule.untilTime
+      sparkTasksModule.fromTime
     )),
     append(SilverTargets.tasksTarget)
   )
