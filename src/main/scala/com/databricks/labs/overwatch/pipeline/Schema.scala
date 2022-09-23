@@ -143,6 +143,7 @@ object Schema extends SparkSessionWrapper {
         StructField("notebook_task", StringType, nullable = true),
         StructField("spark_python_task", StringType, nullable = true),
         StructField("spark_jar_task", StringType, nullable = true),
+        StructField("python_wheel_task", StringType, nullable = true),
         StructField("spark_submit_task", StringType, nullable = true),
         StructField("shell_command_task", StringType, nullable = true),
         StructField("pipeline_task", StringType, nullable = true),
@@ -305,7 +306,7 @@ object Schema extends SparkSessionWrapper {
     StructField("jar_params",ArrayType(StringType, containsNull = true), nullable = true),
     StructField("python_params",ArrayType(StringType, containsNull = true), nullable = true),
     StructField("spark_submit_params",ArrayType(StringType, containsNull = true), nullable = true),
-    StructField("notebook_params",ArrayType(StringType, containsNull = true), nullable = true)
+    StructField("notebook_params",MapType(StringType, StringType, valueContainsNull = true), nullable = true)
   ))
 
   val minimumSubmitRunDetailsSchema: StructType = StructType(Seq(

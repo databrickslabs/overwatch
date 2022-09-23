@@ -78,7 +78,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'min_retry_interval_millis,
       'schedule,
       'task_detail_legacy,
-      'is_from_dlt,
+      coalesce('is_from_dlt, lit(false)).alias("is_from_dlt"),
 //      'access_control_list, TODO -- add back after 503 is resolved -- cannot verifyMinSchema for array<struct>
       'aclPermissionSet,
 //      'grants, TODO -- add back after 503 is resolved -- cannot verifyMinSchema for array<struct>
@@ -757,22 +757,21 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val jobViewColumnMapping: String =
     """
-      |organization_id, workspace_name, job_id, action, unixTimeMS, timestamp, date, job_name, tags, job_type,
-      |job_format, existing_cluster_id, new_cluster, tasks, job_clusters, libraries, git_source, timeout_seconds,
-      |max_concurrent_runs, max_retries, retry_on_timeout, min_retry_interval_millis, schedule, task_detail_legacy,
-      |is_from_dlt, aclPermissionSet, targetUserId, session_id, request_id, user_agent, response, source_ip_address,
-      |created_by, created_ts, deleted_by, deleted_ts, last_edited_by, last_edited_ts
+      |organization_id, workspace_name, job_id, action, date, timestamp, job_name, tags, tasks, job_clusters,
+      |libraries, timeout_seconds, max_concurrent_runs, max_retries, retry_on_timeout, min_retry_interval_millis,
+      |schedule, existing_cluster_id, new_cluster, git_source, task_detail_legacy, is_from_dlt, aclPermissionSet,
+      |targetUserId, session_id, request_id, user_agent, response, source_ip_address, created_by, created_ts,
+      |deleted_by, deleted_ts, last_edited_by, last_edited_ts
       |""".stripMargin
 
   protected val jobRunViewColumnMapping: String =
     """
-      |organization_id, workspace_name, job_id, job_name, tags, run_id, job_run_id, task_run_id, task_key,
-      |cluster_id, cluster_name, multitask_parent_run_id, parent_run_id, task_detail, task_dependencies,
-      |task_runtime, task_execution_runtime, job_cluster_key, cluster_type, job_cluster, task_type, terminal_state,
-      |job_trigger_type, schedule, libraries, manual_override_params, repair_id, repair_details, run_name,
-      |timeout_seconds, retry_on_timeout, max_retries, min_retry_interval_millis, max_concurrent_runs,
-      |run_as_user_name, workflow_context, task_detail_legacy, submitRun_details,
-      |created_by, last_edited_by, request_detail, time_detail
+      |organization_id, workspace_name, job_id, job_name, run_id, run_name, multitask_parent_run_id, job_run_id,
+      |task_run_id, repair_id, task_key, cluster_type, cluster_id, cluster_name, job_cluster_key, job_cluster,
+      |new_cluster, tags, task_detail, task_dependencies, task_runtime, task_execution_runtime, task_type,
+      |terminal_state, job_trigger_type, schedule, libraries, manual_override_params, repair_details, timeout_seconds,
+      |retry_on_timeout, max_retries, min_retry_interval_millis, max_concurrent_runs, run_as_user_name, parent_run_id,
+      |workflow_context, task_detail_legacy, submitRun_details, created_by, last_edited_by, request_detail, time_detail
       |""".stripMargin
 
   protected val jobRunCostPotentialFactViewColumnMapping: String =

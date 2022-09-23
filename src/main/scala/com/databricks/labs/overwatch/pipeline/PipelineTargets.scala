@@ -346,6 +346,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("run_id", "startEpochMS"),
       config,
       _mode = WriteMode.merge,
+      zOrderBy = Array("job_id", "run_id"),
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -361,6 +362,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("run_id", "startEpochMS"),
       config,
       _mode = WriteMode.merge,
+      zOrderBy = Array("job_id", "run_id"),
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
