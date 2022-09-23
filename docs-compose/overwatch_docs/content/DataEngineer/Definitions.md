@@ -283,24 +283,40 @@ activeUntil*                |date             |The end date for the costs in thi
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 organization_id             |string           |Canonical workspace id
+workspace_name              |                 |
 job_id                      |string           |Databricks job id
 action                      |string           |Action type defined by the record. One of: create, reset, update, delete, resetJobAcl, changeJobAcl. More information about these actions can be found [here](https://docs.databricks.com/dev-tools/api/latest/jobs.html)
+date                        |                 |
 timestamp                   |timestamp        |timestamp the action took place
 job_name                    |string           |User defined name of job. NOTE, all jobs created through the UI are initialized with the name, "Untitled" therefore UI-created-named jobs will have an edit action to set the name. The cluster is also set to automated and defaulted on UI create as well
-job_type                    |string           |?? TBD ?? -- there is a job_task_type but that's in Run_id
+tags                        |                 |
+tasks                       |                 |
+job_clusters                |                 |
+libraries                   |                 |
 timeout_seconds             |string           |null unless specified, default == null. Timeout seconds specified in UI or via api
+max_concurrent_runs         |                 |
+max_retries                 |                 |
+retry_on_timeout            |                 |
+min_retry_interval_millis   |                 |
 schedule                    |string           |JSON - quartz cron expression of scheduled job and timezone_id
-notebook_path               |string           |null if job task does not point to a notebook task. If job points to notebook for execution, this is path to that notebook
-new_settings                |dynamic struct   |job action with "reset" or "update" where settings were changed. Includes complex type of cluster. [JobSettings Structure Found Here](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobsjobsettings)
-cluster                     |dyanmic struct   |Where relevant, contains the "new_cluster" spec when cluster definition is "new_cluster" or automated. If job definition points to existing cluster the cluster_id can be found here
-aclPermissionSet            |string           |Predefined aclPermissionsSet such as "Admin" or "Owner". More information on these can be found [HERE](https://docs.databricks.com/security/access-control/jobs-acl.html#jobs-access-control)
-grants                      |string JSON      |Array of explicit grants given to explicit user list
+existing_cluster_id         |                 |
+new_cluster                 |                 |
+git_source                  |                 |
+task_detail_legacy          |                 |
+is_from_dlt                 |                 |
+aclPermissionSet            |                 |
 target_user_id              |string           |Databricks canonical user id to which the aclPermissionSet is to be applied
 session_id                  |string           |session_id that requested the action
 request_id                  |string           |request_id of the action
 user_agent                  |string           |request origin such as browser, terraform, api, etc.
 response                    |struct           |response of api call including errorMessage, result, and statusCode (HTTP 200,400, etc)
 source_ip_address           |string           |Origin IP of action requested
+created_by                  |                 |
+created_ts                  |                 |
+deleted_by                  |                 |
+deleted_ts                  |                 |
+last_edited_by              |                 |
+last_edited_ts              |                 |
 
 #### JobRun
 [**SAMPLE**](/assets/TableSamples/jobrun.tab)
