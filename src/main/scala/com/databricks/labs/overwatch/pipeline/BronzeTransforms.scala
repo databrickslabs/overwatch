@@ -763,6 +763,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
           baseDF
             .withColumn("Timestamp", fixDupTimestamps)
             .drop("timestamp")
+            .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
+
 
         } catch {
           case e: Throwable => {
@@ -836,9 +838,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumnRenamed("executorId", "blackListedExecutorIds")
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
-        //TODO -- use map_filter to remove massive redundant useless column to save space
-        // asOf Spark 3.0.0
-        //.withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
+          .withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
 
         spark.conf.set("spark.sql.caseSensitive", "false")
         // TODO -- PERF test without unpersist, may be unpersisted before re-utilized
