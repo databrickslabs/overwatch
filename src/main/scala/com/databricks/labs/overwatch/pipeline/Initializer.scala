@@ -320,8 +320,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
         s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
         s"available and accessible to this account.")
 
-      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)))
-    } else config.registerWorkspaceMeta(None)
+      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)),rawParams.apiEnvConfig)
+    } else config.registerWorkspaceMeta(None,None)
 
     // Validate data Target
     if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)

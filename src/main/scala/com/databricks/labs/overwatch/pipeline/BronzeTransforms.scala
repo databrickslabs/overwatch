@@ -499,7 +499,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           responseCounter = responseCounter + 1
       }
     }
-    val timeoutThreshold = 300000 // 5 minutes
+    val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
     var currentSleepTime = 0
     var responseStateWhileSleeping = responseCounter
     while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {

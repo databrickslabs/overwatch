@@ -166,6 +166,22 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val workspace_name = getOptionString(masterNode, "workspace_name")
     val externalizeOptimize = getOptionBoolean(masterNode, "externalizeOptimize").getOrElse(false)
     val tempWorkingDir = getOptionString(masterNode, "tempWorkingDir").getOrElse("") // will be set after data target validated if not overridden
+    val apiEnvConfig = if (masterNode.has("apiEnvConfig")) {
+      Some(ApiEnvConfig(
+        getOptionInt(masterNode, "apiEnvConfig.successBatchSize").getOrElse(200),
+        getOptionInt(masterNode, "apiEnvConfig.errorBatchSize").getOrElse(500),
+        getOptionBoolean(masterNode, "apiEnvConfig.enableUnsafeSSL").getOrElse(false),
+        getOptionInt(masterNode, "apiEnvConfig.threadPoolSize").getOrElse(4),
+        getOptionLong(masterNode, "apiEnvConfig.apiWaitingTime").getOrElse(300000),
+        getOptionString(masterNode,"apiEnvConfig.proxyHost"),
+        getOptionInt(masterNode,"apiEnvConfig.proxyPort"),
+        getOptionString(masterNode,"apiEnvConfig.proxyUserName"),
+        getOptionString(masterNode,"apiEnvConfig.proxyPasswordScope"),
+        getOptionString(masterNode,"apiEnvConfig.proxyPasswordKey")
+      ))
+    } else {
+      None
+    }
 
     OverwatchParams(
       auditLogConfig,
@@ -179,6 +195,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       intelligentScalingConfig,
       workspace_name,
       externalizeOptimize,
+      apiEnvConfig,
       tempWorkingDir
     )
   }

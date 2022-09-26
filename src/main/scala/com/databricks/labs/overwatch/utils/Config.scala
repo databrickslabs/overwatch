@@ -328,7 +328,7 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret],apiEnvConfig: Option[ApiEnvConfig]): this.type = {
     var rawToken = ""
     var scope = ""
     var key = ""
@@ -362,7 +362,13 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, 200, 500, runID, false, 4))
+      val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
+        derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
+        derivedApiEnvConfig.apiWaitingTime, derivedApiEnvConfig.proxyHost, derivedApiEnvConfig.proxyPort,
+        derivedApiEnvConfig.proxyUserName, derivedApiEnvConfig.proxyPasswordScope, derivedApiEnvConfig.proxyPasswordKey
+      ))
+
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
@@ -450,7 +456,7 @@ class Config() {
    */
   def buildLocalOverwatchParams(): String = {
 
-    registerWorkspaceMeta(None)
+    registerWorkspaceMeta(None,None)
     _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
