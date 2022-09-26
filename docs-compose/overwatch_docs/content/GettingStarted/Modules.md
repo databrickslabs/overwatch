@@ -29,7 +29,7 @@ are dependent on other modules (details below). At present, the audit module is 
 contains most of the metadata to enable the other overwatch modules.
 
 A full list of which tables are ultimately made available by which module can be found in the
-[Data Definitions]({{%relref "DataEngineer/Definitions.md"%}}) section.
+[Data Definitions]({{%relref "dataengineer/definitions/_index.md"%}}) section.
 
 Upcoming modules include (in no particular order):
 * security

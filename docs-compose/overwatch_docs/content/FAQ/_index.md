@@ -58,9 +58,9 @@ workspace for a clean run.
 ## Q2: The incorrect costs were entered for a specific time range, I'd like to correct them, how should I do that?
 Please refer to the [Configuring Custom Costs]({{%relref "GettingStarted"%}}#configuring-custom-costs) 
 to baseline your understanding. Also, closely review the details of the 
-[instanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails)
+[instanceDetails]({{%relref "dataengineer/definitions/_index.md"%}}/#instancedetails)
 table definition as that's where costs are stored and this is what will need to be accurate. Lastly, 
-please refer to the [ETL_Process]({{%relref "DataEngineer/ETL_Process.md"%}}) section of the docs as 
+please refer to the [Pipeline_Management]({{%relref "DataEngineer/Pipeline_Management.md"%}}) section of the docs as 
 you'll likely need to understand how to move the pipeline through time.
 
 Now that you have a good handle on the costs and the process for restoring / reloading data, note that there are 
@@ -74,7 +74,7 @@ are going to have inaccurate data in them:
 2. Delete all records where Pipeline_SnapTS >= the time where the data became inaccurate.
 
 Both options will require a corresponding appropriate update to the pipeline_report table for the two modules 
-that write to those tables (3005, 3015). [Here are several examples]({{%relref "DataEngineer/ETL_Process.md"%}}/#reloading-data-example)
+that write to those tables (3005, 3015). [Here are several examples]({{%relref "DataEngineer/Pipeline_Management.md"%}}/#reloading-data-example)
 on ways to update the pipeline_report to change update the state of a module.
 
 ## Q3: What is the current guidance / state of customers who want to capture EC2 spot pricing?
@@ -145,5 +145,20 @@ or both use the examples below and apply them to your cluster policies appropria
 * [Interactive Cluster Policy Only](/assets/FAQ/interactive_logs_policy_rule.json)
 * [Automated Cluster Policy Only](/assets/FAQ/automated_logs_policy_rule.json)
 * [Interactive AND Automated Cluster Policy](/assets/FAQ/global_logs_policy_rule.json)
+
+## Q8: Can I use Unity Catalog (UC) with Overwatch
+As of 0.7.0 UC is not fully supported. Overwatch dev team is working with the UC teams to identify best practices, 
+a proper strategy, and implement first-party support. We do have customers successfully using Overwatch atop Unity 
+Catalog but it requires some special considerations. We will continue to update this FAQ as we get more information. 
+Please follow the requirements below if you would like to try to get Overwatch to work on UC before it's fully 
+supported.
+
+* Use DBR 11.1+
+* Use a full path as storage prefix (i.e. s3://... or abfs://)
+* Ensure the catalog is created using an external location
+    * Ensure the Overwatch Cluster has direct, full read/write access to the path location. Consumers will not need this 
+    but the OW cluster does.
+* Ensure the user that executes the OW cluster has full access to the catalog
+* Configure the Data Target as an [External Metastore](https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/#using-external-metastores)
 
 Remember to remove user ability to create unrestricted clusters and assign appropriate permissions to the policies

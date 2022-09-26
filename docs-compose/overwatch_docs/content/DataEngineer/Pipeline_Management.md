@@ -1,5 +1,5 @@
 ---
-title: "ETL Process"
+title: "Pipeline_Management"
 date: 2021-01-11T12:21:46-05:00
 weight: 2
 ---
@@ -43,12 +43,14 @@ query most commonly used is below. If you are asked for the pipReport, please pr
 **SCALA**
 ```scala
 table("overwatch_etl.pipReport")
+  .filter('organization_id === "<workspace_id>") // if you want to see the pipReport for only a specific workspace
   .orderBy('Pipeline_SnapTS.desc)
 ```
 **SQL**
 ```sql
 select * from overwatch_etl.pipReport
-    order by Pipeline_SnapTS.desc
+    where organization_id = '<workspace_id>' -- if you want to see the pipReport for only a specific workspace
+    order by Pipeline_SnapTS desc
 ```
 
 ### Pipeline_Report Structure

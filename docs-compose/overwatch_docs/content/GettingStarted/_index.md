@@ -152,8 +152,8 @@ val prettyConfigString = JsonUtils.objToJson(params).prettyString // human-reada
 The target database\[s\] (defined in the *dataTarget* variable above) should now be visible from the data tab 
 in Databricks. Additionally, the ETL database 
 should contain the custom costing tables, 
-[instanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) and 
-[dbuCostDetails]({{%relref "DataEngineer/Definitions.md"%}}/#dbucostdetails). This is a good time 
+[instanceDetails]({{%relref "dataengineer/definitions/_index.md"%}}/#instancedetails) and 
+[dbuCostDetails]({{%relref "dataengineer/definitions/_index.md"%}}/#dbucostdetails). This is a good time 
 to [customize compute prices](#configuring-custom-costs) if you so desire; after first init but before first pipeline run.
 
 ### Executing The Pipeline
@@ -221,10 +221,10 @@ There are three essential components to the cost function:
 
 The DBU contract costs are captured from the
 [Overwatch Configuration]({{%relref "GettingStarted/Configuration.md"%}}/#databrickscontractprices) maintained
-as a slow-changing-dimension in the [dbuCostDetails table]({{%relref "DataEngineer/Definitions.md"%}}/#dbucostdetails).
+as a slow-changing-dimension in the [dbuCostDetails table]({{%relref "dataengineer/definitions/_index.md"%}}/#dbucostdetails).
 The compute costs and dbu to node
 associations are maintained as a slow-changing-dimension in the
-[instanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails) table.
+[instanceDetails]({{%relref "dataengineer/definitions/_index.md"%}}/#instancedetails) table.
 * **IMPORTANT** These tables are automatically created in the dataTarget upon first initialization of the pipeline.
 * **DO NOT** try to manually create the target database outside of Overwatch as that will lead to database validation errors.
 
@@ -243,8 +243,8 @@ will automatically be recreated upon first pipeline run.
 **IMPORTANT** These cost tables are slow-changing-dimensions and thus they have specific rule requirements; familiarize
 yourself with the details at the links below. If the rules fail, the Gold Pipeline will fail with specific costing
 errors to help you resolve it.
-* [InstanceDetails Table Details]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails)
-* [dbuCostDetails Table Details]({{%relref "DataEngineer/Definitions.md"%}}/#dbucostdetails)
+* [InstanceDetails Table Details]({{%relref "dataengineer/definitions/_index.md"%}}/#instancedetails)
+* [dbuCostDetails Table Details]({{%relref "dataengineer/definitions/_index.md"%}}/#dbucostdetails)
 
 [Helpful Tool (AZURE_Only)](https://azureprice.net/) to get pricing by region by node.
 

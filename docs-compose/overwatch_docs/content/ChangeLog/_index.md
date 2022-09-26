@@ -261,7 +261,7 @@ Below are the major feature and enhancements in 0.4.2
 * [Contract costs through time](https://github.com/databrickslabs/overwatch/issues/49)
   * Changes to the instanceDetails table now allows for the tracking of all costs through time including compute and 
   DBU. To recalcuate associated costs in the gold layer, the jobRunCostPotentialFact and clusterStateFact table will 
-    need to be rolled back as per the documents in [ETL Process]({{%relref "DataEngineer/ETL_Process.md"%}})
+    need to be rolled back as per the documents in [Pipeline_Management]({{%relref "DataEngineer/Pipeline_Management.md"%}})
 * DBU Contract Costs for DatabricksSQL and JobsLight added
   * Costing for additional SKUs were added to the configuration such that they can be tracked. Note that as of 0.4.2 
   release, no calculation changes in costing as it relates to sku have yet been incorporated. These recalculations for

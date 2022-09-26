@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Data Engineering on Overwatch</title>
+    <link>https://databrickslabs.github.io/overwatch/dataengineer/</link>
+    <description>Recent content in Data Engineering on Overwatch</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Thu, 20 May 2021 21:27:44 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Definitions</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/definitions/</link>
+      <pubDate>Mon, 11 Jan 2021 12:21:19 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/definitions/</guid>
+      <description>Consumption Layer  Column Descriptions   ETL Tables  Bronze Silver Gold    Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
+    </item>
+    
+    <item>
+      <title>ETL Process</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/etl_process/</link>
+      <pubDate>Mon, 11 Jan 2021 12:21:46 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/etl_process/</guid>
+      <description>Data Ingestion and Resume Process The specificities can vary slightly between cloud provider but the general methodology is the exact same. Specific differences will be discussed in Cloud-Specific Variations section.
+Each module is responsible for building certain entities at each layer, bronze, silver, gold, and presentation. The mapping between module and gold entity can be found in the Modules section. Each module is also tracked individually in the primary tracking tabe, Pipeline_Report.</description>
+    </item>
+    
+    <item>
+      <title>Upgrade</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</link>
+      <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
+      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. The general upgrade process is:
+ Use the compactString of parameters to instantiate the workspace  The compact string can be found in your original runner notebook which you got from here   Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object  Basic pseudocode can be found below as a reference.</description>
+    </item>
+    
+  </channel>
+</rss>
