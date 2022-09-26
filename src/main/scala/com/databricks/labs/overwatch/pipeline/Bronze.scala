@@ -207,15 +207,14 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   }
 
   private def executeModules(): Unit = {
-    config.overwatchScope.foreach(x=>println(x))
     config.overwatchScope.foreach {
       case OverwatchScope.audit => auditLogsModule.execute(appendAuditLogsProcess)
       case OverwatchScope.clusters => clustersSnapshotModule.execute(appendClustersAPIProcess)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
-      case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
       case OverwatchScope.sqlHistory => sqlHistorySnapshotModule.execute(appendSqlHistoryProcess)
+      case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
       case _ =>
     }
   }

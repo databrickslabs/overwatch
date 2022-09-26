@@ -305,7 +305,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val sqlHistoryModule = Module(2020, "Silver_SqlHistory", this, Array(1016))
   lazy private val appendSqlHistoryProcess = ETLDefinition(
-    BronzeTargets.sqlHistorySnapshotTarget.asIncrementalDF(sqlHistoryModule, SilverTargets.sqlHistoryTarget.incrementalColumns),
+    BronzeTargets.sqlHistorySnapshotTarget.asIncrementalDF(sqlHistoryModule, SilverTargets.sqlHistoryTarget.incrementalColumns,2),
     Seq(sqlHistoryTransform()),
     append(SilverTargets.sqlHistoryTarget)
   )
