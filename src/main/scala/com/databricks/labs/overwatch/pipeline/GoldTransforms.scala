@@ -585,6 +585,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       from_unixtime('startTimestamp.cast("double") / 1000).cast("timestamp").cast("date").alias("date"),
       'TaskRunTime.alias("task_runtime"),
       'TaskMetrics.alias("task_metrics"),
+      'TaskExecutorMetrics.alias("task_executor_metrics"),
       'TaskInfo.alias("task_info"),
       'TaskType.alias("task_type"),
       'TaskEndReason.alias("task_end_reason"),
