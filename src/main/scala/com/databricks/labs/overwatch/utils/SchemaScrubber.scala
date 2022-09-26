@@ -86,14 +86,12 @@ class SchemaScrubber(
         s"have been renamed in place but should be reviewed.\n" +
         s"DUPLICATE FIELDS:\n" +
         s"${dups.mkString("\n")}"
-      println(warnMsg)
       logger.log(Level.WARN, warnMsg)
       fields.map(f => {
         val fieldName = if (caseSensitive) f.sanitizedField.name else f.sanitizedField.name.toLowerCase
         if (dups.contains(fieldName)) {
           val generatedUniqueName = f.sanitizedField.name + "_UNIQUESUFFIX_" + f.originalField.name.hashCode.toString
           val uniqueColumnMapping = s"\n${f.originalField.name} --> ${generatedUniqueName}"
-          println(uniqueColumnMapping)
           logger.log(Level.WARN, uniqueColumnMapping)
           f.sanitizedField.copy(name = generatedUniqueName)
         }

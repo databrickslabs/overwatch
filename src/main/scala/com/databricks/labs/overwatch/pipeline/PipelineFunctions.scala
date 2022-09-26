@@ -14,7 +14,7 @@ import TransformFunctions._
 import java.io.{PrintWriter, StringWriter}
 import java.net.URI
 
-object PipelineFunctions {
+object PipelineFunctions extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   private val uriSchemeRegex = "^([a-zA-Z][-.+a-zA-Z0-9]*):/.*".r
@@ -165,6 +165,22 @@ object PipelineFunctions {
       .alias(defaultAlias)
   }
 
+  /**
+   * Builds the Map to be used in modifyStruct changeInventory to clean a new_cluster schema
+   * @param df df that contains the prefixed field to cleanse
+   * @param newClusterPrefix path to new_cluster including the "new_cluster" such as "new_settings.new_cluster"
+   * @return Map[String, Column] for changeInventory
+   */
+  def newClusterCleaner(df: DataFrame, newClusterPrefix: String): Map[String, Column] = {
+    Map(
+      s"${newClusterPrefix}.custom_tags" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.custom_tags"),
+      s"${newClusterPrefix}.spark_conf" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.spark_conf"),
+      s"${newClusterPrefix}.spark_env_vars" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.spark_env_vars"),
+      s"${newClusterPrefix}.aws_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.aws_attributes"),
+      s"${newClusterPrefix}.azure_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.azure_attributes")
+    )
+  }
+
   def optimizeDFForWrite(
                         df: DataFrame,
                         target: PipelineTable
@@ -200,84 +216,6 @@ object PipelineFunctions {
     mutationDF
 
   }
-
-//  def optimizeWritePartitions(
-//                               df: DataFrame,
-//                               target: PipelineTable,
-//                               spark: SparkSession,
-//                               config: Config,
-//                               moduleName: String,
-//                               currentClusterCoreCount: Int
-//                             ): DataFrame = {
-//
-//    var mutationDF = df
-//    mutationDF = if (target.zOrderBy.nonEmpty) {
-//      mutationDF.moveColumnsToFront(target.zOrderBy ++ target.statsColumns)
-//    } else mutationDF
-//
-//   val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
-//      val targetShufflePartitionSizeMB = 128.0
-//      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes")
-//        .replace("b", "").toDouble / 1024 / 1024
-//
-//      val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
-//
-//      val sourceDFParts = getSourceDFParts(df)
-//      // TODO -- handle streaming until Module refactor with source -> target mappings
-//      val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
-//        target.name match {
-//          case "audit_log_bronze" => // TODO -- check to ensure this should be audit_log_bronze, not audit_log_raw_events
-//            target.asDF.rdd.partitions.length * target.shuffleFactor
-//          case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
-//        }
-//      } else {
-//        sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
-//      }
-//
-//      val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
-//      val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
-//
-//      if (config.debugFlag) {
-//        println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
-//        println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
-//        println(s"DEBUG: Max PartitionBytes (MB): $readMaxPartitionBytesMB")
-//      }
-//
-//      logger.log(Level.INFO, s"$moduleName: " +
-//        s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
-//        s"\nShufflePartitions: ${targetShufflePartitionCount}")
-//
-//      targetShufflePartitionCount
-//    } else {
-//      Math.max(currentClusterCoreCount * 2, spark.conf.get("spark.sql.shuffle.partitions").toInt)
-//    }
-//
-//    spark.conf.set("spark.sql.shuffle.partitions",targetShufflePartitions)
-//
-//    /**
-//     * repartition partitioned tables that are not auto-optimized into the range partitions for writing
-//     * without this the file counts of partitioned tables will be extremely high
-//     * also generate noise to prevent skewed partition writes into extremely low cardinality
-//     * organization_ids/dates per run -- usually 1:1
-//     * noise currently hard-coded to 32 -- assumed to be sufficient in most, if not all, cases
-//     */
-//
-//    if (target.partitionBy.nonEmpty) {
-//      if (target.partitionBy.contains("__overwatch_ctrl_noise") && !target.autoOptimize) {
-//        logger.log(Level.INFO, s"${target.tableFullName}: generating partition noise")
-//        mutationDF = mutationDF.withColumn("__overwatch_ctrl_noise", (rand() * lit(32)).cast("int"))
-//      }
-//
-//      if (!target.autoOptimize) {
-//        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into $targetShufflePartitions " +
-//          s" output partitions defined as ${target.partitionBy.mkString(", ")}")
-//        mutationDF = mutationDF.repartition(targetShufflePartitions, target.partitionBy map col: _*)
-//      }
-//    }
-//
-//    mutationDF
-//
-//  }
 
   def applyFilters(df: DataFrame, filters: Seq[Column], debugFlag: Boolean, module: Option[Module] = None): DataFrame = {
     if (module.nonEmpty) {
@@ -333,6 +271,85 @@ object PipelineFunctions {
 
       df.withColumn("requestParams", struct(cleanRPFields: _*))
     } else df
+  }
+
+  def casedSeqCompare(seq1: Seq[String], s2: String): Boolean = {
+    if ( // make lower case if column names are case insensitive
+      spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
+    ) seq1.contains(s2) else seq1.exists(s1 => s1.equalsIgnoreCase(s2))
+  }
+
+  def buildIncrementalFilters(
+                              target: PipelineTable,
+                               df: DataFrame,
+                               fromTime: TimeTypes,
+                               untilTime: TimeTypes,
+                              additionalLagDays: Long = 0,
+                              moduleName: String = "UNDEFINED"
+                             ): Array[IncrementalFilter] = {
+    if (target.exists) {
+      val dfFields = df.schema.fields
+      val cronFields = dfFields.filter(f => casedSeqCompare(target.incrementalColumns, f.name))
+
+      if (additionalLagDays > 0) require(
+        dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
+        "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
+
+      val filterMsg = s"FILTERING: ${moduleName} using cron columns: ${cronFields.map(_.name).mkString(", ")}"
+      logger.log(Level.INFO, filterMsg)
+      if (target.config.debugFlag) println(filterMsg)
+      cronFields.map(field => {
+
+        field.dataType match {
+          case dt: DateType => {
+            if (!target.partitionBy.map(_.toLowerCase).contains(field.name.toLowerCase)) {
+              val errmsg = s"Date filters are inclusive on both sides and are used for partitioning. Date filters " +
+                s"should not be used in the Overwatch package alone. Date filters must be accompanied by a more " +
+                s"granular filter to utilize df.asIncrementalDF.\nERROR: ${field.name} not in partition columns: " +
+                s"${target.partitionBy.mkString(", ")}"
+              throw new IncompleteFilterException(errmsg)
+            }
+
+            // Nothing in Overwatch is incremental at the date level thus until date should always be inclusive
+            // so add 1 day to follow the rule value >= date && value < date
+            // but still keep it inclusive
+            val untilDate = PipelineFunctions.addNTicks(untilTime.asColumnTS, 1, DateType)
+            IncrementalFilter(
+              field,
+              date_sub(fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
+              untilDate.cast(dt)
+            )
+          }
+          case dt: TimestampType => {
+            val start = if (additionalLagDays > 0) {
+              val epochMillis = fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)
+              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000.0).cast(dt)
+            } else {
+              fromTime.asColumnTS
+            }
+            IncrementalFilter(
+              field,
+              start,
+              untilTime.asColumnTS
+            )
+          }
+          case dt: LongType => {
+            val start = if (additionalLagDays > 0) {
+              lit(fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)).cast(dt)
+            } else {
+              lit(fromTime.asUnixTimeMilli)
+            }
+            IncrementalFilter(
+              field,
+              start,
+              lit(untilTime.asUnixTimeMilli)
+            )
+          }
+          case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
+            s"a filter containing a ${field.dataType.typeName} type. ONLY Timestamp, Date, and Long types are supported.")
+        }
+      })
+    } else Array[IncrementalFilter]()
   }
 
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
@@ -498,10 +515,25 @@ object PipelineFunctions {
       .otherwise("unknown")
   }
 
-  def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+  /**
+   * Fill a column according to the window spec
+   * @param colToFillName name of column to fill
+   * @param w window spec by which the fill should be executed
+   * @param orderedLookups ordered sequence of subsequent columns from which to attempt to fill the collTofill
+   * @param colToFillHasPriority whether or not to consider colToFill's own history to complete the fill or whether to
+   *                             only consider the ordered lookups when filling
+   * @return
+   */
+  def fillForward(
+                   colToFillName: String,
+                   w: WindowSpec,
+                   orderedLookups: Seq[Column] = Seq[Column](),
+                   colToFillHasPriority: Boolean = true
+                 ) : Column = {
     val colToFill = col(colToFillName)
     if (orderedLookups.nonEmpty){ // TODO -- omit nulls from lookup
-      val coalescedLookup = colToFill +: orderedLookups.map(lookupCol => {
+      val orderedLookupsFinal = if (colToFillHasPriority) colToFill +: orderedLookups else orderedLookups
+      val coalescedLookup = orderedLookupsFinal.map(lookupCol => {
         last(lookupCol, true).over(w)
       })
       coalesce(coalescedLookup: _*).alias(colToFillName)
