@@ -891,7 +891,9 @@ object Schema extends SparkSessionWrapper {
       StructField("min_idle_instances", LongType, nullable = true),
       StructField("max_capacity", LongType, nullable = true),
       StructField("preloaded_spark_versions", StringType, nullable = true),
+      StructField("aws_attributes",MapType(StringType,StringType, valueContainsNull = true), nullable = true),
       StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+      StructField("custom_tags",MapType(StringType,StringType, valueContainsNull = true), nullable = true),
       StructField("create_details", poolsCreateSchema, nullable = true),
       StructField("delete_details", poolsDeleteSchema, nullable = true),
       StructField("request_details", poolsRequestDetails, nullable = true)

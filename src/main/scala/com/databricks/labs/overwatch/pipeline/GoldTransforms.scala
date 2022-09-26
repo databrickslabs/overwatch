@@ -6,6 +6,7 @@ import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaTools, Spa
 import org.apache.log4j.Level
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{MapType, StringType}
 import org.apache.spark.sql.{Column, DataFrame}
 
 trait GoldTransforms extends SparkSessionWrapper {
@@ -207,7 +208,9 @@ trait GoldTransforms extends SparkSessionWrapper {
       'min_idle_instances,
       'max_capacity,
       'preloaded_spark_versions,
+      'aws_attributes,
       'azure_attributes,
+      'custom_tags,
       'create_details,
       'delete_details,
       'request_details
@@ -752,7 +755,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     """
       |organization_id, workspace_name, instance_pool_id, serviceName, timestamp, date, actionName, instance_pool_name, node_type_id,
       |idle_instance_autotermination_minutes, min_idle_instances, max_capacity, preloaded_spark_versions,
-      |azure_attributes, create_details, delete_details, request_details
+      |azure_attributes, aws_attributes, custom_tags, create_details, delete_details, request_details
       |""".stripMargin
 
   protected val jobViewColumnMapping: String =
