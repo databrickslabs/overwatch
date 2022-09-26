@@ -950,19 +950,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       ) // cleanup temporary cleaner fields
       .scrubSchema
 
-    // after submitRun_details.tasks has been converted into a struct, cleanse the nested tasks columns
-    // if it still exists after the cullNullTypes
-//    if (SchemaTools.getAllColumnNames(dfWStructedTasksAndCleansedJobs.schema).exists(c => c.startsWith("submitRun_details.tasks"))) {
-//      val secondaryStructTasksCleanser = Map(
-//        "submitRun_details.tasks.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.notebook_task.base_parameters"),
-//        "submitRun_details.tasks.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.shell_command_task.env_vars"),
-//      )
-//
-//      dfWStructedTasksAndCleansedJobs
-//        .modifyStruct(secondaryStructTasksCleanser)
-//        .scrubSchema
-//    } else dfWStructedTasksAndCleansedJobs.scrubSchema
-
   }
 
   /**

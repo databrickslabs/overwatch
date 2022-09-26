@@ -911,6 +911,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .withColumn("pool_snap_node_type", lit(null).cast("string"))
     }
 
+    val onlyOnceSemanticsW = Window.partitionBy('organization_id, 'cluster_id, 'actionName).orderBy('timestamp)
     clusterBaseWithPoolsAndSnapPools
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("organization_id", "cluster_id"), "left")
@@ -928,6 +929,9 @@ trait SilverTransforms extends SparkSessionWrapper {
           'aws_attributes("instance_profile_arn").alias("instance_profile_arn")
         )
       )
+      .withColumn("rnk", rank().over(onlyOnceSemanticsW))
+      .withColumn("rn", row_number().over(onlyOnceSemanticsW))
+      .filter('rnk > 1 || 'rn > 1)
       .withColumn("createdBy",
         when(isAutomated('cluster_name) && 'actionName === "create", lit("JobsService"))
           .when(!isAutomated('cluster_name) && 'actionName === "create", 'userEmail))
@@ -935,7 +939,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
-      .drop("userEmail", "cluster_creator_lookup", "single_user_name")
+      .drop("userEmail", "cluster_creator_lookup", "single_user_name", "rnk", "rn")
   }
 
   def buildClusterStateDetail(
