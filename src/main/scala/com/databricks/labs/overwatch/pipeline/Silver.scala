@@ -222,13 +222,12 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobStatusProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(
-
-
       dbJobsStatusSummary(
         BronzeTargets.jobsSnapshotTarget,
         jobStatusModule.isFirstRun,
         SilverTargets.dbJobsStatusTarget.keys,
-        jobStatusModule.fromTime
+        jobStatusModule.fromTime,
+        config.tempWorkingDir
       )),
     append(SilverTargets.dbJobsStatusTarget)
   )
@@ -242,7 +241,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
-        jobRunsModule.fromTime, jobRunsModule.untilTime
+        jobRunsModule.fromTime, jobRunsModule.untilTime,
+        SilverTargets.dbJobRunsTarget.keys
       )
     ),
     append(SilverTargets.dbJobRunsTarget)
