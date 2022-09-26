@@ -534,7 +534,7 @@ abstract class PipelineTargets(config: Config) {
     )
 
     lazy private[overwatch] val sparkStreamViewTarget: PipelineView = PipelineView(
-      name = "sparkStream_Preview",
+      name = "sparkStream",
       sparkStreamTarget,
       config
     )
