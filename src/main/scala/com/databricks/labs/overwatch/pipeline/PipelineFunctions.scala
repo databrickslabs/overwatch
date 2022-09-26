@@ -492,6 +492,7 @@ object PipelineFunctions {
 
   private[overwatch] def deriveSKU(isAutomated: Column, sparkVersion: Column,clusterName: Column): Column = {
     val isJobsLight = sparkVersion.like("apache_spark_%")
+    // Added for DBSQL Cost
     val isDBSQL = clusterName.like("SQLAnalytics%")
     when(isAutomated && isJobsLight, "jobsLight")
       .when(isAutomated && !isJobsLight, "automated")

@@ -236,7 +236,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val nodeTypeLookup = clusterSpec.asDF
       .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
-      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version,'cluster_name))
+      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version,'cluster_name)) // // Added for DBSQL Cost
       .toTSDF("timestamp", "organization_id", "sku")
       .lookupWhen(dbuCostDetailsTSDF)
       .df
