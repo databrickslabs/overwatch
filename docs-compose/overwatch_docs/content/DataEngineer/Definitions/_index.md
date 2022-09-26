@@ -349,15 +349,14 @@ the job-level to the task-level. Overwatch must accommodate both as many custome
 important. As such, some of the fields seem redundant and the user must apply the correct logic based on the 
 circumstances. Please carefully review the field descriptions to understand the rules.
 
-{{% notice info %}}
+##### Unsupported Scenarios
 Several scenarios are not yet supported by Overwatch; they are called out here. Please stay tuned for updates 
 as it's our intention to include everything we can as soon as possible after Databricks product GAs new features but 
 there will be a delay.
-
-DLT details -- Delta Live tables aren't yet supported even though the run_ids may show up here
-
-Runs that failed to launch due to error in the launch request -- these never actually create a run and never receive a run_id therefore they will not be present in this table at this time.
-{{% /notice %}}
+* DLT details -- Delta Live tables aren't yet supported even though the run_ids may show up here
+* Runs that failed to launch due to error in the launch request -- these never actually create a run and never receive a run_id therefore they will not be present in this table at this time.
+* Runs executing for more than 30 Days -- This is a limitation for performance. This will be an externalized config at a later time but for now
+the hard limit is 30 days. The progress of this feature can be tracked in [Issue 528](https://github.com/databrickslabs/overwatch/issues/528)
 
 **TODO -- clarify the taskRunId vs jobRunId confusion from the UI**
 
@@ -423,13 +422,11 @@ time_detail                 |struct           |All events in the run lifecycle t
 Databricks has moved to "multi-task jobs" and each run now refers to the run of a task not a job. Please reference 
 [jobRuns table](#jobrun) for more detail
 
-{{% notice info %}}
+##### Unsupported Scenarios
 Several scenarios are not yet supported by Overwatch; they are called out here. Please stay tuned for updates
 as it's our intention to include everything we can as soon as possible after Databricks product GAs new features but
 there will be a delay.
-
-Costs for SQL/DBT/DLT
-{{% /notice %}}
+* Costs for SQL/DBT/DLT
 
 **KEY** -- organization_id + run_id + startEpochMS
 

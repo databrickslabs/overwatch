@@ -34,16 +34,5 @@
       <description>Quick Reference  Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch  Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run. For small/medium workspaces, 20-40 minutes should be expected for each run.</description>
     </item>
     
-    <item>
-      <title>Productionizing</title>
-      <link>https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/</link>
-      <pubDate>Wed, 20 Jul 2022 15:03:23 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/</guid>
-      <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch
-Cluster Logging Simplify and Unify your cluster logging directories
- Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
-    </item>
-    
   </channel>
 </rss>
