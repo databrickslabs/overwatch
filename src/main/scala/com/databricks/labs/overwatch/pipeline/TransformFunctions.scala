@@ -48,6 +48,10 @@ object TransformFunctions {
       df.select(nonNullCols: _*)
     }
 
+    def cullNestedColumns(structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
+      SchemaTools.cullNestedColumns(df, structToModify, nestedFieldsToCull)
+    }
+
     def suffixDFCols(
                       suffix: String,
                       columnsToSuffix: Array[String] = Array(),
