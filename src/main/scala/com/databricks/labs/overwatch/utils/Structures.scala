@@ -67,7 +67,11 @@ case class AzureAuditLogEventhubConfig(
                                         maxEventsPerTrigger: Int = 10000,
                                         minEventsPerTrigger: Int = 10,
                                         auditRawEventsChk: Option[String] = None,
-                                        auditLogChk: Option[String] = None
+                                        auditLogChk: Option[String] = None,
+                                        azureClientId: Option[String] = None,
+                                        azureClientSecret: Option[String] = None,
+                                        azureTenantId: Option[String] = None,
+                                        azureAuthEndpoint: String = "https://login.microsoftonline.com/"
                                       )
 
 case class AuditLogConfig(
@@ -185,6 +189,8 @@ case class CloneDetail(source: String, target: String, asOfTS: Option[String] = 
 case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
 
 case class OrgConfigDetail(organization_id: String, latestParams: OverwatchParams)
+
+case class NamedColumn(fieldName: String, column: Column)
 
 case class DeltaHistory(version: Long, timestamp: java.sql.Timestamp, operation: String, clusterId: String, operationMetrics: Map[String, String], userMetadata: String)
 

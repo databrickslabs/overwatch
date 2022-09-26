@@ -1126,4 +1126,10 @@ object Upgrade extends SparkSessionWrapper {
       finalizeUpgrade(overwatchETLDBName, tempDir, "0.610")
   }
 
+  // TODO -- upgrade
+  //  when rebuilding job tables -- use updateModuleState to ensure all pulled as a first run
+  //  EMPTY does not facilitate initModuleState
+  //  this method is better than rolling back pipelineReport
+  def upgradeTo0610 = ???
+
 }

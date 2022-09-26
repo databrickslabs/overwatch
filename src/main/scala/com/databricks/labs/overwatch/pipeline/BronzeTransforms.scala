@@ -3,6 +3,8 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.BatchRunner.spark
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
+import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
@@ -210,14 +212,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     consumerDBLocation: String,
                                     isFirstRun: Boolean,
                                     organizationId: String,
-                                    runID: String
-                                   ): DataFrame = {
+                                    runID: String): DataFrame = {
+    import com.databricks.labs.overwatch.eventhubs.AadClientAuthentication
 
-    val connectionString = ConnectionStringBuilder(PipelineFunctions.parseEHConnectionString(ehConfig.connectionString))
+    val connectionString = ConnectionStringBuilder(
+      PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
       .setEventHubName(ehConfig.eventHubName)
       .build
 
-    val eventHubsConf = try {
+    val ehConf = try {
       validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
 
       if (isFirstRun) {
@@ -241,6 +244,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
+    val eventHubsConf = if (ehConfig.azureClientId.isDefined) {
+      val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
+        "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
+        "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
+        "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
+      AadAuthInstance.addAadAuthParams(ehConf, aadParams)
+    } else
+      ehConf
+
     spark.readStream
       .format("eventhubs")
       .options(eventHubsConf.toMap)
@@ -251,22 +263,30 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def cleanseRawJobsSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+  protected def cleanseRawJobsSnapDF(keys: Array[String], runId: String)(df: DataFrame): DataFrame = {
+    val emptyKeysDF = Seq.empty[(String, Long, String)].toDF("organization_id", "job_id", "Overwatch_RunID")
     val outputDF = SchemaScrubber.scrubSchema(df)
+      .withColumn("Overwatch_RunID", lit(runId))
+
+    val cleansedTasksDF = workflowsCleanseTasks(outputDF, keys, emptyKeysDF, "settings.tasks")
+    val cleansedJobClustersDF = workflowsCleanseJobClusters(outputDF, keys, emptyKeysDF, "settings.job_clusters")
 
     val changeInventory = Map[String, Column](
-      "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
-      "settings.new_cluster.spark_conf" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_conf"),
-      "settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_env_vars"),
-      s"settings.new_cluster.aws_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.aws_attributes"),
-      s"settings.new_cluster.azure_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.azure_attributes"),
+      "settings.tasks" -> col("cleansedTasks"),
+      "settings.job_clusters" -> col("cleansedJobsClusters"),
+      "settings.tags" -> SchemaTools.structToMap(outputDF, "settings.tags"),
       "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
-    )
+    ) ++ PipelineFunctions.newClusterCleaner(outputDF, "settings.tasks.new_cluster")
 
-    outputDF.select(SchemaTools.modifyStruct(outputDF.schema, changeInventory): _*)
+    outputDF
+      .join(cleansedTasksDF, keys.toSeq, "left")
+      .join(cleansedJobClustersDF, keys.toSeq, "left")
+      .modifyStruct(changeInventory)
+      .drop("cleansedTasks", "cleansedJobsClusters") // cleanup temporary cleaner fields
+      .scrubSchema(SchemaScrubber(cullNullTypes = true))
   }
 
-  protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+  protected def cleanseRawClusterSnapDF(df: DataFrame): DataFrame = {
     val outputDF = SchemaScrubber.scrubSchema(df)
 
     outputDF
