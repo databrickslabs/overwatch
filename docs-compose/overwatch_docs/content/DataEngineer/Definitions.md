@@ -272,6 +272,25 @@ activeUntil*                |date             |The end date for the costs in thi
 #### Job
 [**SAMPLE**](/assets/TableSamples/job.tab)
 
+The below columns closely mirror the APIs listed below by action. For more details about these fields and 
+their structures please reference the relevant Databricks Documentation for the action.
+
+Note -- Databricks has moved to API2.1 for all jobs-related functions and in-turn, Databricks has moved 
+several fields from the root level to a nested level to support multi-task jobs. These 
+root level fields are still visible in Overwatch as some customers are still using legacy APIs and many customers have 
+historical data by which this data was generated using the legacy 2.0 APIs. These fields can be identified by the 
+prefix, "Legacy" in the Description.
+
+Action | API
+:-------------------------------|:------------------
+SnapImpute                      |Only created during the first Overwatch Run to initialize records of existing jobs not present in the audit logs. These jobs are still available in the UI but have not been modified since the collection of audit logs begun thus no events have been identified and therefore must be imputed to maximize coverage
+Create                          |["Create New Job API"](https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsCreate)
+Update                          |["Partially Update a Job"](https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsUpdate)
+Reset                           |["Overwrite All Settings for a Job"](https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsReset)
+Delete                          |["Delete A Job"](https://docs.databricks.com/dev-tools/api/latest/jobs.html#operation/JobsDelete)
+ChangeJobAcl                    |["Update Job Permissions"](https://docs.databricks.com/dev-tools/api/latest/permissions.html#operation/set-job-permissions)
+ResetJobAcls                    |["Replace Job Permissions"](https://docs.databricks.com/dev-tools/api/latest/permissions.html#operation/update-all-job-permissions) -- Not yet supported
+
 **KEY** -- organization_id + job_id + unixTimeMS + action + request_id
 
 **Incremental Columns** -- unixTimeMS
@@ -283,43 +302,57 @@ activeUntil*                |date             |The end date for the costs in thi
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 organization_id             |string           |Canonical workspace id
-workspace_name              |                 |
+workspace_name              |                 |Customer defined name of the workspace or workspace_id (default)
 job_id                      |string           |Databricks job id
 action                      |string           |Action type defined by the record. One of: create, reset, update, delete, resetJobAcl, changeJobAcl. More information about these actions can be found [here](https://docs.databricks.com/dev-tools/api/latest/jobs.html)
-date                        |                 |
-timestamp                   |timestamp        |timestamp the action took place
-job_name                    |string           |User defined name of job. NOTE, all jobs created through the UI are initialized with the name, "Untitled" therefore UI-created-named jobs will have an edit action to set the name. The cluster is also set to automated and defaulted on UI create as well
-tags                        |                 |
-tasks                       |                 |
-job_clusters                |                 |
-libraries                   |                 |
-timeout_seconds             |string           |null unless specified, default == null. Timeout seconds specified in UI or via api
-max_concurrent_runs         |                 |
-max_retries                 |                 |
-retry_on_timeout            |                 |
-min_retry_interval_millis   |                 |
-schedule                    |string           |JSON - quartz cron expression of scheduled job and timezone_id
-existing_cluster_id         |                 |
-new_cluster                 |                 |
-git_source                  |                 |
-task_detail_legacy          |                 |
-is_from_dlt                 |                 |
-aclPermissionSet            |                 |
+date                        |                 |Date of the action for the key
+timestamp                   |timestamp        |Timestamp the action took place
+job_name                    |string           |User defined name of job. 
+tags                        |                 |The tags applied to the job if they exist
+tasks                       |                 |The tasks defined for the job
+job_clusters                |                 |The job clusters defined for the job
+libraries                   |                 |LEGACY -- Libraries defined in the job -- Nested within tasks as of API 2.1
+timeout_seconds             |string           |Job-level timeout seconds. Databricks supports timeout seconds at both the job level and the task level. Task level timeout_seconds can be found nested within tasks
+max_concurrent_runs         |                 |Job-level -- maximum concurrent executions of the job
+max_retries                 |                 |LEGACY -- Max retries for legacy jobs -- Nested within tasks as of API 2.1
+retry_on_timeout            |                 |LEGACY -- whether or not to retry if a job run times out -- Nested within tasks as of API 2.1
+min_retry_interval_millis   |                 |LEGACY -- Minimal interval in milliseconds between the start of the failed run and the subsequent retry run. The default behavior is that unsuccessful runs are immediately retried. -- Nested within tasks as of API 2.1 
+schedule                    |                 |Schedule by which the job should execute and whether or not it is paused
+existing_cluster_id         |                 |LEGACY -- If compute is existing interactive cluster the cluster_id will be here -- Nested within tasks as of API 2.1
+new_cluster                 |                 |LEGACY -- The cluster_spec identified as an automated cluster for legacy jobs -- Can be found nested within tasks now but **ONLY for direct API Calls, editing legacy jobs, AND sparkSumbit tasks (as they cannot use job_clusters)**, otherwise, new_clusters defined through the UI will be defined as "job_clusters" and referenced by a "job_cluster_key" in the tasks field.
+git_source                  |                 |Specification for a remote repository containing the notebooks used by this job's notebook tasks.
+task_detail_legacy          |                 |LEGACY -- The job execution details used to be defined at the root level for API 2.0 as of API 2.1 they have been nested within tasks. The logic definition will be defined here for legacy jobs only (or new jobs created using the 2.0 jobs API)
+is_from_dlt                 |                 |Whether or not the job was created from DLT -- Unsupported as OW doesn't yet support DLT but left here as a reference in case it can be helpful
+aclPermissionSet            |                 |Only populated for "ChangeJobAcl" actions. Defines the new ACLs for a job
 target_user_id              |string           |Databricks canonical user id to which the aclPermissionSet is to be applied
 session_id                  |string           |session_id that requested the action
 request_id                  |string           |request_id of the action
 user_agent                  |string           |request origin such as browser, terraform, api, etc.
 response                    |struct           |response of api call including errorMessage, result, and statusCode (HTTP 200,400, etc)
 source_ip_address           |string           |Origin IP of action requested
-created_by                  |                 |
-created_ts                  |                 |
-deleted_by                  |                 |
-deleted_ts                  |                 |
-last_edited_by              |                 |
-last_edited_ts              |                 |
+created_by                  |                 |Email account that created the job
+created_ts                  |                 |Timestamp the job was created
+deleted_by                  |                 |Email account that deleted the job -- will be null if job has not been deleted
+deleted_ts                  |                 |Timestamp the job was deleted -- will be null if job has not been deleted
+last_edited_by              |                 |Email account that made the previous edit -- defaults to created by if no edits made
+last_edited_ts              |                 |Timestamp the job was last edited
 
 #### JobRun
 [**SAMPLE**](/assets/TableSamples/jobrun.tab)
+
+Databricks has moved to "multi-task jobs" and each run now refers to the run of a task not a job. This migration 
+will cause a lot of confusion so please read this carefully.
+
+Each record references the full lifecycle of a single task run with some legacy fields to accommodate historical 
+job-level runs. Since the inception of multi-task jobs and Databricks jobs API 2.1, all run logic has been migrated from 
+the job-level to the task-level. Overwatch must accommodate both as many customers have historical data that is still 
+important. As such, some of the fields seem redundant and the user must apply the correct logic based on the 
+circumstances. Please carefully review the field descriptions to understand the rules.
+
+**TODO -- reference unsupported scenarios for runs**
+Several scenarios are not yet supported by Overwatch and they are called out here
+
+**TODO -- clarify the taskRunId vs jobRunId confusion from the UI**
 
 **KEY** -- organization_id + run_id + startEpochMS
 
@@ -329,30 +362,53 @@ last_edited_ts              |                 |
 
 **Write Mode** -- Merge
 
-Inventory of every canonical job run executed in a databricks workspace.
+Inventory of every canonical task run executed by databricks workspace.
 
 Column | Type | Description
 :---------------------------|:----------------|:--------------------------------------------------
 organization_id             |string           |Canonical workspace id
-run_id                      |int              |Incremental Canonical run ID for the workspaced
-run_name                    |string           |Name of run (if named)
-job_runtime                 |struct           |Complex type with all, standard, runtime information regarding the runtime of the job. The start begins from the moment the job run start is requested (including cluster create time if relevant) and the end time marks the moment the workspace identifies the run as terminated
-job_id                      |int              |Canonical ID of job
-id_in_job                   |int              |Run instance of the job_id. This can be seen in the UI in a job spec denoted as "Run N". Each Job ID has first id_in_job as "Run 1" and is incrented and canonical ONLY for the job_id. This field omits the "Run " prefix and results in an integer value of run instance within job.
-job_cluster_type            |string           |Either new OR existing. New == automated and existing == interactive cluster type
-job_task_type               |string           |Job Task Type - such as Notebook, Python, etc. See [JobTask](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobtask)
-job_terminal_state          |string           |Result state of run such as SUCCESS, FAILED, TIMEDOUT, CANCELLED. See [RunResultState](https://docs.databricks.com/dev-tools/api/latest/jobs.html#runresultstate)
-job_trigger_type            |string           |Type of trigger: PERIODIC, ONE_TIME, RETRY. See [TriggerType](https://docs.databricks.com/dev-tools/api/latest/jobs.html#triggertype)
-cluster_id                  |string           |Canonical workspace cluster id
-notebook_params             |string JSON      |A map of (String, String) parameters sent to notebook parameter overrides. See [ParamPair](https://docs.databricks.com/dev-tools/api/latest/jobs.html#parampair) 
-libraries                   |string JSON      |Array of Libraries in the format defined [HERE](https://docs.databricks.com/dev-tools/api/latest/libraries.html#library)
-children                    |array<struct>    |Array of structs that show all children of this job
-workflow_context            |string           |?? REVIEW ??
-task_detail                 |struct           |Unified location for JobTask contingent upon jobrun task. See [JobTask](https://docs.databricks.com/dev-tools/api/latest/jobs.html#jobtask)
-cancellation_detail         |struct           |All cancellation request detail and status
-time_detail                 |struct           |All time dimensions tied to the run. runBeginTime == Time the run began to execute on the cluster, SubmissionTime == Time the run request was received by the endpoint (before cluster build/start), completionTime == time the workspace denoted the runID was terminal state 
-started_by                  |struct           |Run request received from user -- email is recorded here -- usage == started_by.email
-request_detail              |struct           |Complete request detail received by the endpoint
+workspace_name              |string           |Customer defined name of the workspace or workspace_id (default)
+job_id                      |long             |ID of the job
+job_name                    |string           |Name of the runName if run is named, otherwise it will be job name
+job_trigger_type            |string           |One of "cron" (automated scheduled), "manual", "repair"
+terminal_state              |string           |State of the task run at the time of Overwatch pipeline execution 
+run_id                      |long             |The lowest level of the run_id (i.e. legacy jobs may not have a task_run_id, in this case, it will be the job_run_id).
+run_name                    |string           |The name of the run if the run is named (i.e. in submitRun) otherwise this is set == taskKey
+multitask_parent_run_id     |long             |If the task belongs to a multi-task job the job_run_id will be populated here, otherwise it will be null
+job_run_id                  |long             |The run id of the job, not the task
+task_run_id                 |long             |The run id of the task except for legacy and
+repair_id                   |long             |If the task or job was repaired, the repair id will be present here and the details of the repair will be in repair_details
+task_key                    |string           |The name of the task is actually a key and must be unique within a job, this field specifies the task that was executed in this task_run_id
+cluster_type                |string           |Type of cluster used in the execution, one of "new", "job_cluster", "existing", "SQL Warehouse", null -- will be null for DLT pipelines and/or in situations where the type is not provided from Databricks
+cluster_id                  |string           |The cluster ID of the compute used to execute the task run. If task executed on a SQL Warehouse, the warehouse_id will be populated here.
+cluster_name                |string           |The name of the compute asset used to execute the task run
+job_cluster_key             |string           |When the task compute is a job_cluster the name of the job_cluster will be provided here
+job_cluster                 |struct           |When the task compute is a job_cluster, the cluster_definition of the job_cluster used to execute the task
+new_cluster                 |struct           |LEGACY + SparkSubmit jobs -- new clusters are no longer used for tasks except for sparkSubmit jobs as they cannot use job_clusters. Job_clusters are used everywhere else 
+tags                        |map              |Job tags at the time of the run
+task_detail                 |struct           |The details of the task logic such as notebook_task, sql_task, spark_python_task, etc.
+task_dependencies           |array            |The list of tasks the task depends on to be successful in order to run
+task_runtime                |struct           |The runtime of the task from launch to termination (including compute spin-up time)
+task_execution_runtime      |struct           |The execution time of the task (excluding compute spin-up time)
+task_type                   |string           |Type of task to be executed -- this should mirror the "type" selected in the "type" drop down in the job definition. May be null for submitRun as this jobType
+schedule                    |struct           |Schedule by which the job should execute and whether or not it is paused
+libraries                   |array            |LEGACY -- Libraries defined in the job -- Nested within tasks as of API 2.1
+manual_override_params      |struct           |When task is executed manually and the default parameters were manually overridden the overridden parameters will be captured here
+repair_details              |array            |Details of the repair run including any references to previous repairs
+timeout_seconds             |string           |Job-level timeout seconds. Databricks supports timeout seconds at both the job level and the task level. Task level timeout_seconds can be found nested within tasks
+retry_on_timeout            |boolean          |LEGACY -- whether or not to retry if a job run times out -- Nested within tasks as of API 2.1
+max_retries                 |long             |LEGACY -- Max retries for legacy jobs -- Nested within tasks as of API 2.1
+min_retry_interval_millis   |long             |LEGACY -- Minimal interval in milliseconds between the start of the failed run and the subsequent retry run. The default behavior is that unsuccessful runs are immediately retried. -- Nested within tasks as of API 2.1
+max_concurrent_runs         |long             |Job-level -- maximum concurrent executions of the job
+run_as_user_name            |string           |The user email of the principal configured to execute the job
+parent_run_id               |long             |The upstream run_id of the run that called current run using dbutils.notebook.run -- DO NOT confuse this with multitask_parent_run_id, these are different 
+workflow_context            |string           |The workflow context (as a json string) provided when using Notebook Workflows (i.e. dbutils.notebook.run)
+task_detail_legacy          |struct           |LEGACY -- The details of the task logic for legacy jobs such as notebook_task, spark_python_task, etc. These must be separated from the task level details as the structures have been altered in many cases
+submitRun_details           |struct           |When task_type == submitRun, full job and run definition provided in the submitRun API Call. Since no existing job definition is present for a submitRun -- all the details of the run submission are captured here  
+created_by                  |string           |Email account that created the job
+last_edited_by              |string           |Email account that made the previous edit -- defaults to created by if no edits made
+request_detail              |struct           |All request details of the lifecycle and their results are captured here including submission, cancellation, completions, and execution start 
+time_detail                 |struct           |All events in the run lifecycle timestamps are captured here in the event deeper timestamp analysis is required
 
 #### JobRunCostPotentialFact
 [**SAMPLE**](/assets/TableSamples/jobruncostpotentialfact.tab)
