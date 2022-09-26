@@ -1251,4 +1251,9 @@ trait SilverTransforms extends SparkSessionWrapper {
       .select(notebookCols: _*)
   }
 
+  protected def sqlHistoryTransform()(df: DataFrame): DataFrame = {
+    df.select("*","metrics.*")
+      .drop("metrics")
+  }
+
 }

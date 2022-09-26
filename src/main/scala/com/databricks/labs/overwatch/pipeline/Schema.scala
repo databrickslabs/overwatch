@@ -694,6 +694,17 @@ object Schema extends SparkSessionWrapper {
     StructField("workspace_name", StringType, nullable = true)
   ))
 
+  val sqlHistorySnapMinimumSchema: StructType = StructType(Seq(
+    StructField("warehouse_id", StringType, nullable = false),
+    StructField("organization_id", StringType, nullable = false),
+    StructField("query_id", StringType, nullable = false),
+    StructField("query_start_time_ms", LongType, nullable = true),
+    StructField("metrics",
+      StructType(Seq(
+        StructField("compilation_time_ms",LongType,nullable = true)
+      )),nullable = true)
+  ))
+
   /**
    * Minimum required schema by module. "Minimum Requierd Schema" means that at least these columns of these types
    * must exist for the downstream ETLs to function.
@@ -732,6 +743,8 @@ object Schema extends SparkSessionWrapper {
     2017 -> auditMasterSchema,
     // Notebook Summary
     2018 -> auditMasterSchema,
+    // sqlHistory
+    2020 -> sqlHistorySnapMinimumSchema,
     // jobStatus
     3002 -> StructType(Seq(
       StructField("timestamp", LongType, nullable = false),

@@ -30,7 +30,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkTaskTarget,
       GoldTargets.sparkExecutionTarget,
       GoldTargets.sparkStreamTarget,
-      GoldTargets.sparkExecutorTarget
+      GoldTargets.sparkExecutorTarget,
+      GoldTargets.sqlHistoryTarget
     )
   }
 
@@ -63,6 +64,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           sparkExecutionModule,
           sparkStreamModule
         )
+      }
+      case OverwatchScope.sqlHistory => {
+        Array(sqlHistoryModule)
       }
       case _ => Array[Module]()
     }
@@ -218,6 +222,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkExecutorTarget)
   )
 
+  lazy private[overwatch] val sqlHistoryModule = Module(3017, "Gold_SqlHistory", this, Array(2020), 6.0)
+    .withSparkOverrides(sparkBaseSparkOverrides)
+  lazy private val appendSqlHistoryProcess = ETLDefinition(
+    SilverTargets.sqlHistoryTarget.asIncrementalDF(sqlHistoryModule, GoldTargets.sqlHistoryTarget.incrementalColumns,2),
+    append(GoldTargets.sqlHistoryTarget)
+  )
 
   private def processSparkEvents(): Unit = {
 
@@ -234,6 +244,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
     GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
     GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+    GoldTargets.sqlHistoryViewTarget.publish(sqlHistoryViewColumnMapping)
 
   }
 
@@ -269,6 +280,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         jobRunsModule.execute(appendJobRunsProcess)
         GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
         GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
+      }
+      case OverwatchScope.sqlHistory => {
+        sqlHistoryModule.execute(appendSqlHistoryProcess)
+        GoldTargets.sqlHistoryViewTarget.publish(sqlHistoryViewColumnMapping)
       }
       case OverwatchScope.sparkEvents => {
         processSparkEvents()
@@ -321,6 +336,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
         GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
         GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+      }
+      case OverwatchScope.sqlHistory => {
+        GoldTargets.sqlHistoryViewTarget.publish(sqlHistoryViewColumnMapping)
       }
       case _ =>
     }
