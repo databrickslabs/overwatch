@@ -671,7 +671,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   def jobRunsDeriveRunStarts(df: DataFrame, firstRunSemanticsW: WindowSpec): DataFrame = {
-    // TODO -- ISSUE 488 -- SQL runStarts do not emit clusterId (i.e. sqlEndpointId) need this for run costs
     // TODO -- ISSUE 479 -- DLT runStarts do not emit clusterId -- need this for run costs
     df.filter('actionName.isin("runStart"))
       .select(
@@ -813,15 +812,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           .otherwise('jobTerminalState)
           .alias("terminalState"),
         'clusterId,
-        struct(
-          'existing_cluster_id,
-          structFromJson(spark, jobRunsMaster, "new_cluster", allNullMinimumSchema = Schema.minimumNewClusterSchema),
-          structFromJson(spark, jobRunsMaster, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema),
-          structFromJson(spark, jobRunsMaster, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema),
-          structFromJson(spark, jobRunsMaster, "libraries", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumLibrariesSchema),
-          structFromJson(spark, jobRunsMaster, "access_control_list", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumAccessControlListSchema),
-          structFromJson(spark, jobRunsMaster, "git_source", allNullMinimumSchema = Schema.minimumGitSourceSchema)
-        ).alias("submitRun_details"),
+        'existing_cluster_id,
+        'new_cluster,
+        'tasks.alias("submitRun_tasks"),
+        'job_clusters.alias("submitRun_job_clusters"),
+        'libraries,
+        'access_control_list,
+        'git_source,
         'manual_override_params,
         coalesce('workflow_context_runNow, 'workflow_context_submitRun).alias("workflow_context"),
         'notebook_task,
@@ -868,32 +865,46 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       )
       .withColumn("timestamp", $"TaskRunTime.startEpochMS") // TS lookup key added for next steps (launch time)
       .withColumn("startEpochMS", $"TaskRunTime.startEpochMS") // set launch time as TS key
-      .scrubSchema
+//      .scrubSchema
   }
 
   def jobRunsStructifyLookupMeta(df: DataFrame): DataFrame = {
     df.cache() // caching to speed up schema inference
     df.count()
-    df
-      .withColumn("task_detail_legacy",
-        struct(
-          structFromJson(spark, df, "notebook_task", allNullMinimumSchema = Schema.minimumNotebookTaskSchema),
-          structFromJson(spark, df, "spark_python_task", allNullMinimumSchema = Schema.minimumSparkPythonTaskSchema),
-          structFromJson(spark, df, "python_wheel_task", allNullMinimumSchema = Schema.minimumPythonWheelTaskSchema),
-          structFromJson(spark, df, "spark_jar_task", allNullMinimumSchema = Schema.minimumSparkJarTaskSchema),
-          structFromJson(spark, df, "spark_submit_task", allNullMinimumSchema = Schema.minimumSparkSubmitTaskSchema),
-          structFromJson(spark, df, "shell_command_task", allNullMinimumSchema = Schema.minimumShellCommandTaskSchema),
-          structFromJson(spark, df, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
-        )
-      )
-      .withColumn("notebook_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.notebook_params"))
-      .withColumn("python_named_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.python_named_params"))
-      .withColumn("sql_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.sql_params"))
-      .withColumn("pipeline_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.pipeline_params"))
-      .withColumn("tags", structFromJson(spark, df, "tags"))
+    val colsToOverride = Array("tasks", "job_clusters", "tags").toSet
+    val dfOrigCols = (df.columns.toSet -- colsToOverride).toArray map col
+    val colsToAppend: Array[Column] = Array(
+      structFromJson(spark, df, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema).alias("tasks"),
+      structFromJson(spark, df, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema).alias("job_clusters"),
+      struct(
+        structFromJson(spark, df, "new_cluster", allNullMinimumSchema = Schema.minimumNewClusterSchema),
+        structFromJson(spark, df, "submitRun_tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema).alias("tasks"),
+        structFromJson(spark, df, "submitRun_job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema).alias("job_clusters"),
+        structFromJson(spark, df, "libraries", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumLibrariesSchema),
+        structFromJson(spark, df, "access_control_list", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumAccessControlListSchema),
+        structFromJson(spark, df, "git_source", allNullMinimumSchema = Schema.minimumGitSourceSchema)
+      ).alias("submitRun_details"),
+      struct(
+        structFromJson(spark, df, "notebook_task", allNullMinimumSchema = Schema.minimumNotebookTaskSchema),
+        structFromJson(spark, df, "spark_python_task", allNullMinimumSchema = Schema.minimumSparkPythonTaskSchema),
+        structFromJson(spark, df, "python_wheel_task", allNullMinimumSchema = Schema.minimumPythonWheelTaskSchema),
+        structFromJson(spark, df, "spark_jar_task", allNullMinimumSchema = Schema.minimumSparkJarTaskSchema),
+        structFromJson(spark, df, "spark_submit_task", allNullMinimumSchema = Schema.minimumSparkSubmitTaskSchema),
+        structFromJson(spark, df, "shell_command_task", allNullMinimumSchema = Schema.minimumShellCommandTaskSchema),
+        structFromJson(spark, df, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
+      ).alias("task_detail_legacy"),
+      structFromJson(spark, df, "manual_override_params.notebook_params").alias("notebook_params_overwatch_ctrl"),
+      structFromJson(spark, df, "manual_override_params.python_named_params").alias("python_named_params_overwatch_ctrl"),
+      structFromJson(spark, df, "manual_override_params.sql_params").alias("sql_params_overwatch_ctrl"),
+      structFromJson(spark, df, "manual_override_params.pipeline_params").alias("pipeline_params_overwatch_ctrl"),
+      structFromJson(spark, df, "tags").alias("tags")
+    )
+    val selectCols = dfOrigCols ++ colsToAppend
+    df.select(selectCols: _*)
       .drop(
         "notebook_task", "spark_python_task", "spark_jar_task", "python_wheel_task",
-        "spark_submit_task", "shell_command_task", "pipeline_task"
+        "spark_submit_task", "shell_command_task", "pipeline_task", "new_cluster", "libraries", "access_control_list",
+        "git_source", "submitRun_tasks", "submitRun_job_clusters"
       )
       .scrubSchema
 
@@ -913,6 +924,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       "tags" -> handleRootNull(dfWCleansedJobsAndTasks, "tags", SchemaTools.structToMap(dfWCleansedJobsAndTasks, "tags"), MapType(StringType, StringType)),
       "submitRun_details.tasks" -> col("cleansedTasks"),
       "submitRun_details.job_clusters" -> col("cleansedJobsClusters"),
+      "task_detail.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail.notebook_task.base_parameters"),
+      "task_detail.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail.shell_command_task.env_vars"),
       "task_detail_legacy.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.notebook_task.base_parameters"),
       "task_detail_legacy.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.shell_command_task.env_vars"),
       "manual_override_params.notebook_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "notebook_params_overwatch_ctrl"),
@@ -920,9 +933,12 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       "manual_override_params.sql_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "sql_params_overwatch_ctrl"),
       "manual_override_params.pipeline_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "pipeline_params_overwatch_ctrl")
     ) ++
-      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.new_cluster")
+      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.new_cluster") ++
+      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "new_cluster") ++
+      PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "job_cluster")
 
-    val dfWStructedTasksAndCleansedJobs = dfWCleansedJobsAndTasks
+//    val dfWStructedTasksAndCleansedJobs =
+    dfWCleansedJobsAndTasks
       .modifyStruct(tasksAndJobClustersCleansingInventory) // overwrite nested complex structures with cleansed structures
       .drop(
         "cleansedTasks",
@@ -932,20 +948,20 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         "sql_params_overwatch_ctrl",
         "pipeline_params_overwatch_ctrl"
       ) // cleanup temporary cleaner fields
+      .scrubSchema
 
     // after submitRun_details.tasks has been converted into a struct, cleanse the nested tasks columns
     // if it still exists after the cullNullTypes
-    if (SchemaTools.getAllColumnNames(dfWStructedTasksAndCleansedJobs.schema).exists(c => c.startsWith("submitRun_details.tasks"))) {
-      val secondaryStructTasksCleanser = Map(
-        "submitRun_details.tasks.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.notebook_task.base_parameters"),
-        "submitRun_details.tasks.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.shell_command_task.env_vars"),
-      ) ++
-        PipelineFunctions.newClusterCleaner(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.new_cluster")
-
-      dfWStructedTasksAndCleansedJobs
-        .modifyStruct(secondaryStructTasksCleanser)
-        .scrubSchema
-    } else dfWStructedTasksAndCleansedJobs.scrubSchema
+//    if (SchemaTools.getAllColumnNames(dfWStructedTasksAndCleansedJobs.schema).exists(c => c.startsWith("submitRun_details.tasks"))) {
+//      val secondaryStructTasksCleanser = Map(
+//        "submitRun_details.tasks.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.notebook_task.base_parameters"),
+//        "submitRun_details.tasks.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWStructedTasksAndCleansedJobs, "submitRun_details.tasks.shell_command_task.env_vars"),
+//      )
+//
+//      dfWStructedTasksAndCleansedJobs
+//        .modifyStruct(secondaryStructTasksCleanser)
+//        .scrubSchema
+//    } else dfWStructedTasksAndCleansedJobs.scrubSchema
 
   }
 
@@ -1001,11 +1017,18 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
     runsWithJobName2
       .withColumn("jobName", coalesce('jobName, 'run_name))
+      .withColumn("tasks", coalesce('tasks, 'submitRun_tasks))
+      .withColumn("job_clusters", coalesce('job_clusters, 'submitRun_job_clusters))
 
   }
 
   def jobRunsAppendTaskAndClusterDetails(df: DataFrame): DataFrame = {
-    if (SchemaTools.nestedColExists(df.schema, "tasks")) {
+    val computeIsSQLWarehouse = $"task_detail.sql_task.warehouse_id".isNotNull
+
+    val dfHasTasks = SchemaTools.nestedColExists(df.schema, "tasks")
+    val dfHasJobClusters = SchemaTools.nestedColExists(df.schema, "job_clusters")
+
+    if (dfHasTasks) { // todo -- temp until 503 resolved
       val isSingleTaskMTJ = 'taskKey.isNull && size('tasks) === 1
       val jobRunsWithImprovedKeys = df
         .withColumn("taskKey", when(isSingleTaskMTJ, $"tasks"(0)("task_key")).otherwise('taskKey)) // ES-427957 -- singleTask MTJs don't emit taskKey as of 0.6.2.0
@@ -1038,7 +1061,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           ).alias("task_detail")
         )
 
-      if (SchemaTools.nestedColExists(df.schema, "job_clusters")) { // has tasks AND job_clusters
+      if (dfHasJobClusters) { // has tasks AND job_clusters
         val jobClustersExploded = jobRunsWithImprovedKeys
           .join(tasksExploded, Seq("jobId", "taskKey", "runId"))
           .select('jobId, 'runId, 'job_cluster_key.alias("jobClusterKey"), explode('job_clusters).alias("job_cluster"))
@@ -1051,12 +1074,16 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           .join(tasksExploded, Seq("jobId", "taskKey", "runId"), "left")
           .join(jobClustersExploded, Seq("jobId", "runId", "job_cluster_key"), "left")
           .withColumn("cluster_name", coalesce('cluster_name, 'job_cluster_key, 'taskKey))
+          .withColumn("clusterId", when(computeIsSQLWarehouse, $"task_detail.sql_task.warehouse_id").otherwise('clusterId))
+          .withColumn("clusterType", when(computeIsSQLWarehouse, lit("sqlWarehouse")).otherwise('clusterType))
           .withColumn("run_name", coalesce('run_name, 'taskKey))
           .drop("tasks", "job_clusters")
       } else { // has tasks BUT NO job_clusters in schema
-        df
+        jobRunsWithImprovedKeys
           .join(tasksExploded, Seq("jobId", "taskKey", "runId"), "left")
           .withColumn("cluster_name", coalesce('cluster_name, 'job_cluster_key, 'taskKey))
+          .withColumn("clusterId", when(computeIsSQLWarehouse, $"task_detail.sql_task.warehouse_id").otherwise('clusterId))
+          .withColumn("clusterType", when(computeIsSQLWarehouse, lit("sqlWarehouse")).otherwise('clusterType))
           .withColumn("run_name", coalesce('run_name, 'taskKey))
           .drop("tasks")
       }

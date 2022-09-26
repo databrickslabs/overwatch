@@ -322,7 +322,9 @@ object TransformFunctions {
      */
     def hasFieldNamed(name: String, caseSensitive: Boolean = false): Boolean = {
       val casedName = if (caseSensitive) name else name.toLowerCase
-      SchemaTools.getAllColumnNames(df.schema).exists(c => c.startsWith(casedName))
+      SchemaTools.getAllColumnNames(df.schema).exists(c => {
+        if (caseSensitive) c.startsWith(casedName) else c.toLowerCase.startsWith(casedName)
+      })
     }
 
     /**

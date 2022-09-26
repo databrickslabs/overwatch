@@ -309,8 +309,16 @@ object Schema extends SparkSessionWrapper {
     StructField("notebook_params",MapType(StringType, StringType, valueContainsNull = true), nullable = true)
   ))
 
+  val minimumSQLTaskSchema: StructType = StructType(Seq(
+    StructField("warehouse_id", StringType, nullable = true),
+    StructField("query",StructType(Seq(
+      StructField("query_id",StringType, nullable = true))
+    ), nullable = true)
+  ))
+
   val minimumSubmitRunDetailsSchema: StructType = StructType(Seq(
-    StructField("existing_cluster_id",StringType, nullable = true)
+    StructField("existing_cluster_id",StringType, nullable = true),
+    StructField("sql_task",minimumSQLTaskSchema, nullable = true)
   ))
 
   val minimumRepairDetailsSchema: ArrayType = ArrayType(
@@ -353,12 +361,6 @@ object Schema extends SparkSessionWrapper {
     StructField("entry_point",StringType, nullable = true),
     StructField("package_name",StringType, nullable = true),
     StructField("parameters",ArrayType(StringType, containsNull = true), nullable = true)
-  ))
-
-  val minimumSQLTaskSchema: StructType = StructType(Seq(
-    StructField("query",StructType(Seq(
-      StructField("query_id",StringType, nullable = true))
-    ), nullable = true)
   ))
 
   val minimumDBTTask: StructType = StructType(Seq(

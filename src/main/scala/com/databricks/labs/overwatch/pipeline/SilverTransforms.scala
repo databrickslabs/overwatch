@@ -1196,14 +1196,14 @@ trait SilverTransforms extends SparkSessionWrapper {
         'timeout_seconds,
         'created_by,
         'last_edited_by,
-        'tasks,
-        'job_clusters,
+        to_json('tasks).alias("tasks"),
+        to_json('job_clusters).alias("job_clusters"),
         to_json($"task_detail_legacy.notebook_task").alias("notebook_task"),
         to_json($"task_detail_legacy.spark_python_task").alias("spark_python_task"),
         to_json($"task_detail_legacy.python_wheel_task").alias("python_wheel_task"),
         to_json($"task_detail_legacy.spark_jar_task").alias("spark_jar_task"),
         to_json($"task_detail_legacy.spark_submit_task").alias("spark_submit_task"),
-        to_json($"task_detail_legacy.shell_command_task").alias("shell_command_task"), // not in min schema yet
+        to_json($"task_detail_legacy.shell_command_task").alias("shell_command_task"),
         to_json($"task_detail_legacy.pipeline_task").alias("pipeline_task")
       )
 
@@ -1222,8 +1222,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
       .transform(jobRunsAppendClusterName(jobRunsLookups))
       .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(jobRunsAppendTaskAndClusterDetails)
       .transform(jobRunsStructifyLookupMeta)
+      .transform(jobRunsAppendTaskAndClusterDetails)
       .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
       .transform(jobRunsRollupWorkflowsAndChildren)
       .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
