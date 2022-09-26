@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv}
 import org.scalatest.{BeforeAndAfterAll, Ignore, Tag}
@@ -193,7 +194,6 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       val endPoint = "clusters/list"
       val clusterIDsDf = ApiCallV2(apiEnv, endPoint).execute().asDF().select("cluster_id")
       clusterIDsDf.show(false)
-      val timeoutThreshold = 300000 // 5 minutes
       val clusterIDs = clusterIDsDf.collect()
       val finalResponseCount = clusterIDs.length
       var responseCounter = 0
@@ -202,7 +202,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
       val tmpClusterEventsSuccessPath = ""
       val tmpClusterEventsErrorPath = ""
-
+      val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
       for (i <- clusterIDs.indices) {
        val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i).get(0)}""",
           "start_time"->"1052775426000",
@@ -211,7 +211,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         )
         println(jsonQuery)
         val future = Future {
-          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
+          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
           synchronized {
             apiResponseArray.addAll(apiObj)
             if (apiResponseArray.size() >= apiEnv.successBatchSize) {
@@ -240,8 +240,9 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
             println("Future failure message: " + e.getMessage, e)
         }
       }
+      val timeoutThreshold = 300000 // 5 minutes
       var currentSleepTime = 0;
-      var responseStateWhileSleeping = responseCounter
+      var accumulatorCountWhileSleeping = accumulator.value
       while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
         //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
         // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
@@ -252,15 +253,14 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         }
         Thread.sleep(5000)
         currentSleepTime += 5000
-        if (responseStateWhileSleeping < responseCounter) {//new API response received while waiting
+        if (accumulatorCountWhileSleeping <  accumulator.value) {//new API response received while waiting
           currentSleepTime = 0 //resetting the sleep time
-          responseStateWhileSleeping = responseCounter
+          accumulatorCountWhileSleeping =  accumulator.value
         }
       }
       if (responseCounter != finalResponseCount) {
         throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
       }
-      println("responseStateWhileSleeping "+responseStateWhileSleeping)
     }
 
   }
