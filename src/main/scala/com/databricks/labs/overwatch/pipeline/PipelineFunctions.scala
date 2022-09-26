@@ -490,10 +490,12 @@ object PipelineFunctions {
       s"modules include ${pipelineModules.map(m => s"\n(${m.moduleId}, ${m.moduleName})").mkString("\n")}"))
   }
 
-  private[overwatch] def deriveSKU(isAutomated: Column, sparkVersion: Column): Column = {
+  private[overwatch] def deriveSKU(isAutomated: Column, sparkVersion: Column,clusterName: Column): Column = {
     val isJobsLight = sparkVersion.like("apache_spark_%")
+    val isDBSQL = clusterName.like("SQLAnalytics%")
     when(isAutomated && isJobsLight, "jobsLight")
       .when(isAutomated && !isJobsLight, "automated")
+      .when(!isAutomated && isDBSQL,"sqlCompute")
       .when(!isAutomated, "interactive")
       .otherwise("unknown")
   }

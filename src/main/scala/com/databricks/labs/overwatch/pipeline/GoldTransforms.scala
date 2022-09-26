@@ -236,7 +236,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val nodeTypeLookup = clusterSpec.asDF
       .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
-      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version))
+      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version,'cluster_name))
       .toTSDF("timestamp", "organization_id", "sku")
       .lookupWhen(dbuCostDetailsTSDF)
       .df
@@ -245,7 +245,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     val nodeTypeLookup2 = clusterSnapshot.asDF
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
       .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version)
-      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version))
+      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version,'cluster_name))
       .toTSDF("timestamp", "organization_id", "sku")
       .lookupWhen(dbuCostDetailsTSDF)
       .df
