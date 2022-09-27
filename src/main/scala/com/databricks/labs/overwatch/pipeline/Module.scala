@@ -380,6 +380,8 @@ class Module(
         val msg = PipelineFunctions.appendStackStrace(e, s"$moduleName FAILED -->\n")
         logger.log(Level.ERROR, msg, e)
         fail(msg)
+    } finally {
+      spark.catalog.clearCache()
     }
 
   }

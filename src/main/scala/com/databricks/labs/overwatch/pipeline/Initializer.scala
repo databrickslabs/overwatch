@@ -519,6 +519,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       case "pools" => pools
       case "audit" => audit
       case "accounts" => accounts
+      case "sqlhistory" => sqlHistory
       //      case "iampassthrough" => iamPassthrough
       //      case "profiles" => profiles
       case scope => {
