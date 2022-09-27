@@ -404,10 +404,11 @@ object TransformFunctions {
       val isNotAnSQlWarehouse = !upper(sku).equalTo("SQLCOMPUTE")
       //This is the default logic for DBU calculation
       val defaultCalculation = dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))
+      val dbuMultiplier = 2
 
-      //asign the variables and return column with calculation
+      //assign the variables and return column with calculation
       coalesce(
-        when(isDatabricksBillable && isPhotonEnabled && isNotAnSQlWarehouse , defaultCalculation * 2)
+        when(isDatabricksBillable && isPhotonEnabled && isNotAnSQlWarehouse , defaultCalculation * dbuMultiplier)
           .when(isDatabricksBillable, defaultCalculation)
           .otherwise(lit(0)),
         lit(0) // don't allow costs to be null (i.e. missing worker node type and/or single node workers
