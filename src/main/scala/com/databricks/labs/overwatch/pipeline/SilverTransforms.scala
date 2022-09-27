@@ -1084,7 +1084,8 @@ trait SilverTransforms extends SparkSessionWrapper {
                                      isFirstRun: Boolean,
                                      targetKeys: Array[String],
                                      fromTime: TimeTypes,
-                                     tempWorkingDir: String
+                                     tempWorkingDir: String,
+                                     daysToProcess: Int
                                    )(df: DataFrame): DataFrame = {
 
     val jobsBase = getJobsBase(df)
@@ -1092,6 +1093,8 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobsBaseHasRecords = !jobsBase.isEmpty
     jobStatusValidateNewJobsStatusHasNewData(isFirstRun, jobsSnapshotTargetComplete, jobsBaseHasRecords)
+
+    val optimalCacheParts = Math.min(daysToProcess * getTotalCores * 2, 1000)
 
     // TODO -- temp -- not necessary after 503 fix
     //  adding arrays to lookup will ensure they are added on first run if they don't exist until 503 is resolved
@@ -1123,8 +1126,8 @@ trait SilverTransforms extends SparkSessionWrapper {
     jobStatusDeriveJobsStatusBase(jobsBase)
       .transform(jobStatusLookupJobMeta(jobSnapLookup))
       .transform(jobStatusDeriveBaseLookupAndFillForward(lastJobStatus))
-      .transform(jobStatusStructifyJsonCols)
-      .transform(jobStatusCleanseForPublication(targetKeys))
+      .transform(jobStatusStructifyJsonCols(optimalCacheParts))
+      .transform(jobStatusCleanseForPublication(targetKeys, optimalCacheParts))
       .transform(
         jobStatusFirstRunImputeFromSnap(
           isFirstRunAndJobsSnapshotHasRecords,
@@ -1166,15 +1169,17 @@ trait SilverTransforms extends SparkSessionWrapper {
                                   jobsSnapshot: PipelineTable,
                                   etlStartTime: TimeTypes,
                                   etlUntilTime: TimeTypes,
-                                  targetKeys: Array[String]
+                                  targetKeys: Array[String],
+                                  daysToProcess: Int
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
     val jobRunActions = Array(
       "runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel", "repairRun"
     )
+    val optimalCacheParts = Math.min(daysToProcess * getTotalCores * 2, 1000)
     val jobRunsLag30D = getJobsBase(auditLogLag30D)
       .filter('actionName.isin(jobRunActions: _*))
-      .repartition(getTotalCores * 4)
+      .repartition(optimalCacheParts)
       .cache() // cached df removed at end of module run
 
     // eagerly force this highly reused DF into cache()
@@ -1232,7 +1237,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
       .transform(jobRunsAppendClusterName(jobRunsLookups))
       .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(jobRunsStructifyLookupMeta)
+      .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
       .transform(jobRunsAppendTaskAndClusterDetails)
       .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
       .transform(jobRunsRollupWorkflowsAndChildren)

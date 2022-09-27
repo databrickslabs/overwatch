@@ -23,7 +23,7 @@ case class PipelineTable(
                           incrementalColumns: Array[String] = Array(),
                           format: String = "delta", // TODO -- Convert to Enum
                           persistBeforeWrite: Boolean = false,
-                          private val _mode: WriteMode = WriteMode.append,
+                          _mode: WriteMode = WriteMode.append,
                           maxMergeScanDates: Int = 33, // used to create explicit date merge condition -- should be removed after merge dynamic partition pruning is enabled DBR 11.x LTS
                           private val _permitDuplicateKeys: Boolean = true,
                           private val _databaseName: String = "default",

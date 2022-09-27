@@ -14,7 +14,7 @@ class Config() {
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _debugFlag: Boolean = false
-  private var _overwatchSchemaVersion = "0.610"
+  private var _overwatchSchemaVersion = "0.700"
   private var _organizationId: String = _
   private var _workspaceName: String = _
   private var _tempWorkingDir: String = _
@@ -151,6 +151,8 @@ class Config() {
         value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
       "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
       "spark.sql.caseSensitive" -> "false",
+      "spark.sql.autoBroadcastJoinThreshold" -> "10485760",
+      "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "10485760",
       "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
       "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365
     )

@@ -15,7 +15,7 @@ class Module(
               val moduleDependencies: Array[Int],
               val moduleScaleCoefficient: Double,
               hardLimitMaxHistory: Option[Int],
-              private var _shuffleFactor: Double
+              private var _shuffleFactor: Double = 1.0
             ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -50,8 +50,8 @@ class Module(
    * @return
    */
   def shuffleFactor: Double = {
-    val daysBucket = 5
-    val derivedShuffleFactor = _shuffleFactor + Math.floor(daysToProcess / daysBucket).toInt
+    val daysBucket = 30
+    val derivedShuffleFactor = _shuffleFactor * Math.floor(daysToProcess / daysBucket).toInt
     logger.info(s"SHUFFLE FACTOR: Set to $derivedShuffleFactor")
 
     derivedShuffleFactor
