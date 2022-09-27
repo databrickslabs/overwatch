@@ -364,6 +364,7 @@ class Config() {
         s"a user access token. It should start with 'dapi' ")
       val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
+      validateApiEnvConfig(Some(derivedApiEnvConfig))
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
         derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
@@ -380,6 +381,43 @@ class Config() {
         this
     }
   }
+
+  private def validateApiEnvConfig(apiEnvConfig: Option[ApiEnvConfig]) = {
+    if (apiEnvConfig.isDefined) {
+      val envConfig = apiEnvConfig.get
+      if (envConfig.threadPoolSize < 1 || envConfig.threadPoolSize > 20) {
+        throw new BadConfigException("ThreadPoolSize should be a valid number between 0 to 20")
+      }
+      if (envConfig.apiWaitingTime < 60000) { // 60000ms = 1 mint
+        throw new BadConfigException("ApiWaiting time should be more than 60000ms")
+      }
+      if (envConfig.errorBatchSize < 1 || envConfig.errorBatchSize > 1000) {
+        throw new BadConfigException("ErrorBatchSize should be between 1 to 1000")
+      }
+      if (envConfig.successBatchSize < 1 || envConfig.successBatchSize > 1000) {
+        throw new BadConfigException("SuccessBatchSize should be between 1 to 1000")
+      }
+      if (envConfig.apiProxyConfig.isDefined) {
+        validateApiEnvProxy(envConfig.apiProxyConfig)
+      }
+    }
+  }
+
+  def validateApiEnvProxy(apiProxyConfig: Option[ApiProxyConfig]) = {
+    val proxyConfig = apiProxyConfig.get
+    if (proxyConfig.proxyHost.isDefined) {
+      if (!proxyConfig.proxyPort.isDefined) {
+        throw new BadConfigException("Proxy host and port should be defined")
+      }
+    }
+    if (proxyConfig.proxyUserName.isDefined) {
+      if (!proxyConfig.proxyPasswordKey.isDefined || !proxyConfig.proxyPasswordScope.isDefined) {
+        throw new BadConfigException("Please define ProxyUseName,ProxyPasswordScope and ProxyPasswordKey")
+      }
+    }
+  }
+
+
 
   /**
    * Set Overwatch DB and location

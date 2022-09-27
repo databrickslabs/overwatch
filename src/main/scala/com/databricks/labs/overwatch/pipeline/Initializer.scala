@@ -238,40 +238,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   }
 
 
-  private def validateApiEnvConfig(apiEnvConfig: Option[ApiEnvConfig]) = {
-    if (apiEnvConfig.isDefined) {
-      val envConfig = apiEnvConfig.get
-      if (envConfig.threadPoolSize < 1) {
-        throw new BadConfigException("ThreadPoolSize should be a valid number greater then 0")
-      }
-      if (envConfig.apiWaitingTime < 60000) { // 60000ms = 1 mint
-        throw new BadConfigException("ApiWaiting time should be more than 60000ms")
-      }
-      if (envConfig.errorBatchSize < 1) {
-        throw new BadConfigException("ErrorBatchSize should be greater then 0")
-      }
-      if (envConfig.successBatchSize < 1) {
-        throw new BadConfigException("SuccessBatchSize should be greater then 0")
-      }
-      if (envConfig.apiProxyConfig.isDefined) {
-        validateApiEnvProxy(envConfig.apiProxyConfig)
-      }
-    }
-  }
-
-  def validateApiEnvProxy(apiProxyConfig: Option[ApiProxyConfig]) = {
-    val proxyConfig = apiProxyConfig.get
-    if (proxyConfig.proxyHost.isDefined) {
-      if (!proxyConfig.proxyPort.isDefined) {
-        throw new BadConfigException("Proxy host and port should be defined")
-      }
-    }
-    if (proxyConfig.proxyUserName.isDefined) {
-      if (!proxyConfig.proxyPasswordKey.isDefined || !proxyConfig.proxyPasswordScope.isDefined) {
-        throw new BadConfigException("Please define ProxyUseName,ProxyPasswordScope and ProxyPasswordKey")
-      }
-    }
-  }
 
 
   /**
@@ -312,7 +278,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       mapper.readValue[OverwatchParams](overwatchArgs)
     }
 
-    validateApiEnvConfig(rawParams.apiEnvConfig)
     // Now that the input parameters have been parsed -- set them in the config
     config.setInputConfig(rawParams)
 
