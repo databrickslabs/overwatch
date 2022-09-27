@@ -4,6 +4,10 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.0.0 (Major Release)
+WIP
+* **0700 Upgrade Script** [HTML](/assets/ChangeLog/Upgrade_070_Template.html) | [DBC](/assets/ChangeLog/Upgrade_070_Template.dbc)
+
 ## 0.6.1.1 (Maintenance Release)
 To upgrade from 0.6.1.0, simply swap the JAR from 0.6.1.0 to this version, no upgrade script necessary
 

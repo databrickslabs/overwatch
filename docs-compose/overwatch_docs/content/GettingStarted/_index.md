@@ -14,6 +14,7 @@ weight: 1
 ## Run Methods
 Overwatch is run via one of two methods:
 1. As a job controlling [**running a notebook**](#via-a-notebook)
+   * [Quick Link to Runner Notebooks](#jump-start-notebooks)
 2. As a job running the [**main class**](#via-main-class)
 
 Below are instructions for both methods. The primary difference is the way by which the
@@ -92,6 +93,8 @@ additional details on config customization options see [**configuration**]({{%re
 #### Jump Start Notebooks
 The following notebooks will demonstrate a typical best practice for multi-workspace (and stand-alone) configurations. 
 Simply populate the necessary variables for your environment.
+* AZURE ([HTML 0.7.0+](/assets/GettingStarted/azure_runner_docs_example_070.html) / [DBC 0.7.0+](/assets/GettingStarted/azure_runner_docs_example_070.dbc))
+* AWS ([HTML 0.7.0+](/assets/GettingStarted/aws_runner_docs_example_070.html) / [DBC 0.7.0+](/assets/GettingStarted/aws_runner_docs_example_070.dbc))
 * AZURE ([HTML 0.6.0+](/assets/GettingStarted/azure_runner_docs_example_060.html) / [DBC 0.6.0+](/assets/GettingStarted/azure_runner_docs_example_060.dbc))
 * AWS ([HTML 0.6.0+](/assets/GettingStarted/aws_runner_docs_example_060.html) / [DBC 0.6.0+](/assets/GettingStarted/aws_runner_docs_example_060.dbc))
 * AZURE ([HTML 0.5.0.4+](/assets/GettingStarted/azure_runner_docs_example_0504.html) / [DBC 0.5.0.4+](/assets/GettingStarted/azure_runner_docs_example_0504.dbc))
