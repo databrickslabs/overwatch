@@ -225,7 +225,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val sqlHistoryModule = Module(3017, "Gold_SqlHistory", this, Array(2020), 6.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSqlHistoryProcess = ETLDefinition(
-    SilverTargets.sqlHistoryTarget.asIncrementalDF(sqlHistoryModule, GoldTargets.sqlHistoryTarget.incrementalColumns,2),
+    SilverTargets.sqlHistoryTarget.asIncrementalDF(sqlHistoryModule, SilverTargets.sqlHistoryTarget.incrementalColumns,2),
     append(GoldTargets.sqlHistoryTarget)
   )
 

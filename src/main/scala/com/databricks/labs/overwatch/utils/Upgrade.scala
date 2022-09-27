@@ -1160,6 +1160,10 @@ object Upgrade extends SparkSessionWrapper {
     ).compactString
     val upgradeWorkspace = Initializer(upgradeParamString)
     val upgradeConfig = upgradeWorkspace.getConfig
+    upgradeConfig
+      .setExternalizeOptimize(true)
+      .setOverwatchSchemaVersion("0.610") // override to pass schema check across versions
+      .setDebugFlag(false)
     val tempDir = upgradeConfig.etlDataPathPrefix.split("/").dropRight(1).mkString("/") + s"/upgrade070_tempDir/${System.currentTimeMillis()}"
     val pipReportPath = s"${upgradeConfig.etlDataPathPrefix}/pipeline_report"
     val silverModulesToRebuild = Array(2010, 2011)
@@ -1283,6 +1287,8 @@ object Upgrade extends SparkSessionWrapper {
         targetsToRebuild.tasksupport = taskSupport
 
         targetsToRebuild.map(t => fastDrop(t, upgradeConfig.cloudProvider))
+        // ensure parent dirs are deleted
+        targetsToRebuild.foreach(t => dbutils.fs.rm(t.tableLocation, true))
 
         upgradeStatus.append(UpgradeReport(etlDatabaseName, "Tables to Upgrade", Some("SUCCESS"), stepMsg))
       } catch {
@@ -1335,7 +1341,7 @@ object Upgrade extends SparkSessionWrapper {
 
       try {
         // get latest workspace config by org id
-        val orgRunDetails = getWorkspaceByOrgNew(pipReportPath, 'status.like("ROLLED BACK FOR UPGRADE to 070%"))
+        val orgRunDetails = getWorkspaceByOrgNew(pipReportPath)
         logger.log(Level.INFO, s"\nREBUILDING SILVER for ORG_IDs ${orgRunDetails.map(_.organization_id).mkString(",")}\n")
         orgRunDetails.foreach(org => {
           val launchSilverPipelineForOrgMsg = s"BEGINNING SILVER REBUILD FOR ORG_ID: ${org.organization_id}"
@@ -1348,6 +1354,7 @@ object Upgrade extends SparkSessionWrapper {
 
           orgWorkspace
             .getConfig
+            .setDebugFlag(false)
             .setOrganizationId(org.organization_id)
             .setMaxDays(1000)
             .setOverwatchSchemaVersion("0.700")
@@ -1378,13 +1385,13 @@ object Upgrade extends SparkSessionWrapper {
       verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
     }
     if (startStep <= 7) {
-      val stepMsg = Some("Step 6: Rebuild Gold Targets")
+      val stepMsg = Some("Step 7: Rebuild Gold Targets")
       println(stepMsg.get)
       logger.log(Level.INFO, stepMsg.get)
 
       try {
         // get latest workspace config by org id
-        val orgRunDetails = getWorkspaceByOrgNew(pipReportPath, 'status.like("ROLLED BACK FOR UPGRADE to 070%"))
+        val orgRunDetails = getWorkspaceByOrgNew(pipReportPath)
         logger.log(Level.INFO, s"\nREBUILDING GOLD for ORG_IDs ${orgRunDetails.map(_.organization_id).mkString(",")}\n")
         orgRunDetails.foreach(org => {
           val launchSilverPipelineForOrgMsg = s"BEGINNING GOLD REBUILD FOR ORG_ID: ${org.organization_id}"
@@ -1397,6 +1404,7 @@ object Upgrade extends SparkSessionWrapper {
 
           orgWorkspace
             .getConfig
+            .setDebugFlag(false)
             .setOrganizationId(org.organization_id)
             .setMaxDays(1000)
             .setOverwatchSchemaVersion("0.700")
