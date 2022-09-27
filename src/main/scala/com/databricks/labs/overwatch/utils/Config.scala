@@ -363,10 +363,11 @@ class Config() {
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
       val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
+      val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
-        derivedApiEnvConfig.apiWaitingTime, derivedApiEnvConfig.proxyHost, derivedApiEnvConfig.proxyPort,
-        derivedApiEnvConfig.proxyUserName, derivedApiEnvConfig.proxyPasswordScope, derivedApiEnvConfig.proxyPasswordKey
+        derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
+        derivedApiProxy.proxyUserName, derivedApiProxy.proxyPasswordScope, derivedApiProxy.proxyPasswordKey
       ))
 
       this

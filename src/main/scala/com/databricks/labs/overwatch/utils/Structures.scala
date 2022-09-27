@@ -40,8 +40,8 @@ case class ApiEnv(
                    workspaceURL: String,
                    rawToken: String,
                    packageVersion: String,
-                   successBatchSize: Int = 50,
-                   errorBatchSize: Int = 50,
+                   successBatchSize: Int = 200,
+                   errorBatchSize: Int = 500,
                    runID: String = "",
                    enableUnsafeSSL: Boolean = false,
                    threadPoolSize: Int = 4,
@@ -60,12 +60,16 @@ case class ApiEnvConfig(
                          enableUnsafeSSL: Boolean = false,
                          threadPoolSize: Int = 4,
                          apiWaitingTime: Long = 300000,
-                         proxyHost: Option[String] = None,
-                         proxyPort: Option[Int] = None,
-                         proxyUserName: Option[String] = None,
-                         proxyPasswordScope: Option[String] = None,
-                         proxyPasswordKey: Option[String] = None
+                         apiProxyConfig: Option[ApiProxyConfig] = None
                        )
+
+case class ApiProxyConfig(
+                           proxyHost: Option[String] = None,
+                           proxyPort: Option[Int] = None,
+                           proxyUserName: Option[String] = None,
+                           proxyPasswordScope: Option[String] = None,
+                           proxyPasswordKey: Option[String] = None
+                         )
 
 
 case class ValidatedColumn(
