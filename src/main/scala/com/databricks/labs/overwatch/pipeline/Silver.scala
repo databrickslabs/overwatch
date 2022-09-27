@@ -26,7 +26,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.accountModTarget,
       SilverTargets.clustersSpecTarget,
       SilverTargets.dbJobsStatusTarget,
-      SilverTargets.notebookStatusTarget
+      SilverTargets.notebookStatusTarget,
+      SilverTargets.sqlHistoryTarget
     )
   }
 
@@ -49,6 +50,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         Array(jobStatusModule, jobRunsModule)
       }
+      case OverwatchScope.sqlHistory => Array(sqlHistoryModule)
       case _ => Array[Module]()
     }
   }
@@ -157,7 +159,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkExecutionsSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
-    "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
+    "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
+    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b"),
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b")
   )
   lazy private[overwatch] val executionsModule = Module(2005, "Silver_SPARK_Executions", this, Array(1006), 8.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkExecutionsSparkOverrides)
@@ -173,7 +177,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val sparkJobsSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
-    "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString
+    "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
+    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b"),
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b")
   )
   lazy private[overwatch] val sparkJobsModule = Module(2006, "Silver_SPARK_Jobs", this, Array(1006), 8.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkJobsSparkOverrides)
@@ -188,7 +194,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   private val sparkStagesSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
-    "spark.databricks.delta.optimizeWrite.binSize" -> "2048"
+    "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
+    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b"),
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b")
   )
   lazy private[overwatch] val sparkStagesModule = Module(2007, "Silver_SPARK_Stages", this, Array(1006), 8.0, shuffleFactor = 4.0)
     .withSparkOverrides(sparkStagesSparkOverrides)
@@ -205,7 +213,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048", // output is very dense, shrink output file size
     "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
-    "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 4).toString
+    "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 4).toString,
+    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b"),
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b")
   )
   lazy private[overwatch] val sparkTasksModule = Module(2008, "Silver_SPARK_Tasks", this, Array(1006), 8.0, shuffleFactor = 8.0)
     .withSparkOverrides(sparkTasksSparkOverrides)
@@ -213,7 +223,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     sparkEventsTarget.asIncrementalDF(sparkTasksModule, sparkEventsTarget.incrementalColumns: _*),
     Seq(sparkTasks(
       sparkEventsTarget.asIncrementalDF(sparkTasksModule, 3, sparkEventsTarget.incrementalColumns: _*),
-      sparkTasksModule.fromTime, sparkTasksModule.untilTime
+      sparkTasksModule.fromTime
     )),
     append(SilverTargets.tasksTarget)
   )
@@ -222,13 +232,12 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobStatusProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(
-
-
       dbJobsStatusSummary(
         BronzeTargets.jobsSnapshotTarget,
         jobStatusModule.isFirstRun,
         SilverTargets.dbJobsStatusTarget.keys,
-        jobStatusModule.fromTime
+        jobStatusModule.fromTime,
+        config.tempWorkingDir
       )),
     append(SilverTargets.dbJobsStatusTarget)
   )
@@ -242,7 +251,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget,
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
-        jobRunsModule.fromTime, jobRunsModule.untilTime
+        jobRunsModule.fromTime, jobRunsModule.untilTime,
+        SilverTargets.dbJobRunsTarget.keys
       )
     ),
     append(SilverTargets.dbJobRunsTarget)
@@ -301,6 +311,13 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.notebookStatusTarget)
   )
 
+  lazy private[overwatch] val sqlHistoryModule = Module(2020, "Silver_SqlHistory", this, Array(1016))
+  lazy private val appendSqlHistoryProcess = ETLDefinition(
+    BronzeTargets.sqlHistorySnapshotTarget.asIncrementalDF(sqlHistoryModule, SilverTargets.sqlHistoryTarget.incrementalColumns,2),
+    Seq(sqlHistoryTransform()),
+    append(SilverTargets.sqlHistoryTarget)
+  )
+
   private def processSparkEvents(): Unit = {
 
     executorsModule.execute(appendExecutorsProcess)
@@ -327,6 +344,10 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         jobStatusModule.execute(appendJobStatusProcess)
         jobRunsModule.execute(appendJobRunsProcess)
+      }
+      case OverwatchScope.sqlHistory => {
+        println("inside sql history module")
+        sqlHistoryModule.execute(appendSqlHistoryProcess)
       }
       case _ =>
     }

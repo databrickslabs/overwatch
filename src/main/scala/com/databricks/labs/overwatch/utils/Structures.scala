@@ -224,6 +224,8 @@ case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: S
 
 case class OrgConfigDetail(organization_id: String, latestParams: OverwatchParams)
 
+case class NamedColumn(fieldName: String, column: Column)
+
 case class DeltaHistory(version: Long, timestamp: java.sql.Timestamp, operation: String, clusterId: String, operationMetrics: Map[String, String], userMetadata: String)
 
 /**
@@ -244,7 +246,7 @@ case class SanitizeFieldException(field: StructField, rules: List[SanitizeRule],
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, sqlHistory, pools = Value
   // Todo Issue_77
 }
 

@@ -26,7 +26,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.processedEventLogs,
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.dbuCostDetail,
-      BronzeTargets.clusterEventsErrorsTarget
+      BronzeTargets.clusterEventsErrorsTarget,
+      BronzeTargets.sqlHistorySnapshotTarget
     )
   }
 
@@ -38,6 +39,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => Array(jobsSnapshotModule)
       case OverwatchScope.pools => Array(poolsSnapshotModule)
       case OverwatchScope.sparkEvents => Array(sparkEventLogsModule)
+      case OverwatchScope.sqlHistory => Array(sqlHistorySnapshotModule)
       case _ => Array[Module]()
     }
   }
@@ -94,14 +96,14 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess = ETLDefinition(
     workspace.getJobsDF,
-    Seq(cleanseRawJobsSnapDF(config.cloudProvider)),
+    Seq(cleanseRawJobsSnapDF(BronzeTargets.jobsSnapshotTarget.keys, config.runID)),
     append(BronzeTargets.jobsSnapshotTarget)
   )
 
   lazy private[overwatch] val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
   lazy private val appendClustersAPIProcess = ETLDefinition(
     workspace.getClustersDF,
-    Seq(cleanseRawClusterSnapDF(config.cloudProvider)),
+    Seq(cleanseRawClusterSnapDF),
     append(BronzeTargets.clustersSnapshotTarget)
   )
 
@@ -143,6 +145,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       )
     ),
     append(BronzeTargets.clusterEventsTarget)
+  )
+
+  lazy private[overwatch] val sqlHistorySnapshotModule = Module(1016, "Bronze_Sql_History_Snapshot", this)
+  lazy private val appendSqlHistoryProcess = ETLDefinition(
+    workspace.getSqlHistoryDF,
+    append(BronzeTargets.sqlHistorySnapshotTarget)
   )
 
   private val sparkEventLogsSparkOverrides = Map(
@@ -205,6 +213,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
+      case OverwatchScope.sqlHistory => sqlHistorySnapshotModule.execute(appendSqlHistoryProcess)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
       case _ =>
     }
