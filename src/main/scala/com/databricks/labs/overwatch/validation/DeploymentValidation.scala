@@ -249,7 +249,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
   }
 
   private[overwatch] def validatePrimordialDate(): Rule = {
-    Rule("Valid_PrimordialDate", col(ConfigColumns.primordial_date.toString) <= current_date())
+    Rule("Valid_PrimordialDate", to_date(col(ConfigColumns.primordial_date.toString),"yyyy-MM-dd") <= current_date() && to_date(col(ConfigColumns.primordial_date.toString),"yyyy-MM-dd").isNotNull)
   }
 
   private[overwatch] def validateMaxDays(): Rule = {
@@ -466,7 +466,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
       case "NOTNULL_APIURL" => "API URL should not be empty."
       case "NOTNULL_SecretScope" => "Secrete scope should not be empty."
       case "NOTNULL_SecretKey_DBPAT" => "PAT key should not be empty."
-      case "Valid_PrimordialDate" => "Primordial Date should be less than current date."
+      case "Valid_PrimordialDate" => "Primordial Date should in yyyy-MM-dd format(Ex:2022-01-30) and should be less than current date."
       case "Valid_MaxDays" => "Max Days should be a number."
       case "APIURL_Connectivity" => "API URL should give some response with provided scope and key."
       case "Validate_AuditLogPrefix" => "Folder with Primordial date should be present inside AuditLogPrefix."
