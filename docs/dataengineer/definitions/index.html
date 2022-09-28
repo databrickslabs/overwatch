@@ -12,21 +12,21 @@
     <title>Data Dictionary (Latest) :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664321765" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664809880" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664321765" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664809880" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664321765"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664809880"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664321765"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664321765"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664809880"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664809880"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664321765"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664809880"></script>
 
     
   </div>
@@ -562,6 +562,7 @@
     <div class="wrapper">
 <nav id="TableOfContents">
   <ul>
+    <li><a href="#erd">ERD</a></li>
     <li><a href="#consumption-layer-tables-views">Consumption Layer &ldquo;Tables&rdquo; (Views)</a>
       <ul>
         <li><a href="#data-organization">Data Organization</a></li>
@@ -600,20 +601,17 @@
 
 
 
-	<ul>
-<li><a href="#consumption-layer-tables-views">Consumption Layer</a>
-<ul>
-<li><a href="#column-descriptions">Column Descriptions</a></li>
-</ul>
-</li>
-<li><a href="#etl-tables">ETL Tables</a>
-<ul>
-<li><a href="#bronze">Bronze</a></li>
-<li><a href="#silver">Silver</a></li>
-<li><a href="#gold">Gold</a></li>
-</ul>
-</li>
-</ul>
+	<h2 id="erd">ERD</h2>
+<p>The &ldquo;ERD&rdquo; below is a visual representation of the <a href="#consumption-layer-tables-views">consumer layer</a> data model. 
+Many of the joinable lines have been omitted to reduce 
+chaos and complexity in the visualization. All columns with the same name are joinable (even if there&rsquo;s not a line 
+from one table to the other). The relations depicted are to call the analyst&rsquo;s attention to less obvious joins.</p>
+<p>The goal is to present a data model that unifies the different parts of the platform. The Overwatch team will continue 
+to work with Databricks platform teams to publish and simplify this data. The gray boxes annotated as 
+&ldquo;Backlog/Research&rdquo; are simply a known gap and a pursuit of the Overwatch dev team, it does NOT mean it&rsquo;s going to be 
+released soon but rather that we are aware of the missing component and we hope to enable gold-level data here in 
+the future.</p>
+<p><img src="https://databrickslabs.github.io/overwatch/images/_index/Overwatch_Gold_070.png" alt="OverwatchERD"></p>
 <h2 id="consumption-layer-tables-views">Consumption Layer &ldquo;Tables&rdquo; (Views)</h2>
 <p>All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex.
 Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart
@@ -641,7 +639,6 @@ of data from the Spark UI. There are a few sections that are not included in the
 present in <em>spark_events_bronze</em> albeit extremely complex to derive. The Overwatch development team is working 
 tirelessly to expose additional SparkUI data and will publish as soon as it&rsquo;s ready.</li>
 </ul>
-<p><img src="https://databrickslabs.github.io/overwatch/images/_index/Overwatch_Gold.png" alt="OverwatchERD"></p>
 <h3 id="column-descriptions">Column Descriptions</h3>
 <p>Complete column descriptions are only provided for the consumption layer. The entity names are linked below.</p>
 <ul>
@@ -651,6 +648,7 @@ tirelessly to expose additional SparkUI data and will publish as soon as it&rsqu
 <li><a href="#job">job</a></li>
 <li><a href="#jobrun">jobrun</a></li>
 <li><a href="#jobruncostpotentialfact">jobRunCostPotentialFact</a></li>
+<li><a href="#sqlqueryhistory">sqlQueryHistory</a></li>
 <li><a href="#notebook">notebook</a></li>
 <li><a href="#instancepool">instancePool</a></li>
 <li><a href="#dbucostdetails">dbuCostDetail</a></li>
@@ -830,11 +828,21 @@ The data in the files were generated from an Azure, test deployment created by O
 <p><strong>Partition Columns</strong> &ndash; organization_id + state_start_date</p>
 <p><strong>Z-Order Columns</strong> &ndash; cluster_id + unixTimeMS_state_start</p>
 <p><strong>Write Mode</strong> &ndash; Merge</p>
-<p>Costs and state details by cluster at every state in the cluster lifecycle.</p>
-<p><strong>NOTE</strong> This fact table is not normalized on time. Some states will span multiple days and must be smoothed across 
+<p>Costs and state details by cluster at every state in the cluster lifecycle. 
+The <strong><a href="#cost-functions-explained">Cost Functions</a> are detailed below</strong> the definitions of this table.</p>
+
+<div class="notices warning" ><p>Any static clusters spanning 90 days without any state changes will never get a state closure and result in costs 
+increasing forever. This should be a VERY rare circumstance and usually only happens in extreemely stable, small 
+streams. This max days for clsf will be externalized as an override config in the future but for now it&rsquo;s static.</p>
+</div>
+
+
+<div class="notices note" ><p>This fact table is <strong>not normalized on time</strong>. Some states will span multiple days and must be smoothed across 
 days (i.e. divide by days_in_state) when trying to calculate costs by day. All states are force-terminated at the 
 end of the Overwatch run to the until-timestamp of the run. If the state was still active at this time, it will be 
 updated on the subsequent run.</p>
+</div>
+
 <table>
 <thead>
 <tr>
@@ -1194,7 +1202,7 @@ their structures please reference the relevant Databricks Documentation for the 
 several fields from the root level to a nested level to support multi-task jobs. These 
 root level fields are still visible in Overwatch as some customers are still using legacy APIs and many customers have 
 historical data by which this data was generated using the legacy 2.0 APIs. These fields can be identified by the 
-prefix, &ldquo;Legacy&rdquo; in the Description.</p>
+prefix, &ldquo;Legacy&rdquo; in the Description and have been colored red on the ERD.</p>
 <table>
 <thead>
 <tr>
@@ -1253,12 +1261,12 @@ prefix, &ldquo;Legacy&rdquo; in the Description.</p>
 </tr>
 <tr>
 <td style="text-align:left">workspace_name</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">string</td>
 <td style="text-align:left">Customer defined name of the workspace or workspace_id (default)</td>
 </tr>
 <tr>
 <td style="text-align:left">job_id</td>
-<td style="text-align:left">string</td>
+<td style="text-align:left">long</td>
 <td style="text-align:left">Databricks job id</td>
 </tr>
 <tr>
@@ -1268,7 +1276,7 @@ prefix, &ldquo;Legacy&rdquo; in the Description.</p>
 </tr>
 <tr>
 <td style="text-align:left">date</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">date</td>
 <td style="text-align:left">Date of the action for the key</td>
 </tr>
 <tr>
@@ -1283,22 +1291,22 @@ prefix, &ldquo;Legacy&rdquo; in the Description.</p>
 </tr>
 <tr>
 <td style="text-align:left">tags</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">map</td>
 <td style="text-align:left">The tags applied to the job if they exist</td>
 </tr>
 <tr>
 <td style="text-align:left">tasks</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">array</td>
 <td style="text-align:left">The tasks defined for the job</td>
 </tr>
 <tr>
 <td style="text-align:left">job_clusters</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">array</td>
 <td style="text-align:left">The job clusters defined for the job</td>
 </tr>
 <tr>
 <td style="text-align:left">libraries</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">array</td>
 <td style="text-align:left">LEGACY &ndash; Libraries defined in the job &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
@@ -1308,57 +1316,57 @@ prefix, &ldquo;Legacy&rdquo; in the Description.</p>
 </tr>
 <tr>
 <td style="text-align:left">max_concurrent_runs</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">long</td>
 <td style="text-align:left">Job-level &ndash; maximum concurrent executions of the job</td>
 </tr>
 <tr>
 <td style="text-align:left">max_retries</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">long</td>
 <td style="text-align:left">LEGACY &ndash; Max retries for legacy jobs &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
 <td style="text-align:left">retry_on_timeout</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">boolean</td>
 <td style="text-align:left">LEGACY &ndash; whether or not to retry if a job run times out &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
 <td style="text-align:left">min_retry_interval_millis</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">long</td>
 <td style="text-align:left">LEGACY &ndash; Minimal interval in milliseconds between the start of the failed run and the subsequent retry run. The default behavior is that unsuccessful runs are immediately retried. &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
 <td style="text-align:left">schedule</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">struct</td>
 <td style="text-align:left">Schedule by which the job should execute and whether or not it is paused</td>
 </tr>
 <tr>
 <td style="text-align:left">existing_cluster_id</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">string</td>
 <td style="text-align:left">LEGACY &ndash; If compute is existing interactive cluster the cluster_id will be here &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
 <td style="text-align:left">new_cluster</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">struct</td>
 <td style="text-align:left">LEGACY &ndash; The cluster_spec identified as an automated cluster for legacy jobs &ndash; Can be found nested within tasks now but <strong>ONLY for direct API Calls, editing legacy jobs, AND sparkSumbit tasks (as they cannot use job_clusters)</strong>, otherwise, new_clusters defined through the UI will be defined as &ldquo;job_clusters&rdquo; and referenced by a &ldquo;job_cluster_key&rdquo; in the tasks field.</td>
 </tr>
 <tr>
 <td style="text-align:left">git_source</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">struct</td>
 <td style="text-align:left">Specification for a remote repository containing the notebooks used by this job&rsquo;s notebook tasks.</td>
 </tr>
 <tr>
 <td style="text-align:left">task_detail_legacy</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">struct</td>
 <td style="text-align:left">LEGACY &ndash; The job execution details used to be defined at the root level for API 2.0 as of API 2.1 they have been nested within tasks. The logic definition will be defined here for legacy jobs only (or new jobs created using the 2.0 jobs API)</td>
 </tr>
 <tr>
 <td style="text-align:left">is_from_dlt</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">boolean</td>
 <td style="text-align:left">Whether or not the job was created from DLT &ndash; Unsupported as OW doesn&rsquo;t yet support DLT but left here as a reference in case it can be helpful</td>
 </tr>
 <tr>
 <td style="text-align:left">aclPermissionSet</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">struct</td>
 <td style="text-align:left">Only populated for &ldquo;ChangeJobAcl&rdquo; actions. Defines the new ACLs for a job</td>
 </tr>
 <tr>
@@ -1393,53 +1401,54 @@ prefix, &ldquo;Legacy&rdquo; in the Description.</p>
 </tr>
 <tr>
 <td style="text-align:left">created_by</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">string</td>
 <td style="text-align:left">Email account that created the job</td>
 </tr>
 <tr>
 <td style="text-align:left">created_ts</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">long</td>
 <td style="text-align:left">Timestamp the job was created</td>
 </tr>
 <tr>
 <td style="text-align:left">deleted_by</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">string</td>
 <td style="text-align:left">Email account that deleted the job &ndash; will be null if job has not been deleted</td>
 </tr>
 <tr>
 <td style="text-align:left">deleted_ts</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">long</td>
 <td style="text-align:left">Timestamp the job was deleted &ndash; will be null if job has not been deleted</td>
 </tr>
 <tr>
 <td style="text-align:left">last_edited_by</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">string</td>
 <td style="text-align:left">Email account that made the previous edit &ndash; defaults to created by if no edits made</td>
 </tr>
 <tr>
 <td style="text-align:left">last_edited_ts</td>
-<td style="text-align:left"></td>
+<td style="text-align:left">long</td>
 <td style="text-align:left">Timestamp the job was last edited</td>
 </tr>
 </tbody>
 </table>
 <h4 id="jobrun">JobRun</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/jobrun.tab"><strong>SAMPLE</strong></a></p>
-<p>Databricks has moved to &ldquo;multi-task jobs&rdquo; and each run now refers to the run of a task not a job. This migration 
-will cause a lot of confusion so please read this carefully.</p>
+<p>Databricks has moved to &ldquo;multi-task jobs&rdquo; (MTJs) and each run now refers to the run of a task not a job. This migration 
+will likely cause a lot of confusion so please read this carefully.</p>
 <p>Each record references the full lifecycle of a single task run with some legacy fields to accommodate historical 
-job-level runs. Since the inception of multi-task jobs and Databricks jobs API 2.1, all run logic has been migrated from 
+job-level runs (and jobs/runs still being created/launched from the deprecated Jobs 2.0 API). 
+Since the inception of multi-task jobs and Databricks jobs API 2.1, all run logic has been migrated from 
 the job-level to the task-level. Overwatch must accommodate both as many customers have historical data that is still 
-important. As such, some of the fields seem redundant and the user must apply the correct logic based on the 
+important. As such, some of the fields seem redundant and the analyst must apply the correct logic based on the 
 circumstances. Please carefully review the field descriptions to understand the rules.</p>
 <h5 id="unsupported-scenarios">Unsupported Scenarios</h5>
-<p>Several scenarios are not yet supported by Overwatch; they are called out here. Please stay tuned for updates 
+<p>A few scenarios are not yet supported by Overwatch; they are called out here. Please stay tuned for updates 
 as it&rsquo;s our intention to include everything we can as soon as possible after Databricks product GAs new features but 
 there will be a delay.</p>
 <ul>
-<li>DLT details &ndash; Delta Live tables aren&rsquo;t yet supported even though the run_ids may show up here</li>
-<li>Runs that failed to launch due to error in the launch request &ndash; these never actually create a run and never receive a run_id therefore they will not be present in this table at this time.</li>
-<li>Runs executing for more than 30 Days &ndash; This is a limitation for performance. This will be an externalized config at a later time but for now
+<li><strong>DLT details</strong> &ndash; Delta Live tables aren&rsquo;t yet supported even though the run_ids may show up here</li>
+<li><strong>Runs that failed to launch</strong> due to error in the launch request &ndash; these never actually create a run and never receive a run_id therefore they will not be present in this table at this time.</li>
+<li><strong>Runs executing for more than 30 Days</strong> &ndash; This is a limitation for performance. This will be an externalized config at a later time but for now
 the hard limit is 30 days. The progress of this feature can be tracked in <a href="https://github.com/databrickslabs/overwatch/issues/528">Issue 528</a></li>
 </ul>
 <p><strong>TODO &ndash; clarify the taskRunId vs jobRunId confusion from the UI</strong></p>
@@ -1550,7 +1559,7 @@ the hard limit is 30 days. The progress of this feature can be tracked in <a hre
 <tr>
 <td style="text-align:left">new_cluster</td>
 <td style="text-align:left">struct</td>
-<td style="text-align:left">LEGACY + SparkSubmit jobs &ndash; new clusters are no longer used for tasks except for sparkSubmit jobs as they cannot use job_clusters. Job_clusters are used everywhere else</td>
+<td style="text-align:left"><strong>LEGACY</strong> + SparkSubmit jobs &ndash; new clusters are no longer used for tasks except for sparkSubmit jobs as they cannot use job_clusters. Job_clusters are used everywhere else</td>
 </tr>
 <tr>
 <td style="text-align:left">tags</td>
@@ -1590,7 +1599,7 @@ the hard limit is 30 days. The progress of this feature can be tracked in <a hre
 <tr>
 <td style="text-align:left">libraries</td>
 <td style="text-align:left">array</td>
-<td style="text-align:left">LEGACY &ndash; Libraries defined in the job &ndash; Nested within tasks as of API 2.1</td>
+<td style="text-align:left"><strong>LEGACY</strong> &ndash; Libraries defined in the job &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
 <td style="text-align:left">manual_override_params</td>
@@ -1610,17 +1619,17 @@ the hard limit is 30 days. The progress of this feature can be tracked in <a hre
 <tr>
 <td style="text-align:left">retry_on_timeout</td>
 <td style="text-align:left">boolean</td>
-<td style="text-align:left">LEGACY &ndash; whether or not to retry if a job run times out &ndash; Nested within tasks as of API 2.1</td>
+<td style="text-align:left"><strong>LEGACY</strong> &ndash; whether or not to retry if a job run times out &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
 <td style="text-align:left">max_retries</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">LEGACY &ndash; Max retries for legacy jobs &ndash; Nested within tasks as of API 2.1</td>
+<td style="text-align:left"><strong>LEGACY</strong> &ndash; Max retries for legacy jobs &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
 <td style="text-align:left">min_retry_interval_millis</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">LEGACY &ndash; Minimal interval in milliseconds between the start of the failed run and the subsequent retry run. The default behavior is that unsuccessful runs are immediately retried. &ndash; Nested within tasks as of API 2.1</td>
+<td style="text-align:left"><strong>LEGACY</strong> &ndash; Minimal interval in milliseconds between the start of the failed run and the subsequent retry run. The default behavior is that unsuccessful runs are immediately retried. &ndash; Nested within tasks as of API 2.1</td>
 </tr>
 <tr>
 <td style="text-align:left">max_concurrent_runs</td>
@@ -1645,7 +1654,7 @@ the hard limit is 30 days. The progress of this feature can be tracked in <a hre
 <tr>
 <td style="text-align:left">task_detail_legacy</td>
 <td style="text-align:left">struct</td>
-<td style="text-align:left">LEGACY &ndash; The details of the task logic for legacy jobs such as notebook_task, spark_python_task, etc. These must be separated from the task level details as the structures have been altered in many cases</td>
+<td style="text-align:left"><strong>LEGACY</strong> &ndash; The details of the task logic for legacy jobs such as notebook_task, spark_python_task, etc. These must be separated from the task level details as the structures have been altered in many cases</td>
 </tr>
 <tr>
 <td style="text-align:left">submitRun_details</td>
@@ -1679,11 +1688,8 @@ the hard limit is 30 days. The progress of this feature can be tracked in <a hre
 <p>Databricks has moved to &ldquo;multi-task jobs&rdquo; and each run now refers to the run of a task not a job. Please reference 
 <a href="#jobrun">jobRuns table</a> for more detail</p>
 <h5 id="unsupported-scenarios-1">Unsupported Scenarios</h5>
-<p>Several scenarios are not yet supported by Overwatch; they are called out here. Please stay tuned for updates
-as it&rsquo;s our intention to include everything we can as soon as possible after Databricks product GAs new features but
-there will be a delay.</p>
 <ul>
-<li>Costs for SQL/DBT/DLT</li>
+<li>Costs for runs of that execute SQL/DBT/DLT tasks</li>
 </ul>
 <p><strong>KEY</strong> &ndash; organization_id + run_id + startEpochMS</p>
 <p><strong>Incremental Columns</strong> &ndash; startEpochMS</p>
@@ -1701,18 +1707,18 @@ be captured solely on that date and even more importantly, not only will all 20 
 cost associated will be cluster runtime for 20 days * number of runs. Overwatch will automatically smooth the costs
 across the concurrent runs but not the days running since this fact table is not based by on an equidistant time axis.</p>
 <ul>
-<li>Potential: Total core_milliseconds for which the cluster COULD execute spark tasks. This derivation only includes
+<li><strong>Potential:</strong> Total core_milliseconds for which the cluster COULD execute spark tasks. This derivation only includes
 the worker nodes in a state ready to receive spark tasks (i.e. Running). Nodes being added or running init scripts
 are not ready for spark jobs thus those core milliseconds are omitted from the total potential.</li>
-<li>Cost: Derived from the <a href="#instancedetails">instanceDetails</a> table and DBU configured contract price (see
+<li><strong>Cost:</strong> Derived from the <a href="#instancedetails">instanceDetails</a> table and DBU configured contract price (see
 <a href="(/gettingstarted/configuration/)"><strong>Configuration</strong></a> for more details).
 The compute costs in <a href="#instancedetails">instanceDetails</a> table are taken from the &ldquo;Compute_Contract_Price&rdquo; values associated with the
 instance type in instanceDetails.</li>
-<li>Utilization: Utilization is a function of core milliseconds used during spark task execution divided by the total
+<li><strong>Utilization:</strong> Utilization is a function of core milliseconds used during spark task execution divided by the total
 amount of core milliseconds available given the cluster size and state. (i.e. spark_task_runtime_H / worker_potential_core_H)</li>
-<li>Cluster State: The state[s] of a cluster during a run. As the cluster scales and morphs to accommodate the run&rsquo;s 
+<li><strong>Cluster State:</strong> The state[s] of a cluster during a run. As the cluster scales and morphs to accommodate the run&rsquo;s 
 needs, the state changes. The number of state changes are recorded in this table as &ldquo;run_cluster_states&rdquo;.</li>
-<li>Run State: Advanced Topic for data engineers and developers. This topic is discussed in considerable detail in the 
+<li><strong>Run State:</strong> Advanced Topic for data engineers and developers. This topic is discussed in considerable detail in the 
 <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">Advanced Topics</a> section.
 Given a cluster state, the run state is a state of all runs on a cluster at a given moment in time. This 
 is the measure used to calculate shared costs across concurrent runs. A run state cannot pass the boundaries of 
@@ -1946,6 +1952,53 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <td style="text-align:left">last_edited_by</td>
 <td style="text-align:left">string</td>
 <td style="text-align:left">Email account that made the previous edit &ndash; defaults to created by if no edits made</td>
+</tr>
+</tbody>
+</table>
+<h4 id="sqlqueryhistory">sqlQueryHistory</h4>
+<p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sqlHistory.tab"><strong>SAMPLE</strong></a></p>
+<p><strong>KEY</strong> &ndash; organization_id + ???</p>
+<p><strong>Incremental Columns</strong> &ndash; ???</p>
+<p><strong>Partition Columns</strong> &ndash; ???</p>
+<p><strong>Write Mode</strong> &ndash; Merge</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Column</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">HOLD</td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
 </tr>
 </tbody>
 </table>
@@ -2687,7 +2740,7 @@ structure solidifes.</p>
 <tr>
 <td style="text-align:left">created_by</td>
 <td style="text-align:left">string</td>
-<td></td>
+<td style="text-align:left"></td>
 </tr>
 <tr>
 <td style="text-align:left">last_edited_by</td>
@@ -3315,19 +3368,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664321765"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664809880"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664321765"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664809880"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664321765" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664321765"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664809880" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664809880"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

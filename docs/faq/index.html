@@ -12,21 +12,21 @@
     <title>FAQ :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664321765" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664321765" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664809880" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664321765" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664809880" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664321765"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664809880"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664321765"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664321765"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664809880"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664809880"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664321765"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664809880"></script>
 
     
   </div>
@@ -564,7 +564,8 @@
     <li><a href="#q5-can-i-configure-custom-log4j-appender-settings">Q5: Can I configure custom log4j appender settings</a></li>
     <li><a href="#q6-id-like-to-add-or-update-workspace_name-on-my-overwatch-deployment-is-there-an-easy-way-to-do-that">Q6: I&rsquo;d like to add or update workspace_name on my Overwatch deployment, is there an easy way to do that?</a></li>
     <li><a href="#q7-id-like-to-have-cluster-policies-to-ensure-all-future-interactive-and-automated-clusters-have-an-appropriate-logging-location">Q7: I&rsquo;d like to have cluster policies to ensure all future interactive and automated clusters have an appropriate logging location</a></li>
-    <li><a href="#q8-can-i-use-unity-catalog-uc-with-overwatch">Q8: Can I use Unity Catalog (UC) with Overwatch</a></li>
+    <li><a href="#q8-can-i-deploy-overwatch-on-unity-catalog-uc">Q8: Can I deploy Overwatch on Unity Catalog (UC)</a></li>
+    <li><a href="#q9-how-to-enable-user-email-tracking-in-sparkjob-table-for-dbr-versions--113">Q9: How to enable user-email tracking in sparkJob Table for DBR versions &lt; 11.3</a></li>
   </ul>
 </nav>
     </div>
@@ -707,25 +708,21 @@ or both use the examples below and apply them to your cluster policies appropria
 <li><a href="https://databrickslabs.github.io/overwatch/assets/FAQ/automated_logs_policy_rule.json">Automated Cluster Policy Only</a></li>
 <li><a href="https://databrickslabs.github.io/overwatch/assets/FAQ/global_logs_policy_rule.json">Interactive AND Automated Cluster Policy</a></li>
 </ul>
-<h2 id="q8-can-i-use-unity-catalog-uc-with-overwatch">Q8: Can I use Unity Catalog (UC) with Overwatch</h2>
-<p>As of 0.7.0 UC is not fully supported. Overwatch dev team is working with the UC teams to identify best practices, 
-a proper strategy, and implement first-party support. We do have customers successfully using Overwatch atop Unity 
-Catalog but it requires some special considerations. We will continue to update this FAQ as we get more information. 
-Please follow the requirements below if you would like to try to get Overwatch to work on UC before it&rsquo;s fully 
-supported.</p>
-<ul>
-<li>Use DBR 11.1+</li>
-<li>Use a full path as storage prefix (i.e. s3://&hellip; or abfs://)</li>
-<li>Ensure the catalog is created using an external location
-<ul>
-<li>Ensure the Overwatch Cluster has direct, full read/write access to the path location. Consumers will not need this 
-but the OW cluster does.</li>
-</ul>
-</li>
-<li>Ensure the user that executes the OW cluster has full access to the catalog</li>
-<li>Configure the Data Target as an <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/#using-external-metastores">External Metastore</a></li>
-</ul>
-<p>Remember to remove user ability to create unrestricted clusters and assign appropriate permissions to the policies</p>
+<h2 id="q8-can-i-deploy-overwatch-on-unity-catalog-uc">Q8: Can I deploy Overwatch on Unity Catalog (UC)</h2>
+<p><strong>NO</strong>
+As of 0.7.0 UC is not supported. Overwatch dev team is working with the UC teams to identify best practices, 
+a proper strategy, and implement first-party support. It appears that the issue is in an Overwatch requirement 
+which should be easy to correct. Assuming no major hurdles this will be out shortly after 0.7.0 and will require no 
+schema changes. We recommend deploying on a traditional metastore for now and an update will be published as soon 
+as possible.</p>
+<h2 id="q9-how-to-enable-user-email-tracking-in-sparkjob-table-for-dbr-versions--113">Q9: How to enable user-email tracking in sparkJob Table for DBR versions &lt; 11.3</h2>
+<p>Until DBR 11.3+ the user_email field in sparkJob table was incomplete as Databricks did not begin publishing this 
+in all cases until that version. To enable event log reporting for user_email in DBR versions &lt; 11.3, set the following 
+command to true in the cluster&rsquo;s spark config. This can be done in the cluster config or through an init script. Any 
+clusters running on DBR &lt; 11.3 without this config will not report user_email for Python and R interactive workloads.
+<code>spark.databricks.driver.enableUserContextForPythonAndRCommands</code></p>
+<p>To enable this globally, it&rsquo;s recommended to utilize cluster policies or global_init scripts.</p>
+<p><img src="https://databrickslabs.github.io/overwatch/images/FAQ/FAQ9_user_email_enable.png" alt="Enable_User_email"></p>
 
 
 
@@ -1048,19 +1045,19 @@ but the OW cluster does.</li>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664321765"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664809880"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664321765"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664321765"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664809880"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664321765" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664321765"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664809880" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664809880"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

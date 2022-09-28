@@ -5,8 +5,67 @@ weight: 4
 ---
 
 ## 0.7.0.0 (Major Release)
-WIP
-* **0700 Upgrade Script** [HTML](/assets/ChangeLog/Upgrade_070_Template.html) | [DBC](/assets/ChangeLog/Upgrade_070_Template.dbc)
+
+**0700 Upgrade Script** [HTML](/assets/ChangeLog/Upgrade_070_Template.html) | [DBC](/assets/ChangeLog/Upgrade_070_Template.dbc)
+### Major Changes
+* **Support for Multi-Task Jobs (MTJs)**
+  * Prior to this release Overwatch was unable to properly analyze and display jobs with multiple tasks and, at times
+  even struggled to properly display new-format single-task jobs
+  * As this is a major change, **there are significant changes in the jobs tables in silver and gold**
+  * **Production Dashboards** should be validated/updated in non-prod 0.7.0 deployment as there will likely be some 
+  changes to column naming, typing, and structures. For details on the new schema, see the 
+  [Data Dictionary]({{%relref "dataengineer/definitions/_index.md"%}})
+* **Support for Job Clusters**
+* **Jobs 2.1 API Support**
+  * Databricks Jobs team has migrated to API 2.1 and now so has Overwatch. This resolves some data gaps as well 
+  as API capacity issues
+* **Support for DBSQL Query History Including Metrics**
+  * DBSQL Query History is our first step into first-party support for DBSQL. Warehouses are expected to follow shortly 
+  but was unable to make the cut for this release
+  * Be sure to enable the new scope "sqlHistory" or use the new 
+  [0.7.0 Runner Notebook]({{%relref "GettingStarted/"%}}#jump-start-notebooks) to ensure you're loading 
+  the DBSQL tables if your workspace[s] are using DBSQL.
+  * Limitation - Databricks does not publish Warehouse events yet and as such, explicit cost anlaysis is not yet 
+  possible for DBSQL. As soon as this is made available the Overwatch Dev team will begin work to integrate it.
+* **New API Manager**
+  * The API management libraries were completely rebuilt from the ground up to maximize throughput, capabilities, 
+  and safety for your environment.
+  * The new API manager offers users much deeper control on how Overwatch uses the APIs. See the 
+  [APIEnv Configs]({{%relref "GettingStarted/Configuration.md"%}}/#apienv) on the Configurations details page.
+* **Support for Authenticated PROXY**
+  * Most customers are able to configure proxies with cluster configs and init scripts but Overwatch now offers 
+  deeper, first-party suppot for authenticated Proxy configs. See more details in the
+  [APIEnv Configs]({{%relref "GettingStarted/Configuration.md"%}}/#apienv) section.
+* **SEVERAL New Bronze Snapshot Tables Available**
+  * Below is a full list of new bronze snapshots available. The only new snapshot directly integrated / promoted 
+  to gold is the sqlHistory; however, this paves the way for enhancing several gold tables as well as providing 
+  a lot of new data points. Review the new bronze tables and see how you can join this data in your dashboards to 
+  answer deeper questions.
+  * Libraries
+  * ...WIP
+* **SparkJob User-Email Coverage & Accuracy**
+  * User_Email in sparkJob table now has complete coverage **but may require some action**
+    * The user_email had incompletions and inaccuracies. Databricks was not publishing the user data for users using 
+    Python and R languages. This has now been resolved automatically for clusters
+    (operational clusters not the Overwatch cluster) running DBR 11.3+. To enable this feature on <= DBR 11.2 
+    clusters a config must be added to the cluster. See the 
+    [FAQ 9]({{%relref "FAQ/"%}}/#q9-how-to-enable-user-email-tracking-in-sparkjob-table-for-dbr-versions--113) 
+    for details on how to ensure you're getting 
+    complete coverage for this field.
+* **Multi-Workspace Deployment** (DELAYED)
+  * Allows customers to deploy, manage, and run Overwatch from a single Workspace while still collecting data from 
+  several.
+  * Provides unified global configuration via Excel / Delta tables
+  * While many customers are eagerly awaiting this feature and the dev team thought it could be released as part of 
+  this major release; unfortunately, due to some complications this wasn't possible but should be out in the coming 
+  weeks and isn't expected to need any sort of "upgrade", it should be just a JAR swap.
+    * More details and full documentation coming soon.
+
+### Bug Fixes
+* Biggest fix is with regard to data quality surrounding multi-task jobs and job-clusters. This should all be 
+resolved at this point.
+
+Full list of bug fixes for this release can be found [here](https://github.com/databrickslabs/overwatch/milestone/12)
 
 ## 0.6.1.1 (Maintenance Release)
 To upgrade from 0.6.1.0, simply swap the JAR from 0.6.1.0 to this version, no upgrade script necessary

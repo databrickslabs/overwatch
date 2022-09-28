@@ -146,19 +146,21 @@ or both use the examples below and apply them to your cluster policies appropria
 * [Automated Cluster Policy Only](/assets/FAQ/automated_logs_policy_rule.json)
 * [Interactive AND Automated Cluster Policy](/assets/FAQ/global_logs_policy_rule.json)
 
-## Q8: Can I use Unity Catalog (UC) with Overwatch
-As of 0.7.0 UC is not fully supported. Overwatch dev team is working with the UC teams to identify best practices, 
-a proper strategy, and implement first-party support. We do have customers successfully using Overwatch atop Unity 
-Catalog but it requires some special considerations. We will continue to update this FAQ as we get more information. 
-Please follow the requirements below if you would like to try to get Overwatch to work on UC before it's fully 
-supported.
+## Q8: Can I deploy Overwatch on Unity Catalog (UC)
+**NO**
+As of 0.7.0 UC is not supported. Overwatch dev team is working with the UC teams to identify best practices, 
+a proper strategy, and implement first-party support. It appears that the issue is in an Overwatch requirement 
+which should be easy to correct. Assuming no major hurdles this will be out shortly after 0.7.0 and will require no 
+schema changes. We recommend deploying on a traditional metastore for now and an update will be published as soon 
+as possible.
 
-* Use DBR 11.1+
-* Use a full path as storage prefix (i.e. s3://... or abfs://)
-* Ensure the catalog is created using an external location
-    * Ensure the Overwatch Cluster has direct, full read/write access to the path location. Consumers will not need this 
-    but the OW cluster does.
-* Ensure the user that executes the OW cluster has full access to the catalog
-* Configure the Data Target as an [External Metastore](https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/#using-external-metastores)
+## Q9: How to enable user-email tracking in sparkJob Table for DBR versions < 11.3
+Until DBR 11.3+ the user_email field in sparkJob table was incomplete as Databricks did not begin publishing this 
+in all cases until that version. To enable event log reporting for user_email in DBR versions < 11.3, set the following 
+command to true in the cluster's spark config. This can be done in the cluster config or through an init script. Any 
+clusters running on DBR < 11.3 without this config will not report user_email for Python and R interactive workloads.
+`spark.databricks.driver.enableUserContextForPythonAndRCommands`
 
-Remember to remove user ability to create unrestricted clusters and assign appropriate permissions to the policies
+To enable this globally, it's recommended to utilize cluster policies or global_init scripts.
+
+![Enable_User_email](/images/FAQ/FAQ9_user_email_enable.png)
