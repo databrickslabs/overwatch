@@ -44,7 +44,6 @@ class Config() {
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
   private var _contractJobsLightDBUPrice: Double = _
-  private var _initializer: Initializer = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -54,7 +53,6 @@ class Config() {
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
-  def initializer: Initializer = _initializer
 
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -206,11 +204,6 @@ class Config() {
 
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
-    this
-  }
-
-  private[overwatch] def setInitializer(value: Initializer): this.type = {
-    _initializer = value
     this
   }
 
@@ -371,8 +364,6 @@ class Config() {
         s"a user access token. It should start with 'dapi' ")
       val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
-      initializer.validateApiEnvConfig(Some(derivedApiEnvConfig))
-
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
         derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
