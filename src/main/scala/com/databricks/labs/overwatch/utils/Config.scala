@@ -365,6 +365,7 @@ class Config() {
       val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
       validateApiEnvConfig(Some(derivedApiEnvConfig))
+
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
         derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
@@ -388,8 +389,8 @@ class Config() {
       if (envConfig.threadPoolSize < 1 || envConfig.threadPoolSize > 20) {
         throw new BadConfigException("ThreadPoolSize should be a valid number between 0 to 20")
       }
-      if (envConfig.apiWaitingTime < 60000) { // 60000ms = 1 mint
-        throw new BadConfigException("ApiWaiting time should be more than 60000ms")
+      if (envConfig.apiWaitingTime < 60000 || envConfig.apiWaitingTime > 900000) { // 60000ms = 1 mint,900000ms = 15mint
+        throw new BadConfigException("ApiWaiting time should be between 60000ms and 900000ms")
       }
       if (envConfig.errorBatchSize < 1 || envConfig.errorBatchSize > 1000) {
         throw new BadConfigException("ErrorBatchSize should be between 1 to 1000")
