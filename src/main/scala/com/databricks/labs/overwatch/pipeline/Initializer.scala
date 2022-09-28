@@ -237,7 +237,40 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setTempWorkingDir(workspaceTempWorkingDir)
   }
 
+  private[overwatch] def validateApiEnvConfig(apiEnvConfig: Option[ApiEnvConfig]) = {
+    if (apiEnvConfig.isDefined) {
+      val envConfig = apiEnvConfig.get
+      if (envConfig.threadPoolSize < 1 || envConfig.threadPoolSize > 20) {
+        throw new BadConfigException("ThreadPoolSize should be a valid number between 0 to 20")
+      }
+      if (envConfig.apiWaitingTime < 60000 || envConfig.apiWaitingTime > 900000) { // 60000ms = 1 mint,900000ms = 15mint
+        throw new BadConfigException("ApiWaiting time should be between 60000ms and 900000ms")
+      }
+      if (envConfig.errorBatchSize < 1 || envConfig.errorBatchSize > 1000) {
+        throw new BadConfigException("ErrorBatchSize should be between 1 to 1000")
+      }
+      if (envConfig.successBatchSize < 1 || envConfig.successBatchSize > 1000) {
+        throw new BadConfigException("SuccessBatchSize should be between 1 to 1000")
+      }
+      if (envConfig.apiProxyConfig.isDefined) {
+        validateApiEnvProxy(envConfig.apiProxyConfig)
+      }
+    }
+  }
 
+  def validateApiEnvProxy(apiProxyConfig: Option[ApiProxyConfig]) = {
+    val proxyConfig = apiProxyConfig.get
+    if (proxyConfig.proxyHost.isDefined) {
+      if (!proxyConfig.proxyPort.isDefined) {
+        throw new BadConfigException("Proxy host and port should be defined")
+      }
+    }
+    if (proxyConfig.proxyUserName.isDefined) {
+      if (!proxyConfig.proxyPasswordKey.isDefined || !proxyConfig.proxyPasswordScope.isDefined) {
+        throw new BadConfigException("Please define ProxyUseName,ProxyPasswordScope and ProxyPasswordKey")
+      }
+    }
+  }
 
 
   /**
@@ -322,7 +355,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       if (keyCheck.length == 0) throw new BadConfigException(s"Key ${tokenSecret.get.key} does not exist " +
         s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
         s"available and accessible to this account.")
-
+      config.setInitializer(this)
       config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)),rawParams.apiEnvConfig)
     } else config.registerWorkspaceMeta(None,None)
 

@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.pipeline.{Initializer, PipelineFunctions}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions.col
@@ -44,6 +44,7 @@ class Config() {
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
   private var _contractJobsLightDBUPrice: Double = _
+  private var _initializer: Initializer = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -53,6 +54,7 @@ class Config() {
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
+  def initializer: Initializer = _initializer
 
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -204,6 +206,11 @@ class Config() {
 
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
+    this
+  }
+
+  private[overwatch] def setInitializer(value: Initializer): this.type = {
+    _initializer = value
     this
   }
 
@@ -364,7 +371,7 @@ class Config() {
         s"a user access token. It should start with 'dapi' ")
       val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
-      validateApiEnvConfig(Some(derivedApiEnvConfig))
+      initializer.validateApiEnvConfig(Some(derivedApiEnvConfig))
 
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
@@ -383,40 +390,6 @@ class Config() {
     }
   }
 
-  private def validateApiEnvConfig(apiEnvConfig: Option[ApiEnvConfig]) = {
-    if (apiEnvConfig.isDefined) {
-      val envConfig = apiEnvConfig.get
-      if (envConfig.threadPoolSize < 1 || envConfig.threadPoolSize > 20) {
-        throw new BadConfigException("ThreadPoolSize should be a valid number between 0 to 20")
-      }
-      if (envConfig.apiWaitingTime < 60000 || envConfig.apiWaitingTime > 900000) { // 60000ms = 1 mint,900000ms = 15mint
-        throw new BadConfigException("ApiWaiting time should be between 60000ms and 900000ms")
-      }
-      if (envConfig.errorBatchSize < 1 || envConfig.errorBatchSize > 1000) {
-        throw new BadConfigException("ErrorBatchSize should be between 1 to 1000")
-      }
-      if (envConfig.successBatchSize < 1 || envConfig.successBatchSize > 1000) {
-        throw new BadConfigException("SuccessBatchSize should be between 1 to 1000")
-      }
-      if (envConfig.apiProxyConfig.isDefined) {
-        validateApiEnvProxy(envConfig.apiProxyConfig)
-      }
-    }
-  }
-
-  def validateApiEnvProxy(apiProxyConfig: Option[ApiProxyConfig]) = {
-    val proxyConfig = apiProxyConfig.get
-    if (proxyConfig.proxyHost.isDefined) {
-      if (!proxyConfig.proxyPort.isDefined) {
-        throw new BadConfigException("Proxy host and port should be defined")
-      }
-    }
-    if (proxyConfig.proxyUserName.isDefined) {
-      if (!proxyConfig.proxyPasswordKey.isDefined || !proxyConfig.proxyPasswordScope.isDefined) {
-        throw new BadConfigException("Please define ProxyUseName,ProxyPasswordScope and ProxyPasswordKey")
-      }
-    }
-  }
 
 
 
