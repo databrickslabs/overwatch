@@ -320,6 +320,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'databricks_billable,
       isAutomated('cluster_name).alias("isAutomated"),
       'sku,
+   //   'runtime_engine,
       'dbu_rate,
       'state_dates,
       'days_in_state,
