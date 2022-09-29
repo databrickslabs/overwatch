@@ -940,7 +940,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
       .withColumn("runtime_engine",
         when(col("spark_version").like("%_photon_%") && col("runtime_engine").isNull,"PHOTON")
-          .when(!col("spark_version").like("%_photon_%") && col("runtime_engine").isNull,"Standard")
+          .when(!col("spark_version").like("%_photon_%") && col("runtime_engine").isNull,"STANDARD")
           .otherwise(col("runtime_engine")))
 
       .drop("userEmail", "cluster_creator_lookup", "single_user_name")
