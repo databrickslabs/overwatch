@@ -1,12 +1,11 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.{ApiCallV2}
+import com.databricks.labs.overwatch.ApiCallV2
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
-
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
@@ -130,12 +129,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getSqlHistoryDF: DataFrame = {
+  def getSqlHistoryDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
     val sqlHistoryEndpoint = "sql/history/queries"
-//    val jsonQuery = s"""{"include_metrics":true}"""
-
-    val jsonQuery = Map("include_metrics" -> "true"
-    )
+    val startTime = fromTime.asUnixTimeMilli
+    val endTime = untilTime.asUnixTimeMilli
+    val jsonQuery = Map("include_metrics" -> "true",
+      "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime",
+      "filter_by.query_start_time_range.end_time_ms" -> s"$endTime"
+      )
     ApiCallV2(config.apiEnv,sqlHistoryEndpoint, jsonQuery).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 

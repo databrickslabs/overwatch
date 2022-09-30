@@ -149,7 +149,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val sqlHistorySnapshotModule = Module(1016, "Bronze_Sql_History_Snapshot", this)
   lazy private val appendSqlHistoryProcess = ETLDefinition(
-    workspace.getSqlHistoryDF,
+    workspace.getSqlHistoryDF(
+      sqlHistorySnapshotModule.fromTime,
+      sqlHistorySnapshotModule.untilTime),
     append(BronzeTargets.sqlHistorySnapshotTarget)
   )
 
