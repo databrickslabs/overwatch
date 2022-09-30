@@ -154,13 +154,13 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
-    lazy private[overwatch] val sqlHistorySnapshotTarget: PipelineTable = PipelineTable(
-      name = "sql_history_snapshot_bronze",
-      _keys = Array("warehouse_id", "query_id", "Pipeline_SnapTS"),
+    lazy private[overwatch] val sqlHistoryLandTarget: PipelineTable = PipelineTable(
+      name = "sql_history_land_bronze",
+      _keys = Array("warehouse_id", "query_id"),
       config,
       partitionBy = Seq("organization_id"),
-      incrementalColumns = Array("Pipeline_SnapTS"),
-      statsColumns = "warehouse_id, query_id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
+      incrementalColumns = Array("query_start_time_ms"),
+      statsColumns = "warehouse_id, query_id, Pipeline_SnapTS,query_start_time_ms, Overwatch_RunID".split(", "),
       masterSchema = Some(Schema.sqlHistorySnapMinimumSchema) //check if this is required
     )
 
