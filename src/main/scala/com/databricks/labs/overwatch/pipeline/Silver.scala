@@ -346,7 +346,6 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         jobRunsModule.execute(appendJobRunsProcess)
       }
       case OverwatchScope.sqlHistory => {
-        println("inside sql history module")
         sqlHistoryModule.execute(appendSqlHistoryProcess)
       }
       case _ =>
