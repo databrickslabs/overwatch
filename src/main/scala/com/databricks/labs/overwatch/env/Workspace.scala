@@ -129,15 +129,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getSqlHistoryDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
-    val sqlHistoryEndpoint = "sql/history/queries"
-    val startTime = fromTime.asUnixTimeMilli
-    val endTime = untilTime.asUnixTimeMilli
+  def getSqlQueryHistoryDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+    val sqlQueryHistoryEndpoint = "sql/history/queries"
+    val startTime = fromTime.asUnixTimeMilli - (1000 * 60 * 60 * 24 * 2) // subtract 2 days for running query merge
     val jsonQuery = Map("include_metrics" -> "true",
       "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime",
-      "filter_by.query_start_time_range.end_time_ms" -> s"$endTime"
+      "filter_by.query_start_time_range.end_time_ms" ->  s"${untilTime.asUnixTimeMilli}"
       )
-    ApiCallV2(config.apiEnv,sqlHistoryEndpoint, jsonQuery).execute().asDF().withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv,sqlQueryHistoryEndpoint, jsonQuery).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {

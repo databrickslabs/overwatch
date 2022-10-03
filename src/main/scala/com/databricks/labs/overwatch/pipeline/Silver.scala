@@ -27,7 +27,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.clustersSpecTarget,
       SilverTargets.dbJobsStatusTarget,
       SilverTargets.notebookStatusTarget,
-      SilverTargets.sqlHistoryTarget
+      SilverTargets.sqlQueryHistoryTarget
     )
   }
 
@@ -50,7 +50,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         Array(jobStatusModule, jobRunsModule)
       }
-      case OverwatchScope.sqlHistory => Array(sqlHistoryModule)
+      case OverwatchScope.`sqlQueryHistory` => Array(sqlQueryHistoryModule)
       case _ => Array[Module]()
     }
   }
@@ -311,11 +311,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.notebookStatusTarget)
   )
 
-  lazy private[overwatch] val sqlHistoryModule = Module(2020, "Silver_SqlHistory", this, Array(1016))
-  lazy private val appendSqlHistoryProcess = ETLDefinition(
-    BronzeTargets.sqlHistoryLandTarget.asIncrementalDF(sqlHistoryModule, BronzeTargets.sqlHistoryLandTarget.incrementalColumns,2),
-    Seq(sqlHistoryTransform()),
-    append(SilverTargets.sqlHistoryTarget)
+  lazy private[overwatch] val sqlQueryHistoryModule = Module(2020, "Silver_SQLQueryHistory", this)
+  lazy private val appendSqlQueryHistoryProcess = ETLDefinition(
+    workspace.getSqlQueryHistoryDF(sqlQueryHistoryModule.fromTime, sqlQueryHistoryModule.untilTime),
+    Seq(enhanceSqlQueryHistory),
+    append(SilverTargets.sqlQueryHistoryTarget)
   )
 
   private def processSparkEvents(): Unit = {
@@ -345,8 +345,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         jobStatusModule.execute(appendJobStatusProcess)
         jobRunsModule.execute(appendJobRunsProcess)
       }
-      case OverwatchScope.sqlHistory => {
-        sqlHistoryModule.execute(appendSqlHistoryProcess)
+      case OverwatchScope.`sqlQueryHistory` => {
+        sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
       }
       case _ =>
     }

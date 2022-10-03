@@ -154,16 +154,6 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
-    lazy private[overwatch] val sqlHistoryLandTarget: PipelineTable = PipelineTable(
-      name = "sql_history_land_bronze",
-      _keys = Array("warehouse_id", "query_id"),
-      config,
-      partitionBy = Seq("organization_id"),
-      incrementalColumns = Array("query_start_time_ms"),
-      statsColumns = "warehouse_id, query_id, Pipeline_SnapTS,query_start_time_ms, Overwatch_RunID".split(", "),
-      masterSchema = Some(Schema.sqlHistorySnapMinimumSchema) //check if this is required
-    )
-
   }
 
   /**
@@ -303,11 +293,12 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
-    lazy private[overwatch] val sqlHistoryTarget: PipelineTable = PipelineTable(
-      name = "sql_history_silver",
+    lazy private[overwatch] val sqlQueryHistoryTarget: PipelineTable = PipelineTable(
+      name = "sql_query_history_silver",
       _keys = Array("warehouse_id", "query_id", "query_start_time_ms"),
       config,
       _mode = WriteMode.merge,
+      _permitDuplicateKeys = false,
       incrementalColumns = Array("query_start_time_ms"),
       partitionBy = Seq("organization_id")
     )
@@ -558,18 +549,19 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
-    lazy private[overwatch] val sqlHistoryTarget: PipelineTable = PipelineTable(
-      name = "sql_history_gold",
+    lazy private[overwatch] val sqlQueryHistoryTarget: PipelineTable = PipelineTable(
+      name = "sql_query_history_gold",
       _keys = Array("warehouse_id", "query_id", "query_start_time_ms"),
       config,
       _mode = WriteMode.merge,
+      _permitDuplicateKeys = false,
       incrementalColumns = Array("query_start_time_ms"),
       partitionBy = Seq("organization_id")
     )
 
-    lazy private[overwatch] val sqlHistoryViewTarget: PipelineView = PipelineView(
-      name = "sqlHistory",
-      sqlHistoryTarget,
+    lazy private[overwatch] val sqlQueryHistoryViewTarget: PipelineView = PipelineView(
+      name = "sqlQueryHistory",
+      sqlQueryHistoryTarget,
       config
     )
 

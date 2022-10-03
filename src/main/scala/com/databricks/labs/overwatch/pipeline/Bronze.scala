@@ -26,8 +26,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.processedEventLogs,
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.dbuCostDetail,
-      BronzeTargets.clusterEventsErrorsTarget,
-      BronzeTargets.sqlHistoryLandTarget
+      BronzeTargets.clusterEventsErrorsTarget
     )
   }
 
@@ -39,7 +38,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => Array(jobsSnapshotModule)
       case OverwatchScope.pools => Array(poolsSnapshotModule)
       case OverwatchScope.sparkEvents => Array(sparkEventLogsModule)
-      case OverwatchScope.sqlHistory => Array(sqlHistoryLandModule)
       case _ => Array[Module]()
     }
   }
@@ -147,14 +145,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.clusterEventsTarget)
   )
 
-  lazy private[overwatch] val sqlHistoryLandModule = Module(1016, "Bronze_Sql_History_Land", this)
-  lazy private val appendSqlHistoryProcess = ETLDefinition(
-    workspace.getSqlHistoryDF(
-      sqlHistoryLandModule.fromTime,
-      sqlHistoryLandModule.untilTime),
-    append(BronzeTargets.sqlHistoryLandTarget)
-  )
-
   private val sparkEventLogsSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
@@ -215,7 +205,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
-      case OverwatchScope.sqlHistory => sqlHistoryLandModule.execute(appendSqlHistoryProcess)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
       case _ =>
     }

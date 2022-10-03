@@ -108,7 +108,7 @@ class ApiMetaFactory {
       case "instance-pools/list" => new InstancePoolsListApi
       case "instance-profiles/list" => new InstanceProfileListApi
       case "workspace/list" => new WorkspaceListApi
-      case "sql/history/queries" => new SqlHistoryQueriesApi
+      case "sql/history/queries" => new SqlQueryHistoryApi
       case "clusters/resize" => new ClusterResizeApi
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }
@@ -121,7 +121,7 @@ class ClusterResizeApi extends ApiMeta {
   setApiCallType("POST")
 }
 
-class SqlHistoryQueriesApi extends ApiMeta {
+class SqlQueryHistoryApi extends ApiMeta {
   setPaginationKey("has_next_page")
   setPaginationToken("next_page_token")
   setDataframeColumn("res")
