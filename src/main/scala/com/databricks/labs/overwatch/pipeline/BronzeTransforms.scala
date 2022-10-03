@@ -244,7 +244,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
-    val eventHubsConf = if (ehConfig.azureClientId.isDefined) {
+    val eventHubsConf = if (ehConfig.azureClientId.nonEmpty) {
       val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
         "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
         "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),

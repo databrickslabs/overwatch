@@ -99,11 +99,11 @@ trait ApiMeta {
   private[overwatch] def getBaseRequest(): HttpRequest = {
     var request = Http(s"""${apiEnv.workspaceURL}/${apiV}/${apiName}""")
       .copy(headers = httpHeaders)
-    if (apiEnv.proxyHost.isDefined && apiEnv.proxyPort.isDefined) {
+    if (apiEnv.proxyHost.nonEmpty && apiEnv.proxyPort.nonEmpty) {
       request = request.proxy(apiEnv.proxyHost.get, apiEnv.proxyPort.get)
       logger.log(Level.INFO, s"""Proxy has been set to IP: ${apiEnv.proxyHost.get}  PORT:${apiEnv.proxyPort.get}""")
     }
-    if (apiEnv.proxyUserName.isDefined && apiEnv.proxyPasswordScope.isDefined && apiEnv.proxyPasswordKey.isDefined) {
+    if (apiEnv.proxyUserName.nonEmpty && apiEnv.proxyPasswordScope.nonEmpty && apiEnv.proxyPasswordKey.nonEmpty) {
       val password = dbutils.secrets.get(scope = apiEnv.proxyPasswordScope.get, apiEnv.proxyPasswordKey.get)
       request = request.proxyAuth(apiEnv.proxyUserName.get, password)
       logger.log(Level.INFO, s"""Proxy UserName set to IP: ${apiEnv.proxyUserName.get}  scope:${apiEnv.proxyPasswordScope.get} key:${apiEnv.proxyPasswordKey.get}""")

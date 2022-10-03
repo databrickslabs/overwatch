@@ -20,7 +20,7 @@ class JsonToolsTest extends AnyFunSpec {
 
       val jsonMap = JsonUtils.jsonToMap(jsonStr)
       val bookArray = jsonMap.get("employees")
-      assert(bookArray.isDefined && bookArray.get.isInstanceOf[List[Any]])
+      assert(bookArray.nonEmpty && bookArray.get.isInstanceOf[List[Any]])
     }
 
     it("shouldn't convert JSON string to Map") {
