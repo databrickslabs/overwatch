@@ -150,9 +150,6 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
         case "instance-pools/list" => "instance_pools"
         case "instance-profiles/list" => "instance_profiles"
         case "workspace/list" => "objects"
-        case "policies/clusters/list" => "policies"
-        case "token/list" => "token_infos"
-        case "global-init-scripts" => "scripts"
       }
     } catch {
       case _: scala.MatchError => logger.log(Level.WARN, "API not configured, returning full dataset"); "*"
