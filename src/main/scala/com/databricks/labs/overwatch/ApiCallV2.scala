@@ -212,6 +212,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def buildApi(value: String): this.type = {
     setEndPoint(value)
     setApiMeta(new ApiMetaFactory().getApiClass(endPoint))
+    apiMeta.setApiEnv(apiEnv).setApiName(endPoint)
     setApiResponseArray(new util.ArrayList[String]())
     setAllowUnsafeSSL(apiEnv.enableUnsafeSSL)
     setQueryMap(Map[String, String]())
@@ -383,8 +384,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       case "POST" =>
         response =
           try {
-            Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
-              .copy(headers = httpHeaders)
+            apiMeta.getBaseRequest()
               .postData(jsonQuery)
               .options(reqOptions)
               .asString
@@ -396,10 +396,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
       case "GET" =>
         response = try {
-          Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
+            apiMeta.getBaseRequest()
             .params(queryMap)
             .param(_jsonKey, _jsonValue)
-            .copy(headers = httpHeaders)
             .options(reqOptions)
             .asString
         } catch {
