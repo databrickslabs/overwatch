@@ -250,13 +250,13 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     if (apiEnv.successBatchSize < 1 || apiEnv.successBatchSize > 1000) {
       throw new BadConfigException("SuccessBatchSize should be between 1 to 1000")
     }
-    if (apiEnv.proxyHost.isDefined) {
-      if (!apiEnv.proxyPort.isDefined) {
+    if (apiEnv.proxyHost.nonEmpty) {
+      if (apiEnv.proxyPort.isEmpty) {
         throw new BadConfigException("Proxy host and port should be defined")
       }
     }
-    if (apiEnv.proxyUserName.isDefined) {
-      if (!apiEnv.proxyPasswordKey.isDefined || !apiEnv.proxyPasswordScope.isDefined) {
+    if (apiEnv.proxyUserName.nonEmpty) {
+      if (apiEnv.proxyPasswordKey.isEmpty || apiEnv.proxyPasswordScope.isEmpty) {
         throw new BadConfigException("Please define ProxyUseName,ProxyPasswordScope and ProxyPasswordKey")
       }
     }
