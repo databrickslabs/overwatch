@@ -50,7 +50,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         Array(jobStatusModule, jobRunsModule)
       }
-      case OverwatchScope.`sqlQueryHistory` => Array(sqlQueryHistoryModule)
+      case OverwatchScope.dbsql => Array(sqlQueryHistoryModule)
       case _ => Array[Module]()
     }
   }
@@ -345,7 +345,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         jobStatusModule.execute(appendJobStatusProcess)
         jobRunsModule.execute(appendJobRunsProcess)
       }
-      case OverwatchScope.`sqlQueryHistory` => {
+      case OverwatchScope.dbsql => {
         sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
       }
       case _ =>

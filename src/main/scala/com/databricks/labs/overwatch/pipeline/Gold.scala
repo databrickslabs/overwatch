@@ -65,7 +65,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           sparkStreamModule
         )
       }
-      case OverwatchScope.`sqlQueryHistory` => {
+      case OverwatchScope.dbsql => {
         Array(sqlQueryHistoryModule)
       }
       case _ => Array[Module]()
@@ -281,7 +281,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
         GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
       }
-      case OverwatchScope.`sqlQueryHistory` => {
+      case OverwatchScope.dbsql => {
         sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
       }
@@ -337,7 +337,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
         GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
       }
-      case OverwatchScope.`sqlQueryHistory` => {
+      case OverwatchScope.dbsql => {
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
       }
       case _ =>
