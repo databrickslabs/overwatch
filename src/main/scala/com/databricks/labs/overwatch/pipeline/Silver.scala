@@ -27,7 +27,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.clustersSpecTarget,
       SilverTargets.dbJobsStatusTarget,
       SilverTargets.notebookStatusTarget,
-      SilverTargets.sqlHistoryTarget
+      SilverTargets.sqlQueryHistoryTarget
     )
   }
 
@@ -50,7 +50,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         Array(jobStatusModule, jobRunsModule)
       }
-      case OverwatchScope.sqlHistory => Array(sqlHistoryModule)
+      case OverwatchScope.dbsql => Array(sqlQueryHistoryModule)
       case _ => Array[Module]()
     }
   }
@@ -313,11 +313,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.notebookStatusTarget)
   )
 
-  lazy private[overwatch] val sqlHistoryModule = Module(2020, "Silver_SqlHistory", this, Array(1016))
-  lazy private val appendSqlHistoryProcess = ETLDefinition(
-    BronzeTargets.sqlHistorySnapshotTarget.asIncrementalDF(sqlHistoryModule, BronzeTargets.sqlHistorySnapshotTarget.incrementalColumns,2),
-    Seq(sqlHistoryTransform()),
-    append(SilverTargets.sqlHistoryTarget)
+  lazy private[overwatch] val sqlQueryHistoryModule = Module(2020, "Silver_SQLQueryHistory", this)
+  lazy private val appendSqlQueryHistoryProcess = ETLDefinition(
+    workspace.getSqlQueryHistoryDF(sqlQueryHistoryModule.fromTime, sqlQueryHistoryModule.untilTime),
+    Seq(enhanceSqlQueryHistory),
+    append(SilverTargets.sqlQueryHistoryTarget)
   )
 
   private def processSparkEvents(): Unit = {
@@ -340,9 +340,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.pools => poolsSpecModule.execute(appendPoolsSpecProcess)
       case OverwatchScope.clusters => clusterSpecModule.execute(appendClusterSpecProcess)
       case OverwatchScope.clusterEvents => clusterStateDetailModule.execute(appendClusterStateDetailProcess)
-      case OverwatchScope.sqlHistory => {
-        println("inside sql history module")
-        sqlHistoryModule.execute(appendSqlHistoryProcess)
+      case OverwatchScope.dbsql => {
+        sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
       }
       case OverwatchScope.sparkEvents => {
         processSparkEvents()

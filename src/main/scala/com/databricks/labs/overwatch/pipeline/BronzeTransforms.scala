@@ -244,7 +244,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
-    val eventHubsConf = if (ehConfig.azureClientId.isDefined) {
+    val eventHubsConf = if (ehConfig.azureClientId.nonEmpty) {
       val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
         "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
         "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
@@ -473,6 +473,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
     //TODO identify the best practice to implement the future.
+    val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
     for (i <- clusterIDs.indices) {
       val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
         "start_time" -> s"""${startTime.asUnixTimeMilli}""",
@@ -480,7 +481,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         "limit" -> "500"
       )
       val future = Future {
-        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
+        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
         synchronized {
           apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= apiEnv.successBatchSize) {
@@ -508,9 +509,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
           responseCounter = responseCounter + 1
       }
     }
-    val timeoutThreshold = 300000 // 5 minutes
+    val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
     var currentSleepTime = 0
-    var responseStateWhileSleeping = responseCounter
+    var accumulatorCountWhileSleeping = accumulator.value
     while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
       //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
       // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
@@ -520,9 +521,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
       Thread.sleep(5000)
       currentSleepTime += 5000
-      if (responseStateWhileSleeping < responseCounter) { //new API response received while waiting.
+      if (accumulatorCountWhileSleeping < accumulator.value) { //new API response received while waiting.
         currentSleepTime = 0 //resetting the sleep time.
-        responseStateWhileSleeping = responseCounter
+        accumulatorCountWhileSleeping = accumulator.value
       }
     }
     if (responseCounter != finalResponseCount) { // Checking whether all the api responses has been received or not.
