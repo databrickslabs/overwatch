@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.utils.StringExt._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -97,6 +98,8 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+                                       //> containsNoSpecialChars: (string: String)Boolean
+
   /**
    * Removes nested columns within a struct and returns the Dataframe with the struct less the columns
    * @param df df containing struct with cols to remove
@@ -106,6 +109,15 @@ object SchemaTools extends SparkSessionWrapper {
    * @return
    */
   def cullNestedColumns(df: DataFrame, structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
+    //Exception Block
+    if (nestedFieldsToCull.exists(_.contains("."))) {
+      throw new BadSchemaException("Recursive culling of nested columns is not yet supported (nestedFieldsToCull)")
+    }
+    if (!structToModify.containsNoSpecialChars) {
+      throw new BadSchemaException("Struct To Modify doesn't support column with special characters except _")
+    }
+
+
     val originalFieldNames = df.select(s"$structToModify.*").columns
     val remainingFieldNames = if (spark.conf.get("spark.sql.caseSensitive") == "true") {
       originalFieldNames.diff(nestedFieldsToCull)
@@ -117,7 +129,7 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   /**
-   * recurse through a struct and apply a transformation to all fields in the structed as noted in the
+   * recurse through a struct and apply a transformation to all fields in the structure as noted in the
    * changeInventory. Enabled for nested fields, they can be accessed through dot notation such as
    * parent.child.grandchild
    * @param structToModify which struct to modify, recursion supported through dot notation
@@ -172,9 +184,10 @@ object SchemaTools extends SparkSessionWrapper {
    * @param spark sparkSession to use for json parsing
    * @param df Dataframe containing column to parse
    * @param c column name as a string -- supports recursion via dot map notation parent.child.grandchild
+   * @param isArrayWrapped if the struct is wrapped inside an array set this to true
    * @return
    */
-  def structFromJson(spark: SparkSession, df: DataFrame, c: String): Column = {
+  def structFromJson(spark: SparkSession, df: DataFrame, c: String, isArrayWrapped: Boolean = false, allNullMinimumSchema: DataType = NullType): Column = {
     import spark.implicits._
     require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
     require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
@@ -183,9 +196,10 @@ object SchemaTools extends SparkSessionWrapper {
       println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
     }
     if (jsonSchema.isEmpty) {
-      lit(null)
+      lit(null).cast(allNullMinimumSchema).alias(c)
     } else {
-      from_json(col(c), jsonSchema).alias(c)
+      if (isArrayWrapped) from_json(col(c), ArrayType(jsonSchema)).alias(c)
+      else from_json(col(c), jsonSchema).alias(c)
     }
   }
 
@@ -207,6 +221,7 @@ object SchemaTools extends SparkSessionWrapper {
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
 
     val mapColName = colToConvert.split("\\.").takeRight(1).head
+    val nullMapReturnCol = lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
     val dfFlatColumnNames = getAllColumnNames(df.schema)
     if (dfFlatColumnNames.exists(_.startsWith(colToConvert))) { // if column exists within schema
       df.select(colToConvert).schema.fields.head.dataType.typeName match {
@@ -231,12 +246,14 @@ object SchemaTools extends SparkSessionWrapper {
               .otherwise(map_filter(newRawMap, (_,v) => v.isNotNull)).alias(mapColName)
           } else newRawMap.alias(mapColName)
         case "null" =>
-          lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
+          nullMapReturnCol
+        case "void" =>
+          nullMapReturnCol
         case x =>
           throw new Exception(s"function structToMap, columnToConvert must be of type struct but found $x instead")
       }
     } else { // colToConvert doesn't exist within the schema return null map type
-      lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
+      nullMapReturnCol
     }
   }
 

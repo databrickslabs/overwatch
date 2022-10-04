@@ -22,7 +22,8 @@ case class PipelineTable(
                           config: Config,
                           incrementalColumns: Array[String] = Array(),
                           format: String = "delta", // TODO -- Convert to Enum
-                          private val _mode: WriteMode = WriteMode.append,
+                          persistBeforeWrite: Boolean = false,
+                          _mode: WriteMode = WriteMode.append,
                           maxMergeScanDates: Int = 33, // used to create explicit date merge condition -- should be removed after merge dynamic partition pruning is enabled DBR 11.x LTS
                           private val _permitDuplicateKeys: Boolean = true,
                           private val _databaseName: String = "default",
@@ -76,7 +77,7 @@ case class PipelineTable(
   }
 
   def writeMode: WriteMode = { // initialize to constructor value
-    if (!exists && _mode == WriteMode.merge) {
+    if (!exists(dataValidation = true) && _mode == WriteMode.merge) {
       val onetimeModeChangeMsg = s"MODE CHANGED from MERGE to APPEND. Target ${tableFullName} does not exist, first write will be " +
         s"performed as an append, subsequent writes will be written as merge to this target"
       if (config.debugFlag) println(onetimeModeChangeMsg)
@@ -222,12 +223,6 @@ case class PipelineTable(
     ) s1 == s2 else s1.equalsIgnoreCase(s2)
   }
 
-  private def casedSeqCompare(seq1: Seq[String], s2: String): Boolean = {
-    if ( // make lower case if column names are case insensitive
-      spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
-    ) seq1.contains(s2) else seq1.exists(s1 => s1.equalsIgnoreCase(s2))
-  }
-
   /**
    * Build 1 or more incremental filters for a dataframe from standard start or aditionalStart less
    * "additionalLagDays" when loading an incremental DF with some front-padding to capture lagging start events
@@ -254,67 +249,9 @@ case class PipelineTable(
           s"$moduleId --> $moduleName for Table: $tableFullName")
         spark.read.format(format).load(tableLocation).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
       } else spark.read.format(format).load(tableLocation)
-      val dfFields = instanceDF.schema.fields
-      val cronFields = dfFields.filter(f => casedSeqCompare(cronColumnsNames, f.name))
-
-      if (additionalLagDays > 0) require(
-        dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
-        "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
-
-      val filterMsg = s"FILTERING: ${module.moduleName} using cron columns: ${cronFields.map(_.name).mkString(", ")}"
-      logger.log(Level.INFO, filterMsg)
-      if (config.debugFlag) println(filterMsg)
-      val incrementalFilters = cronFields.map(field => {
-
-        field.dataType match {
-          case dt: DateType => {
-            if (!partitionBy.map(_.toLowerCase).contains(field.name.toLowerCase)) {
-              val errmsg = s"Date filters are inclusive on both sides and are used for partitioning. Date filters " +
-                s"should not be used in the Overwatch package alone. Date filters must be accompanied by a more " +
-                s"granular filter to utilize df.asIncrementalDF.\nERROR: ${field.name} not in partition columns: " +
-                s"${partitionBy.mkString(", ")}"
-              throw new IncompleteFilterException(errmsg)
-            }
-
-            // Nothing in Overwatch is incremental at the date level thus until date should always be inclusive
-            // so add 1 day to follow the rule value >= date && value < date
-            // but still keep it inclusive
-            val untilDate = PipelineFunctions.addNTicks(module.untilTime.asColumnTS, 1, DateType)
-            IncrementalFilter(
-              field,
-              date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
-              untilDate.cast(dt)
-            )
-          }
-          case dt: TimestampType => {
-            val start = if (additionalLagDays > 0) {
-              val epochMillis = module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)
-              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000.0).cast(dt)
-            } else {
-              module.fromTime.asColumnTS
-            }
-            IncrementalFilter(
-              field,
-              start,
-              module.untilTime.asColumnTS
-            )
-          }
-          case dt: LongType => {
-            val start = if (additionalLagDays > 0) {
-              lit(module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)).cast(dt)
-            } else {
-              lit(module.fromTime.asUnixTimeMilli)
-            }
-            IncrementalFilter(
-              field,
-              start,
-              lit(module.untilTime.asUnixTimeMilli)
-            )
-          }
-          case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
-            s"a filter containing a ${field.dataType.typeName} type. ONLY Timestamp, Date, and Long types are supported.")
-        }
-      })
+      val incrementalFilters = PipelineFunctions.buildIncrementalFilters(
+        this, instanceDF, module.fromTime, module.untilTime, additionalLagDays, moduleName
+      )
 
       PipelineFunctions.withIncrementalFilters(
         instanceDF, Some(module), incrementalFilters, config.globalFilters, config.debugFlag
@@ -359,8 +296,12 @@ case class PipelineTable(
     }
   }
 
+  /**
+   * return duplicate records globally
+   * @return
+   */
   def getDups(): DataFrame = {
-    val df = this.asDF
+    val df = if (this.exists) this.asDF(withGlobalFilters = false) else spark.emptyDataFrame
     val w = Window.partitionBy(keys map col: _*).orderBy(incrementalColumns map col: _*)
     val dups = df
       .withColumn("rnk", rank().over(w))
@@ -373,60 +314,65 @@ case class PipelineTable(
       .orderBy(incrementalColumns map col: _*)
   }
 
-//  def deleteDups(tableFullName: String, keyCols: Array[String], orderByCols: Array[String], tableFilters: Array[Column]): Unit = {
+  /**
+   * Deletes duplicates for all workspaces configured in the table
+   * @param tableFilters filter to exclude certain table names
+   */
   def deleteDups(tableFilters: Array[Column] = Array()): Unit = {
-    val completeKeySet = (keys ++ incrementalColumns).map(_.toLowerCase).distinct
-    val w = Window.partitionBy(completeKeySet map col: _*).orderBy(incrementalColumns map col: _*)
-    val wRank = Window.partitionBy((completeKeySet :+ "rnk") map col: _*).orderBy(incrementalColumns map col: _*)
-    val startVersion = spark.sql(s"desc history $tableFullName").select(max('version)).as[Long].first
-    val db = tableFullName.split("\\.")(0)
-    val tbl = tableFullName.split("\\.")(1)
-    val tblLocation = spark.sessionState.catalog.getTableMetadata(TableIdentifier(tbl, Some(db))).location.toString
-    val conditionalMatchClause = completeKeySet.map(c => col(s"source.$c") === col(s"target.$c")).reduce((x, y) => x && y)
+    if (this.exists) {
+      val completeKeySet = (keys ++ incrementalColumns).map(_.toLowerCase).distinct
+      val w = Window.partitionBy(completeKeySet map col: _*).orderBy(incrementalColumns map col: _*)
+      val wRank = Window.partitionBy((completeKeySet :+ "rnk") map col: _*).orderBy(incrementalColumns map col: _*)
+      val startVersion = spark.sql(s"desc history $tableFullName").select(max('version)).as[Long].first
+      val db = tableFullName.split("\\.")(0)
+      val tbl = tableFullName.split("\\.")(1)
+      val tblLocation = spark.sessionState.catalog.getTableMetadata(TableIdentifier(tbl, Some(db))).location.toString
+      val conditionalMatchClause = completeKeySet.map(c => col(s"source.$c") === col(s"target.$c")).reduce((x, y) => x && y)
 
-    val nonNullFilters = completeKeySet.map(k => col(k).isNotNull) ++ tableFilters
-    val currentDF = nonNullFilters.foldLeft(spark.table(tableFullName))((df, f) => df.filter(f))
-    val vnDF = nonNullFilters.foldLeft(spark.read.format("delta").option("versionAsOf", startVersion).load(tblLocation))((df, f) => df.filter(f))
+      val nonNullFilters = completeKeySet.map(k => col(k).isNotNull) ++ tableFilters
+      val currentDF = nonNullFilters.foldLeft(spark.table(tableFullName))((df, f) => df.filter(f))
+      val vnDF = nonNullFilters.foldLeft(spark.read.format("delta").option("versionAsOf", startVersion).load(tblLocation))((df, f) => df.filter(f))
 
-    val dupsToDelete = currentDF
-      .withColumn("rnk", rank().over(w))
-      .withColumn("rn", row_number().over(w))
-      .filter('rnk > 1 || 'rn > 1)
+      val dupsToDelete = currentDF
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter('rnk > 1 || 'rn > 1)
 
-    val dupsToRestore = vnDF
-      .withColumn("rnk", rank().over(w))
-      .withColumn("rn", row_number().over(wRank))
-      .filter('rnk === 1 && 'rn === 2)
-      .drop("rnk", "rn")
+      val dupsToRestore = vnDF
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(wRank))
+        .filter('rnk === 1 && 'rn === 2)
+        .drop("rnk", "rn")
 
-    DeltaTable.forName(tableFullName)
-      .as("target")
-      .merge(
-        dupsToDelete.as("source"), conditionalMatchClause
-      )
-      .whenMatched
-      .delete()
-      .execute
+      DeltaTable.forName(tableFullName)
+        .as("target")
+        .merge(
+          dupsToDelete.as("source"), conditionalMatchClause
+        )
+        .whenMatched
+        .delete()
+        .execute
 
-    DeltaTable.forName(tableFullName)
-      .as("target")
-      .merge(
-        dupsToRestore.as("source"), conditionalMatchClause
-      )
-      .whenNotMatched()
-      .insertAll()
-      .execute
+      DeltaTable.forName(tableFullName)
+        .as("target")
+        .merge(
+          dupsToRestore.as("source"), conditionalMatchClause
+        )
+        .whenNotMatched()
+        .insertAll()
+        .execute
 
-    val wHist = Window.orderBy('version.desc)
-    val hist = spark.sql(s"desc history $tableFullName")
-      .filter('operation === "MERGE")
-      .withColumn("rnk", rank().over(wHist))
-      .withColumn("rn", row_number().over(wHist))
+      val wHist = Window.orderBy('version.desc)
+      val hist = spark.sql(s"desc history $tableFullName")
+        .filter('operation === "MERGE")
+        .withColumn("rnk", rank().over(wHist))
+        .withColumn("rn", row_number().over(wHist))
 
-    val dupsFound = hist.filter('rnk === 2).select($"operationMetrics.numTargetRowsDeleted".cast("long")).as[Long].first
-    val originalsRecovered = hist.filter('rnk === 1).select($"operationMetrics.numTargetRowsInserted".cast("long")).as[Long].first
-    val dupsDropped = dupsFound- originalsRecovered
-    println(s"DROPPED $dupsDropped duplicate records from $tableFullName")
+      val dupsFound = hist.filter('rnk === 2).select($"operationMetrics.numTargetRowsDeleted".cast("long")).as[Long].first
+      val originalsRecovered = hist.filter('rnk === 1).select($"operationMetrics.numTargetRowsInserted".cast("long")).as[Long].first
+      val dupsDropped = dupsFound - originalsRecovered
+      println(s"DROPPED $dupsDropped duplicate records from $tableFullName")
+    } else println(s"$tableFullName does not exist: SKIPPING")
   }
 
 

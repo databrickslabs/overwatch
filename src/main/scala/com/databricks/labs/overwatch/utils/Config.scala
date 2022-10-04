@@ -14,7 +14,7 @@ class Config() {
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _debugFlag: Boolean = false
-  private var _overwatchSchemaVersion = "0.610"
+  private var _overwatchSchemaVersion = "0.700"
   private var _organizationId: String = _
   private var _workspaceName: String = _
   private var _tempWorkingDir: String = _
@@ -47,6 +47,7 @@ class Config() {
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
   /**
    * BEGIN GETTERS
    * The next section is getters that provide access to local configuration variables. Only adding details where
@@ -102,8 +103,11 @@ class Config() {
   def runID: String = _runID
 
   def contractInteractiveDBUPrice: Double = _contractInteractiveDBUPrice
+
   def contractAutomatedDBUPrice: Double = _contractAutomatedDBUPrice
+
   def contractSQLComputeDBUPrice: Double = _contractSQLComputeDBUPrice
+
   def contractJobsLightDBUPrice: Double = _contractJobsLightDBUPrice
 
   def primordialDateString: Option[String] = _primordialDateString
@@ -126,10 +130,10 @@ class Config() {
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
     import OverwatchScope._
     //    jobs, clusters, clusterEvents, sparkEvents, pools, audit, passthrough, profiles
-    Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
+    Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs, dbsql)
   }
 
-  def  overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
+  def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
 
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
     val manualOverrides = Map(
@@ -147,6 +151,8 @@ class Config() {
         value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
       "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
       "spark.sql.caseSensitive" -> "false",
+      "spark.sql.autoBroadcastJoinThreshold" -> "10485760",
+      "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "10485760",
       "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
       "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365
     )
@@ -197,6 +203,7 @@ class Config() {
     this
   }
 
+
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
     this
@@ -215,6 +222,7 @@ class Config() {
   /**
    * Set the Overwatch Scope in the correct order as per the ordered Seq. This is important for processing the
    * modules in the correct order inside the pipeline
+   *
    * @param value
    * @return
    */
@@ -254,7 +262,7 @@ class Config() {
     this
   }
 
-  private [overwatch] def setIntelligentScaling(value: IntelligentScaling): this.type = {
+  private[overwatch] def setIntelligentScaling(value: IntelligentScaling): this.type = {
     _intelligentScaling = value
     this
   }
@@ -322,7 +330,7 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret]): this.type = {
+  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret],apiEnvConfig: Option[ApiEnvConfig]): this.type = {
     var rawToken = ""
     var scope = ""
     var key = ""
@@ -356,7 +364,14 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion))
+      val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
+      val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
+      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
+        derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
+        derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
+        derivedApiProxy.proxyUserName, derivedApiProxy.proxyPasswordScope, derivedApiProxy.proxyPasswordKey
+      ))
+
       this
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
@@ -367,6 +382,9 @@ class Config() {
         this
     }
   }
+
+
+
 
   /**
    * Set Overwatch DB and location
@@ -444,7 +462,7 @@ class Config() {
    */
   def buildLocalOverwatchParams(): String = {
 
-    registerWorkspaceMeta(None)
+    registerWorkspaceMeta(None,None)
     _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters)
     _databaseName = "overwatch_local"
     _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"

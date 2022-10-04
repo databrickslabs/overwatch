@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{SchemaScrubber, SchemaTools, TSDF, ValidatedColumn}
+import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
@@ -48,6 +48,10 @@ object TransformFunctions {
       df.select(nonNullCols: _*)
     }
 
+    def cullNestedColumns(structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
+      SchemaTools.cullNestedColumns(df, structToModify, nestedFieldsToCull)
+    }
+
     def suffixDFCols(
                       suffix: String,
                       columnsToSuffix: Array[String] = Array(),
@@ -63,6 +67,10 @@ object TransformFunctions {
       df.select(dfFields.map(fName => {
         if (allColumnsToSuffix.contains(fName)) col(fName).alias(s"${fName}${suffix}") else col(fName)
       }): _*)
+    }
+
+    def modifyStruct(changeInventory: Map[String, Column]): DataFrame = {
+      df.select(SchemaTools.modifyStruct(df.schema, changeInventory): _*)
     }
 
     /**
@@ -113,11 +121,21 @@ object TransformFunctions {
         (df, df2.suffixDFCols(rightSuffix, allJoinCols, caseSensitive = true))
       } else (df.suffixDFCols(leftSuffix, allJoinCols, caseSensitive = true), df2)
 
-      val baseJoinCondition = usingColumns.map(k => s"$k = ${k}${rightSuffix}").mkString(" AND ")
-      val joinConditionWLag = if (laggingSide == "left") {
+      val baseJoinCondition = if (joinType == "left" || joinType == "inner"){
+        usingColumns.map(k => s"$k = ${k}${rightSuffix}").mkString(" AND ")
+      } else usingColumns.map(k => s"$k = ${k}${leftSuffix}").mkString(" AND ")
+
+      val joinConditionWLag = if (joinType == "left" || joinType == "inner") {
+        if (laggingSide == "left") {
         expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${rightSuffix}, $lagDays)")
       } else {
         expr(s"$baseJoinCondition AND ${lagDateColumnName}${rightSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
+      }} else {
+        if (laggingSide == "left") {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName}${leftSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
+        } else {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${leftSuffix}, $lagDays)")
+        }
       }
 
       logger.log(Level.INFO, s"LagJoin Condition: $joinConditionWLag")
@@ -283,7 +301,8 @@ object TransformFunctions {
                      keys: Seq[String],
                      incrementalFields: Seq[String]
                      ): DataFrame = {
-      val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
+      val w = Window.partitionBy(keysLessIncrementals map col: _*).orderBy(incrementalFields map col: _*)
       df
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
@@ -303,17 +322,14 @@ object TransformFunctions {
     /**
      *
      * @param name
-     * @param searchNestedFields NOT yet implemented
      * @param caseSensitive
      * @return
      */
-    def hasFieldNamed(name: String, searchNestedFields: Boolean = false, caseSensitive: Boolean = false): Boolean = {
-      val (casedName, fieldNames) = if (caseSensitive) (name, df.columns) else (name.toLowerCase, df.columns.map(_.toLowerCase))
-      if (searchNestedFields) { // search nested
-        fieldNames.contains(casedName)
-      } else { // top level only
-        fieldNames.contains(casedName)
-      }
+    def hasFieldNamed(name: String, caseSensitive: Boolean = false): Boolean = {
+      val casedName = if (caseSensitive) name else name.toLowerCase
+      SchemaTools.getAllColumnNames(df.schema).exists(c => {
+        if (caseSensitive) c.startsWith(casedName) else c.toLowerCase.startsWith(casedName)
+      })
     }
 
     /**
@@ -345,8 +361,43 @@ object TransformFunctions {
       df.select(newColumns: _*)
     }
 
-//    private[overwatch] def colByName(df: DataFrame)(colName: String): StructField =
-//      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
+    /**
+     * appends fields to an existing struct
+     * @param structFieldName name of struct to which namedColumns should be applied
+     * @param namedColumns Array of NamedColumn
+     * @param overrideExistingStructCols Whether or not to override the value of existing struct field if it exists
+     * @param newStructFieldName If not provided, the original struct will be morphed, if a secondary struct is desired
+     *                           provide a name here and the original struct will not be altered.
+     *                           New, named struct will be added to the top level
+     * @param caseSensitive whether or not the field names are case sensitive
+     * @return
+     */
+    def appendToStruct(
+                        structFieldName: String,
+                        namedColumns: Array[NamedColumn],
+                        overrideExistingStructCols: Boolean = false,
+                        newStructFieldName: Option[String] = None,
+                        caseSensitive: Boolean = false
+                      ): DataFrame = {
+      require(df.hasFieldNamed(structFieldName, caseSensitive),
+        s"ERROR: Dataframe must contain the struct field to be altered. " +
+        s"$structFieldName was not found. Struct fields include " +
+        s"${df.schema.fields.filter(_.dataType.typeName == "struct").map(_.name).mkString(", ")}"
+      )
+
+      val fieldToAlterTypeName = df.select(structFieldName).schema.fields.head.dataType.typeName
+      require(fieldToAlterTypeName == "struct", s"ERROR: Field to alter must a struct but got $fieldToAlterTypeName")
+
+      val targetStructFieldNames = df.select(s"$structFieldName.*").schema.fieldNames
+      val missingFieldsToAdd = namedColumns.filterNot(fc => targetStructFieldNames.contains(fc.fieldName))
+      val colsToAdd = if (overrideExistingStructCols) namedColumns else missingFieldsToAdd
+      val alteredStructColumn = colsToAdd.foldLeft(col(structFieldName))((structCol, fc) => {
+        structCol.withField(fc.fieldName, fc.column.alias(fc.fieldName))
+      })
+
+      df.withColumn(newStructFieldName.getOrElse(structFieldName), alteredStructColumn)
+    }
+
   }
 
   private def bidirectionalFill(colToFillName: String, wPrev: WindowSpec, wNext: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
@@ -384,10 +435,22 @@ object TransformFunctions {
              dbuRate_H: Column,
              nodeCount: Column,
              computeTime_H: Column,
+             runtimeEngine: Column,
+             sku: Column,
              smoothingCol: Option[Column] = None
            ): Column = {
+      //Check if the cluster is enabled with Photon or not
+      val isPhotonEnabled = upper(runtimeEngine).equalTo("PHOTON")
+      //Check if the cluster is not a SQL warehouse/endpoint
+      val isNotAnSQlWarehouse = !upper(sku).equalTo("SQLCOMPUTE")
+      //This is the default logic for DBU calculation
+      val defaultCalculation = dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))
+      val dbuMultiplier = 2
+
+      //assign the variables and return column with calculation
       coalesce(
-        when(isDatabricksBillable, dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1)))
+        when(isDatabricksBillable && isPhotonEnabled && isNotAnSQlWarehouse , defaultCalculation * dbuMultiplier)
+          .when(isDatabricksBillable, defaultCalculation)
           .otherwise(lit(0)),
         lit(0) // don't allow costs to be null (i.e. missing worker node type and/or single node workers
       )

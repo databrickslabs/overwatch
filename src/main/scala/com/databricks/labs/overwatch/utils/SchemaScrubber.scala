@@ -1,14 +1,14 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.utils.SchemaScrubber.SanitizedField
-import com.databricks.labs.overwatch.utils.SchemaTools.uniqueRandomStrings
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.{ArrayType, DataType, StructField, StructType}
+import org.apache.spark.sql.types._
 
 class SchemaScrubber(
                       sanitizationRules: List[SanitizeRule],
-                      sanitizationExceptions: Array[SanitizeFieldException]
+                      sanitizationExceptions: Array[SanitizeFieldException],
+                      cullNullTypes: Boolean
                     ) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   // TODO -- Delta writer is schema case sensitive and will fail on write if column case is not identical on both sides
@@ -85,14 +85,12 @@ class SchemaScrubber(
         s"have been renamed in place but should be reviewed.\n" +
         s"DUPLICATE FIELDS:\n" +
         s"${dups.mkString("\n")}"
-      println(warnMsg)
       logger.log(Level.WARN, warnMsg)
       fields.map(f => {
         val fieldName = if (caseSensitive) f.sanitizedField.name else f.sanitizedField.name.toLowerCase
         if (dups.contains(fieldName)) {
           val generatedUniqueName = f.sanitizedField.name + "_UNIQUESUFFIX_" + f.originalField.name.hashCode.toString
           val uniqueColumnMapping = s"\n${f.originalField.name} --> ${generatedUniqueName}"
-          println(uniqueColumnMapping)
           logger.log(Level.WARN, uniqueColumnMapping)
           f.sanitizedField.copy(name = generatedUniqueName)
         }
@@ -109,14 +107,18 @@ class SchemaScrubber(
    * @param dataType
    * @return
    */
-  private def sanitizeSchema(dataType: DataType, parentSanitizations: List[SanitizeRule] = List()): DataType = {
+  private def sanitizeSchema(
+                              dataType: DataType,
+                              parentSanitizations: List[SanitizeRule] = List()
+                            ): DataType = {
     dataType match {
       case dt: StructType =>
-        val dtStruct = dt.asInstanceOf[StructType]
-        dtStruct.copy(fields = generateUniques(dtStruct.fields.map(f => sanitizeFields(f, parentSanitizations))))
+        val fieldsToCleanse = if (cullNullTypes) {
+          dt.fields.filterNot(_.dataType == NullType)
+        } else dt.fields
+        dt.copy(fields = generateUniques(fieldsToCleanse.map(f => sanitizeFields(f, parentSanitizations))))
       case dt: ArrayType =>
-        val dtArray = dt.asInstanceOf[ArrayType]
-        dtArray.copy(elementType = sanitizeSchema(dtArray.elementType))
+        dt.copy(elementType = sanitizeSchema(dt.elementType))
       case _ => dataType
     }
   }
@@ -159,10 +161,11 @@ object SchemaScrubber {
    */
   def apply(
              sanitizationRules: List[SanitizeRule] = _defaultSanitizationRules,
-             exceptions: Array[SanitizeFieldException] = _noExceptions
+             exceptions: Array[SanitizeFieldException] = _noExceptions,
+             cullNullTypes: Boolean = false
            ): SchemaScrubber = {
     new SchemaScrubber(
-      sanitizationRules, exceptions
+      sanitizationRules, exceptions, cullNullTypes
     )
   }
 
