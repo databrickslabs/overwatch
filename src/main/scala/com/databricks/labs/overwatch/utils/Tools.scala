@@ -332,7 +332,7 @@ object Helpers extends SparkSessionWrapper {
    * @param maxFileSizeMB Optimizer's max file size in MB. Default is 1000 but that's too large so it's commonly
    *                      reduced to improve parallelism
    */
-  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int, includeVacuum: Boolean = true): Unit = {
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * maxFileSizeMB)
 
@@ -346,7 +346,7 @@ object Helpers extends SparkSessionWrapper {
         val sql = s"""optimize delta.`${tbl.tableLocation}` $zorderColumns"""
         println(s"optimizing: ${tbl.tableLocation} --> $sql")
         spark.sql(sql)
-        if (tbl.vacuum_H > 0) {
+        if (tbl.vacuum_H > 0 && includeVacuum) {
           println(s"vacuuming: ${tbl.tableLocation}, Retention == ${tbl.vacuum_H}")
           spark.sql(s"VACUUM delta.`${tbl.tableLocation}` RETAIN ${tbl.vacuum_H} HOURS")
         }

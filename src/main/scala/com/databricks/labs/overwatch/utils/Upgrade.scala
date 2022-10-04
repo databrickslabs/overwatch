@@ -1201,7 +1201,7 @@ object Upgrade extends SparkSessionWrapper {
           optBronze.BronzeTargets.auditLogsTarget,
           optSilver.SilverTargets.clustersSpecTarget
         )
-        parOptimize(targetsToOptimize, 128)
+        parOptimize(targetsToOptimize, 128, includeVacuum = false)
         upgradeStatus.append(UpgradeReport(etlDatabaseName, "Targets to Optimize", Some("SUCCESS"), stepMsg))
       } catch {
         case e: SimplifiedUpgradeException =>
@@ -1275,16 +1275,13 @@ object Upgrade extends SparkSessionWrapper {
 
         val silver = Silver(upgradeWorkspace, suppressReport = true, suppressStaticDatasets = true)
         val gold = Gold(upgradeWorkspace, suppressReport = true, suppressStaticDatasets = true)
-        val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(5))
         val targetsToRebuild = Array(
           PipelineFunctions.getPipelineTarget(silver, "job_status_silver"),
           PipelineFunctions.getPipelineTarget(silver, "jobrun_silver"),
           PipelineFunctions.getPipelineTarget(gold, "job_gold"),
           PipelineFunctions.getPipelineTarget(gold, "jobrun_gold"),
           PipelineFunctions.getPipelineTarget(gold, "jobRunCostPotentialFact_gold")
-        ).par
-
-        targetsToRebuild.tasksupport = taskSupport
+        )
 
         targetsToRebuild.map(t => fastDrop(t, upgradeConfig.cloudProvider))
         // ensure parent dirs are deleted
