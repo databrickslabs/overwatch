@@ -12,21 +12,21 @@
     <title>Data Dictionary (Latest) :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664849027" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664849027" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664849027"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664809880"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664809880"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664849027"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664849027"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664809880"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664849027"></script>
 
     
   </div>
@@ -828,6 +828,19 @@ The data in the files were generated from an Azure, test deployment created by O
 <p><strong>Partition Columns</strong> &ndash; organization_id + state_start_date</p>
 <p><strong>Z-Order Columns</strong> &ndash; cluster_id + unixTimeMS_state_start</p>
 <p><strong>Write Mode</strong> &ndash; Merge</p>
+<h5 id="unsupported-scenarios">Unsupported Scenarios</h5>
+<p>A few scenarios are not yet supported by Overwatch; they are called out here. Please stay tuned for updates
+as it&rsquo;s our intention to include everything we can as soon as possible after Databricks product GAs new features but
+there will be a delay.</p>
+<ul>
+<li>Costs for DBSQL clusters
+<ul>
+<li>Even though DBSQL warehouses may show up here (they normally will not), the costs for these cannot be calculated 
+at this time. Databricks doesn&rsquo;t yet publish the warehouse event logs (i.e. start/stop/scale) and until that is
+available, we cannot estimate costs for warehouses like we do for traditional clusters.</li>
+</ul>
+</li>
+</ul>
 <p>Costs and state details by cluster at every state in the cluster lifecycle. 
 The <strong><a href="#cost-functions-explained">Cost Functions</a> are detailed below</strong> the definitions of this table.</p>
 
@@ -1441,7 +1454,7 @@ Since the inception of multi-task jobs and Databricks jobs API 2.1, all run logi
 the job-level to the task-level. Overwatch must accommodate both as many customers have historical data that is still 
 important. As such, some of the fields seem redundant and the analyst must apply the correct logic based on the 
 circumstances. Please carefully review the field descriptions to understand the rules.</p>
-<h5 id="unsupported-scenarios">Unsupported Scenarios</h5>
+<h5 id="unsupported-scenarios-1">Unsupported Scenarios</h5>
 <p>A few scenarios are not yet supported by Overwatch; they are called out here. Please stay tuned for updates 
 as it&rsquo;s our intention to include everything we can as soon as possible after Databricks product GAs new features but 
 there will be a delay.</p>
@@ -1687,7 +1700,7 @@ the hard limit is 30 days. The progress of this feature can be tracked in <a hre
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/jobruncostpotentialfact.tab"><strong>SAMPLE</strong></a></p>
 <p>Databricks has moved to &ldquo;multi-task jobs&rdquo; and each run now refers to the run of a task not a job. Please reference 
 <a href="#jobrun">jobRuns table</a> for more detail</p>
-<h5 id="unsupported-scenarios-1">Unsupported Scenarios</h5>
+<h5 id="unsupported-scenarios-2">Unsupported Scenarios</h5>
 <ul>
 <li>Costs for runs of that execute SQL/DBT/DLT tasks</li>
 </ul>
@@ -3368,19 +3381,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664849027"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664849027"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664809880" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664809880"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664849027" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664849027"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

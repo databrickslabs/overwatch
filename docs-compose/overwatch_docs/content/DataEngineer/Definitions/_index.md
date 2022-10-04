@@ -130,6 +130,15 @@ The data in the files were generated from an Azure, test deployment created by O
 
 **Write Mode** -- Merge
 
+##### Unsupported Scenarios
+A few scenarios are not yet supported by Overwatch; they are called out here. Please stay tuned for updates
+as it's our intention to include everything we can as soon as possible after Databricks product GAs new features but
+there will be a delay.
+* Costs for DBSQL clusters
+  * Even though DBSQL warehouses may show up here (they normally will not), the costs for these cannot be calculated 
+  at this time. Databricks doesn't yet publish the warehouse event logs (i.e. start/stop/scale) and until that is
+  available, we cannot estimate costs for warehouses like we do for traditional clusters.
+
 Costs and state details by cluster at every state in the cluster lifecycle. 
 The **[Cost Functions](#cost-functions-explained) are detailed below** the definitions of this table.
 

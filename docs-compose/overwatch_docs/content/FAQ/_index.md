@@ -164,3 +164,28 @@ clusters running on DBR < 11.3 without this config will not report user_email fo
 To enable this globally, it's recommended to utilize cluster policies or global_init scripts.
 
 ![Enable_User_email](/images/FAQ/FAQ9_user_email_enable.png)
+
+## Q10: My view is giving me some strange error when I try to select from it, how do I fix it?
+Occasionally the views have an issue with their refresh and get stuck. If you're having a strange error with your 
+view, try the following code snipped to try and repair it.
+
+```scala
+import com.databricks.labs.overwatch.pipeline.Gold
+import com.databricks.labs.overwatch.utils.Helpers
+
+val myETLDB = "overwatch_etl" // CHANGE ME
+val nameOfMisbehavingView = "jobrun" // CHANGE ME
+
+spark.sql(s"drop view ${myETLDB}.${nameOfMisbehavingView}")
+
+val workspace = Helpers.getWorkspaceByDatabase(myETLDB)
+val gold = Gold(workspace)
+gold.refreshViews()
+```
+
+## Q11: An API call is resulting in Job Aborted what can I do
+This can be due to a large resulting dataset. To validate download the appropriate logs and search for 
+`spark.rpc.message.maxSize`. If you don't find skip ahead, if you do find it, add the following parameter to 
+the spark config of the Overwatch cluster. `spark.rpc.message.maxSize 1024`. 
+
+If the issue wasn't the RPC size reduce the size of the "SuccessBatchSize" in the APIENV configuration (as of 0.7.0)

@@ -13,6 +13,7 @@ Modules are the method by which Overwatch is segmented; currently, the modules a
 * [jobs](#jobs)
 * [accounts](#accounts)
 * [notebooks](#notebooks)
+* [DBSQL](#dbsql-preview)
 * [sparkEvents](#sparkevents)
 
 The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently,
@@ -152,7 +153,17 @@ Overwatch should not be used as single source of truth for any audit requirement
 
 *Gold Entities:* Notebook
 
-Currently a very simple module that just enables the materialization of notebooks as slow changing dimensions. 
+Currently a very simple module that just enables the materialization of notebooks as slow changing dimensions.
+
+### DBSQL (Preview)
+Preview as of 0.7.0
+*Requires:* Audit
+
+*Gold Entities:* sqlQueryHistory
+
+Additional DBSQL entities will be coming shortly to enable users to join with warehouses and other assets. As of 0.7.0 
+this is a preview; we're looking for feedback, so please submit a 
+[new git issue](https://github.com/databrickslabs/overwatch/issues/new) if you identify an issue with the data.
 
 ### SparkEvents
 *Requires:* Clusters

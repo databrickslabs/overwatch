@@ -12,21 +12,21 @@
     <title>FAQ :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664809880" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664849027" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664809880" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664849027" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664849027"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664809880"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664809880"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664849027"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664849027"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664809880"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664849027"></script>
 
     
   </div>
@@ -566,6 +566,8 @@
     <li><a href="#q7-id-like-to-have-cluster-policies-to-ensure-all-future-interactive-and-automated-clusters-have-an-appropriate-logging-location">Q7: I&rsquo;d like to have cluster policies to ensure all future interactive and automated clusters have an appropriate logging location</a></li>
     <li><a href="#q8-can-i-deploy-overwatch-on-unity-catalog-uc">Q8: Can I deploy Overwatch on Unity Catalog (UC)</a></li>
     <li><a href="#q9-how-to-enable-user-email-tracking-in-sparkjob-table-for-dbr-versions--113">Q9: How to enable user-email tracking in sparkJob Table for DBR versions &lt; 11.3</a></li>
+    <li><a href="#q10-my-view-is-giving-me-some-strange-error-when-i-try-to-select-from-it-how-do-i-fix-it">Q10: My view is giving me some strange error when I try to select from it, how do I fix it?</a></li>
+    <li><a href="#q11-an-api-call-is-resulting-in-job-aborted-what-can-i-do">Q11: An API call is resulting in Job Aborted what can I do</a></li>
   </ul>
 </nav>
     </div>
@@ -723,6 +725,25 @@ clusters running on DBR &lt; 11.3 without this config will not report user_email
 <code>spark.databricks.driver.enableUserContextForPythonAndRCommands</code></p>
 <p>To enable this globally, it&rsquo;s recommended to utilize cluster policies or global_init scripts.</p>
 <p><img src="https://databrickslabs.github.io/overwatch/images/FAQ/FAQ9_user_email_enable.png" alt="Enable_User_email"></p>
+<h2 id="q10-my-view-is-giving-me-some-strange-error-when-i-try-to-select-from-it-how-do-i-fix-it">Q10: My view is giving me some strange error when I try to select from it, how do I fix it?</h2>
+<p>Occasionally the views have an issue with their refresh and get stuck. If you&rsquo;re having a strange error with your 
+view, try the following code snipped to try and repair it.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-scala" data-lang="scala"><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Gold
+<span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Helpers
+
+<span style="color:#66d9ef">val</span> myETLDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;overwatch_etl&#34;</span> <span style="color:#75715e">// CHANGE ME
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> nameOfMisbehavingView <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;jobrun&#34;</span> <span style="color:#75715e">// CHANGE ME
+</span><span style="color:#75715e"></span>
+spark<span style="color:#f92672">.</span>sql<span style="color:#f92672">(</span><span style="color:#e6db74">s&#34;drop view </span><span style="color:#e6db74">${</span>myETLDB<span style="color:#e6db74">}</span><span style="color:#e6db74">.</span><span style="color:#e6db74">${</span>nameOfMisbehavingView<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">)</span>
+
+<span style="color:#66d9ef">val</span> workspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>getWorkspaceByDatabase<span style="color:#f92672">(</span>myETLDB<span style="color:#f92672">)</span>
+<span style="color:#66d9ef">val</span> gold <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Gold</span><span style="color:#f92672">(</span>workspace<span style="color:#f92672">)</span>
+gold<span style="color:#f92672">.</span>refreshViews<span style="color:#f92672">()</span>
+</code></pre></div><h2 id="q11-an-api-call-is-resulting-in-job-aborted-what-can-i-do">Q11: An API call is resulting in Job Aborted what can I do</h2>
+<p>This can be due to a large resulting dataset. To validate download the appropriate logs and search for 
+<code>spark.rpc.message.maxSize</code>. If you don&rsquo;t find skip ahead, if you do find it, add the following parameter to 
+the spark config of the Overwatch cluster. <code>spark.rpc.message.maxSize 1024</code>.</p>
+<p>If the issue wasn&rsquo;t the RPC size reduce the size of the &ldquo;SuccessBatchSize&rdquo; in the APIENV configuration (as of 0.7.0)</p>
 
 
 
@@ -1045,19 +1066,19 @@ clusters running on DBR &lt; 11.3 without this config will not report user_email
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664849027"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664809880"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664809880"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664849027"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664809880" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664809880"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664849027" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664849027"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

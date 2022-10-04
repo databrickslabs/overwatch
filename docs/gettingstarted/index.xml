@@ -22,7 +22,7 @@
       
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</guid>
       <description>Modules Modules are the method by which Overwatch is segmented; currently, the modules available include:
- audit clusters clusterEvents pools jobs accounts notebooks sparkEvents  The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently, under normal, daily operations, there no significant cost to any of these modules. It&amp;rsquo;s likely best to leave them all turned on unless there&amp;rsquo;s a specific reason not to.</description>
+ audit clusters clusterEvents pools jobs accounts notebooks DBSQL sparkEvents  The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently, under normal, daily operations, there no significant cost to any of these modules. It&amp;rsquo;s likely best to leave them all turned on unless there&amp;rsquo;s a specific reason not to.</description>
     </item>
     
     <item>
