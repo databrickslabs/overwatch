@@ -12,6 +12,7 @@ import org.json.JSONObject
 import scalaj.http.{HttpOptions, HttpResponse}
 
 import java.util
+import scala.annotation.tailrec
 
 /**
  * Companion object for APICallV2.
@@ -305,7 +306,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    *
    * @param jsonObject response as jsonObject received from API call.
    */
-  private def paginate(response: String): Unit = {
+  private def paginate(response: String): Boolean = {
+    var paginate = false
     val mapper = new ObjectMapper()
     val jsonObject = mapper.readTree(response);
     if (jsonObject.get(apiMeta.paginationKey) != null) {
@@ -314,16 +316,17 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
           val nextPageParams = apiMeta.getPaginationLogic(jsonObject, queryMap)
           if (nextPageParams != null) {
             setQueryMap(nextPageParams)
-            execute()
+            paginate = true
+//            execute()
           }
         } else {
           setJsonQuery(apiMeta.getPaginationLogicForSingleObject(jsonObject))
-          execute()
+          paginate = true
+//          execute()
         }
       }
-
     }
-
+    paginate
   }
 
 
@@ -494,7 +497,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
 
   def executeMultiThread(): util.ArrayList[String] = {
-    try {
+    @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
@@ -507,12 +510,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
           }
         }
       }
-      paginate(response.body)
       if (_printFinalStatusFlag) {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      _apiResponseArray
+      if (paginate(response.body)) executeThreadedHelper() else _apiResponseArray
+    }
+    try {
+      executeThreadedHelper()
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
@@ -544,7 +549,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   def execute(): this.type = {
-    try {
+    @tailrec def executeHelper(): this.type = {
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
@@ -557,12 +562,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
           }
         }
       }
-      paginate(response.body)
       if (_printFinalStatusFlag) {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      this
+      if (paginate(response.body)) executeHelper() else this
+    }
+    try {
+      executeHelper()
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
@@ -583,7 +590,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         logger.log(Level.WARN, excMsg, e)
         throw e
       }
-
     }
   }
 

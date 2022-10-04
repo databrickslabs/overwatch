@@ -332,7 +332,7 @@ object Helpers extends SparkSessionWrapper {
    * @param maxFileSizeMB Optimizer's max file size in MB. Default is 1000 but that's too large so it's commonly
    *                      reduced to improve parallelism
    */
-  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int, includeVacuum: Boolean = true): Unit = {
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int, includeVacuum: Boolean): Unit = {
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * maxFileSizeMB)
 
@@ -356,6 +356,10 @@ object Helpers extends SparkSessionWrapper {
       }
     })
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+  }
+
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+    parOptimize(tables, maxFileSizeMB, includeVacuum = true)
   }
 
   /**
