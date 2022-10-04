@@ -14,7 +14,7 @@ class Config() {
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _debugFlag: Boolean = false
-  private var _overwatchSchemaVersion = "0.610"
+  private var _overwatchSchemaVersion = "0.700"
   private var _organizationId: String = _
   private var _workspaceName: String = _
   private var _tempWorkingDir: String = _
@@ -130,7 +130,7 @@ class Config() {
   private[overwatch] def orderedOverwatchScope: Seq[OverwatchScope.Value] = {
     import OverwatchScope._
     //    jobs, clusters, clusterEvents, sparkEvents, pools, audit, passthrough, profiles
-    Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs, sqlHistory)
+    Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs, dbsql)
   }
 
   def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope

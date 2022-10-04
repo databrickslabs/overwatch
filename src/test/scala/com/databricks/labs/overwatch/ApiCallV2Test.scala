@@ -44,7 +44,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         "expand_tasks" -> "true",
         "offset" -> "0"
       )
-      ApiCallV2(apiEnv, endPoint, query, 2.0).execute().asDF()
+      ApiCallV2(apiEnv, endPoint, query, 2.1).execute().asDF()
     }
 
     it("Consume data from clusters/list API") {
@@ -78,12 +78,19 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
 
     it("Consume data from sql/history/queries API") {
       val endPoint = "sql/history/queries"
-      val query = Map("max_results" -> "100",
+      val query = Map("max_results" -> "20",
         "include_metrics" -> "true",
-        "filter_by.query_start_time_range.start_time_ms" -> "1652775426000",
-        "filter_by.query_start_time_range.end_time_ms" -> "1655453826000"
+        "filter_by.query_start_time_range.start_time_ms" -> "1663977600000",
+        "filter_by.query_start_time_range.end_time_ms" -> "1664236800000"
       )
-      assert(ApiCallV2(apiEnv, endPoint, query).execute().asDF() != null)
+      val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+      assert(ApiCallV2(
+        apiEnv,
+        endPoint,
+        query,
+        tempSuccessPath = "src/test/scala/tempDir/sqlqueryhistory",
+        accumulator = acc
+      ).execute().asDF() != null)
     }
 
     it("Consume data from clusters/resize API") {

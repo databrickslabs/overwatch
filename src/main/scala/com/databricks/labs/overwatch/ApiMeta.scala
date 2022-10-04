@@ -150,7 +150,7 @@ class ApiMetaFactory {
       case "instance-pools/list" => new InstancePoolsListApi
       case "instance-profiles/list" => new InstanceProfileListApi
       case "workspace/list" => new WorkspaceListApi
-      case "sql/history/queries" => new SqlHistoryQueriesApi
+      case "sql/history/queries" => new SqlQueryHistoryApi
       case "clusters/resize" => new ClusterResizeApi
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }
@@ -163,11 +163,12 @@ class ClusterResizeApi extends ApiMeta {
   setApiCallType("POST")
 }
 
-class SqlHistoryQueriesApi extends ApiMeta {
+class SqlQueryHistoryApi extends ApiMeta {
   setPaginationKey("has_next_page")
   setPaginationToken("next_page_token")
   setDataframeColumn("res")
   setApiCallType("GET")
+  setStoreInTempLocation(true)
   setIsDerivePaginationLogic(true)
 
   private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
@@ -175,15 +176,10 @@ class SqlHistoryQueriesApi extends ApiMeta {
   }
 
   private[overwatch] override def getPaginationLogic(jsonObject: JsonNode, requestMap: Map[String, String]): Map[String, String] = {
-    if (jsonObject.get(paginationKey).asBoolean()) { //Pagination key for sql/history/queries can return true or false
-      val _jsonKey = "page_token"
-      val _jsonValue = jsonObject.get(paginationToken).asText()
-      Map(
-        s"${_jsonKey}" -> s"${_jsonValue}"
-      )
-    } else {
-      null
-    }
+//    val jsonPageFilterKey = "page_token"
+    val _jsonValue = jsonObject.get(paginationToken).asText()
+//    logger.info(s"DEBUG - NEXT_PAGE_TOKEN = ${_jsonValue}")
+    requestMap.filterNot { case (k, _) => k.toLowerCase.startsWith("filter_by")} ++ Map(s"page_token" -> s"${_jsonValue}")
   }
 }
 

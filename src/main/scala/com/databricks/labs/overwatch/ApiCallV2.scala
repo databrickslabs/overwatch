@@ -398,7 +398,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         response = try {
             apiMeta.getBaseRequest()
             .params(queryMap)
-            .param(_jsonKey, _jsonValue)
             .options(reqOptions)
             .asString
         } catch {

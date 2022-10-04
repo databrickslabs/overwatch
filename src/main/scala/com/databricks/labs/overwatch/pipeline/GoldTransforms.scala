@@ -856,7 +856,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       |unixTimeMS, timestamp, date, event_log_start, event_log_end
       |""".stripMargin
 
-  protected val sqlHistoryViewColumnMapping: String =
+  protected val sqlQueryHistoryViewColumnMapping: String =
     """
       |organization_id,workspace_name,warehouse_id,query_id,query_end_time_ms,user_name,user_id,
       |executed_as_user_id,executed_as_user_name,duration,error_message,execution_end_time_ms,
