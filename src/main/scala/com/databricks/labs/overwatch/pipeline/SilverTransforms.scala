@@ -454,7 +454,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       'driver_instance_pool_id,
       'instance_pool_id,
       'instance_pool_name,
-      'spark_version,
+      coalesce('effective_spark_version, 'spark_version).alias("spark_version"),
+      'runtime_engine,
       'cluster_creator,
       'idempotency_token,
       'user_id,
@@ -762,10 +763,11 @@ trait SilverTransforms extends SparkSessionWrapper {
           'spark_conf,
           'driver_instance_pool_id,
           'instance_pool_id,
-          'spark_version,
+          coalesce('effective_spark_version, 'spark_version).alias("spark_version"),
           (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
           'Pipeline_SnapTS.cast("date").alias("date"),
-          'creator_user_name.alias("createdBy")
+          'creator_user_name.alias("createdBy"),
+          'runtime_engine
         )
 
       unionWithMissingAsNull(clusterBaseWMetaDF, missingClusterBaseFromSnap)
@@ -858,10 +860,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       when('driver_instance_pool_id.isNotNull, coalesce('driver_instance_pool_name, 'pool_snap_driver_instance_pool_name))
         .otherwise(lit(null).cast("string"))
         .alias("driver_instance_pool_name"),
-      'spark_version,
+      PipelineFunctions.fillForward("spark_version", clusterBefore),
       'idempotency_token,
       'timestamp,
-      'userEmail)
+      'userEmail,
+      'runtime_engine
+    )
 
     val clustersRemoved = clusterBaseDF
       .filter($"response.statusCode" === 200) // only successful delete statements get applied
@@ -945,6 +949,11 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("createdBy", when('createdBy.isNull && 'cluster_creator_lookup.isNotNull, 'cluster_creator_lookup).otherwise('createdBy))
       .withColumn("lastEditedBy", when(!isAutomated('cluster_name) && 'actionName === "edit", 'userEmail))
       .withColumn("lastEditedBy", when('lastEditedBy.isNull, last('lastEditedBy, true).over(clusterBefore)).otherwise('lastEditedBy))
+      .withColumn("runtime_engine",
+        when('runtime_engine.isNotNull, 'runtime_engine)
+          .when('spark_version.like("%_photon_%") && 'runtime_engine.isNull,"PHOTON")
+          .when(!'spark_version.like("%_photon_%") && 'runtime_engine.isNull,"STANDARD")
+          .otherwise(lit("UNKNOWN")))
       .drop("userEmail", "cluster_creator_lookup", "single_user_name", "rnk", "rn")
   }
 

@@ -209,7 +209,10 @@ object Schema extends SparkSessionWrapper {
         // EXPLICIT EXCLUSIONS -- fields will not be in targetDF
         StructField("organization_id", NullType, nullable = true),
         StructField("orgId", NullType, nullable = true),
-        StructField("version", NullType, nullable = true)
+        StructField("version", NullType, nullable = true),
+        //adding schema used for photon evolution
+        StructField("effective_spark_version", StringType, nullable = true),
+        StructField("runtime_engine", StringType, nullable = true)
       )), nullable = true),
     common("response"),
     common("useridentity")
