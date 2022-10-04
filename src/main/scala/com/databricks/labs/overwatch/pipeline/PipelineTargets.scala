@@ -237,6 +237,7 @@ abstract class PipelineTargets(config: Config) {
       name = "account_login_silver",
       _keys = Array("timestamp", "login_type", "requestId", "sourceIPAddress"),
       config,
+      _permitDuplicateKeys = false,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -416,6 +417,7 @@ abstract class PipelineTargets(config: Config) {
       name = "account_login_gold",
       _keys = Array("request_id", "login_type", "login_unixTimeMS", "from_ip_address"),
       config,
+      _permitDuplicateKeys = false,
       incrementalColumns = Array("login_unixTimeMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )

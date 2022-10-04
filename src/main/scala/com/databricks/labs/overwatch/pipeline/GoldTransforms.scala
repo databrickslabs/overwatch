@@ -48,8 +48,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'organization_id,
       'deleted_by,
       'createdBy.alias("created_by"),
-      'lastEditedBy.alias("last_edited_by"),
-      'runtime_engine
+      'lastEditedBy.alias("last_edited_by")
     )
     df.select(clusterCols: _*)
   }
