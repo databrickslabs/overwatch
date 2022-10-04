@@ -44,6 +44,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'driver_instance_pool_name,
       'instance_pool_name,
       'spark_version,
+      'runtime_engine,
       'idempotency_token,
       'organization_id,
       'deleted_by,
@@ -748,11 +749,12 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val clusterViewColumnMapping: String =
     """
-      |organization_id, workspace_name, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type, node_type, num_workers,
-      |autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type, security_profile, cluster_log_conf,
-      |init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf, acl_path_prefix, aws_attributes, azure_attributes,
-      |driver_instance_pool_id, instance_pool_id, driver_instance_pool_name, instance_pool_name,
-      |spark_version, idempotency_token, deleted_by, created_by, last_edited_by
+      |organization_id, workspace_name, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type,
+      |node_type, num_workers, autoscale, auto_termination_minutes, enable_elastic_disk, is_automated, cluster_type,
+      |security_profile, cluster_log_conf, init_scripts, custom_tags, cluster_source, spark_env_vars, spark_conf,
+      |acl_path_prefix, aws_attributes, azure_attributes, driver_instance_pool_id, instance_pool_id,
+      |driver_instance_pool_name, instance_pool_name, spark_version, runtime_engine, idempotency_token,
+      |deleted_by, created_by, last_edited_by
       |""".stripMargin
 
   protected val poolsViewColumnMapping: String =
@@ -816,9 +818,9 @@ trait GoldTransforms extends SparkSessionWrapper {
       |organization_id, workspace_name, cluster_id, cluster_name, custom_tags, state_start_date, unixTimeMS_state_start, unixTimeMS_state_end,
       |timestamp_state_start, timestamp_state_end, state, driver_node_type_id, node_type_id, current_num_workers,
       |target_num_workers, uptime_since_restart_S, uptime_in_state_S, uptime_in_state_H, cloud_billable,
-      |databricks_billable, isAutomated, dbu_rate, state_dates, days_in_state, worker_potential_core_H, core_hours,
-      |driver_compute_cost, worker_compute_cost, driver_dbu_cost, worker_dbu_cost, total_compute_cost, total_DBU_cost,
-      |total_driver_cost, total_worker_cost, total_cost, driverSpecs, workerSpecs
+      |databricks_billable, isAutomated, sku, runtime_engine, dbu_rate, state_dates, days_in_state,
+      |worker_potential_core_H, core_hours, driver_compute_cost, worker_compute_cost, driver_dbu_cost, worker_dbu_cost,
+      |total_compute_cost, total_DBU_cost, total_driver_cost, total_worker_cost, total_cost, driverSpecs, workerSpecs
       |""".stripMargin
 
   protected val sparkJobViewColumnMapping: String =
