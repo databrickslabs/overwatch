@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{AnalysisException, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.LongAccumulator
 import org.json.JSONObject
@@ -474,7 +474,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     } else if (_apiResponseArray.size != 0 && !apiMeta.storeInTempLocation) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
       apiResultDF = spark.read.json(Seq(_apiResponseArray.toString).toDS())
     } else if (apiMeta.storeInTempLocation) { //Read the response from the Temp location/Disk and convert it to Dataframe.
-      apiResultDF = spark.read.json(successTempPath)
+      apiResultDF = try {
+        spark.read.json(successTempPath)
+      } catch {
+        case e: AnalysisException if e.getMessage().contains("Path does not exist") => spark.emptyDataFrame
+      }
 
     }
     if (apiResultDF.columns.length == 0) {
