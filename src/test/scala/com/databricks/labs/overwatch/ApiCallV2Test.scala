@@ -3,8 +3,8 @@ package com.databricks.labs.overwatch
 import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv}
-import org.scalatest.{BeforeAndAfterAll, Ignore, Tag}
 import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.{BeforeAndAfterAll, Ignore}
 
 import java.util
 import java.util.Collections

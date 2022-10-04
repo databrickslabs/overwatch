@@ -9,7 +9,7 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.LongAccumulator
 import org.json.JSONObject
-import scalaj.http.{Http, HttpOptions, HttpResponse}
+import scalaj.http.{HttpOptions, HttpResponse}
 
 import java.util
 

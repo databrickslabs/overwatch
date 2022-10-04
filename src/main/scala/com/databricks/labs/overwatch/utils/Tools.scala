@@ -1,10 +1,9 @@
 package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
+import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper

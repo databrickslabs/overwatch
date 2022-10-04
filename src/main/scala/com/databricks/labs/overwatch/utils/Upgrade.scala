@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.utils
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils.Helpers.{fastDrop, parOptimize}
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException
@@ -9,9 +10,8 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
-import TransformFunctions._
 
-import java.util.concurrent.{ConcurrentHashMap, ForkJoinPool}
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConverters._
 import scala.collection.concurrent
 import scala.collection.mutable.ArrayBuffer

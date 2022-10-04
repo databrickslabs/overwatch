@@ -1,10 +1,8 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.BatchRunner.spark
 import com.databricks.labs.overwatch.env.Database
-import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
+import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
@@ -20,7 +18,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
-import java.time.{Duration, LocalDateTime}
+import java.time.LocalDateTime
 import java.util
 import java.util.Collections
 import java.util.concurrent.Executors
@@ -213,7 +211,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     isFirstRun: Boolean,
                                     organizationId: String,
                                     runID: String): DataFrame = {
-    import com.databricks.labs.overwatch.eventhubs.AadClientAuthentication
 
     val connectionString = ConnectionStringBuilder(
       PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))

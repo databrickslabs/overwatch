@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.pipeline.{Initializer, PipelineFunctions}
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions.col

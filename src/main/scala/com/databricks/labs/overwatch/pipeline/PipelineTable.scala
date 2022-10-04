@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.WriteMode.{WriteMode, merge}
+import com.databricks.labs.overwatch.utils.WriteMode.WriteMode
 import com.databricks.labs.overwatch.utils._
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}

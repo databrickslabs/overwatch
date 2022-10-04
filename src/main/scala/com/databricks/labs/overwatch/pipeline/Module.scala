@@ -4,7 +4,6 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.catalyst.expressions.Shuffle
 
 import java.time.Duration
 
