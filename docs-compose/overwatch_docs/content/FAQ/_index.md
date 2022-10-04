@@ -165,6 +165,13 @@ To enable this globally, it's recommended to utilize cluster policies or global_
 
 ![Enable_User_email](/images/FAQ/FAQ9_user_email_enable.png)
 
+{{% notice warning%}}
+If you set this property and someone in your org depends on one of these fields for their workflow this will overwrite 
+their value. They should not be doing this and if they are they need to stop before 11.3 as this will be part of DBR 
+by then. For example if a dev team is using something like "if not sc.getLocalProperty("user"): doThing()" then this 
+will now be set so their code would break.
+{{% /notice %}}
+
 ## Q10: My view is giving me some strange error when I try to select from it, how do I fix it?
 Occasionally the views have an issue with their refresh and get stuck. If you're having a strange error with your 
 view, try the following code snipped to try and repair it.

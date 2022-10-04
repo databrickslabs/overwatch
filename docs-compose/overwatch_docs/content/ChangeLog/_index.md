@@ -44,13 +44,6 @@ weight: 4
   * Most customers are able to configure proxies with cluster configs and init scripts but Overwatch now offers 
   deeper, first-party suppot for authenticated Proxy configs. See more details in the
   [APIEnv Configs]({{%relref "GettingStarted/Configuration.md"%}}/#apienv) section.
-* **SEVERAL New Bronze Snapshot Tables Available**
-  * Below is a full list of new bronze snapshots available. The only new snapshot directly integrated / promoted 
-  to gold is the sqlHistory; however, this paves the way for enhancing several gold tables as well as providing 
-  a lot of new data points. Review the new bronze tables and see how you can join this data in your dashboards to 
-  answer deeper questions.
-  * Libraries
-  * ...WIP
 * **SparkJob User-Email Coverage & Accuracy**
   * User_Email in sparkJob table now has complete coverage **but may require some action**
     * The user_email had incompletions and inaccuracies. Databricks was not publishing the user data for users using 
