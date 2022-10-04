@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.WriteMode.{WriteMode, merge}
+import com.databricks.labs.overwatch.utils.WriteMode.WriteMode
 import com.databricks.labs.overwatch.utils._
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -296,8 +296,12 @@ case class PipelineTable(
     }
   }
 
+  /**
+   * return duplicate records globally
+   * @return
+   */
   def getDups(): DataFrame = {
-    val df = this.asDF
+    val df = if (this.exists) this.asDF(withGlobalFilters = false) else spark.emptyDataFrame
     val w = Window.partitionBy(keys map col: _*).orderBy(incrementalColumns map col: _*)
     val dups = df
       .withColumn("rnk", rank().over(w))
@@ -310,60 +314,65 @@ case class PipelineTable(
       .orderBy(incrementalColumns map col: _*)
   }
 
-//  def deleteDups(tableFullName: String, keyCols: Array[String], orderByCols: Array[String], tableFilters: Array[Column]): Unit = {
+  /**
+   * Deletes duplicates for all workspaces configured in the table
+   * @param tableFilters filter to exclude certain table names
+   */
   def deleteDups(tableFilters: Array[Column] = Array()): Unit = {
-    val completeKeySet = (keys ++ incrementalColumns).map(_.toLowerCase).distinct
-    val w = Window.partitionBy(completeKeySet map col: _*).orderBy(incrementalColumns map col: _*)
-    val wRank = Window.partitionBy((completeKeySet :+ "rnk") map col: _*).orderBy(incrementalColumns map col: _*)
-    val startVersion = spark.sql(s"desc history $tableFullName").select(max('version)).as[Long].first
-    val db = tableFullName.split("\\.")(0)
-    val tbl = tableFullName.split("\\.")(1)
-    val tblLocation = spark.sessionState.catalog.getTableMetadata(TableIdentifier(tbl, Some(db))).location.toString
-    val conditionalMatchClause = completeKeySet.map(c => col(s"source.$c") === col(s"target.$c")).reduce((x, y) => x && y)
+    if (this.exists) {
+      val completeKeySet = (keys ++ incrementalColumns).map(_.toLowerCase).distinct
+      val w = Window.partitionBy(completeKeySet map col: _*).orderBy(incrementalColumns map col: _*)
+      val wRank = Window.partitionBy((completeKeySet :+ "rnk") map col: _*).orderBy(incrementalColumns map col: _*)
+      val startVersion = spark.sql(s"desc history $tableFullName").select(max('version)).as[Long].first
+      val db = tableFullName.split("\\.")(0)
+      val tbl = tableFullName.split("\\.")(1)
+      val tblLocation = spark.sessionState.catalog.getTableMetadata(TableIdentifier(tbl, Some(db))).location.toString
+      val conditionalMatchClause = completeKeySet.map(c => col(s"source.$c") === col(s"target.$c")).reduce((x, y) => x && y)
 
-    val nonNullFilters = completeKeySet.map(k => col(k).isNotNull) ++ tableFilters
-    val currentDF = nonNullFilters.foldLeft(spark.table(tableFullName))((df, f) => df.filter(f))
-    val vnDF = nonNullFilters.foldLeft(spark.read.format("delta").option("versionAsOf", startVersion).load(tblLocation))((df, f) => df.filter(f))
+      val nonNullFilters = completeKeySet.map(k => col(k).isNotNull) ++ tableFilters
+      val currentDF = nonNullFilters.foldLeft(spark.table(tableFullName))((df, f) => df.filter(f))
+      val vnDF = nonNullFilters.foldLeft(spark.read.format("delta").option("versionAsOf", startVersion).load(tblLocation))((df, f) => df.filter(f))
 
-    val dupsToDelete = currentDF
-      .withColumn("rnk", rank().over(w))
-      .withColumn("rn", row_number().over(w))
-      .filter('rnk > 1 || 'rn > 1)
+      val dupsToDelete = currentDF
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter('rnk > 1 || 'rn > 1)
 
-    val dupsToRestore = vnDF
-      .withColumn("rnk", rank().over(w))
-      .withColumn("rn", row_number().over(wRank))
-      .filter('rnk === 1 && 'rn === 2)
-      .drop("rnk", "rn")
+      val dupsToRestore = vnDF
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(wRank))
+        .filter('rnk === 1 && 'rn === 2)
+        .drop("rnk", "rn")
 
-    DeltaTable.forName(tableFullName)
-      .as("target")
-      .merge(
-        dupsToDelete.as("source"), conditionalMatchClause
-      )
-      .whenMatched
-      .delete()
-      .execute
+      DeltaTable.forName(tableFullName)
+        .as("target")
+        .merge(
+          dupsToDelete.as("source"), conditionalMatchClause
+        )
+        .whenMatched
+        .delete()
+        .execute
 
-    DeltaTable.forName(tableFullName)
-      .as("target")
-      .merge(
-        dupsToRestore.as("source"), conditionalMatchClause
-      )
-      .whenNotMatched()
-      .insertAll()
-      .execute
+      DeltaTable.forName(tableFullName)
+        .as("target")
+        .merge(
+          dupsToRestore.as("source"), conditionalMatchClause
+        )
+        .whenNotMatched()
+        .insertAll()
+        .execute
 
-    val wHist = Window.orderBy('version.desc)
-    val hist = spark.sql(s"desc history $tableFullName")
-      .filter('operation === "MERGE")
-      .withColumn("rnk", rank().over(wHist))
-      .withColumn("rn", row_number().over(wHist))
+      val wHist = Window.orderBy('version.desc)
+      val hist = spark.sql(s"desc history $tableFullName")
+        .filter('operation === "MERGE")
+        .withColumn("rnk", rank().over(wHist))
+        .withColumn("rn", row_number().over(wHist))
 
-    val dupsFound = hist.filter('rnk === 2).select($"operationMetrics.numTargetRowsDeleted".cast("long")).as[Long].first
-    val originalsRecovered = hist.filter('rnk === 1).select($"operationMetrics.numTargetRowsInserted".cast("long")).as[Long].first
-    val dupsDropped = dupsFound- originalsRecovered
-    println(s"DROPPED $dupsDropped duplicate records from $tableFullName")
+      val dupsFound = hist.filter('rnk === 2).select($"operationMetrics.numTargetRowsDeleted".cast("long")).as[Long].first
+      val originalsRecovered = hist.filter('rnk === 1).select($"operationMetrics.numTargetRowsInserted".cast("long")).as[Long].first
+      val dupsDropped = dupsFound - originalsRecovered
+      println(s"DROPPED $dupsDropped duplicate records from $tableFullName")
+    } else println(s"$tableFullName does not exist: SKIPPING")
   }
 
 

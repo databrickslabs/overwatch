@@ -1,10 +1,9 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.utils.SchemaScrubber.SanitizedField
-import com.databricks.labs.overwatch.utils.SchemaTools.uniqueRandomStrings
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.{ArrayType, DataType, NullType, StructField, StructType}
+import org.apache.spark.sql.types._
 
 class SchemaScrubber(
                       sanitizationRules: List[SanitizeRule],

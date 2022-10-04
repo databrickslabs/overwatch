@@ -3,10 +3,10 @@ package com.databricks.labs.overwatch.utils
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.types.{MapType, NullType, StringType, StructField, StructType}
+import org.apache.spark.sql.functions.{col, lit, size, struct}
+import org.apache.spark.sql.types._
 import org.scalatest.GivenWhenThen
 import org.scalatest.funspec.AnyFunSpec
-import org.apache.spark.sql.functions.{col, lit, size, struct}
 
 
 class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with GivenWhenThen {

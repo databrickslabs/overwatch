@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.utils.{BadConfigException, Config}
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import io.delta.tables.DeltaTable
 import org.apache.spark.sql.execution.streaming.MemoryStream
-import org.apache.spark.sql.functions.{col, lit, row_number}
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, SQLContext}

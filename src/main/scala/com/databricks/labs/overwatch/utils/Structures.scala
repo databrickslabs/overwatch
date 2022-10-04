@@ -9,13 +9,11 @@ import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
-import org.json.{JSONArray, JSONObject}
 import scalaj.http.HttpResponse
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
-import java.util
 import java.util.Date
 
 case class DBDetail()

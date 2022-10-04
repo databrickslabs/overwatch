@@ -1,10 +1,9 @@
 package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
+import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -333,7 +332,7 @@ object Helpers extends SparkSessionWrapper {
    * @param maxFileSizeMB Optimizer's max file size in MB. Default is 1000 but that's too large so it's commonly
    *                      reduced to improve parallelism
    */
-  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int, includeVacuum: Boolean): Unit = {
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * maxFileSizeMB)
 
@@ -347,7 +346,7 @@ object Helpers extends SparkSessionWrapper {
         val sql = s"""optimize delta.`${tbl.tableLocation}` $zorderColumns"""
         println(s"optimizing: ${tbl.tableLocation} --> $sql")
         spark.sql(sql)
-        if (tbl.vacuum_H > 0) {
+        if (tbl.vacuum_H > 0 && includeVacuum) {
           println(s"vacuuming: ${tbl.tableLocation}, Retention == ${tbl.vacuum_H}")
           spark.sql(s"VACUUM delta.`${tbl.tableLocation}` RETAIN ${tbl.vacuum_H} HOURS")
         }
@@ -357,6 +356,10 @@ object Helpers extends SparkSessionWrapper {
       }
     })
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+  }
+
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+    parOptimize(tables, maxFileSizeMB, includeVacuum = true)
   }
 
   /**

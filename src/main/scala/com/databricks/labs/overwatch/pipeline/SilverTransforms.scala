@@ -6,7 +6,6 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{MapType, StringType}
 import org.apache.spark.sql.{Column, DataFrame}
 
 
