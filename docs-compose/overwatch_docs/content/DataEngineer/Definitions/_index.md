@@ -174,6 +174,7 @@ updated on the subsequent run.
 | databricks_billable     | boolean     | State incurs databricks DBU costs. All states incur DBU costs except: INIT_SCRIPTS_FINISHED, INIT_SCRIPTS_STARTED, STARTING, TERMINATING, CREATING, RESTARTING |
 | isAutomated             | boolean     | Whether the cluster was created as an "automated" or "interactive" cluster                                                                                     |
 | dbu_rate                | double      | Effective dbu rate used for calculations (effective at time of pipeline run)                                                                                   |
+| runtime_engine          | string      | One of STANDARD or PHOTON. When PHOTON, pricing is adjusted when deriving the dbu_costs                                                                        |
 | state_dates             | array<date> | Array of all dates across which the state spanned                                                                                                              |
 | days_in_state           | int         | Number of days in state                                                                                                                                        |
 | worker_potential_core_H | double      | Worker core hours available to execute spark tasks                                                                                                             |
@@ -204,10 +205,11 @@ accurately reflect a customer's costs.
   however, if some workers cannot be provisioned the worker_compute_cost will be slightly higher than actual while
   target_num_workers > current_num_workers. target_num_workers used here because the compute costs begin accumulating 
   as soon as the node is provisioned, not at the time it is added to the cluster.
+* **photon_kicker**: when runtime_engine == Photon 2 otherwise 1
 * **driver_dbu_cost**: when databricks_billable --> driver_hourly_dbus (instancedetails.hourlyDBUs) * houry_dbu_rate for dbu type (dbuCostDetails.contract_price) *
-  uptime_in_state_H --> otherwise 0
+  uptime_in_state_H * photon_kicker --> otherwise 0
 * **worker_dbu_cost**: when databricks_billable --> driver_hourly_dbus (instancedetails.hourlyDBUs) * houry_dbu_rate for dbu type (dbuCostDetails.contract_price) *
-  current_num_workers * uptime_in_state_H --> otherwise 0
+  current_num_workers * uptime_in_state_H * photon_kicker --> otherwise 0
   * current_num_workers used here as dbu costs do not begin until the node able to receive workloads (i.e. node is 
     moved from target_worker to current_worker / "upsize_complete" state)
 * **cloudBillable**: Cluster is in a running state

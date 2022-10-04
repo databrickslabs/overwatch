@@ -27,6 +27,14 @@ weight: 4
   the DBSQL tables if your workspace[s] are using DBSQL.
   * Limitation - Databricks does not publish Warehouse events yet and as such, explicit cost anlaysis is not yet 
   possible for DBSQL. As soon as this is made available the Overwatch Dev team will begin work to integrate it.
+* **Photon Costs Attributed in CLSF and JRCP**
+  * Photon cost calculations have been integrated into Overwatch.
+  * By default the Photon costs will begin being applied after the upgrade date. If you want to retroactively apply 
+  this change you can by rolling back and rebuilding the following tables as this is not automatically handled in 
+  the upgrade (some customers don't want to see that change in their historical reports)
+    * cluster_spec_silver
+    * clusterstatefact_gold 
+    * jobruncostpotentialfact_gold
 * **New API Manager**
   * The API management libraries were completely rebuilt from the ground up to maximize throughput, capabilities, 
   and safety for your environment.

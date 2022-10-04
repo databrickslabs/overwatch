@@ -12,21 +12,21 @@
     <title>ChangeLog :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664849027" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664849027" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664849027" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664849027" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664849027" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664849027" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664849027" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664849027" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664861627" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664861627" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664861627" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664861627" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664861627" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664861627" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664861627" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664861627" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664861627" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664849027" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664861627" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664861627"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664849027"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664849027"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664861627"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664861627"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664849027"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664861627"></script>
 
     
   </div>
@@ -649,6 +649,20 @@ but was unable to make the cut for this release</li>
 the DBSQL tables if your workspace[s] are using DBSQL.</li>
 <li>Limitation - Databricks does not publish Warehouse events yet and as such, explicit cost anlaysis is not yet 
 possible for DBSQL. As soon as this is made available the Overwatch Dev team will begin work to integrate it.</li>
+</ul>
+</li>
+<li><strong>Photon Costs Attributed in CLSF and JRCP</strong>
+<ul>
+<li>Photon cost calculations have been integrated into Overwatch.</li>
+<li>By default the Photon costs will begin being applied after the upgrade date. If you want to retroactively apply 
+this change you can by rolling back and rebuilding the following tables as this is not automatically handled in 
+the upgrade (some customers don&rsquo;t want to see that change in their historical reports)
+<ul>
+<li>cluster_spec_silver</li>
+<li>clusterstatefact_gold</li>
+<li>jobruncostpotentialfact_gold</li>
+</ul>
+</li>
 </ul>
 </li>
 <li><strong>New API Manager</strong>
@@ -1502,19 +1516,19 @@ if it didn&rsquo;t already exist for the workspace</li>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664849027"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664849027"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664849027"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664849027"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664849027"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664861627"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664861627"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664861627"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664861627"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664861627"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664861627"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664849027"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664849027"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664849027"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664861627"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664861627"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664861627"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664849027" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664849027"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664861627" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664861627"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
