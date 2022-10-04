@@ -276,9 +276,10 @@ trait GoldTransforms extends SparkSessionWrapper {
         coalesce(unix_timestamp('activeUntil) * 1000, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000)
       )
 
+    val derivedSKU = PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version, 'cluster_type)
     val nodeTypeLookup = clusterSpec.asDF
-      .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version, 'runtime_engine)
-      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version))
+      .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version, 'cluster_type, 'runtime_engine)
+      .withColumn("sku", derivedSKU)
       .toTSDF("timestamp", "organization_id", "sku")
       .lookupWhen(dbuCostDetailsTSDF)
       .df
@@ -286,8 +287,8 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val nodeTypeLookup2 = clusterSnapshot.asDF
       .withColumn("timestamp", coalesce('terminated_time, 'start_time))
-      .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version, 'runtime_engine)
-      .withColumn("sku", PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version))
+      .select('organization_id, 'cluster_id, 'cluster_name, to_json('custom_tags).alias("custom_tags"), 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version, lit(null).cast("string").alias("cluster_type"), 'runtime_engine)
+      .withColumn("sku", derivedSKU)
       .toTSDF("timestamp", "organization_id", "sku")
       .lookupWhen(dbuCostDetailsTSDF)
       .df
@@ -364,7 +365,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'databricks_billable,
       isAutomated('cluster_name).alias("isAutomated"),
       'sku,
-   //   'runtime_engine,
+      'runtime_engine,
       'dbu_rate,
       'state_dates,
       'days_in_state,
