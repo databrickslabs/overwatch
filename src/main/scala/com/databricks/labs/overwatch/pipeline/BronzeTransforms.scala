@@ -773,7 +773,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
           baseDF
             .withColumn("Timestamp", fixDupTimestamps)
             .drop("timestamp")
-            .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
 
 
         } catch {
@@ -846,6 +845,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
           .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
           .withColumnRenamed("executorId", "blackListedExecutorIds")
+          .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
           .withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))

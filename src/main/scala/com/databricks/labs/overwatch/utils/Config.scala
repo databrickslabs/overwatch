@@ -151,6 +151,8 @@ class Config() {
         value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
       "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
       "spark.sql.caseSensitive" -> "false",
+      "spark.sql.autoBroadcastJoinThreshold" -> "10485760",
+      "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "10485760",
       "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
       "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365
     )

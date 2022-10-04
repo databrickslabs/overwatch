@@ -160,8 +160,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val sparkExecutionsSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
-    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b"),
-    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b")
+    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString),
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString)
   )
   lazy private[overwatch] val executionsModule = Module(2005, "Silver_SPARK_Executions", this, Array(1006), 8.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkExecutionsSparkOverrides)
@@ -178,8 +178,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
     "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
-    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b"),
-    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b")
+    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString),
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString)
   )
   lazy private[overwatch] val sparkJobsModule = Module(2006, "Silver_SPARK_Jobs", this, Array(1006), 8.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkJobsSparkOverrides)
@@ -195,8 +195,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   private val sparkStagesSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
-    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b"),
-    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b")
+    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString),
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString)
   )
   lazy private[overwatch] val sparkStagesModule = Module(2007, "Silver_SPARK_Stages", this, Array(1006), 8.0, shuffleFactor = 4.0)
     .withSparkOverrides(sparkStagesSparkOverrides)
@@ -214,8 +214,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048", // output is very dense, shrink output file size
     "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
     "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 4).toString,
-    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b"),
-    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString + "b")
+    "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString),
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString)
   )
   lazy private[overwatch] val sparkTasksModule = Module(2008, "Silver_SPARK_Tasks", this, Array(1006), 8.0, shuffleFactor = 8.0)
     .withSparkOverrides(sparkTasksSparkOverrides)
@@ -237,7 +237,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         jobStatusModule.isFirstRun,
         SilverTargets.dbJobsStatusTarget.keys,
         jobStatusModule.fromTime,
-        config.tempWorkingDir
+        config.tempWorkingDir,
+        jobStatusModule.daysToProcess
       )),
     append(SilverTargets.dbJobsStatusTarget)
   )
@@ -252,7 +253,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         SilverTargets.dbJobsStatusTarget,
         BronzeTargets.jobsSnapshotTarget,
         jobRunsModule.fromTime, jobRunsModule.untilTime,
-        SilverTargets.dbJobRunsTarget.keys
+        SilverTargets.dbJobRunsTarget.keys,
+        jobRunsModule.daysToProcess
       )
     ),
     append(SilverTargets.dbJobRunsTarget)
@@ -338,15 +340,15 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.pools => poolsSpecModule.execute(appendPoolsSpecProcess)
       case OverwatchScope.clusters => clusterSpecModule.execute(appendClusterSpecProcess)
       case OverwatchScope.clusterEvents => clusterStateDetailModule.execute(appendClusterStateDetailProcess)
+      case OverwatchScope.dbsql => {
+        sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
+      }
       case OverwatchScope.sparkEvents => {
         processSparkEvents()
       }
       case OverwatchScope.jobs => {
         jobStatusModule.execute(appendJobStatusProcess)
         jobRunsModule.execute(appendJobRunsProcess)
-      }
-      case OverwatchScope.dbsql => {
-        sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
       }
       case _ =>
     }

@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.{Module, PipelineFunctions, PipelineTable}
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import com.databricks.labs.overwatch.validation.SnapReport
@@ -223,6 +224,8 @@ case class CloneDetail(source: String, target: String, asOfTS: Option[String] = 
 case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
 
 case class OrgConfigDetail(organization_id: String, latestParams: OverwatchParams)
+
+case class OrgWorkspace(organization_id: String, workspace: Workspace)
 
 case class NamedColumn(fieldName: String, column: Column)
 

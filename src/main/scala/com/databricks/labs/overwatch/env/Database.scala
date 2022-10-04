@@ -139,6 +139,7 @@ class Database(config: Config) extends SparkSessionWrapper {
    * @return
    */
   private def persistAndLoad(df: DataFrame, target: PipelineTable): DataFrame = {
+    spark.conf.set("spark.databricks.delta.formatCheck.enabled", "false")
     val tempPrefix = target.config.tempWorkingDir
     val tempSuffix = UUID.randomUUID().toString.replace("-", "")
     val dfTempPath = s"${tempPrefix}/${target.name.toLowerCase}/$tempSuffix"
@@ -151,6 +152,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     df.write.format("delta").save(dfTempPath)
 
     spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16) // maximize parallelism on re-read and let
+    spark.conf.set("spark.databricks.delta.formatCheck.enabled", "true")
     // AQE bring it back down
     spark.read.format("delta").load(dfTempPath)
   }

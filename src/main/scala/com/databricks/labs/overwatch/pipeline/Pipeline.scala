@@ -47,12 +47,21 @@ class Pipeline(
     pipelineState
   }
 
+  def overridePipelineState(newPipelineState: scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport]): Unit = {
+    clearPipelineState()
+    newPipelineState.values.foreach(state => updateModuleState(state))
+  }
+
   def getVerbosePipelineState: Array[ModuleStatusReport] = {
     pipelineStateTarget.asDF.as[ModuleStatusReport].collect()
   }
 
   def updateModuleState(moduleState: SimplifiedModuleStatusReport): Unit = {
     pipelineState.put(moduleState.moduleID, moduleState)
+  }
+
+  def dropModuleState(moduleId: Int): Unit = {
+    pipelineState.remove(moduleId)
   }
 
   def clearPipelineState(): this.type = {

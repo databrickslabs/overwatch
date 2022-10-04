@@ -406,8 +406,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       if (jobsBaseHasRecords) {
         // using delta writer merge nested complex structs -- not possible with a union
         val schemaMergePath = s"${tmpWorkingDir}/jobStatus/firstRun/${fromTime.asUnixTimeMilli}"
+        spark.conf.set("spark.databricks.delta.formatCheck.enabled", "false")
         df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(schemaMergePath)
         imputedFirstRunJobRecords.write.format("delta").mode("append").option("mergeSchema", "true").save(schemaMergePath)
+        spark.conf.set("spark.databricks.delta.formatCheck.enabled", "true")
         spark.read.format("delta").load(schemaMergePath)
       } else imputedFirstRunJobRecords
     } else if (jobsBaseHasRecords) df
@@ -422,10 +424,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   /**
    * Convert complex json columns to typed structs
    */
-  def jobStatusStructifyJsonCols(df: DataFrame): DataFrame = {
-    df.cache() // persisting to speed up schema inference
-    df.count()
-    val dfCols = df.columns
+  def jobStatusStructifyJsonCols(cacheParts: Int)(df: DataFrame): DataFrame = {
+    val dfc = df.repartition(cacheParts).cache() // persisting to speed up schema inference
+    dfc.count()
+    val dfCols = dfc.columns
     val colsToRebuild = Array(
       "email_notifications", "tags", "schedule", "libraries", "job_clusters", "tasks", "new_cluster",
       "git_source", "access_control_list", "grants", "notebook_task", "spark_python_task", "spark_jar_task",
@@ -433,27 +435,27 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     ).map(_.toLowerCase)
     val baseSelects = dfCols.filterNot(cName => colsToRebuild.contains(cName.toLowerCase)) map col
     val structifiedCols: Array[Column] = Array(
-      structFromJson(spark, df, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema),
-      structFromJson(spark, df, "email_notifications", allNullMinimumSchema = Schema.minimumEmailNotificationsSchema),
-      structFromJson(spark, df, "tags"),
-      structFromJson(spark, df, "schedule", allNullMinimumSchema = Schema.minimumScheduleSchema),
-      structFromJson(spark, df, "new_cluster", allNullMinimumSchema = Schema.minimumNewClusterSchema),
-      structFromJson(spark, df, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema),
-      structFromJson(spark, df, "libraries", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumLibrariesSchema),
-      structFromJson(spark, df, "git_source", allNullMinimumSchema = Schema.minimumGitSourceSchema),
-      structFromJson(spark, df, "access_control_list", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumAccessControlListSchema),
-      structFromJson(spark, df, "grants", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumGrantsSchema),
-      structFromJson(spark, df, "notebook_task", allNullMinimumSchema = Schema.minimumNotebookTaskSchema),
-      structFromJson(spark, df, "spark_python_task", allNullMinimumSchema = Schema.minimumSparkPythonTaskSchema),
-      structFromJson(spark, df, "spark_jar_task", allNullMinimumSchema = Schema.minimumSparkJarTaskSchema),
-      structFromJson(spark, df, "spark_submit_task", allNullMinimumSchema = Schema.minimumSparkSubmitTaskSchema),
-      structFromJson(spark, df, "shell_command_task", allNullMinimumSchema = Schema.minimumShellCommandTaskSchema),
-      structFromJson(spark, df, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
+      structFromJson(spark, dfc, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema),
+      structFromJson(spark, dfc, "email_notifications", allNullMinimumSchema = Schema.minimumEmailNotificationsSchema),
+      structFromJson(spark, dfc, "tags"),
+      structFromJson(spark, dfc, "schedule", allNullMinimumSchema = Schema.minimumScheduleSchema),
+      structFromJson(spark, dfc, "new_cluster", allNullMinimumSchema = Schema.minimumNewClusterSchema),
+      structFromJson(spark, dfc, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema),
+      structFromJson(spark, dfc, "libraries", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumLibrariesSchema),
+      structFromJson(spark, dfc, "git_source", allNullMinimumSchema = Schema.minimumGitSourceSchema),
+      structFromJson(spark, dfc, "access_control_list", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumAccessControlListSchema),
+      structFromJson(spark, dfc, "grants", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumGrantsSchema),
+      structFromJson(spark, dfc, "notebook_task", allNullMinimumSchema = Schema.minimumNotebookTaskSchema),
+      structFromJson(spark, dfc, "spark_python_task", allNullMinimumSchema = Schema.minimumSparkPythonTaskSchema),
+      structFromJson(spark, dfc, "spark_jar_task", allNullMinimumSchema = Schema.minimumSparkJarTaskSchema),
+      structFromJson(spark, dfc, "spark_submit_task", allNullMinimumSchema = Schema.minimumSparkSubmitTaskSchema),
+      structFromJson(spark, dfc, "shell_command_task", allNullMinimumSchema = Schema.minimumShellCommandTaskSchema),
+      structFromJson(spark, dfc, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
     )
 
 
     // Done this way for performance -- using with columns creates massive plan
-    df
+    dfc
       .select((baseSelects ++ structifiedCols): _*)
       .scrubSchema
       //      .withColumn("tags", structFromJson(spark, df, "tags")) // having to do this after -- some issue with removing all null tags
@@ -473,13 +475,18 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       )
   }
 
-  def jobStatusCleanseForPublication(keys: Array[String])(df: DataFrame): DataFrame = {
+  def jobStatusCleanseForPublication(
+                                      keys: Array[String],
+                                      cacheParts: Int
+                                    )(df: DataFrame): DataFrame = {
+    val dfc = df.repartition(cacheParts).cache()
+    dfc.count()
     val emptyKeysDF = Seq.empty[(String, Long, Long, String, String)].toDF("organization_id", "timestamp", "jobId", "actionName", "requestId")
 
-    val rootCleansedTasksDF = workflowsCleanseTasks(df, keys, emptyKeysDF, "tasks", "rootCleansedTasks")
-    val rootCleansedJobClustersDF = workflowsCleanseJobClusters(df, keys, emptyKeysDF, "job_clusters", "rootCleansedJobClusters")
+    val rootCleansedTasksDF = workflowsCleanseTasks(dfc, keys, emptyKeysDF, "tasks", "rootCleansedTasks")
+    val rootCleansedJobClustersDF = workflowsCleanseJobClusters(dfc, keys, emptyKeysDF, "job_clusters", "rootCleansedJobClusters")
 
-    val dfWCleansedJobClustersAndTasks = df
+    val dfWCleansedJobClustersAndTasks = dfc
       .join(rootCleansedTasksDF, keys.toSeq, "left")
       .join(rootCleansedJobClustersDF, keys.toSeq, "left")
 
@@ -868,39 +875,39 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 //      .scrubSchema
   }
 
-  def jobRunsStructifyLookupMeta(df: DataFrame): DataFrame = {
-    df.cache() // caching to speed up schema inference
-    df.count()
+  def jobRunsStructifyLookupMeta(cacheParts: Int)(df: DataFrame): DataFrame = {
+    val dfc = df.repartition(cacheParts).cache() // caching to speed up schema inference
+    dfc.count()
     val colsToOverride = Array("tasks", "job_clusters", "tags").toSet
-    val dfOrigCols = (df.columns.toSet -- colsToOverride).toArray map col
+    val dfOrigCols = (dfc.columns.toSet -- colsToOverride).toArray map col
     val colsToAppend: Array[Column] = Array(
-      structFromJson(spark, df, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema).alias("tasks"),
-      structFromJson(spark, df, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema).alias("job_clusters"),
+      structFromJson(spark, dfc, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema).alias("tasks"),
+      structFromJson(spark, dfc, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema).alias("job_clusters"),
       struct(
-        structFromJson(spark, df, "new_cluster", allNullMinimumSchema = Schema.minimumNewClusterSchema),
-        structFromJson(spark, df, "submitRun_tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema).alias("tasks"),
-        structFromJson(spark, df, "submitRun_job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema).alias("job_clusters"),
-        structFromJson(spark, df, "libraries", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumLibrariesSchema),
-        structFromJson(spark, df, "access_control_list", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumAccessControlListSchema),
-        structFromJson(spark, df, "git_source", allNullMinimumSchema = Schema.minimumGitSourceSchema)
+        structFromJson(spark, dfc, "new_cluster", allNullMinimumSchema = Schema.minimumNewClusterSchema),
+        structFromJson(spark, dfc, "submitRun_tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema).alias("tasks"),
+        structFromJson(spark, dfc, "submitRun_job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema).alias("job_clusters"),
+        structFromJson(spark, dfc, "libraries", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumLibrariesSchema),
+        structFromJson(spark, dfc, "access_control_list", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumAccessControlListSchema),
+        structFromJson(spark, dfc, "git_source", allNullMinimumSchema = Schema.minimumGitSourceSchema)
       ).alias("submitRun_details"),
       struct(
-        structFromJson(spark, df, "notebook_task", allNullMinimumSchema = Schema.minimumNotebookTaskSchema),
-        structFromJson(spark, df, "spark_python_task", allNullMinimumSchema = Schema.minimumSparkPythonTaskSchema),
-        structFromJson(spark, df, "python_wheel_task", allNullMinimumSchema = Schema.minimumPythonWheelTaskSchema),
-        structFromJson(spark, df, "spark_jar_task", allNullMinimumSchema = Schema.minimumSparkJarTaskSchema),
-        structFromJson(spark, df, "spark_submit_task", allNullMinimumSchema = Schema.minimumSparkSubmitTaskSchema),
-        structFromJson(spark, df, "shell_command_task", allNullMinimumSchema = Schema.minimumShellCommandTaskSchema),
-        structFromJson(spark, df, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
+        structFromJson(spark, dfc, "notebook_task", allNullMinimumSchema = Schema.minimumNotebookTaskSchema),
+        structFromJson(spark, dfc, "spark_python_task", allNullMinimumSchema = Schema.minimumSparkPythonTaskSchema),
+        structFromJson(spark, dfc, "python_wheel_task", allNullMinimumSchema = Schema.minimumPythonWheelTaskSchema),
+        structFromJson(spark, dfc, "spark_jar_task", allNullMinimumSchema = Schema.minimumSparkJarTaskSchema),
+        structFromJson(spark, dfc, "spark_submit_task", allNullMinimumSchema = Schema.minimumSparkSubmitTaskSchema),
+        structFromJson(spark, dfc, "shell_command_task", allNullMinimumSchema = Schema.minimumShellCommandTaskSchema),
+        structFromJson(spark, dfc, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
       ).alias("task_detail_legacy"),
-      structFromJson(spark, df, "manual_override_params.notebook_params").alias("notebook_params_overwatch_ctrl"),
-      structFromJson(spark, df, "manual_override_params.python_named_params").alias("python_named_params_overwatch_ctrl"),
-      structFromJson(spark, df, "manual_override_params.sql_params").alias("sql_params_overwatch_ctrl"),
-      structFromJson(spark, df, "manual_override_params.pipeline_params").alias("pipeline_params_overwatch_ctrl"),
-      structFromJson(spark, df, "tags").alias("tags")
+      structFromJson(spark, dfc, "manual_override_params.notebook_params").alias("notebook_params_overwatch_ctrl"),
+      structFromJson(spark, dfc, "manual_override_params.python_named_params").alias("python_named_params_overwatch_ctrl"),
+      structFromJson(spark, dfc, "manual_override_params.sql_params").alias("sql_params_overwatch_ctrl"),
+      structFromJson(spark, dfc, "manual_override_params.pipeline_params").alias("pipeline_params_overwatch_ctrl"),
+      structFromJson(spark, dfc, "tags").alias("tags")
     )
     val selectCols = dfOrigCols ++ colsToAppend
-    df.select(selectCols: _*)
+    dfc.select(selectCols: _*)
       .drop(
         "notebook_task", "spark_python_task", "spark_jar_task", "python_wheel_task",
         "spark_submit_task", "shell_command_task", "pipeline_task", "new_cluster", "libraries", "access_control_list",
