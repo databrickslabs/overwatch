@@ -7,6 +7,9 @@ version := "0.6.1.2"
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 
+fork in Test := true
+envVars in Test := Map("OVERWATCH_ENV" -> " ","OVERWATCH_TOKEN" -> " ","OVERWATCH" -> " ")
+
 val sparkVersion = "3.1.2"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
@@ -36,6 +39,8 @@ developers := List(Developer("geeksheikh", "Daniel Tomes", "daniel@databricks.co
 licenses += ("Databricks", url("https://github.com/databrickslabs/overwatch/blob/develop/LICENSE"))
 publishMavenStyle := true
 
+parallelExecution in Test := false //TO avoid object collision happening in PipelineFunctionsTest
+
 publishTo := Some(
   if (version.value.endsWith("SNAPSHOT"))
     Opts.resolver.sonatypeSnapshots
@@ -62,10 +67,7 @@ assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeSca
 // assemblyExcludedJars in assembly := {
 //   val cp = (fullClasspath in assembly).value
 //   cp filter { f =>
-//     f.data.getName.contains("dbutils-api_2.12") ||
-//       f.data.getName.contains("spark-core") ||
-//       f.data.getName.contains("spark-sql") ||
-//       f.data.getName.contains("delta-core") ||
-//       f.data.getName.contains("com.amazonaws")
+//     f.data.getName.contains("eventhubs") ||
+//     f.data.getName.contains("msal4j")
 //   }
 // }

@@ -3,6 +3,8 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.BatchRunner.spark
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
+import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
@@ -211,6 +213,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     isFirstRun: Boolean,
                                     organizationId: String,
                                     runID: String): DataFrame = {
+    import com.databricks.labs.overwatch.eventhubs.AadClientAuthentication
 
     val connectionString = ConnectionStringBuilder(
       PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
@@ -241,13 +244,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
-    val eventHubsConf = if (ehConfig.azureClientId.isDefined) {
+    val eventHubsConf = if (ehConfig.azureClientId.nonEmpty) {
       val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
         "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
         "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
         "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
-      ehConf.setAadAuthCallbackParams(aadParams)
-        .setAadAuthCallback(new com.databricks.labs.overwatch.utils.AadClientAuthentication(aadParams))
+      AadAuthInstance.addAadAuthParams(ehConf, aadParams)
     } else
       ehConf
 
@@ -261,22 +263,30 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def cleanseRawJobsSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+  protected def cleanseRawJobsSnapDF(keys: Array[String], runId: String)(df: DataFrame): DataFrame = {
+    val emptyKeysDF = Seq.empty[(String, Long, String)].toDF("organization_id", "job_id", "Overwatch_RunID")
     val outputDF = SchemaScrubber.scrubSchema(df)
+      .withColumn("Overwatch_RunID", lit(runId))
+
+    val cleansedTasksDF = workflowsCleanseTasks(outputDF, keys, emptyKeysDF, "settings.tasks")
+    val cleansedJobClustersDF = workflowsCleanseJobClusters(outputDF, keys, emptyKeysDF, "settings.job_clusters")
 
     val changeInventory = Map[String, Column](
-      "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
-      "settings.new_cluster.spark_conf" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_conf"),
-      "settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_env_vars"),
-      s"settings.new_cluster.aws_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.aws_attributes"),
-      s"settings.new_cluster.azure_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.azure_attributes"),
+      "settings.tasks" -> col("cleansedTasks"),
+      "settings.job_clusters" -> col("cleansedJobsClusters"),
+      "settings.tags" -> SchemaTools.structToMap(outputDF, "settings.tags"),
       "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
-    )
+    ) ++ PipelineFunctions.newClusterCleaner(outputDF, "settings.tasks.new_cluster")
 
-    outputDF.select(SchemaTools.modifyStruct(outputDF.schema, changeInventory): _*)
+    outputDF
+      .join(cleansedTasksDF, keys.toSeq, "left")
+      .join(cleansedJobClustersDF, keys.toSeq, "left")
+      .modifyStruct(changeInventory)
+      .drop("cleansedTasks", "cleansedJobsClusters") // cleanup temporary cleaner fields
+      .scrubSchema(SchemaScrubber(cullNullTypes = true))
   }
 
-  protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+  protected def cleanseRawClusterSnapDF(df: DataFrame): DataFrame = {
     val outputDF = SchemaScrubber.scrubSchema(df)
 
     outputDF
@@ -463,6 +473,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
     //TODO identify the best practice to implement the future.
+    val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
     for (i <- clusterIDs.indices) {
       val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
         "start_time" -> s"""${startTime.asUnixTimeMilli}""",
@@ -470,7 +481,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         "limit" -> "500"
       )
       val future = Future {
-        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
+        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
         synchronized {
           apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= apiEnv.successBatchSize) {
@@ -498,9 +509,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
           responseCounter = responseCounter + 1
       }
     }
-    val timeoutThreshold = 300000 // 5 minutes
+    val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
     var currentSleepTime = 0
-    var responseStateWhileSleeping = responseCounter
+    var accumulatorCountWhileSleeping = accumulator.value
     while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
       //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
       // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
@@ -510,9 +521,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
       Thread.sleep(5000)
       currentSleepTime += 5000
-      if (responseStateWhileSleeping < responseCounter) { //new API response received while waiting.
+      if (accumulatorCountWhileSleeping < accumulator.value) { //new API response received while waiting.
         currentSleepTime = 0 //resetting the sleep time.
-        responseStateWhileSleeping = responseCounter
+        accumulatorCountWhileSleeping = accumulator.value
       }
     }
     if (responseCounter != finalResponseCount) { // Checking whether all the api responses has been received or not.
@@ -762,6 +773,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
           baseDF
             .withColumn("Timestamp", fixDupTimestamps)
             .drop("timestamp")
+            .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
+
 
         } catch {
           case e: Throwable => {
@@ -835,9 +848,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumnRenamed("executorId", "blackListedExecutorIds")
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
-        //TODO -- use map_filter to remove massive redundant useless column to save space
-        // asOf Spark 3.0.0
-        //.withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
+          .withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
 
         spark.conf.set("spark.sql.caseSensitive", "false")
         // TODO -- PERF test without unpersist, may be unpersisted before re-utilized

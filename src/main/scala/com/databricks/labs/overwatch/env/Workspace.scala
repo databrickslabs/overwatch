@@ -1,12 +1,11 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.{ApiCallV2}
+import com.databricks.labs.overwatch.ApiCallV2
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
-
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
@@ -130,6 +129,27 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
+  def getSqlQueryHistoryDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+    val sqlQueryHistoryEndpoint = "sql/history/queries"
+    val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+    val startTime = fromTime.asUnixTimeMilli - (1000 * 60 * 60 * 24 * 2) // subtract 2 days for running query merge
+    val jsonQuery = Map(
+      "max_results" -> "50",
+      "include_metrics" -> "true",
+      "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime",
+      "filter_by.query_start_time_range.end_time_ms" ->  s"${untilTime.asUnixTimeMilli}"
+      )
+    ApiCallV2(
+      config.apiEnv,
+      sqlQueryHistoryEndpoint,
+      jsonQuery,
+      tempSuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}",
+      accumulator = acc
+    )
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
 
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {
     val endpoint = "clusters/resize"

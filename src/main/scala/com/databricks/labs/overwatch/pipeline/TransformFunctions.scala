@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{SchemaScrubber, SchemaTools, TSDF, ValidatedColumn}
+import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
@@ -48,6 +48,10 @@ object TransformFunctions {
       df.select(nonNullCols: _*)
     }
 
+    def cullNestedColumns(structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
+      SchemaTools.cullNestedColumns(df, structToModify, nestedFieldsToCull)
+    }
+
     def suffixDFCols(
                       suffix: String,
                       columnsToSuffix: Array[String] = Array(),
@@ -63,6 +67,10 @@ object TransformFunctions {
       df.select(dfFields.map(fName => {
         if (allColumnsToSuffix.contains(fName)) col(fName).alias(s"${fName}${suffix}") else col(fName)
       }): _*)
+    }
+
+    def modifyStruct(changeInventory: Map[String, Column]): DataFrame = {
+      df.select(SchemaTools.modifyStruct(df.schema, changeInventory): _*)
     }
 
     /**
@@ -313,17 +321,14 @@ object TransformFunctions {
     /**
      *
      * @param name
-     * @param searchNestedFields NOT yet implemented
      * @param caseSensitive
      * @return
      */
-    def hasFieldNamed(name: String, searchNestedFields: Boolean = false, caseSensitive: Boolean = false): Boolean = {
-      val (casedName, fieldNames) = if (caseSensitive) (name, df.columns) else (name.toLowerCase, df.columns.map(_.toLowerCase))
-      if (searchNestedFields) { // search nested
-        fieldNames.contains(casedName)
-      } else { // top level only
-        fieldNames.contains(casedName)
-      }
+    def hasFieldNamed(name: String, caseSensitive: Boolean = false): Boolean = {
+      val casedName = if (caseSensitive) name else name.toLowerCase
+      SchemaTools.getAllColumnNames(df.schema).exists(c => {
+        if (caseSensitive) c.startsWith(casedName) else c.toLowerCase.startsWith(casedName)
+      })
     }
 
     /**
@@ -355,8 +360,43 @@ object TransformFunctions {
       df.select(newColumns: _*)
     }
 
-//    private[overwatch] def colByName(df: DataFrame)(colName: String): StructField =
-//      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
+    /**
+     * appends fields to an existing struct
+     * @param structFieldName name of struct to which namedColumns should be applied
+     * @param namedColumns Array of NamedColumn
+     * @param overrideExistingStructCols Whether or not to override the value of existing struct field if it exists
+     * @param newStructFieldName If not provided, the original struct will be morphed, if a secondary struct is desired
+     *                           provide a name here and the original struct will not be altered.
+     *                           New, named struct will be added to the top level
+     * @param caseSensitive whether or not the field names are case sensitive
+     * @return
+     */
+    def appendToStruct(
+                        structFieldName: String,
+                        namedColumns: Array[NamedColumn],
+                        overrideExistingStructCols: Boolean = false,
+                        newStructFieldName: Option[String] = None,
+                        caseSensitive: Boolean = false
+                      ): DataFrame = {
+      require(df.hasFieldNamed(structFieldName, caseSensitive),
+        s"ERROR: Dataframe must contain the struct field to be altered. " +
+        s"$structFieldName was not found. Struct fields include " +
+        s"${df.schema.fields.filter(_.dataType.typeName == "struct").map(_.name).mkString(", ")}"
+      )
+
+      val fieldToAlterTypeName = df.select(structFieldName).schema.fields.head.dataType.typeName
+      require(fieldToAlterTypeName == "struct", s"ERROR: Field to alter must a struct but got $fieldToAlterTypeName")
+
+      val targetStructFieldNames = df.select(s"$structFieldName.*").schema.fieldNames
+      val missingFieldsToAdd = namedColumns.filterNot(fc => targetStructFieldNames.contains(fc.fieldName))
+      val colsToAdd = if (overrideExistingStructCols) namedColumns else missingFieldsToAdd
+      val alteredStructColumn = colsToAdd.foldLeft(col(structFieldName))((structCol, fc) => {
+        structCol.withField(fc.fieldName, fc.column.alias(fc.fieldName))
+      })
+
+      df.withColumn(newStructFieldName.getOrElse(structFieldName), alteredStructColumn)
+    }
+
   }
 
   private def bidirectionalFill(colToFillName: String, wPrev: WindowSpec, wNext: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {

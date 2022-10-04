@@ -385,10 +385,10 @@ class Pipeline(
     PipelineFunctions.setSparkOverrides(spark, value, config.debugFlag)
   }
 
-//  private def getLastOptimized(moduleID: Int): Long = {
-//    val state = pipelineState.get(moduleID)
-//    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
-//  }
+  private def getLastOptimized(moduleID: Int): Long = {
+    val state = pipelineState.get(moduleID)
+    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
+  }
 
   private def needsOptimize(lastOptimizedTS: Long, optimizeFreq_H: Int): Boolean = {
     val optFreq_Millis = 1000L * 60L * 60L * optimizeFreq_H.toLong

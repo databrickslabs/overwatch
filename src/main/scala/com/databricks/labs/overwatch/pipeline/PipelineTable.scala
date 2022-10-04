@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.utils.WriteMode.WriteMode
+import com.databricks.labs.overwatch.utils.WriteMode.{WriteMode, merge}
 import com.databricks.labs.overwatch.utils._
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -22,6 +22,7 @@ case class PipelineTable(
                           config: Config,
                           incrementalColumns: Array[String] = Array(),
                           format: String = "delta", // TODO -- Convert to Enum
+                          persistBeforeWrite: Boolean = false,
                           private val _mode: WriteMode = WriteMode.append,
                           maxMergeScanDates: Int = 33, // used to create explicit date merge condition -- should be removed after merge dynamic partition pruning is enabled DBR 11.x LTS
                           private val _permitDuplicateKeys: Boolean = true,
@@ -76,7 +77,7 @@ case class PipelineTable(
   }
 
   def writeMode: WriteMode = { // initialize to constructor value
-    if (!exists && _mode == WriteMode.merge) {
+    if (!exists(dataValidation = true) && _mode == WriteMode.merge) {
       val onetimeModeChangeMsg = s"MODE CHANGED from MERGE to APPEND. Target ${tableFullName} does not exist, first write will be " +
         s"performed as an append, subsequent writes will be written as merge to this target"
       if (config.debugFlag) println(onetimeModeChangeMsg)
@@ -222,12 +223,6 @@ case class PipelineTable(
     ) s1 == s2 else s1.equalsIgnoreCase(s2)
   }
 
-  private def casedSeqCompare(seq1: Seq[String], s2: String): Boolean = {
-    if ( // make lower case if column names are case insensitive
-      spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
-    ) seq1.contains(s2) else seq1.exists(s1 => s1.equalsIgnoreCase(s2))
-  }
-
   /**
    * Build 1 or more incremental filters for a dataframe from standard start or aditionalStart less
    * "additionalLagDays" when loading an incremental DF with some front-padding to capture lagging start events
@@ -254,67 +249,9 @@ case class PipelineTable(
           s"$moduleId --> $moduleName for Table: $tableFullName")
         spark.read.format(format).load(tableLocation).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
       } else spark.read.format(format).load(tableLocation)
-      val dfFields = instanceDF.schema.fields
-      val cronFields = dfFields.filter(f => casedSeqCompare(cronColumnsNames, f.name))
-
-      if (additionalLagDays > 0) require(
-        dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
-        "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
-
-      val filterMsg = s"FILTERING: ${module.moduleName} using cron columns: ${cronFields.map(_.name).mkString(", ")}"
-      logger.log(Level.INFO, filterMsg)
-      if (config.debugFlag) println(filterMsg)
-      val incrementalFilters = cronFields.map(field => {
-
-        field.dataType match {
-          case dt: DateType => {
-            if (!partitionBy.map(_.toLowerCase).contains(field.name.toLowerCase)) {
-              val errmsg = s"Date filters are inclusive on both sides and are used for partitioning. Date filters " +
-                s"should not be used in the Overwatch package alone. Date filters must be accompanied by a more " +
-                s"granular filter to utilize df.asIncrementalDF.\nERROR: ${field.name} not in partition columns: " +
-                s"${partitionBy.mkString(", ")}"
-              throw new IncompleteFilterException(errmsg)
-            }
-
-            // Nothing in Overwatch is incremental at the date level thus until date should always be inclusive
-            // so add 1 day to follow the rule value >= date && value < date
-            // but still keep it inclusive
-            val untilDate = PipelineFunctions.addNTicks(module.untilTime.asColumnTS, 1, DateType)
-            IncrementalFilter(
-              field,
-              date_sub(module.fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
-              untilDate.cast(dt)
-            )
-          }
-          case dt: TimestampType => {
-            val start = if (additionalLagDays > 0) {
-              val epochMillis = module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)
-              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000.0).cast(dt)
-            } else {
-              module.fromTime.asColumnTS
-            }
-            IncrementalFilter(
-              field,
-              start,
-              module.untilTime.asColumnTS
-            )
-          }
-          case dt: LongType => {
-            val start = if (additionalLagDays > 0) {
-              lit(module.fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)).cast(dt)
-            } else {
-              lit(module.fromTime.asUnixTimeMilli)
-            }
-            IncrementalFilter(
-              field,
-              start,
-              lit(module.untilTime.asUnixTimeMilli)
-            )
-          }
-          case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
-            s"a filter containing a ${field.dataType.typeName} type. ONLY Timestamp, Date, and Long types are supported.")
-        }
-      })
+      val incrementalFilters = PipelineFunctions.buildIncrementalFilters(
+        this, instanceDF, module.fromTime, module.untilTime, additionalLagDays, moduleName
+      )
 
       PipelineFunctions.withIncrementalFilters(
         instanceDF, Some(module), incrementalFilters, config.globalFilters, config.debugFlag

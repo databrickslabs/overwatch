@@ -1,10 +1,10 @@
-package com.databricks.labs.overwatch.utils
+package com.databricks.labs.overwatch.eventhubs
 
-import java.util.{Collections, function}
-import java.util.concurrent.CompletableFuture
-import com.microsoft.aad.msal4j.{IAuthenticationResult, _}
+import com.microsoft.aad.msal4j._
 import org.apache.spark.eventhubs.utils.AadAuthenticationCallback
 
+import java.util.concurrent.CompletableFuture
+import java.util.{Collections, function}
 import scala.language.implicitConversions
 
 class AadClientAuthentication(params: Map[String, Object]) extends AadAuthenticationCallback {
@@ -33,3 +33,4 @@ class AadClientAuthentication(params: Map[String, Object]) extends AadAuthentica
       failed
   }
 }
+

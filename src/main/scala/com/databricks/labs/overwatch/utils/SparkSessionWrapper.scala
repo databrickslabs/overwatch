@@ -34,7 +34,7 @@ trait SparkSessionWrapper extends Serializable {
   } else {
     logger.log(Level.INFO, "Using Custom, local SparkSession")
     SparkSession.builder()
-      .master("local")
+      .master("local[*]")
       .config("spark.driver.maxResultSize", "8g")
       .appName("OverwatchBatch")
 //    Useful configs for local spark configs and/or using labs/spark-local-execution
