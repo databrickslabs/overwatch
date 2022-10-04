@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/dataengineer/definitions/definitions/</loc>
+    <lastmod>2021-01-11T12:21:19-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/gettingstarted/</loc>
+    <lastmod>2020-10-27T16:40:00-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/environmentsetup/</loc>
+    <lastmod>2021-01-12T05:49:17-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/dataengineer/etl_process/</loc>
+    <lastmod>2021-01-11T12:21:46-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/gettingstarted/configuration/</loc>
+    <lastmod>2020-10-28T11:55:12-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/dataengineer/</loc>
+    <lastmod>2021-05-20T21:27:44-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</loc>
+    <lastmod>2021-05-20T21:27:44-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</loc>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/changelog/</loc>
+    <lastmod>2021-05-05T17:00:13-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</loc>
+    <lastmod>2020-10-28T13:43:52-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/faq/</loc>
+    <lastmod>2021-01-12T05:49:17-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/</loc>
+    <lastmod>2022-07-20T15:03:23-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/</loc>
+    <lastmod>2022-07-20T15:03:23-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/environmentsetup/azure/</loc>
+    <lastmod>2020-10-28T09:12:32-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/environmentsetup/aws/</loc>
+    <lastmod>2020-10-28T09:12:28-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/contributing/</loc>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/categories/</loc>
+  </url>
+  
+  <url>
+    <loc>https://databrickslabs.github.io/overwatch/tags/</loc>
+  </url>
+  
+</urlset>

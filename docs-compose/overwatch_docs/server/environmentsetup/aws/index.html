@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en" class="js csstransforms3d">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="Hugo 0.76.5" />
+    <meta name="description" content="Overwatch Documentation">
+<meta name="author" content="Daniel Tomes -- DatabricksLabs">
+
+    <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
+
+    <title>AWS :: Overwatch</title>
+
+    
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1664195754" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1664195754" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1664195754" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1664195754" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1664195754" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1664195754" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1664195754" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1664195754" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1664195754" rel="stylesheet">
+    
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1664195754" rel="stylesheet">
+    
+    
+
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1664195754"></script>
+
+    <style>
+      :root #header + #content > #left > #rlblock_left{
+          display:none !important;
+      }
+      
+    </style>
+    
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+  </head>
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/environmentsetup/aws/">
+    <nav id="sidebar" class="">
+
+
+
+  <div id="header-wrapper">
+    <div id="header">
+      <a id="logo" href="https://databrickslabs.github.io/overwatch/">
+    <img src="https://databrickslabs.github.io/overwatch/images/tmp_logo4.png", width="85%">
+</a>
+
+    </div>
+    
+        <div class="searchbox">
+    <label for="search-by"><i class="fas fa-search"></i></label>
+    <input data-search-input id="search-by" type="search" placeholder="Search...">
+    <span data-search-clear=""><i class="fas fa-times"></i></span>
+</div>
+
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1664195754"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1664195754"></script>
+<script type="text/javascript">
+    
+        var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
+    
+</script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1664195754"></script>
+
+    
+  </div>
+  
+  <section id="homelinks">
+    <ul>
+      <li>
+        <a class="padding" href='https://databrickslabs.github.io/overwatch/'><i class='fas fa-home'></i> Home</a>
+      </li>
+    </ul>
+  </section>
+  
+
+    <div class="highlightable">
+    <ul class="topics">
+
+        
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/gettingstarted/" title="Getting Started" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/gettingstarted/">
+          Getting Started
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/configuration/" title="Configuration" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/configuration/">
+        Configuration
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/modules/" title="Modules" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/modules/">
+        Modules
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/advancedtopics/" title="Advanced Topics" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/">
+        Advanced Topics
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/gettingstarted/productionizing/" title="Productionizing" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/">
+        Productionizing
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/environmentsetup/" title="Environment Setup" class="dd-item
+        parent
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/environmentsetup/">
+          Environment Setup
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/environmentsetup/azure/" title="Azure" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/environmentsetup/azure/">
+        Azure
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/environmentsetup/aws/" title="AWS" class="dd-item active">
+        <a href="https://databrickslabs.github.io/overwatch/environmentsetup/aws/">
+        AWS
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/dataengineer/" title="Data Engineering" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dataengineer/">
+          Data Engineering
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/definitions/definitions/" title="Definitions" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions/definitions/">
+        Definitions
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/etl_process/" title="ETL Process" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/etl_process/">
+        ETL Process
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/upgrade/" title="Upgrade" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/upgrade/">
+        Upgrade
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/changelog/" title="ChangeLog" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/changelog/">
+          ChangeLog
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/faq/" title="FAQ" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/faq/">
+          FAQ
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/contributing/" title="" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/contributing/">
+          
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+        
+    </ul>
+
+    
+    
+
+    
+    <section id="footer">
+      <center>
+
+    
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch/subscription"
+       data-icon="octicon-eye" data-show-count="true" aria-label="Watch Overwatch on GitHub">Watch</a>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch" data-icon="octicon-star" data-show-count="true" aria-label="Star databrickslabs/overwatch on GitHub">Star</a>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch/fork"
+       data-icon="octicon-repo-forked" data-show-count="true" aria-label="Fork Overwatch on GitHub">Fork</a>
+
+    <p>A <a href="https://github.com/databrickslabs">Databricks Labs</a> project.</p>
+</center>
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+    </section>
+  </div>
+</nav>
+
+
+
+
+        <section id="body">
+        <div id="overlay"></div>
+        <div class="padding highlightable">
+              
+              <div>
+                <div id="top-bar">
+                
+                
+                <div id="breadcrumbs" itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb">
+                    <span id="sidebar-toggle-span">
+                        <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
+                          <i class="fas fa-bars"></i>
+                        </a>
+                    </span>
+                  
+                  <span id="toc-menu"><i class="fas fa-list-alt"></i></span>
+                  
+                  <span class="links">
+                 
+                 
+                    
+          
+          
+            
+            
+          
+          
+            
+            
+          
+          
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/environmentsetup/'>Environment Setup</a> > AWS
+          
+        
+          
+        
+          
+        
+                 
+                  </span>
+                </div>
+                
+                    <div class="progress">
+    <div class="wrapper">
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#configuring-overwatch-on-aws---databricks">Configuring Overwatch on AWS - Databricks</a>
+      <ul>
+        <li><a href="#with-databricks-billable-usage-delivery-logs">With Databricks Billable Usage Delivery Logs</a></li>
+        <li><a href="#with-cloud-provider-costs">With Cloud Provider Costs</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+    </div>
+</div>
+
+                
+              </div>
+            </div>
+            
+        <div id="head-tags">
+        
+        </div>
+        
+        <div id="body-inner">
+          
+            <h1>
+              
+              AWS
+            </h1>
+          
+
+        
+
+
+<h2 id="configuring-overwatch-on-aws---databricks">Configuring Overwatch on AWS - Databricks</h2>
+<p>Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
+<!-- raw HTML omitted -->
+To get started, the <a href="#basic-deployment">Basic Deployment</a> configuration. As more modules are enabled, additional
+environment configuration may be required in addition to the Basic Deployment.</p>
+<p>There are two primary sources of data that need to be configured:</p>
+<ul>
+<li><a href="https://docs.databricks.com/administration-guide/account-settings/audit-logs.html">Audit Logs</a>
+<ul>
+<li>These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis 
+and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions. 
+We don&rsquo;t want multiple workspaces delivering into the same prefix. The audit logs contain data for every interaction
+within the environment and are used to track the state of various objects through time along with which accounts 
+interacted with them. This data is relatively small and delivery occurs infrequently which is why it&rsquo;s 
+rarely of any consequence to deliver audit logs to buckets even outside of the control plane region.</li>
+</ul>
+</li>
+<li>Cluster Logs - Crucial to get the most out of Overwatch
+<ul>
+<li>Cluster logs delivery location is configured in the cluster spec &ndash;&gt; Advanced Options &ndash;&gt; Logging. These logs can 
+get quite large and they are stored in a very inefficient format for query and long-term storage. As such, it&rsquo;s 
+crucial to store these logs in the same region as the worker nodes for best results. Additionally, using dedicated 
+buckets provides more flexibility when configuring TTL (time-to-live) to minimize long-term, unnecessary costs.
+It&rsquo;s not recommended to store these on DBFS directly (dbfs mount points are ok).</li>
+<li>Best Practice - Multi-Workspace &ndash; When multiple workspaces are using Overwatch within a single region it&rsquo;s best to 
+ensure that each are going to their own prefix, even if sharing a bucket. This greatly reduces Overwatch scan times
+as the log files build up.</li>
+<li>Best Practice - Sharding &ndash; When many clusters send their logs to the same prefix it reduces the AWS read parallelism
+for these small files. It&rsquo;s best to find a methodology for log prefixes that works for your org. One example would 
+be to have each workspace and each team store their logs in a specific prefix, etc to break up the number of log 
+files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data 
+to the data model.</li>
+</ul>
+</li>
+</ul>
+<p><img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/Cluster_Logs_AWS.png" alt="AWSClusterLogging"></p>
+<table>
+<thead>
+<tr>
+<th>Basic Deployment</th>
+<th>Multi-Region Deployment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/Overwatch_Arch_Simple_AWS.png" alt="BasicAwsArch"></td>
+<td><img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/Overwatch_Arch_AWS.png" alt="AWSArch"></td>
+</tr>
+</tbody>
+</table>
+<h3 id="with-databricks-billable-usage-delivery-logs">With Databricks Billable Usage Delivery Logs</h3>
+<p>Detailed costs data 
+<a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">directly from Databricks</a>. 
+This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn&rsquo;t support this just yet, 
+if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
+to load all the historical data from the day that you began receiving it.</p>
+<p>In the meantime, it&rsquo;s easy to join these up with the Overwatch data for cost validation and / or exact cost break 
+down by dimensions not supported in the usage logs.</p>
+<h3 id="with-cloud-provider-costs">With Cloud Provider Costs</h3>
+<p>There can be substantial cloud provider costs associated with a cluster. Databricks (and Overwatch) has no visibility 
+to this by default. The plan here is to work with a few pilot customers to build API keys with appropriate 
+permissions to allow Overwatch to capture the compute, storage, etc costs associated with cluster machines. The 
+primary focus here would be to help customers visualize and optimize SPOT markets by illuminating costs 
+and opportunities across different AZs in your region given you machine types. Additionally, Overwatch could 
+make recommendations on:</p>
+<ul>
+<li>Actual compute/disk costs associated with clusters</li>
+<li>Optimal time of day for large jobs</li>
+<li>Small adjustments to node type by hour of day (i.e. i3.4xlarge instead of i3.2xlarge)</li>
+</ul>
+<p>The goal is to go even deeper than compute by looking at disk IO as well to determine the benefit/need of NVMEs 
+vs SSDs vs HDDs. Picking the right storage type and amount can save large sums over the course of a year. Picking 
+the wrong type (or not enough) can result in elevated compute bills due to inefficiencies. If you&rsquo;re interested in 
+this feature and would like to participate, please inform your CSE and/or Databricks Account Team.</p>
+
+<div class="notices info" ><p>Targeted 2021</p>
+</div>
+
+
+
+<footer class="footline">
+	
+</footer>
+
+        
+        </div> 
+        
+
+      </div>
+
+    <div id="navigation">
+        
+        
+        
+        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+        
+        
+
+
+	 
+	 
+		
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/environmentsetup/azure/" title="Azure"> <i class="fa fa-chevron-left"></i></a>
+		
+		
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/dataengineer/" title="Data Engineering" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+	
+    </div>
+
+    </section>
+    
+    <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
+      <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
+    </div>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1664195754"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1664195754"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1664195754"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1664195754"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1664195754"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1664195754"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1664195754"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1664195754"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1664195754"></script>
+
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1664195754" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1664195754"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    
+
+  </body>
+</html>
+

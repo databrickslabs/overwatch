@@ -58,9 +58,9 @@ workspace for a clean run.
 ## Q2: The incorrect costs were entered for a specific time range, I'd like to correct them, how should I do that?
 Please refer to the [Configuring Custom Costs]({{%relref "GettingStarted"%}}#configuring-custom-costs) 
 to baseline your understanding. Also, closely review the details of the 
-[instanceDetails]({{%relref "DataEngineer/Definitions.md"%}}/#instancedetails)
+[instanceDetails]({{%relref "dataengineer/definitions/_index.md"%}}/#instancedetails)
 table definition as that's where costs are stored and this is what will need to be accurate. Lastly, 
-please refer to the [ETL_Process]({{%relref "DataEngineer/ETL_Process.md"%}}) section of the docs as 
+please refer to the [Pipeline_Management]({{%relref "DataEngineer/Pipeline_Management.md"%}}) section of the docs as 
 you'll likely need to understand how to move the pipeline through time.
 
 Now that you have a good handle on the costs and the process for restoring / reloading data, note that there are 
@@ -74,7 +74,7 @@ are going to have inaccurate data in them:
 2. Delete all records where Pipeline_SnapTS >= the time where the data became inaccurate.
 
 Both options will require a corresponding appropriate update to the pipeline_report table for the two modules 
-that write to those tables (3005, 3015). [Here are several examples]({{%relref "DataEngineer/ETL_Process.md"%}}/#reloading-data-example)
+that write to those tables (3005, 3015). [Here are several examples]({{%relref "DataEngineer/Pipeline_Management.md"%}}/#reloading-data-example)
 on ways to update the pipeline_report to change update the state of a module.
 
 ## Q3: What is the current guidance / state of customers who want to capture EC2 spot pricing?
@@ -146,4 +146,53 @@ or both use the examples below and apply them to your cluster policies appropria
 * [Automated Cluster Policy Only](/assets/FAQ/automated_logs_policy_rule.json)
 * [Interactive AND Automated Cluster Policy](/assets/FAQ/global_logs_policy_rule.json)
 
-Remember to remove user ability to create unrestricted clusters and assign appropriate permissions to the policies
+## Q8: Can I deploy Overwatch on Unity Catalog (UC)
+**NO**
+As of 0.7.0 UC is not supported. Overwatch dev team is working with the UC teams to identify best practices, 
+a proper strategy, and implement first-party support. It appears that the issue is in an Overwatch requirement 
+which should be easy to correct. Assuming no major hurdles this will be out shortly after 0.7.0 and will require no 
+schema changes. We recommend deploying on a traditional metastore for now and an update will be published as soon 
+as possible.
+
+## Q9: How to enable user-email tracking in sparkJob Table for DBR versions < 11.3
+Until DBR 11.3+ the user_email field in sparkJob table was incomplete as Databricks did not begin publishing this 
+in all cases until that version. To enable event log reporting for user_email in DBR versions < 11.3, set the following 
+command to true in the cluster's spark config. This can be done in the cluster config or through an init script. Any 
+clusters running on DBR < 11.3 without this config will not report user_email for Python and R interactive workloads.
+`spark.databricks.driver.enableUserContextForPythonAndRCommands`
+
+To enable this globally, it's recommended to utilize cluster policies or global_init scripts.
+
+![Enable_User_email](/images/FAQ/FAQ9_user_email_enable.png)
+
+{{% notice warning%}}
+If you set this property and someone in your org depends on one of these fields for their workflow this will overwrite 
+their value. They should not be doing this and if they are they need to stop before 11.3 as this will be part of DBR 
+by then. For example if a dev team is using something like "if not sc.getLocalProperty("user"): doThing()" then this 
+will now be set so their code would break.
+{{% /notice %}}
+
+## Q10: My view is giving me some strange error when I try to select from it, how do I fix it?
+Occasionally the views have an issue with their refresh and get stuck. If you're having a strange error with your 
+view, try the following code snipped to try and repair it.
+
+```scala
+import com.databricks.labs.overwatch.pipeline.Gold
+import com.databricks.labs.overwatch.utils.Helpers
+
+val myETLDB = "overwatch_etl" // CHANGE ME
+val nameOfMisbehavingView = "jobrun" // CHANGE ME
+
+spark.sql(s"drop view ${myETLDB}.${nameOfMisbehavingView}")
+
+val workspace = Helpers.getWorkspaceByDatabase(myETLDB)
+val gold = Gold(workspace)
+gold.refreshViews()
+```
+
+## Q11: An API call is resulting in Job Aborted what can I do
+This can be due to a large resulting dataset. To validate download the appropriate logs and search for 
+`spark.rpc.message.maxSize`. If you don't find skip ahead, if you do find it, add the following parameter to 
+the spark config of the Overwatch cluster. `spark.rpc.message.maxSize 1024`. 
+
+If the issue wasn't the RPC size reduce the size of the "SuccessBatchSize" in the APIENV configuration (as of 0.7.0)

@@ -5,24 +5,23 @@
     <link>https://databrickslabs.github.io/overwatch/</link>
     <description>Recent content in Welcome To OverWatch on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Wed, 20 Jul 2022 15:03:23 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Mon, 26 Sep 2022 08:47:24 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>Definitions</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/</link>
-      <pubDate>Mon, 11 Jan 2021 12:21:19 -0500</pubDate>
+      <title>Data Dictionary - 0.6.1.x</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</link>
+      <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
       
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</guid>
       <description>Consumption Layer  Column Descriptions   ETL Tables  Bronze Silver Gold    Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
     </item>
     
     <item>
-      <title>ETL Process</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/etl_process/</link>
+      <title>Pipeline_Management</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</link>
       <pubDate>Mon, 11 Jan 2021 12:21:46 -0500</pubDate>
       
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/etl_process/</guid>
-      <description>Data Ingestion and Resume Process The specificities can vary slightly between cloud provider but the general methodology is the exact same. Specific differences will be discussed in Cloud-Specific Variations section.
-Each module is responsible for building certain entities at each layer, bronze, silver, gold, and presentation. The mapping between module and gold entity can be found in the Modules section. Each module is also tracked individually in the primary tracking tabe, Pipeline_Report.</description>
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</guid>
+      <description>Overwatch Data Promotion Process Overwatch data is promoted from bronze - silver - gold - presentation to ensure data consistency and quality as the data is enriched between the stages. The presentation layer is composed of views that reference the latest schema version of the gold layer. This disconnects the consumption layer from the underlying data structure so that developers can transparently add and alter columns without user disruption. All tables in each layer (except consumption) are suffixed in the ETL database with _layer.</description>
     </item>
     
     <item>
@@ -51,7 +50,18 @@ Each module is responsible for building certain entities at each layer, bronze, 
       
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</guid>
       <description>Modules Modules are the method by which Overwatch is segmented; currently, the modules available include:
- audit clusters clusterEvents pools jobs accounts notebooks sparkEvents  The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently, under normal, daily operations, there no significant cost to any of these modules. It&amp;rsquo;s likely best to leave them all turned on unless there&amp;rsquo;s a specific reason not to.</description>
+ audit clusters clusterEvents pools jobs accounts notebooks DBSQL sparkEvents  The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently, under normal, daily operations, there no significant cost to any of these modules. It&amp;rsquo;s likely best to leave them all turned on unless there&amp;rsquo;s a specific reason not to.</description>
+    </item>
+    
+    <item>
+      <title>Productionizing</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</link>
+      <pubDate>Wed, 20 Jul 2022 15:03:23 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</guid>
+      <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch
+Cluster Logging Simplify and Unify your cluster logging directories
+ Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
     </item>
     
     <item>
@@ -61,17 +71,6 @@ Each module is responsible for building certain entities at each layer, bronze, 
       
       <guid>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</guid>
       <description>Quick Reference  Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch  Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run. For small/medium workspaces, 20-40 minutes should be expected for each run.</description>
-    </item>
-    
-    <item>
-      <title>Productionizing</title>
-      <link>https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/</link>
-      <pubDate>Wed, 20 Jul 2022 15:03:23 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/productionizing/</guid>
-      <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch
-Cluster Logging Simplify and Unify your cluster logging directories
- Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
     </item>
     
     <item>
