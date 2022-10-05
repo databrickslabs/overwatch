@@ -177,7 +177,7 @@ Add relevant tags and create
 ### Using the Storage Account
 The overwatch output storage account may be accessed directly via:
 * abfss:// 
-* wasbs:// (not recommended)
+* wasbs:// (not supported)
 * A mounted filed system within Databricks. More information on mounting storage accounts can be found 
   [here](https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html#access-azure-data-lake-storage-gen2-using-oauth-20-with-an-azure-service-principal).
   

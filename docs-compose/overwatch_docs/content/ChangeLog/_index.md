@@ -66,7 +66,7 @@ weight: 4
 * Biggest fix is with regard to data quality surrounding multi-task jobs and job-clusters. This should all be 
 resolved at this point.
 
-Full list of bug fixes for this release can be found [here](https://github.com/databrickslabs/overwatch/milestone/12)
+Full list of bug fixes for this release can be found [here](https://github.com/databrickslabs/overwatch/milestone/12?closed=1)
 
 ## 0.6.1.1 (Maintenance Release)
 To upgrade from 0.6.1.0, simply swap the JAR from 0.6.1.0 to this version, no upgrade script necessary
