@@ -586,7 +586,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           from_json('jar_params, arrayStringSchema).alias("jar_params"),
           from_json('python_params, arrayStringSchema).alias("python_params"),
           from_json('spark_submit_params, arrayStringSchema).alias("spark_submit_params"),
-          from_json('notebook_params, arrayStringSchema).alias("notebook_params")
+          'notebook_params,
+          'python_named_params,
+          'sql_params,
+          from_json('dbt_commands, arrayStringSchema).alias("dbt_commands")
         ).alias("manual_override_params"),
         'sourceIPAddress.alias("submitSourceIP"),
         'sessionId.alias("submitSessionId"),
@@ -869,7 +872,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   def jobRunsStructifyLookupMeta(df: DataFrame): DataFrame = {
-    df.cache() // caching to speed up schema infernece
+    df.cache() // caching to speed up schema inference
     df.count()
     df
       .withColumn("task_detail_legacy",
@@ -883,6 +886,9 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           structFromJson(spark, df, "pipeline_task", allNullMinimumSchema = Schema.minimumPipelineTaskSchema)
         )
       )
+      .withColumn("notebook_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.notebook_params"))
+      .withColumn("python_named_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.python_named_params"))
+      .withColumn("sql_params_overwatch_ctrl", structFromJson(spark, df, "manual_override_params.sql_params"))
       .withColumn("tags", structFromJson(spark, df, "tags"))
       .drop(
         "notebook_task", "spark_python_task", "spark_jar_task", "python_wheel_task",
@@ -907,13 +913,22 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       "submitRun_details.tasks" -> col("cleansedTasks"),
       "submitRun_details.job_clusters" -> col("cleansedJobsClusters"),
       "task_detail_legacy.notebook_task.base_parameters" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.notebook_task.base_parameters"),
-      "task_detail_legacy.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.shell_command_task.env_vars")
+      "task_detail_legacy.shell_command_task.env_vars" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "task_detail_legacy.shell_command_task.env_vars"),
+      "manual_override_params.notebook_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "notebook_params_overwatch_ctrl"),
+      "manual_override_params.python_named_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "python_named_params_overwatch_ctrl"),
+      "manual_override_params.sql_params" -> SchemaTools.structToMap(dfWCleansedJobsAndTasks, "sql_params_overwatch_ctrl"),
     ) ++
       PipelineFunctions.newClusterCleaner(dfWCleansedJobsAndTasks, "submitRun_details.new_cluster")
 
     val dfWStructedTasksAndCleansedJobs = dfWCleansedJobsAndTasks
       .modifyStruct(tasksAndJobClustersCleansingInventory) // overwrite nested complex structures with cleansed structures
-      .drop("cleansedTasks", "cleansedJobsClusters") // cleanup temporary cleaner fields
+      .drop(
+        "cleansedTasks",
+        "cleansedJobsClusters",
+        "notebook_params_overwatch_ctrl",
+        "python_named_params_overwatch_ctrl",
+        "sql_params_overwatch_ctrl"
+      ) // cleanup temporary cleaner fields
 
     // after submitRun_details.tasks has been converted into a struct, cleanse the nested tasks columns
     // if it still exists after the cullNullTypes
