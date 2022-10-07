@@ -8,6 +8,11 @@ import org.apache.spark.sql.functions.{col, lit, struct}
 import org.apache.spark.sql.types._
 import org.scalatest.GivenWhenThen
 import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.GivenWhenThen
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.types._
+
 
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDate}
@@ -25,7 +30,60 @@ class TransformFunctionsTest extends AnyFunSpec
 
     }
   }
+  describe("Test Verify Schema") {
+    it("Should Test Struct Type") {
+      val minimumJobClustersSchema: ArrayType = ArrayType(
+        StructType(Seq(StructField("job_cluster_key",StringType,nullable = true))),
+        containsNull = true
+      )
 
+      val minimumNewClusterSchema: StructType = StructType(Seq(
+        StructField("autoscale",
+          StructType(Seq(
+            StructField("max_workers", LongType, true),
+            StructField("min_workers", LongType, true)
+          )), true),
+        StructField("cluster_name", StringType, true),
+        StructField("driver_instance_pool_id", StringType, true),
+        StructField("driver_node_type_id", StringType, true),
+        StructField("enable_elastic_disk", BooleanType, true),
+        StructField("instance_pool_id", StringType, true),
+        StructField("node_type_id", StringType, true),
+        StructField("num_workers", LongType, true),
+        StructField("policy_id", StringType, true),
+        StructField("spark_version", StringType, true)
+      ))
+
+      val jobSnapMinimumSchema: StructType = StructType(Seq(
+        StructField("settings", StructType(Seq(
+          StructField("name", StringType, nullable = true),
+          StructField("existing_cluster_id", StringType, nullable = true),
+          StructField("job_clusters", minimumJobClustersSchema, nullable = true),
+          StructField("new_cluster", minimumNewClusterSchema, nullable = true)
+        )), nullable = true),
+        StructField("organization_id", StringType, nullable = false)
+      ))
+
+      val df = Seq(("123")).toDF("organization_id")
+        .withColumn("settings", struct(
+          array(
+            struct(
+              lit("my_cluster_name").alias("job_cluster_key"),
+              struct(
+                lit("my_new_cluster_name").cast("string").alias("cluster_name")
+              ).alias("new_cluster")
+            )
+          ).alias("job_clusters")
+        ))
+
+      df.createOrReplaceTempView("df")
+
+      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+
+      assertResult(1)(validatedDF.count())  // Just as a Placeholder
+    }
+
+  }
   describe("TransformFunctions.subtractTime") {
     it("should subtractTime") {
       val schema = StructType(
