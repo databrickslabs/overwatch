@@ -79,8 +79,9 @@ class TransformFunctionsTest extends AnyFunSpec
       df.createOrReplaceTempView("df")
 
       val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+      assertResult(df.schema)(validatedDF.schema)
 
-      assertResult(1)(validatedDF.count())  // Just as a Placeholder
+//      assertResult(1)(validatedDF.count())  // Just as a Placeholder
     }
 
   }

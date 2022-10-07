@@ -11,9 +11,9 @@ fork in Test := true
 envVars in Test := Map("OVERWATCH_ENV" -> " ","OVERWATCH_TOKEN" -> " ","OVERWATCH" -> " ")
 
 val sparkVersion = "3.1.2"
-libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
-libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
-libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
+libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion //% Provided
+libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion //% Provided
+libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion //% Provided
 libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5" % Provided
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
 libraryDependencies += "io.delta" % "delta-core_2.12" % "1.0.0" % Provided
