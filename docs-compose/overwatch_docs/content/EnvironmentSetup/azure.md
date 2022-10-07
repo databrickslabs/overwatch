@@ -70,6 +70,13 @@ Review the Throughput Units sizing and make the best decision for you.
 
 Inside the namespace create an Event Hub
 
+**ALERT!!** 
+
+**If your Event Hub is behind a VNET**, you must "Allow Trusted MSFT Services through the Firewall" or configure specific 
+firewall rules. This should be done in the Event Hub Namespace --> Networking Tab; see screenshot below.
+
+![EH_Network](/images/EnvironmentSetup/EH_Network.png)
+
 #### Step 2
 Create an Event Hub inside your chosen (or created) EH Namespace.
 {{% notice info %}}
