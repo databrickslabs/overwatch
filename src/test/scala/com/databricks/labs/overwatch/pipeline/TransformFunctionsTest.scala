@@ -79,21 +79,21 @@ class TransformFunctionsTest extends AnyFunSpec
 
       df.createOrReplaceTempView("df")
 
-      val validatedCols = SchemaTools
-        .buildValidationRunner(df.schema, jobSnapMinimumSchema, true, false)
-      val validateSchema = validatedCols.map(SchemaTools.validateSchema(_, isDebug = false))
-
-
-      val ValidatedColsDF= df.select(validatedCols.map(_.column): _*)
-      val ValidateSchemaDF = df.select(validateSchema.map(_.column): _*)
+//      val validatedCols = SchemaTools
+//        .buildValidationRunner(df.schema, jobSnapMinimumSchema, true, false)
+//      val validateSchema = validatedCols.map(SchemaTools.validateSchema(_, isDebug = false))
+//
+//
+//      val ValidatedColsDF= df.select(validatedCols.map(_.column): _*)
+//      val ValidateSchemaDF = df.select(validateSchema.map(_.column): _*)
 
 
       val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
 
       print(df.printSchema)
-      print(ValidatedColsDF.printSchema)
-      print(ValidateSchemaDF.printSchema)
-//      print(validatedDF.printSchema)
+//      print(ValidatedColsDF.printSchema)
+//      print(ValidateSchemaDF.printSchema)
+      print(validatedDF.printSchema)
 
 //      assertResult(df.schema)(validatedDF.schema)
 
