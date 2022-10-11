@@ -578,7 +578,7 @@ across the concurrent runs but not the days running since this fact table is not
 | read_cache_bytes      | long   | Size of data cached during reading in bytes                                                         |
 | read_files_count      | long   | Total number of files in read                                                                       |
 | read_partitions_count | long   | Total number of partitions used while reading                                                       |
-| read_remote_bytes     | long   |                                                                                                     |
+| read_remote_bytes     | long   | Shuffle fetches from remote executor                                                                |
 | result_fetch_time_ms  | long   | Time taken in ms to fetch the results                                                               |
 | result_from_cache     | long   | Flag to check whether result is fetched from cache                                                  |
 | rows_produced_count   | long   | Total number of rows produced after fetching the data                                               |
@@ -586,7 +586,7 @@ across the concurrent runs but not the days running since this fact table is not
 | spill_to_disk_bytes   | long   | Data spilled to disk in bytes                                                                       |
 | task_total_time_ms    | long   | Total time taken by task to complete in ms                                                          |
 | total_time_ms         | long   | Total time taken by query in ms                                                                     |
-| write_remote_bytes    | long   |                                                                                                     |
+| write_remote_bytes    | long   | Shuffle writes to the remote executor                                                               |
 
 #### Notebook
 [**SAMPLE**](/assets/TableSamples/notebook.tab)
