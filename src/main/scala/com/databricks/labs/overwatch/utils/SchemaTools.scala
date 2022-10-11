@@ -436,18 +436,13 @@ object SchemaTools extends SparkSessionWrapper {
                       isDebug: Boolean = false
                     ): ValidatedColumn = {
 
-//    println(validator)
     if (validator.requiredStructure.nonEmpty) { // is requirement on the field
       val fieldStructure = validator.fieldToValidate.get
 
       val requiredFieldStructure = validator.requiredStructure.get
       val newPrefix = Some(getPrefixedString(cPrefix, fieldStructure.name))
-//      println("fieldStructure is "+fieldStructure)
-//      println("dataType is "+ fieldStructure.dataType)
-//      println("Name is "+fieldStructure.name)
       fieldStructure.dataType match {
         case dt: StructType => // field is struct type
-//          println("fieldStructure name for structType Case is "+fieldStructure.name)
           val dtStruct = dt.asInstanceOf[StructType]
           if (!requiredFieldStructure.dataType.isInstanceOf[StructType]) // requirement is not struct field
             throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
@@ -466,7 +461,6 @@ object SchemaTools extends SparkSessionWrapper {
           validator.copy(column = struct(validatedChildren.map(_.column): _*).alias(fieldStructure.name))
 
         case dt: MapType => // field is MapType
-//          println("fieldStructure name for MapType Case is "+fieldStructure.name)
           val dtMap = dt.asInstanceOf[MapType]
           if (!requiredFieldStructure.dataType.isInstanceOf[MapType])
             throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
@@ -481,7 +475,6 @@ object SchemaTools extends SparkSessionWrapper {
           validator
 
         case dt: ArrayType => // field is ArrayType
-//          println("fieldStructure name for ArrayType Case is "+fieldStructure.name)
           val dtArray = dt.asInstanceOf[ArrayType]
           // field is array BUT requirement is NOT array --> throw error
           if (!requiredFieldStructure.dataType.isInstanceOf[ArrayType])
@@ -505,7 +498,6 @@ object SchemaTools extends SparkSessionWrapper {
               ).map(validateSchema(_, newPrefix))
 
               // build and return array(struct)
-//              println("validatedChildren for StructType eType is "+validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias(fieldStructure.name)))
               validator
 //              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias(fieldStructure.name))
 
@@ -523,7 +515,6 @@ object SchemaTools extends SparkSessionWrapper {
           }
         // TODO -- Issue_86 -- add support for MapType
         case scalarField => // field is base scalar
-//          println("fieldStructure name for scalerField Case is "+fieldStructure.name)
           if (isComplexDataType(requiredFieldStructure.dataType)) { // FAIL -- Scalar to Complex not supported
             throw malformedStructureHandler(fieldStructure, requiredFieldStructure, cPrefix)
           }
