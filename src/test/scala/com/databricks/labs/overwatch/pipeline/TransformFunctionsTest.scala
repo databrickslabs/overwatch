@@ -30,8 +30,8 @@ class TransformFunctionsTest extends AnyFunSpec
 
     }
   }
-  describe("Test Verify Schema") {
-    it("Should Test Struct Type") {
+  describe("Test VerifySchema") {
+    it("Should be able to parse array of struct") {
       val minimumJobClustersSchema: ArrayType = ArrayType(
         StructType(Seq(StructField("job_cluster_key",StringType,nullable = true))),
         containsNull = true
@@ -78,8 +78,7 @@ class TransformFunctionsTest extends AnyFunSpec
 
       df.createOrReplaceTempView("df")
 
-      //      val validatedCols = SchemaTools
-      //        .buildValidationRunner(df.schema, jobSnapMinimumSchema, true, false)
+      //      val validatedCols = SchemaTools.buildValidationRunner(df.schema, jobSnapMinimumSchema, true, false)
       //      val validateSchema = validatedCols.map(SchemaTools.validateSchema(_, isDebug = false))
       //
       //
@@ -89,14 +88,80 @@ class TransformFunctionsTest extends AnyFunSpec
 
       val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
 
+//      print(df.printSchema)
+//      print(ValidatedColsDF.printSchema)
+//      print(ValidateSchemaDF.printSchema)
+//      print(validatedDF.printSchema)
+
+//       assertResult(df.schema)(validatedDF.schema)
+    }
+
+    it("Should be able to typecast Int to String") {
+      val minimumJobClustersSchema: ArrayType = ArrayType(
+        StructType(Seq(StructField("job_cluster_key",StringType,nullable = true))),
+        containsNull = true
+      )
+
+      val minimumNewClusterSchema: StructType = StructType(Seq(
+        StructField("autoscale",
+          StructType(Seq(
+            StructField("max_workers", LongType, true),
+            StructField("min_workers", LongType, true)
+          )), true),
+        StructField("cluster_name", StringType, true),
+        StructField("driver_instance_pool_id", StringType, true),
+        StructField("driver_node_type_id", StringType, true),
+        StructField("enable_elastic_disk", BooleanType, true),
+        StructField("instance_pool_id", StringType, true),
+        StructField("node_type_id", StringType, true),
+        StructField("num_workers", LongType, true),
+        StructField("policy_id", StringType, true),
+        StructField("spark_version", StringType, true)
+      ))
+
+      val jobSnapMinimumSchema: StructType = StructType(Seq(
+        StructField("settings", StructType(Seq(
+          StructField("name", StringType, nullable = true),
+          StructField("existing_cluster_id", StringType, nullable = true),
+          StructField("job_clusters", minimumJobClustersSchema, nullable = true),
+          StructField("new_cluster", minimumNewClusterSchema, nullable = true)
+        )), nullable = true),
+        StructField("organization_id", StringType, nullable = false)
+      ))
+
+      val df = Seq((123)).toDF("organization_id")
+        .withColumn("settings", struct(
+          array(
+            struct(
+              lit("my_cluster_key").alias("job_cluster_key"),
+              struct(
+                lit("my_new_cluster_name").cast("string").alias("cluster_name")
+              ).alias("new_cluster")
+            )
+          ).alias("job_clusters")
+        ))
+
+      df.createOrReplaceTempView("df")
+
+      //      val validatedCols = SchemaTools.buildValidationRunner(df.schema, jobSnapMinimumSchema, true, false)
+      //      val validateSchema = validatedCols.map(SchemaTools.validateSchema(_, isDebug = false))
+      //
+      //
+      //      val ValidatedColsDF= df.select(validatedCols.map(_.column): _*)
+      //      val ValidateSchemaDF = df.select(validateSchema.map(_.column): _*)
+
+
+      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+      df.select("organization_id")
+
       print(df.printSchema)
       //      print(ValidatedColsDF.printSchema)
       //      print(ValidateSchemaDF.printSchema)
       print(validatedDF.printSchema)
-      print()
 
-      //      assertResult(df.schema)(validatedDF.schema)
+      //       assertResult(df.schema)(validatedDF.schema)
     }
+
 
   }
 
