@@ -168,10 +168,7 @@ class TransformFunctionsTest extends AnyFunSpec
 
         assertResult(baseType)(validatedType)
     }
-
-
   }
-
 
   describe("TransformFunctions.subtractTime") {
     it("should subtractTime") {
