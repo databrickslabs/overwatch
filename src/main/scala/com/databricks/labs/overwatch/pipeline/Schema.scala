@@ -623,6 +623,7 @@ object Schema extends SparkSessionWrapper {
     StructField("num_workers", LongType, nullable = true),
     StructField("single_user_name", StringType, nullable = true),
     StructField("spark_version", StringType, nullable = true),
+    StructField("runtime_engine", StringType, nullable = true),
     StructField("state", StringType, nullable = true),
     StructField("default_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
     StructField("custom_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
