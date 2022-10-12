@@ -1283,7 +1283,7 @@ object Upgrade extends SparkSessionWrapper {
           PipelineFunctions.getPipelineTarget(gold, "jobRunCostPotentialFact_gold")
         )
 
-        targetsToRebuild.map(t => fastDrop(t, upgradeConfig.cloudProvider))
+        targetsToRebuild.filter(_.exists).map(t => fastDrop(t, upgradeConfig.cloudProvider))
         // ensure parent dirs are deleted
         targetsToRebuild.foreach(t => dbutils.fs.rm(t.tableLocation, true))
 
@@ -1355,7 +1355,7 @@ object Upgrade extends SparkSessionWrapper {
             .setOrganizationId(org.organization_id)
             .setMaxDays(1000)
             .setOverwatchSchemaVersion("0.700")
-            .setOverwatchScope(upgradeConfig.overwatchScope)
+            .setOverwatchScope(Seq(OverwatchScope.jobs))
             .setDatabaseNameAndLoc(upgradeConfig.databaseName, upgradeConfig.databaseLocation, upgradeConfig.etlDataPathPrefix)
             .setConsumerDatabaseNameandLoc(upgradeConfig.consumerDatabaseName, upgradeConfig.consumerDatabaseLocation)
             .setCloudProvider(orgCloudProvider)
@@ -1405,7 +1405,7 @@ object Upgrade extends SparkSessionWrapper {
             .setOrganizationId(org.organization_id)
             .setMaxDays(1000)
             .setOverwatchSchemaVersion("0.700")
-            .setOverwatchScope(upgradeConfig.overwatchScope)
+            .setOverwatchScope(Seq(OverwatchScope.jobs))
             .setDatabaseNameAndLoc(upgradeConfig.databaseName, upgradeConfig.databaseLocation, upgradeConfig.etlDataPathPrefix)
             .setConsumerDatabaseNameandLoc(upgradeConfig.consumerDatabaseName, upgradeConfig.consumerDatabaseLocation)
             .setCloudProvider(orgCloudProvider)
