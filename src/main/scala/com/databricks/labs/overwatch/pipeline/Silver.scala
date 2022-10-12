@@ -232,7 +232,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobStatusProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, BronzeTargets.auditLogsTarget.incrementalColumns),
     Seq(
-      dbJobsStatusSummary(
+        dbJobsStatusSummary(
         BronzeTargets.jobsSnapshotTarget,
         jobStatusModule.isFirstRun,
         SilverTargets.dbJobsStatusTarget.keys,
