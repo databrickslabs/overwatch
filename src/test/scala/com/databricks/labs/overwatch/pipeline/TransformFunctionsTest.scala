@@ -150,16 +150,23 @@ class TransformFunctionsTest extends AnyFunSpec
       //      val ValidatedColsDF= df.select(validatedCols.map(_.column): _*)
       //      val ValidateSchemaDF = df.select(validateSchema.map(_.column): _*)
 
-//
       val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
-      df.select("organization_id")
 
-      print(df.printSchema)
-      //      print(ValidatedColsDF.printSchema)
-      //      print(ValidateSchemaDF.printSchema)
-      print(validatedDF.printSchema)
+      val baseType = df.select("organization_id").collect()(0)(0).toString.getClass.getSimpleName
+      val validatedType = validatedDF.select("organization_id").collect()(0)(0).getClass.getSimpleName
 
-      //       assertResult(df.schema)(validatedDF.schema)
+      println(baseType)
+      println(validatedType)
+
+//      println(df.select("organization_id").collect()(0)(0))
+//      println(validatedDF.select("organization_id").collect()(0)(0))
+
+//      println(df.printSchema)
+//      print(ValidatedColsDF.printSchema)
+//      print(ValidateSchemaDF.printSchema)
+//      println(validatedDF.printSchema)
+
+        assertResult(baseType)(validatedType)
     }
 
 
