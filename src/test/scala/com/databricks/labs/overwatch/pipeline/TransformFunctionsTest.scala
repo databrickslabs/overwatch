@@ -150,7 +150,7 @@ class TransformFunctionsTest extends AnyFunSpec
       //      val ValidatedColsDF= df.select(validatedCols.map(_.column): _*)
       //      val ValidateSchemaDF = df.select(validateSchema.map(_.column): _*)
 
-
+//
       val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
       df.select("organization_id")
 
