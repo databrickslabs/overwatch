@@ -2,12 +2,16 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCallV2
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
+import java.util
+import java.util.Collections
 import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.Future
 import scala.concurrent.forkjoin.ForkJoinPool
 
 /**
@@ -140,6 +144,57 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime",
       "filter_by.query_start_time_range.end_time_ms" ->  s"${untilTime.asUnixTimeMilli}"
       )
+    ApiCallV2(
+      config.apiEnv,
+      sqlQueryHistoryEndpoint,
+      jsonQuery,
+      tempSuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}",
+      accumulator = acc
+    )
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+    val sqlQueryHistoryEndpoint = "sql/history/queries"
+    val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+    val untilTimeMs = untilTime.asUnixTimeMilli
+    val fromTimeMs = fromTime.asUnixTimeMilli
+    for (counterTimeMs <- fromTimeMs to untilTimeMs){
+    var (startTime, endTime) = if (untilTimeMs/(1000*60*60) - counterTimeMs/(1000*60*60) > 60) {
+      (counterTimeMs,
+        counterTimeMs+(1000*60*60))
+      }
+      else{
+      (counterTimeMs,
+        untilTimeMs)
+      }
+
+      //create payload for the API calls
+      val jsonQuery = Map(
+        "max_results" -> "50",
+        "include_metrics" -> "true",
+        "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime", // Do we need to subtract 2 days for every API call?
+        "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
+      )
+
+      //call future
+      val future = Future {
+        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
+        synchronized {
+          apiResponseArray.addAll(apiObj)
+          if (apiResponseArray.size() >= apiEnv.successBatchSize) {
+            PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
+            apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+          }
+        }
+
+      }
+
+    }
+
+
     ApiCallV2(
       config.apiEnv,
       sqlQueryHistoryEndpoint,
