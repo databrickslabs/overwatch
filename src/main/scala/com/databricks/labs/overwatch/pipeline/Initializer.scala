@@ -350,7 +350,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     } else config.registerWorkspaceMeta(None,None)
 
     // Validate data Target
-    if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
+    // todo UC enablement
+//    if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
 
     // If data target is valid get db name and location and set it
     val dbName = dataTarget.databaseName.get
@@ -389,7 +390,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     // must happen AFTER data target validation
     if (!disableValidations && !config.isLocalTesting) { // temp working dir is not necessary for disabled validations as pipelines cannot be
       // executed without validations
-      prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
+      // todo UC
+//      prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
+      config.setTempWorkingDir(rawParams.tempWorkingDir)
     }
 
     config.setMaxDays(rawParams.maxDaysToLoad)
@@ -449,8 +452,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       }
     }
 
-    if (Helpers.pathExists(etlDataLocation)) println(s"\n\nWARNING!! The ETL Data Prefix exists. Verify that only " +
-      s"Overwatch data exists in this path.")
+    // todo UC
+//    if (Helpers.pathExists(etlDataLocation)) println(s"\n\nWARNING!! The ETL Data Prefix exists. Verify that only " +
+//      s"Overwatch data exists in this path.")
 
     // todo - refactor away duplicity
     /**
