@@ -187,7 +187,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
     val testDetails = s"""WorkSpaceURLConnectivityTest APIURL:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
     try {
       val patToken = dbutils.secrets.get(scope = scope, key = patKey)
-      val apiEnv = ApiEnv(false, url, patToken, "6.1.2.0")
+      val apiEnv = ApiEnv(false, url, patToken, getClass.getPackage.getImplementationVersion)
       val endPoint = "clusters/list"
       ApiCallV2(apiEnv, endPoint).execute().asDF()
       validationStatus.append(DeploymentValidationReport(true,
