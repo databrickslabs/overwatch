@@ -468,42 +468,6 @@ class DeploymentValidation() extends SparkSessionWrapper {
     }
   }
 
-  //Currently not in USE
-  private[overwatch] def validatePools(): Unit = {
-    inputDataFrame.collect().foreach(row => {
-      val scopeOW = row.getAs(ConfigColumns.scopes.toString).toString
-      if (scopeOW.contains("pool") || scopeOW.contains("all")) {
-        val url = row.getAs(ConfigColumns.api_url.toString).toString
-        val scope = row.getAs(ConfigColumns.secret_scope.toString).toString
-        val patKey = row.getAs(ConfigColumns.secret_key_dbpat.toString).toString
-        val workspaceId = row.getAs(ConfigColumns.workspace_id.toString).toString
-        val testDetails = s"""PoolAccessTest workspace_id:${workspaceId}"""
-        try {
-          val patToken = dbutils.secrets.get(scope = scope, key = patKey)
-          val apiEnv = ApiEnv(false, url, patToken, "6.1.2.0")
-          val endPoint = "instance-pools/list"
-          ApiCallV2(apiEnv, endPoint).execute().asDF()
-          /* validationStatus.append(DeploymentValidationReport(deploymentId,
-             testDetails,
-             Some("SUCCESS"),
-             true
-           ))*/
-        } catch {
-          case exception: Exception =>
-            val msg = s"""No Data retrieved workspaceId:${workspaceId} url:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
-            val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
-            logger.log(Level.ERROR, fullMsg)
-          /*  validationStatus.append(DeploymentValidationReport(deploymentId,
-              testDetails,
-              Some(fullMsg),
-              false
-            ))*/
-
-        }
-      }
-    })
-
-  }
 
  def performMandatoryValidation = {
    println("Performing mandatory validation")
