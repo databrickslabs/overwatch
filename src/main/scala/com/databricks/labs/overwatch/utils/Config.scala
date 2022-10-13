@@ -203,6 +203,15 @@ class Config() {
     this
   }
 
+  private[overwatch] def setWorkspaceURL(value: String): this.type = {
+    _workspaceUrl = value
+    this
+  }
+
+  private[overwatch] def setTokenType(value: String): this.type = {
+    _tokenType = value
+    this
+  }
 
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
@@ -304,7 +313,7 @@ class Config() {
     this
   }
 
-  private def setApiEnv(value: ApiEnv): this.type = {
+  private[overwatch] def setApiEnv(value: ApiEnv): this.type = {
     _apiEnv = value
     this
   }
@@ -330,56 +339,57 @@ class Config() {
    *                    as the job owner or notebook user (if called from notebook)
    * @return
    */
-  private[overwatch] def registerWorkspaceMeta(tokenSecret: Option[TokenSecret],apiEnvConfig: Option[ApiEnvConfig]): this.type = {
+  private[overwatch] def buildApiEnv(tokenSecret: Option[TokenSecret], apiEnvConfig: Option[ApiEnvConfig]): ApiEnv = {
     var rawToken = ""
     var scope = ""
     var key = ""
+
+    setWorkspaceURL(dbutils.notebook.getContext().apiUrl.get)
+    setCloudProvider(if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws")
     try {
       // Token secrets not supported in local testing
-      if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
-        _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
-        _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
+      if (tokenSecret.nonEmpty) { // not local testing and secret passed
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key
         rawToken = dbutils.secrets.get(scope, key)
         val authMessage = s"Valid Secret Identified: Executing with token located in secret, $scope : $key"
         logger.log(Level.INFO, authMessage)
-        _tokenType = "Secret"
-      } else {
-        if (_isLocalTesting) { // Local testing env vars
-          _workspaceUrl = System.getenv("OVERWATCH_ENV")
-          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
-          rawToken = System.getenv("OVERWATCH_TOKEN")
-          _tokenType = "Environment"
-        } else { // Use default token for job owner
-          _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
-          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
-          rawToken = dbutils.notebook.getContext().apiToken.get
-          val authMessage = "No secret parameters provided: attempting to continue with job owner's token."
-          logger.log(Level.WARN, authMessage)
-          println(authMessage)
-          _tokenType = "Owner"
-        }
+        setTokenType("Secret")
+      } else { // Use default token for job owner
+        rawToken = dbutils.notebook.getContext().apiToken.get
+        val authMessage = "No secret parameters provided: attempting to continue with job owner's token."
+        logger.log(Level.WARN, authMessage)
+        println(authMessage)
+        setTokenType("Owner")
       }
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
       val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
-      setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
-        derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
-        derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
-        derivedApiProxy.proxyUserName, derivedApiProxy.proxyPasswordScope, derivedApiProxy.proxyPasswordKey
-      ))
-
-      this
+      ApiEnv(
+        isLocalTesting,
+        workspaceURL,
+        rawToken,
+        packageVersion,
+        derivedApiEnvConfig.successBatchSize,
+        derivedApiEnvConfig.errorBatchSize,
+        runID,
+        derivedApiEnvConfig.enableUnsafeSSL,
+        derivedApiEnvConfig.threadPoolSize,
+        derivedApiEnvConfig.apiWaitingTime,
+        derivedApiProxy.proxyHost,
+        derivedApiProxy.proxyPort,
+        derivedApiProxy.proxyUserName,
+        derivedApiProxy.proxyPasswordScope,
+        derivedApiProxy.proxyPasswordKey
+      )
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
         throw new BadConfigException(e.getMessage, failPipeline = true)
       case e: Throwable =>
         logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e)
         throw new BadConfigException(e.getMessage, failPipeline = true)
-        this
     }
   }
 
@@ -452,27 +462,5 @@ class Config() {
   private[overwatch] def setBadRecordsPath(value: String): this.type = {
     _badRecordsPath = value
     this
-  }
-
-  /**
-   * Manual setters for DB Remote and Local Testing. This is not used if "isLocalTesting" == false
-   * This function allows for hard coded parameters for rapid integration testing and prototyping
-   *
-   * @return
-   */
-  def buildLocalOverwatchParams(): String = {
-
-    registerWorkspaceMeta(None,None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters)
-    _databaseName = "overwatch_local"
-    _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
-    //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
-
-    // AWS TEST
-    _cloudProvider = "azure"
-    """
-      |{String for testing. Run string without escape chars. Do not commit secrets to git}
-      |""".stripMargin
-
   }
 }
