@@ -338,7 +338,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     val processingStartTime = System.currentTimeMillis();
     setParallelism(parallelism)
     println("ParallelismLevel :" + parallelism)
-    val deploymentValidation = DeploymentValidation(configCsvPath, outputPath, parallelism, deploymentId)
+    val deploymentValidation = DeploymentValidation(configCsvPath, parallelism, deploymentId)
     deploymentValidation.performMandatoryValidation
     val dataFrame = deploymentValidation.makeDataFrame()
     setInputDataFrame(dataFrame)
@@ -350,18 +350,18 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
       prams.foreach(compactString => {
         val future = Future {
-          zone match {
-            case "Bronze" =>
-              var runNotifyMsg = "*************Deploying BRONZE***********************"
+          zone.toLowerCase match {
+            case "bronze" =>
+              val runNotifyMsg = "*************Deploying BRONZE***********************"
               println(runNotifyMsg)
               logger.log(Level.INFO, runNotifyMsg)
               startBronzeDeployment(compactString._1, compactString._2)
               println("*************BRONZE Deployment Completed***********************")
-            case "Silver" =>
+            case "silver" =>
               println("*************Deploying SILVER***********************")
               startSilverDeployment(compactString._1, compactString._2)
               println("*************SILVER Deployment Completed***********************")
-            case "Gold" =>
+            case "gold" =>
               println("*************Deploying GOLD***********************")
               startGoldDeployment(compactString._1, compactString._2)
               println("*************GOLD Deployment Completed***********************")

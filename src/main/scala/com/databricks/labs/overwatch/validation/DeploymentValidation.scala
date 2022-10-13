@@ -30,6 +30,13 @@ object DeploymentValidation extends SparkSessionWrapper {
       .setDeploymentId(deploymentId)
   }
 
+  def apply(configCsvPath: String, parallelism: Int, deploymentId: String) = {
+    new DeploymentValidation()
+      .setConfigCsvPath(configCsvPath)
+      .setParallelism(parallelism)
+      .setDeploymentId(deploymentId)
+  }
+
 }
 
 class DeploymentValidation() extends SparkSessionWrapper {
