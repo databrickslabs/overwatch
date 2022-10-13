@@ -96,14 +96,36 @@ class TransformFunctionsTest extends AnyFunSpec
                     lit("my_new_cluster_name1").cast("string").alias("cluster_name")
                   ).alias("new_cluster")
                 )
-              ).alias("job_clusters_y")
+              ).alias("job_clusters_1")
             )
           ).alias("job_clusters")
         ))
-
       df.createOrReplaceTempView("df")
       val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
 
+    }
+
+    it("VerifySchema on MapType") {
+
+      val arrayStructureData = Seq(
+        Row("overwatch_dev",List(Row("my_new_cluster_name"),Row("my_new_cluster_name1")),
+          Map("spark_version"->"3.0","language"->"python"))
+      )
+
+      val mapType  = DataTypes.createMapType(StringType,StringType)
+
+      val arrayStructureSchema = new StructType()
+        .add("cluster_name",StringType)
+        .add("new_cluster", ArrayType(new StructType()
+          .add("cluster_name",StringType)))
+        .add("properties", MapType(StringType,StringType))
+
+      val df = spark.createDataFrame(
+        spark.sparkContext.parallelize(arrayStructureData),arrayStructureSchema).withColumn("organization_id",lit("123"))
+      df.createOrReplaceTempView("df")
+      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+      println(df.printSchema())
+      println(validatedDF.printSchema())
     }
 
     it("Should be able to typecast Int to String") {
@@ -126,6 +148,29 @@ class TransformFunctionsTest extends AnyFunSpec
       val baseType = df.select("organization_id").collect()(0)(0).toString.getClass.getSimpleName
       val validatedType = validatedDF.select("organization_id").collect()(0)(0).getClass.getSimpleName
       assertResult(baseType)(validatedType)
+    }
+
+    ignore ("Non Nullable Column should be present in Schema - Negative Test Case") {
+
+      val arrayStructureData = Seq(
+        Row("overwatch_dev",List(Row("my_new_cluster_name"),Row("my_new_cluster_name1")),
+          Map("spark_version"->"3.0","language"->"python"))
+      )
+
+      val mapType  = DataTypes.createMapType(StringType,StringType)
+
+      val arrayStructureSchema = new StructType()
+        .add("cluster_name",StringType)
+        .add("new_cluster", ArrayType(new StructType()
+          .add("cluster_name",StringType)))
+        .add("properties", MapType(StringType,StringType))
+
+      val df = spark.createDataFrame(
+        spark.sparkContext.parallelize(arrayStructureData),arrayStructureSchema)
+      df.createOrReplaceTempView("df")
+      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+      println(df.printSchema())
+      println(validatedDF.printSchema())
     }
 
 
@@ -244,7 +289,6 @@ class TransformFunctionsTest extends AnyFunSpec
 
     }
   }
-
   describe("TransformFunctions.toTS") {
     it("should work for TimestampType") {
       val sourceTS = 123456789L
@@ -319,7 +363,6 @@ class TransformFunctionsTest extends AnyFunSpec
       }
     }
   }
-
   describe("TransformFunctions.stringTsToUnixMillis") {
     it("should convert timestamp string to milliseconds") {
       val df = Seq(("2020-11-06T08:10:12.123Z")).toDF("col1")
@@ -335,7 +378,6 @@ class TransformFunctionsTest extends AnyFunSpec
       assertSmallDataFrameEquality(actualDF, expectedDF)
     }
   }
-
   describe("TransformFunctions.joinWithLag") {
     val dfSchema1 = StructType(
       Seq(StructField("organization_id", StringType, true),
