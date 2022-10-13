@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ParamDeserializer
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.pipeline.Initializer.{envInit, getNumberOfWorkerNodes, initConfigState, logger, spark}
+import com.databricks.labs.overwatch.pipeline.InitializerV2.{envInit, getNumberOfWorkerNodes, initConfigState, logger, spark}
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
@@ -11,7 +11,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
 
-class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
+class InitializerV2(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
   extends InitializerFunctions(config, disableValidations, isSnap, initDB)
     with SparkSessionWrapper {
 
@@ -151,7 +151,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
 
 }
 
-object Initializer extends SparkSessionWrapper {
+object InitializerV2 extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
@@ -236,7 +236,7 @@ object Initializer extends SparkSessionWrapper {
     val config = initConfigState(debugFlag)
 
     logger.log(Level.INFO, "Initializing Environment")
-    val initializer = new Initializer(config, disableValidations, isSnap, initializeDatabase)
+    val initializer = new InitializerV2(config, disableValidations, isSnap, initializeDatabase)
       .validateAndRegisterArgs(overwatchArgs)
 
     val database = initializer.initializeDatabase()

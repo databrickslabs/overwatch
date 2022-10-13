@@ -232,9 +232,9 @@ class Pipeline(
     if (getConfig.debugFlag) println(logMsg)
     val instanceDetailsDF = config.cloudProvider match {
       case "aws" =>
-        InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
+        PipelineFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
       case "azure" =>
-        InitializerFunctions.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
+        PipelineFunctions.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
       case _ =>
         throw new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure.")
     }
