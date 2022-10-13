@@ -193,9 +193,10 @@ case class DeploymentValidationReport(
                                      )
 
 case class MultiWSDeploymentReport(
-                                    zone:String,
+                                    workspaceId: String,
+                                    zone: String,
                                     workspaceDetails: Option[String],
-                                    errorMsg:  String,
+                                    errorMsg: String,
                                     deploymentId: Option[String]
                                   )
 

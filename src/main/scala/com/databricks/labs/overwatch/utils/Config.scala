@@ -44,6 +44,7 @@ class Config() {
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
   private var _contractJobsLightDBUPrice: Double = _
+  private var _isMultiworkspaceDeployment: Boolean = false
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -53,6 +54,7 @@ class Config() {
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
+  def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
 
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -195,6 +197,12 @@ class Config() {
     _maxDays = value
     this
   }
+
+  private[overwatch] def setIsMultiworkspaceDeployment(value: Boolean): this.type = {
+    _isMultiworkspaceDeployment = value
+    this
+  }
+
 
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value

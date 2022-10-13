@@ -43,8 +43,6 @@ class DeploymentValidation() extends SparkSessionWrapper {
 
   private var _cloudProvider: String = _
 
-  private var _configNumber: Long = _
-
   private var _parallelism: Int = _
 
   private var _outputPath: String = _
@@ -64,7 +62,6 @@ class DeploymentValidation() extends SparkSessionWrapper {
 
   protected def deploymentId: String = _deploymentId
 
-  protected def configNumber: Long = _configNumber
 
   protected def parallelism: Int = _parallelism
 
@@ -104,10 +101,6 @@ class DeploymentValidation() extends SparkSessionWrapper {
     this
   }
 
-  private[overwatch] def setConfigNumber(value: Long): this.type = {
-    _configNumber = value
-    this
-  }
 
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
@@ -140,7 +133,6 @@ class DeploymentValidation() extends SparkSessionWrapper {
         df = df.withColumnRenamed(columnName, columnName.replaceAll(" ", ""))
       )
       setInputDataFrame(df)
-      setConfigNumber(df.count())
       setValidationStatus(ArrayBuffer())
       df
     }catch{

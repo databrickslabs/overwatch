@@ -286,7 +286,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
     if (isMultiworkspaceDeployment) multiWorkspaceOverrideOrganizationId(rawParams.organizationID.get)
     config.setInputConfig(rawParams)
-
+    config.setIsMultiworkspaceDeployment(isMultiworkspaceDeployment)
 
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
