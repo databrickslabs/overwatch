@@ -12,21 +12,21 @@
     <title>Data Dictionary (Latest) :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1665169866" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1665169866" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1665169866" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1665169866" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1665169866" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1665169866" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1665169866" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1665169866" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1665169866" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1665683514" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1665683514" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1665683514" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1665683514" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1665683514" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1665683514" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1665683514" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1665683514" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1665683514" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1665169866" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1665683514" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1665169866"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1665683514"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1665169866"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1665169866"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1665683514"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1665683514"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1665169866"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1665683514"></script>
 
     
   </div>
@@ -1975,10 +1975,10 @@ a cluster state, a run that continues across cluster-state lines will result in 
 </tbody>
 </table>
 <h4 id="sqlqueryhistory">sqlQueryHistory</h4>
-<p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sqlHistory.tab"><strong>SAMPLE</strong></a></p>
-<p><strong>KEY</strong> &ndash; organization_id + ???</p>
-<p><strong>Incremental Columns</strong> &ndash; ???</p>
-<p><strong>Partition Columns</strong> &ndash; ???</p>
+<p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/sqlqueryhistory.tab"><strong>SAMPLE</strong></a></p>
+<p><strong>KEY</strong> &ndash; organization_id + warehouse_id + query_id + query_start_time_ms</p>
+<p><strong>Incremental Columns</strong> &ndash; query_start_time_ms</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
 <p><strong>Write Mode</strong> &ndash; Merge</p>
 <table>
 <thead>
@@ -1990,34 +1990,189 @@ a cluster state, a run that continues across cluster-state lines will result in 
 </thead>
 <tbody>
 <tr>
-<td style="text-align:left">HOLD</td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
+<td style="text-align:left">organization_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Canonical workspace id</td>
 </tr>
 <tr>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
+<td style="text-align:left">workspace_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Customizable human-legible name of the workspace, should be globally unique within the organization</td>
 </tr>
 <tr>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
+<td style="text-align:left">warehouse_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">ID of the SQL warehouse.</td>
 </tr>
 <tr>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
+<td style="text-align:left">query_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">ID of the query executed in the warehouse</td>
 </tr>
 <tr>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
+<td style="text-align:left">query_end_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Query execution end time</td>
 </tr>
 <tr>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
-<td style="text-align:left"></td>
+<td style="text-align:left">user_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">User name who created the query</td>
+</tr>
+<tr>
+<td style="text-align:left">user_id</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Id of the user who created the query</td>
+</tr>
+<tr>
+<td style="text-align:left">executed_as_user_id</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Id of the user who executed the query</td>
+</tr>
+<tr>
+<td style="text-align:left">executed_as_user_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">User name who executed the query</td>
+</tr>
+<tr>
+<td style="text-align:left">duration</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Duration of the query execution</td>
+</tr>
+<tr>
+<td style="text-align:left">error_message</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Error message for failed queries</td>
+</tr>
+<tr>
+<td style="text-align:left">execution_end_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Query execution end time in ms</td>
+</tr>
+<tr>
+<td style="text-align:left">query_start_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Query start time in ms</td>
+</tr>
+<tr>
+<td style="text-align:left">query_text</td>
+<td style="text-align:left">text</td>
+<td style="text-align:left">Query text which is executed in the warehouse</td>
+</tr>
+<tr>
+<td style="text-align:left">rows_produced</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Number of rows returned as query output</td>
+</tr>
+<tr>
+<td style="text-align:left">spark_ui_url</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">URL of the Spark UI</td>
+</tr>
+<tr>
+<td style="text-align:left">statement_type</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Statement type of the query being executed, e.g - Select, Update etc</td>
+</tr>
+<tr>
+<td style="text-align:left">status</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Current status of the query being executed, e.g - FINISHED, RUNNING etc</td>
+</tr>
+<tr>
+<td style="text-align:left">compilation_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Query compilation time in ms</td>
+</tr>
+<tr>
+<td style="text-align:left">execution_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Query execution time in ms</td>
+</tr>
+<tr>
+<td style="text-align:left">network_sent_bytes</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Size of data transferred over network in bytes</td>
+</tr>
+<tr>
+<td style="text-align:left">photon_total_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total time in ms Photon engine executed</td>
+</tr>
+<tr>
+<td style="text-align:left">pruned_bytes</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Size of data pruned in bytes</td>
+</tr>
+<tr>
+<td style="text-align:left">pruned_files_count</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total number of files pruned</td>
+</tr>
+<tr>
+<td style="text-align:left">read_bytes</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Size of data red in bytes</td>
+</tr>
+<tr>
+<td style="text-align:left">read_cache_bytes</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Size of data cached during reading in bytes</td>
+</tr>
+<tr>
+<td style="text-align:left">read_files_count</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total number of files in read</td>
+</tr>
+<tr>
+<td style="text-align:left">read_partitions_count</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total number of partitions used while reading</td>
+</tr>
+<tr>
+<td style="text-align:left">read_remote_bytes</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Shuffle fetches from remote executor</td>
+</tr>
+<tr>
+<td style="text-align:left">result_fetch_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Time taken in ms to fetch the results</td>
+</tr>
+<tr>
+<td style="text-align:left">result_from_cache</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Flag to check whether result is fetched from cache</td>
+</tr>
+<tr>
+<td style="text-align:left">rows_produced_count</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total number of rows produced after fetching the data</td>
+</tr>
+<tr>
+<td style="text-align:left">rows_read_count</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Total number of rows in the output after fetcing the data</td>
+</tr>
+<tr>
+<td style="text-align:left">spill_to_disk_bytes</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Data spilled to disk in bytes</td>
+</tr>
+<tr>
+<td style="text-align:left">task_total_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total time taken by task to complete in ms</td>
+</tr>
+<tr>
+<td style="text-align:left">total_time_ms</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total time taken by query in ms</td>
+</tr>
+<tr>
+<td style="text-align:left">write_remote_bytes</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Shuffle writes to the remote executor</td>
 </tr>
 </tbody>
 </table>
@@ -2965,6 +3120,12 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <td style="text-align:left">silver</td>
 <td style="text-align:left">All spark event data relevant to spark tasks</td>
 </tr>
+<tr>
+<td style="text-align:left">sql_query_history_silver</td>
+<td style="text-align:left">sqlHistory</td>
+<td style="text-align:left">silver</td>
+<td style="text-align:left">History of all the sql queries executed through SQL warehouses</td>
+</tr>
 </tbody>
 </table>
 <h3 id="gold">Gold</h3>
@@ -3061,6 +3222,12 @@ all tables. Users should always reference Consumption and Gold layers unless the
 <td style="text-align:left">sparkEvents</td>
 <td style="text-align:left">gold</td>
 <td style="text-align:left">All spark event data relevant to spark streams</td>
+</tr>
+<tr>
+<td style="text-align:left">sql_query_history_gold</td>
+<td style="text-align:left">sqlHistory</td>
+<td style="text-align:left">gold</td>
+<td style="text-align:left">History of all the sql queries executed through SQL warehouses</td>
 </tr>
 </tbody>
 </table>
@@ -3387,19 +3554,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1665169866"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1665169866"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1665169866"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1665169866"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1665169866"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1665169866"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1665683514"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1665683514"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1665683514"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1665683514"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1665683514"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1665683514"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1665169866"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1665169866"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1665169866"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1665683514"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1665683514"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1665683514"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1665169866" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1665169866"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1665683514" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1665683514"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
