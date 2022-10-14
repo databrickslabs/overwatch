@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.validation.{ConfigColumns, DeploymentValidation}
@@ -139,6 +138,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     this
   }
 
+  /**
+   * Validates all the parameters provided in config csv file and generates a report which is stored at /etl_storrage_prefix/report/validationReport
+   * @param parallelism number of threads which will be running parallely to complete the task
+   */
   def validate(parallelism: Int = 4): Unit = {
     val processingStartTime = System.currentTimeMillis();
     val deploymentValidation = DeploymentValidation(configCsvPath, outputPath, parallelism, deploymentId)
@@ -158,6 +161,11 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     println(msg)
   }
 
+  /**
+   * Creating overwatch parameters
+   * @param config each row of the csv config file
+   * @return
+   */
   private def buildParams(config: Row): (String, String) = {
     try {
       val dataTarget = DataTarget(
@@ -167,14 +175,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         Some(s"${config.getAs(ConfigColumns.consumer_database_name.toString)}"),
         Some(s"${config.getAs(ConfigColumns.etl_storage_prefix.toString)}/${config.getAs(ConfigColumns.consumer_database_name.toString)}.db")
       )
-
       val tokenSecret = TokenSecret(config.getAs(ConfigColumns.secret_scope.toString), config.getAs(ConfigColumns.secret_key_dbpat.toString))
       val ehConnString = s"{{secrets/${config.getAs(ConfigColumns.secret_scope.toString)}/${config.getAs(ConfigColumns.eh_scope_key.toString)}}}"
-      //private val ehConnString = dbutils.secrets.get(secretsScope, ehKey)
-
       val ehStatePath = s"${config.getAs(ConfigColumns.etl_storage_prefix.toString)}/${config.getAs(ConfigColumns.workspace_id.toString)}/ehState"
       val badRecordsPath = s"${config.getAs(ConfigColumns.etl_storage_prefix.toString)}/${config.getAs(ConfigColumns.workspace_id.toString)}/sparkEventsBadrecords"
-
       val auditLogConfig = if (s"${config.getAs(ConfigColumns.cloud.toString)}" == "AWS") {
         val awsAuditSourcePath = s"${config.getAs(ConfigColumns.auditlogprefix_source_aws.toString)}"
         AuditLogConfig(rawAuditPath = Some(awsAuditSourcePath))
@@ -191,7 +195,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       if (config.getAs(ConfigColumns.excluded_scopes.toString) != null) {
         config.getAs(ConfigColumns.excluded_scopes.toString).toString.split(":").foreach(scope => standardScopes -= scope)
       }
-
 
       val maxDaysToLoad: Int = config.getAs(ConfigColumns.max_days.toString)
       val primordialDateString: Date = config.getAs(ConfigColumns.primordial_date.toString)
@@ -224,25 +227,23 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           MultiWSDeploymentReport(s"""${config.getAs(ConfigColumns.workspace_id.toString)}""",
             "",
             Some(s"""WorkspaceId: ${config.getAs(ConfigColumns.workspace_id.toString).toString}"""),
-          fullMsg,
-          Some(deploymentId)
-        ))
+            fullMsg,
+            Some(deploymentId)
+          ))
         null
     }
   }
 
   private def startBronzeDeployment(args: String, workspaceID: String) = {
-
     try {
-      println(s"""Bronze Deployment started config params: ${args} , ThreadName: """ + Thread.currentThread().getName)
+      println(s"""Bronze Deployment Started workspaceID:${workspaceID} """)
       val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
       Bronze(workspace).run()
-      println(s"""Bronze Deployment Completed******* config , ThreadName: """ + Thread.currentThread().getName)
+      println(s"""Bronze Deployment Completed workspaceID:${workspaceID} """)
       deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Bronze", Some(args),
         "SUCCESS",
         Some(deploymentId)
       ))
-
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
@@ -255,15 +256,15 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   }
 
   private def startSilverDeployment(args: String, workspaceID: String) = {
-
     try {
-      println(s"""Silver Deployment started config params: ${args} , ThreadName: """ + Thread.currentThread().getName)
+      println(s"""Silver Deployment Started workspaceID:${workspaceID}""" )
       val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
       Silver(workspace).run()
       deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Silver", Some(args),
         "SUCCESS",
         Some(deploymentId)
       ))
+      println(s"""Silver Deployment Completed workspaceID:${workspaceID}""" )
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
@@ -276,15 +277,15 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   }
 
   private def startGoldDeployment(args: String, workspaceID: String) = {
-
     try {
-      println(s"""Gold Deployment started config params: ${args} , ThreadName: """ + Thread.currentThread().getName)
+      println(s"""Gold Deployment Started workspaceID:${workspaceID}""")
       val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
       Gold(workspace).run()
       deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Gold", Some(args),
         "SUCCESS",
         Some(deploymentId)
       ))
+      println(s"""Gold Deployment Completed workspaceID:${workspaceID}""")
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
@@ -296,7 +297,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     }
   }
 
-
+  /**
+   * Takes a snapshot of the config and saves it to /report/configTable
+   * @param configDF
+   */
   private def snapshotConfig(configDF: DataFrame) = {
     var configWriteLocation = configDF.head().getAs(ConfigColumns.etl_storage_prefix.toString).toString
     if (!configWriteLocation.startsWith("dbfs:") && !configWriteLocation.startsWith("s3") && !configWriteLocation.startsWith("abfss")) {
@@ -309,6 +313,12 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       .write.format("delta").mode("append").save(s"""${configWriteLocation}/report/configTable""")
   }
 
+  /**
+   * Takes a snapshot of the validation result
+   * @param validationDF
+   * @param path
+   * @param reportName
+   */
   private def snapShotValidation(validationDF: Dataset[DeploymentValidationReport], path: String, reportName: String): Unit = {
     var validationPath = path
     if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
@@ -322,6 +332,12 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     println("Validation report has been saved to " + s"""${validationPath}/report/${reportName}""")
   }
 
+  /**
+   * Saves the deployment report.
+   * @param validationDF
+   * @param path
+   * @param reportName
+   */
   private def saveDeploymentReport(validationDF: Dataset[MultiWSDeploymentReport], path: String, reportName: String): Unit = {
     var reportPath = path
     if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
@@ -333,7 +349,12 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       .write.format("delta").mode("append").save(s"""${reportPath}/report/${reportName}""")
   }
 
-
+  /**
+   * Performs the multi workspace deployment
+   *
+   * @param parallelism the number of threads which will run in parallel to perform the deployment
+   * @param zones       the zone can be Bronze,Silver or Gold by default it will be Bronze
+   */
   def deploy(parallelism: Int = 4, zones: String = "Bronze"): Unit = {
     val processingStartTime = System.currentTimeMillis();
     setParallelism(parallelism)
@@ -352,19 +373,11 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         val future = Future {
           zone.toLowerCase match {
             case "bronze" =>
-              val runNotifyMsg = "*************Deploying BRONZE***********************"
-              println(runNotifyMsg)
-              logger.log(Level.INFO, runNotifyMsg)
               startBronzeDeployment(compactString._1, compactString._2)
-              println("*************BRONZE Deployment Completed***********************")
             case "silver" =>
-              println("*************Deploying SILVER***********************")
               startSilverDeployment(compactString._1, compactString._2)
-              println("*************SILVER Deployment Completed***********************")
             case "gold" =>
-              println("*************Deploying GOLD***********************")
               startGoldDeployment(compactString._1, compactString._2)
-              println("*************GOLD Deployment Completed***********************")
           }
         }
         future.onComplete {

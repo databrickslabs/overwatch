@@ -3,6 +3,9 @@ package com.databricks.labs.overwatch
 import com.databricks.labs.overwatch.utils.{BadConfigException, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
 
+/**
+ * Main class for running multiclass deployment.
+ */
 object MultiWorkspaceRunner  extends SparkSessionWrapper{
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -25,6 +28,12 @@ object MultiWorkspaceRunner  extends SparkSessionWrapper{
     })
   }
 
+  /**
+   * args(0) = Config file path (Mandatory)
+   * args(1) =  parallelism (Optional)(Default value 4)
+   * args(2) = Deployment zone(Optional)(Default Bronze,Silver,Gold)
+   * @param args
+   */
   def main(args: Array[String]): Unit = {
     envInit()
     setGlobalDeltaOverrides()
