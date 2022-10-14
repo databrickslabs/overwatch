@@ -4,7 +4,12 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.0.0.1 (PATCH)
+This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is 
+the same as 0700 with the bug fixes closed in [PR 559](https://github.com/databrickslabs/overwatch/pull/559).
+
 ## 0.7.0.0 (Major Release)
+**Please use [PATCH 0.7.0.0.1](#07001-patch)** from maven. Everything in this release stands
 
 **0700 Upgrade Script** [HTML](/assets/ChangeLog/Upgrade_070_Template.html) | [DBC](/assets/ChangeLog/Upgrade_070_Template.dbc)
 ### Major Changes
@@ -22,7 +27,7 @@ weight: 4
 * **Support for DBSQL Query History Including Metrics**
   * DBSQL Query History is our first step into first-party support for DBSQL. Warehouses are expected to follow shortly 
   but was unable to make the cut for this release
-  * Be sure to enable the new scope "sqlHistory" or use the new 
+  * Be sure to enable the new scope "dbsql" or use the new 
   [0.7.0 Runner Notebook]({{%relref "GettingStarted/"%}}#jump-start-notebooks) to ensure you're loading 
   the DBSQL tables if your workspace[s] are using DBSQL.
   * Limitation - Databricks does not publish Warehouse events yet and as such, explicit cost anlaysis is not yet 
