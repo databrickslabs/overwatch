@@ -498,7 +498,8 @@ object SchemaTools extends SparkSessionWrapper {
               ).map(validateSchema(_, newPrefix))
 
               // build and return array(struct)
-              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias(fieldStructure.name))
+              validator
+//              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias(fieldStructure.name))
 
             case eType =>
               if (eType != requiredFieldStructure.dataType.asInstanceOf[ArrayType].elementType) { //element types don't match FAIL
