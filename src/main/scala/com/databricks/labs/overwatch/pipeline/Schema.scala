@@ -212,7 +212,8 @@ object Schema extends SparkSessionWrapper {
         StructField("version", NullType, nullable = true),
         //adding schema used for photon evolution
         StructField("effective_spark_version", StringType, nullable = true),
-        StructField("runtime_engine", StringType, nullable = true)
+        StructField("runtime_engine", StringType, nullable = true),
+        StructField("fields_to_remove", StringType, nullable = true)
       )), nullable = true),
     common("response"),
     common("useridentity")
@@ -402,7 +403,7 @@ object Schema extends SparkSessionWrapper {
   val minimumExplodedTaskLookupMetaSchema: StructType = StructType(Seq(
     StructField("taskKey",StringType, nullable = true),
     StructField("job_cluster_key",StringType, nullable = true),
-//    StructField("libraries",minimumLibrariesSchema, nullable = true), // 503
+    StructField("libraries",minimumLibrariesSchema, nullable = true),
     StructField("max_retries", LongType, nullable = true),
     StructField("retry_on_timeout", BooleanType, nullable = true),
     StructField("min_retry_interval_millis", LongType, nullable = true),
@@ -482,8 +483,8 @@ object Schema extends SparkSessionWrapper {
     StructField("timestamp", LongType, nullable = false),
     StructField("jobId", LongType, nullable = true),
     StructField("jobName", StringType, nullable = true),
-//    StructField("tasks", minimumTasksSchema, nullable = true), // TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
-//    StructField("job_clusters", minimumJobClustersSchema, nullable = true), // TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+    StructField("tasks", minimumTasksSchema, nullable = true),
+    StructField("job_clusters", minimumJobClustersSchema, nullable = true),
     StructField("tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
     StructField("schedule", minimumScheduleSchema, nullable = true),
     StructField("max_concurrent_runs", LongType, nullable = true),
@@ -622,6 +623,7 @@ object Schema extends SparkSessionWrapper {
     StructField("num_workers", LongType, nullable = true),
     StructField("single_user_name", StringType, nullable = true),
     StructField("spark_version", StringType, nullable = true),
+    StructField("runtime_engine", StringType, nullable = true),
     StructField("state", StringType, nullable = true),
     StructField("default_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
     StructField("custom_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
@@ -669,10 +671,10 @@ object Schema extends SparkSessionWrapper {
     StructField("settings", StructType(Seq(
       StructField("name", StringType, nullable = true),
       StructField("existing_cluster_id", StringType, nullable = true),
-//      StructField("job_clusters", minimumJobClustersSchema, nullable = true), // TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
-//      StructField("tasks", minimumTasksSchema, nullable = true), // TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+      StructField("job_clusters", minimumJobClustersSchema, nullable = true),
+      StructField("tasks", minimumTasksSchema, nullable = true),
       StructField("new_cluster", minimumNewClusterSchema, nullable = true),
-//      StructField("libraries", minimumLibrariesSchema, nullable = true), // 503
+      StructField("libraries", minimumLibrariesSchema, nullable = true),
       StructField("git_source", minimumGitSourceSchema, nullable = true),
       StructField("max_concurrent_runs", LongType, nullable = true),
       StructField("max_retries", LongType, nullable = true),
@@ -748,9 +750,9 @@ object Schema extends SparkSessionWrapper {
       StructField("format", StringType, nullable = true),
       StructField("existing_cluster_id", StringType, nullable = true),
       StructField("new_cluster", minimumNewClusterSchema, nullable = true),
-//      StructField("tasks", minimumTasksSchema, nullable = true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
-//      StructField("job_clusters", minimumJobClustersSchema, nullable = true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
-//      StructField("libraries", minimumLibrariesSchema, nullable = true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+      StructField("tasks", minimumTasksSchema, nullable = true),
+      StructField("job_clusters", minimumJobClustersSchema, nullable = true),
+      StructField("libraries", minimumLibrariesSchema, nullable = true),
       StructField("git_source", minimumGitSourceSchema, nullable = true),
       StructField("timeout_seconds", LongType, nullable = true),
       StructField("max_concurrent_runs", LongType, nullable = true),
@@ -760,9 +762,9 @@ object Schema extends SparkSessionWrapper {
       StructField("schedule", minimumScheduleSchema, nullable = true),
       StructField("task_detail_legacy", minimumTaskDetailSchema, nullable = true),
       StructField("is_from_dlt", BooleanType, nullable = true),
-//      StructField("access_control_list", minimumAccessControlListSchema, nullable = true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+      StructField("access_control_list", minimumAccessControlListSchema, nullable = true),
       StructField("aclPermissionSet", StringType, nullable = true),
-//      StructField("grants", minimumGrantsSchema, true), TODO -- add back after 503 is resolved -- breaks verifyMinimumSchema
+      StructField("grants", minimumGrantsSchema, nullable = true),
       StructField("targetUserId", StringType, nullable = true),
       StructField("sessionId", StringType, nullable = true),
       StructField("requestId", StringType, nullable = true),
@@ -800,16 +802,16 @@ object Schema extends SparkSessionWrapper {
       runtimeField("TaskExecutionRunTime"),
       StructField("job_cluster_key", StringType, nullable = true),
       StructField("clusterType", StringType, nullable = true),
-//      StructField("job_cluster", minimumJobClustersSchema, nullable = true), // todo 503
+      StructField("job_cluster", minimumNewClusterSchema, nullable = true), // use newCluster Schema here since the job_cluster has already been exploded and structured as a cluster spec
       StructField("new_cluster", minimumNewClusterSchema, nullable = true),
       StructField("taskType", StringType, nullable = true),
       StructField("terminalState", StringType, nullable = true),
       StructField("jobTriggerType", StringType, nullable = true),
       StructField("schedule", minimumScheduleSchema, nullable = true),
-//      StructField("libraries", minimumLibrariesSchema, nullable = true), // todo 503
+      StructField("libraries", minimumLibrariesSchema, nullable = true),
       StructField("manual_override_params", minimumManualOverrideParamsSchema, nullable = true),
       StructField("repairId", LongType, nullable = true),
-//      StructField("repair_details", minimumRepairDetailsSchema, nullable = true), // todo 503
+      StructField("repair_details", minimumRepairDetailsSchema, nullable = true),
       StructField("run_name", StringType, nullable = true),
       StructField("timeout_seconds", LongType, nullable = true),
       StructField("retry_on_timeout", BooleanType, nullable = true),

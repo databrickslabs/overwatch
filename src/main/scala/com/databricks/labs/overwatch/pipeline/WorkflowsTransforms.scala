@@ -1060,6 +1060,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           .join(tasksExploded, Seq("jobId", "taskKey", "runId"))
           .select('jobId, 'runId, 'job_cluster_key.alias("jobClusterKey"), explode('job_clusters).alias("job_cluster"))
           .filter('jobClusterKey === $"job_cluster.job_cluster_key")
+          // ensure job_cluster contains new_cluster field but don't override it if it exists already
+          .appendToStruct("job_cluster", Array(NamedColumn("new_cluster", lit(null).cast(Schema.minimumNewClusterSchema))))
           .selectExpr("*", "job_cluster.*").drop("job_cluster", "job_cluster_key")
           .withColumnRenamed("jobClusterKey", "job_cluster_key")
           .select('jobId, 'runId, 'job_cluster_key, 'new_cluster.alias("job_cluster"))
