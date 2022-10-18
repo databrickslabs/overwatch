@@ -957,7 +957,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   def buildClusterStateDetail(
-                               pipelineSnapTime: TimeTypes
+                               untilTime: TimeTypes
                              )(clusterEventsDF: DataFrame): DataFrame = {
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
@@ -1066,7 +1066,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("unixTimeMS_state_start", 'timestamp)
       .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
         lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
-        lit(pipelineSnapTime.asUnixTimeMilli)
+        lit(untilTime.asUnixTimeMilli)
       ))
       .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
       .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
