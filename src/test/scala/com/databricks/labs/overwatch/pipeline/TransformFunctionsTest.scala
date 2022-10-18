@@ -1,17 +1,16 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions.{col, lit, struct}
 import org.apache.spark.sql.types._
-import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.GivenWhenThen
+import org.scalatest.funspec.AnyFunSpec
 
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDate}
-
-import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 
 class TransformFunctionsTest extends AnyFunSpec
   with DataFrameComparer

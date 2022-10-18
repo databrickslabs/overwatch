@@ -1,9 +1,10 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv}
-import org.scalatest.{BeforeAndAfterAll, Ignore, Tag}
 import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.{BeforeAndAfterAll, Ignore}
 
 import java.util
 import java.util.Collections
@@ -38,7 +39,12 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
 
     it("Consume data from jobs/list API") {
       val endPoint = "jobs/list"
-      assert(ApiCallV2(apiEnv, endPoint).execute().asDF() != null)
+      val query = Map(
+        "limit" -> "25",
+        "expand_tasks" -> "true",
+        "offset" -> "0"
+      )
+      ApiCallV2(apiEnv, endPoint, query, 2.1).execute().asDF()
     }
 
     it("Consume data from clusters/list API") {
@@ -72,12 +78,19 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
 
     it("Consume data from sql/history/queries API") {
       val endPoint = "sql/history/queries"
-      val query = Map("max_results" -> "100",
+      val query = Map("max_results" -> "20",
         "include_metrics" -> "true",
-        "filter_by.query_start_time_range.start_time_ms" -> "1652775426000",
-        "filter_by.query_start_time_range.end_time_ms" -> "1655453826000"
+        "filter_by.query_start_time_range.start_time_ms" -> "1663977600000",
+        "filter_by.query_start_time_range.end_time_ms" -> "1664236800000"
       )
-      assert(ApiCallV2(apiEnv, endPoint, query).execute().asDF() != null)
+      val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+      assert(ApiCallV2(
+        apiEnv,
+        endPoint,
+        query,
+        tempSuccessPath = "src/test/scala/tempDir/sqlqueryhistory",
+        accumulator = acc
+      ).execute().asDF() != null)
     }
 
     it("Consume data from clusters/resize API") {
@@ -139,8 +152,16 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
     it("comparison test for jobs/list API") {
       val endPoint = "jobs/list"
       val oldAPI = ApiCall(endPoint, apiEnv).executeGet().asDF
-      val newAPI = ApiCallV2(apiEnv, endPoint).execute().asDF()
-      assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
+       val query = Map(
+         "limit"->"2",
+         "expand_tasks"->"true",
+         "offset"->"0"
+       )
+       val newAPI =  ApiCallV2(apiEnv, endPoint,query,2.1).execute().asDF()
+       println(oldAPI.count()+"old api count")
+       println(newAPI.count()+"new api count")
+       assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
+
     }
     it("comparison test for clusters/list API") {
       val endPoint = "clusters/list"
@@ -180,7 +201,6 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       val endPoint = "clusters/list"
       val clusterIDsDf = ApiCallV2(apiEnv, endPoint).execute().asDF().select("cluster_id")
       clusterIDsDf.show(false)
-      val timeoutThreshold = 300000 // 5 minutes
       val clusterIDs = clusterIDsDf.collect()
       val finalResponseCount = clusterIDs.length
       var responseCounter = 0
@@ -189,7 +209,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
       val tmpClusterEventsSuccessPath = ""
       val tmpClusterEventsErrorPath = ""
-
+      val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
       for (i <- clusterIDs.indices) {
        val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i).get(0)}""",
           "start_time"->"1052775426000",
@@ -198,7 +218,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         )
         println(jsonQuery)
         val future = Future {
-          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread()
+          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
           synchronized {
             apiResponseArray.addAll(apiObj)
             if (apiResponseArray.size() >= apiEnv.successBatchSize) {
@@ -227,8 +247,9 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
             println("Future failure message: " + e.getMessage, e)
         }
       }
+      val timeoutThreshold = 300000 // 5 minutes
       var currentSleepTime = 0;
-      var responseStateWhileSleeping = responseCounter
+      var accumulatorCountWhileSleeping = accumulator.value
       while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
         //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
         // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
@@ -239,15 +260,14 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         }
         Thread.sleep(5000)
         currentSleepTime += 5000
-        if (responseStateWhileSleeping < responseCounter) {//new API response received while waiting
+        if (accumulatorCountWhileSleeping <  accumulator.value) {//new API response received while waiting
           currentSleepTime = 0 //resetting the sleep time
-          responseStateWhileSleeping = responseCounter
+          accumulatorCountWhileSleeping =  accumulator.value
         }
       }
       if (responseCounter != finalResponseCount) {
         throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
       }
-      println("responseStateWhileSleeping "+responseStateWhileSleeping)
     }
 
   }

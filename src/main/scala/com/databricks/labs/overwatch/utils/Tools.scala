@@ -1,10 +1,9 @@
 package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
+import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -14,6 +13,7 @@ import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
 
@@ -332,7 +332,7 @@ object Helpers extends SparkSessionWrapper {
    * @param maxFileSizeMB Optimizer's max file size in MB. Default is 1000 but that's too large so it's commonly
    *                      reduced to improve parallelism
    */
-  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int, includeVacuum: Boolean): Unit = {
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * maxFileSizeMB)
 
@@ -346,7 +346,7 @@ object Helpers extends SparkSessionWrapper {
         val sql = s"""optimize delta.`${tbl.tableLocation}` $zorderColumns"""
         println(s"optimizing: ${tbl.tableLocation} --> $sql")
         spark.sql(sql)
-        if (tbl.vacuum_H > 0) {
+        if (tbl.vacuum_H > 0 && includeVacuum) {
           println(s"vacuuming: ${tbl.tableLocation}, Retention == ${tbl.vacuum_H}")
           spark.sql(s"VACUUM delta.`${tbl.tableLocation}` RETAIN ${tbl.vacuum_H} HOURS")
         }
@@ -356,6 +356,10 @@ object Helpers extends SparkSessionWrapper {
       }
     })
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+  }
+
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+    parOptimize(tables, maxFileSizeMB, includeVacuum = true)
   }
 
   /**
@@ -532,7 +536,7 @@ object Helpers extends SparkSessionWrapper {
    * @param etlDB Overwatch ETL database
    * @return
    */
-  def getWorkspaceByDatabase(etlDB: String): Workspace = {
+  def getWorkspaceByDatabase(etlDB: String, successfulOnly: Boolean = true, disableValidations: Boolean = false): Workspace = {
     // verify database exists
     assert(spark.catalog.databaseExists(etlDB), s"The database provided, $etlDB, does not exist.")
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
@@ -542,30 +546,19 @@ object Helpers extends SparkSessionWrapper {
     assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided, $etlDB, is not an Overwatch managed Database. Please provide an Overwatch managed database")
     val workspaceID = Initializer.getOrgId
 
-    // handle non-nullable field between azure and aws
-    val addNewConfigs = Map(
-      "auditLogConfig.azureAuditLogEventhubConfig" ->
-        when($"auditLogConfig.rawAuditPath".isNotNull, lit(null))
-          .otherwise($"auditLogConfig.azureAuditLogEventhubConfig")
-          .alias("azureAuditLogEventhubConfig")
-    )
+    val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
 
-    // acquires the config for the current workspace from the last run
-    val orgRunDetailsBase = spark.table(s"${etlDB}.pipeline_report")
+    val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
+    val testConfig = spark.table(s"${etlDB}.pipeline_report")
+      .filter(statusFilter)
+      .withColumn("rnk", rank().over(latestConfigByOrg))
+      .withColumn("rn", row_number().over(latestConfigByOrg))
+      .filter('rnk === 1 && 'rn === 1)
       .filter('organization_id === workspaceID)
-      .select('organization_id, 'Pipeline_SnapTS, 'inputConfig)
-      .orderBy('Pipeline_SnapTS.desc)
-      .select($"inputConfig.*")
+      .select(to_json('inputConfig).alias("compactString"))
+      .as[String].first()
 
-    // get latest workspace config by org_id
-    val overwatchParams = orgRunDetailsBase
-      .select(SchemaTools.modifyStruct(orgRunDetailsBase.schema, addNewConfigs): _*)
-      .limit(1)
-      .as[OverwatchParams]
-      .first
-
-    val compactString = JsonUtils.objToJson(overwatchParams).compactString
-    Initializer(compactString)
+    Initializer(testConfig, disableValidations = disableValidations)
   }
 
   /**

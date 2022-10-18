@@ -87,7 +87,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, "Initializing Consumer Database")
       if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
         val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
-          s"location '${config.consumerDatabaseLocation}'"
+            s"location '${config.consumerDatabaseLocation}'"
+
         spark.sql(createConsumerDBSTMT)
         logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
       }
@@ -122,8 +123,8 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       val ehConfig = auditLogConfig.azureAuditLogEventhubConfig.get
       val ehPrefix = ehConfig.auditRawEventsPrefix
       val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
-      val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
-      val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
+      val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${cleanPrefix}/rawEventsCheckpoint")
+      val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${cleanPrefix}/auditLogBronzeCheckpoint")
       val ehFinalConfig = auditLogConfig.azureAuditLogEventhubConfig.get.copy(
         auditRawEventsPrefix = cleanPrefix,
         auditRawEventsChk = Some(rawEventsCheckpoint),
@@ -245,6 +246,30 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setTempWorkingDir(workspaceTempWorkingDir)
   }
 
+  private[overwatch] def validateApiEnv(apiEnv: ApiEnv) = {
+    if (apiEnv.threadPoolSize < 1 || apiEnv.threadPoolSize > 20) {
+      throw new BadConfigException("ThreadPoolSize should be a valid number between 0 to 20")
+    }
+    if (apiEnv.apiWaitingTime < 60000 || apiEnv.apiWaitingTime > 900000) { // 60000ms = 1 mint,900000ms = 15mint
+      throw new BadConfigException("ApiWaiting time should be between 60000ms and 900000ms")
+    }
+    if (apiEnv.errorBatchSize < 1 || apiEnv.errorBatchSize > 1000) {
+      throw new BadConfigException("ErrorBatchSize should be between 1 to 1000")
+    }
+    if (apiEnv.successBatchSize < 1 || apiEnv.successBatchSize > 1000) {
+      throw new BadConfigException("SuccessBatchSize should be between 1 to 1000")
+    }
+    if (apiEnv.proxyHost.nonEmpty) {
+      if (apiEnv.proxyPort.isEmpty) {
+        throw new BadConfigException("Proxy host and port should be defined")
+      }
+    }
+    if (apiEnv.proxyUserName.nonEmpty) {
+      if (apiEnv.proxyPasswordKey.isEmpty || apiEnv.proxyPasswordScope.isEmpty) {
+        throw new BadConfigException("Please define ProxyUseName,ProxyPasswordScope and ProxyPasswordKey")
+      }
+    }
+  }
 
   private def multiWorkspaceOverrideOrganizationId(orgId: String): Unit = {
     val overrideMsg = s"Multiworkspace Deployment Overriding organization_id from ${config.organizationId} to " +
@@ -253,6 +278,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     logger.log(Level.INFO, overrideMsg)
     config.setOrganizationId(orgId)
   }
+
 
   /**
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
@@ -328,8 +354,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       if (keyCheck.length == 0) throw new BadConfigException(s"Key ${tokenSecret.get.key} does not exist " +
         s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
         s"available and accessible to this account.")
-      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)), rawParams.apiURL)
-    } else config.registerWorkspaceMeta(None, None)
+      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)),rawParams.apiEnvConfig)
+      validateApiEnv(config.apiEnv)
+    } else config.registerWorkspaceMeta(None,None)
 
     // Validate data Target
     if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
@@ -527,6 +554,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       case "pools" => pools
       case "audit" => audit
       case "accounts" => accounts
+      case "dbsql" => dbsql
       //      case "iampassthrough" => iamPassthrough
       //      case "profiles" => profiles
       case scope => {
@@ -657,4 +685,3 @@ object Initializer extends SparkSessionWrapper {
 
 
 }
-

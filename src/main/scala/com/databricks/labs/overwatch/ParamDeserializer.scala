@@ -166,20 +166,34 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val workspace_name = getOptionString(masterNode, "workspace_name")
     val externalizeOptimize = getOptionBoolean(masterNode, "externalizeOptimize").getOrElse(false)
     val tempWorkingDir = getOptionString(masterNode, "tempWorkingDir").getOrElse("") // will be set after data target validated if not overridden
-    val apiURL = getOptionString(masterNode,"apiURL")
-    val organizationID = getOptionString(masterNode,"organizationID")
-    /*val apiEnvConfig = if (masterNode.has("apiEnvConfig")) {
-      Some(ApiEnvConfig(
-        getOptionInt(masterNode, "apiEnvConfig.successBatchSize").getOrElse(50),
-        getOptionInt(masterNode, "apiEnvConfig.errorBatchSize").getOrElse(50),
-        getOptionBoolean(masterNode, "apiEnvConfig.enableUnsafeSSL").getOrElse(false),
-        getOptionInt(masterNode, "apiEnvConfig.threadPoolSize").getOrElse(4),
-        getOptionLong(masterNode, "apiEnvConfig.apiWaitingTime").getOrElse(300000)
+
+    val apiProxyNode = getNodeFromPath(masterNode, "apiEnvConfig.apiProxyConfig")
+    val apiProxyNodeConfig = if (apiProxyNode.nonEmpty) {
+      val node = apiProxyNode.get
+      Option(ApiProxyConfig(
+        getOptionString(node, "proxyHost"),
+        getOptionInt(node, "proxyPort"),
+        getOptionString(node, "proxyUserName"),
+        getOptionString(node, "proxyPasswordScope"),
+        getOptionString(node, "proxyPasswordKey"),
       ))
     } else {
       None
     }
-*/
+
+    val apiEnvConfig = if (masterNode.has("apiEnvConfig")) {
+      Some(ApiEnvConfig(
+        getOptionInt(masterNode, "apiEnvConfig.successBatchSize").getOrElse(200),
+        getOptionInt(masterNode, "apiEnvConfig.errorBatchSize").getOrElse(500),
+        getOptionBoolean(masterNode, "apiEnvConfig.enableUnsafeSSL").getOrElse(false),
+        getOptionInt(masterNode, "apiEnvConfig.threadPoolSize").getOrElse(4),
+        getOptionLong(masterNode, "apiEnvConfig.apiWaitingTime").getOrElse(300000),
+        apiProxyNodeConfig
+      ))
+    } else {
+      None
+    }
+
     OverwatchParams(
       auditLogConfig,
       token,
@@ -192,8 +206,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       intelligentScalingConfig,
       workspace_name,
       externalizeOptimize,
-      apiURL,
-      organizationID,
+      apiEnvConfig,
       tempWorkingDir
     )
   }

@@ -5,13 +5,14 @@ import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{AnalysisException, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.LongAccumulator
 import org.json.JSONObject
-import scalaj.http.{Http, HttpOptions, HttpResponse}
+import scalaj.http.{HttpOptions, HttpResponse}
 
 import java.util
+import scala.annotation.tailrec
 
 /**
  * Companion object for APICallV2.
@@ -36,7 +37,7 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setSuccessTempPath(tempSuccessPath)
   }
 
-  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], tempSuccessPath: String,accumulator: LongAccumulator) = {
+  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], tempSuccessPath: String, accumulator: LongAccumulator) = {
     new ApiCallV2(apiEnv)
       .buildApi(apiName)
       .setQueryMap(queryMap)
@@ -48,6 +49,13 @@ object ApiCallV2 extends SparkSessionWrapper {
     new ApiCallV2(apiEnv)
       .buildApi(apiName)
       .setQueryMap(queryMap)
+  }
+
+  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], apiVersion: Double = 2.0) = {
+    new ApiCallV2(apiEnv)
+      .buildApi(apiName)
+      .setQueryMap(queryMap)
+      .setApiV(apiVersion)
   }
 
 }
@@ -107,6 +115,12 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     _accumulator = value
     this
   }
+
+  private[overwatch] def setApiV(value: Double): this.type = {
+    apiMeta.setApiV("api/"+value)
+    this
+  }
+
   private[overwatch] def setQueryMap(value: Map[String, String]): this.type = {
     _queryMap = value
     val mapper = new ObjectMapper()
@@ -199,6 +213,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def buildApi(value: String): this.type = {
     setEndPoint(value)
     setApiMeta(new ApiMetaFactory().getApiClass(endPoint))
+    apiMeta.setApiEnv(apiEnv).setApiName(endPoint)
     setApiResponseArray(new util.ArrayList[String]())
     setAllowUnsafeSSL(apiEnv.enableUnsafeSSL)
     setQueryMap(Map[String, String]())
@@ -291,27 +306,27 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    *
    * @param jsonObject response as jsonObject received from API call.
    */
-  private def paginate(response: String): Unit = {
+  private def paginate(response: String): Boolean = {
+    var paginate = false
     val mapper = new ObjectMapper()
     val jsonObject = mapper.readTree(response);
     if (jsonObject.get(apiMeta.paginationKey) != null) {
       if (apiMeta.hasNextPage(jsonObject)) { //Pagination key for sql/history/queries can return true or false
-        if (apiMeta.tuplePaginationObject) {
-          val (key, value) = apiMeta.getPaginationLogicForTuple(jsonObject)
-          if (value != null) {
-            setJsonKey(key)
-            setJsonValue(value)
-            setQueryMap(Map[String, String]())
-            execute()
+        if (apiMeta.isDerivePaginationLogic) {
+          val nextPageParams = apiMeta.getPaginationLogic(jsonObject, queryMap)
+          if (nextPageParams != null) {
+            setQueryMap(nextPageParams)
+            paginate = true
+//            execute()
           }
         } else {
           setJsonQuery(apiMeta.getPaginationLogicForSingleObject(jsonObject))
-          execute()
+          paginate = true
+//          execute()
         }
       }
-
     }
-
+    paginate
   }
 
 
@@ -372,8 +387,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       case "POST" =>
         response =
           try {
-            Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
-              .copy(headers = httpHeaders)
+            apiMeta.getBaseRequest()
               .postData(jsonQuery)
               .options(reqOptions)
               .asString
@@ -385,10 +399,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
       case "GET" =>
         response = try {
-          Http(s"""${apiEnv.workspaceURL}/${apiMeta.apiV}/${endPoint}""")
+            apiMeta.getBaseRequest()
             .params(queryMap)
-            .param(_jsonKey, _jsonValue)
-            .copy(headers = httpHeaders)
             .options(reqOptions)
             .asString
         } catch {
@@ -465,38 +477,47 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     } else if (_apiResponseArray.size != 0 && !apiMeta.storeInTempLocation) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
       apiResultDF = spark.read.json(Seq(_apiResponseArray.toString).toDS())
     } else if (apiMeta.storeInTempLocation) { //Read the response from the Temp location/Disk and convert it to Dataframe.
-      apiResultDF = spark.read.json(successTempPath)
+      apiResultDF = try {
+        spark.read.json(successTempPath)
+      } catch {
+        case e: AnalysisException if e.getMessage().contains("Path does not exist") => spark.emptyDataFrame
+      }
 
     }
     if (apiResultDF.columns.length == 0) {
-      val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
-        s"Details Below:\n$buildGenericErrorMessage"
-      throw new ApiCallEmptyResponse(errMsg, true)
+      val errMsg =
+        s"""API CALL Resulting DF is empty BUT no errors detected, progressing module.
+           |Details Below:\n$buildGenericErrorMessage""".stripMargin
+      logger.error(errMsg)
+      spark.emptyDataFrame
+    }else {
+      extrapolateSupportedStructure(apiResultDF)
     }
-    extrapolateSupportedStructure(apiResultDF)
   }
 
 
-  def executeMultiThread(): (util.ArrayList[String]) = {
-    try {
+  def executeMultiThread(): util.ArrayList[String] = {
+    @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation) {
         accumulator.add(1)
-        if (apiEnv.successBatchSize <= _apiResponseArray.size()) {//Checking if its right time to write the batches into persistent storage
+        if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath, _apiResponseArray.toString)
           if (responseFlag) { //Clearing the resultArray in-case of successful write
             setApiResponseArray(new util.ArrayList[String]())
           }
         }
       }
-      paginate(response.body)
       if (_printFinalStatusFlag) {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      _apiResponseArray
+      if (paginate(response.body)) executeThreadedHelper() else _apiResponseArray
+    }
+    try {
+      executeThreadedHelper()
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
@@ -528,25 +549,27 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   def execute(): this.type = {
-    try {
+    @tailrec def executeHelper(): this.type = {
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation) {
         accumulator.add(1)
-        if (apiEnv.successBatchSize <= _apiResponseArray.size()) {//Checking if its right time to write the batches into persistent storage
+        if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath, _apiResponseArray.toString)
           if (responseFlag) { //Clearing the resultArray in-case of successful write
             setApiResponseArray(new util.ArrayList[String]())
           }
         }
       }
-      paginate(response.body)
       if (_printFinalStatusFlag) {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      this
+      if (paginate(response.body)) executeHelper() else this
+    }
+    try {
+      executeHelper()
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
@@ -567,7 +590,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         logger.log(Level.WARN, excMsg, e)
         throw e
       }
-
     }
   }
 
@@ -575,15 +597,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
     val mapper = new ObjectMapper()
     val jsonObject = mapper.readTree(jsonQuery);
-    val clusterId = jsonObject.get("cluster_id").toString.replace("\"","")
+    val clusterId = jsonObject.get("cluster_id").toString.replace("\"", "")
     val start_time = jsonObject.get("start_time").asLong()
     val end_time = jsonObject.get("end_time").asLong()
     val errorObj = mapper.readTree(e.getMessage);
     val newJsonObject = new JSONObject();
-    newJsonObject.put("cluster_id",clusterId)
-    newJsonObject.put("from_epoch",start_time)
-    newJsonObject.put("until_epoch",end_time)
-    newJsonObject.put("error",errorObj.get("error_code").toString.replace("\"","") +" "+ errorObj.get("message").toString.replace("\"",""))
+    newJsonObject.put("cluster_id", clusterId)
+    newJsonObject.put("from_epoch", start_time)
+    newJsonObject.put("until_epoch", end_time)
+    newJsonObject.put("error", errorObj.get("error_code").toString.replace("\"", "") + " " + errorObj.get("message").toString.replace("\"", ""))
     newJsonObject.toString
   }
 

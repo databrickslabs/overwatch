@@ -47,12 +47,21 @@ class Pipeline(
     pipelineState
   }
 
+  def overridePipelineState(newPipelineState: scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport]): Unit = {
+    clearPipelineState()
+    newPipelineState.values.foreach(state => updateModuleState(state))
+  }
+
   def getVerbosePipelineState: Array[ModuleStatusReport] = {
     pipelineStateTarget.asDF.as[ModuleStatusReport].collect()
   }
 
   def updateModuleState(moduleState: SimplifiedModuleStatusReport): Unit = {
     pipelineState.put(moduleState.moduleID, moduleState)
+  }
+
+  def dropModuleState(moduleId: Int): Unit = {
+    pipelineState.remove(moduleId)
   }
 
   def clearPipelineState(): this.type = {
@@ -385,10 +394,10 @@ class Pipeline(
     PipelineFunctions.setSparkOverrides(spark, value, config.debugFlag)
   }
 
-//  private def getLastOptimized(moduleID: Int): Long = {
-//    val state = pipelineState.get(moduleID)
-//    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
-//  }
+  private def getLastOptimized(moduleID: Int): Long = {
+    val state = pipelineState.get(moduleID)
+    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
+  }
 
   private def needsOptimize(lastOptimizedTS: Long, optimizeFreq_H: Int): Boolean = {
     val optFreq_Millis = 1000L * 60L * 60L * optimizeFreq_H.toLong

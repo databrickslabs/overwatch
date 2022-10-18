@@ -94,14 +94,14 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess = ETLDefinition(
     workspace.getJobsDF,
-    Seq(cleanseRawJobsSnapDF(config.cloudProvider)),
+    Seq(cleanseRawJobsSnapDF(BronzeTargets.jobsSnapshotTarget.keys, config.runID)),
     append(BronzeTargets.jobsSnapshotTarget)
   )
 
   lazy private[overwatch] val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
   lazy private val appendClustersAPIProcess = ETLDefinition(
     workspace.getClustersDF,
-    Seq(cleanseRawClusterSnapDF(config.cloudProvider)),
+    Seq(cleanseRawClusterSnapDF),
     append(BronzeTargets.clustersSnapshotTarget)
   )
 

@@ -4,7 +4,6 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.catalyst.expressions.Shuffle
 
 import java.time.Duration
 
@@ -15,7 +14,7 @@ class Module(
               val moduleDependencies: Array[Int],
               val moduleScaleCoefficient: Double,
               hardLimitMaxHistory: Option[Int],
-              private var _shuffleFactor: Double
+              private var _shuffleFactor: Double = 1.0
             ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -50,8 +49,8 @@ class Module(
    * @return
    */
   def shuffleFactor: Double = {
-    val daysBucket = 5
-    val derivedShuffleFactor = _shuffleFactor + Math.floor(daysToProcess / daysBucket).toInt
+    val daysBucket = 30
+    val derivedShuffleFactor = _shuffleFactor * Math.floor(daysToProcess / daysBucket).toInt
     logger.info(s"SHUFFLE FACTOR: Set to $derivedShuffleFactor")
 
     derivedShuffleFactor
@@ -380,6 +379,8 @@ class Module(
         val msg = PipelineFunctions.appendStackStrace(e, s"$moduleName FAILED -->\n")
         logger.log(Level.ERROR, msg, e)
         fail(msg)
+    } finally {
+      spark.catalog.clearCache()
     }
 
   }
