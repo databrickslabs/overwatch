@@ -345,10 +345,7 @@ class Config() {
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
-        //For multiworksspace deployment get api url from config file
-        //For single deployment get the api url from notebook context.
-        _workspaceUrl = apiURL.getOrElse(dbutils.notebook.getContext().apiUrl.get)
-        println("setting workspace URL" + _workspaceUrl)
+        _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key

@@ -5,7 +5,6 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.delta.ProtocolChangedException
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.streaming.StreamingQueryListener._
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}

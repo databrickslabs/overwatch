@@ -5,8 +5,8 @@ import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{AnalysisException, DataFrame}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{AnalysisException, DataFrame}
 import org.apache.spark.util.LongAccumulator
 import org.json.JSONObject
 import scalaj.http.{HttpOptions, HttpResponse}

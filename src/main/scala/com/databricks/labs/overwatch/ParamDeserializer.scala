@@ -166,6 +166,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val workspace_name = getOptionString(masterNode, "workspace_name")
     val externalizeOptimize = getOptionBoolean(masterNode, "externalizeOptimize").getOrElse(false)
     val tempWorkingDir = getOptionString(masterNode, "tempWorkingDir").getOrElse("") // will be set after data target validated if not overridden
+    val apiURL = getOptionString(masterNode,"apiURL")
+    val organizationID = getOptionString(masterNode,"organizationID")
 
     val apiProxyNode = getNodeFromPath(masterNode, "apiEnvConfig.apiProxyConfig")
     val apiProxyNodeConfig = if (apiProxyNode.nonEmpty) {
@@ -206,6 +208,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       intelligentScalingConfig,
       workspace_name,
       externalizeOptimize,
+      apiURL,
+      organizationID,
       apiEnvConfig,
       tempWorkingDir
     )

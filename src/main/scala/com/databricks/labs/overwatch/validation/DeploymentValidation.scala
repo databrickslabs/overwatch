@@ -13,8 +13,8 @@ import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.storage.StorageLevel
 
-import java.time.{LocalDate, LocalDateTime}
 import java.time.temporal.ChronoUnit
+import java.time.{LocalDate, LocalDateTime}
 import java.util.Date
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.ForkJoinTaskSupport

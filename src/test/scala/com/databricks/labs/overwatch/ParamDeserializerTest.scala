@@ -52,6 +52,7 @@ class ParamDeserializerTest extends AnyFunSpec {
         false,
         None,
         None,
+        Some(ApiEnvConfig()),
         ""
       )
       assertResult(expected)(mapper.readValue[OverwatchParams](incomplete))

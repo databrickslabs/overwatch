@@ -9,13 +9,11 @@ import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
-import org.json.{JSONArray, JSONObject}
 import scalaj.http.HttpResponse
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.time.{LocalDate, LocalDateTime, ZonedDateTime}
-import java.util
 import java.util.Date
 
 case class DBDetail()
@@ -127,6 +125,8 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
                            workspace_name: Option[String] = None,
                            externalizeOptimize: Boolean = false,
+                           apiURL: Option[String] = None,
+                           organizationID: Option[String] = None,
                            apiEnvConfig: Option[ApiEnvConfig] = None,
                            tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )

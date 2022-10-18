@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.utils.SchemaScrubber.SanitizedField
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
