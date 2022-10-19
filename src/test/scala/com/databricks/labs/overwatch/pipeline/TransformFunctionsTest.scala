@@ -61,28 +61,115 @@ class TransformFunctionsTest extends AnyFunSpec
         StructField("job_clusters", minimumJobClustersSchema, nullable = true),
         StructField("new_cluster", minimumNewClusterSchema, nullable = true)
       )), nullable = true),
-      StructField("organization_id", StringType, nullable = false)
+      StructField("organization_id", IntegerType, nullable = false)
     ))
 
-    it("Should be able to parse array of struct") {
+    val df = Seq(("123")).toDF("organization_id")
+      .withColumn("settings", struct(
+        array(
+          struct(
+            lit(1234567).alias("job_cluster_key"),
+            struct(
+              lit("my_new_cluster_name").cast("string").alias("cluster_name")
+            ).alias("new_cluster1")
+          )
+        ).alias("job_clusters")
+      ))
+
+    it("Test Case 1 - Implicit type casting to Int") {
+      df.createOrReplaceTempView("df")
+      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+
+      val organizationIdType = validatedDF.select("organization_id").collect()(0)(0).getClass.getSimpleName
+      assertResult("Integer")(organizationIdType)
+    }
+
+    it("Test Case 2 - Should be able to parse array of struct") {
+
+      df.createOrReplaceTempView("df")
+      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+
+      assertResult(df.select("settings.job_clusters").schema.head.dataType)(validatedDF.select("settings.job_clusters").schema.head.dataType)
+
+    }
+
+    it("Test Case 3 - VerifyMinimumSchema on Array of String Value - Implicit Type Conversion") {
+
+      val jobSnapMinimumSchema: StructType = StructType(Seq(
+        StructField("settings", StructType(Seq(
+          StructField("name", StringType, nullable = true),
+          StructField("existing_cluster_id", StringType, nullable = true),
+          StructField("job_clusters", minimumJobClustersSchema, nullable = true),
+          StructField("new_cluster", minimumNewClusterSchema, nullable = true)
+        )), nullable = true),
+        StructField("organization_id", IntegerType, nullable = false),
+        StructField("cluster_id_array",ArrayType(StringType),nullable = true)
+      ))
+
+      val df1 = df.withColumn("cluster_id_array",array(
+        when(col("organization_id").contains("123"), 123)))  //cluster_id_array is Array of Integer
+      df1.createOrReplaceTempView("df1")
+      val validatedDF = df1.verifyMinimumSchema(jobSnapMinimumSchema) //cluster_id_array converted to is Array of String as defined in jobSnapMinimumSchema
+
+      //      assertResult(df.select("settings.job_clusters").schema.head.dataType)(validatedDF.select("settings.job_clusters").schema.head.dataType)
+
+    }
+    //Implicit casting of map types is not supported
+    ignore ("Test Case 4 - VerifyMinimumSchema on Map of String Value - Implicit Type Conversion") {
+
+      val jobSnapMinimumSchema: StructType = StructType(Seq(
+        StructField("settings", StructType(Seq(
+          StructField("name", StringType, nullable = true),
+          StructField("existing_cluster_id", StringType, nullable = true),
+          StructField("job_clusters", minimumJobClustersSchema, nullable = true),
+          StructField("new_cluster", minimumNewClusterSchema, nullable = true)
+        )), nullable = true),
+        StructField("organization_id", IntegerType, nullable = false),
+        StructField("cluster_id_Map",MapType(StringType,IntegerType),nullable = true)
+      ))
+
+      val df1 = df.withColumn("cluster_id_Map",typedLit[Map[String, String]](Map("key1" -> "123")))  //cluster_id_array is Array of Integer
+      df1.createOrReplaceTempView("df1")
+      val validatedDF = df1.verifyMinimumSchema(jobSnapMinimumSchema) //cluster_id_array converted to is Array of String as defined in jobSnapMinimumSchema
+
+    }
+
+    it ("Test Case 5 - VerifyMinimumSchema on struct of MapType Column") {
+
+      val jobSnapMinimumSchema: StructType = StructType(Seq(
+        StructField("settings", StructType(Seq(
+          StructField("name", StringType, nullable = true),
+          StructField("existing_cluster_id", StringType, nullable = true),
+          StructField("job_clusters", minimumJobClustersSchema, nullable = true),
+          StructField("new_cluster", minimumNewClusterSchema, nullable = true)
+        )), nullable = true),
+        StructField("organization_id", IntegerType, nullable = false),
+        StructField("settings_Struct_MapType", StructType(Seq(
+          StructField("cluster_id_Map",MapType(StringType,StringType),nullable = true)
+        )),nullable = true)
+      ))
 
       val df = Seq(("123")).toDF("organization_id")
         .withColumn("settings", struct(
           array(
             struct(
-              lit("my_cluster_name").alias("job_cluster_key"),
+              lit(1234567).alias("job_cluster_key"),
               struct(
                 lit("my_new_cluster_name").cast("string").alias("cluster_name")
-              ).alias("new_cluster")
+              ).alias("new_cluster1")
             )
           ).alias("job_clusters")
         ))
 
-      df.createOrReplaceTempView("df")
-      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+      val df1 = df.withColumn("settings_Struct_MapType",struct(
+        typedLit[Map[String, String]](Map("key1" -> "123")).alias("cluster_id_Map")
+      ))
+      df1.createOrReplaceTempView("df1")
+      val validatedDF = df1.verifyMinimumSchema(jobSnapMinimumSchema) //cluster_id_array converted to is Array of String as defined in jobSnapMinimumSchema
+      assertResult(df1.select("settings_Struct_MapType").schema.head.dataType)(validatedDF.select("settings_Struct_MapType").schema.head.dataType)
     }
 
-    it("Should be able to parse complex nested Datatype") {
+    it("Test Case 6 - VerifyMinimumSchema on struct<<<array<<<struct<<<struct column") {
 
       val df = Seq(("123")).toDF("organization_id")
         .withColumn("settings", struct(
@@ -102,55 +189,55 @@ class TransformFunctionsTest extends AnyFunSpec
         ))
       df.createOrReplaceTempView("df")
       val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
-
+      assertResult(df.select("settings.job_clusters").schema.head.dataType)(validatedDF.select("settings.job_clusters").schema.head.dataType)
     }
 
-    it("VerifySchema on MapType") {
+    it("Test Case 7 - VerifySchema on MapType") {
 
-      val arrayStructureData = Seq(
-        Row("overwatch_dev",List(Row("my_new_cluster_name"),Row("my_new_cluster_name1")),
-          Map("spark_version"->"3.0","language"->"python"))
-      )
+          val arrayStructureData = Seq(
+            Row("overwatch_dev",List(Row("my_new_cluster_name"),Row("my_new_cluster_name1")),
+              Map("spark_version"->"3.0","language"->"python"))
+          )
 
-      val mapType  = DataTypes.createMapType(StringType,StringType)
+          val mapType  = DataTypes.createMapType(StringType,StringType)
 
-      val arrayStructureSchema = new StructType()
-        .add("cluster_name",StringType)
-        .add("new_cluster", ArrayType(new StructType()
-          .add("cluster_name",StringType)))
-        .add("properties", MapType(StringType,StringType))
+          val arrayStructureSchema = new StructType()
+            .add("cluster_name",StringType)
+            .add("new_cluster", ArrayType(new StructType()
+              .add("cluster_name",StringType)))
+            .add("properties", MapType(StringType,StringType))
 
-      val df = spark.createDataFrame(
-        spark.sparkContext.parallelize(arrayStructureData),arrayStructureSchema).withColumn("organization_id",lit("123"))
-      df.createOrReplaceTempView("df")
-      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
-      println(df.printSchema())
-      println(validatedDF.printSchema())
-    }
+          val df = spark.createDataFrame(
+            spark.sparkContext.parallelize(arrayStructureData),arrayStructureSchema).withColumn("organization_id",lit("123"))
+          df.createOrReplaceTempView("df")
+          val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+          println(df.printSchema())
+          println(validatedDF.printSchema())
+        }
 
-    it("Should be able to typecast Int to String") {
+    it("Test Case 8 - Should be able to typecast Int to String") {
 
-      val df = Seq((123)).toDF("organization_id")
-        .withColumn("settings", struct(
-          array(
-            struct(
-              lit("my_cluster_key").alias("job_cluster_key"),
-              struct(
-                lit("my_new_cluster_name").cast("string").alias("cluster_name")
-              ).alias("new_cluster")
-            )
-          ).alias("job_clusters")
-        ))
+          val df = Seq((123)).toDF("organization_id")
+            .withColumn("settings", struct(
+              array(
+                struct(
+                  lit("my_cluster_key").alias("job_cluster_key"),
+                  struct(
+                    lit("my_new_cluster_name").cast("string").alias("cluster_name")
+                  ).alias("new_cluster")
+                )
+              ).alias("job_clusters")
+            ))
 
-      df.createOrReplaceTempView("df")
-      val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
+          df.createOrReplaceTempView("df")
+          val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
 
-      val baseType = df.select("organization_id").collect()(0)(0).toString.getClass.getSimpleName
-      val validatedType = validatedDF.select("organization_id").collect()(0)(0).getClass.getSimpleName
-      assertResult(baseType)(validatedType)
-    }
+//          val baseType = df.select("organization_id").collect()(0)(0).toString.getClass.getSimpleName
+          val validatedType = validatedDF.select("organization_id").collect()(0)(0).getClass.getSimpleName
+          assertResult("Integer")(validatedType)
+        }
 
-    ignore ("Non Nullable Column should be present in Schema - Negative Test Case") {
+    ignore ("Test Case 9 - Non Nullable Column should be present in Schema - Negative Test Case") {
 
       val arrayStructureData = Seq(
         Row("overwatch_dev",List(Row("my_new_cluster_name"),Row("my_new_cluster_name1")),
@@ -172,7 +259,6 @@ class TransformFunctionsTest extends AnyFunSpec
       println(df.printSchema())
       println(validatedDF.printSchema())
     }
-
 
 
   }
@@ -611,3 +697,4 @@ class TransformFunctionsTest extends AnyFunSpec
   }
 
 }
+
