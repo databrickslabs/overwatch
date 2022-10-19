@@ -501,6 +501,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
+//      println(s"""response.body----${response.body}""")
       if (apiMeta.storeInTempLocation) {
         accumulator.add(1)
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage

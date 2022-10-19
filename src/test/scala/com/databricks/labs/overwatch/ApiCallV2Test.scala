@@ -3,6 +3,8 @@ package com.databricks.labs.overwatch
 import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv}
+import org.apache.log4j.Level
+import org.apache.spark.sql.functions.{col, explode, lit}
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.{BeforeAndAfterAll, Ignore}
 
@@ -12,7 +14,7 @@ import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
-@Ignore
+//@Ignore
 class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
 
   var apiEnv: ApiEnv = null
@@ -268,6 +270,109 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       if (responseCounter != finalResponseCount) {
         throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
       }
+    }
+    it("test sqlQueryHistoryParallel") {
+      println("test")
+      val sqlQueryHistoryEndpoint = "sql/history/queries"
+      val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+      var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+      var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+      var responseCounter = 0
+      implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
+      val tmpSqlQueryHistorySuccessPath = ""
+      val untilTimeMs = "1666182197381".toLong
+      var fromTimeMs = "1662249600000".toLong - (1000*60*60*24*2)  //subtracting 2 days for running query merge
+      val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
+
+      while (fromTimeMs < untilTimeMs){
+        val (startTime, endTime) = if ((untilTimeMs- fromTimeMs)/(1000*60*60) > 1) {
+          (fromTimeMs,
+            fromTimeMs+(1000*60*60))
+        }
+        else{
+          (fromTimeMs,
+            untilTimeMs)
+        }
+
+        //create payload for the API calls
+        val jsonQuery = Map(
+          "max_results" -> "50",
+          "include_metrics" -> "true",
+          "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime", // Do we need to subtract 2 days for every API call?
+          "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
+        )
+        /**TODO:
+         * Refactor the below code to make it more generic
+         */
+        //call future
+        val future = Future {
+          val apiObj = ApiCallV2(
+            apiEnv,
+            sqlQueryHistoryEndpoint,
+            jsonQuery,
+            tempSuccessPath = tmpSqlQueryHistorySuccessPath,
+            accumulator = acc
+          ).executeMultiThread()
+
+          synchronized {
+            apiResponseArray.addAll(apiObj)
+            if (apiResponseArray.size() >= apiEnv.successBatchSize) {
+              PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
+              apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+            }
+          }
+        }
+        future.onComplete {
+          case Success(_) =>
+            responseCounter = responseCounter + 1
+
+          case Failure(e) =>
+            if (e.isInstanceOf[ApiCallFailureV2]) {
+              synchronized {
+                apiErrorArray.add(e.getMessage)
+                if (apiErrorArray.size() >= apiEnv.errorBatchSize) {
+                  PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiErrorArray.toString)
+                  apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+                }
+              }
+
+            }
+            responseCounter = responseCounter + 1
+        }
+        fromTimeMs = fromTimeMs+(1000*60*60)
+      }
+      val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
+      var currentSleepTime = 0
+      var accumulatorCountWhileSleeping = acc.value
+      while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
+        //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
+        // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
+        if (currentSleepTime > 120000) //printing the waiting message only if the waiting time is more than 2 minutes.
+        {
+          println(s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000} seconds; Api response yet to receive ${finalResponseCount - responseCounter}""")
+        }
+        Thread.sleep(5000)
+        currentSleepTime += 5000
+        if (accumulatorCountWhileSleeping < acc.value) { //new API response received while waiting.
+          currentSleepTime = 0 //resetting the sleep time.
+          accumulatorCountWhileSleeping = acc.value
+        }
+      }
+      if (responseCounter != finalResponseCount) { // Checking whether all the api responses has been received or not.
+
+        throw new Exception(s"""Unable to receive all the sql/history/queries api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
+      }
+      if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
+        PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
+        apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+      }
+      if (apiErrorArray.size() > 0) { //In case of error array didn't hit the batch-size as a final step we will write it to the persistent storage.
+        PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiErrorArray.toString)
+        apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+      }
+
+      println(tmpSqlQueryHistorySuccessPath)
+
     }
 
   }
