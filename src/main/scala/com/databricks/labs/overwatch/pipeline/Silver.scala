@@ -315,7 +315,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val sqlQueryHistoryModule = Module(2020, "Silver_SQLQueryHistory", this)
   lazy private val appendSqlQueryHistoryProcess = ETLDefinition(
-    workspace.getSqlQueryHistoryDF(sqlQueryHistoryModule.fromTime, sqlQueryHistoryModule.untilTime),
+    workspace.getSqlQueryHistoryParallelDF(sqlQueryHistoryModule.fromTime, sqlQueryHistoryModule.untilTime),
     Seq(enhanceSqlQueryHistory),
     append(SilverTargets.sqlQueryHistoryTarget)
   )

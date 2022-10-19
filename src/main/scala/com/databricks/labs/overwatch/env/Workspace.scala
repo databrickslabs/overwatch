@@ -167,17 +167,18 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
     val tmpSqlQueryHistorySuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
     val untilTimeMs = untilTime.asUnixTimeMilli
-    var fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)
-    val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs)/(1000*60*60))
+    var fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
+    val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
+
     while (fromTimeMs < untilTimeMs){
-    var (startTime, endTime) = if (untilTimeMs/(1000*60*60) - fromTimeMs/(1000*60*60) > 1) {
-      (fromTimeMs,
-        fromTimeMs+(1000*60*60))
-      }
-      else{
-      (fromTimeMs,
-        untilTimeMs)
-      }
+      val (startTime, endTime) = if ((untilTimeMs- fromTimeMs)/(1000*60*60) > 1) {
+        (fromTimeMs,
+          fromTimeMs+(1000*60*60))
+        }
+        else{
+        (fromTimeMs,
+          untilTimeMs)
+        }
 
       //create payload for the API calls
       val jsonQuery = Map(
@@ -186,7 +187,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime", // Do we need to subtract 2 days for every API call?
         "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
       )
-
+      /**TODO:
+       * Refactor the below code to make it more generic
+       */
       //call future
       val future = Future {
         val apiObj = ApiCallV2(
