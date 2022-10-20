@@ -166,6 +166,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     var responseCounter = 0
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
     val tmpSqlQueryHistorySuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
+    val tmpSqlQueryHistoryErrorPath = s"${config.tempWorkingDir}/errors/sqlqueryhistory_silver/${System.currentTimeMillis()}"
     val untilTimeMs = untilTime.asUnixTimeMilli
     var fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
     val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
@@ -218,7 +219,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
             synchronized {
               apiErrorArray.add(e.getMessage)
               if (apiErrorArray.size() >= config.apiEnv.errorBatchSize) {
-                PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiErrorArray.toString)
+                PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistoryErrorPath, apiErrorArray.toString)
                 apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
               }
             }

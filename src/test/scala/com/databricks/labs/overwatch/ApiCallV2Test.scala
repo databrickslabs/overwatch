@@ -4,6 +4,8 @@ import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv}
 import org.apache.log4j.Level
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, explode, lit}
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.{BeforeAndAfterAll, Ignore}
@@ -14,7 +16,7 @@ import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
-//@Ignore
+@Ignore
 class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
 
   var apiEnv: ApiEnv = null
@@ -273,15 +275,28 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
     }
     it("test sqlQueryHistoryParallel") {
       println("test")
+      lazy val spark: SparkSession = {
+        SparkSession
+          .builder()
+          .master("local")
+          .appName("spark session")
+          .config("spark.sql.shuffle.partitions", "1")
+          .getOrCreate()
+      }
+
+      lazy val sc: SparkContext = spark.sparkContext
       val sqlQueryHistoryEndpoint = "sql/history/queries"
       val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
       var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
       var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
       var responseCounter = 0
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
-      val tmpSqlQueryHistorySuccessPath = ""
+      val tmpSqlQueryHistorySuccessPath = "/tmp/test/"
+      val tmpSqlQueryHistoryErrorPath = ""
       val untilTimeMs = "1666182197381".toLong
-      var fromTimeMs = "1662249600000".toLong - (1000*60*60*24*2)  //subtracting 2 days for running query merge
+//      val untilTimeMs = "1662249600000".toLong
+//      var fromTimeMs = "1662249600000".toLong - (1000*60*60*24*2)  //subtracting 2 days for running query merge
+      var fromTimeMs = "1666182197381".toLong - (1000*60*60*24*2)
       val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
 
       while (fromTimeMs < untilTimeMs){
@@ -315,9 +330,20 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
           ).executeMultiThread()
 
           synchronized {
-            apiResponseArray.addAll(apiObj)
+//            println(apiObj)
+             apiObj.forEach(
+               obj=>if(! obj.contains("res")){
+//                 println(obj)
+               }
+               else{
+                 apiResponseArray.addAll(apiObj)
+               }
+             )
+//            apiResponseArray.addAll(apiObj)
             if (apiResponseArray.size() >= apiEnv.successBatchSize) {
-              PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
+              println(s"final result ${responseCounter}")
+              println(apiResponseArray.toString)
+//              PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
               apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
             }
           }
@@ -331,7 +357,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
               synchronized {
                 apiErrorArray.add(e.getMessage)
                 if (apiErrorArray.size() >= apiEnv.errorBatchSize) {
-                  PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiErrorArray.toString)
+                  PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistoryErrorPath, apiErrorArray.toString)
                   apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
                 }
               }
@@ -372,6 +398,9 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       }
 
       println(tmpSqlQueryHistorySuccessPath)
+//      spark.read.json(tmpSqlQueryHistorySuccessPath)
+//        .select(explode(col("res")).alias("res")).select(col("res" + ".*"))
+//        .withColumn("organization_id", lit("123"))
 
     }
 
