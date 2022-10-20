@@ -940,7 +940,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
       .withColumn("rnk", rank().over(onlyOnceSemanticsW))
       .withColumn("rn", row_number().over(onlyOnceSemanticsW))
-      .filter('rnk > 1 || 'rn > 1)
+      .filter('rnk === 1 && 'rn === 1)
       .withColumn("createdBy",
         when(isAutomated('cluster_name) && 'actionName === "create", lit("JobsService"))
           .when(!isAutomated('cluster_name) && 'actionName === "create", 'userEmail))
