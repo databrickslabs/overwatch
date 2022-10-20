@@ -273,6 +273,42 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
       }
     }
+
+    it("test sqlHistoryDF"){
+      lazy val spark: SparkSession = {
+        SparkSession
+          .builder()
+          .master("local")
+          .appName("spark session")
+          .config("spark.sql.shuffle.partitions", "1")
+          .getOrCreate()
+      }
+      lazy val sc: SparkContext = spark.sparkContext
+      val sqlQueryHistoryEndpoint = "sql/history/queries"
+      val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+//      val startTime =  "1665878400000".toLong // subtract 2 days for running query merge
+      val startTime =  "1666224000010".toLong -(1000*60*60*24)// subtract 2 days for running query merge
+      val untilTime = "1666224000010".toLong
+      val tempWorkingDir = ""
+      val jsonQuery = Map(
+        "max_results" -> "50",
+        "include_metrics" -> "true",
+        "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime",
+        "filter_by.query_start_time_range.end_time_ms" ->  s"${untilTime}"
+      )
+      ApiCallV2(
+        apiEnv,
+        sqlQueryHistoryEndpoint,
+        jsonQuery,
+        tempSuccessPath = s"${tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}",
+        accumulator = acc
+      )
+        .execute()
+        .asDF()
+        .withColumn("organization_id", lit("1234"))
+        .show(false)
+    }
+
     it("test sqlQueryHistoryParallel") {
       println("test")
       lazy val spark: SparkSession = {
@@ -330,20 +366,14 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
           ).executeMultiThread()
 
           synchronized {
-//            println(apiObj)
              apiObj.forEach(
-               obj=>if(! obj.contains("res")){
-//                 println(obj)
-               }
-               else{
-                 apiResponseArray.addAll(apiObj)
+               obj=>if(obj.contains("res")){
+                 apiResponseArray.add(obj)
                }
              )
-//            apiResponseArray.addAll(apiObj)
+            println(apiResponseArray.toString)
             if (apiResponseArray.size() >= apiEnv.successBatchSize) {
-              println(s"final result ${responseCounter}")
-              println(apiResponseArray.toString)
-//              PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
+              PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
               apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
             }
           }
@@ -398,6 +428,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       }
 
       println(tmpSqlQueryHistorySuccessPath)
+      print(apiResponseArray.toString)
 //      spark.read.json(tmpSqlQueryHistorySuccessPath)
 //        .select(explode(col("res")).alias("res")).select(col("res" + ".*"))
 //        .withColumn("organization_id", lit("123"))

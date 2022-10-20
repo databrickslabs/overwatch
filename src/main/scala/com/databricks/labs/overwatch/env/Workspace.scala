@@ -202,8 +202,12 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         ).executeMultiThread()
 
         synchronized {
-          println(s"""apiObj......${apiObj}""")
-          apiResponseArray.addAll(apiObj)
+          apiObj.forEach(
+            obj=>if(obj.contains("res")){
+              apiResponseArray.add(obj)
+            }
+          )
+//          apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= config.apiEnv.successBatchSize) {
             PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
             apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
