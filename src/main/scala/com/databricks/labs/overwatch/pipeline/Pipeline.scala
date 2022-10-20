@@ -424,6 +424,16 @@ class Pipeline(
     logger.log(Level.INFO, startLogMsg)
 
     // Append the output -- don't apply spark overrides, applied at top of function
+    // DEBUG
+    println("DEBUG: PIPELINE - finalDF from Pipeline")
+    import spark.implicits._
+    if (target.name == "cluster_state_detail_silver") {
+      finalDF
+        .filter('organization_id === "2222170229861029" && 'cluster_id === "0207-100712-yd99nxu4" && 'state_start_date >= "2022-10-13")
+        .select('organization_id, 'cluster_id, 'unixTimeMS_state_start, 'timestamp, 'timestamp_state_start, 'state, 'state_start_date)
+        .orderBy('unixTimeMS_state_start)
+        .show(false)
+    }
     if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS, maxMergeScanDates)
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."

@@ -1053,7 +1053,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'timestamp, 'state, 'current_num_workers, 'target_num_workers
       )
 
-    clusterEventsBaseline
+    val debugCLSD = clusterEventsBaseline
       .withColumn("counter_reset",
         when(
           lag('state, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING", "EDITED") ||
@@ -1085,6 +1085,15 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
       .withColumn("days_in_state", size('state_dates))
 
+    // DEBUG
+    println(s"DEBUG UNTILTIME = ${untilTime.asTSString}")
+    debugCLSD
+      .filter('organization_id === "2222170229861029" && 'cluster_id === "0207-100712-yd99nxu4" && 'state_start_date >= "2022-10-13")
+      .select('organization_id, 'cluster_id, 'unixTimeMS_state_start, 'timestamp, 'timestamp_state_start, 'state, 'state_start_date)
+      .orderBy('unixTimeMS_state_start)
+      .show(false)
+
+    debugCLSD
   }
 
   protected def dbJobsStatusSummary(

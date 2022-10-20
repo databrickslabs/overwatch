@@ -199,6 +199,27 @@ class Database(config: Config) extends SparkSessionWrapper {
            |MERGE CONDITION: $mergeCondition
            |""".stripMargin
       logger.log(Level.INFO, mergeDetailMsg)
+
+      // DEBUG
+//      println(s"DEBUG - FinalDF Count = ${finalDF.count()}")
+      println(mergeDetailMsg)
+      import spark.implicits._
+      if (target.name == "cluster_state_detail_silver") {
+        println("DEBUG: DATABASE FINALSOURCEDF: clsd DF for specific cluster\n")
+        finalSourceDF
+          .filter('organization_id === "2222170229861029" && 'cluster_id === "0207-100712-yd99nxu4" && 'state_start_date >= "2022-10-13")
+          .select('organization_id, 'cluster_id, 'unixTimeMS_state_start, 'timestamp, 'timestamp_state_start, 'state, 'state_start_date)
+          .orderBy('unixTimeMS_state_start)
+          .show(false)
+
+      println("DEBUG: DATABASE FINALDF: clsd DF for specific cluster\n")
+        finalDF
+          .filter('organization_id === "2222170229861029" && 'cluster_id === "0207-100712-yd99nxu4" && 'state_start_date >= "2022-10-13")
+          .select('organization_id, 'cluster_id, 'unixTimeMS_state_start, 'timestamp, 'timestamp_state_start, 'state, 'state_start_date)
+          .orderBy('unixTimeMS_state_start)
+          .show(false)
+      }
+
       spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", config.runID)
       // TODO -- when DBR 9.1 LTS GA, use LSM (low-shuffle-merge) to improve pipeline
       deltaTarget
