@@ -290,7 +290,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     BronzeTargets.clusterEventsTarget.asIncrementalDF(
       clusterStateDetailModule,
       BronzeTargets.clusterEventsTarget.incrementalColumns,
-      SilverTargets.clusterStateDetailTarget.maxMergeScanDates
+      SilverTargets.clusterStateDetailTarget.maxMergeScanDates // pick up last state up to 30 days ago
     ),
     Seq(buildClusterStateDetail(clusterStateDetailModule.untilTime)),
     append(SilverTargets.clusterStateDetailTarget)
