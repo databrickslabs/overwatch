@@ -1029,5 +1029,15 @@ object Schema extends SparkSessionWrapper {
     StructField("max_days", IntegerType, nullable = true),
     StructField("excluded_scopes", StringType, nullable = true),
     StructField("active", BooleanType, nullable = true),
+    StructField("proxy_host", StringType, nullable = true),
+    StructField("proxy_port", IntegerType, nullable = true),
+    StructField("proxy_user_name", StringType, nullable = true),
+    StructField("proxy_password_scope", StringType, nullable = true),
+    StructField("proxy_password_key", StringType, nullable = true),
+    StructField("success_batch_size", IntegerType, nullable = true),
+    StructField("error_batch_size", IntegerType, nullable = true),
+    StructField("enable_unsafe_SSL", BooleanType, nullable = true),
+    StructField("thread_pool_size", IntegerType, nullable = true),
+    StructField("api_waiting_time", LongType, nullable = true)
   ))
 }

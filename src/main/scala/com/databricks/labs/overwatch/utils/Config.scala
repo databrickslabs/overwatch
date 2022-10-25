@@ -45,6 +45,7 @@ class Config() {
   private var _contractSQLComputeDBUPrice: Double = _
   private var _contractJobsLightDBUPrice: Double = _
   private var _isMultiworkspaceDeployment: Boolean = false
+  private var _apiUrl: Option[String] = None
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -55,6 +56,8 @@ class Config() {
    * the getter may be obscure or more complicated.
    */
   def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
+
+  def apiUrl: Option[String] = _apiUrl
 
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -205,6 +208,10 @@ class Config() {
     this
   }
 
+  private[overwatch] def setApiUrl(value: Option[String]): this.type = {
+    _apiUrl = value
+    this
+  }
 
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value
@@ -345,7 +352,12 @@ class Config() {
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
-        _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+        if (isMultiworkspaceDeployment && apiUrl.nonEmpty) {
+          _workspaceUrl = apiUrl.get
+          logger.log(Level.INFO, "Multiworkspace Deployment setting the workspaceURL :" + _workspaceUrl)
+        } else {
+          _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+        }
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key

@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.env
 
-import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -12,6 +12,7 @@ import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
 import java.util
 import java.util.UUID
+import scala.annotation.tailrec
 
 class Database(config: Config) extends SparkSessionWrapper {
 
@@ -245,7 +246,8 @@ class Database(config: Config) extends SparkSessionWrapper {
           target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
         } catch {
           case e: Throwable =>
-            logger.log(Level.ERROR, s"""Exception while writing to ${target.tableFullName}""""+Thread.currentThread().getName)
+            val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception in writeMethod:")
+            logger.log(Level.ERROR, s"""Exception while writing to ${target.tableFullName}"""" + Thread.currentThread().getName + " Error msg:" + fullMsg)
             throw e
         }
       }
@@ -255,45 +257,61 @@ class Database(config: Config) extends SparkSessionWrapper {
     true
   }
 
-  def writeWithRetry(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array(), daysToProcess: Option[Int] = None): Boolean = {
 
-    if (daysToProcess != None) {
-      if (daysToProcess.get < 5 && !target.autoOptimize) {
-        logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
-        df.persist()
-        df.count()
-      }
-    }
-    var runFlag = true
-    var i = 0
-    val retryCount = 5
-    while (runFlag && i < 5) {
-      try {
-        write(df, target, pipelineSnapTime, maxMergeScanDates)
-        runFlag = false
-      }
-      catch {
+  def performRetry(inputDf: DataFrame,
+                   target: PipelineTable,
+                   pipelineSnapTime: Column,
+                   maxMergeScanDates: Array[String] = Array()): this.type = {
+    @tailrec def executeRetry(retryCount: Int): this.type = {
+      val rerunFlag = try {
+        write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
+        false
+      } catch {
         case e: Throwable =>
-          logger.info("Database retry count" + i + " Table name:" + target.tableFullName + " Thread name: " + Thread.currentThread().getName)
-           if (i == retryCount) {
-            logger.log(Level.INFO, s"""Reached max retry current retry count:${i}""")
+          val exceptionMsg = e.getMessage.toLowerCase()
+          if (exceptionMsg != null && (exceptionMsg.contains("concurrent") || exceptionMsg.contains("conflicting")) && retryCount < 5) {
+            coolDown(target.tableFullName)
+            true
+          } else {
             throw e
           }
-          i = i + 1
-          coolDown(target.tableFullName)
       }
+      if (retryCount < 5 && rerunFlag) executeRetry(retryCount + 1) else this
     }
-    println("Successfully written" + target.tableLocation)
+    try {
+      executeRetry(1)
+    } catch {
+      case e: Throwable =>
+        throw e
+    }
+
+  }
+
+  def writeWithRetry(df: DataFrame,
+                     target: PipelineTable,
+                     pipelineSnapTime: Column,
+                     maxMergeScanDates: Array[String] = Array(),
+                     daysToProcess: Option[Int] = None): Boolean = {
+
+    val needsCache = daysToProcess.getOrElse(1000) < 5 && !target.autoOptimize
+    val inputDf = if (needsCache) {
+      logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
+      df.persist()
+    } else df
+    if (needsCache) inputDf.count()
+    performRetry(inputDf,target, pipelineSnapTime, maxMergeScanDates)
     true
   }
 
+  /**
+   * Function forces the thread to sleep for a random 30-60 seconds.
+   * @param tableName
+   */
   private def coolDown(tableName: String): Unit = {
-    val start = 1
-    val end = 10
     val rnd = new scala.util.Random
-    val number = start + rnd.nextInt((end - start) + 1)
-    logger.log(Level.INFO, "Slowing multithreaded writing for " + tableName + "sleeping..." + 10000 * number)
-    Thread.sleep(10000 * number)
+    val number:Long = (rnd.nextFloat() * 30 + 30).toLong*1000
+    logger.log(Level.INFO,"Slowing multithreaded writing for " + tableName + "sleeping..." + number+" thread name "+Thread.currentThread().getName)
+    Thread.sleep(number)
   }
 
 }

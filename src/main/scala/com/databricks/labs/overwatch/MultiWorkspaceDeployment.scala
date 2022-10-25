@@ -2,14 +2,15 @@ package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.validation.{ConfigColumns, DeploymentValidation}
+import com.databricks.labs.overwatch.validation.DeploymentValidation
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions.lit
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
 
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
-import java.util.Date
+import java.util
+import java.util.{Collections, Date}
 import java.util.concurrent.Executors
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -24,27 +25,16 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 object MultiWorkspaceDeployment extends SparkSessionWrapper {
 
 
-  def apply(configCsvPath: String, tempOutputPath: String, apiEnvConfig: ApiEnvConfig): MultiWorkspaceDeployment = {
-    new MultiWorkspaceDeployment()
-      .setConfigCsvPath(configCsvPath)
-      .setOutputPath(tempOutputPath)
-      .setApiEnvConfig(apiEnvConfig)
-      .initDeployment()
-  }
-
-
-  def apply(configCsvPath: String, tempOutputPath: String): MultiWorkspaceDeployment = {
-    new MultiWorkspaceDeployment()
-      .setConfigCsvPath(configCsvPath)
-      .setOutputPath(tempOutputPath)
-      .initDeployment()
-  }
 
   def apply(configCsvPath: String): MultiWorkspaceDeployment = {
+   apply(configCsvPath,"/mnt/tmp/overwatch")
+  }
+
+  def apply(configCsvPath: String, tempOutputPath: String)={
     new MultiWorkspaceDeployment()
       .setConfigCsvPath(configCsvPath)
-      .setOutputPath("/mnt/tmp/overwatch")
-      .initDeployment()
+      .setOutputPath(tempOutputPath)
+      .setPipelineSnapTime()
   }
 }
 
@@ -57,73 +47,30 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private var _configCsvPath: String = _
 
-  private var _deploymentId: String = _
-
   private var _outputPath: String = _
 
-  private var _deploymentReport: ArrayBuffer[MultiWSDeploymentReport] = _
+  private val _deploymentReport: ArrayBuffer[MultiWSDeploymentReport] = ArrayBuffer()
 
-  private var _parallelism: Int = _
+  private val _deploymentId: String = java.util.UUID.randomUUID.toString
 
-  private var _inputDataFrame: DataFrame = _
+  private def deploymentId = _deploymentId
 
-  private var _apiEnvConfig: ApiEnvConfig = _
+  private def deploymentReport: ArrayBuffer[MultiWSDeploymentReport] = _deploymentReport
 
-  protected def apiEnvConfig: ApiEnvConfig = _apiEnvConfig
-
-  protected def inputDataFrame: DataFrame = _inputDataFrame
-
-  protected def parallelism: Int = _parallelism
-
-  protected def deploymentId: String = _deploymentId
-
-  protected def deploymentReport: ArrayBuffer[MultiWSDeploymentReport] = _deploymentReport
-
-  protected def outputPath: String = _outputPath
+  private def outputPath: String = _outputPath
 
   protected def configCsvPath: String = _configCsvPath
 
   private var _pipelineSnapTime: Long = _
 
-  private[overwatch] def setApiEnvConfig(value: ApiEnvConfig): this.type = {
-    _apiEnvConfig = value
-    this
-  }
-
-  private[overwatch] def setInputDataFrame(value: DataFrame): this.type = {
-    _inputDataFrame = value
-    this
-  }
-
-  private def initDeployment(): this.type = {
-    setDeploymentReport(ArrayBuffer())
-    setDeploymentId(java.util.UUID.randomUUID.toString)
-    setPipelineSnapTime()
-    this
-  }
-
-  private def setParallelism(value: Int): this.type = {
-    _parallelism = value
-    this
-  }
-
-  private def setDeploymentId(value: String): this.type = {
-    _deploymentId = value
-    this
-  }
-
-  private def setDeploymentReport(value: ArrayBuffer[MultiWSDeploymentReport]): this.type = {
-    _deploymentReport = value
-    this
-  }
 
 
-  private[overwatch] def setConfigCsvPath(value: String): this.type = {
+  private def setConfigCsvPath(value: String): this.type = {
     _configCsvPath = value
     this
   }
 
-  private[overwatch] def setOutputPath(value: String): this.type = {
+  private def setOutputPath(value: String): this.type = {
     _outputPath = value
     this
   }
@@ -140,17 +87,18 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   /**
    * Validates all the parameters provided in config csv file and generates a report which is stored at /etl_storrage_prefix/report/validationReport
+   *
    * @param parallelism number of threads which will be running parallely to complete the task
    */
   def validate(parallelism: Int = 4): Unit = {
     val processingStartTime = System.currentTimeMillis();
-    val deploymentValidation = DeploymentValidation(configCsvPath, outputPath, parallelism, deploymentId)
-    val report = deploymentValidation.performValidation
+    val deploymentValidation = DeploymentValidation
+    val report = deploymentValidation.performValidation(configCsvPath, parallelism, deploymentId,outputPath)
     val notValidatedCount = report.filter(x => {
       !x.validated
     }).count()
-    snapShotValidation(report, deploymentValidation.makeDataFrame().head().getAs(ConfigColumns.etl_storage_prefix.toString), "validationReport")
 
+    snapShotValidation(report, deploymentValidation.makeDataFrame(configCsvPath, deploymentId).head().etl_storage_prefix, "validationReport",deploymentId)
     val processingEndTime = System.currentTimeMillis();
     val msg =
       s"""Validation report details
@@ -163,46 +111,46 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   /**
    * Creating overwatch parameters
+   *
    * @param config each row of the csv config file
    * @return
    */
-  private def buildParams(config: Row): (String, String) = {
+  private def buildParams(config: MultiWorkspaceConfig): MultiWorkspaceParams = {
     try {
       val dataTarget = DataTarget(
-        Some(config.getAs(ConfigColumns.etl_database_name.toString)),
-        Some(s"${config.getAs(ConfigColumns.etl_storage_prefix.toString)}/${config.getAs(ConfigColumns.etl_database_name.toString)}.db"),
-        Some(s"${config.getAs(ConfigColumns.etl_storage_prefix.toString)}/global_share"),
-        Some(s"${config.getAs(ConfigColumns.consumer_database_name.toString)}"),
-        Some(s"${config.getAs(ConfigColumns.etl_storage_prefix.toString)}/${config.getAs(ConfigColumns.consumer_database_name.toString)}.db")
+        Some(config.etl_database_name),
+        Some(s"${config.etl_storage_prefix}/${config.etl_database_name}.db"),
+        Some(s"${config.etl_storage_prefix}/global_share"),
+        Some(s"${config.consumer_database_name}"),
+        Some(s"${config.etl_storage_prefix}/${config.consumer_database_name}.db")
       )
-      val tokenSecret = TokenSecret(config.getAs(ConfigColumns.secret_scope.toString), config.getAs(ConfigColumns.secret_key_dbpat.toString))
-      val ehConnString = s"{{secrets/${config.getAs(ConfigColumns.secret_scope.toString)}/${config.getAs(ConfigColumns.eh_scope_key.toString)}}}"
-      val ehStatePath = s"${config.getAs(ConfigColumns.etl_storage_prefix.toString)}/${config.getAs(ConfigColumns.workspace_id.toString)}/ehState"
-      val badRecordsPath = s"${config.getAs(ConfigColumns.etl_storage_prefix.toString)}/${config.getAs(ConfigColumns.workspace_id.toString)}/sparkEventsBadrecords"
-      val auditLogConfig = if (s"${config.getAs(ConfigColumns.cloud.toString)}" == "AWS") {
-        val awsAuditSourcePath = s"${config.getAs(ConfigColumns.auditlogprefix_source_aws.toString)}"
+      val tokenSecret = TokenSecret(config.secret_scope, config.secret_key_dbpat)
+      val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key}}}"
+      val ehStatePath = s"${config.etl_storage_prefix}/${config.workspace_id}/ehState"
+      val badRecordsPath = s"${config.etl_storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
+      val auditLogConfig = if (s"${config.cloud}" == "AWS") {
+        val awsAuditSourcePath = s"${config.auditlogprefix_source_aws}"
         AuditLogConfig(rawAuditPath = Some(awsAuditSourcePath))
       } else {
-        val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.getAs(ConfigColumns.eh_name.toString), auditRawEventsPrefix = ehStatePath)
+        val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name, auditRawEventsPrefix = ehStatePath)
         AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
       }
-      val interactiveDBUPrice: Double = config.getAs(ConfigColumns.interactive_dbu_price.toString)
-      val automatedDBUPrice: Double = config.getAs(ConfigColumns.automated_dbu_price.toString)
-      val sqlComputerDBUPrice: Double = config.getAs(ConfigColumns.sql_compute_dbu_price.toString)
-      val jobsLightDBUPrice: Double = config.getAs(ConfigColumns.jobs_light_dbu_price.toString)
-      val customWorkspaceName: String = config.getAs(ConfigColumns.workspace_name.toString)
+      val interactiveDBUPrice: Double = config.interactive_dbu_price
+      val automatedDBUPrice: Double = config.automated_dbu_price
+      val sqlComputerDBUPrice: Double = config.sql_compute_dbu_price
+      val jobsLightDBUPrice: Double = config.jobs_light_dbu_price
+      val customWorkspaceName: String = config.workspace_name
       val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts".split(",").toBuffer
-      if (config.getAs(ConfigColumns.excluded_scopes.toString) != null) {
-        config.getAs(ConfigColumns.excluded_scopes.toString).toString.split(":").foreach(scope => standardScopes -= scope)
+      if (config.excluded_scopes != null) {
+        config.excluded_scopes.split(":").foreach(scope => standardScopes -= scope)
       }
 
-      val maxDaysToLoad: Int = config.getAs(ConfigColumns.max_days.toString)
-      val primordialDateString: Date = config.getAs(ConfigColumns.primordial_date.toString)
+      val maxDaysToLoad: Int = config.max_days
+      val primordialDateString: Date = config.primordial_date
       val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
       val stringDate = dateFormat.format(primordialDateString)
-      if (apiEnvConfig == null) {
-        setApiEnvConfig(ApiEnvConfig())
-      }
+      val apiEnvConfig = getProxyConfig(config)
+
       val params = OverwatchParams(
         auditLogConfig = auditLogConfig,
         dataTarget = Some(dataTarget),
@@ -214,95 +162,118 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         primordialDateString = Some(stringDate),
         workspace_name = Some(customWorkspaceName),
         externalizeOptimize = true,
-        apiURL = Some(config.getAs(ConfigColumns.workspace_url.toString)),
-        organizationID = Some(config.getAs(ConfigColumns.workspace_id.toString)),
+        apiEnvConfig= Some(apiEnvConfig),
         tempWorkingDir = ""
       )
-      (JsonUtils.objToJson(params).compactString, s"""${config.getAs(ConfigColumns.workspace_id.toString)}""")
+      MultiWorkspaceParams(JsonUtils.objToJson(params).compactString,
+        s"""${config.api_url}""",
+        s"""${config.workspace_id}""",
+        s"""${config.deployment_id}""")
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while building params")
         logger.log(Level.ERROR, fullMsg)
         deploymentReport.append(
-          MultiWSDeploymentReport(s"""${config.getAs(ConfigColumns.workspace_id.toString)}""",
+          MultiWSDeploymentReport(s"""${config.workspace_id}""",
             "",
-            Some(s"""WorkspaceId: ${config.getAs(ConfigColumns.workspace_id.toString).toString}"""),
+            Some(s"""WorkspaceId: ${config.workspace_id}"""),
             fullMsg,
-            Some(deploymentId)
+            Some(config.deployment_id)
           ))
         null
     }
   }
 
-  private def startBronzeDeployment(args: String, workspaceID: String) = {
+  private def getProxyConfig(config: MultiWorkspaceConfig): ApiEnvConfig = {
+    val apiProxyConfig = ApiProxyConfig(config.proxy_host, config.proxy_port, config.proxy_user_name, config.proxy_password_scope, config.proxy_password_key)
+    val apiEnvConfig = ApiEnvConfig(config.success_batch_size.getOrElse(200),
+      config.error_batch_size.getOrElse(500),
+      config.enable_unsafe_SSL.getOrElse(false),
+      config.thread_pool_size.getOrElse(4),
+      config.api_waiting_time.getOrElse(300000),
+      Some(apiProxyConfig))
+    apiEnvConfig
+  }
+
+  private def startBronzeDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
     try {
-      println(s"""Bronze Deployment Started workspaceID:${workspaceID} """)
-      val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
+      println(s"""************Bronze Deployment Started workspaceID:${multiWorkspaceParams.workspaceId}  args:${multiWorkspaceParams.args}**********  """)
+      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = true,
+        apiURL = Some(multiWorkspaceParams.apiUrl),
+        organizationID = Some(multiWorkspaceParams.workspaceId))
+
       Bronze(workspace).run()
-      println(s"""Bronze Deployment Completed workspaceID:${workspaceID} """)
-      deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Bronze", Some(args),
+      println(s"""************Bronze Deployment Completed workspaceID:${multiWorkspaceParams.workspaceId}************ """)
+      deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Bronze", Some(multiWorkspaceParams.args),
         "SUCCESS",
-        Some(deploymentId)
+        Some(multiWorkspaceParams.deploymentId)
       ))
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Bronze", Some(args),
+        deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Bronze", Some(multiWorkspaceParams.args),
           fullMsg,
-          Some(deploymentId)
+          Some(multiWorkspaceParams.deploymentId)
         ))
     }
   }
 
-  private def startSilverDeployment(args: String, workspaceID: String) = {
+  private def startSilverDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
     try {
-      println(s"""Silver Deployment Started workspaceID:${workspaceID}""" )
-      val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
+      println(s"""************Silver Deployment Started workspaceID:${multiWorkspaceParams.workspaceId} args:${multiWorkspaceParams.args} ************""")
+      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = true,
+        apiURL = Some(multiWorkspaceParams.apiUrl),
+        organizationID = Some(multiWorkspaceParams.workspaceId))
+
       Silver(workspace).run()
-      deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Silver", Some(args),
+      deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Silver", Some(multiWorkspaceParams.args),
         "SUCCESS",
-        Some(deploymentId)
+        Some(multiWorkspaceParams.deploymentId)
       ))
-      println(s"""Silver Deployment Completed workspaceID:${workspaceID}""" )
+      println(s"""************Silver Deployment Completed workspaceID:${multiWorkspaceParams.workspaceId}************""")
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Silver", Some(args),
+        deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Silver", Some(multiWorkspaceParams.args),
           fullMsg,
-          Some(deploymentId)
+          Some(multiWorkspaceParams.deploymentId)
         ))
     }
   }
 
-  private def startGoldDeployment(args: String, workspaceID: String) = {
+  private def startGoldDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
     try {
-      println(s"""Gold Deployment Started workspaceID:${workspaceID}""")
-      val workspace = Initializer(args, debugFlag = true, isMultiworkspaceDeployment = true)
+      println(s"""************Gold Deployment Started workspaceID:${multiWorkspaceParams.workspaceId} args:${multiWorkspaceParams.args} ************"""")
+      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = true,
+        apiURL = Some(multiWorkspaceParams.apiUrl),
+        organizationID = Some(multiWorkspaceParams.workspaceId))
+
       Gold(workspace).run()
-      deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Gold", Some(args),
+      deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Gold", Some(multiWorkspaceParams.args),
         "SUCCESS",
-        Some(deploymentId)
+        Some(multiWorkspaceParams.deploymentId)
       ))
-      println(s"""Gold Deployment Completed workspaceID:${workspaceID}""")
+      println(s"""************Gold Deployment Completed workspaceID:${multiWorkspaceParams.workspaceId}************""")
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        deploymentReport.append(MultiWSDeploymentReport(workspaceID, "Gold", Some(args),
+        deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Gold", Some(multiWorkspaceParams.args),
           fullMsg,
-          Some(deploymentId)
+          Some(multiWorkspaceParams.deploymentId)
         ))
     }
   }
 
   /**
    * Takes a snapshot of the config and saves it to /report/configTable
+   *
    * @param configDF
    */
-  private def snapshotConfig(configDF: DataFrame) = {
-    var configWriteLocation = configDF.head().getAs(ConfigColumns.etl_storage_prefix.toString).toString
+  private def snapshotConfig(configDF: Dataset[MultiWorkspaceConfig]) = {
+    var configWriteLocation = configDF.head().etl_storage_prefix
     if (!configWriteLocation.startsWith("dbfs:") && !configWriteLocation.startsWith("s3") && !configWriteLocation.startsWith("abfss")) {
       configWriteLocation = s"""dbfs:${configWriteLocation}"""
     }
@@ -310,30 +281,32 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
       .withColumn("configFile", lit(configCsvPath))
-      .write.format("delta").mode("append").save(s"""${configWriteLocation}/report/configTable""")
+      .write.format("delta").mode("append").option("mergeSchema", "true").save(s"""${configWriteLocation}/report/configTable""")
   }
 
   /**
    * Takes a snapshot of the validation result
+   *
    * @param validationDF
    * @param path
    * @param reportName
    */
-  private def snapShotValidation(validationDF: Dataset[DeploymentValidationReport], path: String, reportName: String): Unit = {
+  private def snapShotValidation(validationDF: Dataset[DeploymentValidationReport], path: String, reportName: String, deploymentId: String): Unit = {
     var validationPath = path
     if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
       validationPath = s"""dbfs:${path}"""
     }
     validationDF
-      .withColumn("deploymentId", lit(deploymentId))
+      .withColumn("deployment_id", lit(deploymentId))
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
-      .write.format("delta").mode("append").save(s"""${validationPath}/report/${reportName}""")
+      .write.format("delta").option("mergeSchema", "true").mode("append").save(s"""${validationPath}/report/${reportName}""")
     println("Validation report has been saved to " + s"""${validationPath}/report/${reportName}""")
   }
 
   /**
    * Saves the deployment report.
+   *
    * @param validationDF
    * @param path
    * @param reportName
@@ -357,39 +330,38 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   def deploy(parallelism: Int = 4, zones: String = "Bronze"): Unit = {
     val processingStartTime = System.currentTimeMillis();
-    setParallelism(parallelism)
     println("ParallelismLevel :" + parallelism)
-    val deploymentValidation = DeploymentValidation(configCsvPath, parallelism, deploymentId)
-    deploymentValidation.performMandatoryValidation
-    val dataFrame = deploymentValidation.makeDataFrame()
-    setInputDataFrame(dataFrame)
+    val deploymentValidation = DeploymentValidation
+    deploymentValidation.performMandatoryValidation(configCsvPath, parallelism, deploymentId)
+    val dataFrame = deploymentValidation.makeDataFrame(configCsvPath, deploymentId)
     snapshotConfig(dataFrame)
-    val prams = dataFrame.collect().map(buildParams).filter(args => args != null)
+    val params = dataFrame.collect().map(buildParams).filter(args => args != null).par
+    println("Workspace to be Deployed :"+params.size)
     val zoneArray = zones.split(",")
     zoneArray.foreach(zone => {
-      var responseCounter = 0
+      val responseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
-      prams.foreach(compactString => {
+      params.foreach(deploymentParams => {
         val future = Future {
           zone.toLowerCase match {
             case "bronze" =>
-              startBronzeDeployment(compactString._1, compactString._2)
+              startBronzeDeployment(deploymentParams)
             case "silver" =>
-              startSilverDeployment(compactString._1, compactString._2)
+              startSilverDeployment(deploymentParams)
             case "gold" =>
-              startGoldDeployment(compactString._1, compactString._2)
+              startGoldDeployment(deploymentParams)
           }
         }
         future.onComplete {
           case _ =>
-            responseCounter = responseCounter + 1
+            responseCounter.add(1)
         }
       })
-      while (responseCounter < prams.length) {
+      while (responseCounter.size() < params.length) {
         Thread.sleep(5000)
       }
     })
-    saveDeploymentReport(deploymentReport.toDS, deploymentValidation.makeDataFrame().head().getAs(ConfigColumns.etl_storage_prefix.toString), "deploymentReport")
+    saveDeploymentReport(deploymentReport.toDS, dataFrame.head().etl_storage_prefix, "deploymentReport")
     println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
 
   }

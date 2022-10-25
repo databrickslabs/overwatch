@@ -12,7 +12,7 @@ import scalaj.http.{Http, HttpRequest}
 trait ApiMeta {
 
   val logger: Logger = Logger.getLogger(this.getClass)
-  protected var _paginationKey: String = _
+  protected var _paginationKey: String = ""
   protected var _paginationToken: String = _
   protected var _dataframeColumn: String = "*"
   protected var _apiCallType: String = _
@@ -151,7 +151,7 @@ class ApiMetaFactory {
       case "workspace/list" => new WorkspaceListApi
       case "sql/history/queries" => new SqlQueryHistoryApi
       case "clusters/resize" => new ClusterResizeApi
-      case "/jobs/runs/get" => new JobRunGetApi
+      case "jobs/runs/get" => new JobRunGetApi
       case "dbfs/search-mounts" => new DbfsSearchMountsApi
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }
