@@ -69,13 +69,17 @@ object SchemaTools extends SparkSessionWrapper {
    * TODO - make this recursive with dot delimiter
    * @param df
    * @param colName
+   * @param missingNullType if the field does not exist what type should be returned
    * @return
    */
-  def colByName(df: DataFrame)(colName: String): StructField = {
+  def colByName(df: DataFrame)(colName: String, missingNullType: DataType = StringType): StructField = {
     if (spark.conf.get("spark.sql.caseSensitive") == "true") {
-      df.schema.find(_.name == colName).get
+      df.schema.find(_.name == colName).getOrElse(StructField(colName, missingNullType, nullable = true))
     } else {
-      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
+      val lowerCaseColName = colName.toLowerCase
+      df.schema.find(_.name.toLowerCase() == lowerCaseColName)
+        .getOrElse(StructField(lowerCaseColName, missingNullType, nullable = true))
+        .copy(name = lowerCaseColName) // ensure the returned case is lower case
     }
   }
 
