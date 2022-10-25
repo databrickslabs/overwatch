@@ -1377,6 +1377,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'organization_id, 'run_id, 'cluster_id, 'run_state_start_epochMS, 'run_state_end_epochMS,
         'unixTimeMS_state_start, 'unixTimeMS_state_end
       )
+      .repartition()
+      .cache()
+
+    simplifiedJobRunByClusterState.count() // eager cache as its used several times below
 
     // sum of run_state_times starting before ending during
     val runStateBeforeEndsDuring = simplifiedJobRunByClusterState.alias("obs")
