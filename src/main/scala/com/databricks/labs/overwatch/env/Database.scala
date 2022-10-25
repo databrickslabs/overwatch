@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.functions.{col, filter, lit}
 import org.apache.spark.sql.streaming.StreamingQueryListener._
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, StreamingQueryListener}
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
@@ -166,22 +166,38 @@ class Database(config: Config) extends SparkSessionWrapper {
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
   def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array()): Boolean = {
+    // df = finalDF(clsd) have 49 rows
+    // target = cluster_state_detail_silver have 9 rows
     var finalSourceDF: DataFrame = df
 
     // apend metadata to source DF
     finalSourceDF = if (target.withCreateDate) finalSourceDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalSourceDF
     finalSourceDF = if (target.withOverwatchRunID) finalSourceDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalSourceDF
     finalSourceDF = if (target.workspaceName) finalSourceDF.withColumn("workspace_name", lit(config.workspaceName)) else finalSourceDF
+    val beforeDedupsDF = finalSourceDF
 
     // if target is to be deduped, dedup it by keys
-    finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
+    finalSourceDF = if (!target.permitDuplicateKeys) {
+      val afterDedupsDF = finalSourceDF.dedupByKey(target.keys, target.incrementalColumns)
+
+      println("beforeDedupsDF count is",beforeDedupsDF.count())
+      println("afterDedupsDF count is",beforeDedupsDF.count())
+      if (beforeDedupsDF.count() == afterDedupsDF.count()){
+        println("dedupByKey is working fine for clsf")
+      }
+      else println("dedupByKey not working fine for clsf")
+
+      finalSourceDF.dedupByKey(target.keys, target.incrementalColumns)
+
+    } else finalSourceDF // Problem arises here
+    // ***** finalDF.filter('cluster_id === "0207-100712-yd99nxu4" && 'state_start_date >= "2022-10-13").orderBy('timestamp_state_start).count() is becoming 0
 
     val finalDF = if (target.persistBeforeWrite) persistAndLoad(finalSourceDF, target) else finalSourceDF
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
       val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
-      val updatesDF = finalDF.alias("updates")
+        val updatesDF = finalDF.alias("updates")
 
       val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
 

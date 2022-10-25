@@ -297,12 +297,16 @@ object TransformFunctions {
      * @param incrementalFields seq of incremental fields for the df
      * @return
      */
+
+    // Missing CLSF
     def dedupByKey(
                      keys: Seq[String],
                      incrementalFields: Seq[String]
                      ): DataFrame = {
-      val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
-      val w = Window.partitionBy(keysLessIncrementals map col: _*).orderBy(incrementalFields map col: _*)
+//      val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
+//      val keysLessIncrementals1 = keysLessIncrementals :+ "unixTimeMS_state_start"
+//      val w = Window.partitionBy(keysLessIncrementals1 map col: _*).orderBy(incrementalFields map col: _*)
+      val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
       df
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
