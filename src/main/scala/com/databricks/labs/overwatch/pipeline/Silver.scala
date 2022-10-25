@@ -288,7 +288,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005))
   lazy private val appendClusterStateDetailProcess = ETLDefinition(
     BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateDetailModule, "timestamp"),
-    Seq(buildClusterStateDetail(pipelineSnapTime)),
+    Seq(buildClusterStateDetail(clusterStateDetailModule.untilTime)),
     append(SilverTargets.clusterStateDetailTarget)
   )
 
