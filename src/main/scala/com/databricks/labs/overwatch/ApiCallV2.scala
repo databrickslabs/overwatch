@@ -484,7 +484,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       }
 
     }
-    if (apiResultDF.columns.length == 0) {
+    if (emptyDFCheck(apiResultDF)) {
       val errMsg =
         s"""API CALL Resulting DF is empty BUT no errors detected, progressing module.
            |Details Below:\n$buildGenericErrorMessage""".stripMargin
@@ -495,6 +495,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
+  def emptyDFCheck(apiResultDF: DataFrame): Boolean = {
+    if (apiResultDF.columns.length == 0) { //Check number of columns in result Dataframe
+      true
+    } else if (apiResultDF.columns.size == 1 && apiResultDF.columns.contains(apiMeta.paginationKey)) { //Check if only pagination key in present in the response
+      true
+    } else {
+      false
+    }
+  }
 
   def executeMultiThread(): util.ArrayList[String] = {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {

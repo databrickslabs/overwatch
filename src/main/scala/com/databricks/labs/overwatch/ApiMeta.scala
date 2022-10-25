@@ -12,7 +12,7 @@ import scalaj.http.{Http, HttpRequest}
 trait ApiMeta {
 
   val logger: Logger = Logger.getLogger(this.getClass)
-  protected var _paginationKey: String = _
+  protected var _paginationKey: String = ""
   protected var _paginationToken: String = _
   protected var _dataframeColumn: String = "*"
   protected var _apiCallType: String = _
