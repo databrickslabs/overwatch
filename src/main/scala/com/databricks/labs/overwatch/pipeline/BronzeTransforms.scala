@@ -33,8 +33,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
   import TransformFunctions._
   import spark.implicits._
 
-  @transient
-  var statusFlag: Int = 0
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _newDataRetrieved: Boolean = true
 

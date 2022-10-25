@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.ApiCallV2
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.{Pipeline, PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
-import com.databricks.labs.overwatch.utils.{BadConfigException, _}
+import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.validation.{Rule, RuleSet}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
@@ -57,7 +57,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
 
   private var _outputPath: String = _
 
-  private var _validationStatus: ArrayBuffer[DeploymentValidationReport] = _
+  private var _validationStatus: ArrayBuffer[DeploymentValidationReport] = new ArrayBuffer[DeploymentValidationReport]()
 
   private var _deploymentId: String = _
 
@@ -100,11 +100,6 @@ class DeploymentValidation() extends SparkSessionWrapper {
     this
   }
 
-  private[overwatch] def setValidationStatus(value: ArrayBuffer[DeploymentValidationReport]): this.type = {
-    _validationStatus = value
-    this
-  }
-
 
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
@@ -113,31 +108,34 @@ class DeploymentValidation() extends SparkSessionWrapper {
 
   private[overwatch] def setInputDataFrame(value: DataFrame): this.type = {
     _inputDataFrame = value
-    _inputDataFrame.persist(StorageLevel.MEMORY_AND_DISK)
     this
   }
 
-  private[overwatch] def validateFileExistance() = {
+  /**
+   * Validates the config csv file existence.
+   */
+  private def validateFileExistence() = {
     if (!Helpers.pathExists(configCsvPath)) {
       throw new BadConfigException("Unable to find config file in the given location:" + configCsvPath)
     }
   }
 
-  def makeDataFrame(): DataFrame = {
+  /**
+   * Create a DataFrame from provided csv file.
+   * @return
+   */
+  private[overwatch] def makeDataFrame(): DataFrame = {
     try {
       var df = spark.read.option("header", "true")
         .option("ignoreLeadingWhiteSpace", true)
         .option("ignoreTrailingWhiteSpace", true)
         .csv(configCsvPath)
-        .verifyMinimumSchema(Schema.deployementMinimumSchema, enforceNonNullCols = false)
+        .scrubSchema
+        .verifyMinimumSchema(Schema.deployementMinimumSchema)
         .filter(ConfigColumns.active.toString)
-        .withColumn("deploymentId", lit(deploymentId))
-      val columns = df.columns
-      columns.foreach(columnName =>
-        df = df.withColumnRenamed(columnName, columnName.replaceAll(" ", ""))
-      )
-      setInputDataFrame(df)
-      setValidationStatus(ArrayBuffer())
+        .withColumn("deployment_id", lit(deploymentId))
+      df.show(false)
+      setInputDataFrame(df.persist(StorageLevel.MEMORY_AND_DISK))
       df
     } catch {
       case e: Exception =>
@@ -155,16 +153,16 @@ class DeploymentValidation() extends SparkSessionWrapper {
    * @param fastFail if true it will throw the exception and exit the process
    *                 if false it will register the exception in the validation report.
    */
-  private[overwatch] def storagePrefixAccessValidation(row: Row, fastFail: Boolean = false): Unit = {
-    val storagePrefix = row.getAs(ConfigColumns.etl_storage_prefix.toString).toString
-    val workspaceId = row.getAs(ConfigColumns.workspace_id.toString).toString
+  private def storagePrefixAccessValidation(row: Row, fastFail: Boolean = false): Unit = {
+    val storagePrefix: String = row.getAs(ConfigColumns.etl_storage_prefix.toString).toString
+    val workspaceId: String = row.getAs(ConfigColumns.workspace_id.toString).toString
     val testDetails = s"""StorageAccessTest storage : ${storagePrefix}"""
     try {
       dbutils.fs.mkdirs(s"""${storagePrefix}/test_access""")
       dbutils.fs.put(s"""${storagePrefix}/test_access/testwrite""", "This is a file in cloud storage.")
       dbutils.fs.head(s"""${storagePrefix}/test_access/testwrite""")
       dbutils.fs.rm(s"""${storagePrefix}/test_access""", true)
-      validationStatus.append(DeploymentValidationReport(true,
+      updateValidationStatus(DeploymentValidationReport(true,
         getSimpleMsg("Storage_Access"),
         testDetails,
         Some("SUCCESS"),
@@ -176,7 +174,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
         val msg = s"""Unable to read/write/create file in the provided etl storage prefix"""
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
-        validationStatus.append(DeploymentValidationReport(false,
+        updateValidationStatus(DeploymentValidationReport(false,
           getSimpleMsg("Storage_Access"),
           testDetails,
           Some(fullMsg),
@@ -195,7 +193,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
    *
    * @param row
    */
-  private[overwatch] def validateApiUrl(row: Row): Unit = {
+  private def validateApiUrl(row: Row): Unit = {
     val url = row.getAs(ConfigColumns.api_url.toString).toString
     val scope = row.getAs(ConfigColumns.secret_scope.toString).toString
     val patKey = row.getAs(ConfigColumns.secret_key_dbpat.toString).toString
@@ -206,7 +204,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
       val apiEnv = ApiEnv(false, url, patToken, getClass.getPackage.getImplementationVersion)
       val endPoint = "clusters/list"
       ApiCallV2(apiEnv, endPoint).execute().asDF()
-      validationStatus.append(DeploymentValidationReport(true,
+      updateValidationStatus(DeploymentValidationReport(true,
         getSimpleMsg("APIURL_Connectivity"),
         testDetails,
         Some("SUCCESS"),
@@ -217,7 +215,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
         val msg = s"""No Data retrieved workspaceId:${workspaceId} APIURL:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
-        validationStatus.append(DeploymentValidationReport(false,
+        updateValidationStatus(DeploymentValidationReport(false,
           getSimpleMsg("APIURL_Connectivity"),
           testDetails,
           Some(fullMsg),
@@ -228,53 +226,70 @@ class DeploymentValidation() extends SparkSessionWrapper {
 
   }
 
-  private[overwatch] def validateEtlStorage(): Rule = {
-    Rule("Common_ETLStoragePrefix", countDistinct(ConfigColumns.etl_storage_prefix.toString), lit(1))
+  /**
+   * Checks for distinct values in the provided column.
+   * @param ruleName
+   * @param configColumns
+   * @return
+   */
+  private def validateDistinct(ruleName: String, configColumns: String): Rule = {
+    Rule(ruleName, countDistinct(configColumns), lit(1))
   }
 
-  private[overwatch] def validateETLDatabaseName(): Rule = {
-    Rule("Common_ETLDatabase", countDistinct(ConfigColumns.etl_database_name.toString), lit(1))
+
+  /**
+   * Cloud should be either AWS or Azure.
+   * @return
+   */
+  private def validateCloud(): Rule = {
+    Rule("Valid_Cloud_providers", lower(col(ConfigColumns.cloud.toString)), Array("aws", "azure"))
   }
 
-  private[overwatch] def validateConsumerDatabaseName(): Rule = {
-    Rule("Common_ConsumerDatabaseName", countDistinct(ConfigColumns.consumer_database_name.toString), lit(1))
-  }
 
-  private[overwatch] def validateCloud(): Rule = {
-    Rule("Valid_Cloud_providers", col(ConfigColumns.cloud.toString), Array("AWS", "Azure"))
-  }
-
-  private[overwatch] def validateSecretScope(): Rule = {
-    Rule("NOTNULL_SecretScope", col(ConfigColumns.secret_scope.toString).isNotNull)
-  }
-
-  private[overwatch] def validateSecreteKeyDBPAT(): Rule = {
-    Rule("NOTNULL_SecretKey_DBPAT", col(ConfigColumns.secret_key_dbpat.toString).isNotNull)
-  }
-
-  private[overwatch] def validateAPIURL(): Rule = {
-    Rule("NOTNULL_APIURL", col(ConfigColumns.api_url.toString).isNotNull)
-  }
-
-  private[overwatch] def validatePrimordialDate(): Rule = {
+  /**
+   * PrimordialDate should be less than current date and should be in yyyy-MM-dd format.
+   * @return
+   */
+  private def validatePrimordialDate(): Rule = {
     Rule("Valid_PrimordialDate", to_date(col(ConfigColumns.primordial_date.toString), "yyyy-MM-dd") <= current_date() && to_date(col(ConfigColumns.primordial_date.toString), "yyyy-MM-dd").isNotNull)
   }
 
-  private[overwatch] def validateMaxDays(): Rule = {
+  /**
+   * Check for not null values in the provided column
+   * @param ruleName
+   * @param configColumns
+   * @return
+   */
+  private def validateNotNull(ruleName: String, configColumns: String): Rule = {
+    Rule(ruleName, col(configColumns).isNotNull)
+  }
+
+  /**
+   *Max days should be greater then 0 and should be not null.
+   * @return
+   */
+  private def validateMaxDays(): Rule = {
     Rule("Valid_MaxDays", col(ConfigColumns.max_days.toString) >= 0 && col(ConfigColumns.max_days.toString).isNotNull)
   }
 
-  private[overwatch] def validateOWScope(): Rule = {
-    Rule("Valid_Excluded_Scopes", col(ConfigColumns.excluded_scopes.toString), Array("audit", "sparkEvents", "jobs", "clusters", "clusterEvents", "notebooks", "pools", "accounts", "", null))
+  /**
+   * Scopes for Overwatch should be audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql
+   * @return
+   */
+  private def validateOWScope(): Rule = {
+    Rule("Valid_Excluded_Scopes", lower(col(ConfigColumns.excluded_scopes.toString)), Array("audit", "sparkEvents", "jobs", "clusters", "clusterEvents", "notebooks", "pools", "accounts", "dbsql","",null))
   }
 
+  /**
+   * Validate audit log data for Aws and Azure
+   * @param row
+   */
+  private def cloudSpecificValidation(row: Row): Unit = {
 
-  private[overwatch] def cloudSpecificValidation(row: Row): Unit = {
-
-    row.getAs(ConfigColumns.cloud.toString).toString match {
-      case "AWS" =>
+    row.getAs(ConfigColumns.cloud.toString).toString.toLowerCase match {
+      case "aws" =>
         validateAuditLog(row.getAs(ConfigColumns.workspace_id.toString), row.getAs(ConfigColumns.auditlogprefix_source_aws.toString), row.getAs(ConfigColumns.primordial_date.toString), row.getAs(ConfigColumns.max_days.toString))
-      case "Azure" =>
+      case "azure" =>
         validateEventHub(row.getAs(ConfigColumns.workspace_id.toString), row.getAs(ConfigColumns.secret_scope.toString), row.getAs(ConfigColumns.eh_scope_key.toString), row.getAs(ConfigColumns.eh_name.toString))
     }
 
@@ -288,7 +303,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
    * @param primordial_date
    * @param maxDate
    */
-  private[overwatch] def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: String, primordial_date: Date, maxDate: Int): Unit = {
+  private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: String, primordial_date: Date, maxDate: Int): Unit = {
     try {
       val fromDT = new java.sql.Date(primordial_date.getTime()).toLocalDate()
       var untilDT = fromDT.plusDays(maxDate)
@@ -309,7 +324,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
         }
       }
       if (validationFlag) {
-        validationStatus.append(DeploymentValidationReport(true,
+        updateValidationStatus(DeploymentValidationReport(true,
           getSimpleMsg("Validate_AuditLogPrefix"),
           s"""Folder should be present from :${fromDT} to:${untilDT} """,
           Some("SUCCESS"),
@@ -322,7 +337,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
-        validationStatus.append(DeploymentValidationReport(false,
+        updateValidationStatus(DeploymentValidationReport(false,
           getSimpleMsg("Validate_AuditLogPrefix"),
           s"""Folder should be present from :${fromDT} to:${untilDT} """,
           Some(msg),
@@ -339,7 +354,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
-        validationStatus.append(DeploymentValidationReport(false,
+        updateValidationStatus(DeploymentValidationReport(false,
           getSimpleMsg("Validate_AuditLogPrefix"),
           "Validating folders",
           Some(fullMsg),
@@ -356,7 +371,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
    * @param key
    * @param ehName
    */
-  private[overwatch] def validateEventHub(workspace_id: String, scope: String, key: String, ehName: String): Unit = {
+  private def validateEventHub(workspace_id: String, scope: String, key: String, ehName: String): Unit = {
     val testDetails = s"""Connectivity test with ehName:${ehName} scope:${scope} SecretKey_DBPAT:${key}"""
     try {
       import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
@@ -424,7 +439,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
       dbutils.fs.rm(s"""${tmpPersistDFPath}""", true)
       dbutils.fs.rm(s"""${tempPersistChk}""", true)
 
-      validationStatus.append(DeploymentValidationReport(true,
+      updateValidationStatus(DeploymentValidationReport(true,
         getSimpleMsg("Validate_EventHub"),
         testDetails,
         Some("SUCCESS"),
@@ -435,7 +450,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
         val msg = s"""Unable to retrieve data from ehName:${ehName} scope:${scope} SecretKey_DBPAT:${key}"""
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
-        validationStatus.append(DeploymentValidationReport(false,
+        updateValidationStatus(DeploymentValidationReport(false,
           getSimpleMsg("Validate_EventHub"),
           testDetails,
           Some(fullMsg),
@@ -445,40 +460,42 @@ class DeploymentValidation() extends SparkSessionWrapper {
 
   }
 
+  private def updateValidationStatus(deploymentValidationReport: DeploymentValidationReport): Unit ={
+    synchronized {
+      validationStatus.append(deploymentValidationReport)
+    }
+  }
 
-  private[overwatch] def validateRuleAndUpdateStatus(ruleSet: RuleSet, groupedRule: Boolean): Unit = {
+  /**
+   * Transforms output of the rules engine to DeploymentValidationReport
+   * @param ruleSet
+   */
+  private def validateRuleAndUpdateStatus(ruleSet: RuleSet): Unit = {
     val validation = ruleSet.validate()
-    val inputRow = ruleSet.getRules.par
-    inputRow.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-    ruleSet.getRules.foreach(rule => { //TODO case class / higher order function
-      if (groupedRule) {
-        validation.completeReport.select(rule.ruleName).collect().foreach(reportRow => {
-          val validationRow = reportRow.getAs(0).toString
-          val validationResult = validationRow.contains("true")
-          var validationMsg = "SUCCESS"
-          if (!validationResult) {
-            validationMsg = s"""Validation failed:  ${validationRow}"""
-          }
-          val validationDetails = s"""Grouped Test: ${validationRow}"""
-          validationStatus.append(DeploymentValidationReport(validationResult, getSimpleMsg(rule.ruleName), validationDetails, Some(validationMsg), Some("")))
-        })
-      } else {
-        validation.completeReport.select(rule.ruleName, ConfigColumns.workspace_id.toString).collect().foreach(reportRow => {
-          val validationRow = reportRow.getAs(0).toString
-          val dataArray = validationRow.split(",")
-          val validationResult = validationRow.contains("true") || dataArray(1) == "null"
-          val workspace_id = reportRow.getAs(1).toString
-          var validationMsg = "SUCCESS"
-          if (!validationResult) {
-            validationMsg = s"""Validation failed: ${validationRow}"""
-          }
-          val validationDetails = s"""Test :${validationRow}, workspace_id:${workspace_id}"""
-          validationStatus.append(DeploymentValidationReport(validationResult, getSimpleMsg(rule.ruleName), validationDetails, Some(validationMsg), Some(workspace_id)))
-        })
+    val columns = ruleSet.getRules.map(x => x.ruleName)
+    val completeReportDF = if (!validation.completeReport.columns.contains("workspace_id")) {
+      validation.completeReport.withColumn("workspace_id", lit(""))
+    } else {
+      validation.completeReport
+    }
+     val resultDF = completeReportDF.withColumn("concat_columns", array(columns map col: _*))
+      .withColumn("result", explode(col("concat_columns")))
+      .select("deployment_id", "workspace_id", "result")
 
+
+    val validationReport = resultDF.as[WorkSpaceValidationReport].collect().par
+    validationReport.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    validationReport.foreach(validation => {
+      var validationMsg = "SUCCESS"
+      val resultFlag: Boolean = validation.result.passed==null || validation.result.passed.toBoolean
+      if (!resultFlag) {
+        validationMsg = s"""Validation failed:  ${validation.result}"""
       }
+      val validationDetails = s""" ${validation.result.ruleName}"""
+      updateValidationStatus(DeploymentValidationReport(resultFlag, getSimpleMsg(validation.result.ruleName), validationDetails, Some(validationMsg), Some(validation.workspace_id)))
 
-    })
+     })
+
   }
 
   /**
@@ -487,7 +504,7 @@ class DeploymentValidation() extends SparkSessionWrapper {
    * @param ruleName
    * @return
    */
-  private[overwatch] def getSimpleMsg(ruleName: String): String = {
+  private  def getSimpleMsg(ruleName: String): String = {
     ruleName match {
       case "Common_ETLStoragePrefix" => "ETL Storage Prefix should be common across the workspaces."
       case "Common_ETLDatabase" => "Workspaces should have a common ETL Database Name."
@@ -509,13 +526,13 @@ class DeploymentValidation() extends SparkSessionWrapper {
   /**
    * Performs mandatory validation before each deployment.
    */
-  private[overwatch] def performMandatoryValidation = {
+  private[overwatch] def performMandatoryValidation() = {
     logger.log(Level.INFO, "Performing mandatory validation")
-    validateFileExistance
-    makeDataFrame
-    val groupedRuleSet = RuleSet(inputDataFrame, by = "deploymentId")
-    groupedRuleSet.add(validateEtlStorage)
-    validateRuleAndUpdateStatus(groupedRuleSet, true)
+    validateFileExistence()
+    makeDataFrame()
+    val groupedRuleSet = RuleSet(inputDataFrame, by = "deployment_id")
+    groupedRuleSet.add(validateDistinct("Common_ETLStoragePrefix",ConfigColumns.etl_storage_prefix.toString))
+    validateRuleAndUpdateStatus(groupedRuleSet)
     if (validationStatus.toDS().filter("validated==false").count > 0) { //Checks for failed validations
       throw new BadConfigException(getSimpleMsg("Common_ETLStoragePrefix"))
     }
@@ -527,30 +544,36 @@ class DeploymentValidation() extends SparkSessionWrapper {
    *
    * @return
    */
-  private[overwatch] def performValidation: Dataset[DeploymentValidationReport] = {
+  private[overwatch] def performValidation(): Dataset[DeploymentValidationReport] = {
     //Primary validation //
-    validateFileExistance
-    makeDataFrame
+    validateFileExistence()
+    makeDataFrame()
     println("Parallelism :" + parallelism)
 
     //csv data validation
     val processingStartTime = System.currentTimeMillis();
-    val groupedRuleSet = RuleSet(inputDataFrame, by = "deploymentId")
-    groupedRuleSet.add(validateEtlStorage)
-    groupedRuleSet.add(validateETLDatabaseName)
-    groupedRuleSet.add(validateConsumerDatabaseName)
-    validateRuleAndUpdateStatus(groupedRuleSet, true)
+    val groupedRuleSet = RuleSet(inputDataFrame, by = "deployment_id")
+    val gropedRules = Seq[Rule](
+      validateDistinct("Common_ETLStoragePrefix",ConfigColumns.etl_storage_prefix.toString),
+      validateDistinct("Common_ETLDatabase",ConfigColumns.etl_database_name.toString),
+      validateDistinct("Common_ConsumerDatabaseName",ConfigColumns.consumer_database_name.toString)
+    )
+    groupedRuleSet.add(gropedRules)
+    validateRuleAndUpdateStatus(groupedRuleSet)
 
     val nonGroupedRuleSet = RuleSet(inputDataFrame)
-    nonGroupedRuleSet.add(validateCloud)
-    nonGroupedRuleSet.add(validateAPIURL)
-    nonGroupedRuleSet.add(validateSecretScope)
-    nonGroupedRuleSet.add(validateSecreteKeyDBPAT)
-    nonGroupedRuleSet.add(validatePrimordialDate)
-    nonGroupedRuleSet.add(validateMaxDays)
-    nonGroupedRuleSet.add(validateOWScope())
-    validateRuleAndUpdateStatus(nonGroupedRuleSet, false)
-    val processingEndTime = System.currentTimeMillis();
+    val nonGroupedRules = Seq[Rule](
+      validateNotNull("NOTNULL_APIURL",ConfigColumns.api_url.toString),
+      validateNotNull("NOTNULL_SecretScope",ConfigColumns.secret_scope.toString),
+      validateNotNull("NOTNULL_SecretKey_DBPAT",ConfigColumns.secret_key_dbpat.toString),
+      validateCloud(),
+      validatePrimordialDate(),
+      validateMaxDays(),
+      validateOWScope()
+    )
+    nonGroupedRuleSet.add(nonGroupedRules)
+    validateRuleAndUpdateStatus(nonGroupedRuleSet)
+  val processingEndTime = System.currentTimeMillis();
     println("Rule engine validation Duration in sec :" + (processingEndTime - processingStartTime) / 1000)
 
     //Connectivity validation

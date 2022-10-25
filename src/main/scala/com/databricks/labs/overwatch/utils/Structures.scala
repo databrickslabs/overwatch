@@ -70,6 +70,15 @@ case class ApiProxyConfig(
                            proxyPasswordKey: Option[String] = None
                          )
 
+case class WorkSpaceValidationResult(ruleName: String, passed: String, permitted: String, actual: String)
+
+case class WorkSpaceValidationReport(deployment_id: String, workspace_id: String, result: WorkSpaceValidationResult)
+
+case class MultiWorkspaceParams(
+                                 args: String,
+                                 apiUrl: String,
+                                 workspaceID: String
+                               )
 
 case class ValidatedColumn(
                             column: Column,
@@ -125,8 +134,6 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
                            workspace_name: Option[String] = None,
                            externalizeOptimize: Boolean = false,
-                           apiURL: Option[String] = None,
-                           organizationID: Option[String] = None,
                            apiEnvConfig: Option[ApiEnvConfig] = None,
                            tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )

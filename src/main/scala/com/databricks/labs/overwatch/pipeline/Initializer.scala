@@ -23,14 +23,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _isSnap: Boolean = false
   private var _disableValidations: Boolean = false
-  private var _isMultiworkspaceDeployment: Boolean = false
-
-  private def setIsMultiworkspaceDeployment(value: Boolean): this.type = {
-    _isMultiworkspaceDeployment = value
-    this
-  }
-
-  private def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
 
   private def setIsSnap(value: Boolean): this.type = {
     _isSnap = value
@@ -270,13 +262,6 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     }
   }
 
-  private def multiWorkspaceOverrideOrganizationId(orgId: String): Unit = {
-    val overrideMsg = s"Multiworkspace Deployment Overriding organization_id from ${config.organizationId} to " +
-      s"${orgId} to accommodate data continuity across deployments"
-    if (config.debugFlag) println(overrideMsg)
-    logger.log(Level.INFO, overrideMsg)
-    config.setOrganizationId(orgId)
-  }
 
 
   /**
@@ -309,9 +294,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      */
     logger.log(Level.INFO, "Validating Input Parameters")
     val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
-    if (isMultiworkspaceDeployment) multiWorkspaceOverrideOrganizationId(rawParams.organizationID.get)
     config.setInputConfig(rawParams)
-    config.setIsMultiworkspaceDeployment(isMultiworkspaceDeployment)
 
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
@@ -323,7 +306,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      * between one deployment and the next. To resolve this, PVC customers will be REQUIRED to provide a canonical
      * name for each workspace (i.e. workspaceName) to provide consistency across deployments.
      */
-    if (isPVC) pvcOverrideOrganizationId
+    if (isPVC && !config.isMultiworkspaceDeployment) pvcOverrideOrganizationId
 
     config.setExternalizeOptimize(rawParams.externalizeOptimize)
 
@@ -580,12 +563,18 @@ object Initializer extends SparkSessionWrapper {
     } else dbutils.notebook.getContext.tags("orgId")
   }
 
-  private def initConfigState(debugFlag: Boolean,isMultiworkspaceDeployment:Boolean): Config = {
+  private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-    if(!isMultiworkspaceDeployment) {
-      val orgId = getOrgId
-      config.setOrganizationId(orgId)
+    if(organizationID.isEmpty) {
+      config.setOrganizationId(getOrgId)
+    }else{
+      logger.log(Level.INFO, "Setting multiworkspace deployment")
+      config.setOrganizationId(organizationID.get)
+      if (apiUrl.nonEmpty) {
+        config.setApiUrl(apiUrl)
+      }
+      config.setIsMultiworkspaceDeployment(true)
     }
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
@@ -629,7 +618,7 @@ object Initializer extends SparkSessionWrapper {
     )
   }
 
-  def apply(overwatchArgs: String, debugFlag: Boolean,disableValidations:Boolean, isMultiworkspaceDeployment: Boolean): Workspace = {
+/*  def apply(overwatchArgs: String, debugFlag: Boolean,disableValidations:Boolean, isMultiworkspaceDeployment: Boolean): Workspace = {
     apply(
       overwatchArgs,
       debugFlag,
@@ -638,7 +627,7 @@ object Initializer extends SparkSessionWrapper {
       initializeDatabase = true,
       isMultiworkspaceDeployment
     )
-  }
+  }*/
 
   /**
    *
@@ -661,15 +650,15 @@ object Initializer extends SparkSessionWrapper {
                                 isSnap: Boolean = false,
                                 disableValidations: Boolean = false,
                                 initializeDatabase: Boolean = true,
-                                isMultiworkspaceDeployment: Boolean = false
+                                apiURL: Option[String] = None ,
+                                organizationID: Option[String] = None,
                               ): Workspace = {
 
-    val config = initConfigState(debugFlag,isMultiworkspaceDeployment)
+    val config = initConfigState(debugFlag,organizationID,apiURL)
 
     logger.log(Level.INFO, "Initializing Environment")
     val initializer = new Initializer(config)
       .setIsSnap(isSnap)
-      .setIsMultiworkspaceDeployment(isMultiworkspaceDeployment)
       .setDisableValidations(disableValidations) // if true, will result in a read only pipeline
       .validateAndRegisterArgs(overwatchArgs)
 

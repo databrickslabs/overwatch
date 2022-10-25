@@ -255,45 +255,49 @@ class Database(config: Config) extends SparkSessionWrapper {
     true
   }
 
-  def writeWithRetry(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array(), daysToProcess: Option[Int] = None): Boolean = {
+  def writeWithRetry(df: DataFrame,
+                     target: PipelineTable,
+                     pipelineSnapTime: Column,
+                     maxMergeScanDates: Array[String] = Array(),
+                     daysToProcess: Option[Int] = None): Boolean = {
 
-    if (daysToProcess != None) {
+    var inputDf = df
+    if (daysToProcess.nonEmpty) {
       if (daysToProcess.get < 5 && !target.autoOptimize) {
         logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
-        df.persist()
-        df.count()
+        inputDf = df.persist()
+        inputDf.count()
       }
     }
-    var runFlag = true
-    var i = 0
+
     val retryCount = 5
-    while (runFlag && i < 5) {
+    for(i<- 1  to retryCount){
       try {
-        write(df, target, pipelineSnapTime, maxMergeScanDates)
-        runFlag = false
+        write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
       }
-      catch {
-        case e: Throwable =>
+      catch{
+        case e: Throwable=>
           logger.info("Database retry count" + i + " Table name:" + target.tableFullName + " Thread name: " + Thread.currentThread().getName)
-           if (i == retryCount) {
+          if(i == retryCount){
             logger.log(Level.INFO, s"""Reached max retry current retry count:${i}""")
             throw e
           }
-          i = i + 1
           coolDown(target.tableFullName)
       }
+
     }
-    println("Successfully written" + target.tableLocation)
     true
   }
 
+  /**
+   * Function forces the thread to sleep for a random 30-60 seconds.
+   * @param tableName
+   */
   private def coolDown(tableName: String): Unit = {
-    val start = 1
-    val end = 10
     val rnd = new scala.util.Random
-    val number = start + rnd.nextInt((end - start) + 1)
-    logger.log(Level.INFO, "Slowing multithreaded writing for " + tableName + "sleeping..." + 10000 * number)
-    Thread.sleep(10000 * number)
+    val number:Long = (rnd.nextFloat() * 30 + 30).toLong*1000
+    logger.log(Level.INFO, "Slowing multithreaded writing for " + tableName + "sleeping..." + number)
+    Thread.sleep(number)
   }
 
 }

@@ -45,6 +45,7 @@ class Config() {
   private var _contractSQLComputeDBUPrice: Double = _
   private var _contractJobsLightDBUPrice: Double = _
   private var _isMultiworkspaceDeployment: Boolean = false
+  private var _apiUrl: Option[String] = None
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -55,6 +56,8 @@ class Config() {
    * the getter may be obscure or more complicated.
    */
   def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
+
+  def apiUrl: Option[String] = _apiUrl
 
   def overwatchSchemaVersion: String = _overwatchSchemaVersion
 
@@ -205,6 +208,10 @@ class Config() {
     this
   }
 
+  private[overwatch] def setApiUrl(value: Option[String]): this.type = {
+    _apiUrl = value
+    this
+  }
 
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value
@@ -374,6 +381,10 @@ class Config() {
         s"a user access token. It should start with 'dapi' ")
       val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
+      if(isMultiworkspaceDeployment && apiUrl.nonEmpty){
+        _workspaceUrl = apiUrl.get
+        println("multi workspace setting api url "+_workspaceUrl)
+      }
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
         derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
