@@ -287,7 +287,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005))
   lazy private val appendClusterStateDetailProcess = ETLDefinition(
-    BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateDetailModule, "timestamp"),
+    BronzeTargets.clusterEventsTarget.asIncrementalDF(
+      clusterStateDetailModule,
+      BronzeTargets.clusterEventsTarget.incrementalColumns,
+      SilverTargets.clusterStateDetailTarget.maxMergeScanDates // pick up last state up to 30 days ago
+    ),
     Seq(buildClusterStateDetail(clusterStateDetailModule.untilTime)),
     append(SilverTargets.clusterStateDetailTarget)
   )
