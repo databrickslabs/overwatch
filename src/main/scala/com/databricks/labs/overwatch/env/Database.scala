@@ -181,7 +181,7 @@ class Database(config: Config) extends SparkSessionWrapper {
       val afterDedupsDF = finalSourceDF.dedupByKey(target.keys, target.incrementalColumns)
 
       println("beforeDedupsDF count is",beforeDedupsDF.count())
-      println("afterDedupsDF count is",beforeDedupsDF.count())
+      println("afterDedupsDF count is",afterDedupsDF.count())
       if (beforeDedupsDF.count() == afterDedupsDF.count()){
         println("dedupByKey is working fine for clsf")
       }

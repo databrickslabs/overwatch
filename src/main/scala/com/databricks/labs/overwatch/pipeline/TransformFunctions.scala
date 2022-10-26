@@ -306,7 +306,15 @@ object TransformFunctions {
 //      val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
 //      val keysLessIncrementals1 = keysLessIncrementals :+ "unixTimeMS_state_start"
 //      val w = Window.partitionBy(keysLessIncrementals1 map col: _*).orderBy(incrementalFields map col: _*)
+      println("keys are ",keys)
       val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      val df1 = df
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter(col("rnk") > 1  or col("rn") > 1)
+
+      println("Missing record count ",df1.count())
+      println("Missing record are ",df1.show(50,false))
       df
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
