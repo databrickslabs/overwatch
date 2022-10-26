@@ -596,6 +596,8 @@ object Schema extends SparkSessionWrapper {
     StructField("s3", s3LogSchema, true)
   ))
 
+  //Implicit type casting of map types is not supported. Need to modify schema to accomodate this logic
+
   val clusterSnapMinimumSchema: StructType = StructType(Seq(
     StructField("autoscale",
       StructType(Seq(

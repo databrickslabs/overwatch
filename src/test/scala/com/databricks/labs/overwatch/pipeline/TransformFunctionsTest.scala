@@ -114,7 +114,8 @@ class TransformFunctionsTest extends AnyFunSpec
       //      assertResult(df.select("settings.job_clusters").schema.head.dataType)(validatedDF.select("settings.job_clusters").schema.head.dataType)
 
     }
-    //Implicit casting of map types is not supported
+
+    //Implicit type casting of map types is not supported. Need to modify schema to accomodate this logic
     ignore ("Test Case 4 - VerifyMinimumSchema on Map of String Value - Implicit Type Conversion") {
 
       val jobSnapMinimumSchema: StructType = StructType(Seq(
