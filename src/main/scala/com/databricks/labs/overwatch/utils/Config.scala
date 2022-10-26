@@ -352,7 +352,12 @@ class Config() {
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
-        _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+        if (isMultiworkspaceDeployment && apiUrl.nonEmpty) {
+          _workspaceUrl = apiUrl.get
+          logger.log(Level.INFO, "Multiworkspace Deployment setting the workspaceURL :" + _workspaceUrl)
+        } else {
+          _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+        }
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key
@@ -381,10 +386,6 @@ class Config() {
         s"a user access token. It should start with 'dapi' ")
       val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
-      if(isMultiworkspaceDeployment && apiUrl.nonEmpty){
-        _workspaceUrl = apiUrl.get
-        println("multi workspace setting api url "+_workspaceUrl)
-      }
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
         derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,

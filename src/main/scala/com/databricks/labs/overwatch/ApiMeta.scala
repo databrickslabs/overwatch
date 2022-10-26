@@ -151,7 +151,7 @@ class ApiMetaFactory {
       case "workspace/list" => new WorkspaceListApi
       case "sql/history/queries" => new SqlQueryHistoryApi
       case "clusters/resize" => new ClusterResizeApi
-      case "/jobs/runs/get" => new JobRunGetApi
+      case "jobs/runs/get" => new JobRunGetApi
       case "dbfs/search-mounts" => new DbfsSearchMountsApi
       case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
     }

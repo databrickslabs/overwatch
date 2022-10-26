@@ -145,12 +145,12 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   def validate(parallelism: Int = 4): Unit = {
     val processingStartTime = System.currentTimeMillis();
-    val deploymentValidation = DeploymentValidation(configCsvPath, outputPath, parallelism, deploymentId)
-    val report = deploymentValidation.performValidation
+    val deploymentValidation = DeploymentValidation
+    val report = deploymentValidation.performValidation(configCsvPath, parallelism, deploymentId,outputPath)
     val notValidatedCount = report.filter(x => {
       !x.validated
     }).count()
-    snapShotValidation(report, deploymentValidation.makeDataFrame().head().getAs(ConfigColumns.etl_storage_prefix.toString), "validationReport")
+    snapShotValidation(report, deploymentValidation.makeDataFrame(configCsvPath, deploymentId).head().getAs(ConfigColumns.etl_storage_prefix.toString), "validationReport")
     val processingEndTime = System.currentTimeMillis();
     val msg =
       s"""Validation report details
@@ -372,9 +372,9 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     val processingStartTime = System.currentTimeMillis();
     setParallelism(parallelism)
     println("ParallelismLevel :" + parallelism)
-    val deploymentValidation = DeploymentValidation(configCsvPath, parallelism, deploymentId)
-    deploymentValidation.performMandatoryValidation()
-    val dataFrame = deploymentValidation.makeDataFrame()
+    val deploymentValidation = DeploymentValidation
+    deploymentValidation.performMandatoryValidation(configCsvPath, parallelism, deploymentId)
+    val dataFrame = deploymentValidation.makeDataFrame(configCsvPath, deploymentId)
     setInputDataFrame(dataFrame)
     snapshotConfig(dataFrame)
     val prams = dataFrame.collect().map(buildParams).filter(args => args != null)
@@ -402,7 +402,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         Thread.sleep(5000)
       }
     })
-    saveDeploymentReport(deploymentReport.toDS, deploymentValidation.makeDataFrame().head().getAs(ConfigColumns.etl_storage_prefix.toString), "deploymentReport")
+    saveDeploymentReport(deploymentReport.toDS, dataFrame.head().getAs(ConfigColumns.etl_storage_prefix.toString), "deploymentReport")
     println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
 
   }
