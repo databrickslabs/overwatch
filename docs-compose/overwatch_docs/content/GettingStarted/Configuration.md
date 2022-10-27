@@ -143,7 +143,7 @@ Config | Required Override | Default Value | Type | AsOfVersion | Description
 **workspace_name**|N|<organization_id>|Option\[String\]|0.6.x|Allows the user to specify the workspace_name to be different than the default, canonical workspace_id (i.e. organization_id). This is helpful during analysis as it provides a human-legible reference for the workspace
 **externalizeOptimize**|N|false|Boolean|0.6.x|Allows the user to externalize the optimize and zorders done on the delta tables. This can be run as a secondary job with different cluster configs at different intervals increasing efficiency
 **tempWorkingDir**|N|<etlDataPathPrefix>/tempWorkingDir/<organization_id>|String|0.6.1|Provides ability to override temporary working directory. This directory gets cleaned up before and after each run.
-**apiEnvConfig**|N|None|Option[\[ApiEnvConfig\]](#apienvconfig)|0.7.x|Allows the user to configure api calls.
+**apiEnvConfig**|N|ApiEnvConfig()|Option[\[ApiEnvConfig\]](#apienvconfig)|0.7.x|Allows the user to configure api calls.
 
 
 
@@ -229,7 +229,7 @@ Config | Required Override | Default Value | Type | Description
 **enableUnsafeSSL**|N|false|Boolean|Enable unasfe SSL.
 **threadPoolSize**|N|4|Int|Number of threads to perform api calls in parallel.
 **apiWaitingTime**|N|300000|milliseconds|Api waiting time incase of delay in response.
-**apiProxyConfig**|N|None|Option[\[ApiProxyConfig\]](#apiproxyconfig)|Allows user to configure proxy.
+**apiProxyConfig**|N|ApiProxyConfig()|Option[\[ApiProxyConfig\]](#apiproxyconfig)|Allows user to configure proxy.
 
 ### ApiProxyConfig
 
