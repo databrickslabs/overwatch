@@ -303,18 +303,36 @@ object TransformFunctions {
                      keys: Seq[String],
                      incrementalFields: Seq[String]
                      ): DataFrame = {
-//      val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
+      val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
 //      val keysLessIncrementals1 = keysLessIncrementals :+ "unixTimeMS_state_start"
-//      val w = Window.partitionBy(keysLessIncrementals1 map col: _*).orderBy(incrementalFields map col: _*)
-      println("keys are ",keys)
+
       val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
-      val df1 = df
+      val w1 = Window.partitionBy(keysLessIncrementals map col: _*).orderBy(incrementalFields map col: _*)
+
+      val dfDupsOldDF = df
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
         .filter(col("rnk") > 1  or col("rn") > 1)
+        .orderBy(incrementalFields map col: _*)
 
-      println("Missing record count ",df1.count())
-      println("Missing record are ",df1.show(50,false))
+      val dfDupsNewDF = df
+        .withColumn("rnk", rank().over(w1))
+        .withColumn("rn", row_number().over(w1))
+        .filter(col("rnk") > 1  or col("rn") > 1)
+        .orderBy(incrementalFields map col: _*)
+
+      if (dfDupsOldDF.count() == dfDupsNewDF.count()){
+        println("Both Old and New logic having same result for key ", keys)
+        println("Dups count with old logic ",dfDupsOldDF.count())
+        println("Dups count with new logic ",dfDupsNewDF.count())
+
+      }else{
+        println("Both Old and New logic having different result for key ", keys)
+        println("Dups count with old logic ",dfDupsOldDF.count())
+        println("Dups count with new logic ",dfDupsNewDF.count())
+      }
+
+
       df
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
