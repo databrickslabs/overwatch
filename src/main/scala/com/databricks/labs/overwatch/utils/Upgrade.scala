@@ -1248,6 +1248,26 @@ object Upgrade extends SparkSessionWrapper {
         val jSnapBronzeDF = jSnapBronzeTarget.asDF(withGlobalFilters = false)
           .scrubSchema
 
+        // validation to ensure settings.tags exists and is a not already a map
+        if (SchemaTools.nestedColExists(jSnapBronzeDF.schema, "settings.tags")) {
+          val tagsTypename = jSnapBronzeDF.select($"settings.tags").schema.fields.find(_.name == "tags").get.dataType.typeName
+          if (tagsTypename == "map") {
+            throw new SimplifiedUpgradeException(
+              s"settings.tags is already the proper type 'map'. Skipping Step",
+              etlDatabaseName, jSnapBronzeTarget.name, Some("3"), failUpgrade = false
+            )
+          } else if(tagsTypename != "map" && tagsTypename != "struct") {
+            throw new SimplifiedUpgradeException(
+              s"settings.tags must either be a struct or a map to proceed. Failing Upgrade",
+              etlDatabaseName, jSnapBronzeTarget.name, Some("3"), failUpgrade = true
+            )
+          }
+        } else {
+          throw new SimplifiedUpgradeException(
+            "settings.tags does not exist in jobs_snapshot_bronze. Skipping Step",
+            etlDatabaseName, jSnapBronzeTarget.name, Some("3"), failUpgrade = false
+          )
+        }
         val upgradedTags = NamedColumn("tags", SchemaTools.structToMap(jSnapBronzeDF, "settings.tags"))
         val upgradedJSnapBronze = jSnapBronzeDF
           .appendToStruct("settings", Array(upgradedTags), overrideExistingStructCols = true)
