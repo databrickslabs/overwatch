@@ -7,7 +7,7 @@ import com.databricks.labs.overwatch.validation.SnapReport
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{StructField, StructType}
+import org.apache.spark.sql.types.{DateType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame}
 import scalaj.http.HttpResponse
 
@@ -70,14 +70,46 @@ case class ApiProxyConfig(
                            proxyPasswordKey: Option[String] = None
                          )
 
-case class WorkSpaceValidationResult(ruleName: String, passed: String, permitted: String, actual: String)
+case class MultiWorkspaceConfig(workspace_name: String,
+                                workspace_id: String,
+                                workspace_url: String,
+                                api_url: String,
+                                cloud: String,
+                                primordial_date: java.sql.Date,
+                                etl_storage_prefix: String,
+                                etl_database_name: String,
+                                consumer_database_name: String,
+                                secret_scope: String,
+                                secret_key_dbpat: String,
+                                auditlogprefix_source_aws: String,
+                                eh_name: String,
+                                eh_scope_key: String,
+                                interactive_dbu_price: Double,
+                                automated_dbu_price: Double,
+                                sql_compute_dbu_price: Double,
+                                jobs_light_dbu_price: Double,
+                                max_days: Int,
+                                excluded_scopes: String,
+                                active: Boolean,
+                                deployment_id: String,
+                                output_path: String
+                               )
+case class RulesValidationResult(ruleName: String, passed: String, permitted: String, actual: String)
 
-case class WorkSpaceValidationReport(deployment_id: String, workspace_id: String, result: WorkSpaceValidationResult)
+case class RulesValidationReport(deployment_id: String, workspace_id: String, result: RulesValidationResult)
 
+object MultiWorkspaceConfigColumns extends Enumeration {
+  val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,
+  etl_storage_prefix, etl_database_name, consumer_database_name, secret_scope,
+  secret_key_dbpat, auditlogprefix_source_aws, eh_name, eh_scope_key, scopes,
+  interactive_dbu_price, automated_dbu_price, sql_compute_dbu_price, jobs_light_dbu_price,
+  max_days, excluded_scopes, active, deploymentId, output_path = Value
+}
 case class MultiWorkspaceParams(
                                  args: String,
                                  apiUrl: String,
-                                 workspaceID: String
+                                 workspaceId: String,
+                                 deploymentId: String
                                )
 
 case class ValidatedColumn(

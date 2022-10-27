@@ -261,14 +261,14 @@ class Database(config: Config) extends SparkSessionWrapper {
                      maxMergeScanDates: Array[String] = Array(),
                      daysToProcess: Option[Int] = None): Boolean = {
 
-    var inputDf = df
-    if (daysToProcess.nonEmpty) {
-      if (daysToProcess.get < 5 && !target.autoOptimize) {
-        logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
-        inputDf = df.persist()
-        inputDf.count()
-      }
-    }
+    val needsCache = daysToProcess.getOrElse(1000) < 5 && !target.autoOptimize
+    val inputDf = if (needsCache) {
+      logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
+      df.persist()
+    } else df
+
+    if (needsCache) inputDf.count()
+
 
     val retryCount = 5
     for(i<- 1  to retryCount){

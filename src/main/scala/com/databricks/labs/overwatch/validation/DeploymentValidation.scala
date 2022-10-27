@@ -34,17 +34,18 @@ object DeploymentValidation extends SparkSessionWrapper {
   /**
    * Validates the config csv file existence.
    */
-  private def validateFileExistence(configCsvPath: String) = {
+  private def validateFileExistence(configCsvPath: String): Boolean = {
     if (!Helpers.pathExists(configCsvPath)) {
       throw new BadConfigException("Unable to find config file in the given location:" + configCsvPath)
     }
+    true
   }
 
   /**
    * Create a DataFrame from provided csv file.
    * @return
    */
-  private[overwatch] def makeDataFrame(configCsvPath: String,deploymentId: String,outputPath: String = ""): DataFrame = {
+  private[overwatch] def makeDataFrame(configCsvPath: String,deploymentId: String,outputPath: String = ""): Dataset[MultiWorkspaceConfig] = {
     try {
       val df = spark.read.option("header", "true")
         .option("ignoreLeadingWhiteSpace", true)
@@ -52,10 +53,12 @@ object DeploymentValidation extends SparkSessionWrapper {
         .csv(configCsvPath)
         .scrubSchema
         .verifyMinimumSchema(Schema.deployementMinimumSchema)
-        .filter(ConfigColumns.active.toString)
+        .filter(MultiWorkspaceConfigColumns.active.toString)
         .withColumn("deployment_id", lit(deploymentId))
         .withColumn("output_path", lit(outputPath))
-      df
+     val multiWorkspaceConfig = df.as[MultiWorkspaceConfig]
+      multiWorkspaceConfig.show()
+      multiWorkspaceConfig
     } catch {
       case e: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(e, "Unable to create Config Dataframe")
@@ -65,6 +68,8 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   }
 
+
+
   /**
    * Check the access of etl_storage_prefix
    *
@@ -72,20 +77,18 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param fastFail if true it will throw the exception and exit the process
    *                 if false it will register the exception in the validation report.
    */
-  private def storagePrefixAccessValidation(row: Row, fastFail: Boolean = false): DeploymentValidationReport  = {
-    val storagePrefix: String = row.getAs(ConfigColumns.etl_storage_prefix.toString).toString
-    val workspaceId: String = row.getAs(ConfigColumns.workspace_id.toString).toString
-    val testDetails = s"""StorageAccessTest storage : ${storagePrefix}"""
+  private def storagePrefixAccessValidation(config: MultiWorkspaceConfig, fastFail: Boolean = false): DeploymentValidationReport  = {
+    val testDetails = s"""StorageAccessTest storage : ${config.etl_storage_prefix}"""
     try {
-      dbutils.fs.mkdirs(s"""${storagePrefix}/test_access""")
-      dbutils.fs.put(s"""${storagePrefix}/test_access/testwrite""", "This is a file in cloud storage.")
-      dbutils.fs.head(s"""${storagePrefix}/test_access/testwrite""")
-      dbutils.fs.rm(s"""${storagePrefix}/test_access""", true)
+      dbutils.fs.mkdirs(s"""${config.etl_storage_prefix}/test_access""")
+      dbutils.fs.put(s"""${config.etl_storage_prefix}/test_access/testwrite""", "This is a file in cloud storage.")
+      dbutils.fs.head(s"""${config.etl_storage_prefix}/test_access/testwrite""")
+      dbutils.fs.rm(s"""${config.etl_storage_prefix}/test_access""", true)
       DeploymentValidationReport(true,
         getSimpleMsg("Storage_Access"),
         testDetails,
         Some("SUCCESS"),
-        Some(workspaceId)
+        Some(config.workspace_id)
       )
     }
     catch {
@@ -100,12 +103,8 @@ object DeploymentValidation extends SparkSessionWrapper {
           getSimpleMsg("Storage_Access"),
           testDetails,
           Some(fullMsg),
-          Some(workspaceId)
+          Some(config.workspace_id)
         )
-
-
-
-
     }
   }
 
@@ -114,33 +113,39 @@ object DeploymentValidation extends SparkSessionWrapper {
    *
    * @param row
    */
-  private def validateApiUrlConnectivity(row: Row): DeploymentValidationReport = {
-    val url = row.getAs(ConfigColumns.api_url.toString).toString
-    val scope = row.getAs(ConfigColumns.secret_scope.toString).toString
-    val patKey = row.getAs(ConfigColumns.secret_key_dbpat.toString).toString
-    val workspaceId = row.getAs(ConfigColumns.workspace_id.toString).toString
-    val testDetails = s"""WorkSpaceURLConnectivityTest APIURL:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
+  private def validateApiUrlConnectivity(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
+
+    val testDetails =
+      s"""WorkSpaceURLConnectivityTest
+         |APIURL:${conf.api_url}
+         |DBPATWorkspaceScope:${conf.secret_scope}
+         |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
     try {
-      val patToken = dbutils.secrets.get(scope = scope, key = patKey)
-      val apiEnv = ApiEnv(false, url, patToken, getClass.getPackage.getImplementationVersion)
+      val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
+      val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
       val endPoint = "clusters/list"
       ApiCallV2(apiEnv, endPoint).execute().asDF()
       DeploymentValidationReport(true,
         getSimpleMsg("APIURL_Connectivity"),
         testDetails,
         Some("SUCCESS"),
-        Some(workspaceId)
+        Some(conf.workspace_id)
       )
     } catch {
       case exception: Exception =>
-        val msg = s"""No Data retrieved workspaceId:${workspaceId} APIURL:${url} DBPATWorkspaceScope:${scope} SecretKey_DBPAT:${patKey}"""
+        val msg =
+          s"""No Data retrieved
+             |WorkspaceId:${conf.workspace_id}
+             |APIURL:${conf.api_url}
+             | DBPATWorkspaceScope:${conf.secret_scope}
+             | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
         DeploymentValidationReport(false,
           getSimpleMsg("APIURL_Connectivity"),
           testDetails,
           Some(fullMsg),
-          Some(workspaceId)
+          Some(conf.workspace_id)
         )
 
     }
@@ -163,7 +168,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def validateCloud(): Rule = {
-    Rule("Valid_Cloud_providers", lower(col(ConfigColumns.cloud.toString)), Array("aws", "azure"))
+    Rule("Valid_Cloud_providers", lower(col(MultiWorkspaceConfigColumns.cloud.toString)), Array("aws", "azure"))
   }
 
 
@@ -172,7 +177,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def validatePrimordialDate(): Rule = {
-    Rule("Valid_PrimordialDate", to_date(col(ConfigColumns.primordial_date.toString), "yyyy-MM-dd") <= current_date() && to_date(col(ConfigColumns.primordial_date.toString), "yyyy-MM-dd").isNotNull)
+    Rule("Valid_PrimordialDate", to_date(col(MultiWorkspaceConfigColumns.primordial_date.toString), "yyyy-MM-dd") <= current_date() && to_date(col(MultiWorkspaceConfigColumns.primordial_date.toString), "yyyy-MM-dd").isNotNull)
   }
 
   /**
@@ -190,7 +195,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def validateMaxDays(): Rule = {
-    Rule("Valid_MaxDays", col(ConfigColumns.max_days.toString) >= 0 && col(ConfigColumns.max_days.toString).isNotNull)
+    Rule("Valid_MaxDays", col(MultiWorkspaceConfigColumns.max_days.toString) >= 0 && col(MultiWorkspaceConfigColumns.max_days.toString).isNotNull)
   }
 
   /**
@@ -198,30 +203,32 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def validateOWScope(): Rule = {
-    Rule("Valid_Excluded_Scopes", lower(col(ConfigColumns.excluded_scopes.toString)), Array("audit", "sparkEvents", "jobs", "clusters", "clusterEvents", "notebooks", "pools", "accounts", "dbsql","",null))
+    Rule("Valid_Excluded_Scopes",
+      lower(col(MultiWorkspaceConfigColumns.excluded_scopes.toString)),
+      Array("audit", "sparkEvents", "jobs", "clusters", "clusterEvents", "notebooks", "pools", "accounts", "dbsql","",null))
   }
 
   /**
    * Validate audit log data for Aws and Azure
    * @param row
    */
-  private def cloudSpecificValidation(row: Row): DeploymentValidationReport = {
+  private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
 
-    row.getAs(ConfigColumns.cloud.toString).toString.toLowerCase match {
+    config.cloud.toLowerCase match {
       case "aws" =>
         validateAuditLog(
-          row.getAs(ConfigColumns.workspace_id.toString),
-          row.getAs(ConfigColumns.auditlogprefix_source_aws.toString),
-          row.getAs(ConfigColumns.primordial_date.toString),
-          row.getAs(ConfigColumns.max_days.toString),
+          config.workspace_id,
+          config.auditlogprefix_source_aws,
+          config.primordial_date,
+          config.max_days
         )
       case "azure" =>
         validateEventHub(
-          row.getAs(ConfigColumns.workspace_id.toString),
-          row.getAs(ConfigColumns.secret_scope.toString),
-          row.getAs(ConfigColumns.eh_scope_key.toString),
-          row.getAs(ConfigColumns.eh_name.toString),
-          row.getAs(ConfigColumns.output_path.toString))
+          config.workspace_id,
+          config.secret_scope,
+          config.eh_scope_key,
+          config.eh_name,
+          config.output_path)
     }
 
   }
@@ -410,7 +417,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       .select("deployment_id", "workspace_id", "result")
 
 
-    val validationReport = resultDF.as[WorkSpaceValidationReport].collect().par
+    val validationReport = resultDF.as[RulesValidationReport].collect().par
     validationReport.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     validationReport.foreach(validation => {
       var validationMsg = "SUCCESS"
@@ -455,12 +462,12 @@ object DeploymentValidation extends SparkSessionWrapper {
   /**
    * Performs mandatory validation before each deployment.
    */
-  private[overwatch] def performMandatoryValidation(configCsvPath: String,parallelism: Int,deploymentId: String) = {
+  private[overwatch] def performMandatoryValidation(configCsvPath: String,parallelism: Int,deploymentId: String):Unit = {
     logger.log(Level.INFO, "Performing mandatory validation")
     validateFileExistence(configCsvPath)
     val configDF = makeDataFrame(configCsvPath,deploymentId)
-    val groupedRuleSet = RuleSet(configDF, by = "deployment_id")
-    groupedRuleSet.add(validateDistinct("Common_ETLStoragePrefix",ConfigColumns.etl_storage_prefix.toString))
+    val groupedRuleSet = RuleSet(configDF.toDF(), by = "deployment_id")
+    groupedRuleSet.add(validateDistinct("Common_ETLStoragePrefix",MultiWorkspaceConfigColumns.etl_storage_prefix.toString))
     val validationStatus =  validateRuleAndUpdateStatus(groupedRuleSet,parallelism)
     if (validationStatus.toDS().filter("validated==false").count > 0) { //Checks for failed validations
       throw new BadConfigException(getSimpleMsg("Common_ETLStoragePrefix"))
@@ -481,24 +488,25 @@ object DeploymentValidation extends SparkSessionWrapper {
 
     var validationStatus: ArrayBuffer[DeploymentValidationReport] = new ArrayBuffer[DeploymentValidationReport]()
     //csv data validation
-    val groupedRuleSet = RuleSet(configDF, by = "deployment_id")
+
     val gropedRules = Seq[Rule](
-      validateDistinct("Common_ETLStoragePrefix",ConfigColumns.etl_storage_prefix.toString),
-      validateDistinct("Common_ETLDatabase",ConfigColumns.etl_database_name.toString),
-      validateDistinct("Common_ConsumerDatabaseName",ConfigColumns.consumer_database_name.toString)
+      validateDistinct("Common_ETLStoragePrefix",MultiWorkspaceConfigColumns.etl_storage_prefix.toString),
+      validateDistinct("Common_ETLDatabase",MultiWorkspaceConfigColumns.etl_database_name.toString),
+      validateDistinct("Common_ConsumerDatabaseName",MultiWorkspaceConfigColumns.consumer_database_name.toString)
     )
-    groupedRuleSet.add(gropedRules)
-    val nonGroupedRuleSet = RuleSet(configDF)
+    val groupedRuleSet = RuleSet(configDF.toDF(), by = "deployment_id").add(gropedRules)
+
     val nonGroupedRules = Seq[Rule](
-      validateNotNull("NOTNULL_APIURL",ConfigColumns.api_url.toString),
-      validateNotNull("NOTNULL_SecretScope",ConfigColumns.secret_scope.toString),
-      validateNotNull("NOTNULL_SecretKey_DBPAT",ConfigColumns.secret_key_dbpat.toString),
+      validateNotNull("NOTNULL_APIURL",MultiWorkspaceConfigColumns.api_url.toString),
+      validateNotNull("NOTNULL_SecretScope",MultiWorkspaceConfigColumns.secret_scope.toString),
+      validateNotNull("NOTNULL_SecretKey_DBPAT",MultiWorkspaceConfigColumns.secret_key_dbpat.toString),
       validateCloud(),
       validatePrimordialDate(),
       validateMaxDays(),
       validateOWScope()
     )
-    nonGroupedRuleSet.add(nonGroupedRules)
+    val nonGroupedRuleSet = RuleSet(configDF.toDF()).add(nonGroupedRules)
+
 
     //Connectivity validation
     val inputRow = configDF.collect().par
@@ -514,15 +522,8 @@ object DeploymentValidation extends SparkSessionWrapper {
     validationStatus.append(storagePrefixAccessValidation(inputRow.head)) //Check read/write/create/list access for etl_storage_prefix
 
     configDF.unpersist()
-    validationStatus.toDS()
+    validationStatus.toDS().as[DeploymentValidationReport]
   }
 
 }
 
-object ConfigColumns extends Enumeration {
-  val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,
-  etl_storage_prefix, etl_database_name, consumer_database_name, secret_scope,
-  secret_key_dbpat, auditlogprefix_source_aws, eh_name, eh_scope_key, scopes,
-  interactive_dbu_price, automated_dbu_price, sql_compute_dbu_price, jobs_light_dbu_price,
-  max_days, excluded_scopes, active, deploymentId,output_path = Value
-}
