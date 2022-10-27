@@ -108,9 +108,9 @@ object TransformFunctions {
         df.schema.fields
           .filter(f => f.name == lagDateColumnName)
           .exists(f => f.dataType == TimestampType || f.dataType == DateType) &&
-        df2.schema.fields
-          .filter(f => f.name == lagDateColumnName)
-          .exists(f => f.dataType == TimestampType || f.dataType == DateType),
+          df2.schema.fields
+            .filter(f => f.name == lagDateColumnName)
+            .exists(f => f.dataType == TimestampType || f.dataType == DateType),
         s"$lagDateColumnName must be either a Date or Timestamp type on both sides of the join"
       )
 
@@ -127,10 +127,10 @@ object TransformFunctions {
 
       val joinConditionWLag = if (joinType == "left" || joinType == "inner") {
         if (laggingSide == "left") {
-        expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${rightSuffix}, $lagDays)")
-      } else {
-        expr(s"$baseJoinCondition AND ${lagDateColumnName}${rightSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
-      }} else {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${rightSuffix}, $lagDays)")
+        } else {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName}${rightSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
+        }} else {
         if (laggingSide == "left") {
           expr(s"$baseJoinCondition AND ${lagDateColumnName}${leftSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
         } else {
@@ -297,42 +297,12 @@ object TransformFunctions {
      * @param incrementalFields seq of incremental fields for the df
      * @return
      */
-
-    // Missing CLSF
     def dedupByKey(
-                     keys: Seq[String],
-                     incrementalFields: Seq[String]
-                     ): DataFrame = {
-      val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
-//      val keysLessIncrementals1 = keysLessIncrementals :+ "unixTimeMS_state_start"
-
+                    keys: Seq[String],
+                    incrementalFields: Seq[String]
+                  ): DataFrame = {
+//      val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
       val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
-      val w1 = Window.partitionBy(keysLessIncrementals map col: _*).orderBy(incrementalFields map col: _*)
-
-      val dfDupsOldDF = df
-        .withColumn("rnk", rank().over(w))
-        .withColumn("rn", row_number().over(w))
-        .filter(col("rnk") > 1  or col("rn") > 1)
-        .orderBy(incrementalFields map col: _*)
-
-      val dfDupsNewDF = df
-        .withColumn("rnk", rank().over(w1))
-        .withColumn("rn", row_number().over(w1))
-        .filter(col("rnk") > 1  or col("rn") > 1)
-        .orderBy(incrementalFields map col: _*)
-
-      if (dfDupsOldDF.count() == dfDupsNewDF.count()){
-        println("Both Old and New logic having same result for key ", keys)
-        println("Dups count with old logic ",dfDupsOldDF.count())
-        println("Dups count with new logic ",dfDupsNewDF.count())
-
-      }else{
-        println("Both Old and New logic having different result for key ", keys)
-        println("Dups count with old logic ",dfDupsOldDF.count())
-        println("Dups count with new logic ",dfDupsNewDF.count())
-      }
-
-
       df
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
@@ -411,8 +381,8 @@ object TransformFunctions {
                       ): DataFrame = {
       require(df.hasFieldNamed(structFieldName, caseSensitive),
         s"ERROR: Dataframe must contain the struct field to be altered. " +
-        s"$structFieldName was not found. Struct fields include " +
-        s"${df.schema.fields.filter(_.dataType.typeName == "struct").map(_.name).mkString(", ")}"
+          s"$structFieldName was not found. Struct fields include " +
+          s"${df.schema.fields.filter(_.dataType.typeName == "struct").map(_.name).mkString(", ")}"
       )
 
       val fieldToAlterTypeName = df.select(structFieldName).schema.fields.head.dataType.typeName
