@@ -433,7 +433,7 @@ object SchemaTools extends SparkSessionWrapper {
                       validator: ValidatedColumn,
                       cPrefix: Option[String] = None,
                       enforceNonNullCols: Boolean = true,
-                      isDebug: Boolean = false,
+                      isDebug: Boolean = false
                     ): ValidatedColumn = {
 
     if (validator.requiredStructure.nonEmpty) { // is requirement on the field
@@ -496,31 +496,9 @@ object SchemaTools extends SparkSessionWrapper {
                 isDebug,
                 newPrefix
               ).map(validateSchema(_, newPrefix))
-//              println("1st Item",validatedChildren(0))
-//              println("validatedChildren1 is ",struct(validatedChildren1.map(_.column): _*).alias(fieldStructure.name))
-//              println("fieldStructure.name is ",fieldStructure.name)
-//              println("dtArray.elementType is ",dtArray.elementType)
-
-//              println("validatedChildren is ",struct(validatedChildren.map(_.column): _*).alias(fieldStructure.name))
 
               // build and return array(struct)
-              val test = validator.copy(column = struct(validatedChildren.map(_.column): _*).alias(fieldStructure.name))
-
-//              println("validated children first column is",validatedChildren(0).column)
-//              println("validated children first column job_clusters class is",validatedChildren(0).column.getClass)
-//              println("test is ",test)
-//              println("test column is ",test.column)
-//              println("test fieldToValidate is ",test.fieldToValidate)
-//              println("test requiredStructure is ",test.requiredStructure)
-//
-//              println("validator column is ",validator.column)
-//              println("validator fieldToValidate is ",validator.fieldToValidate)
-//              println("validator requiredStructure is ",validator.requiredStructure)
-
-//              validator
-//              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias(fieldStructure.name))
-//              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias("test"))
-//              validator.copy(column = struct(validatedChildren.map(_.column): _*).alias(fieldStructure.name))
+              validator.copy(column = struct(validatedChildren.map(_.column): _*).alias(fieldStructure.name))
               validator
 
             case eType =>
