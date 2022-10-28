@@ -212,8 +212,6 @@ class TransformFunctionsTest extends AnyFunSpec
             spark.sparkContext.parallelize(arrayStructureData),arrayStructureSchema).withColumn("organization_id",lit("123"))
           df.createOrReplaceTempView("df")
           val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
-          println(df.printSchema())
-          println(validatedDF.printSchema())
         }
 
     it("Test Case 8 - Should be able to typecast Int to String") {
@@ -257,8 +255,6 @@ class TransformFunctionsTest extends AnyFunSpec
         spark.sparkContext.parallelize(arrayStructureData),arrayStructureSchema)
       df.createOrReplaceTempView("df")
       val validatedDF = df.verifyMinimumSchema(jobSnapMinimumSchema)
-      println(df.printSchema())
-      println(validatedDF.printSchema())
     }
 
 
