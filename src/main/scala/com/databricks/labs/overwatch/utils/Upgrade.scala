@@ -1332,7 +1332,7 @@ object Upgrade extends SparkSessionWrapper {
            |where moduleID in (${(silverModulesToRebuild ++ goldModulesToRebuild).mkString(", ")})
            |and (status = 'SUCCESS' or status like 'EMPT%')
            |""".stripMargin
-      val updateMsg = s"UPGRADE - Step X - Rolling back modules to be rebuilt\nSTATEMENT: $rollbackPipReportSQL"
+      val updateMsg = s"UPGRADE - Step 5 - Rolling back modules to be rebuilt\nSTATEMENT: $rollbackPipReportSQL"
       logger.log(Level.INFO, updateMsg)
 
       try {

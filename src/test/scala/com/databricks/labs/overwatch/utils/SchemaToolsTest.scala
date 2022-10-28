@@ -234,7 +234,7 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
       val df = Seq(1).toDF("key")
         .withColumn("Properties", lit("myString"))
       val field = SchemaTools.colByName(df)("Properties")
-      assertResult("properties")(field.name)
+      assertResult("Properties")(field.name)
       assertResult(StringType)(field.dataType)
       assertResult("string")(field.dataType.typeName)
     }

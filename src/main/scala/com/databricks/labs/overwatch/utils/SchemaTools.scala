@@ -79,7 +79,6 @@ object SchemaTools extends SparkSessionWrapper {
       val lowerCaseColName = colName.toLowerCase
       df.schema.find(_.name.toLowerCase() == lowerCaseColName)
         .getOrElse(StructField(lowerCaseColName, missingNullType, nullable = true))
-        .copy(name = lowerCaseColName) // ensure the returned case is lower case
     }
   }
 
