@@ -57,7 +57,6 @@ object DeploymentValidation extends SparkSessionWrapper {
         .withColumn("deployment_id", lit(deploymentId))
         .withColumn("output_path", lit(outputPath))
      val multiWorkspaceConfig = df.as[MultiWorkspaceConfig]
-      multiWorkspaceConfig.show()
       multiWorkspaceConfig
     } catch {
       case e: Exception =>
