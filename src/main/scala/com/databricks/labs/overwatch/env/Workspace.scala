@@ -163,7 +163,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
-    var responseCounter = 0
+//    var responseCounter = 0
+    val apiResponseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
     val tmpSqlQueryHistorySuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
     val tmpSqlQueryHistoryErrorPath = s"${config.tempWorkingDir}/errors/sqlqueryhistory_silver/${System.currentTimeMillis()}"
@@ -216,7 +217,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       }
       future.onComplete {
         case Success(_) =>
-          responseCounter = responseCounter + 1
+//          responseCounter = responseCounter + 1
+          apiResponseCounter.add(1)
 
         case Failure(e) =>
           if (e.isInstanceOf[ApiCallFailureV2]) {
@@ -229,19 +231,23 @@ class Workspace(config: Config) extends SparkSessionWrapper {
             }
             logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
           }
-          responseCounter = responseCounter + 1
+//          responseCounter = responseCounter + 1
+          apiResponseCounter.add(1)
       }
       fromTimeMs = fromTimeMs+(1000*60*60)
     }
     val timeoutThreshold = config.apiEnv.apiWaitingTime // 5 minutes
     var currentSleepTime = 0
     var accumulatorCountWhileSleeping = acc.value
-    while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
-      //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
-      // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
+    while (apiResponseCounter.size() < finalResponseCount && currentSleepTime < timeoutThreshold) {
+      //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed
+      // the execution or not. If we have not received the response from all the threads then we are waiting for 5
+      // seconds and again revalidating the count.
       if (currentSleepTime > 120000) //printing the waiting message only if the waiting time is more than 2 minutes.
       {
-        println(s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000} seconds; Api response yet to receive ${finalResponseCount - responseCounter}""")
+        println(
+          s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000}
+             |seconds; Api response yet to receive ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
       }
       Thread.sleep(5000)
       currentSleepTime += 5000
@@ -250,9 +256,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         accumulatorCountWhileSleeping = acc.value
       }
     }
-    if (responseCounter != finalResponseCount) { // Checking whether all the api responses has been received or not.
-      logger.log(Level.ERROR, s"""Unable to receive all the sql/history/queries api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
-      throw new Exception(s"""Unable to receive all the sql/history/queries api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
+    if (apiResponseCounter.size() != finalResponseCount) { // Checking whether all the api responses has been received or not.
+      logger.log(Level.ERROR,
+        s"""Unable to receive all the sql/history/queries api responses; Api response
+           |received ${apiResponseCounter.size()};Api response not
+           |received ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
+      throw new Exception(
+        s"""Unable to receive all the sql/history/queries api responses; Api response received
+           |${apiResponseCounter.size()};Api response not received ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
     }
     if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
       PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
