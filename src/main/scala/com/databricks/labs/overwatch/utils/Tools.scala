@@ -739,7 +739,7 @@ object Helpers extends SparkSessionWrapper {
 
     println(s"BEGINNING PIPELINE STATE ROLLBACK for modules " +
       s"${rollbackTSByModule.map(_.moduleId).distinct.mkString(", ")} for ORGANIZATION IDs " +
-      s"${rollbackTSByModule.map(_.organization_id).distinct.mkString(", ")")
+      s"${rollbackTSByModule.map(_.organization_id).distinct.mkString(", ")}")
     rollbackPipelineStateToTimestamp(rollbackTSByModule, customRollbackStatus, config, dryRun)
 
     val allTargets = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++

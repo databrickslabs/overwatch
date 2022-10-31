@@ -465,9 +465,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 tmpClusterEventsSuccessPath: String,
                                 tmpClusterEventsErrorPath: String) = {
     val finalResponseCount = clusterIDs.length
-    var responseCounter = 0
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+    val apiResponseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
     //TODO identify the best practice to implement the future.
     val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
@@ -490,7 +490,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
       future.onComplete {
         case Success(_) =>
-          responseCounter = responseCounter + 1
+          apiResponseCounter.add(1)
 
         case Failure(e) =>
           if (e.isInstanceOf[ApiCallFailureV2]) {
@@ -503,18 +503,18 @@ trait BronzeTransforms extends SparkSessionWrapper {
             }
             logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
           }
-          responseCounter = responseCounter + 1
+          apiResponseCounter.add(1)
       }
     }
     val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
     var currentSleepTime = 0
     var accumulatorCountWhileSleeping = accumulator.value
-    while (responseCounter < finalResponseCount && currentSleepTime < timeoutThreshold) {
+    while (apiResponseCounter.size() < finalResponseCount && currentSleepTime < timeoutThreshold) {
       //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
       // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
       if (currentSleepTime > 120000) //printing the waiting message only if the waiting time is more than 2 minutes.
       {
-        println(s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000} seconds; Api response yet to receive ${finalResponseCount - responseCounter}""")
+        println(s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000} seconds; Api response yet to receive ${finalResponseCount - apiResponseCounter.size()}""")
       }
       Thread.sleep(5000)
       currentSleepTime += 5000
@@ -523,9 +523,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         accumulatorCountWhileSleeping = accumulator.value
       }
     }
-    if (responseCounter != finalResponseCount) { // Checking whether all the api responses has been received or not.
-      logger.log(Level.ERROR, s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
-      throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${responseCounter};Api response not received ${finalResponseCount - responseCounter}""")
+    if (apiResponseCounter.size() != finalResponseCount) { // Checking whether all the api responses has been received or not.
+      logger.log(Level.ERROR, s"""Unable to receive all the clusters/events api responses; Api response received ${apiResponseCounter.size()};Api response not received ${finalResponseCount - apiResponseCounter.size()}""")
+      throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${apiResponseCounter.size()};Api response not received ${finalResponseCount - apiResponseCounter.size()}""")
     }
     if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
       PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
