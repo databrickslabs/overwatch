@@ -227,6 +227,10 @@ case class OrgWorkspace(organization_id: String, workspace: Workspace)
 
 case class NamedColumn(fieldName: String, column: Column)
 
+case class ModuleRollbackTS(organization_id: String, moduleId: Int, rollbackTS: Long)
+
+case class TargetRollbackTS(organization_id: String, target: PipelineTable, rollbackTS: Long)
+
 case class DeltaHistory(version: Long, timestamp: java.sql.Timestamp, operation: String, clusterId: String, operationMetrics: Map[String, String], userMetadata: String)
 
 /**

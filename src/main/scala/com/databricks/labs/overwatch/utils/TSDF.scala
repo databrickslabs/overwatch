@@ -185,7 +185,7 @@ object TSDF {
              partitionColNames: String*): TSDF = {
 
     df.requireFields(tsColumnName +: partitionColNames)
-    val colFinder = SchemaTools.colByName(df) _
+    val colFinder = SchemaTools.colByName(df)(_, StringType)
     val tsColumn = colFinder(tsColumnName)
     val partitionCols = partitionColNames.map(colFinder)
     new BaseTSDF(df, tsColumn, partitionCols: _*)

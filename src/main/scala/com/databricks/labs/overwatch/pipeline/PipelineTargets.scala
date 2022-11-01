@@ -265,7 +265,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
       partitionBy = Seq("organization_id", "state_start_date"),
-      maxMergeScanDates = 8,
+      maxMergeScanDates = 30, // 1 less than clusterStateFact
     )
 
     lazy private[overwatch] val poolsSpecTarget: PipelineTable = PipelineTable(
@@ -435,7 +435,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "state_start_date", "__overwatch_ctrl_noise"),
-      maxMergeScanDates = 7,
+      maxMergeScanDates = 31, // 1 greater than clusterStateDetail
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
       zOrderBy = Array("cluster_id", "unixTimeMS_state_start")
     )

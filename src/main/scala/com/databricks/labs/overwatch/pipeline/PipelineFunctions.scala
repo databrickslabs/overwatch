@@ -611,6 +611,47 @@ object PipelineFunctions extends SparkSessionWrapper {
     }
   }
 
+  def getTargetTableNameByModule(moduleId: Int): String = {
+    moduleId match {
+      case 1001 => "jobs_snapshot_bronze"
+      case 1002 => "clusters_snapshot_bronze"
+      case 1003 => "pools_snapshot_bronze"
+      case 1004 => "audit_log_bronze"
+      case 1005 => "cluster_events_bronze"
+      case 1006 => "spark_events_bronze"
+      case 2003 => "spark_executors_silver"
+      case 2005 => "spark_Executions_silver"
+      case 2006 => "spark_jobs_silver"
+      case 2007 => "spark_stages_silver"
+      case 2008 => "spark_tasks_silver"
+      case 2009 => "pools_silver"
+      case 2010 => "job_status_silver"
+      case 2011 => "jobrun_silver"
+      case 2014 => "cluster_spec_silver"
+      case 2016 => "account_login_silver"
+      case 2017 => "account_mods_silver"
+      case 2018 => "notebook_silver"
+      case 2019 => "cluster_state_detail_silver"
+      case 2020 => "sql_query_history_silver"
+      case 3001 => "cluster_gold"
+      case 3002 => "job_gold"
+      case 3003 => "jobRun_gold"
+      case 3004 => "notebook_gold"
+      case 3005 => "clusterStateFact_gold"
+      case 3007 => "account_mods_gold"
+      case 3008 => "account_login_gold"
+      case 3009 => "instancepool_gold"
+      case 3010 => "sparkJob_gold"
+      case 3011 => "sparkStage_gold"
+      case 3012 => "sparkTask_gold"
+      case 3013 => "sparkExecution_gold"
+      case 3014 => "sparkExecutor_gold"
+      case 3015 => "jobRunCostPotentialFact_gold"
+      case 3016 => "sparkStream_gold"
+      case 3017 => "sql_query_history_gold"
+    }
+  }
+
   /**
    * Load text file
    *
