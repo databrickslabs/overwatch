@@ -196,7 +196,7 @@ updated on the subsequent run.
 broken down by any dimension at the millisecond level. Bad because there can be significant differences between the 
 derived costs and actual costs. These should generally be very close to equal but may differ within margin of error by 
 as much as 10%. To verify the cost functions and the elements therein feel free to review them in more detail. If 
-your costs are off by a large marine, please review all the components of the cost function and correct any configurations 
+your costs are off by a large margin, please review all the components of the cost function and correct any configurations 
 as necessary to align your reality with the Overwatch config. The default costs are list price and often do not 
 accurately reflect a customer's costs.
 * **driver_compute_cost**: when cloudBillable --> Driver Node Compute Contract Price Hourly (instanceDetails) * Uptime_In_State_H --> otherwise 0
