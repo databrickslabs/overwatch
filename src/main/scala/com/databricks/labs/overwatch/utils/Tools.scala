@@ -688,7 +688,7 @@ object Helpers extends SparkSessionWrapper {
       val updateClause =
         s"""
            |update ${config.databaseName}.pipeline_report
-           |set status = '$customRollbackStatus'
+           |set status = concat('$customRollbackStatus', ' - ', status)
            |where organization_id = '${rollbackDetail.organization_id}'
            |and fromTS >= ${rollbackDetail.rollbackTS}
            |and moduleId = ${rollbackDetail.moduleId}
