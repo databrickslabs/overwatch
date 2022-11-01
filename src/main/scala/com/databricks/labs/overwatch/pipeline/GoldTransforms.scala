@@ -422,7 +422,13 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val newAndOpenJobRuns = if (!jrcpLag30IsEmpty) {
       jrcpDeriveNewAndOpenRuns(newJrLaunches, jrGoldLag30D ,jrcpLag30D, fromTime)
+        .repartition()
+        .cache()
     } else newJrLaunches
+      .repartition()
+      .cache()
+
+    newAndOpenJobRuns.count() // eager cache as this DF is used several times downstream
 
 
     // for states (CREATING and STARTING) OR automated cluster runstate start is same as cluster state start

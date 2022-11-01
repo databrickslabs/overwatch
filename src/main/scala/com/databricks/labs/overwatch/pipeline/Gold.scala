@@ -85,7 +85,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(2019, 2014), 3.0)
   lazy private val appendClusterStateFactProccess = ETLDefinition(
-    SilverTargets.clusterStateDetailTarget.asIncrementalDF(clusterStateFactModule, SilverTargets.clusterStateDetailTarget.incrementalColumns),
+    SilverTargets.clusterStateDetailTarget.asIncrementalDF(
+      clusterStateFactModule,
+      SilverTargets.clusterStateDetailTarget.incrementalColumns,
+      GoldTargets.clusterStateFactTarget.maxMergeScanDates
+    ),
     Seq(buildClusterStateFact(
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.dbuCostDetail,

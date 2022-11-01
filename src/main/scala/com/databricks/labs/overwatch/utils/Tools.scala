@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
 import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
@@ -51,6 +52,7 @@ object JsonUtils {
   /**
    * Extracts the key and value from Json String.This function only extracts the key and value if jsonString contains only one key and value.
    * If the Json contains more then one key and value then this function will return the first pair of key and value.
+   *
    * @param jsonString
    * @return
    */
@@ -181,7 +183,7 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    *
-   * @param fromDT inclusive
+   * @param fromDT  inclusive
    * @param untilDT until date is exclusive
    * @return array of strings of dates between fromDT and untilDT in YYYY-mm-dd format
    */
@@ -393,7 +395,7 @@ object Helpers extends SparkSessionWrapper {
    * Be VERY CAREFUL with this function as it's a nuke. There's a different methodology to make this work depending
    * on the cloud platform. At present Azure and AWS are both supported
    *
-   * @param target target table
+   * @param target        target table
    * @param cloudProvider - name of the cloud provider
    */
   @throws(classOf[UnhandledException])
@@ -423,6 +425,7 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * Execute a parallelized clone to follow the instructions provided through CloneDetail class
+   *
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
@@ -632,64 +635,135 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
-  def rollbackTargetToTimestamp(
-                                 workspace: Workspace,
-                                 targetName: String,
-                                 rollbackToEpochMS: Long,
-                                 dryRun: Boolean = true
-                               ): Unit = {
+  private def rollbackTargetToTimestamp(
+                                         targetsToRollbackByTS: Array[TargetRollbackTS],
+                                         dryRun: Boolean
+                                       ): Unit = {
     val deleteLogger = Logger.getLogger("ROLLBACK Logger")
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism - 1))
+    val targetsToRollback = targetsToRollbackByTS.par
+    targetsToRollback.tasksupport = taskSupport
+
+    targetsToRollback.foreach(rollbackTarget => {
+      val target = rollbackTarget.target
+      val rollbackToTime = Pipeline.createTimeDetail(rollbackTarget.rollbackTS)
+      val targetSchema = target.asDF.schema
+      val incrementalFields = targetSchema.filter(f => target.incrementalColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
+      val incrementalFilters = incrementalFields.map(f => {
+        f.dataType.typeName match {
+          case "long" => s"${f.name} >= ${rollbackToTime.asUnixTimeMilli}"
+          case "date" => s"${f.name} >= '${rollbackToTime.asDTString}'"
+          case "timestamp" => s"${f.name} >= '${rollbackToTime.asTSString}'"
+        }
+      })
+      val orgIdFilter = s" and organization_id = '${rollbackTarget.organization_id}'"
+      val deleteClause = incrementalFilters.reduce((x, y) => s"$x and $y ") + orgIdFilter
+      val deleteStatement =
+        s"""
+           |delete from ${target.tableFullName}
+           |where $deleteClause
+           |""".stripMargin
+      deleteLogger.info(s"DELETE STATEMENT: $deleteStatement")
+      try {
+        if (!dryRun) spark.sql(deleteStatement)
+      } catch {
+        case e: Throwable =>
+          val failMsg = s"FAILED DELETE FROM TARGET: ${target.tableFullName}\n\nDELETE STATEMENT: ${deleteStatement}"
+          println(PipelineFunctions.appendStackStrace(e, failMsg))
+          deleteLogger.error(PipelineFunctions.appendStackStrace(e, failMsg))
+      }
+    })
+
+  }
+
+  private def rollbackPipelineStateToTimestamp(
+                                                rollbackTSByModule: Array[ModuleRollbackTS],
+                                                customRollbackStatus: String,
+                                                config: Config,
+                                                dryRun: Boolean
+                                              ): Unit = {
+    val rollbackLogger = Logger.getLogger("Overwatch_State: ROLLBACK Logger")
+
+    rollbackTSByModule.foreach(rollbackDetail => {
+      val updateClause =
+        s"""
+           |update ${config.databaseName}.pipeline_report
+           |set status = concat('$customRollbackStatus', ' - ', status)
+           |where organization_id = '${rollbackDetail.organization_id}'
+           |and fromTS >= ${rollbackDetail.rollbackTS}
+           |and moduleId = ${rollbackDetail.moduleId}
+           |""".stripMargin
+      rollbackLogger.info(updateClause)
+      try {
+        if (!dryRun) spark.sql(updateClause)
+      } catch {
+        case e: Throwable =>
+          val failMsg = s"FAILED TARGET STATE UPDATE:\n MODULE ID: " +
+            s"${rollbackDetail.moduleId}\nRollbackTS: ${rollbackDetail.rollbackTS}\nORGID: " +
+            s"${rollbackDetail.organization_id}"
+          println(PipelineFunctions.appendStackStrace(e, failMsg))
+          rollbackLogger.error(PipelineFunctions.appendStackStrace(e, failMsg))
+      }
+    })
+  }
+
+  def rollbackPipelineForModule(
+                                 workspace: Workspace,
+                                 rollbackToTimeEpochMS: Long,
+                                 moduleIds: Array[Int],
+                                 workspaceIds: Array[String],
+                                 dryRun: Boolean = true,
+                                 customRollbackStatus: String = "ROLLED BACK"
+                               ): Unit = {
+    if (dryRun) println("DRY RUN: Nothing will be changed")
     val config = workspace.getConfig
-    val rollbackToTime = Pipeline.createTimeDetail(rollbackToEpochMS)
+    val orgFilter = if (workspaceIds.isEmpty) {
+      'organization_id === config.organizationId
+    } else if (workspaceIds.headOption.getOrElse(config.organizationId) == "global") {
+      lit(true)
+    } else {
+      'organization_id.isin(workspaceIds: _*)
+    }
+    val latestRunW = Window.partitionBy('organization_id, 'moduleId).orderBy('fromTS)
+
+    val rollbackTSByModule = spark.table(s"${config.databaseName}.pipeline_report")
+      .filter(orgFilter)
+      .filter('moduleId.isin(moduleIds: _*))
+      .filter('untilTS >= rollbackToTimeEpochMS)
+      .withColumn("rnk", rank().over(latestRunW))
+      .withColumn("rn", row_number().over(latestRunW))
+      .filter('rnk === 1 && 'rn === 1)
+      .select('organization_id, 'moduleId, 'fromTS.alias("rollbackTS"))
+      .as[ModuleRollbackTS]
+      .collect()
+
+    println(s"BEGINNING PIPELINE STATE ROLLBACK for modules " +
+      s"${rollbackTSByModule.map(_.moduleId).distinct.mkString(", ")} for ORGANIZATION IDs " +
+      s"${rollbackTSByModule.map(_.organization_id).distinct.mkString(", ")}")
+    rollbackPipelineStateToTimestamp(rollbackTSByModule, customRollbackStatus, config, dryRun)
+
     val allTargets = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets
-    val targetToRollback = allTargets.find(_.name.toLowerCase == targetName.toLowerCase)
-    assert(targetToRollback.nonEmpty, s"Target with name: $targetName not found")
 
-    val target = targetToRollback.get
-    val targetSchema = target.asDF.schema
-    val incrementalFields = targetSchema.filter(f => target.incrementalColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
-    val incrementalFilters = incrementalFields.map(f => {
-      f.dataType.typeName match {
-        case "long" => s"${f.name} >= ${rollbackToTime.asUnixTimeMilli}"
-        case "date" => s"${f.name} >= '${rollbackToTime.asDTString}'"
-        case "timestamp" => s"${f.name} >= '${rollbackToTime.asTSString}'"
-      }
+    val targetsToRollback = rollbackTSByModule.map(rollback => {
+      val targetTableName = PipelineFunctions.getTargetTableNameByModule(rollback.moduleId)
+      val targetToRollback = allTargets.find(_.name.toLowerCase == targetTableName.toLowerCase)
+      assert(targetToRollback.nonEmpty, s"Target with name: $targetTableName not found")
+      TargetRollbackTS(
+        rollback.organization_id,
+        targetToRollback.get,
+        rollback.rollbackTS
+      )
     })
-    val orgIdFilter = s" and organization_id = '${workspace.getConfig.organizationId}'"
-    val deleteClause = incrementalFilters.reduce((x, y) => s"$x and $y ") + orgIdFilter
-    val deleteStatement =
-      s"""
-         |delete from ${target.tableFullName}
-         |where $deleteClause
-         |""".stripMargin
-    deleteLogger.info(s"DELETE STATEMENT: $deleteStatement")
-    if (!dryRun) spark.sql(deleteStatement)
+
+    println(s"BEGINNING TARGET ROLLBACK FOR TABLES " +
+      s"${targetsToRollback.map(_.target.tableFullName).distinct.mkString(", ")} for WORKSPACE IDs " +
+      s"${targetsToRollback.map(_.organization_id).distinct.mkString(", ")}"
+    )
+    rollbackTargetToTimestamp(targetsToRollback, dryRun)
 
   }
 
-  def rollbackPipelineStateToTimestamp(
-                                        workspace: Workspace,
-                                        fromEpochMS: Long,
-                                        moduleId: Int,
-                                        customRollbackStatus: String = "ROLLED BACK"
-                                      ): Unit = {
-    val rollbackLogger = Logger.getLogger("Overwatch_State: ROLLBACK Logger")
-    val config = workspace.getConfig
-    val b = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
-    val pipelineReportTarget = b.pipelineStateTarget
-    val updateClause =
-      s"""
-         |update ${pipelineReportTarget.tableFullName}
-         |set status = '$customRollbackStatus'
-         |where organization_id = '${config.organizationId}'
-         |and fromTS >= $fromEpochMS
-         |and moduleId = $moduleId
-         |and (status = 'SUCCESS' or status like 'EMPT%')
-         |""".stripMargin
-    rollbackLogger.info(updateClause)
-    spark.sql(updateClause)
-  }
 
 }
