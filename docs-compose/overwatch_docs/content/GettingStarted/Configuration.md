@@ -6,7 +6,7 @@ weight: 2
 
 ## Configuration Basics
 The Overwatch configuration can be created as a case class of [OverwatchParams](#overwatchparams) or as a json string passed into
-the main class `com.databricks.labs.overwatch.BatchRunner`. When passed in as a json string, it is 
+the main class `com.databricks.labs.overwatch.BatchRunner`. When passed in as a json string, it is
 serialized into an instance of [OverwatchParams](#overwatchparams). This provides strong validation on the input parameters
 and strong typing for additional validation options. All configs attempt to be defaulted to a reasonable default
 where possible. If a default is set, passing in a value will overwrite the default.
@@ -15,23 +15,23 @@ where possible. If a default is set, passing in a value will overwrite the defau
 Below are some configurations examples of building the configuration parameters called *params* which is a variable
 set to contain an instance of the class *OverwatchParams*.
 
-Once the config has been created according to your needs, refer back to the 
+Once the config has been created according to your needs, refer back to the
 [Getting Started - Run Via Notebook]({{%relref "GettingStarted"%}}#via-a-notebook) or
 [Getting Started - Run Via Main Class]({{%relref "GettingStarted"%}}#via-main-class) section to see how it's can be used
 when executing the Overwatch Run.
 
 {{% notice warning%}}
 The configuration examples below use a data target prefix of */user/hive/warehouse*. It is STRONGLY recommended that
-a data target with a prefix other than /user/hive/warehouse be used. Even though the tables are external, any 
+a data target with a prefix other than /user/hive/warehouse be used. Even though the tables are external, any
 spark database located within the default warehouse will drop all tables (including external) with certain drop database
 commands resulting in permanent data loss. This is default behavior and has nothing to do with Overwatch specifically
-but it's called out here as a major precaution. If multiple workspaces are to be configured and someone with write 
-access to this location invokes certain drop database commands, all tables will be permanently deleted for all 
+but it's called out here as a major precaution. If multiple workspaces are to be configured and someone with write
+access to this location invokes certain drop database commands, all tables will be permanently deleted for all
 workspaces.
 {{% /notice %}}
 
 ### Azure Example
-Azure does require an event hub to be set up and referenced in the config as an 
+Azure does require an event hub to be set up and referenced in the config as an
 [AzureAuditLogEventhubConfig](#azureauditlogeventhubconfig). More details for setting up this Event Hub
 can be found in the [Azure Environment Setup]({{%relref "EnvironmentSetup/azure.md"%}}) page. An example notebook
 can be found [here](/assets/GettingStarted/azure_runner_docs_example.html).
@@ -45,7 +45,7 @@ private val dataTarget = DataTarget(
 )
 
 private val tokenSecret = TokenSecret(secretsScope, dbPATKey)
-// Use the format exactly replacing "scope" and "key" with the names of the scope and key where your 
+// Use the format exactly replacing "scope" and "key" with the names of the scope and key where your
 // Event Hub connection string is stored.
 private val ehConnScopeKeyString = "{{secrets/scope/key}}"
 
@@ -73,10 +73,10 @@ val params = OverwatchParams(
 )
 ```
 
-**NOTE** The connection string stored in the *ehConnScopeKeyString* above is stored as a secret since it contains 
+**NOTE** The connection string stored in the *ehConnScopeKeyString* above is stored as a secret since it contains
 sensitive information.
 
-**THIS IS NOT THE KEY** but the actual connection string from the SAS Policy. To find this follow the path in the 
+**THIS IS NOT THE KEY** but the actual connection string from the SAS Policy. To find this follow the path in the
 Azure portal below.
 
 eh-namespace --> eventhub --> shared access policies --> Connection String-primary key
@@ -134,7 +134,7 @@ Config | Required Override | Default Value | Type | AsOfVersion | Description
 **auditLogConfig**|Y|NULL|[AuditLogConfig](#auditlogconfig)|0.5.x|Databricks Audit Log delivery information.
 **tokenSecret**|N|Execution Owner's Token|Option[\[TokenSecret\]](#tokensecret)|0.5.x|Secret retrieval information
 **dataTarget**|N|DataTarget("overwatch", "/user/hive/warehouse/{databaseName}.db", "/user/hive/warehouse/{databaseName}.db")|Option[\[DataTarget\]](#datatarget)|0.5.x|What to call the database and where to store it
-**badRecordsPath**|N|/tmp/overwatch/badRecordsPath|Option\[String\]|0.5.x|When reading the log files, where should Overwatch store the records / files that cannot be parsed. Overwatch must have write permissions to this path 
+**badRecordsPath**|N|/tmp/overwatch/badRecordsPath|Option\[String\]|0.5.x|When reading the log files, where should Overwatch store the records / files that cannot be parsed. Overwatch must have write permissions to this path
 **overwatchScope**|N|all|Option\[Seq\[String\]\]|0.5.x|List of [modules]({{%relref "GettingStarted/Modules.md"%}}) in scope for the run. It's important to note that there are many co-dependencies. When choosing a module, be sure to also enable it's requisites. If not value provided, all modules will execute.
 **maxDaysToLoad**|N|60|Int|0.5.x|On large, busy workspaces 60 days of data may amount in 10s of TB of raw data. This parameter allows the job to be broken out into several smaller runs. Pipeline will load previous pipeline end time (or primordial_date if first_run) until lesser of \[current timestamp or previous pipeline end time + maxDaysToLoad\]. Ex: 1 year historical load, first run, don't want to load full year, set maxDaysToLoad to 14 to test / validate load, when that works increase to 60 or 365 depending on confidence level and data size.  
 **primordialDateString**|N|Today's date minus 60 days, format = "yyyy-mm-dd"|String|0.5.x|Date from which data collection was to begin. This is the earliest date for which data should attempted to be collected.
@@ -143,6 +143,9 @@ Config | Required Override | Default Value | Type | AsOfVersion | Description
 **workspace_name**|N|<organization_id>|Option\[String\]|0.6.x|Allows the user to specify the workspace_name to be different than the default, canonical workspace_id (i.e. organization_id). This is helpful during analysis as it provides a human-legible reference for the workspace
 **externalizeOptimize**|N|false|Boolean|0.6.x|Allows the user to externalize the optimize and zorders done on the delta tables. This can be run as a secondary job with different cluster configs at different intervals increasing efficiency
 **tempWorkingDir**|N|<etlDataPathPrefix>/tempWorkingDir/<organization_id>|String|0.6.1|Provides ability to override temporary working directory. This directory gets cleaned up before and after each run.
+**apiEnvConfig**|N|ApiEnvConfig()|Option[\[ApiEnvConfig\]](#apienvconfig)|0.7.x|Allows the user to configure api calls.
+
+
 
 ### AuditLogConfig
 Config to point Overwatch to the location of the delivered audit logs
@@ -155,39 +158,39 @@ Config | Required Override | Default Value | Type | Description
 
 ### TokenSecret
 Overwatch must have permission to perform its functions; these are further discussed in [AdvancedTopics]({{%relref "GettingStarted/advancedtopics.md"%}}).
-The token secret stores the Databricks Secret scope / key for Overwatch to retrieve. The key should store the 
+The token secret stores the Databricks Secret scope / key for Overwatch to retrieve. The key should store the
 token secret to be used which usually starts with "dapi..."
 
-If no TokenSecret is passed into the config, the operation owner's token will be used. If Overwatch is being 
-executed in a notebook the notebook user's token will be used. If Overwatch is being executed through a job the 
-token of the job owner will be used. Whatever token is used, it must have the appropriate access or it will result 
+If no TokenSecret is passed into the config, the operation owner's token will be used. If Overwatch is being
+executed in a notebook the notebook user's token will be used. If Overwatch is being executed through a job the
+token of the job owner will be used. Whatever token is used, it must have the appropriate access or it will result
 in missing data, or an Overwatch run failure.
 
 Config | Required Override | Default Value | Type | Description
 :--------------------------|:---|:----------|:----------|:--------------------------------------------------
-**scope**|N|NA|String|Databricks secret scope 
+**scope**|N|NA|String|Databricks secret scope
 **key**|N|NA|String|Databricks secret key within the scope defined in the Scope parameter
 
 ### DataTarget
 Where to create the database and what to call it. This must be defined on first run or Overwatch will create a
 database named "Overwatch" at the default location which is "/user/hive/warehouse/overwatch.db". This is challenging
-to change later, so be sure you choose a good starting point. After the initial run, this must not change without 
+to change later, so be sure you choose a good starting point. After the initial run, this must not change without
 and entire [database migration]({{%relref "GettingStarted/advancedtopics.md"%}}). Overwatch can perform destructive tasks within its own database and
 this is how it protects itself against harming existing data. Overwatch creates specific metadata inside the database
-at creation time to ensure the database is created and owned by the Overwatch process. Furthermore, metadata is 
+at creation time to ensure the database is created and owned by the Overwatch process. Furthermore, metadata is
 managed to track schema versions and other states.
 
 Config | Required Override | Default Value | Type | Description
 :--------------------------|:---|:-----|:----------|:--------------------------------------------------
 **databaseName**|N|Overwatch|Option[String]|Name of the primary database to be created on first run or to which will be appended on subsequent runs. This database is typically used as the ETL database only as the consumer database is also usually specified to have a different name. If consumerDatabase is also specified in the configuration, on the ETL entities will be stored in this datbase.
 **databaseLocation**|N|/user/hive/warehouse/{databaseName}.db|Option[String]|Location of the Overwatch database. Any compatible fully-qualified URI can be used here as long as Overwatch has access to write the target. Most customers, however, mount the qualified path and reference the mount point for simplicity but this is not required and may not be possible depending on security requirements and environment.
-**etlDataPathPrefix**|N|{databaseLocation}|Option[String]|The location the data will actually be stored. This is critical as data (even EXTERNAL) stored underneath a database path can be deleted if a user call drop database or drop database cascade. This is even more significant when working with multiple workspaces as the risk increases with the breadth of access. 
+**etlDataPathPrefix**|N|{databaseLocation}|Option[String]|The location the data will actually be stored. This is critical as data (even EXTERNAL) stored underneath a database path can be deleted if a user call drop database or drop database cascade. This is even more significant when working with multiple workspaces as the risk increases with the breadth of access.
 **consumerDatabaseName**|N|{databaseName}|Option[String]|Will be the same as the databaseName if not otherwise specified. Holds the user-facing entities and separates them from all the intermediate ETL entities for a less cluttered experience, easy-to-find entities, and simplified security.
 **ConsumerDatabaseLocation**|N|/user/hive/warehouse/{consumerDatabaseName}.db|Option[String]|*See databaseLocation above*
 
 ### AzureAuditLogEventhubConfig
 Not Required when using AWS <br>
-Eventhub streaming environment configurations 
+Eventhub streaming environment configurations
 
 Config | Required Override | Default Value | Type | Description
 :--------------------------|:---|:----------|:----------|:--------------------------------------------------
@@ -215,3 +218,27 @@ Config | Required Override | Default Value | Type | Description
 **minimumCores**|N|4|Int|Minimum number of cores to be used during Overwatch run
 **maximumCores**|N|512|Int|Maximum number of cores to be used during Overwatch run
 **coeff**|N|1.0|Double|Scaler, each module has a scale based on it's size relative to the other modules. This variable acts as a scaler to the scaler, if the modules are scaling too fast (or not fast enough), this can be tweaked to increase the variability of the scaling from the starting core count.
+
+### ApiEnvConfig
+Configurations of Api calls.
+
+Config | Required Override | Default Value | Type | Description
+:--------------------------|:---|:----------|:----------|:--------------------------------------------------
+**successBatchSize**|N|200|Int|Responce of successful api calls are stored into the disk.This config signifies the batch size.
+**errorBatchSize**|N|500|Int|Failed api calls are stored into disk.This config signifies the batch size of failed api calls.
+**enableUnsafeSSL**|N|false|Boolean|Enable unasfe SSL.
+**threadPoolSize**|N|4|Int|Number of threads to perform api calls in parallel.
+**apiWaitingTime**|N|300000|milliseconds|Api waiting time incase of delay in response.
+**apiProxyConfig**|N|ApiProxyConfig()|Option[\[ApiProxyConfig\]](#apiproxyconfig)|Allows user to configure proxy.
+
+### ApiProxyConfig
+
+Configurations of proxy.
+
+Config | Required Override | Default Value | Type | Description
+:--------------------------|:---|:----------|:----------|:--------------------------------------------------
+**proxyHost**|N|None|Option[String]|Proxy host.
+**proxyPort**|N|None|Option[Int]|Proxy port.
+**proxyUserName**|N|None|Option[String]|Proxy user name.
+**proxyPasswordScope**|N|None|Option[String]|Secret Scope which contain key for password.
+**proxyPasswordKey**|N|None|Option[String]|Key for password(This should be present in the secret scope).
