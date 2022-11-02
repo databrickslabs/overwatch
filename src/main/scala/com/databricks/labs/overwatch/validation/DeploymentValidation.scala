@@ -313,7 +313,8 @@ object DeploymentValidation extends SparkSessionWrapper {
     try {
       import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
       val ehConn = dbutils.secrets.get(scope = scope, key)
-
+      //TODO limit 10 check aws
+      //pull 10 milit from aws audit log and grab org id
       val connectionString = ConnectionStringBuilder(
         PipelineFunctions.parseAndValidateEHConnectionString(ehConn, false))
         .setEventHubName(ehName)
@@ -362,7 +363,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .withColumn("organization_id", lit("2222170229861029"))
+        .withColumn("organization_id", lit(workspace_id))
         .select('resourceId, 'category, 'version, 'timestamp, 'date, 'properties, 'organization_id, 'identity.alias("userIdentity"))
         .withColumn("userIdentity", structFromJson(spark, schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")

@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.env
 
-import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
@@ -12,6 +12,7 @@ import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
 import java.util
 import java.util.UUID
+import scala.util.control.Breaks.{break, breakable}
 
 class Database(config: Config) extends SparkSessionWrapper {
 
@@ -245,7 +246,8 @@ class Database(config: Config) extends SparkSessionWrapper {
           target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
         } catch {
           case e: Throwable =>
-            logger.log(Level.ERROR, s"""Exception while writing to ${target.tableFullName}""""+Thread.currentThread().getName)
+            val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception in writeMethod:")
+            logger.log(Level.ERROR, s"""Exception while writing to ${target.tableFullName}"""" + Thread.currentThread().getName + " Error msg:" + fullMsg)
             throw e
         }
       }
@@ -266,25 +268,37 @@ class Database(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
       df.persist()
     } else df
-
     if (needsCache) inputDf.count()
 
-
     val retryCount = 5
-    for(i<- 1  to retryCount){
+    var currentCount = 1
+
+    //TODO made it recursive tail recursion
+    if (currentCount < retryCount) {
       try {
         write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
+        //break
+        if (currentCount > 1) {
+          logger.log(Level.INFO, "Retry successful.." + target.tableFullName + " thread name " + Thread.currentThread().getName)
+        }
+        currentCount = 5
       }
-      catch{
-        case e: Throwable=>
-          logger.info("Database retry count" + i + " Table name:" + target.tableFullName + " Thread name: " + Thread.currentThread().getName)
-          if(i == retryCount){
-            logger.log(Level.INFO, s"""Reached max retry current retry count:${i}""")
+      catch {
+        case e: Throwable =>
+          val exceptionMsg = e.getMessage.toLowerCase()
+          if (exceptionMsg != null && (exceptionMsg.contains("concurrent") || exceptionMsg.contains("conflicting"))) {
+            logger.log(Level.INFO, "Database retry count" + currentCount + " Table name:" + target.tableFullName
+              + " Error Msg: " + e.getMessage)
+            if (currentCount == retryCount) {
+              logger.log(Level.INFO, s"""Reached max retry current retry count:${currentCount}""")
+              throw e
+            }
+            coolDown(target.tableFullName)
+            currentCount = currentCount + 1
+          } else {
             throw e
           }
-          coolDown(target.tableFullName)
       }
-
     }
     true
   }
@@ -296,7 +310,7 @@ class Database(config: Config) extends SparkSessionWrapper {
   private def coolDown(tableName: String): Unit = {
     val rnd = new scala.util.Random
     val number:Long = (rnd.nextFloat() * 30 + 30).toLong*1000
-    logger.log(Level.INFO, "Slowing multithreaded writing for " + tableName + "sleeping..." + number)
+    logger.log(Level.INFO,"Slowing multithreaded writing for " + tableName + "sleeping..." + number+" thread name "+Thread.currentThread().getName)
     Thread.sleep(number)
   }
 
