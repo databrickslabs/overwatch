@@ -1,9 +1,9 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{SchemaScrubber, SchemaTools, TSDF, ValidatedColumn}
+import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.catalyst.plans.logical.SubqueryAlias
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
@@ -23,6 +23,35 @@ object TransformFunctions {
       }
     }
 
+    /**
+     * drops columns that contain only nulls
+     * @param df dataframe to more data
+     * @return
+     *
+     */
+    def cullNull(): DataFrame = {
+      val dfSchema = df.schema
+      // df.summary doesn't display summaries for all data types, so the types that aren't displayed need to be
+      // converted to a string to be analyzed by df.summary
+      val summarySelects = dfSchema.map(f => {
+        f.dataType.typeName match {
+          case "struct" | "array" | "map" => to_json(col(f.name)).alias(f.name)
+          case "date" | "timestamp" | "boolean" => col(f.name).cast("string").alias(f.name)
+          case _ => col(f.name).alias(f.name)
+        }
+      })
+
+      val cntsDF = df.select(summarySelects: _*).summary("count").drop("summary")
+      val nonNullCols = cntsDF.collect()
+        .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
+        .map(col)
+      df.select(nonNullCols: _*)
+    }
+
+    def cullNestedColumns(structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
+      SchemaTools.cullNestedColumns(df, structToModify, nestedFieldsToCull)
+    }
+
     def suffixDFCols(
                       suffix: String,
                       columnsToSuffix: Array[String] = Array(),
@@ -38,6 +67,10 @@ object TransformFunctions {
       df.select(dfFields.map(fName => {
         if (allColumnsToSuffix.contains(fName)) col(fName).alias(s"${fName}${suffix}") else col(fName)
       }): _*)
+    }
+
+    def modifyStruct(changeInventory: Map[String, Column]): DataFrame = {
+      df.select(SchemaTools.modifyStruct(df.schema, changeInventory): _*)
     }
 
     /**
@@ -88,11 +121,21 @@ object TransformFunctions {
         (df, df2.suffixDFCols(rightSuffix, allJoinCols, caseSensitive = true))
       } else (df.suffixDFCols(leftSuffix, allJoinCols, caseSensitive = true), df2)
 
-      val baseJoinCondition = usingColumns.map(k => s"$k = ${k}${rightSuffix}").mkString(" AND ")
-      val joinConditionWLag = if (laggingSide == "left") {
+      val baseJoinCondition = if (joinType == "left" || joinType == "inner"){
+        usingColumns.map(k => s"$k = ${k}${rightSuffix}").mkString(" AND ")
+      } else usingColumns.map(k => s"$k = ${k}${leftSuffix}").mkString(" AND ")
+
+      val joinConditionWLag = if (joinType == "left" || joinType == "inner") {
+        if (laggingSide == "left") {
         expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${rightSuffix}, $lagDays)")
       } else {
         expr(s"$baseJoinCondition AND ${lagDateColumnName}${rightSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
+      }} else {
+        if (laggingSide == "left") {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName}${leftSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
+        } else {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${leftSuffix}, $lagDays)")
+        }
       }
 
       logger.log(Level.INFO, s"LagJoin Condition: $joinConditionWLag")
@@ -103,7 +146,6 @@ object TransformFunctions {
       } else joinResult.schema.fields.filterNot(_.name.endsWith(leftSuffix)).map(f => col(f.name))
 
       joinResult.select(joinSelects: _*)
-        .dropDuplicates(usingColumns) // remove any duplicates produced by joining current overtop of lag
     }
 
     def requireFields(fieldName: Seq[String]): DataFrame = requireFields(false, fieldName: _*)
@@ -133,7 +175,7 @@ object TransformFunctions {
     }
 
     def scrubSchema: DataFrame = {
-      SchemaScrubber.scrubSchema((df))
+      SchemaScrubber.scrubSchema(df)
     }
 
     def scrubSchema(schemaScrubber: SchemaScrubber): DataFrame = {
@@ -192,6 +234,83 @@ object TransformFunctions {
     }
 
     /**
+     * fills metadata columns in a dataframe using windows
+     * the windows will use the keys and the incrementals to go back as far as needed to get a value
+     * if a value cannot be filled from previous data, first future value will be used to fill
+     * @param fieldsToFill Array of fields to fill
+     * @param keys keys by which to partition the window
+     * @param incrementalFields fields by which to order the window
+     * @param orderedLookups Seq of columns that provide a secondary lookup for the value within the row
+     * @param noiseBuckets Optional number of buckets to split lookup window
+     *                     creates an intermediate step that can help shrink skew on large datasets with
+     *                     heavily skewed lookups
+     * @return
+     */
+    def fillMeta(
+                  fieldsToFill: Array[String],
+                  keys: Seq[String],
+                  incrementalFields: Seq[String],
+                  orderedLookups: Seq[Column] = Seq[Column](),
+                  noiseBuckets: Int = 0
+                ) : DataFrame = {
+      val dfFields = df.columns
+
+      // generate noise as per the number of noise buckets created
+      val stepDF = if (noiseBuckets > 0)  {
+        val keysWithNoise = keys :+ "__overwatch_ctrl_noiseBucket"
+        val wNoise = Window.partitionBy(keysWithNoise map col: _*).orderBy(incrementalFields map col: _*)
+        val wNoisePrev = wNoise.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+        val wNoiseNext = wNoise.rowsBetween(Window.currentRow, Window.unboundedFollowing)
+
+        val selectsWithFills = dfFields.map(f => {
+          if(fieldsToFill.map(_.toLowerCase).contains(f.toLowerCase)) { // field to fill
+            bidirectionalFill(f, wNoisePrev, wNoiseNext, orderedLookups)
+          } else { // not a fill field just return original value
+            col(f)
+          }
+        })
+        df
+          .withColumn("__overwatch_ctrl_noiseBucket", round(rand() * noiseBuckets, 0))
+          .select(selectsWithFills: _*)
+
+      } else df
+
+      val wRaw = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      val wPrev = wRaw.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+      val wNext = wRaw.rowsBetween(Window.currentRow, Window.unboundedFollowing)
+
+      val selectsWithFills = dfFields.map(f => {
+        if(fieldsToFill.map(_.toLowerCase).contains(f.toLowerCase)) { // field to fill
+          bidirectionalFill(f, wPrev, wNext, orderedLookups)
+        } else { // not a fill field just return original value
+          col(f)
+        }
+      })
+      stepDF
+        .drop("__overwatch_ctrl_noiseBucket") // drop noise col if exists
+        .select(selectsWithFills: _*)
+    }
+
+    /**
+     * remove dups via a window
+     * @param keys seq of keys for the df
+     * @param incrementalFields seq of incremental fields for the df
+     * @return
+     */
+    def dedupByKey(
+                     keys: Seq[String],
+                     incrementalFields: Seq[String]
+                     ): DataFrame = {
+//       val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
+      val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      df
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter(col("rnk") === 1  && col("rn") === 1)
+        .drop("rnk", "rn")
+    }
+
+    /**
      * Supports strings, numericals, booleans. Defined keys don't contain any other types thus this function should
      * ensure no nulls present for keys
      * @return
@@ -203,21 +322,96 @@ object TransformFunctions {
     /**
      *
      * @param name
-     * @param searchNestedFields NOT yet implemented
      * @param caseSensitive
      * @return
      */
-    def hasFieldNamed(name: String, searchNestedFields: Boolean = false, caseSensitive: Boolean = false): Boolean = {
-      val (casedName, fieldNames) = if (caseSensitive) (name, df.columns) else (name.toLowerCase, df.columns.map(_.toLowerCase))
-      if (searchNestedFields) { // search nested
-        fieldNames.contains(casedName)
-      } else { // top level only
-        fieldNames.contains(casedName)
-      }
+    def hasFieldNamed(name: String, caseSensitive: Boolean = false): Boolean = {
+      val casedName = if (caseSensitive) name else name.toLowerCase
+      SchemaTools.getAllColumnNames(df.schema).exists(c => {
+        if (caseSensitive) c.startsWith(casedName) else c.toLowerCase.startsWith(casedName)
+      })
     }
 
-//    private[overwatch] def colByName(df: DataFrame)(colName: String): StructField =
-//      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
+    /**
+     * Delta, by default, calculates statistics on the first 32 columns and there's no way to specify which columns
+     * on which to calc stats. Delta can be configured to calc stats on less than 32 columns but it still starts
+     * from left to right moving to the nth position as configured. This simplifies the migration of columns to the
+     * front of the dataframe to allow them to be "indexed" in front of others.
+     *
+     * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
+     * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
+     * array should be reversed before progressing through the logic
+     *
+     * TODO -- change colsToMove to the Seq[String]....
+     * TODO: checks for empty list, for existence of columns, etc.
+     *
+     * @param df         Input dataframe
+     * @param colsToMove Array of column names to be moved to front of schema
+     * @return
+     */
+    def moveColumnsToFront(colsToMove: Array[String]): DataFrame = {
+      val allNames = df.schema.names
+      val newColumns = (colsToMove ++ allNames.diff(colsToMove)).map(col)
+      df.select(newColumns: _*)
+    }
+
+    def moveColumnsToFront(colsToMove: String*): DataFrame = {
+      val allNames = df.schema.names
+      val newColumns = (colsToMove ++ allNames.diff(colsToMove)).map(col)
+      df.select(newColumns: _*)
+    }
+
+    /**
+     * appends fields to an existing struct
+     * @param structFieldName name of struct to which namedColumns should be applied
+     * @param namedColumns Array of NamedColumn
+     * @param overrideExistingStructCols Whether or not to override the value of existing struct field if it exists
+     * @param newStructFieldName If not provided, the original struct will be morphed, if a secondary struct is desired
+     *                           provide a name here and the original struct will not be altered.
+     *                           New, named struct will be added to the top level
+     * @param caseSensitive whether or not the field names are case sensitive
+     * @return
+     */
+    def appendToStruct(
+                        structFieldName: String,
+                        namedColumns: Array[NamedColumn],
+                        overrideExistingStructCols: Boolean = false,
+                        newStructFieldName: Option[String] = None,
+                        caseSensitive: Boolean = false
+                      ): DataFrame = {
+      require(df.hasFieldNamed(structFieldName, caseSensitive),
+        s"ERROR: Dataframe must contain the struct field to be altered. " +
+        s"$structFieldName was not found. Struct fields include " +
+        s"${df.schema.fields.filter(_.dataType.typeName == "struct").map(_.name).mkString(", ")}"
+      )
+
+      val fieldToAlterTypeName = df.select(structFieldName).schema.fields.head.dataType.typeName
+      require(fieldToAlterTypeName == "struct", s"ERROR: Field to alter must a struct but got $fieldToAlterTypeName")
+
+      val targetStructFieldNames = df.select(s"$structFieldName.*").schema.fieldNames
+      val missingFieldsToAdd = namedColumns.filterNot(fc => targetStructFieldNames.contains(fc.fieldName))
+      val colsToAdd = if (overrideExistingStructCols) namedColumns else missingFieldsToAdd
+      val alteredStructColumn = colsToAdd.foldLeft(col(structFieldName))((structCol, fc) => {
+        structCol.withField(fc.fieldName, fc.column.alias(fc.fieldName))
+      })
+
+      df.withColumn(newStructFieldName.getOrElse(structFieldName), alteredStructColumn)
+    }
+
+  }
+
+  private def bidirectionalFill(colToFillName: String, wPrev: WindowSpec, wNext: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+    val colToFill = col(colToFillName)
+    if (orderedLookups.nonEmpty){ // TODO -- omit nulls from lookup
+      val coalescedLookup = Array(colToFill) ++ orderedLookups.map(lookupCol => {
+        last(lookupCol, true).over(wPrev)
+      }) ++ orderedLookups.map(lookupCol => {
+        first(lookupCol, true).over(wNext)
+      })
+      coalesce(coalescedLookup: _*).alias(colToFillName)
+    } else {
+      coalesce(colToFill, last(colToFill, true).over(wPrev), first(colToFill, true).over(wNext)).alias(colToFillName)
+    }
   }
 
   object Costs {
@@ -241,10 +435,22 @@ object TransformFunctions {
              dbuRate_H: Column,
              nodeCount: Column,
              computeTime_H: Column,
+             runtimeEngine: Column,
+             sku: Column,
              smoothingCol: Option[Column] = None
            ): Column = {
+      //Check if the cluster is enabled with Photon or not
+      val isPhotonEnabled = upper(runtimeEngine).equalTo("PHOTON")
+      //Check if the cluster is not a SQL warehouse/endpoint
+      val isNotAnSQlWarehouse = !upper(sku).equalTo("SQLCOMPUTE")
+      //This is the default logic for DBU calculation
+      val defaultCalculation = dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))
+      val dbuMultiplier = 2
+
+      //assign the variables and return column with calculation
       coalesce(
-        when(isDatabricksBillable, dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1)))
+        when(isDatabricksBillable && isPhotonEnabled && isNotAnSQlWarehouse , defaultCalculation * dbuMultiplier)
+          .when(isDatabricksBillable, defaultCalculation)
           .otherwise(lit(0)),
         lit(0) // don't allow costs to be null (i.e. missing worker node type and/or single node workers
       )
@@ -381,33 +587,6 @@ object TransformFunctions {
 
   /**
    *
-   * Warning Does not remove null structs, arrays, etc.
-   *
-   * TODO: think, do we need to return the list of the columns - it could be inferred from DataFrame itself
-   * TODO: fix its behaviour with non-string & non-numeric fields - for example, it will remove Boolean columns and
-   * disregards structs
-   *
-   * Another helpful user function not utilized in the code base.
-   *
-   * @param df dataframe to more data
-   * @return
-   *
-   */
-  def removeNullCols(df: DataFrame): (Seq[Column], DataFrame) = {
-    val cntsDF = df.summary("count").drop("summary")
-    val nonNullCols = cntsDF.collect()
-      .flatMap(r => r.getValuesMap[Any](cntsDF.columns).filter(_._2 != "0").keys)
-      .map(col)
-    val complexTypeFields = df.schema.fields
-      .filter(f => f.dataType.isInstanceOf[StructType] || f.dataType.isInstanceOf[ArrayType] || f.dataType.isInstanceOf[MapType])
-      .map(_.name).map(col)
-    val columns = nonNullCols ++ complexTypeFields
-    val cleanDF = df.select(columns: _*)
-    (columns, cleanDF)
-  }
-
-  /**
-   *
    * @param baseDF
    * @param lookupDF
    * @return
@@ -427,29 +606,6 @@ object TransformFunctions {
     }
 
     df1Complete.unionByName(df2Complete)
-  }
-
-  /**
-   * Delta, by default, calculates statistics on the first 32 columns and there's no way to specify which columns
-   * on which to calc stats. Delta can be configured to calc stats on less than 32 columns but it still starts
-   * from left to right moving to the nth position as configured. This simplifies the migration of columns to the
-   * front of the dataframe to allow them to be "indexed" in front of others.
-   *
-   * TODO -- Validate order of columns in Array matches the order in the dataframe after the function call.
-   * If input is Array("a", "b", "c") the first three columns should match that order. If it's backwards, the
-   * array should be reversed before progressing through the logic
-   *
-   * TODO -- change colsToMove to the Seq[String]....
-   * TODO: checks for empty list, for existence of columns, etc.
-   *
-   * @param df         Input dataframe
-   * @param colsToMove Array of column names to be moved to front of schema
-   * @return
-   */
-  def moveColumnsToFront(df: DataFrame, colsToMove: Array[String]): DataFrame = {
-    val allNames = df.schema.names
-    val newColumns = (colsToMove ++ (allNames.diff(colsToMove))).map(col)
-    df.select(newColumns: _*)
   }
 
   /**

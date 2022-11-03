@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.utils.StringExt._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -68,13 +69,16 @@ object SchemaTools extends SparkSessionWrapper {
    * TODO - make this recursive with dot delimiter
    * @param df
    * @param colName
+   * @param missingNullType if the field does not exist what type should be returned
    * @return
    */
-  def colByName(df: DataFrame)(colName: String): StructField = {
+  def colByName(df: DataFrame)(colName: String, missingNullType: DataType = StringType): StructField = {
     if (spark.conf.get("spark.sql.caseSensitive") == "true") {
-      df.schema.find(_.name == colName).get
+      df.schema.find(_.name == colName).getOrElse(StructField(colName, missingNullType, nullable = true))
     } else {
-      df.schema.find(_.name.toLowerCase() == colName.toLowerCase()).get
+      val lowerCaseColName = colName.toLowerCase
+      df.schema.find(_.name.toLowerCase() == lowerCaseColName)
+        .getOrElse(StructField(lowerCaseColName, missingNullType, nullable = true))
     }
   }
 
@@ -97,6 +101,46 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+                                       //> containsNoSpecialChars: (string: String)Boolean
+
+  /**
+   * Removes nested columns within a struct and returns the Dataframe with the struct less the columns
+   * @param df df containing struct with cols to remove
+   * @param structToModify name of struct field to modify -- currently must be a top level field
+   *                       recursion is not yet enabled
+   * @param nestedFieldsToCull fields to remove -- top leve fields only, recursion not yet enabled
+   * @return
+   */
+  def cullNestedColumns(df: DataFrame, structToModify: String, nestedFieldsToCull: Array[String]): DataFrame = {
+    //Exception Block
+    if (nestedFieldsToCull.exists(_.contains("."))) {
+      throw new BadSchemaException("Recursive culling of nested columns is not yet supported (nestedFieldsToCull)")
+    }
+    if (!structToModify.containsNoSpecialChars) {
+      throw new BadSchemaException("Struct To Modify doesn't support column with special characters except _")
+    }
+
+
+    val originalFieldNames = df.select(s"$structToModify.*").columns
+    val remainingFieldNames = if (spark.conf.get("spark.sql.caseSensitive") == "true") {
+      originalFieldNames.diff(nestedFieldsToCull)
+    } else {
+      originalFieldNames.filterNot(f => nestedFieldsToCull.map(_.toLowerCase).contains(f.toLowerCase))
+    }
+    val newStructCol = struct(remainingFieldNames.map(f => s"$structToModify.$f") map col: _*).alias(structToModify)
+    df.withColumn(structToModify, newStructCol)
+  }
+
+  /**
+   * recurse through a struct and apply a transformation to all fields in the structure as noted in the
+   * changeInventory. Enabled for nested fields, they can be accessed through dot notation such as
+   * parent.child.grandchild
+   * @param structToModify which struct to modify, recursion supported through dot notation
+   * @param changeInventory Inventory of all changes to be made where the key is the dot map to the struct field
+   *                        to modify and the column is the columnar expression of the transform
+   * @param prefix initializes to null and appends as recursion drills down into the schema
+   * @return
+   */
   def modifyStruct(structToModify: StructType, changeInventory: Map[String, Column], prefix: String = null): Array[Column] = {
     structToModify.fields.map(f => {
       val fullFieldName = if (prefix == null) f.name else (prefix + "." + f.name)
@@ -109,6 +153,14 @@ object SchemaTools extends SparkSessionWrapper {
     })
   }
 
+  /**
+   * Identifies whether a field exists in a struct. This supports recursion through dot map notation.
+   * parent.child.grandchild
+   * if parent.child.grandchild exists in the schema func will return true
+   * @param schema schema to analyze
+   * @param dotPathOfField dot map notation parent.child.grandchild to check field
+   * @return
+   */
   def nestedColExists(schema: StructType, dotPathOfField: String): Boolean = {
     val dotPathAr = dotPathOfField.split("\\.")
     val elder = dotPathAr.head
@@ -130,7 +182,15 @@ object SchemaTools extends SparkSessionWrapper {
     }
   }
 
-  def structFromJson(spark: SparkSession, df: DataFrame, c: String): Column = {
+  /**
+   * Converts a string column containing valid JSON to a struct field
+   * @param spark sparkSession to use for json parsing
+   * @param df Dataframe containing column to parse
+   * @param c column name as a string -- supports recursion via dot map notation parent.child.grandchild
+   * @param isArrayWrapped if the struct is wrapped inside an array set this to true
+   * @return
+   */
+  def structFromJson(spark: SparkSession, df: DataFrame, c: String, isArrayWrapped: Boolean = false, allNullMinimumSchema: DataType = NullType): Column = {
     import spark.implicits._
     require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
     require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
@@ -139,39 +199,32 @@ object SchemaTools extends SparkSessionWrapper {
       println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
     }
     if (jsonSchema.isEmpty) {
-      lit(null)
+      lit(null).cast(allNullMinimumSchema).alias(c)
     } else {
-      from_json(col(c), jsonSchema).alias(c)
+      if (isArrayWrapped) from_json(col(c), ArrayType(jsonSchema)).alias(c)
+      else from_json(col(c), jsonSchema).alias(c)
     }
-  }
-
-  def structFromJson(spark: SparkSession, df: DataFrame, cs: String*): Column = {
-    import spark.implicits._
-    val dfFields = df.schema.fields
-    cs.foreach(c => {
-      require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
-      require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
-    })
-    array(
-      cs.map(c => {
-        val jsonSchema = spark.read.json(df.select(col(c)).filter(col(c).isNotNull).as[String]).schema
-        if (jsonSchema.fields.map(_.name).contains("_corrupt_record")) {
-          println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
-        }
-        from_json(col(c), jsonSchema).alias(c)
-      }): _*
-    )
   }
 
   // TODO -- Remove keys with nulls from maps?
   //  Add test to ensure that null/"" key and null/"" value are both handled
   //  as of 0.4.1 failed with key "" in spark_conf
   //  TEST for multiple null/"" cols / keynames in same struct/record
+
+  /**
+   * Converts a struct field to a map of string,string
+   * @param df Dataframe containing column to convert
+   * @param colToConvert name of struct column to be converted from struct to map
+   *                     must reference a struct field and the fields contained in the struct must be simple types,
+   *                     types that can be implicitly cast to a string
+   * @param dropEmptyKeys whether or not to remove keys that have a null value. This is defaulted to true as
+   *                      it's most common to remove keys without a value and there are often many of these
+   * @return
+   */
   def structToMap(df: DataFrame, colToConvert: String, dropEmptyKeys: Boolean = true): Column = {
 
     val mapColName = colToConvert.split("\\.").takeRight(1).head
-    val removeEmptyKeys = udf((m: Map[String, String]) => m.filterNot(_._2 == null))
-
+    val nullMapReturnCol = lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
     val dfFlatColumnNames = getAllColumnNames(df.schema)
     if (dfFlatColumnNames.exists(_.startsWith(colToConvert))) { // if column exists within schema
       df.select(colToConvert).schema.fields.head.dataType.typeName match {
@@ -185,7 +238,7 @@ object SchemaTools extends SparkSessionWrapper {
                 s"This key value will be replaced with a 'null_<random_string>' but should be corrected."
               logger.log(Level.WARN, errMsg)
               println(errMsg)
-              s"null_${randomString(42L, 6)}"
+              s"null_${randomString(22L, 6)}"
             } else kRaw
             mapCols.add(lit(k).cast("string"))
             mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
@@ -193,15 +246,17 @@ object SchemaTools extends SparkSessionWrapper {
           val newRawMap = map(mapCols.toSeq: _*)
           if (dropEmptyKeys) {
             when(newRawMap.isNull, lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)))
-              .otherwise(removeEmptyKeys(newRawMap)).alias(mapColName)
+              .otherwise(map_filter(newRawMap, (_,v) => v.isNotNull)).alias(mapColName)
           } else newRawMap.alias(mapColName)
         case "null" =>
-          lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
+          nullMapReturnCol
+        case "void" =>
+          nullMapReturnCol
         case x =>
           throw new Exception(s"function structToMap, columnToConvert must be of type struct but found $x instead")
       }
     } else { // colToConvert doesn't exist within the schema return null map type
-      lit(null).cast(MapType(StringType, StringType, valueContainsNull = true)).alias(mapColName)
+      nullMapReturnCol
     }
   }
 
@@ -211,7 +266,9 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   def uniqueRandomStrings(uniquesNeeded: Option[Int] = None, seed: Option[Long] = None, length: Int = 10): Seq[String] = {
-    (0 to uniquesNeeded.getOrElse(500) + 10).map(i => randomString(seed.getOrElse(42L) + i, length)).distinct
+    (0 to uniquesNeeded.getOrElse(500) + 10)
+      .map(i => randomString(seed.getOrElse(new Random().nextLong()) + i, length))
+      .distinct
   }
 
   /**
@@ -303,6 +360,20 @@ object SchemaTools extends SparkSessionWrapper {
     new BadSchemaException(msg)
   }
 
+  /**
+   * Build validationRunner for Schema validation. Provides the input schema vs. the minimum required schema
+   * to ensure rules are met. Input schema must conform to the minimum required schema or otherwise be able to
+   * be implicitly altered to meet the requirements
+   * @param dfSchema source schema to validate
+   * @param minRequiredSchema minimum required schema against which to validate
+   *                          fields of null type will be removed from the schema, this is different than
+   *                          enforce nonNullableColumns
+   * @param enforceNonNullCols Whether or not to implicitly convert nonNullable columns identified in the
+   *                           minimum schema where the input schema may otherwise allow nulls
+   * @param isDebug if enabled enables more robust logging
+   * @param cPrefix defaults to None -- used to map location within the schema through recursion
+   * @return
+   */
   def buildValidationRunner(
                              dfSchema: StructType,
                              minRequiredSchema: StructType,
@@ -351,6 +422,16 @@ object SchemaTools extends SparkSessionWrapper {
 
   }
 
+  /**
+   * validates the minimum required schema against the schema provided in the validator
+   * all rules in the validator must be met to return a ValidatedColumn
+   * @param validator Validation rule set and input schema
+   * @param cPrefix defaults to None -- used to map location within the schema through recursion
+   * @param enforceNonNullCols Whether or not to implicitly convert nonNullable columns identified in the
+   *                           minimum schema where the input schema may otherwise allow nulls
+   * @param isDebug if enabled enables more robust logging
+   * @return
+   */
   def validateSchema(
                       validator: ValidatedColumn,
                       cPrefix: Option[String] = None,
@@ -420,7 +501,8 @@ object SchemaTools extends SparkSessionWrapper {
               ).map(validateSchema(_, newPrefix))
 
               // build and return array(struct)
-              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias(fieldStructure.name))
+              validator
+//              validator.copy(column = array(struct(validatedChildren.map(_.column): _*)).alias(fieldStructure.name))
 
             case eType =>
               if (eType != requiredFieldStructure.dataType.asInstanceOf[ArrayType].elementType) { //element types don't match FAIL

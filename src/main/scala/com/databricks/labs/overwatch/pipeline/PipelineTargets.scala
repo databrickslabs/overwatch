@@ -111,8 +111,8 @@ abstract class PipelineTargets(config: Config) {
       config,
       incrementalColumns = Array("fileCreateDate", "fileCreateEpochMS"),
       partitionBy = Seq("organization_id", "Event", "fileCreateDate"),
-      statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID," +
-        "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename," +
+      statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID, " +
+        "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "),
       autoOptimize = true, // TODO -- perftest
       masterSchema = Some(Schema.sparkEventsRawMasterSchema)
@@ -176,8 +176,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("addedTimestamp"),
-      autoOptimize = true,
-      shuffleFactor = 0.25
+      autoOptimize = true
     )
 
     lazy private[overwatch] val executionsTarget: PipelineTable = PipelineTable(
@@ -187,8 +186,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("startTimestamp"),
-      autoOptimize = true,
-      shuffleFactor = 0.25
+      autoOptimize = true
     )
 
     lazy private[overwatch] val jobsTarget: PipelineTable = PipelineTable(
@@ -198,8 +196,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
-      autoOptimize = true,
-      shuffleFactor = 0.75
+      maxMergeScanDates = 4,
+      autoOptimize = true
     )
 
     lazy private[overwatch] val stagesTarget: PipelineTable = PipelineTable(
@@ -209,8 +207,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
-      autoOptimize = true,
-      shuffleFactor = 0.25
+      maxMergeScanDates = 4,
+      autoOptimize = true
     )
 
     lazy private[overwatch] val tasksTarget: PipelineTable = PipelineTable(
@@ -220,7 +218,7 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startDate", "startTimestamp"),
       partitionBy = Seq("organization_id", "startDate"),
-      shuffleFactor = 5,
+      maxMergeScanDates = 4,
       autoOptimize = true
     )
 
@@ -231,13 +229,15 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated
       zOrderBy = Array("runId", "jobId"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      persistBeforeWrite = true
     )
 
     lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
       name = "account_login_silver",
       _keys = Array("timestamp", "login_type", "requestId", "sourceIPAddress"),
       config,
+      _permitDuplicateKeys = false,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -264,7 +264,8 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
-      partitionBy = Seq("organization_id", "state_start_date")
+      partitionBy = Seq("organization_id", "state_start_date"),
+      maxMergeScanDates = 30, // 1 less than clusterStateFact
     )
 
     lazy private[overwatch] val poolsSpecTarget: PipelineTable = PipelineTable(
@@ -291,6 +292,16 @@ abstract class PipelineTargets(config: Config) {
       config,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+    )
+
+    lazy private[overwatch] val sqlQueryHistoryTarget: PipelineTable = PipelineTable(
+      name = "sql_query_history_silver",
+      _keys = Array("warehouse_id", "query_id", "query_start_time_ms"),
+      config,
+      _mode = WriteMode.merge,
+      _permitDuplicateKeys = false,
+      incrementalColumns = Array("query_start_time_ms"),
+      partitionBy = Seq("organization_id")
     )
 
   }
@@ -346,6 +357,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("run_id", "startEpochMS"),
       config,
       _mode = WriteMode.merge,
+      zOrderBy = Array("job_id", "run_id"),
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -361,6 +373,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("run_id", "startEpochMS"),
       config,
       _mode = WriteMode.merge,
+      zOrderBy = Array("job_id", "run_id"),
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -404,6 +417,7 @@ abstract class PipelineTargets(config: Config) {
       name = "account_login_gold",
       _keys = Array("request_id", "login_type", "login_unixTimeMS", "from_ip_address"),
       config,
+      _permitDuplicateKeys = false,
       incrementalColumns = Array("login_unixTimeMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -421,6 +435,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "state_start_date", "__overwatch_ctrl_noise"),
+      maxMergeScanDates = 31, // 1 greater than clusterStateDetail
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
       zOrderBy = Array("cluster_id", "unixTimeMS_state_start")
     )
@@ -436,6 +451,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("spark_context_id", "job_id", "unixTimeMS"),
       config,
       _mode = WriteMode.merge,
+      maxMergeScanDates = 4,
       partitionBy = Seq("organization_id", "date"),
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true,
@@ -454,6 +470,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "date"),
+      maxMergeScanDates = 4,
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true,
       zOrderBy = Array("cluster_id")
@@ -471,9 +488,9 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id", "date"),
+      maxMergeScanDates = 4,
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("date", "unixTimeMS"),
-      shuffleFactor = 5,
       autoOptimize = true
     )
 
@@ -488,6 +505,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("spark_context_id", "execution_id", "date", "unixTimeMS"),
       config,
       _mode = WriteMode.merge,
+      maxMergeScanDates = 4,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("date", "unixTimeMS"),
       autoOptimize = true
@@ -504,6 +522,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("spark_context_id", "executor_id", "date", "unixTimeMS"),
       config,
       _mode = WriteMode.merge,
+      maxMergeScanDates = 4,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("date", "unixTimeMS")
     )
@@ -519,16 +538,32 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("organization_id", "spark_context_id", "cluster_id", "stream_id", "stream_run_id", "stream_batch_id", "stream_timestamp"),
       config,
       _mode = WriteMode.merge,
+      maxMergeScanDates = 30,
       partitionBy = Seq("organization_id", "date"),
       zOrderBy = Array("cluster_id"),
       incrementalColumns = Array("date", "stream_timestamp"),
-      shuffleFactor = 3,
       autoOptimize = true
     )
 
     lazy private[overwatch] val sparkStreamViewTarget: PipelineView = PipelineView(
-      name = "sparkStream_Preview",
+      name = "sparkStream",
       sparkStreamTarget,
+      config
+    )
+
+    lazy private[overwatch] val sqlQueryHistoryTarget: PipelineTable = PipelineTable(
+      name = "sql_query_history_gold",
+      _keys = Array("warehouse_id", "query_id", "query_start_time_ms"),
+      config,
+      _mode = WriteMode.merge,
+      _permitDuplicateKeys = false,
+      incrementalColumns = Array("query_start_time_ms"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val sqlQueryHistoryViewTarget: PipelineView = PipelineView(
+      name = "sqlQueryHistory",
+      sqlQueryHistoryTarget,
       config
     )
 

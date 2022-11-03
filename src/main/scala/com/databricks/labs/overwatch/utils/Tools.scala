@@ -1,9 +1,10 @@
 package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.pipeline.{Initializer, PipelineFunctions, PipelineTable}
+import com.databricks.labs.overwatch.pipeline
+import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
+import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -13,10 +14,12 @@ import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
 
 import java.net.URI
+import java.time.LocalDate
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 
@@ -44,6 +47,29 @@ object JsonUtils {
         .setInclude(Value.construct(Include.NON_EMPTY, Include.NON_EMPTY))
     }
     obj
+  }
+
+  /**
+   * Extracts the key and value from Json String.This function only extracts the key and value if jsonString contains only one key and value.
+   * If the Json contains more then one key and value then this function will return the first pair of key and value.
+   *
+   * @param jsonString
+   * @return
+   */
+  private[overwatch] def getJsonKeyValue(jsonString: String): (String, String) = {
+    try {
+      val mapper = new ObjectMapper()
+      val actualObj = mapper.readTree(jsonString);
+      val key = actualObj.fields().next().getKey
+      val value = actualObj.fields().next().getValue.asText()
+      (key, value)
+    } catch {
+      case e: Throwable => {
+        logger.log(Level.ERROR, s"ERROR: Could not extract key and value from json. \nJSON: $jsonString", e)
+        throw e
+      }
+    }
+
   }
 
   private[overwatch] lazy val defaultObjectMapper: ObjectMapper =
@@ -153,6 +179,16 @@ object Helpers extends SparkSessionWrapper {
     } catch {
       case _: Throwable => Array(path)
     }
+  }
+
+  /**
+   *
+   * @param fromDT  inclusive
+   * @param untilDT until date is exclusive
+   * @return array of strings of dates between fromDT and untilDT in YYYY-mm-dd format
+   */
+  def getDatesGlob(fromDT: LocalDate, untilDT: LocalDate): Array[String] = {
+    datesStream(fromDT).takeWhile(_.isBefore(untilDT)).map(_.toString).toArray
   }
 
   /**
@@ -298,7 +334,7 @@ object Helpers extends SparkSessionWrapper {
    * @param maxFileSizeMB Optimizer's max file size in MB. Default is 1000 but that's too large so it's commonly
    *                      reduced to improve parallelism
    */
-  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int, includeVacuum: Boolean): Unit = {
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * maxFileSizeMB)
 
@@ -312,7 +348,7 @@ object Helpers extends SparkSessionWrapper {
         val sql = s"""optimize delta.`${tbl.tableLocation}` $zorderColumns"""
         println(s"optimizing: ${tbl.tableLocation} --> $sql")
         spark.sql(sql)
-        if (tbl.vacuum_H > 0) {
+        if (tbl.vacuum_H > 0 && includeVacuum) {
           println(s"vacuuming: ${tbl.tableLocation}, Retention == ${tbl.vacuum_H}")
           spark.sql(s"VACUUM delta.`${tbl.tableLocation}` RETAIN ${tbl.vacuum_H} HOURS")
         }
@@ -322,6 +358,10 @@ object Helpers extends SparkSessionWrapper {
       }
     })
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+  }
+
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
+    parOptimize(tables, maxFileSizeMB, includeVacuum = true)
   }
 
   /**
@@ -355,7 +395,7 @@ object Helpers extends SparkSessionWrapper {
    * Be VERY CAREFUL with this function as it's a nuke. There's a different methodology to make this work depending
    * on the cloud platform. At present Azure and AWS are both supported
    *
-   * @param target target table
+   * @param target        target table
    * @param cloudProvider - name of the cloud provider
    */
   @throws(classOf[UnhandledException])
@@ -385,6 +425,7 @@ object Helpers extends SparkSessionWrapper {
 
   /**
    * Execute a parallelized clone to follow the instructions provided through CloneDetail class
+   *
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
@@ -422,8 +463,12 @@ object Helpers extends SparkSessionWrapper {
     }).toArray.toSeq
   }
 
-  def getLatestVersion(tablePath: String): Long = {
+  def getLatestTableVersionByPath(tablePath: String): Long = {
     DeltaTable.forPath(tablePath).history(1).select('version).as[Long].head
+  }
+
+  def getLatestTableVersionByName(tableName: String): Long = {
+    DeltaTable.forName(tableName).history(1).select('version).as[Long].head
   }
 
   def getURI(pathString: String): URI = {
@@ -490,10 +535,11 @@ object Helpers extends SparkSessionWrapper {
    * Requires that the ETLDB exists and has had successful previous runs
    * As of 0.6.0.4
    * Cannot derive schemas < 0.6.0.3
+   *
    * @param etlDB Overwatch ETL database
    * @return
    */
-  def getWorkspaceByDatabase(etlDB: String): Workspace = {
+  def getWorkspaceByDatabase(etlDB: String, successfulOnly: Boolean = true, disableValidations: Boolean = false): Workspace = {
     // verify database exists
     assert(spark.catalog.databaseExists(etlDB), s"The database provided, $etlDB, does not exist.")
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
@@ -503,6 +549,36 @@ object Helpers extends SparkSessionWrapper {
     assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided, $etlDB, is not an Overwatch managed Database. Please provide an Overwatch managed database")
     val workspaceID = Initializer.getOrgId
 
+    val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
+
+    val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
+    val testConfig = spark.table(s"${etlDB}.pipeline_report")
+      .filter(statusFilter)
+      .withColumn("rnk", rank().over(latestConfigByOrg))
+      .withColumn("rn", row_number().over(latestConfigByOrg))
+      .filter('rnk === 1 && 'rn === 1)
+      .filter('organization_id === workspaceID)
+      .select(to_json('inputConfig).alias("compactString"))
+      .as[String].first()
+
+    Initializer(testConfig, disableValidations = disableValidations)
+  }
+
+  /**
+   * Enable Overwatch to retrieve a remote workspace as it's configured on a remote workspace.
+   * Key differences in the way this workspace is initialized is 1) all validations are disabled; thus no
+   * errors regarding remote keys not being present, etc. and 2) the database is not initialized since it's
+   * likely that the user doesn't want to start a new Overwatch database in the local workspace
+   * as it's defined in the remote workspace.
+   * Lastly, Pipelines that are build from this workspace instance cannot be run as all pipelines built from
+   * this workspace will be set to read only since validations have not been executed.
+   *
+   * @param pipelineReportPath path to remote "pipeline_report" table. Usually some_prefix/global_share/pipeline_report
+   * @param workspaceID        A single organization_id that has been run and successfully completed and reported data
+   *                           to this pipeline_report output
+   * @return
+   */
+  def getRemoteWorkspaceByPath(pipelineReportPath: String, workspaceID: String): Workspace = {
     // handle non-nullable field between azure and aws
     val addNewConfigs = Map(
       "auditLogConfig.azureAuditLogEventhubConfig" ->
@@ -511,8 +587,8 @@ object Helpers extends SparkSessionWrapper {
           .alias("azureAuditLogEventhubConfig")
     )
 
-    // acquires the config for the current workspace from the last run
-    val orgRunDetailsBase = spark.table(s"${etlDB}.pipeline_report")
+    // acquires the config for the workspaceId from the latest run
+    val orgRunDetailsBase = spark.read.format("delta").load(pipelineReportPath)
       .filter('organization_id === workspaceID)
       .select('organization_id, 'Pipeline_SnapTS, 'inputConfig)
       .orderBy('Pipeline_SnapTS.desc)
@@ -526,7 +602,168 @@ object Helpers extends SparkSessionWrapper {
       .first
 
     val compactString = JsonUtils.objToJson(overwatchParams).compactString
-    Initializer(compactString)
+    Initializer(compactString, disableValidations = true, initializeDatabase = false)
   }
+
+  /**
+   * Enables users to create a database with all the Overwatch datasets linked to their remote source WITHOUT needing
+   * to run Overwatch on the local workspace.
+   * Get the remote workspace using 'getRemoteWorkspaceByPath' function, build a localDataTarget to define the local
+   * etl and consumer database details
+   *
+   * @param remoteWorkspace remote workspace can be retrieved through getRemoteWorkspaceByPath
+   * @param localDataTarget DataTarget defined for local database names and locations
+   *                        the etlStoragePrefix must point to the existing Overwatch dataset whether it's mounted
+   *                        or direct access via s3:// or abfss:// or dbfs:/mnt/ etc.
+   * @return
+   */
+  def registerRemoteOverwatchIntoLocalMetastore(
+                                                 remoteWorkspace: Workspace,
+                                                 localDataTarget: DataTarget
+                                               ): Seq[WorkspaceMetastoreRegistrationReport] = {
+
+    val newConfigParams = remoteWorkspace.getConfig.inputConfig.copy(dataTarget = Some(localDataTarget))
+    val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
+    val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
+    val registrationReport = localTempWorkspace.addToMetastore()
+    val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
+    val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
+
+    b.refreshViews()
+    g.refreshViews()
+    registrationReport
+
+  }
+
+  private def rollbackTargetToTimestamp(
+                                         targetsToRollbackByTS: Array[TargetRollbackTS],
+                                         dryRun: Boolean
+                                       ): Unit = {
+    val deleteLogger = Logger.getLogger("ROLLBACK Logger")
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism - 1))
+    val targetsToRollback = targetsToRollbackByTS.par
+    targetsToRollback.tasksupport = taskSupport
+
+    targetsToRollback.foreach(rollbackTarget => {
+      val target = rollbackTarget.target
+      val rollbackToTime = Pipeline.createTimeDetail(rollbackTarget.rollbackTS)
+      val targetSchema = target.asDF.schema
+      val incrementalFields = targetSchema.filter(f => target.incrementalColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
+      val incrementalFilters = incrementalFields.map(f => {
+        f.dataType.typeName match {
+          case "long" => s"${f.name} >= ${rollbackToTime.asUnixTimeMilli}"
+          case "date" => s"${f.name} >= '${rollbackToTime.asDTString}'"
+          case "timestamp" => s"${f.name} >= '${rollbackToTime.asTSString}'"
+        }
+      })
+      val orgIdFilter = s" and organization_id = '${rollbackTarget.organization_id}'"
+      val deleteClause = incrementalFilters.reduce((x, y) => s"$x and $y ") + orgIdFilter
+      val deleteStatement =
+        s"""
+           |delete from ${target.tableFullName}
+           |where $deleteClause
+           |""".stripMargin
+      deleteLogger.info(s"DELETE STATEMENT: $deleteStatement")
+      try {
+        if (!dryRun) spark.sql(deleteStatement)
+      } catch {
+        case e: Throwable =>
+          val failMsg = s"FAILED DELETE FROM TARGET: ${target.tableFullName}\n\nDELETE STATEMENT: ${deleteStatement}"
+          println(PipelineFunctions.appendStackStrace(e, failMsg))
+          deleteLogger.error(PipelineFunctions.appendStackStrace(e, failMsg))
+      }
+    })
+
+  }
+
+  private def rollbackPipelineStateToTimestamp(
+                                                rollbackTSByModule: Array[ModuleRollbackTS],
+                                                customRollbackStatus: String,
+                                                config: Config,
+                                                dryRun: Boolean
+                                              ): Unit = {
+    val rollbackLogger = Logger.getLogger("Overwatch_State: ROLLBACK Logger")
+
+    rollbackTSByModule.foreach(rollbackDetail => {
+      val updateClause =
+        s"""
+           |update ${config.databaseName}.pipeline_report
+           |set status = concat('$customRollbackStatus', ' - ', status)
+           |where organization_id = '${rollbackDetail.organization_id}'
+           |and fromTS >= ${rollbackDetail.rollbackTS}
+           |and moduleId = ${rollbackDetail.moduleId}
+           |""".stripMargin
+      rollbackLogger.info(updateClause)
+      try {
+        if (!dryRun) spark.sql(updateClause)
+      } catch {
+        case e: Throwable =>
+          val failMsg = s"FAILED TARGET STATE UPDATE:\n MODULE ID: " +
+            s"${rollbackDetail.moduleId}\nRollbackTS: ${rollbackDetail.rollbackTS}\nORGID: " +
+            s"${rollbackDetail.organization_id}"
+          println(PipelineFunctions.appendStackStrace(e, failMsg))
+          rollbackLogger.error(PipelineFunctions.appendStackStrace(e, failMsg))
+      }
+    })
+  }
+
+  def rollbackPipelineForModule(
+                                 workspace: Workspace,
+                                 rollbackToTimeEpochMS: Long,
+                                 moduleIds: Array[Int],
+                                 workspaceIds: Array[String],
+                                 dryRun: Boolean = true,
+                                 customRollbackStatus: String = "ROLLED BACK"
+                               ): Unit = {
+    if (dryRun) println("DRY RUN: Nothing will be changed")
+    val config = workspace.getConfig
+    val orgFilter = if (workspaceIds.isEmpty) {
+      'organization_id === config.organizationId
+    } else if (workspaceIds.headOption.getOrElse(config.organizationId) == "global") {
+      lit(true)
+    } else {
+      'organization_id.isin(workspaceIds: _*)
+    }
+    val latestRunW = Window.partitionBy('organization_id, 'moduleId).orderBy('fromTS)
+
+    val rollbackTSByModule = spark.table(s"${config.databaseName}.pipeline_report")
+      .filter(orgFilter)
+      .filter('moduleId.isin(moduleIds: _*))
+      .filter('untilTS >= rollbackToTimeEpochMS)
+      .withColumn("rnk", rank().over(latestRunW))
+      .withColumn("rn", row_number().over(latestRunW))
+      .filter('rnk === 1 && 'rn === 1)
+      .select('organization_id, 'moduleId, 'fromTS.alias("rollbackTS"))
+      .as[ModuleRollbackTS]
+      .collect()
+
+    println(s"BEGINNING PIPELINE STATE ROLLBACK for modules " +
+      s"${rollbackTSByModule.map(_.moduleId).distinct.mkString(", ")} for ORGANIZATION IDs " +
+      s"${rollbackTSByModule.map(_.organization_id).distinct.mkString(", ")}")
+    rollbackPipelineStateToTimestamp(rollbackTSByModule, customRollbackStatus, config, dryRun)
+
+    val allTargets = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
+      Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
+      Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets
+
+    val targetsToRollback = rollbackTSByModule.map(rollback => {
+      val targetTableName = PipelineFunctions.getTargetTableNameByModule(rollback.moduleId)
+      val targetToRollback = allTargets.find(_.name.toLowerCase == targetTableName.toLowerCase)
+      assert(targetToRollback.nonEmpty, s"Target with name: $targetTableName not found")
+      TargetRollbackTS(
+        rollback.organization_id,
+        targetToRollback.get,
+        rollback.rollbackTS
+      )
+    })
+
+    println(s"BEGINNING TARGET ROLLBACK FOR TABLES " +
+      s"${targetsToRollback.map(_.target.tableFullName).distinct.mkString(", ")} for WORKSPACE IDs " +
+      s"${targetsToRollback.map(_.organization_id).distinct.mkString(", ")}"
+    )
+    rollbackTargetToTimestamp(targetsToRollback, dryRun)
+
+  }
+
 
 }

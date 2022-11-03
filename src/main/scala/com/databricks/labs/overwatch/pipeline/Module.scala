@@ -5,13 +5,16 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
+import java.time.Duration
+
 class Module(
               val moduleId: Int,
               val moduleName: String,
               private[overwatch] val pipeline: Pipeline,
               val moduleDependencies: Array[Int],
               val moduleScaleCoefficient: Double,
-              hardLimitMaxHistory: Option[Int]
+              hardLimitMaxHistory: Option[Int],
+              private var _shuffleFactor: Double = 1.0
             ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -33,13 +36,51 @@ class Module(
 
   def isFirstRun: Boolean = _isFirstRun
 
+  def daysToProcess: Int = {
+    Duration.between(
+      fromTime.asLocalDateTime.toLocalDate.atStartOfDay(),
+      untilTime.asLocalDateTime.toLocalDate.plusDays(1L).atStartOfDay()
+    ).toDays.toInt
+  }
+
+  /**
+   * use shuffle factor as a starting point and for every 5 days of history add an additional shuffle factor
+   * coefficient to scale shuffle partitions with history
+   * @return
+   */
+  def shuffleFactor: Double = {
+    val daysBucket = 30
+    val derivedShuffleFactor = _shuffleFactor * Math.floor(daysToProcess / daysBucket).toInt
+    logger.info(s"SHUFFLE FACTOR: Set to $derivedShuffleFactor")
+
+    derivedShuffleFactor
+  }
+
+  private def optimizeShufflePartitions(): Unit = {
+    val defaultShuffleParts = spark.conf.get("spark.sql.shuffle.partitions").toInt
+    val coreTargetOptimization = getTotalCores * 2
+
+    // At least 2 * cluster core count
+    val derivedShuffleParts = Math.max(
+      // Max out at 40,000 shuffle parts
+      Math.min(
+        Math.floor(defaultShuffleParts * shuffleFactor).toInt,
+        40000
+      ),
+      coreTargetOptimization
+    )
+    logger.info(s"SHUFFLE PARTITIONS SET: $derivedShuffleParts")
+    withSparkOverrides(Map("spark.sql.shuffle.partitions" -> derivedShuffleParts.toString))
+  }
+
   def copy(
             _moduleID: Int = moduleId,
             _moduleName: String = moduleName,
             _pipeline: Pipeline = pipeline,
             _moduleDependencies: Array[Int] = moduleDependencies,
-            _hardLimitMaxHistory: Option[Int] = hardLimitMaxHistory): Module = {
-    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies, moduleScaleCoefficient, _hardLimitMaxHistory)
+            _hardLimitMaxHistory: Option[Int] = hardLimitMaxHistory,
+            _shuffleFactor: Double = _shuffleFactor): Module = {
+    new Module(_moduleID, _moduleName, _pipeline, _moduleDependencies, moduleScaleCoefficient, _hardLimitMaxHistory, _shuffleFactor)
   }
 
   def withSparkOverrides(overrides: Map[String, String]): this.type = {
@@ -290,6 +331,7 @@ class Module(
 
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
+    optimizeShufflePartitions()
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
 
@@ -321,9 +363,15 @@ class Module(
         failWithRollback(e.target, PipelineFunctions.appendStackStrace(e, errMessage))
       case e: NoNewDataException =>
         // EMPTY prefix gets prepended in the errorHandler
-        val customMsg = s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
-          s"module will not progress until new data is received by this module.\n " +
-          s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        val customMsg = if (!e.allowModuleProgression) {
+          s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
+            s"module will not progress until new data is received by this module.\n " +
+            s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        } else {
+          s"$moduleId-$moduleName Module: No new data found. This does not appear to be an error but simply a " +
+            s"lack of data present for the module. Progressing module state.\n " +
+            s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        }
         val errMessage = PipelineFunctions.appendStackStrace(e, customMsg)
         logger.log(Level.ERROR, errMessage, e)
         noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
@@ -331,6 +379,8 @@ class Module(
         val msg = PipelineFunctions.appendStackStrace(e, s"$moduleName FAILED -->\n")
         logger.log(Level.ERROR, msg, e)
         fail(msg)
+    } finally {
+      spark.catalog.clearCache()
     }
 
   }
@@ -340,12 +390,24 @@ class Module(
 
 object Module {
 
+  /**
+   *
+   * @param moduleId
+   * @param moduleName
+   * @param pipeline
+   * @param moduleDependencies
+   * @param clusterScaleUpPercent
+   * @param hardLimitMaxHistory
+   * @param shuffleFactor starting point for shuffle factor coefficient
+   * @return
+   */
   def apply(moduleId: Int,
             moduleName: String,
             pipeline: Pipeline,
             moduleDependencies: Array[Int] = Array(),
             clusterScaleUpPercent: Double = 1.0,
-            hardLimitMaxHistory: Option[Int] = None
+            hardLimitMaxHistory: Option[Int] = None,
+            shuffleFactor: Double = 1.0
            ): Module = {
 
     // reset spark configs to default for each module
@@ -357,7 +419,8 @@ object Module {
       pipeline,
       moduleDependencies,
       clusterScaleUpPercent,
-      hardLimitMaxHistory
+      hardLimitMaxHistory,
+      shuffleFactor
     )
 
   }

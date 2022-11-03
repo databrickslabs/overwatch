@@ -1,19 +1,22 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
-import com.databricks.labs.overwatch.utils.Helpers.fastDrop
+import com.databricks.labs.overwatch.utils.Helpers.{fastDrop, parOptimize}
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 
-import java.util.concurrent.{ConcurrentHashMap, ForkJoinPool}
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConverters._
 import scala.collection.concurrent
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 object Upgrade extends SparkSessionWrapper {
 
@@ -51,6 +54,25 @@ object Upgrade extends SparkSessionWrapper {
         s"$targetVersion. This upgrade is meant to upgrade schemas below $targetVersion to $targetVersion schema. This is not a " +
         s"valid upgrade."
     )
+  }
+
+  private def finalizeUpgrade(
+                               overwatchETLDBName: String,
+                               tempDir: String,
+                               targetSchemaVersion: String
+                             ): Unit = {
+    val cleanupMsg = s"Cleaning up all upgrade backups and temporary reports from the upgrade located " +
+      s"within path $tempDir"
+    logger.log(Level.INFO, cleanupMsg)
+    println(cleanupMsg)
+    Helpers.fastrm(Array(tempDir))
+    val cleanupCompleteMsg = "UPGRADE - Cleanup complete"
+    logger.log(Level.INFO, cleanupCompleteMsg)
+    println(cleanupMsg)
+    SchemaTools.modifySchemaVersion(overwatchETLDBName, targetSchemaVersion)
+    val upgradeFinalizedMsg = "Upgrade Complete & Finalized"
+    logger.log(Level.INFO, upgradeFinalizedMsg)
+    println(upgradeFinalizedMsg)
   }
 
   /**
@@ -307,6 +329,7 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * when instantiating the workspace for orgs outside the current workspace the workspace config must be built
    * using the pipeline_report's latest configs for the org
+   *
    * @param pipelineReportPath pass in database name
    * @return
    */
@@ -330,7 +353,7 @@ object Upgrade extends SparkSessionWrapper {
 
     val ehConfigExistingCols = ehConfigFields.map(f => col("inputConfig.auditLogConfig.azureAuditLogEventhubConfig." + f.name).alias(f.name))
 
-    val ehConfigCols = if(ehConfigFields.map(_.name).contains("minEventsPerTrigger")) {
+    val ehConfigCols = if (ehConfigFields.map(_.name).contains("minEventsPerTrigger")) {
       ehConfigExistingCols
     } else {
       ehConfigExistingCols :+ lit(10).alias("minEventsPerTrigger")
@@ -359,12 +382,28 @@ object Upgrade extends SparkSessionWrapper {
       .collect
   }
 
+  def getWorkspaceByOrgNew(pipelineReportPath: String, statusFilter: Column = lit(true)): Array[OrgWorkspace] = {
+    val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
+    val compactStringByOrg = spark.read.format("delta").load(pipelineReportPath)
+      .filter(statusFilter)
+      .withColumn("rnk", rank().over(latestConfigByOrg))
+      .withColumn("rn", row_number().over(latestConfigByOrg))
+      .filter('rnk === 1 && 'rn === 1)
+      .select('organization_id, to_json('inputConfig).alias("compactString"))
+      .as[(String, String)].collect()
+
+    compactStringByOrg.map(cso => {
+      OrgWorkspace(cso._1, Initializer(cso._2, disableValidations = true))
+    })
+  }
+
   def upgradeTo060(
                     workspace: Workspace,
                     workspaceNameMap: Map[String, String] = Map(),
                     maxDays: Int = 9999,
                     rebuildSparkTables: Boolean = true,
-                    startStep: Double = 1.0 // TODO -- Reorder steps and switch back to Int
+                    startStep: Double = 1.0, // TODO -- Reorder steps and switch back to Int
+                    snapDir: String = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
                   ): DataFrame = {
 
     // TODO - ADD steps as an array to allow to resume upgrades at various steps
@@ -378,7 +417,6 @@ object Upgrade extends SparkSessionWrapper {
       "This upgrade function is only for upgrading schema version 042+ to new version 060. " +
         "Please first upgrade to at least schema version 0.4.2 before proceeding."
     )
-    val snapDir = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
     val config = workspace.getConfig
     config.setMaxDays(maxDays)
       .setExternalizeOptimize(true) // complete optimize at end
@@ -427,7 +465,7 @@ object Upgrade extends SparkSessionWrapper {
       val stepMsg = Some("Step 2: Upgrade pipeline_report")
       println(stepMsg.get)
       logger.log(Level.INFO, stepMsg)
-      val pipReportLatestVersion = Helpers.getLatestVersion(pipReportPath)
+      val pipReportLatestVersion = Helpers.getLatestTableVersionByPath(pipReportPath)
       initialSourceVersions.put("pipeline_report", pipReportLatestVersion)
 
       try {
@@ -578,7 +616,7 @@ object Upgrade extends SparkSessionWrapper {
       bronzeTargets.tasksupport = taskSupport
 
       // Get start version of all bronze targets
-      bronzeTargets.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestVersion(t.tableLocation)))
+      bronzeTargets.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestTableVersionByPath(t.tableLocation)))
 
       bronzeTargets.filter(_.exists).foreach(target => {
         try {
@@ -694,7 +732,7 @@ object Upgrade extends SparkSessionWrapper {
       val targetsToRebuild = if (rebuildSparkTables) { // rebuild all spark modules
         allSilverGoldTargets.par
       } else { // don't rebuild spark modules (except executors)
-         // executor tables had schema upgrade, they are small so just rebuild them
+        // executor tables had schema upgrade, they are small so just rebuild them
         allSilverGoldTargets.filter(
           t => !t.name.toLowerCase.contains("spark") ||
             sparkExecutorTargetsToRebuild.contains(t.name)).par
@@ -702,7 +740,7 @@ object Upgrade extends SparkSessionWrapper {
       targetsToRebuild.tasksupport = taskSupport
 
       // Get start version of all targets to be rebuilt
-      targetsToRebuild.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestVersion(t.tableLocation)))
+      targetsToRebuild.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestTableVersionByPath(t.tableLocation)))
 
       targetsToRebuild.foreach(target => {
         try {
@@ -877,21 +915,543 @@ object Upgrade extends SparkSessionWrapper {
   /**
    * Call this function after the entire upgrade has been confirmed to cleanup the backups and temporary files
    */
-    def finalize060Upgrade(overwatchETLDBName: String): Unit = {
-    val snapDir = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
-    val targetSchemaVersion = "0.600"
-    val cleanupMsg = s"Cleaning up all upgrade backups and temporary reports from the upgraded to 060 located " +
-      s"within path $snapDir"
-    logger.log(Level.INFO, cleanupMsg)
-    println(cleanupMsg)
-    Helpers.fastrm(Array(snapDir))
-    val cleanupCompleteMsg = "UPGRADE - Cleanup complete"
-    logger.log(Level.INFO, cleanupCompleteMsg)
-    println(cleanupMsg)
-    SchemaTools.modifySchemaVersion(overwatchETLDBName, targetSchemaVersion)
-    val upgradeFinalizedMsg = "Upgrade Complete & Finalized"
-    logger.log(Level.INFO, upgradeFinalizedMsg)
-    println(upgradeFinalizedMsg)
+  def finalize060Upgrade(
+                          overwatchETLDBName: String,
+                          snapDir: String = "/tmp/overwatch/060_upgrade_snapsot__ctrl_0x110"
+                        ): Unit = {
+    finalizeUpgrade(overwatchETLDBName, snapDir, "0.600")
+  }
+
+  private def upgradeDeltaTable(qualifiedName: String): Unit = {
+    try {
+      val tblPropertiesUpgradeStmt =
+        s"""ALTER TABLE $qualifiedName SET TBLPROPERTIES (
+      'delta.minReaderVersion' = '2',
+      'delta.minWriterVersion' = '5',
+      'delta.columnMapping.mode' = 'name'
+    )
+    """
+      logger.info(s"UPGRADE STATEMENT for $qualifiedName: $tblPropertiesUpgradeStmt")
+      spark.sql(tblPropertiesUpgradeStmt)
+    } catch {
+      case e: Throwable =>
+        logger.error(s"FAILED $qualifiedName ->", e)
+        println(s"FAILED UPGRADE FOR $qualifiedName")
+    }
+  }
+
+  /**
+   * Upgrades Overwatch schema to version 0610
+   * @param etlDatabaseName overwatch_etl database name
+   * @param startStep step from which to start (defaults to step 1)
+   * @param enableUpgradeBelowDBR104 required boolean to allow user to upgrade using DBR < 10.4LTS
+   * @param tempDir temporary dir in which to store metadata and upgrade status results
+   * @return
+   */
+  def upgradeTo0610(
+                     etlDatabaseName: String,
+                     startStep: Int = 1,
+                     enableUpgradeBelowDBR104: Boolean = false,
+                     tempDir: String = s"/tmp/overwatch/upgrade0610_status__ctrl_0x111/${System.currentTimeMillis()}"
+                   ): DataFrame = {
+    dbutils.fs.mkdirs(tempDir) // init tempDir -- if no errors it wouldn't be created
+    val blankConfig = new Config()
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName)
+    val numericalSchemaVersion = getNumericalSchemaVersion(currentSchemaVersion)
+    val targetSchemaVersion = "0.610"
+    validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
+    require(
+      numericalSchemaVersion >= 600 && numericalSchemaVersion < 610,
+      "This upgrade function is only for upgrading schema version 0600+ to new version 0610 " +
+        "Please first upgrade to at least schema version 0600 before proceeding. " +
+        "Upgrade documentation can be found in the change log."
+    )
+    val upgradeStatus: ArrayBuffer[UpgradeReport] = ArrayBuffer()
+    val dbrVersion = spark.conf.get("spark.databricks.clusterUsageTags.effectiveSparkVersion")
+    val dbrMajorV = dbrVersion.split("\\.").head
+    val dbrMinorV = dbrVersion.split("\\.")(1)
+    val dbrVersionNumerical = s"$dbrMajorV.$dbrMinorV".toDouble
+    val initialSourceVersions: concurrent.Map[String, Long] = new ConcurrentHashMap[String, Long]().asScala
+    val packageVersion = blankConfig.getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
+    val startingSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName).split("\\.").takeRight(1).head.toInt
+    assert(startingSchemaVersion >= 600 && packageVersion >= 610,
+      s"""
+         |This schema upgrade is only necessary when upgrading from < 0610 but > 05x.
+         |If upgrading from 05x directly to 0610+ simply run the 'upgradeTo060' function.
+         |""".stripMargin)
+    if (startStep <= 1) {
+      val stepMsg = Some("Step 1: Upgrade Schema - Job Status Silver")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+      val targetName = "job_status_silver"
+      try {
+        if (!spark.catalog.tableExists(etlDatabaseName, targetName)) {
+          throw new SimplifiedUpgradeException(
+            s"""
+               |$targetName cannot be found in db $etlDatabaseName, proceeding with upgrade assuming no jobs
+               |have been recorded.
+               |""".stripMargin,
+            etlDatabaseName, targetName, Some("1"), failUpgrade = false
+          )
+        }
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
+        val jobSilverDF = spark.table(s"${etlDatabaseName}.${targetName}")
+        SchemaTools.cullNestedColumns(jobSilverDF, "new_settings", Array("tasks", "job_clusters"))
+          .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
+          .write
+          .format("delta")
+          .partitionBy("organization_id", "__overwatch_ctrl_noise")
+          .mode("overwrite")
+          .option("overwriteSchema", "true")
+          .saveAsTable(s"${etlDatabaseName}.${targetName}")
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, targetName, Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    if (startStep <= 2) {
+      val stepMsg = Some("Step 2: Upgrade Schema - Job Gold")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+      val targetName = "job_gold"
+      try {
+        if (!spark.catalog.tableExists(etlDatabaseName, targetName)) {
+          throw new SimplifiedUpgradeException(
+            s"$targetName cannot be found in db $etlDatabaseName, proceeding with upgrade assuming no jobs " +
+              s"have been recorded.",
+            etlDatabaseName, targetName, Some("1"), failUpgrade = false
+          )
+        }
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
+        val jobGoldDF = spark.table(s"${etlDatabaseName}.${targetName}")
+        SchemaTools.cullNestedColumns(jobGoldDF, "new_settings", Array("tasks", "job_clusters"))
+          .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
+          .write
+          .format("delta")
+          .partitionBy("organization_id", "__overwatch_ctrl_noise")
+          .mode("overwrite")
+          .option("overwriteSchema", "true")
+          .saveAsTable(s"${etlDatabaseName}.${targetName}")
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, targetName, Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    if (startStep <= 3) {
+      val stepMsg = Some("Step 3: Upgrade Schema - Spark Events Bronze")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+      val targetName = "spark_events_bronze"
+      try {
+        if (!spark.catalog.tableExists(etlDatabaseName, targetName)) {
+          throw new SimplifiedUpgradeException(
+            s"""
+               |${targetName} cannot be found in db $etlDatabaseName, proceeding with upgrade assuming
+               |sparkEvents module is disabled.
+               |""".stripMargin,
+            etlDatabaseName, targetName, Some("1"), failUpgrade = false
+          )
+        }
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
+        spark.conf.set("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "500000")
+        spark.conf.set("spark.databricks.delta.optimizeWrite.binSize", "2048")
+        spark.conf.set("spark.sql.files.maxPartitionBytes", (1024 * 1024 * 64).toString)
+        spark.conf.set("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "true")
+
+        val sparkEventsBronzeDF = spark.table(s"${etlDatabaseName}.${targetName}")
+        val sparkEventsSchema = sparkEventsBronzeDF.schema
+        val fieldsRequiringRebuild = Array("modifiedConfigs", "extraTags")
+
+        if (dbrVersionNumerical < 10.4) { // if dbr < 10.4LTS -- rebuild table without the column
+          assert(enableUpgradeBelowDBR104, s"EXPLICIT force of parameter 'enableUpgradeBelowDBR104' is required " +
+            s"as upgrading without DBR 10.4LTS+ requires a full rebuild of $targetName table which can be " +
+            s"compute intensive for customers with large tables. Recommend upgrade to DBR 10.4LTS before " +
+            s"continuing.")
+
+          val partitionByCols = Seq("organization_id", "Event", "fileCreateDate")
+          val statsColumns = ("organization_id, Event, clusterId, SparkContextId, JobID, StageID, " +
+            "StageAttemptID, TaskType, ExecutorID, fileCreateDate, fileCreateEpochMS, fileCreateTS, filename, " +
+            "Pipeline_SnapTS, Overwatch_RunID").split(", ")
+          if (sparkEventsSchema.fields.exists(f => fieldsRequiringRebuild.contains(f.name))) {
+            logger.info(s"Beginning full rebuild of $targetName table. This could take some time. Recommend " +
+              s"monitoring of cluster size and ensure autoscaling enabled.")
+            sparkEventsBronzeDF
+              .drop(fieldsRequiringRebuild: _*)
+              .moveColumnsToFront(statsColumns)
+              .write.format("delta")
+              .partitionBy(partitionByCols: _*)
+              .mode("overwrite").option("overwriteSchema", "true")
+              .saveAsTable(s"${etlDatabaseName}.${targetName}")
+          }
+        } else { // if dbr >= 10.4 -- rename and deprecate the column (perf savings)
+          // spark_events_bronze must be upgraded to minimum delta reader/writer values
+          upgradeDeltaTable(s"${etlDatabaseName}.${targetName}")
+
+          val fieldsToRename = sparkEventsSchema.fieldNames.filter(f => fieldsRequiringRebuild.contains(f))
+          fieldsToRename.foreach(f => {
+            val modifyColStmt = s"alter table ${etlDatabaseName}.${targetName} rename " +
+              s"column $f to ${f}_tobedeleted"
+            logger.info(s"Beginning $targetName upgrade\nSTMT1: $modifyColStmt")
+            spark.sql(modifyColStmt)
+          })
+        }
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, targetName, Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    upgradeStatus.toArray.toSeq.toDF
+  }
+
+  /**
+   * Finalize the upgrade. This cleans up the temporary paths and upgrades the schema version
+   * @param overwatchETLDBName overwatch_etl database name
+   * @param tempDir temporary directory used for the 0610 upgrade
+   */
+  def finalize0610Upgrade(
+                           overwatchETLDBName: String,
+                           tempDir: String = "/tmp/overwatch/upgrade0610_status__ctrl_0x111/"
+                         ): Unit = {
+    require(Helpers.pathExists(tempDir), s"The default temporary directory $tempDir does not exist. If you used a " +
+      s"custom temporary directory please put add that path to the 'tempDir' parameter of this function and try again. " +
+      s"Otherwise, nothing can be found in the upgrade temp path, WILL NOT upgrading the schema.")
+      finalizeUpgrade(overwatchETLDBName, tempDir, "0.610")
+  }
+
+  // TODO -- upgrade
+  //  when rebuilding job tables -- use updateModuleState to ensure all pulled as a first run
+  //  EMPTY does not facilitate initModuleState
+  //  this method is better than rolling back pipelineReport
+  def upgradeTo0700(
+                     prodWorkspace: Workspace,
+                     startStep: Int = 1
+                   ): DataFrame = {
+    val prodConfig = prodWorkspace.getConfig
+    val etlDatabaseName = prodConfig.databaseName
+    val upgradeParamString = JsonUtils.objToJson(
+      prodConfig.inputConfig.copy(
+        overwatchScope = Some(Seq("audit", "clusters", "jobs")),
+        maxDaysToLoad = 1000,
+        externalizeOptimize = true)
+    ).compactString
+    val upgradeWorkspace = Initializer(upgradeParamString)
+    val upgradeConfig = upgradeWorkspace.getConfig
+    upgradeConfig
+      .setExternalizeOptimize(true)
+      .setOverwatchSchemaVersion("0.610") // override to pass schema check across versions
+      .setDebugFlag(false)
+    val tempDir = upgradeConfig.etlDataPathPrefix.split("/").dropRight(1).mkString("/") + s"/upgrade070_tempDir/${System.currentTimeMillis()}"
+    val pipReportPath = s"${upgradeConfig.etlDataPathPrefix}/pipeline_report"
+    val silverModulesToRebuild = Array(2010, 2011)
+    val goldModulesToRebuild = Array(3002, 3003, 3015)
+    dbutils.fs.mkdirs(tempDir) // init tempDir -- if no errors it wouldn't be created
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName)
+    val numericalSchemaVersion = getNumericalSchemaVersion(currentSchemaVersion)
+    val targetSchemaVersion = "0.700"
+    validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
+    require(
+      numericalSchemaVersion >= 610 && numericalSchemaVersion < 700,
+      "This upgrade function is only for upgrading schema version 6010+ to new version 0700 " +
+        "Please first upgrade to at least schema version 0610 before proceeding. " +
+        "Upgrade documentation can be found in the change log."
+    )
+    val upgradeStatus: ArrayBuffer[UpgradeReport] = ArrayBuffer()
+    val initialSourceVersions: concurrent.Map[String, Long] = new ConcurrentHashMap[String, Long]().asScala
+    val packageVersion = new Config().getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
+    val startingSchemaVersion = SchemaTools.getSchemaVersion(etlDatabaseName).split("\\.").takeRight(1).head.toInt
+    assert(startingSchemaVersion >= 610 && packageVersion >= 700,
+      s"""
+         |This schema upgrade is only necessary when upgrading from < 0700 but >= 0610.
+         |If upgrading from a lower schema, please perform the necessary intermediate upgrades.
+         |""".stripMargin)
+
+    if (startStep <= 1) {
+      val stepMsg = Some("Step 1: Optimize Main Sources")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+      try {
+        val optBronze = Bronze(upgradeWorkspace, suppressReport = true, suppressStaticDatasets = true)
+        val optSilver = Silver(upgradeWorkspace, suppressReport = true, suppressStaticDatasets = true)
+        val targetsToOptimize = Array(
+          optBronze.pipelineStateTarget,
+          optBronze.BronzeTargets.auditLogsTarget,
+          optSilver.SilverTargets.clustersSpecTarget
+        )
+        parOptimize(targetsToOptimize, 128, includeVacuum = false)
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, "Targets to Optimize", Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, "Targets to Optimize", Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    if (startStep <= 2) {
+      val stepMsg = Some("Step 2: Snapshot Targets To Be Rebuilt")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+      try {
+        val tablesToUpgrade = Array("jobs_snapshot_bronze", "job_status_silver", "jobrun_silver", "job_gold", "jobrun_gold", "jobruncostpotentialfact_gold")
+        val snapExcludes = upgradeWorkspace.getWorkspaceDatasets.filterNot(ds => tablesToUpgrade.contains(ds.name))
+        val cloneReport = upgradeWorkspace.snap(tempDir, excludes = snapExcludes.map(_.name).toArray)
+        cloneReport.toDS.write.format("delta").save(s"${tempDir}/clone_report")
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, "Tables to Upgrade", Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, "Tables to Upgrade", Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    if (startStep <= 3) {
+      val stepMsg = Some("Step 3: Upgrade jobs_snapshot_bronze")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+      try {
+        val upgradeBronze = Bronze(upgradeWorkspace, suppressReport = true, suppressStaticDatasets = true)
+        val jSnapBronzeTarget = PipelineFunctions.getPipelineTarget(upgradeBronze, "jobs_snapshot_bronze")
+          .copy(_mode = WriteMode.overwrite, withCreateDate = false, withOverwatchRunID = false, masterSchema = None)
+        val jSnapBronzeDF = jSnapBronzeTarget.asDF(withGlobalFilters = false)
+          .scrubSchema
+
+        // validation to ensure settings.tags exists and is a not already a map
+        if (SchemaTools.nestedColExists(jSnapBronzeDF.schema, "settings.tags")) {
+          val tagsTypename = jSnapBronzeDF.select($"settings.tags").schema.fields.find(_.name == "tags").get.dataType.typeName
+          if (tagsTypename == "map") {
+            throw new SimplifiedUpgradeException(
+              s"settings.tags is already the proper type 'map'. Skipping Step",
+              etlDatabaseName, jSnapBronzeTarget.name, Some("3"), failUpgrade = false
+            )
+          } else if(tagsTypename != "map" && tagsTypename != "struct") {
+            throw new SimplifiedUpgradeException(
+              s"settings.tags must either be a struct or a map to proceed. Failing Upgrade",
+              etlDatabaseName, jSnapBronzeTarget.name, Some("3"), failUpgrade = true
+            )
+          }
+        } else {
+          throw new SimplifiedUpgradeException(
+            "settings.tags does not exist in jobs_snapshot_bronze. Skipping Step",
+            etlDatabaseName, jSnapBronzeTarget.name, Some("3"), failUpgrade = false
+          )
+        }
+        val upgradedTags = NamedColumn("tags", SchemaTools.structToMap(jSnapBronzeDF, "settings.tags"))
+        val upgradedJSnapBronze = jSnapBronzeDF
+          .appendToStruct("settings", Array(upgradedTags), overrideExistingStructCols = true)
+
+        upgradeBronze.database.write(upgradedJSnapBronze, jSnapBronzeTarget, upgradeBronze.pipelineSnapTime.asColumnTS)
+
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, "jobs_snapshot_bronze", Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, "jobs_snapshot_bronze", Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    if (startStep <= 4) {
+      val stepMsg = Some("Step 4: Drop Targets to Rebuild")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+      try {
+
+        val silver = Silver(upgradeWorkspace, suppressReport = true, suppressStaticDatasets = true)
+        val gold = Gold(upgradeWorkspace, suppressReport = true, suppressStaticDatasets = true)
+        val targetsToRebuild = Array(
+          PipelineFunctions.getPipelineTarget(silver, "job_status_silver"),
+          PipelineFunctions.getPipelineTarget(silver, "jobrun_silver"),
+          PipelineFunctions.getPipelineTarget(gold, "job_gold"),
+          PipelineFunctions.getPipelineTarget(gold, "jobrun_gold"),
+          PipelineFunctions.getPipelineTarget(gold, "jobRunCostPotentialFact_gold")
+        )
+
+        targetsToRebuild.filter(_.exists).map(t => fastDrop(t, upgradeConfig.cloudProvider))
+        // ensure parent dirs are deleted
+        targetsToRebuild.foreach(t => dbutils.fs.rm(t.tableLocation, true))
+
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, "Tables to Upgrade", Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, "Tables to Upgrade", Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    if (startStep <= 5) { // TODO -- rebuild all workspaces val orgRunDetails = getLatestWorkspaceByOrg(pipReportPath)
+      val stepMsg = Some("Step 5: Rollback State For Upgrade Modules")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+
+      val rollbackPipReportSQL =
+        s"""
+           |update delta.`$pipReportPath`
+           |set status = concat('ROLLED BACK FOR UPGRADE to 070: Original Status - ', status)
+           |where moduleID in (${(silverModulesToRebuild ++ goldModulesToRebuild).mkString(", ")})
+           |and (status = 'SUCCESS' or status like 'EMPT%')
+           |""".stripMargin
+      val updateMsg = s"UPGRADE - Step 5 - Rolling back modules to be rebuilt\nSTATEMENT: $rollbackPipReportSQL"
+      logger.log(Level.INFO, updateMsg)
+
+      try {
+        spark.sql(rollbackPipReportSQL)
+
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, "pipeline_report", Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, "pipeline_report", Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    if (startStep <= 6) {
+      val stepMsg = Some("Step 6: Rebuild Silver Targets")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+
+      try {
+        // get latest workspace config by org id
+        val orgRunDetails = getWorkspaceByOrgNew(pipReportPath)
+        logger.log(Level.INFO, s"\nREBUILDING SILVER for ORG_IDs ${orgRunDetails.map(_.organization_id).mkString(",")}\n")
+        orgRunDetails.foreach(org => {
+          val launchSilverPipelineForOrgMsg = s"BEGINNING SILVER REBUILD FOR ORG_ID: ${org.organization_id}"
+          logger.log(Level.INFO, launchSilverPipelineForOrgMsg)
+          println(launchSilverPipelineForOrgMsg)
+          val orgWorkspace = org.workspace
+
+          val orgCloudProvider = if (orgWorkspace.getConfig.auditLogConfig.rawAuditPath.isEmpty) "azure" else "aws"
+          logger.info(s"CLOUD PROVIDER SET: $orgCloudProvider for ORGID: ${org.organization_id}")
+
+          orgWorkspace
+            .getConfig
+            .setDebugFlag(false)
+            .setOrganizationId(org.organization_id)
+            .setMaxDays(1000)
+            .setOverwatchSchemaVersion("0.700")
+            .setOverwatchScope(Seq(OverwatchScope.jobs))
+            .setDatabaseNameAndLoc(upgradeConfig.databaseName, upgradeConfig.databaseLocation, upgradeConfig.etlDataPathPrefix)
+            .setConsumerDatabaseNameandLoc(upgradeConfig.consumerDatabaseName, upgradeConfig.consumerDatabaseLocation)
+            .setCloudProvider(orgCloudProvider)
+            .setTempWorkingDir(upgradeConfig.tempWorkingDir)
+
+          val upgradeSilver = Silver(orgWorkspace, suppressReport = true, suppressStaticDatasets = true)
+            .setReadOnly(false)
+          // reset rebuild module states to ensure first run is detected
+          silverModulesToRebuild.foreach(upgradeSilver.dropModuleState)
+          upgradeSilver.run()
+          logger.log(Level.INFO, s"COMPLETED SILVER REBUILD FOR ORG_ID: ${org.organization_id}")
+        })
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, "Silver Targets to be Rebuilt", Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, "Silver Targets to be Rebuilt", Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    if (startStep <= 7) {
+      val stepMsg = Some("Step 7: Rebuild Gold Targets")
+      println(stepMsg.get)
+      logger.log(Level.INFO, stepMsg.get)
+
+      try {
+        // get latest workspace config by org id
+        val orgRunDetails = getWorkspaceByOrgNew(pipReportPath)
+        logger.log(Level.INFO, s"\nREBUILDING GOLD for ORG_IDs ${orgRunDetails.map(_.organization_id).mkString(",")}\n")
+        orgRunDetails.foreach(org => {
+          val launchSilverPipelineForOrgMsg = s"BEGINNING GOLD REBUILD FOR ORG_ID: ${org.organization_id}"
+          logger.log(Level.INFO, launchSilverPipelineForOrgMsg)
+          println(launchSilverPipelineForOrgMsg)
+          val orgWorkspace = org.workspace
+
+          val orgCloudProvider = if (orgWorkspace.getConfig.auditLogConfig.rawAuditPath.isEmpty) "azure" else "aws"
+          logger.info(s"CLOUD PROVIDER SET: $orgCloudProvider for ORGID: ${org.organization_id}")
+
+          orgWorkspace
+            .getConfig
+            .setDebugFlag(false)
+            .setOrganizationId(org.organization_id)
+            .setMaxDays(1000)
+            .setOverwatchSchemaVersion("0.700")
+            .setOverwatchScope(Seq(OverwatchScope.jobs))
+            .setDatabaseNameAndLoc(upgradeConfig.databaseName, upgradeConfig.databaseLocation, upgradeConfig.etlDataPathPrefix)
+            .setConsumerDatabaseNameandLoc(upgradeConfig.consumerDatabaseName, upgradeConfig.consumerDatabaseLocation)
+            .setCloudProvider(orgCloudProvider)
+            .setTempWorkingDir(upgradeConfig.tempWorkingDir)
+
+          val upgradeGold = Gold(orgWorkspace, suppressReport = true, suppressStaticDatasets = true)
+            .setReadOnly(false)
+          // reset rebuild module states to ensure first run is detected
+          goldModulesToRebuild.foreach(upgradeGold.dropModuleState)
+          upgradeGold.run()
+          logger.log(Level.INFO, s"COMPLETED GOLD REBUILD FOR ORG_ID: ${org.organization_id}")
+        })
+        upgradeStatus.append(UpgradeReport(etlDatabaseName, "Gold Targets to be Rebuilt", Some("SUCCESS"), stepMsg))
+      } catch {
+        case e: SimplifiedUpgradeException =>
+          upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
+        case e: Throwable =>
+          val failMsg = s"UPGRADE FAILED"
+          logger.log(Level.ERROR, failMsg)
+          upgradeStatus.append(
+            UpgradeReport(etlDatabaseName, "Gold Targets to be Rebuilt", Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
+          )
+      }
+      verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
+    }
+    upgradeStatus.toArray.toSeq.toDF
   }
 
 }

@@ -20,7 +20,7 @@ class JsonToolsTest extends AnyFunSpec {
 
       val jsonMap = JsonUtils.jsonToMap(jsonStr)
       val bookArray = jsonMap.get("employees")
-      assert(bookArray.isDefined && bookArray.get.isInstanceOf[List[Any]])
+      assert(bookArray.nonEmpty && bookArray.get.isInstanceOf[List[Any]])
     }
 
     it("shouldn't convert JSON string to Map") {
@@ -156,6 +156,27 @@ class JsonToolsTest extends AnyFunSpec {
       assertResult(
         "{ }".stripMargin)(js.prettyString)
     }
+
+    it("Should parse the json string and return key and value of that input string "){
+      assertResult(("path","/tmp"),"")(JsonUtils.getJsonKeyValue("""{"path":"/tmp"}"""))
+     // assertResult("")(JsonUtils.getJsonKeyValue(""))
+    }
+    it("Should throw error"){
+      assertThrows[NoSuchElementException](JsonUtils.getJsonKeyValue(""))
+    }
+    it("Should throw error for corrupted json"){
+      assertThrows[Throwable](JsonUtils.getJsonKeyValue("""{"path":/missing"}"""))
+    }
+    it("Should return first pair of key and value"){
+      assertResult(("path","/tmp"),"")(JsonUtils.getJsonKeyValue("""{"path":"/tmp","path2":"/tmp2"}"""))
+    }
+    it("Should throw error for unsupported json"){
+      assertThrows[NoSuchElementException](JsonUtils.getJsonKeyValue("""[{"path":"/tmp"},{"path2":"/tmp2"}]"""))
+    }
+    it("Should throw error for unsupported nested json"){
+      assertThrows[NoSuchElementException](JsonUtils.getJsonKeyValue("""[{"path":"/tmp"},{"nestedParent":{"nestedChildKey": "nestedChildValue"}}]"""))
+    }
+
 
   }
 }

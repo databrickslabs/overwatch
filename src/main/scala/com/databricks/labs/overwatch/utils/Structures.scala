@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.{Module, PipelineFunctions, PipelineTable}
 import com.databricks.labs.overwatch.utils.OverwatchScope.OverwatchScope
 import com.databricks.labs.overwatch.validation.SnapReport
@@ -33,7 +34,42 @@ case class DatabricksContractPrices(
                                      jobsLightDBUCostUSD: Double = 0.10
                                    )
 
-case class ApiEnv(isLocal: Boolean, workspaceURL: String, rawToken: String, packageVersion: String)
+case class ApiEnv(
+                   isLocal: Boolean,
+                   workspaceURL: String,
+                   rawToken: String,
+                   packageVersion: String,
+                   successBatchSize: Int = 200,
+                   errorBatchSize: Int = 500,
+                   runID: String = "",
+                   enableUnsafeSSL: Boolean = false,
+                   threadPoolSize: Int = 4,
+                   apiWaitingTime: Long = 300000,
+                   proxyHost: Option[String] = None,
+                   proxyPort: Option[Int] = None,
+                   proxyUserName: Option[String] = None,
+                   proxyPasswordScope: Option[String] = None,
+                   proxyPasswordKey: Option[String] = None
+                 )
+
+
+case class ApiEnvConfig(
+                         successBatchSize: Int = 200,
+                         errorBatchSize: Int = 500,
+                         enableUnsafeSSL: Boolean = false,
+                         threadPoolSize: Int = 4,
+                         apiWaitingTime: Long = 300000,
+                         apiProxyConfig: Option[ApiProxyConfig] = None
+                       )
+
+case class ApiProxyConfig(
+                           proxyHost: Option[String] = None,
+                           proxyPort: Option[Int] = None,
+                           proxyUserName: Option[String] = None,
+                           proxyPasswordScope: Option[String] = None,
+                           proxyPasswordKey: Option[String] = None
+                         )
+
 
 case class ValidatedColumn(
                             column: Column,
@@ -63,7 +99,11 @@ case class AzureAuditLogEventhubConfig(
                                         maxEventsPerTrigger: Int = 10000,
                                         minEventsPerTrigger: Int = 10,
                                         auditRawEventsChk: Option[String] = None,
-                                        auditLogChk: Option[String] = None
+                                        auditLogChk: Option[String] = None,
+                                        azureClientId: Option[String] = None,
+                                        azureClientSecret: Option[String] = None,
+                                        azureTenantId: Option[String] = None,
+                                        azureAuthEndpoint: String = "https://login.microsoftonline.com/"
                                       )
 
 case class AuditLogConfig(
@@ -83,8 +123,10 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            databricksContractPrices: DatabricksContractPrices = DatabricksContractPrices(),
                            primordialDateString: Option[String] = None,
                            intelligentScaling: IntelligentScaling = IntelligentScaling(),
-                           workspace_name: Option[String],
-                           externalizeOptimize: Boolean
+                           workspace_name: Option[String] = None,
+                           externalizeOptimize: Boolean = false,
+                           apiEnvConfig: Option[ApiEnvConfig] = None,
+                           tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )
 
 case class ParsedConfig(
@@ -175,11 +217,19 @@ case class WorkspaceDataset(path: String, name: String)
 
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
 
-case class CloneDetail(source: String, target: String, asOfTS: Option[String], cloneLevel: String = "DEEP")
+case class CloneDetail(source: String, target: String, asOfTS: Option[String] = None, cloneLevel: String = "DEEP")
 
 case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
 
 case class OrgConfigDetail(organization_id: String, latestParams: OverwatchParams)
+
+case class OrgWorkspace(organization_id: String, workspace: Workspace)
+
+case class NamedColumn(fieldName: String, column: Column)
+
+case class ModuleRollbackTS(organization_id: String, moduleId: Int, rollbackTS: Long)
+
+case class TargetRollbackTS(organization_id: String, target: PipelineTable, rollbackTS: Long)
 
 case class DeltaHistory(version: Long, timestamp: java.sql.Timestamp, operation: String, clusterId: String, operationMetrics: Map[String, String], userMetadata: String)
 
@@ -201,7 +251,7 @@ case class SanitizeFieldException(field: StructField, rules: List[SanitizeRule],
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, pools = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, dbsql, pools = Value
   // Todo Issue_77
 }
 
@@ -220,6 +270,8 @@ private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 private[overwatch] class IncompleteFilterException(s: String) extends Exception(s) {}
 
 private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val allowModuleProgression: Boolean) extends Exception(apiCallDetail)
+
+private[overwatch] class ApiCallFailureV2(s: String) extends Exception(s) {}
 
 private[overwatch] class ApiCallFailure(
                                          val httpResponse: HttpResponse[String],
@@ -311,6 +363,12 @@ private[overwatch] class BadSchemaException(s: String) extends Exception(s) {
 private[overwatch] class UpgradeException(s: String, target: PipelineTable, step: Option[String] = None, failUpgrade: Boolean = false) extends Exception(s) {
   def getUpgradeReport: UpgradeReport = {
     UpgradeReport(target.databaseName, target.name, Some(PipelineFunctions.appendStackStrace(this, s)), step, failUpgrade)
+  }
+}
+
+private[overwatch] class SimplifiedUpgradeException(s: String, db: String, table: String, step: Option[String] = None, failUpgrade: Boolean = false) extends Exception(s) {
+  def getUpgradeReport: UpgradeReport = {
+    UpgradeReport(db, table, Some(PipelineFunctions.appendStackStrace(this, s)), step, failUpgrade)
   }
 }
 

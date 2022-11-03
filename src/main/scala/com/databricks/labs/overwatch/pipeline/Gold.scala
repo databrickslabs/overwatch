@@ -30,7 +30,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkTaskTarget,
       GoldTargets.sparkExecutionTarget,
       GoldTargets.sparkStreamTarget,
-      GoldTargets.sparkExecutorTarget
+      GoldTargets.sparkExecutorTarget,
+      GoldTargets.sqlQueryHistoryTarget
     )
   }
 
@@ -64,6 +65,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           sparkStreamModule
         )
       }
+      case OverwatchScope.dbsql => {
+        Array(sqlQueryHistoryModule)
+      }
       case _ => Array[Module]()
     }
   }
@@ -81,7 +85,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(2019, 2014), 3.0)
   lazy private val appendClusterStateFactProccess = ETLDefinition(
-    SilverTargets.clusterStateDetailTarget.asIncrementalDF(clusterStateFactModule, SilverTargets.clusterStateDetailTarget.incrementalColumns),
+    SilverTargets.clusterStateDetailTarget.asIncrementalDF(
+      clusterStateFactModule,
+      SilverTargets.clusterStateDetailTarget.incrementalColumns,
+      GoldTargets.clusterStateFactTarget.maxMergeScanDates
+    ),
     Seq(buildClusterStateFact(
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.dbuCostDetail,
@@ -134,7 +142,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           .asIncrementalDF(jobRunCostPotentialFactModule, GoldTargets.clusterStateFactTarget.incrementalColumns, 90),
         GoldTargets.sparkJobTarget.asIncrementalDF(jobRunCostPotentialFactModule, GoldTargets.sparkJobTarget.incrementalColumns, 2),
         GoldTargets.sparkTaskTarget.asIncrementalDF(jobRunCostPotentialFactModule, GoldTargets.sparkTaskTarget.incrementalColumns, 2),
-        jobRunCostPotentialFactModule.fromTime
+        jobRunCostPotentialFactModule.fromTime,
+        jobRunCostPotentialFactModule.untilTime
       )),
     append(GoldTargets.jobRunCostPotentialFactTarget)
   )
@@ -165,7 +174,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048" // output is very dense, shrink output file size
   )
 
-  lazy private[overwatch] val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006), 6.0)
+  lazy private[overwatch] val sparkJobModule = Module(3010, "Gold_SparkJob", this, Array(2006), 6.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkJobProcess = ETLDefinition(
     SilverTargets.jobsTarget.asIncrementalDF(sparkJobModule, SilverTargets.jobsTarget.incrementalColumns),
@@ -173,7 +182,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkJobTarget)
   )
 
-  lazy private[overwatch] val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007), 6.0)
+  lazy private[overwatch] val sparkStageModule = Module(3011, "Gold_SparkStage", this, Array(2007), 6.0, shuffleFactor = 4.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkStageProcess = ETLDefinition(
     SilverTargets.stagesTarget.asIncrementalDF(sparkStageModule, SilverTargets.stagesTarget.incrementalColumns),
@@ -181,7 +190,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkStageTarget)
   )
 
-  lazy private[overwatch] val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008), 6.0)
+  lazy private[overwatch] val sparkTaskModule = Module(3012, "Gold_SparkTask", this, Array(2008), 6.0, shuffleFactor = 8.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkTaskProcess = ETLDefinition(
     SilverTargets.tasksTarget.asIncrementalDF(sparkTaskModule, SilverTargets.tasksTarget.incrementalColumns),
@@ -189,7 +198,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkTaskTarget)
   )
 
-  lazy private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005), 6.0)
+  lazy private[overwatch] val sparkExecutionModule = Module(3013, "Gold_SparkExecution", this, Array(2005), 6.0, shuffleFactor = 2.0)
     .withSparkOverrides(sparkBaseSparkOverrides)
   lazy private val appendSparkExecutionProcess = ETLDefinition(
     SilverTargets.executionsTarget.asIncrementalDF(sparkExecutionModule, SilverTargets.executionsTarget.incrementalColumns),
@@ -197,7 +206,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkExecutionTarget)
   )
 
-  lazy private[overwatch] val sparkStreamModule = Module(3016, "Gold_SparkStream", this, Array(1006, 2005), 6.0)
+  lazy private[overwatch] val sparkStreamModule = Module(3016, "Gold_SparkStream", this, Array(1006, 2005), 6.0, shuffleFactor = 4.0)
     .withSparkOverrides(sparkBaseSparkOverrides ++ Map("spark.sql.caseSensitive" -> "true"))
   lazy private val appendSparkStreamProcess = ETLDefinition(
     BronzeTargets.sparkEventLogsTarget.asIncrementalDF(sparkStreamModule, BronzeTargets.sparkEventLogsTarget.incrementalColumns),
@@ -217,6 +226,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.sparkExecutorTarget)
   )
 
+  lazy private[overwatch] val sqlQueryHistoryModule = Module(3017, "Gold_Sql_QueryHistory", this, Array(2020), 6.0)
+    .withSparkOverrides(sparkBaseSparkOverrides)
+  lazy private val appendSqlQueryHistoryProcess = ETLDefinition(
+    SilverTargets.sqlQueryHistoryTarget.asIncrementalDF(sqlQueryHistoryModule, SilverTargets.sqlQueryHistoryTarget.incrementalColumns,2),
+    append(GoldTargets.sqlQueryHistoryTarget)
+  )
 
   private def processSparkEvents(): Unit = {
 
@@ -233,6 +248,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
     GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
     GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+    GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
 
   }
 
@@ -269,6 +285,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
         GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
       }
+      case OverwatchScope.dbsql => {
+        sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
+        GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
+      }
       case OverwatchScope.sparkEvents => {
         processSparkEvents()
       }
@@ -290,6 +310,44 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
+  def refreshViews(): Unit = {
+    config.overwatchScope.foreach {
+      case OverwatchScope.accounts => {
+        GoldTargets.accountLoginViewTarget.publish(accountLoginViewColumnMappings)
+        GoldTargets.accountModsViewTarget.publish(accountModViewColumnMappings)
+      }
+      case OverwatchScope.notebooks => {
+        GoldTargets.notebookViewTarget.publish(notebookViewColumnMappings)
+      }
+      case OverwatchScope.pools => {
+        GoldTargets.poolsViewTarget.publish(poolsViewColumnMapping)
+      }
+      case OverwatchScope.clusters => {
+        GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping)
+      }
+      case OverwatchScope.clusterEvents => {
+        GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings)
+      }
+      case OverwatchScope.jobs => {
+        GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
+        GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
+        GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
+      }
+      case OverwatchScope.sparkEvents => {
+        GoldTargets.sparkJobViewTarget.publish(sparkJobViewColumnMapping)
+        GoldTargets.sparkStageViewTarget.publish(sparkStageViewColumnMapping)
+        GoldTargets.sparkTaskViewTarget.publish(sparkTaskViewColumnMapping)
+        GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
+        GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
+        GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+      }
+      case OverwatchScope.dbsql => {
+        GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
+      }
+      case _ =>
+    }
+  }
+
 
   def run(): Pipeline = {
 
@@ -305,9 +363,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
 object Gold {
   def apply(workspace: Workspace): Gold = {
-    new Gold(workspace, workspace.database, workspace.getConfig)
-      .initPipelineRun()
-      .loadStaticDatasets()
+    apply(
+      workspace,
+      readOnly = false,
+      suppressReport = false,
+      suppressStaticDatasets = false
+    )
   }
 
   private[overwatch] def apply(
@@ -317,7 +378,7 @@ object Gold {
                                 suppressStaticDatasets: Boolean = false
                               ): Gold = {
     val goldPipeline = new Gold(workspace, workspace.database, workspace.getConfig)
-      .setReadOnly(readOnly)
+      .setReadOnly(if (workspace.isValidated) readOnly else true) // if workspace is not validated set it read only
       .suppressRangeReport(suppressReport)
       .initPipelineRun()
 

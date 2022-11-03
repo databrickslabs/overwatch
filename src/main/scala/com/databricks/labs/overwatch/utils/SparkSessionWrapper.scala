@@ -34,7 +34,7 @@ trait SparkSessionWrapper extends Serializable {
   } else {
     logger.log(Level.INFO, "Using Custom, local SparkSession")
     SparkSession.builder()
-      .master("local")
+      .master("local[*]")
       .config("spark.driver.maxResultSize", "8g")
       .appName("OverwatchBatch")
 //    Useful configs for local spark configs and/or using labs/spark-local-execution
@@ -53,7 +53,11 @@ trait SparkSessionWrapper extends Serializable {
 
   def getNumberOfWorkerNodes: Int = sc.statusTracker.getExecutorInfos.length - 1
 
-  def getTotalCores: Int = getCoresPerWorker * getNumberOfWorkerNodes
+  def getTotalCores: Int = {
+    val totalWorkCores = getCoresPerWorker * getNumberOfWorkerNodes
+    // handle for single node clusters
+    if (totalWorkCores == 0) getDriverCores else totalWorkCores
+  }
 
   def getCoresPerTask: Int = {
     try {

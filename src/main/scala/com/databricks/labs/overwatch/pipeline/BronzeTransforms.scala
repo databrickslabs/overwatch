@@ -1,9 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.ApiCall
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
+import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
+import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
-import com.databricks.labs.overwatch.utils.{SparkSessionWrapper, _}
+import com.databricks.labs.overwatch.utils._
+import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -12,13 +15,17 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{BooleanType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
-import java.time.{Duration, LocalDateTime}
+import java.time.LocalDateTime
+import java.util
+import java.util.Collections
+import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success}
 
 
 trait BronzeTransforms extends SparkSessionWrapper {
@@ -203,14 +210,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     consumerDBLocation: String,
                                     isFirstRun: Boolean,
                                     organizationId: String,
-                                    runID: String
-                                   ): DataFrame = {
+                                    runID: String): DataFrame = {
 
-    val connectionString = ConnectionStringBuilder(PipelineFunctions.parseEHConnectionString(ehConfig.connectionString))
+    val connectionString = ConnectionStringBuilder(
+      PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
       .setEventHubName(ehConfig.eventHubName)
       .build
 
-    val eventHubsConf = try {
+    val ehConf = try {
       validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
 
       if (isFirstRun) {
@@ -234,6 +241,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
+    val eventHubsConf = if (ehConfig.azureClientId.nonEmpty) {
+      val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
+        "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
+        "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
+        "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
+      AadAuthInstance.addAadAuthParams(ehConf, aadParams)
+    } else
+      ehConf
+
     spark.readStream
       .format("eventhubs")
       .options(eventHubsConf.toMap)
@@ -244,22 +260,30 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def cleanseRawJobsSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+  protected def cleanseRawJobsSnapDF(keys: Array[String], runId: String)(df: DataFrame): DataFrame = {
+    val emptyKeysDF = Seq.empty[(String, Long, String)].toDF("organization_id", "job_id", "Overwatch_RunID")
     val outputDF = SchemaScrubber.scrubSchema(df)
+      .withColumn("Overwatch_RunID", lit(runId))
+
+    val cleansedTasksDF = workflowsCleanseTasks(outputDF, keys, emptyKeysDF, "settings.tasks")
+    val cleansedJobClustersDF = workflowsCleanseJobClusters(outputDF, keys, emptyKeysDF, "settings.job_clusters")
 
     val changeInventory = Map[String, Column](
-      "settings.new_cluster.custom_tags" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.custom_tags"),
-      "settings.new_cluster.spark_conf" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_conf"),
-      "settings.new_cluster.spark_env_vars" -> SchemaTools.structToMap(outputDF, "settings.new_cluster.spark_env_vars"),
-      s"settings.new_cluster.aws_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.aws_attributes"),
-      s"settings.new_cluster.azure_attributes" -> SchemaTools.structToMap(outputDF, s"settings.new_cluster.azure_attributes"),
+      "settings.tasks" -> col("cleansedTasks"),
+      "settings.job_clusters" -> col("cleansedJobsClusters"),
+      "settings.tags" -> SchemaTools.structToMap(outputDF, "settings.tags"),
       "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
-    )
+    ) ++ PipelineFunctions.newClusterCleaner(outputDF, "settings.tasks.new_cluster")
 
-    outputDF.select(SchemaTools.modifyStruct(outputDF.schema, changeInventory): _*)
+    outputDF
+      .join(cleansedTasksDF, keys.toSeq, "left")
+      .join(cleansedJobClustersDF, keys.toSeq, "left")
+      .modifyStruct(changeInventory)
+      .drop("cleansedTasks", "cleansedJobsClusters") // cleanup temporary cleaner fields
+      .scrubSchema(SchemaScrubber(cullNullTypes = true))
   }
 
-  protected def cleanseRawClusterSnapDF(cloudProvider: String)(df: DataFrame): DataFrame = {
+  protected def cleanseRawClusterSnapDF(df: DataFrame): DataFrame = {
     val outputDF = SchemaScrubber.scrubSchema(df)
 
     outputDF
@@ -333,7 +357,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val datesGlob = if (fromDT == untilDT) {
         Array(s"${auditLogConfig.rawAuditPath.get}/date=${fromDT.toString}")
       } else {
-        datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
+        getDatesGlob(fromDT, untilDT)
           .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
           .filter(Helpers.pathExists)
       }
@@ -434,6 +458,130 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  private def landClusterEvents(clusterIDs: Array[String],
+                                startTime: TimeTypes,
+                                endTime: TimeTypes,
+                                apiEnv: ApiEnv,
+                                tmpClusterEventsSuccessPath: String,
+                                tmpClusterEventsErrorPath: String) = {
+    val finalResponseCount = clusterIDs.length
+    var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+    var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+    val apiResponseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
+    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
+    //TODO identify the best practice to implement the future.
+    val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
+    for (i <- clusterIDs.indices) {
+      val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
+        "start_time" -> s"""${startTime.asUnixTimeMilli}""",
+        "end_time" -> s"""${endTime.asUnixTimeMilli}""",
+        "limit" -> "500"
+      )
+      val future = Future {
+        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
+        synchronized {
+          apiResponseArray.addAll(apiObj)
+          if (apiResponseArray.size() >= apiEnv.successBatchSize) {
+            PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
+            apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+          }
+        }
+
+      }
+      future.onComplete {
+        case Success(_) =>
+          apiResponseCounter.add(1)
+
+        case Failure(e) =>
+          if (e.isInstanceOf[ApiCallFailureV2]) {
+            synchronized {
+              apiErrorArray.add(e.getMessage)
+              if (apiErrorArray.size() >= apiEnv.errorBatchSize) {
+                PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
+                apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+              }
+            }
+            logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
+          }
+          apiResponseCounter.add(1)
+      }
+    }
+    val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
+    var currentSleepTime = 0
+    var accumulatorCountWhileSleeping = accumulator.value
+    while (apiResponseCounter.size() < finalResponseCount && currentSleepTime < timeoutThreshold) {
+      //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
+      // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
+      if (currentSleepTime > 120000) //printing the waiting message only if the waiting time is more than 2 minutes.
+      {
+        println(s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000} seconds; Api response yet to receive ${finalResponseCount - apiResponseCounter.size()}""")
+      }
+      Thread.sleep(5000)
+      currentSleepTime += 5000
+      if (accumulatorCountWhileSleeping < accumulator.value) { //new API response received while waiting.
+        currentSleepTime = 0 //resetting the sleep time.
+        accumulatorCountWhileSleeping = accumulator.value
+      }
+    }
+    if (apiResponseCounter.size() != finalResponseCount) { // Checking whether all the api responses has been received or not.
+      logger.log(Level.ERROR, s"""Unable to receive all the clusters/events api responses; Api response received ${apiResponseCounter.size()};Api response not received ${finalResponseCount - apiResponseCounter.size()}""")
+      throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${apiResponseCounter.size()};Api response not received ${finalResponseCount - apiResponseCounter.size()}""")
+    }
+    if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
+      PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
+      apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+    }
+    if (apiErrorArray.size() > 0) { //In case of error array didn't hit the batch-size as a final step we will write it to the persistent storage.
+      PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
+      apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+    }
+    logger.log(Level.INFO, " Cluster event landing completed")
+  }
+
+  private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
+    logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
+    if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
+      if (spark.read.json(tmpClusterEventsSuccessPath).columns.contains("events")) {
+        try {
+          val tdf = SchemaScrubber.scrubSchema(
+            spark.read.json(tmpClusterEventsSuccessPath)
+              .select(explode('events).alias("events"))
+              .select(col("events.*"))
+          )
+          val changeInventory = Map[String, Column](
+            "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
+            "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
+            "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
+            "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
+            "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
+            "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
+          )
+
+          val clusterEventsDF = SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+            .withColumn("organization_id", lit(organizationId))
+
+          val clusterEventsCaptured = clusterEventsDF.count
+          val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
+          logger.log(Level.INFO, logEventsMSG)
+          clusterEventsDF
+
+        } catch {
+          case e: Throwable =>
+            throw new Exception(e)
+        }
+      }
+      else {
+        logger.info("Events column not found in dataset")
+        throw new NoNewDataException(s"EMPTY: No New Cluster Events.Events column not found in dataset, Progressing module but it's recommended you " +
+          s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
+      }
+    } else {
+      logger.info("EMPTY MODULE: Cluster Events")
+      throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
+        s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
+    }
+  }
+
   protected def prepClusterEventLogs(
                                       filteredAuditLogDF: DataFrame,
                                       startTime: TimeTypes,
@@ -442,7 +590,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       apiEnv: ApiEnv,
                                       organizationId: String,
                                       database: Database,
-                                      erroredBronzeEventsTarget: PipelineTable
+                                      erroredBronzeEventsTarget: PipelineTable,
+                                      tempWorkingDir: String
                                     )(clusterSnapshotDF: DataFrame): DataFrame = {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
@@ -453,89 +602,30 @@ trait BronzeTransforms extends SparkSessionWrapper {
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
       s"properly. Skipping!", Level.ERROR)
 
-    /**
-     * NOTE *** IMPORTANT
-     * Large batches are more efficient but can result in OOM with driver.maxResultSize. To avoid this it's
-     * important to increase the driver.maxResultSize for non-periodic runs with this module
-     * Ensure large enough driver (memory) and add this to cluster config
-     * spark.driver.maxResultSize 32g
-     */
-    val batchSize = 500000D
-    // TODO -- remove hard-coded path
-    val tmpClusterEventsPath = s"/tmp/overwatch/bronze/$organizationId/clusterEventsBatches"
-    val (clusterEventsBuffer, failedBatchingCalls) = buildClusterEventBatches(apiEnv, batchSize, startTime, endTime, clusterIDs)
+    val processingStartTime = System.currentTimeMillis();
+    logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
+    val tmpClusterEventsSuccessPath = s"$tempWorkingDir/clusterEventsBronze/success" + apiEnv.runID
+    val tmpClusterEventsErrorPath = s"$tempWorkingDir/clusterEventsBronze/error" + apiEnv.runID
 
-    persistErrors(
-      buildClusterEventsErrorDF(failedBatchingCalls),
-      database,
-      erroredBronzeEventsTarget,
-      pipelineSnapTS,
-      organizationId
-    )
-
-    logger.log(Level.INFO, s"NUMBER OF BATCHES: ${clusterEventsBuffer.length} \n" +
-      s"ESTIMATED EVENTS: ${clusterEventsBuffer.length * batchSize.toInt}")
-
-    var batchCounter = 0
-    clusterEventsBuffer.foreach(clusterIdsBatch => {
-      batchCounter += 1
-      logger.log(Level.INFO, s"BEGINNING BATCH ${batchCounter} of ${clusterEventsBuffer.length}")
-      val (clusterEvents, erroredEventsLookupDF) = clusterEventsByClusterBatch(startTime, endTime, apiEnv, clusterIdsBatch)
-
-      // persist errors from batch
-      persistErrors(erroredEventsLookupDF, database, erroredBronzeEventsTarget, pipelineSnapTS, organizationId)
-
-      if (clusterEvents.nonEmpty) {
-        try {
-          val tdf = SchemaScrubber.scrubSchema(
-            spark.read.json(Seq(clusterEvents: _*).toDS())
-              .select(explode('events).alias("events"))
-              .select(col("events.*"))
-          )
-
-          val changeInventory = Map[String, Column](
-            "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
-            "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
-            "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
-            "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
-            "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
-            "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
-          )
-
-          SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
-            .withColumn("organization_id", lit(organizationId))
-            .write.mode("append").format("delta")
-            .option("mergeSchema", "true")
-            .save(tmpClusterEventsPath)
-
-        } catch {
-          case e: Throwable => {
-            // persist errored events by clusterID
-            val errorsByClusterID = clusterIdsBatch.map(cluster_id => {
-              val errorDetail = ErrorDetail(e.getMessage, startTime.asUnixTimeMilli, endTime.asUnixTimeMilli)
-              ClusterEventCall(cluster_id, Array[String](), succeeded = false, Some(errorDetail))
-            })
-            persistErrors(buildClusterEventsErrorDF(errorsByClusterID), database, erroredBronzeEventsTarget, pipelineSnapTS, organizationId)
-          }
-        }
-      }
-
-    })
-
-    logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
-    if (Helpers.pathExists(tmpClusterEventsPath)) {
-      val clusterEventsDF = spark.read.format("delta").load(tmpClusterEventsPath)
-      val clusterEventsCaptured = clusterEventsDF.count
-      val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
-      logger.log(Level.INFO, logEventsMSG)
-      clusterEventsDF
-    } else {
-      println("EMPTY MODULE: Cluster Events")
-      throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
-        s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
+    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath, tmpClusterEventsErrorPath)
+    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
+      persistErrors(
+        spark.read.json(tmpClusterEventsErrorPath)
+          .withColumn("from_ts", toTS(col("from_epoch")))
+          .withColumn("until_ts", toTS(col("until_epoch"))),
+        database,
+        erroredBronzeEventsTarget,
+        pipelineSnapTS,
+        organizationId
+      )
+      logger.log(Level.INFO, "Persist error completed")
     }
-
+    val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
+    val processingEndTime = System.currentTimeMillis();
+    logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
+    clusterEventDf
   }
+
 
   private def appendNewFilesToTracker(database: Database,
                                       newFiles: DataFrame,
@@ -681,6 +771,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("Timestamp", fixDupTimestamps)
             .drop("timestamp")
 
+
         } catch {
           case e: Throwable => {
             val failFilesSQL =
@@ -694,17 +785,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
           }
         }
 
-        // build special scrubber for df
-        //        val scrubExceptions = baseEventsDF.select("Properties").schema.fields.map(f => {
-        //          Tuple2(
-        //            f,
-        //                    Array(
-        //                      SanitizeRule("\\s", ""),
-        //                      SanitizeRule("\\.", ""),
-        //                      SanitizeRule("[^a-zA-Z0-9]", "_")
-        //                    )
-        //          )
-        //        }).toMap
         val propertiesScrubException = SanitizeFieldException(
           field = SchemaTools.colByName(baseEventsDF)("Properties"),
           rules = List(
@@ -759,11 +839,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
         }
 
         val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+          .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
+          .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
+          .withColumnRenamed("executorId", "blackListedExecutorIds")
+          .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
-        //TODO -- use map_filter to remove massive redundant useless column to save space
-        // asOf Spark 3.0.0
-        //.withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
+          .withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
 
         spark.conf.set("spark.sql.caseSensitive", "false")
         // TODO -- PERF test without unpersist, may be unpersisted before re-utilized
@@ -785,7 +867,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
-                                      cloudProvider: String,
+                                      daysToProcess: Int,
                                       historicalAuditLookupDF: DataFrame,
                                       clusterSnapshotTable: PipelineTable,
                                       sparkLogClusterScaleCoefficient: Double
@@ -801,10 +883,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val coreCount = (getTotalCores * sparkLogClusterScaleCoefficient).toInt
     val fromTimeEpochMillis = fromTime.asUnixTimeMilli
     val untilTimeEpochMillis = untilTime.asUnixTimeMilli
-    val fromDate = fromTime.asLocalDateTime.toLocalDate
-    val untilDate = untilTime.asLocalDateTime.toLocalDate
-    val daysToProcess = Duration.between(fromDate.atStartOfDay(), untilDate.plusDays(1L).atStartOfDay())
-      .toDays.toInt
 
     val clusterSnapshot = clusterSnapshotTable.asDF
     // Shoot for partitions coreCount < 16 partitions per day < 576
@@ -845,7 +923,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // all files considered for ingest
     val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
-    allEventLogPrefixes
+    val eventLogPaths = allEventLogPrefixes
       .repartition(optimizeParCount)
       .as[String]
       .map(x => Helpers.parListFiles(x, hadoopConf)) // parallelized file lister since large / shared / long-running (months) clusters will have MANy paths
@@ -859,6 +937,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumnRenamed("pathString", "filename")
       .withColumn("fileCreateTS", from_unixtime('fileCreateEpochMS / lit(1000)).cast("timestamp"))
       .withColumn("fileCreateDate", 'fileCreateTS.cast("date"))
+      .repartition().cache()
+
+    // eager execution to minimize secondary compute downstream
+    eventLogPaths.count()
+    eventLogPaths
 
   }
 

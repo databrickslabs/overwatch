@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
 import com.databricks.labs.overwatch.utils._
@@ -47,12 +48,21 @@ class Pipeline(
     pipelineState
   }
 
+  def overridePipelineState(newPipelineState: scala.collection.mutable.Map[Int, SimplifiedModuleStatusReport]): Unit = {
+    clearPipelineState()
+    newPipelineState.values.foreach(state => updateModuleState(state))
+  }
+
   def getVerbosePipelineState: Array[ModuleStatusReport] = {
     pipelineStateTarget.asDF.as[ModuleStatusReport].collect()
   }
 
   def updateModuleState(moduleState: SimplifiedModuleStatusReport): Unit = {
     pipelineState.put(moduleState.moduleID, moduleState)
+  }
+
+  def dropModuleState(moduleId: Int): Unit = {
+    pipelineState.remove(moduleId)
   }
 
   def clearPipelineState(): this.type = {
@@ -369,10 +379,11 @@ class Pipeline(
 
   private[overwatch] def initiatePostProcessing(): Unit = {
 
+    // cleanse the temp dir
+    // if failure doesn't allow pipeline to get here, temp dir will be cleansed on workspace init
     if (!config.externalizeOptimize) postProcessor.optimize(this, Pipeline.OPTIMIZESCALINGCOEF)
-    Helpers.fastrm(Array(
-      s"/tmp/overwatch/bronze/${config.organizationId}/clusterEventsBatches"
-    ))
+    Helpers.fastrm(Array(config.tempWorkingDir))
+    dbutils.fs.rm(config.tempWorkingDir)
 
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
 
@@ -387,10 +398,10 @@ class Pipeline(
     PipelineFunctions.setSparkOverrides(spark, value, config.debugFlag)
   }
 
-//  private def getLastOptimized(moduleID: Int): Long = {
-//    val state = pipelineState.get(moduleID)
-//    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
-//  }
+  private def getLastOptimized(moduleID: Int): Long = {
+    val state = pipelineState.get(moduleID)
+    if (state.nonEmpty) state.get.lastOptimizedTS else 0L
+  }
 
   private def needsOptimize(lastOptimizedTS: Long, optimizeFreq_H: Int): Boolean = {
     val optFreq_Millis = 1000L * 60L * 60L * optimizeFreq_H.toLong
@@ -399,32 +410,30 @@ class Pipeline(
     else false
   }
 
+  private def getMaxMergeScanDates(fromTime: TimeTypes, untilTime: TimeTypes, maxMergeScanDays: Int): Array[String] = {
+    val startDate = fromTime.asLocalDateTime.minusDays(maxMergeScanDays)
+    Helpers.getDatesGlob(startDate.toLocalDate, untilTime.asLocalDateTime.plusDays(1).toLocalDate)
+  }
+
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
     val startTime = System.currentTimeMillis()
 
-    //      if (!target.exists && !module.isFirstRun) throw new PipelineStateException("MODULE STATE EXCEPTION: " +
-    //        s"Module ${module.moduleName} has a defined state but the target to which it writes is missing.", Some(target))
+    val finalDF = PipelineFunctions.optimizeDFForWrite(df, target)
 
-    val localSafeTotalCores = if (config.isLocalTesting) spark.conf.getOption("spark.sql.shuffle.partitions").getOrElse("200").toInt
-    else getTotalCores
-    val finalDF = PipelineFunctions.optimizeWritePartitions(df, target, spark, config, module.moduleName, localSafeTotalCores)
+    val maxMergeScanDates = if (target.writeMode == WriteMode.merge) {
+      getMaxMergeScanDates(module.fromTime, module.untilTime, target.maxMergeScanDates)
+    } else Array[String]()
 
     val startLogMsg = s"Beginning append to ${target.tableFullName}"
     logger.log(Level.INFO, startLogMsg)
 
     // Append the output -- don't apply spark overrides, applied at top of function
-    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS)
+    if (!readOnly) database.write(finalDF, target, pipelineSnapTime.asColumnTS, maxMergeScanDates)
     else {
       val readOnlyMsg = "PIPELINE IS READ ONLY: Writes cannot be performed on read only pipelines."
       println(readOnlyMsg)
       logger.log(Level.WARN, readOnlyMsg)
     }
-
-    // Source files for spark event logs are extremely inefficient. Get count from bronze table instead
-    // of attempting to re-read the very inefficient json.gz files.
-//    val dfCount = if (target.name == "spark_events_bronze") {
-//      target.asIncrementalDF(module, 2, "fileCreateDate", "fileCreateEpochMS").count()
-//    } else finalDF.count()
 
     val writeOpsMetrics = PipelineFunctions.getTargetWriteMetrics(spark, target, pipelineSnapTime, config.runID)
 
@@ -439,7 +448,8 @@ class Pipeline(
 
     val rowsWritten = writeOpsMetrics.getOrElse("numOutputRows", "0")
     val execMins: Double = (endTime - startTime) / 1000.0 / 60.0
-    val msg = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: $execMins"
+    val simplifiedExecMins: Double = execMins - (execMins % 0.01)
+    val msg = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: $simplifiedExecMins"
     println(msg)
     logger.log(Level.INFO, msg)
 

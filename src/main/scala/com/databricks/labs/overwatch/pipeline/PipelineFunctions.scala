@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils._
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -12,30 +13,43 @@ import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import java.io.{PrintWriter, StringWriter}
 import java.net.URI
 
-object PipelineFunctions {
+object PipelineFunctions extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   private val uriSchemeRegex = "^([a-zA-Z][-.+a-zA-Z0-9]*):/.*".r
 
   /**
-   * parses the value for the connection string from the scope/key defined if the pattern matches {{secrets/scope/key}}
+   * parses the value for the string from the scope/key defined if the pattern matches {{secrets/scope/key}}
    * otherwise return the true string value
    * https://docs.databricks.com/security/secrets/secrets.html#store-the-path-to-a-secret-in-a-spark-configuration-property
-   * @param connectionString
-   * @return
+   * @param str input string
+   * @return string from secrets, or original string
    */
-  def parseEHConnectionString(connectionString: String): String = {
+  def maybeGetSecret(str: String): String = {
     val secretsRE = "\\{\\{secrets/([^/]+)/([^}]+)\\}\\}".r
 
-    val retrievedConnectionString = secretsRE.findFirstMatchIn(connectionString) match {
+    secretsRE.findFirstMatchIn(str) match {
       case Some(i) =>
         dbutils.secrets.get(i.group(1), i.group(2))
       case None =>
-        connectionString
+        str
     }
-    if (!retrievedConnectionString.matches("^Endpoint=sb://.*;SharedAccessKey=.*$")) {
-      throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
-    } else retrievedConnectionString
+  }
+
+  /**
+   * parses the value for the connection string from the scope/key defined if the pattern matches {{secrets/scope/key}}
+   * otherwise return the true string value
+   * @param connectionString EventHubs connection string
+   * @return
+   */
+  def parseAndValidateEHConnectionString(connectionString: String, withSAS: Boolean): String = {
+    val retrievedConnectionString = maybeGetSecret(connectionString)
+    if ((withSAS && !retrievedConnectionString.matches("^Endpoint=sb://.*;SharedAccessKey=.*$")) ||
+      !retrievedConnectionString.matches("^Endpoint=sb://.*$")) {
+        throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
+    }
+
+    retrievedConnectionString
   }
 
   /**
@@ -150,58 +164,32 @@ object PipelineFunctions {
       .alias(defaultAlias)
   }
 
-  def optimizeWritePartitions(
-                               df: DataFrame,
-                               target: PipelineTable,
-                               spark: SparkSession,
-                               config: Config,
-                               moduleName: String,
-                               currentClusterCoreCount: Int
-                             ): DataFrame = {
+  /**
+   * Builds the Map to be used in modifyStruct changeInventory to clean a new_cluster schema
+   * @param df df that contains the prefixed field to cleanse
+   * @param newClusterPrefix path to new_cluster including the "new_cluster" such as "new_settings.new_cluster"
+   * @return Map[String, Column] for changeInventory
+   */
+  def newClusterCleaner(df: DataFrame, newClusterPrefix: String): Map[String, Column] = {
+    Map(
+      s"${newClusterPrefix}.custom_tags" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.custom_tags"),
+      s"${newClusterPrefix}.spark_conf" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.spark_conf"),
+      s"${newClusterPrefix}.spark_env_vars" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.spark_env_vars"),
+      s"${newClusterPrefix}.aws_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.aws_attributes"),
+      s"${newClusterPrefix}.azure_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.azure_attributes")
+    )
+  }
+
+  def optimizeDFForWrite(
+                        df: DataFrame,
+                        target: PipelineTable
+                        ): DataFrame = {
 
     var mutationDF = df
+
     mutationDF = if (target.zOrderBy.nonEmpty) {
-      TransformFunctions.moveColumnsToFront(mutationDF, target.zOrderBy ++ target.statsColumns)
+      mutationDF.moveColumnsToFront(target.zOrderBy ++ target.statsColumns)
     } else mutationDF
-
-   val targetShufflePartitions = if (!target.tableFullName.toLowerCase.endsWith("_bronze")) {
-      val targetShufflePartitionSizeMB = 128.0
-      val readMaxPartitionBytesMB = spark.conf.get("spark.sql.files.maxPartitionBytes")
-        .replace("b", "").toDouble / 1024 / 1024
-
-      val partSizeNoramlizationFactor = targetShufflePartitionSizeMB / readMaxPartitionBytesMB
-
-      val sourceDFParts = getSourceDFParts(df)
-      // TODO -- handle streaming until Module refactor with source -> target mappings
-      val finalDFPartCount = if (target.checkpointPath.nonEmpty && config.cloudProvider == "azure") {
-        target.name match {
-          case "audit_log_bronze" => // TODO -- check to ensure this should be audit_log_bronze, not audit_log_raw_events
-            target.asDF.rdd.partitions.length * target.shuffleFactor
-          case _ => sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
-        }
-      } else {
-        sourceDFParts / partSizeNoramlizationFactor * target.shuffleFactor
-      }
-
-      val estimatedFinalDFSizeMB = finalDFPartCount * readMaxPartitionBytesMB.toInt
-      val targetShufflePartitionCount = math.min(math.max(100, finalDFPartCount), 20000).toInt
-
-      if (config.debugFlag) {
-        println(s"DEBUG: Source DF Partitions: ${sourceDFParts}")
-        println(s"DEBUG: Target Shuffle Partitions: ${targetShufflePartitionCount}")
-        println(s"DEBUG: Max PartitionBytes (MB): $readMaxPartitionBytesMB")
-      }
-
-      logger.log(Level.INFO, s"$moduleName: " +
-        s"Final DF estimated at ${estimatedFinalDFSizeMB} MBs." +
-        s"\nShufflePartitions: ${targetShufflePartitionCount}")
-
-      targetShufflePartitionCount
-    } else {
-      Math.max(currentClusterCoreCount * 2, spark.conf.get("spark.sql.shuffle.partitions").toInt)
-    }
-
-    spark.conf.set("spark.sql.shuffle.partitions",targetShufflePartitions)
 
     /**
      * repartition partitioned tables that are not auto-optimized into the range partitions for writing
@@ -218,9 +206,9 @@ object PipelineFunctions {
       }
 
       if (!target.autoOptimize) {
-        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into $targetShufflePartitions " +
+        logger.log(Level.INFO, s"${target.tableFullName}: shuffling into" +
           s" output partitions defined as ${target.partitionBy.mkString(", ")}")
-        mutationDF = mutationDF.repartition(targetShufflePartitions, target.partitionBy map col: _*)
+        mutationDF = mutationDF.repartition(target.partitionBy map col: _*)
       }
     }
 
@@ -284,6 +272,85 @@ object PipelineFunctions {
     } else df
   }
 
+  def casedSeqCompare(seq1: Seq[String], s2: String): Boolean = {
+    if ( // make lower case if column names are case insensitive
+      spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
+    ) seq1.contains(s2) else seq1.exists(s1 => s1.equalsIgnoreCase(s2))
+  }
+
+  def buildIncrementalFilters(
+                              target: PipelineTable,
+                               df: DataFrame,
+                               fromTime: TimeTypes,
+                               untilTime: TimeTypes,
+                              additionalLagDays: Long = 0,
+                              moduleName: String = "UNDEFINED"
+                             ): Array[IncrementalFilter] = {
+    if (target.exists) {
+      val dfFields = df.schema.fields
+      val cronFields = dfFields.filter(f => casedSeqCompare(target.incrementalColumns, f.name))
+
+      if (additionalLagDays > 0) require(
+        dfFields.map(_.dataType).contains(DateType) || dfFields.map(_.dataType).contains(TimestampType),
+        "additional lag days cannot be used without at least one DateType or TimestampType column in the filterArray")
+
+      val filterMsg = s"FILTERING: ${moduleName} using cron columns: ${cronFields.map(_.name).mkString(", ")}"
+      logger.log(Level.INFO, filterMsg)
+      if (target.config.debugFlag) println(filterMsg)
+      cronFields.map(field => {
+
+        field.dataType match {
+          case dt: DateType => {
+            if (!target.partitionBy.map(_.toLowerCase).contains(field.name.toLowerCase)) {
+              val errmsg = s"Date filters are inclusive on both sides and are used for partitioning. Date filters " +
+                s"should not be used in the Overwatch package alone. Date filters must be accompanied by a more " +
+                s"granular filter to utilize df.asIncrementalDF.\nERROR: ${field.name} not in partition columns: " +
+                s"${target.partitionBy.mkString(", ")}"
+              throw new IncompleteFilterException(errmsg)
+            }
+
+            // Nothing in Overwatch is incremental at the date level thus until date should always be inclusive
+            // so add 1 day to follow the rule value >= date && value < date
+            // but still keep it inclusive
+            val untilDate = PipelineFunctions.addNTicks(untilTime.asColumnTS, 1, DateType)
+            IncrementalFilter(
+              field,
+              date_sub(fromTime.asColumnTS.cast(dt), additionalLagDays.toInt),
+              untilDate.cast(dt)
+            )
+          }
+          case dt: TimestampType => {
+            val start = if (additionalLagDays > 0) {
+              val epochMillis = fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)
+              from_unixtime(lit(epochMillis).cast(DoubleType) / 1000.0).cast(dt)
+            } else {
+              fromTime.asColumnTS
+            }
+            IncrementalFilter(
+              field,
+              start,
+              untilTime.asColumnTS
+            )
+          }
+          case dt: LongType => {
+            val start = if (additionalLagDays > 0) {
+              lit(fromTime.asUnixTimeMilli - (additionalLagDays * 24 * 60 * 60 * 1000L)).cast(dt)
+            } else {
+              lit(fromTime.asUnixTimeMilli)
+            }
+            IncrementalFilter(
+              field,
+              start,
+              lit(untilTime.asUnixTimeMilli)
+            )
+          }
+          case _ => throw new UnsupportedTypeException(s"UNSUPPORTED TYPE: An incremental Dataframe was derived from " +
+            s"a filter containing a ${field.dataType.typeName} type. ONLY Timestamp, Date, and Long types are supported.")
+        }
+      })
+    } else Array[IncrementalFilter]()
+  }
+
   // TODO -- handle complex data types such as structs with format "jobRunTime.startEpochMS"
   //  currently filters with nested columns aren't supported
   def withIncrementalFilters(
@@ -309,7 +376,11 @@ object PipelineFunctions {
 
   def setSparkOverrides(spark: SparkSession, sparkOverrides: Map[String, String],
                         debugFlag: Boolean = false): Unit = {
-    logger.log(Level.INFO, s"SETTING SPARK OVERRIDES:\n${sparkOverrides.mkString(", ")}")
+    logger.info(
+      s"""
+         |SPARK OVERRIDES BEING SET:
+         |${sparkOverrides.mkString("\n")}
+         |""".stripMargin)
     sparkOverrides foreach { case (k, v) =>
       try {
         val opt = spark.conf.getOption(k)
@@ -435,18 +506,39 @@ object PipelineFunctions {
       s"modules include ${pipelineModules.map(m => s"\n(${m.moduleId}, ${m.moduleName})").mkString("\n")}"))
   }
 
-  private[overwatch] def deriveSKU(isAutomated: Column, sparkVersion: Column): Column = {
+  private[overwatch] def deriveSKU(
+                                    isAutomated: Column,
+                                    sparkVersion: Column,
+                                    clusterType: Column
+                                  ): Column = {
     val isJobsLight = sparkVersion.like("apache_spark_%")
     when(isAutomated && isJobsLight, "jobsLight")
       .when(isAutomated && !isJobsLight, "automated")
       .when(!isAutomated, "interactive")
+      .when(clusterType === "SQL Analytics", lit("sqlCompute"))
+      .when(clusterType === "Serverless", lit("serverless"))
       .otherwise("unknown")
   }
 
-  def fillForward(colToFillName: String, w: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+  /**
+   * Fill a column according to the window spec
+   * @param colToFillName name of column to fill
+   * @param w window spec by which the fill should be executed
+   * @param orderedLookups ordered sequence of subsequent columns from which to attempt to fill the collTofill
+   * @param colToFillHasPriority whether or not to consider colToFill's own history to complete the fill or whether to
+   *                             only consider the ordered lookups when filling
+   * @return
+   */
+  def fillForward(
+                   colToFillName: String,
+                   w: WindowSpec,
+                   orderedLookups: Seq[Column] = Seq[Column](),
+                   colToFillHasPriority: Boolean = true
+                 ) : Column = {
     val colToFill = col(colToFillName)
     if (orderedLookups.nonEmpty){ // TODO -- omit nulls from lookup
-      val coalescedLookup = colToFill +: orderedLookups.map(lookupCol => {
+      val orderedLookupsFinal = if (colToFillHasPriority) colToFill +: orderedLookups else orderedLookups
+      val coalescedLookup = orderedLookupsFinal.map(lookupCol => {
         last(lookupCol, true).over(w)
       })
       coalesce(coalescedLookup: _*).alias(colToFillName)
@@ -498,6 +590,66 @@ object PipelineFunctions {
       .collect()
       .head
       .getOrElse(0L)
+  }
+
+  /**
+   * Write the any given string to given path..
+   *
+   * @param resultJsonArray containing responses from the API call.
+   * @return true encase of successfully write to the temp location.
+   */
+  private[overwatch] def writeMicroBatchToTempLocation(path: String, resultJsonArray: String): Boolean = {
+    try {
+      val fileName = java.util.UUID.randomUUID.toString + ".json"
+      dbutils.fs.put(path + "/" + fileName, resultJsonArray, true)
+      logger.log(Level.INFO,"File Successfully written:" + path + "/" + fileName)
+      true
+    } catch {
+      case e: Throwable =>
+        logger.info(Level.ERROR, "Unable to write in " + path + "/", e)
+        false
+    }
+  }
+
+  def getTargetTableNameByModule(moduleId: Int): String = {
+    moduleId match {
+      case 1001 => "jobs_snapshot_bronze"
+      case 1002 => "clusters_snapshot_bronze"
+      case 1003 => "pools_snapshot_bronze"
+      case 1004 => "audit_log_bronze"
+      case 1005 => "cluster_events_bronze"
+      case 1006 => "spark_events_bronze"
+      case 2003 => "spark_executors_silver"
+      case 2005 => "spark_Executions_silver"
+      case 2006 => "spark_jobs_silver"
+      case 2007 => "spark_stages_silver"
+      case 2008 => "spark_tasks_silver"
+      case 2009 => "pools_silver"
+      case 2010 => "job_status_silver"
+      case 2011 => "jobrun_silver"
+      case 2014 => "cluster_spec_silver"
+      case 2016 => "account_login_silver"
+      case 2017 => "account_mods_silver"
+      case 2018 => "notebook_silver"
+      case 2019 => "cluster_state_detail_silver"
+      case 2020 => "sql_query_history_silver"
+      case 3001 => "cluster_gold"
+      case 3002 => "job_gold"
+      case 3003 => "jobRun_gold"
+      case 3004 => "notebook_gold"
+      case 3005 => "clusterStateFact_gold"
+      case 3007 => "account_mods_gold"
+      case 3008 => "account_login_gold"
+      case 3009 => "instancepool_gold"
+      case 3010 => "sparkJob_gold"
+      case 3011 => "sparkStage_gold"
+      case 3012 => "sparkTask_gold"
+      case 3013 => "sparkExecution_gold"
+      case 3014 => "sparkExecutor_gold"
+      case 3015 => "jobRunCostPotentialFact_gold"
+      case 3016 => "sparkStream_gold"
+      case 3017 => "sql_query_history_gold"
+    }
   }
 
 }

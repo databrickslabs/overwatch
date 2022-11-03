@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.PipelineTable
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -10,6 +11,7 @@ import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, Streami
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
 import java.util
+import java.util.UUID
 
 class Database(config: Config) extends SparkSessionWrapper {
 
@@ -127,30 +129,69 @@ class Database(config: Config) extends SparkSessionWrapper {
     streamManager
   }
 
+  /**
+   * It's often more efficient to write a temporary version of the data to be merged than to compare complex
+   * pipelines multiple times. This function simplifies the logic to write the df to temp storage and
+   * read it back as a simple scan for deduping and merging
+   * NOTE: this may be moved outside of database.scala if usage is valuable in other contexts
+   * @param df Dataframe to persist and load as fresh
+   * @param target target the df represents
+   * @return
+   */
+  private def persistAndLoad(df: DataFrame, target: PipelineTable): DataFrame = {
+    spark.conf.set("spark.databricks.delta.formatCheck.enabled", "false")
+    val tempPrefix = target.config.tempWorkingDir
+    val tempSuffix = UUID.randomUUID().toString.replace("-", "")
+    val dfTempPath = s"${tempPrefix}/${target.name.toLowerCase}/$tempSuffix"
+
+    logger.info(
+      s"""
+         |Writing intermediate dataframe '${target.tableFullName}' to temporary path '$dfTempPath'
+         |to optimize downstream performance.
+         |""".stripMargin)
+    df.write.format("delta").save(dfTempPath)
+
+    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16) // maximize parallelism on re-read and let
+    spark.conf.set("spark.databricks.delta.formatCheck.enabled", "true")
+    // AQE bring it back down
+    spark.read.format("delta").load(dfTempPath)
+  }
+
+  private def getPartitionedDateField(df: DataFrame, partitionFields: Seq[String]): Option[String] = {
+    df.schema.filter(f => partitionFields.map(_.toLowerCase).contains(f.name.toLowerCase))
+      .filter(_.dataType.typeName == "date")
+      .map(_.name).headOption
+  }
+
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
-  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column): Boolean = {
-    var finalDF: DataFrame = df
-    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
-    finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
-    finalDF = if (target.workspaceName) finalDF.withColumn("workspace_name", lit(config.workspaceName)) else finalDF
+  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array()): Boolean = {
+    var finalSourceDF: DataFrame = df
+
+    // apend metadata to source DF
+    finalSourceDF = if (target.withCreateDate) finalSourceDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalSourceDF
+    finalSourceDF = if (target.withOverwatchRunID) finalSourceDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalSourceDF
+    finalSourceDF = if (target.workspaceName) finalSourceDF.withColumn("workspace_name", lit(config.workspaceName)) else finalSourceDF
+
+    // if target is to be deduped, dedup it by keys
+    finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
+
+    val finalDF = if (target.persistBeforeWrite) persistAndLoad(finalSourceDF, target) else finalSourceDF
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
       val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")
-//      val targetColumns = deltaTarget.toDF.columns
-      val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
-//      val columnsToUpdateOnMatch = targetColumns.filterNot(c => immutableColumns.contains(c))
 
+      val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
+
+      val datePartitionFields = getPartitionedDateField(finalDF, target.partitionBy)
+      val explicitDatePartitionCondition = if (datePartitionFields.nonEmpty & maxMergeScanDates.nonEmpty) {
+        s" AND target.${datePartitionFields.get} in (${maxMergeScanDates.mkString("'", "', '", "'")})"
+      } else ""
       val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")  + " " +
-        s"AND target.organization_id = '${config.organizationId}'" // force partition filter for concurrent merge
-//      val updateExpr: Map[String, String] = columnsToUpdateOnMatch.map(updateCol => {
-//        s"target.$updateCol" -> s"updates.$updateCol"
-//      }).toMap
-//      val insertExpr: Map[String, String] = targetColumns.map(insertCol => {
-//        s"target.$insertCol" -> s"updates.$insertCol"
-//      }).toMap
+        s"AND target.organization_id = '${config.organizationId}'" +  // force partition filter for concurrent merge
+        explicitDatePartitionCondition // force right side scan to only scan relevant dates
 
       val mergeDetailMsg =
         s"""

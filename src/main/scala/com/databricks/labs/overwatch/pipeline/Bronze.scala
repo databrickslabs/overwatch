@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
+import com.databricks.labs.overwatch.utils.{CloneDetail, Config, Helpers, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
 
 
@@ -42,19 +42,66 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
+  /**
+   * Simplified method for the common task of deep cloning bronze targets.
+   * This function will perform a deep clone on all existing bronze targets
+   * If not overwriting, it's important for customer to set up lifecycle management to ensure
+   * max age of backups as this data can grow quite large
+   * @param targetPrefix where to store the backups -- subdir handling is done automatically
+   * @param overwrite whether or not to overwrite the backups
+   *                  if choosing to overwrite, only one backup will be maintained
+   * @param excludes which bronze targets to exclude from the snapshot
+   */
+  def snapshot(
+                targetPrefix: String,
+                overwrite: Boolean,
+                excludes: Array[String] = Array()
+              ): Unit = {
+    val bronzeTargets = getAllTargets :+ pipelineStateTarget
+    val currTime = Pipeline.createTimeDetail(System.currentTimeMillis())
+    val timestampedTargetPrefix = s"$targetPrefix/${currTime.asDTString}/${currTime.asUnixTimeMilli.toString}"
+
+    // if user provides dot path to table -- remove dot path and lower case the name
+    val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
+      if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
+    })
+
+    // remove excludes
+    // remove non-existing bronze targets
+    val targetsToSnap = bronzeTargets
+      .filter(_.exists()) // source path must exist
+      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
+
+    val finalTargetPathPrefix = if (overwrite) { // Overwrite - clean paths and reuse prefix
+      val dirsToClean = targetsToSnap.map(t => s"${targetPrefix}/${t.name.toLowerCase}")
+      Helpers.fastrm(dirsToClean)
+      targetPrefix
+    } else timestampedTargetPrefix // !Overwrite - targetPrefix/currDateString/timestampMillisString
+
+    // build clone details
+    val cloneSpecs = targetsToSnap.map(t => {
+      val targetPath = s"${finalTargetPathPrefix}/${t.name.toLowerCase}"
+      CloneDetail(t.tableLocation, targetPath)
+    })
+
+    // par clone
+    Helpers.parClone(cloneSpecs)
+
+  }
+
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess = ETLDefinition(
     workspace.getJobsDF,
-    Seq(cleanseRawJobsSnapDF(config.cloudProvider)),
+    Seq(cleanseRawJobsSnapDF(BronzeTargets.jobsSnapshotTarget.keys, config.runID)),
     append(BronzeTargets.jobsSnapshotTarget)
   )
 
   lazy private[overwatch] val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
   lazy private val appendClustersAPIProcess = ETLDefinition(
     workspace.getClustersDF,
-    Seq(cleanseRawClusterSnapDF(config.cloudProvider)),
+    Seq(cleanseRawClusterSnapDF),
     append(BronzeTargets.clustersSnapshotTarget)
   )
 
@@ -91,7 +138,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.apiEnv,
         config.organizationId,
         database,
-        BronzeTargets.clusterEventsErrorsTarget
+        BronzeTargets.clusterEventsErrorsTarget,
+        config.tempWorkingDir
       )
     ),
     append(BronzeTargets.clusterEventsTarget)
@@ -100,7 +148,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private val sparkEventLogsSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
-    "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString
+    "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
+    "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 8).toString
     // very large schema to imply, too much parallelism and schema result size is too large to
     // serialize, 64m seems to be a good middle ground.
   )
@@ -113,7 +162,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       collectEventLogPaths(
         sparkEventLogsModule.fromTime,
         sparkEventLogsModule.untilTime,
-        config.cloudProvider,
+        sparkEventLogsModule.daysToProcess,
         BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, 30),
         BronzeTargets.clustersSnapshotTarget,
         sparkLogClusterScaleCoefficient
@@ -142,13 +191,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       config.runID
     )
 
-    val optimizedAzureAuditEvents = PipelineFunctions.optimizeWritePartitions(
-      rawAzureAuditEvents,
-      BronzeTargets.auditLogAzureLandRaw,
-      spark, config, "azure_audit_log_preProcessing", getTotalCores
-    )
-
-    database.write(optimizedAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
+    database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
 
     val rawProcessCompleteMsg = "Azure audit ingest process complete"
     if (config.debugFlag) println(rawProcessCompleteMsg)
@@ -165,6 +208,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
       case _ =>
     }
+  }
+
+  def refreshViews(): Unit = {
+    postProcessor.refreshPipReportView(pipelineStateViewTarget)
+    BronzeTargets.dbuCostDetailViewTarget.publish("*")
+    BronzeTargets.cloudMachineDetailViewTarget.publish("*")
   }
 
   def run(): Pipeline = {
@@ -187,9 +236,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
 object Bronze {
   def apply(workspace: Workspace): Bronze = {
-    new Bronze(workspace, workspace.database, workspace.getConfig)
-      .initPipelineRun()
-      .loadStaticDatasets()
+    apply(
+      workspace,
+      readOnly = false,
+      suppressReport = false,
+      suppressStaticDatasets = false
+    )
   }
 
   private[overwatch] def apply(
@@ -198,8 +250,9 @@ object Bronze {
                                 suppressReport: Boolean = false,
                                 suppressStaticDatasets: Boolean = false
                               ): Bronze = {
+
     val bronzePipeline = new Bronze(workspace, workspace.database, workspace.getConfig)
-      .setReadOnly(readOnly)
+      .setReadOnly(if (workspace.isValidated) readOnly else true) // if workspace is not validated set it read only
       .suppressRangeReport(suppressReport)
       .initPipelineRun()
 
