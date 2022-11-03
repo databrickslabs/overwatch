@@ -334,14 +334,20 @@ class Config() {
     var rawToken = ""
     var scope = ""
     var key = ""
+    val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
-        // Todo: This is failing to pull data from url using this dbutils api
-        // for workaround I have hard coded the url like this 
-        // _workspaceUrl = "https://631866050010.0.gcp.databricks.com"
-        _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
-        _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
+        //Todo: This is failing to pull data from url using this dbutils api
+        //for workaround I have runtime param that sets the url
+        _workspaceUrl = {if (derivedApiEnvConfig.apiUrlOverride.nonEmpty) derivedApiEnvConfig.apiUrlOverride
+          else dbutils.notebook.getContext().apiUrl.get}
+        _cloudProvider = _workspaceUrl.toLowerCase match {
+          case x if x.contains("azure") => "azure"
+          case x if x.contains("gcp") => "gcp"
+          case x if x.contains("aws") => "aws"
+          case _ => "Not a Valid URI"
+        }
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key
         rawToken = dbutils.secrets.get(scope, key)
@@ -351,15 +357,25 @@ class Config() {
       } else {
         if (_isLocalTesting) { // Local testing env vars
           _workspaceUrl = System.getenv("OVERWATCH_ENV")
-          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
+          _cloudProvider = _workspaceUrl.toLowerCase match {
+            case x if x.contains("azure") => "azure"
+            case x if x.contains("gcp") => "gcp"
+            case x if x.contains("aws") => "aws"
+            case _ => "Not a Valid URI"
+          }
           rawToken = System.getenv("OVERWATCH_TOKEN")
           _tokenType = "Environment"
         } else { // Use default token for job owner
-          // Todo: This is failing to pull data from url using this dbutils api
-          // for workaround I have hard coded the url like this 
-          // _workspaceUrl = "https://631866050010.0.gcp.databricks.com"
-          _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
-          _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
+          //Todo: This is failing to pull data from url using this dbutils api
+          //for workaround I have runtime param that sets the url
+          _workspaceUrl = {if (derivedApiEnvConfig.apiUrlOverride.nonEmpty) derivedApiEnvConfig.apiUrlOverride
+            else dbutils.notebook.getContext().apiUrl.get}
+          _cloudProvider = _workspaceUrl.toLowerCase match {
+            case x if x.contains("azure") => "azure"
+            case x if x.contains("gcp") => "gcp"
+            case x if x.contains("aws") => "aws"
+            case _ => "Not a Valid URI"
+          }
           rawToken = dbutils.notebook.getContext().apiToken.get
           val authMessage = "No secret parameters provided: attempting to continue with job owner's token."
           logger.log(Level.WARN, authMessage)
@@ -370,7 +386,6 @@ class Config() {
       if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
         s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
         s"a user access token. It should start with 'dapi' ")
-      val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,

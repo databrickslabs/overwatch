@@ -59,6 +59,7 @@ case class ApiEnvConfig(
                          enableUnsafeSSL: Boolean = false,
                          threadPoolSize: Int = 4,
                          apiWaitingTime: Long = 300000,
+                         apiUrlOverride: String = "",
                          apiProxyConfig: Option[ApiProxyConfig] = None
                        )
 

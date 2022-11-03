@@ -188,6 +188,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         getOptionBoolean(masterNode, "apiEnvConfig.enableUnsafeSSL").getOrElse(false),
         getOptionInt(masterNode, "apiEnvConfig.threadPoolSize").getOrElse(4),
         getOptionLong(masterNode, "apiEnvConfig.apiWaitingTime").getOrElse(300000),
+        getOptionString(masterNode, "apiEnvConfig.apiUrlOverride").getOrElse(""),
         apiProxyNodeConfig
       ))
     } else {
