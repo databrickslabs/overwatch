@@ -340,8 +340,10 @@ class Config() {
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
         //Todo: This is failing to pull data from url using this dbutils api
         //for workaround I have runtime param that sets the url
-        _workspaceUrl = {if (derivedApiEnvConfig.apiUrlOverride.nonEmpty) derivedApiEnvConfig.apiUrlOverride
-          else dbutils.notebook.getContext().apiUrl.get}
+        _workspaceUrl = {
+          if (derivedApiEnvConfig.apiUrlOverride.nonEmpty) derivedApiEnvConfig.apiUrlOverride
+          else dbutils.notebook.getContext().apiUrl.get
+        }
         _cloudProvider = _workspaceUrl.toLowerCase match {
           case x if x.contains("azure") => "azure"
           case x if x.contains("gcp") => "gcp"
@@ -368,8 +370,10 @@ class Config() {
         } else { // Use default token for job owner
           //Todo: This is failing to pull data from url using this dbutils api
           //for workaround I have runtime param that sets the url
-          _workspaceUrl = {if (derivedApiEnvConfig.apiUrlOverride.nonEmpty) derivedApiEnvConfig.apiUrlOverride
-            else dbutils.notebook.getContext().apiUrl.get}
+          _workspaceUrl = {
+            if (derivedApiEnvConfig.apiUrlOverride.nonEmpty) derivedApiEnvConfig.apiUrlOverride
+            else dbutils.notebook.getContext().apiUrl.get
+          }
           _cloudProvider = _workspaceUrl.toLowerCase match {
             case x if x.contains("azure") => "azure"
             case x if x.contains("gcp") => "gcp"
