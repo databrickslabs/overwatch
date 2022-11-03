@@ -12,6 +12,7 @@ import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
 import java.util
 import java.util.UUID
+import scala.annotation.tailrec
 
 class Database(config: Config) extends SparkSessionWrapper {
 
