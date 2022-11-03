@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.env
 
-import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
@@ -12,7 +12,6 @@ import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
 import java.util
 import java.util.UUID
-import scala.util.control.Breaks.{break, breakable}
 
 class Database(config: Config) extends SparkSessionWrapper {
 
@@ -257,6 +256,36 @@ class Database(config: Config) extends SparkSessionWrapper {
     true
   }
 
+
+  def performRetry(inputDf: DataFrame,
+                   target: PipelineTable,
+                   pipelineSnapTime: Column,
+                   maxMergeScanDates: Array[String] = Array()): this.type = {
+    @tailrec def executeRetry(retryCount: Int): this.type = {
+      val rerunFlag = try {
+        write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
+        false
+      } catch {
+        case e: Throwable =>
+          val exceptionMsg = e.getMessage.toLowerCase()
+          if (exceptionMsg != null && (exceptionMsg.contains("concurrent") || exceptionMsg.contains("conflicting")) && retryCount < 5) {
+            coolDown(target.tableFullName)
+            true
+          } else {
+            throw e
+          }
+      }
+      if (retryCount < 5 && rerunFlag) executeRetry(retryCount + 1) else this
+    }
+    try {
+      executeRetry(1)
+    } catch {
+      case e: Throwable =>
+        throw e
+    }
+
+  }
+
   def writeWithRetry(df: DataFrame,
                      target: PipelineTable,
                      pipelineSnapTime: Column,
@@ -269,37 +298,7 @@ class Database(config: Config) extends SparkSessionWrapper {
       df.persist()
     } else df
     if (needsCache) inputDf.count()
-
-    val retryCount = 5
-    var currentCount = 1
-
-    //TODO made it recursive tail recursion
-    if (currentCount < retryCount) {
-      try {
-        write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
-        //break
-        if (currentCount > 1) {
-          logger.log(Level.INFO, "Retry successful.." + target.tableFullName + " thread name " + Thread.currentThread().getName)
-        }
-        currentCount = 5
-      }
-      catch {
-        case e: Throwable =>
-          val exceptionMsg = e.getMessage.toLowerCase()
-          if (exceptionMsg != null && (exceptionMsg.contains("concurrent") || exceptionMsg.contains("conflicting"))) {
-            logger.log(Level.INFO, "Database retry count" + currentCount + " Table name:" + target.tableFullName
-              + " Error Msg: " + e.getMessage)
-            if (currentCount == retryCount) {
-              logger.log(Level.INFO, s"""Reached max retry current retry count:${currentCount}""")
-              throw e
-            }
-            coolDown(target.tableFullName)
-            currentCount = currentCount + 1
-          } else {
-            throw e
-          }
-      }
-    }
+    performRetry(inputDf,target, pipelineSnapTime, maxMergeScanDates)
     true
   }
 

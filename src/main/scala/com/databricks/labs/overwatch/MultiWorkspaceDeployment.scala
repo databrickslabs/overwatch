@@ -281,7 +281,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
       .withColumn("configFile", lit(configCsvPath))
-      .write.format("delta").mode("append").save(s"""${configWriteLocation}/report/configTable""")
+      .write.format("delta").mode("append").option("mergeSchema", "true").save(s"""${configWriteLocation}/report/configTable""")
   }
 
   /**
@@ -300,7 +300,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       .withColumn("deployment_id", lit(deploymentId))
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
-      .write.format("delta").mode("append").save(s"""${validationPath}/report/${reportName}""")
+      .write.format("delta").option("mergeSchema", "true").mode("append").save(s"""${validationPath}/report/${reportName}""")
     println("Validation report has been saved to " + s"""${validationPath}/report/${reportName}""")
   }
 

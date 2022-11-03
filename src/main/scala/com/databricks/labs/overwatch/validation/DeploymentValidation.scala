@@ -107,6 +107,58 @@ object DeploymentValidation extends SparkSessionWrapper {
     }
   }
 
+  private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
+
+    val testDetails =
+      s"""WorkSpaceMountTest
+         |APIURL:${conf.api_url}
+         |DBPATWorkspaceScope:${conf.secret_scope}
+         |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+    try {
+      val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
+      val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
+      val endPoint = "dbfs/search-mounts"
+      val mountCount = ApiCallV2(apiEnv, endPoint).execute().asDF().count()
+      if(mountCount<50)
+        {
+          DeploymentValidationReport(true,
+            getSimpleMsg("Validate_Mount"),
+            testDetails,
+            Some("SUCCESS"),
+            Some(conf.workspace_id)
+          )
+        }else{
+        DeploymentValidationReport(false,
+          getSimpleMsg("Validate_Mount"),
+          testDetails,
+          Some("Number of mounts found in workspace is more than 50"),
+          Some(conf.workspace_id)
+        )
+      }
+
+    } catch {
+      case exception: Exception =>
+        val msg =
+          s"""No Data retrieved
+             |WorkspaceId:${conf.workspace_id}
+             |APIURL:${conf.api_url}
+             | DBPATWorkspaceScope:${conf.secret_scope}
+             | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+        val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
+        logger.log(Level.ERROR, fullMsg)
+        DeploymentValidationReport(false,
+          getSimpleMsg("Validate_Mount"),
+          testDetails,
+          Some(fullMsg),
+          Some(conf.workspace_id)
+        )
+
+    }
+
+  }
+
+
+
   /**
    * Performs clusters/list api call to check the access to the workspace
    *
@@ -456,6 +508,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case "Validate_EventHub" => "Consuming data from EventHub."
       case "Valid_Excluded_Scopes" => "Excluded scope can be audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts."
       case "Storage_Access" => "ETL_STORAGE_PREFIX should have read,write and create access"
+      case "Validate_Mount" => "Number of mount points in the workspace should not exceed 50"
     }
   }
 
@@ -516,8 +569,8 @@ object DeploymentValidation extends SparkSessionWrapper {
         validateRuleAndUpdateStatus(groupedRuleSet,parallelism) ++
         validateRuleAndUpdateStatus(nonGroupedRuleSet,parallelism)++
         inputRow.map(validateApiUrlConnectivity) ++ //Make request to each API and check the response
-        inputRow.map(cloudSpecificValidation) //Connection check for audit logs s3/EH
-
+        inputRow.map(cloudSpecificValidation)++ //Connection check for audit logs s3/EH
+        inputRow.map(validateMountCount)
     //Access validation for etl_storage_prefix
     validationStatus.append(storagePrefixAccessValidation(inputRow.head)) //Check read/write/create/list access for etl_storage_prefix
 
