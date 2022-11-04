@@ -1248,7 +1248,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
       .transform(jobRunsAppendTaskAndClusterDetails)
       .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
-      .transform(jobRunsRollupWorkflowsAndChildren)
+//      .transform(jobRunsRollupWorkflowsAndChildren)
       .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
   }
 
