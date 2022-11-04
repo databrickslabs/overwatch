@@ -234,10 +234,13 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, stmt)
       try {
         if (spark.catalog.tableExists(fullTableName)) throw new BadConfigException(s"TABLE EXISTS: SKIPPING")
+        if (dataset.name == "tempworkingdir") throw new UnsupportedTypeException(s"Cant Create table using '${dataset.path}'")
         spark.sql(stmt)
         WorkspaceMetastoreRegistrationReport(dataset, stmt, "SUCCESS")
       } catch {
         case e: BadConfigException =>
+          WorkspaceMetastoreRegistrationReport(dataset, stmt, e.getMessage)
+        case e: UnsupportedTypeException =>
           WorkspaceMetastoreRegistrationReport(dataset, stmt, e.getMessage)
         case e: Throwable =>
           val msg = s"TABLE REGISTRATION FAILED: ${e.getMessage}"
