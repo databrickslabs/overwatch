@@ -2,6 +2,8 @@ package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
 import com.databricks.labs.overwatch.pipeline._
@@ -617,11 +619,99 @@ object Helpers extends SparkSessionWrapper {
    *                        or direct access via s3:// or abfss:// or dbfs:/mnt/ etc.
    * @return
    */
+//  def registerRemoteOverwatchIntoLocalMetastore(
+//                                                 remoteWorkspace: Workspace,
+//                                                 localDataTarget: DataTarget
+//                                               ): Seq[WorkspaceMetastoreRegistrationReport] = {
+//
+//    val newConfigParams = remoteWorkspace.getConfig.inputConfig.copy(dataTarget = Some(localDataTarget))
+//    val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
+//    val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
+//    val registrationReport = localTempWorkspace.addToMetastore()
+//    val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
+//    val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
+//
+//    b.refreshViews()
+//    g.refreshViews()
+//    registrationReport
+//
+//  }
   def registerRemoteOverwatchIntoLocalMetastore(
-                                                 remoteWorkspace: Workspace,
-                                                 localDataTarget: DataTarget
-                                               ): Seq[WorkspaceMetastoreRegistrationReport] = {
+                                                 remoteStoragePrefix: String,
+                                                 remoteWorkspaceID: String,
+                                                 localETLDatabaseName: String = "",
+                                                 localConsumerDatabaseName: String = "",
+                                                 remoteETLDataPathPrefixOverride: String = "",
+                                                 usingExternalMetastore: Boolean = false
+                                               ): Seq[WorkspaceMetastoreRegistrationReport]  = {
 
+    // Derive eltDatapathPrefix
+    val eltDataPathPrefix = if (remoteETLDataPathPrefixOverride == "") {
+      remoteStoragePrefix + "/global_share"
+    } else remoteETLDataPathPrefixOverride
+
+    // Check whether eltDatapathPrefix Contains PipReport
+    val pipReportPath = eltDataPathPrefix+"/pipeline_report"
+    try{
+      dbutils.fs.ls(pipReportPath)
+      logger.log(Level.INFO, s"${pipReportPath} is a Delta table.....Proceed")
+    }catch {
+      // TODO: Throw ERROR and EXIT
+      case e: FileNotFoundException =>
+        val msg = s"${pipReportPath} is not a Delta table.....Exit"
+        logger.log(Level.ERROR, msg)
+    }
+
+    // Derive Remote Workspace
+    val remoteWorkspace = Helpers.getRemoteWorkspaceByPath(pipReportPath,remoteWorkspaceID)
+
+    val remoteConfig = remoteWorkspace.getConfig
+    val etlDatabaseNameToCreate = if (localETLDatabaseName == "" & !usingExternalMetastore)  {remoteConfig.databaseName} else {localETLDatabaseName}
+    val consumerDatabaseNameToCreate = 	if (localConsumerDatabaseName == "" & !usingExternalMetastore) {remoteConfig.consumerDatabaseName} else {localConsumerDatabaseName}
+    val LocalWorkSpaceID = if (dbutils.notebook.getContext.tags("orgId") == "0") {
+      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+    } else dbutils.notebook.getContext.tags("orgId")
+
+    val localETLDBPath = if (!usingExternalMetastore ){
+      Some(s"${remoteStoragePrefix}/${LocalWorkSpaceID}/${etlDatabaseNameToCreate}.db")
+    }else{
+      val storagePrefix = remoteETLDataPathPrefixOverride.split("/").dropRight(1).mkString("/")
+      Some(s"${storagePrefix}/${LocalWorkSpaceID}/${etlDatabaseNameToCreate}.db")
+    }
+    val localConsumerDBPath = if (!usingExternalMetastore) {
+      Some(s"${remoteStoragePrefix}/${LocalWorkSpaceID}/${consumerDatabaseNameToCreate}.db")
+    }else{
+      val storagePrefix = remoteETLDataPathPrefixOverride.split("/").dropRight(1).mkString("/")
+      Some(s"${storagePrefix}/${LocalWorkSpaceID}/${consumerDatabaseNameToCreate}.db")
+    }
+
+
+    if (usingExternalMetastore){
+      try {
+        if (localConsumerDatabaseName == localETLDatabaseName) {
+          logger.log(Level.INFO, s"ExternalMetastore Flag is true and localConsumerDatabaseName is same as localETLDatabaseName")
+        } else {
+          throw new BadConfigException(s"ExternalMetastore Flag is true and localConsumerDatabaseName is not same as localETLDatabaseName")
+        }
+      }catch{
+        case e: BadConfigException =>
+          val msg = s"TABLE REGISTRATION FAILED: ${e.getMessage}"
+          logger.log(Level.ERROR, msg)
+      }
+    }else{
+      logger.log(Level.INFO, s"External Metastore Flag set as ${usingExternalMetastore}")
+    }
+
+    //    if (usingExternalMetastore & localConsumerDatabaseName == localETLDatabaseName){
+    //      println("localConsumerDatabaseName and localETLDatabaseName both are same...Proceed")
+    //    }else{
+    //      println("localConsumerDatabaseName and localETLDatabaseName both are Not same...Does not Proceed")
+    //    }
+
+    val localDataTarget = DataTarget(
+      Some(etlDatabaseNameToCreate), localETLDBPath, Some(eltDataPathPrefix),
+      Some(consumerDatabaseNameToCreate), localConsumerDBPath
+    )
     val newConfigParams = remoteWorkspace.getConfig.inputConfig.copy(dataTarget = Some(localDataTarget))
     val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
     val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
@@ -632,7 +722,7 @@ object Helpers extends SparkSessionWrapper {
     b.refreshViews()
     g.refreshViews()
     registrationReport
-
+    //    Helpers.registerRemoteOverwatchIntoLocalMetastore(remoteWorkspace, localDataTarget)
   }
 
   private def rollbackTargetToTimestamp(

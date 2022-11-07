@@ -183,11 +183,11 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
 
     val apiEnvConfig = if (masterNode.has("apiEnvConfig")) {
       Some(ApiEnvConfig(
-        getOptionInt(masterNode, "apiEnvConfig.successBatchSize").getOrElse(200),
-        getOptionInt(masterNode, "apiEnvConfig.errorBatchSize").getOrElse(500),
-        getOptionBoolean(masterNode, "apiEnvConfig.enableUnsafeSSL").getOrElse(false),
-        getOptionInt(masterNode, "apiEnvConfig.threadPoolSize").getOrElse(4),
-        getOptionLong(masterNode, "apiEnvConfig.apiWaitingTime").getOrElse(300000),
+        Some(getOptionInt(masterNode, "apiEnvConfig.successBatchSize").getOrElse(200)),
+        Some(getOptionInt(masterNode, "apiEnvConfig.errorBatchSize").getOrElse(500)),
+        Some(getOptionBoolean(masterNode, "apiEnvConfig.enableUnsafeSSL").getOrElse(false)),
+        Some(getOptionInt(masterNode, "apiEnvConfig.threadPoolSize").getOrElse(4)),
+        Some(getOptionLong(masterNode, "apiEnvConfig.apiWaitingTime").getOrElse(300000)),
         apiProxyNodeConfig
       ))
     } else {
