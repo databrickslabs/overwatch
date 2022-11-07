@@ -1384,7 +1384,7 @@ object Upgrade extends SparkSessionWrapper {
           val upgradeSilver = Silver(orgWorkspace, suppressReport = true, suppressStaticDatasets = true)
             .setReadOnly(false)
           // reset rebuild module states to ensure first run is detected
-          silverModulesToRebuild.foreach(upgradeSilver.dropModuleState)
+          if (startStep <= 4) silverModulesToRebuild.foreach(upgradeSilver.dropModuleState) // only drop the state if the Upgrade process dropped and reset the states
           upgradeSilver.run()
           logger.log(Level.INFO, s"COMPLETED SILVER REBUILD FOR ORG_ID: ${org.organization_id}")
         })
@@ -1434,7 +1434,7 @@ object Upgrade extends SparkSessionWrapper {
           val upgradeGold = Gold(orgWorkspace, suppressReport = true, suppressStaticDatasets = true)
             .setReadOnly(false)
           // reset rebuild module states to ensure first run is detected
-          goldModulesToRebuild.foreach(upgradeGold.dropModuleState)
+          if (startStep <= 4) goldModulesToRebuild.foreach(upgradeGold.dropModuleState) // only drop the state if the Upgrade process dropped and reset the states
           upgradeGold.run()
           logger.log(Level.INFO, s"COMPLETED GOLD REBUILD FOR ORG_ID: ${org.organization_id}")
         })
