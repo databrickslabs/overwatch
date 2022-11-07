@@ -642,7 +642,8 @@ object Helpers extends SparkSessionWrapper {
                                                  localETLDatabaseName: String = "",
                                                  localConsumerDatabaseName: String = "",
                                                  remoteETLDataPathPrefixOverride: String = "",
-                                                 usingExternalMetastore: Boolean = false
+                                                 usingExternalMetastore: Boolean = false,
+                                                 workspacesAllowed: Array[String] = Array()
                                                ): Seq[WorkspaceMetastoreRegistrationReport]  = {
 
     // Derive eltDatapathPrefix
@@ -719,8 +720,8 @@ object Helpers extends SparkSessionWrapper {
     val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
     val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
 
-    b.refreshViews()
-    g.refreshViews()
+    b.refreshViews(workspacesAllowed)
+    g.refreshViews(workspacesAllowed)
     registrationReport
     //    Helpers.registerRemoteOverwatchIntoLocalMetastore(remoteWorkspace, localDataTarget)
   }

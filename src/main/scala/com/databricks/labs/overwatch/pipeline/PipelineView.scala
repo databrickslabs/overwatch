@@ -7,12 +7,12 @@ case class PipelineView(name: String,
                         dataSource: PipelineTable,
                         config: Config,
                         partitionMapOverrides: Map[String, String] = Map(),
-                        dbTargetOverride: Option[String] = None
+                        dbTargetOverride: Option[String] = None,
                        ) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
 
-  def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false): Unit = {
+  def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
     if (dataSource.exists) {
       val pubStatementSB = new StringBuilder("create or replace view ")
       pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
@@ -30,6 +30,11 @@ case class PipelineView(name: String,
             pubStatementSB.append(s"and ${pCol._1} = ${dataSource.name}.${pCol._2} ")
           })
         }
+        if (workspacesAllowed.length !=0){
+          val workspacesAllowedString = workspacesAllowed.mkString(",")
+          pubStatementSB.append(s" and organization_id in (${workspacesAllowedString})")
+          println("pubStatementSB after workspacesAllowedString is ",pubStatementSB)
+        }
         if (sorted) {
           val orderDef = if (reverse) {
             dataSource.incrementalColumns.map(c => s"$c desc").mkString(", ")
@@ -45,6 +50,7 @@ case class PipelineView(name: String,
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
       try {
+        println("pubStatement is ",pubStatement)
         spark.sql(pubStatement)
       } catch {
         case e: Throwable =>
