@@ -920,7 +920,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes =
     if(isMultiWorkSpaceDeployment) {
-      println("calling map finder")
       getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix)
      } else {
