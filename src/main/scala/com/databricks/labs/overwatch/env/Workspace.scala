@@ -163,7 +163,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
-//    var responseCounter = 0
     val apiResponseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
     val tmpSqlQueryHistorySuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
@@ -208,7 +207,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
               apiResponseArray.add(obj)
             }
           )
-//          apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= config.apiEnv.successBatchSize) {
             PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
             apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
@@ -217,7 +215,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       }
       future.onComplete {
         case Success(_) =>
-//          responseCounter = responseCounter + 1
           apiResponseCounter.add(1)
 
         case Failure(e) =>
@@ -231,7 +228,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
             }
             logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
           }
-//          responseCounter = responseCounter + 1
           apiResponseCounter.add(1)
       }
       fromTimeMs = fromTimeMs+(1000*60*60)
