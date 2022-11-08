@@ -789,12 +789,13 @@ trait SilverTransforms extends SparkSessionWrapper {
         ))
     } else (None, None)
 
+    val basePoolsDF = auditRawTable.asDF
+      .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
+      .cache()
 
-    val (driverPoolLookup: Option[DataFrame], workerPoolLookup: Option[DataFrame]) = if ( // if instance pools found in audit logs
-      !auditRawTable.asDF
-        .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit")).isEmpty) {
-      val basePoolsDF = auditRawTable.asDF
-        .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
+    basePoolsDF.count
+
+    val (driverPoolLookup: Option[DataFrame], workerPoolLookup: Option[DataFrame]) = if (!basePoolsDF.isEmpty) { // if instance pools found in audit logs
       (
         Some(basePoolsDF.select(
           'timestamp, 'organization_id,
@@ -884,12 +885,14 @@ trait SilverTransforms extends SparkSessionWrapper {
         .toTSDF("timestamp", "organization_id", "instance_pool_id")
         .lookupWhen(
           workerPoolLookup.get
-            .toTSDF("timestamp", "organization_id", "instance_pool_id")
+            .toTSDF("timestamp", "organization_id", "instance_pool_id"),
+          maxLookAhead = Long.MaxValue
         ).df
         .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         .lookupWhen(
           driverPoolLookup.get
-            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
+            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id"),
+          maxLookAhead = Long.MaxValue
         ).df
     } else { // driver pool does not exist -- filter and add null lookup cols
       clusterBaseFilled.filter('actionName.isin("create", "edit", "snapImpute"))
@@ -905,12 +908,14 @@ trait SilverTransforms extends SparkSessionWrapper {
         .toTSDF("timestamp", "organization_id", "instance_pool_id")
         .lookupWhen(
           workerPoolSnapLookup.get
-            .toTSDF("timestamp", "organization_id", "instance_pool_id")
+            .toTSDF("timestamp", "organization_id", "instance_pool_id"),
+          maxLookAhead = Long.MaxValue
         ).df
         .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         .lookupWhen(
           driverPoolSnapLookup.get
-            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
+            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id"),
+          maxLookAhead = Long.MaxValue
         ).df
     } else {
       clusterBaseWithPools
