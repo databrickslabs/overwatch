@@ -657,10 +657,11 @@ object Helpers extends SparkSessionWrapper {
       dbutils.fs.ls(pipReportPath)
       logger.log(Level.INFO, s"${pipReportPath} is a Delta table.....Proceed")
     }catch {
-      // TODO: Throw ERROR and EXIT
+
       case e: FileNotFoundException =>
         val msg = s"${pipReportPath} is not a Delta table.....Exit"
         logger.log(Level.ERROR, msg)
+        throw new BadConfigException(msg)
     }
 
     // Derive Remote Workspace
@@ -698,6 +699,7 @@ object Helpers extends SparkSessionWrapper {
         case e: BadConfigException =>
           val msg = s"TABLE REGISTRATION FAILED: ${e.getMessage}"
           logger.log(Level.ERROR, msg)
+          throw new BadConfigException(msg)
       }
     }else{
       logger.log(Level.INFO, s"External Metastore Flag set as ${usingExternalMetastore}")
