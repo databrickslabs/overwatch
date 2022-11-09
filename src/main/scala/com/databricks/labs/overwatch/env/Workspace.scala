@@ -235,7 +235,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       try {
         if (spark.catalog.tableExists(fullTableName)) throw new BadConfigException(s"TABLE EXISTS: SKIPPING")
         if (dataset.name == "tempworkingdir") throw new UnsupportedTypeException(s"Cant Create table using '${dataset.path}'")
-        spark.sql(stmt)
+        else {
+          spark.sql(stmt)
+        }
         WorkspaceMetastoreRegistrationReport(dataset, stmt, "SUCCESS")
       } catch {
         case e: BadConfigException =>
