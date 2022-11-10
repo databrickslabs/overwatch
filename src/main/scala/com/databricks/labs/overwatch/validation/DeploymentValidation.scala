@@ -31,15 +31,7 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  /**
-   * Validates the config csv file existence.
-   */
-  private def validateFileExistence(configCsvPath: String): Boolean = {
-    if (!Helpers.pathExists(configCsvPath)) {
-      throw new BadConfigException("Unable to find config file in the given location:" + configCsvPath)
-    }
-    true
-  }
+
 
   /**
    * Create a DataFrame from provided csv file.
@@ -158,11 +150,10 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
 
-
   /**
    * Performs clusters/list api call to check the access to the workspace
-   *
-   * @param row
+   * @param conf
+   * @return
    */
   private def validateApiUrlConnectivity(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
@@ -261,7 +252,8 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   /**
    * Validate audit log data for Aws and Azure
-   * @param row
+   * @param config
+   * @return
    */
   private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
 
@@ -373,7 +365,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         .build
 
       val ehConf = EventHubsConf(connectionString)
-        .setMaxEventsPerTrigger(100)
+        .setMaxEventsPerTrigger(5000)
         .setStartingPosition(EventPosition.fromStartOfStream)
 
       val rawEHDF = spark.readStream
@@ -458,14 +450,14 @@ object DeploymentValidation extends SparkSessionWrapper {
   private def validateRuleAndUpdateStatus(ruleSet: RuleSet,parallelism: Int): ArrayBuffer[DeploymentValidationReport] = {
     val validationStatus: ArrayBuffer[DeploymentValidationReport] = new ArrayBuffer[DeploymentValidationReport]()
     val validation = ruleSet.validate()
-    val columns = ruleSet.getRules.map(x => x.ruleName)
+    val columns = ruleSet.getRules.map(_.ruleName)
     val completeReportDF = if (!validation.completeReport.columns.contains("workspace_id")) {
       validation.completeReport.withColumn("workspace_id", lit(""))
     } else {
       validation.completeReport
     }
-     val resultDF = completeReportDF.withColumn("concat_columns", array(columns map col: _*))
-      .withColumn("result", explode(col("concat_columns")))
+     val resultDF = completeReportDF.withColumn("concat_rule_columns", array(columns map col: _*))
+      .withColumn("result", explode(col("concat_rule_columns")))
       .select("deployment_id", "workspace_id", "result")
 
 
@@ -513,31 +505,35 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
   /**
-   * Performs mandatory validation before each deployment.
+   * Performs common_etl_storasgsePrefix check and read write access check for storage prefix before each deployment.
+   * @param multiWorkspaceConfig
+   * @param parallelism
+   * @return
    */
-  private[overwatch] def performMandatoryValidation(configCsvPath: String,parallelism: Int,deploymentId: String):Unit = {
+  private[overwatch] def performMandatoryValidation( multiWorkspaceConfig: Array[MultiWorkspaceConfig],parallelism: Int):Array[MultiWorkspaceConfig]  = {
     logger.log(Level.INFO, "Performing mandatory validation")
-    validateFileExistence(configCsvPath)
-    val configDF = makeDataFrame(configCsvPath,deploymentId)
-    val groupedRuleSet = RuleSet(configDF.toDF(), by = "deployment_id")
-    groupedRuleSet.add(validateDistinct("Common_ETLStoragePrefix",MultiWorkspaceConfigColumns.etl_storage_prefix.toString))
-    val validationStatus =  validateRuleAndUpdateStatus(groupedRuleSet,parallelism)
-    if (validationStatus.toDS().filter("validated==false").count > 0) { //Checks for failed validations
+    val commonEtlStorageRuleSet = RuleSet(multiWorkspaceConfig.toSeq.toDS.toDF(), by = "deployment_id")//Check common etl_storage_prefix
+    commonEtlStorageRuleSet.add(validateDistinct("Common_ETLStoragePrefix", MultiWorkspaceConfigColumns.etl_storage_prefix.toString))
+    val validationStatus = validateRuleAndUpdateStatus(commonEtlStorageRuleSet, parallelism)
+    if (!validationStatus.forall(_.validated)) {
       throw new BadConfigException(getSimpleMsg("Common_ETLStoragePrefix"))
     }
-    storagePrefixAccessValidation(configDF.head(), true)
-  }
+    storagePrefixAccessValidation(multiWorkspaceConfig.head, fastFail = true) //Check read write access for etl_storage_prefix
+    multiWorkspaceConfig
+    }
 
   /**
    * Entry point of the validation.
    *
    * @return
    */
-  private[overwatch] def performValidation(configCsvPath: String,parallelism: Int,deploymentId: String,outputPath: String): Dataset[DeploymentValidationReport] = {
+  private[overwatch] def performValidation(
+                                            multiWorkspaceConfig: Array[MultiWorkspaceConfig],
+                                            parallelism: Int,
+                                          ): Array[DeploymentValidationReport] = {
     //Primary validation //
-    validateFileExistence(configCsvPath)
-    val configDF = makeDataFrame(configCsvPath,deploymentId,outputPath).persist(StorageLevel.MEMORY_AND_DISK)
-    println("Parallelism :" + parallelism +" Number of input rows :"+configDF.count())
+    val configDF = multiWorkspaceConfig.toSeq.toDS.toDF.repartition(getTotalCores).cache()
+    println("Parallelism :" + parallelism + " Number of input rows :" + configDF.count())
 
     var validationStatus: ArrayBuffer[DeploymentValidationReport] = new ArrayBuffer[DeploymentValidationReport]()
     //csv data validation
@@ -547,7 +543,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       validateDistinct("Common_ETLDatabase",MultiWorkspaceConfigColumns.etl_database_name.toString),
       validateDistinct("Common_ConsumerDatabaseName",MultiWorkspaceConfigColumns.consumer_database_name.toString)
     )
-    val groupedRuleSet = RuleSet(configDF.toDF(), by = "deployment_id").add(gropedRules)
+    val groupedRuleSet = RuleSet(configDF, by = "deployment_id").add(gropedRules)
 
     val nonGroupedRules = Seq[Rule](
       validateNotNull("NOTNULL_APIURL",MultiWorkspaceConfigColumns.api_url.toString),
@@ -558,24 +554,24 @@ object DeploymentValidation extends SparkSessionWrapper {
       validateMaxDays(),
       validateOWScope()
     )
-    val nonGroupedRuleSet = RuleSet(configDF.toDF()).add(nonGroupedRules)
+    val nonGroupedRuleSet = RuleSet(configDF).add(nonGroupedRules)
 
 
     //Connectivity validation
-    val inputRow = configDF.collect().par
+    val configToValidate = multiWorkspaceConfig.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
-    inputRow.tasksupport = taskSupport
+    configToValidate.tasksupport = taskSupport
     validationStatus =
         validateRuleAndUpdateStatus(groupedRuleSet,parallelism) ++
         validateRuleAndUpdateStatus(nonGroupedRuleSet,parallelism)++
-        inputRow.map(validateApiUrlConnectivity) ++ //Make request to each API and check the response
-        inputRow.map(cloudSpecificValidation)++ //Connection check for audit logs s3/EH
-        inputRow.map(validateMountCount)
+          configToValidate.map(validateApiUrlConnectivity) ++ //Make request to each API and check the response
+          configToValidate.map(cloudSpecificValidation)++ //Connection check for audit logs s3/EH
+          configToValidate.map(validateMountCount)
     //Access validation for etl_storage_prefix
-    validationStatus.append(storagePrefixAccessValidation(inputRow.head)) //Check read/write/create/list access for etl_storage_prefix
+    validationStatus.append(storagePrefixAccessValidation(configToValidate.head)) //Check read/write/create/list access for etl_storage_prefix
 
     configDF.unpersist()
-    validationStatus.toDS().as[DeploymentValidationReport]
+    validationStatus.toArray
   }
 
 }

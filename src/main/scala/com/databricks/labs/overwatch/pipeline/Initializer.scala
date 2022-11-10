@@ -618,17 +618,6 @@ object Initializer extends SparkSessionWrapper {
     )
   }
 
-/*  def apply(overwatchArgs: String, debugFlag: Boolean,disableValidations:Boolean, isMultiworkspaceDeployment: Boolean): Workspace = {
-    apply(
-      overwatchArgs,
-      debugFlag,
-      isSnap = false,
-      disableValidations,
-      initializeDatabase = true,
-      isMultiworkspaceDeployment
-    )
-  }*/
-
   /**
    *
    * @param overwatchArgs Json string of args -- When passing into args in Databricks job UI, the json string must

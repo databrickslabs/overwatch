@@ -2,7 +2,9 @@ package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
+
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions.lit
@@ -25,12 +27,11 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 object MultiWorkspaceDeployment extends SparkSessionWrapper {
 
 
-
   def apply(configCsvPath: String): MultiWorkspaceDeployment = {
-   apply(configCsvPath,"/mnt/tmp/overwatch")
+    apply(configCsvPath, "/mnt/tmp/overwatch")
   }
 
-  def apply(configCsvPath: String, tempOutputPath: String)={
+  def apply(configCsvPath: String, tempOutputPath: String) = {
     new MultiWorkspaceDeployment()
       .setConfigCsvPath(configCsvPath)
       .setOutputPath(tempOutputPath)
@@ -64,7 +65,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   private var _pipelineSnapTime: Long = _
 
 
-
   private def setConfigCsvPath(value: String): this.type = {
     _configCsvPath = value
     this
@@ -85,29 +85,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     this
   }
 
-  /**
-   * Validates all the parameters provided in config csv file and generates a report which is stored at /etl_storrage_prefix/report/validationReport
-   *
-   * @param parallelism number of threads which will be running parallely to complete the task
-   */
-  def validate(parallelism: Int = 4): Unit = {
-    val processingStartTime = System.currentTimeMillis();
-    val deploymentValidation = DeploymentValidation
-    val report = deploymentValidation.performValidation(configCsvPath, parallelism, deploymentId,outputPath)
-    val notValidatedCount = report.filter(x => {
-      !x.validated
-    }).count()
-
-    snapShotValidation(report, deploymentValidation.makeDataFrame(configCsvPath, deploymentId).head().etl_storage_prefix, "validationReport",deploymentId)
-    val processingEndTime = System.currentTimeMillis();
-    val msg =
-      s"""Validation report details
-         |Total validation count: ${report.count()}
-         |Failed validation count:${notValidatedCount}
-         |Report run duration in sec : ${(processingEndTime - processingStartTime) / 1000}
-         |""".stripMargin
-    println(msg)
-  }
 
   /**
    * Creating overwatch parameters
@@ -162,7 +139,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         primordialDateString = Some(stringDate),
         workspace_name = Some(customWorkspaceName),
         externalizeOptimize = true,
-        apiEnvConfig= Some(apiEnvConfig),
+        apiEnvConfig = Some(apiEnvConfig),
         tempWorkingDir = ""
       )
       MultiWorkspaceParams(JsonUtils.objToJson(params).compactString,
@@ -272,16 +249,19 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    *
    * @param configDF
    */
-  private def snapshotConfig(configDF: Dataset[MultiWorkspaceConfig]) = {
-    var configWriteLocation = configDF.head().etl_storage_prefix
+  private def snapshotConfig(multiworkspaceConfigs: Array[MultiWorkspaceConfig]) = {
+    var configWriteLocation = multiworkspaceConfigs.head.etl_storage_prefix
     if (!configWriteLocation.startsWith("dbfs:") && !configWriteLocation.startsWith("s3") && !configWriteLocation.startsWith("abfss")) {
       configWriteLocation = s"""dbfs:${configWriteLocation}"""
     }
-    configDF
+    multiworkspaceConfigs.toSeq.toDS().toDF()
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
       .withColumn("configFile", lit(configCsvPath))
-      .write.format("delta").mode("append").option("mergeSchema", "true").save(s"""${configWriteLocation}/report/configTable""")
+      .write.format("delta")
+      .mode("append")
+      .option("mergeSchema", "true")
+      .save(s"""${configWriteLocation}/report/configTable""")
   }
 
   /**
@@ -291,16 +271,19 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    * @param path
    * @param reportName
    */
-  private def snapShotValidation(validationDF: Dataset[DeploymentValidationReport], path: String, reportName: String, deploymentId: String): Unit = {
+  private def snapShotValidation(validationArray: Array[DeploymentValidationReport], path: String, reportName: String, deploymentId: String): Unit = {
     var validationPath = path
     if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
       validationPath = s"""dbfs:${path}"""
     }
-    validationDF
+    validationArray.toSeq.toDS().toDF()
       .withColumn("deployment_id", lit(deploymentId))
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
-      .write.format("delta").option("mergeSchema", "true").mode("append").save(s"""${validationPath}/report/${reportName}""")
+      .write.format("delta")
+      .option("mergeSchema", "true")
+      .mode("append")
+      .save(s"""${validationPath}/report/${reportName}""")
     println("Validation report has been saved to " + s"""${validationPath}/report/${reportName}""")
   }
 
@@ -311,16 +294,60 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    * @param path
    * @param reportName
    */
-  private def saveDeploymentReport(validationDF: Dataset[MultiWSDeploymentReport], path: String, reportName: String): Unit = {
+  private def saveDeploymentReport(validationArray: ArrayBuffer[MultiWSDeploymentReport], path: String, reportName: String): Unit = {
     var reportPath = path
     if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
       reportPath = s"""dbfs:${path}"""
     }
-    validationDF
+    validationArray.toDS().toDF()
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
       .write.format("delta").mode("append").save(s"""${reportPath}/report/${reportName}""")
   }
+
+  /**
+   * Validates the config csv file existence.
+   */
+  private[overwatch] def validateFileExistence(configCsvPath: String): Boolean = {
+    if (!Helpers.pathExists(configCsvPath)) {
+      throw new BadConfigException("Unable to find config file in the given location:" + configCsvPath)
+    }
+    true
+  }
+
+  private def generateMultiWorkspaceConfig(
+                                            configCsvPath: String,
+                                            deploymentId: String,
+                                            outputPath: String = ""
+                                          ): Array[MultiWorkspaceConfig] = { // Array[MultiWorkspaceConfig] = {
+    try {
+      validateFileExistence(configCsvPath)
+      val multiWorkspaceConfig = spark.read.option("header", "true")
+        .option("ignoreLeadingWhiteSpace", true)
+        .option("ignoreTrailingWhiteSpace", true)
+        .csv(configCsvPath)
+        .scrubSchema
+        .verifyMinimumSchema(Schema.deployementMinimumSchema)
+        .filter(MultiWorkspaceConfigColumns.active.toString)
+        .withColumn("deployment_id", lit(deploymentId))
+        .withColumn("output_path", lit(outputPath))
+        .as[MultiWorkspaceConfig]
+        .collect()
+      if(multiWorkspaceConfig.size<1){
+        throw new BadConfigException("Config file has 0 record, config file:" + configCsvPath)
+      }
+      multiWorkspaceConfig
+    } catch {
+      case e: Exception =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, "Unable to create Config Dataframe")
+        logger.log(Level.ERROR, fullMsg)
+        throw e
+    }
+
+  }
+
+
+
 
   /**
    * Performs the multi workspace deployment
@@ -331,12 +358,14 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   def deploy(parallelism: Int = 4, zones: String = "Bronze"): Unit = {
     val processingStartTime = System.currentTimeMillis();
     println("ParallelismLevel :" + parallelism)
-    val deploymentValidation = DeploymentValidation
-    deploymentValidation.performMandatoryValidation(configCsvPath, parallelism, deploymentId)
-    val dataFrame = deploymentValidation.makeDataFrame(configCsvPath, deploymentId)
-    snapshotConfig(dataFrame)
-    val params = dataFrame.collect().map(buildParams).filter(args => args != null).par
-    println("Workspace to be Deployed :"+params.size)
+
+    val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
+    snapshotConfig(multiWorkspaceConfig)
+    val params = DeploymentValidation
+      .performMandatoryValidation(multiWorkspaceConfig, parallelism)
+      .map(buildParams)
+
+    println("Workspace to be Deployed :" + params.size)
     val zoneArray = zones.split(",")
     zoneArray.foreach(zone => {
       val responseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
@@ -361,9 +390,32 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         Thread.sleep(5000)
       }
     })
-    saveDeploymentReport(deploymentReport.toDS, dataFrame.head().etl_storage_prefix, "deploymentReport")
+    saveDeploymentReport(deploymentReport, multiWorkspaceConfig.head.etl_storage_prefix, "deploymentReport")
     println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
 
+  }
+
+  /**
+   * Validates all the parameters provided in config csv file and generates a report which is stored at /etl_storrage_prefix/report/validationReport
+   *
+   *
+   * @param parallelism number of threads which will be running in parallel to complete the task
+   */
+  def validate(parallelism: Int = 4): Unit = {
+    val processingStartTime = System.currentTimeMillis()
+    val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
+    val validations = DeploymentValidation.performValidation(multiWorkspaceConfig, parallelism)
+    val notValidatedCount = validations.filterNot(_.validated).length
+
+    snapShotValidation(validations, multiWorkspaceConfig.head.etl_storage_prefix, "validationReport", deploymentId)
+    val processingEndTime = System.currentTimeMillis();
+    val msg =
+      s"""Validation report details
+         |Total validation count: ${validations.length}
+         |Failed validation count:${notValidatedCount}
+         |Report run duration in sec : ${(processingEndTime - processingStartTime) / 1000}
+         |""".stripMargin
+    println(msg)
   }
 
 }
