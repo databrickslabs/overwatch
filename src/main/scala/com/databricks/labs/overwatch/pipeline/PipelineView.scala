@@ -30,7 +30,7 @@ case class PipelineView(name: String,
             pubStatementSB.append(s"and ${pCol._1} = ${dataSource.name}.${pCol._2} ")
           })
         }
-        if (workspacesAllowed.length !=0){
+        if (workspacesAllowed.nonEmpty){
           val workspacesAllowedString = workspacesAllowed.mkString(",")
           pubStatementSB.append(s" and organization_id in (${workspacesAllowedString})")
           println("pubStatementSB after workspacesAllowedString is ",pubStatementSB)
