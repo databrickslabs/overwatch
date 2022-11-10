@@ -1019,9 +1019,9 @@ trait SilverTransforms extends SparkSessionWrapper {
         when('isRunning.isNull, !first('isRunning, true).over(stateFromCurrentW)).otherwise('isRunning),
         lit(false)
       )).drop("lastRunningSwitch", "nextRunningSwitch")
-      .withColumn("previousState",lag($"state", 1, null).over(stateUnboundW))
-      .withColumn("isRunning",when(col("previousState") === "false" && col("state") === "EXPANDED_DISK",lit(false)).otherwise('isRunning))
-      .drop("previousState")
+      .withColumn("previousIsRunning",lag($"isRunning", 1, null).over(stateUnboundW))
+      .withColumn("isRunning",when(col("previousIsRunning") === "false" && col("state") === "EXPANDED_DISK",lit(false)).otherwise('isRunning))
+      .drop("previousIsRunning")
       .withColumn(
         "current_num_workers",
         coalesce(
