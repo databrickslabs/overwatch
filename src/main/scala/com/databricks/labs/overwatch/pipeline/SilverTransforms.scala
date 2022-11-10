@@ -878,6 +878,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('rnk === 1 && 'rn === 1)
       .select('organization_id, 'cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
 
+
     // lookup pools node types from audit logs if records present
     val clusterBaseWithPools = if (driverPoolLookup.nonEmpty) {
       clusterBaseFilled
@@ -885,14 +886,12 @@ trait SilverTransforms extends SparkSessionWrapper {
         .toTSDF("timestamp", "organization_id", "instance_pool_id")
         .lookupWhen(
           workerPoolLookup.get
-            .toTSDF("timestamp", "organization_id", "instance_pool_id"),
-          maxLookAhead = Long.MaxValue
+            .toTSDF("timestamp", "organization_id", "instance_pool_id")
         ).df
         .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         .lookupWhen(
           driverPoolLookup.get
-            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id"),
-          maxLookAhead = Long.MaxValue
+            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         ).df
     } else { // driver pool does not exist -- filter and add null lookup cols
       clusterBaseFilled.filter('actionName.isin("create", "edit", "snapImpute"))
@@ -904,18 +903,35 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // lookup pools node types from pools snapshots when snapshots exist
     val clusterBaseWithPoolsAndSnapPools = if (driverPoolSnapLookup.nonEmpty) {
+      // initialize snap pools for when snap is after pool creation set timestamp to 0 to provide a historical record
+      // without needing to look ahead
+      // the following will copy the first record but set the timestamp to 0 to ensure the first record will appear before
+      // the cluster action even if the snap date is after the cluster action timestamp
+      val initPoolW = Window.partitionBy('organization_id, 'instance_pool_id).orderBy('timestamp)
+      val initDriverPoolW = Window.partitionBy('organization_id, 'driver_instance_pool_id).orderBy('timestamp)
+
+      val initSnapPool = workerPoolSnapLookup.get
+        .withColumn("rnk", rank().over(initPoolW))
+        .withColumn("rn", row_number().over(initPoolW))
+        .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+        .withColumn("timestamp", lit(0))
+
+      val initDriverSnapPool = driverPoolSnapLookup.get
+        .withColumn("rnk", rank().over(initDriverPoolW))
+        .withColumn("rn", row_number().over(initDriverPoolW))
+        .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+        .withColumn("timestamp", lit(0))
+
       clusterBaseWithPools
         .toTSDF("timestamp", "organization_id", "instance_pool_id")
         .lookupWhen(
-          workerPoolSnapLookup.get
-            .toTSDF("timestamp", "organization_id", "instance_pool_id"),
-          maxLookAhead = Long.MaxValue
+          workerPoolSnapLookup.get.unionByName(initSnapPool)
+            .toTSDF("timestamp", "organization_id", "instance_pool_id")
         ).df
         .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         .lookupWhen(
-          driverPoolSnapLookup.get
-            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id"),
-          maxLookAhead = Long.MaxValue
+          driverPoolSnapLookup.get.unionByName(initDriverSnapPool, allowMissingColumns = true)
+            .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         ).df
     } else {
       clusterBaseWithPools
