@@ -156,6 +156,7 @@ Module ID | Module Name | Target Table Name | Module ID Dependencies
 2017|Silver_ModifiedAccounts|account_mods_silver|1004
 2018|Silver_Notebooks|notebook_silver|1004
 2019|Silver_ClusterStateDetail|cluster_state_detail_silver|1005
+2020|Silver_SQLQueryHistory|sql_query_history_silver|1004
 3001|Gold_Cluster|cluster_gold|2014
 3002|Gold_Job|job_gold|2010
 3003|Gold_JobRun|jobrun_gold|2011
@@ -171,6 +172,7 @@ Module ID | Module Name | Target Table Name | Module ID Dependencies
 3014|Gold_SparkExecutor|sparkexecutor_gold|2003
 3016|Gold_SparkStream|sparkstream_gold|1006,2005
 3015|Gold_jobRunCostPotentialFact|jobruncostpotentialfact_gold|3001,3003,3005,3010,3012
+3017|Gold_Sql_QueryHistory|sql_query_history_gold|2020
 
 
 
