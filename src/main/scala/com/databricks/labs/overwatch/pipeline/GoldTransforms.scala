@@ -138,8 +138,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       'min_retry_interval_millis,
       'max_concurrent_runs,
       'run_as_user_name,
-      'children,
-      'workflow_children,
+//      'children,
+//      'workflow_children,
       'workflow_context,
       'task_detail_legacy,
       'submitRun_details,
@@ -824,8 +824,9 @@ trait GoldTransforms extends SparkSessionWrapper {
       |timestamp_state_start, timestamp_state_end, state, driver_node_type_id, node_type_id, current_num_workers,
       |target_num_workers, uptime_since_restart_S, uptime_in_state_S, uptime_in_state_H, cloud_billable,
       |databricks_billable, isAutomated, sku, runtime_engine, dbu_rate, state_dates, days_in_state,
-      |worker_potential_core_H, core_hours, driver_compute_cost, worker_compute_cost, driver_dbu_cost, worker_dbu_cost,
-      |total_compute_cost, total_DBU_cost, total_driver_cost, total_worker_cost, total_cost, driverSpecs, workerSpecs
+      |worker_potential_core_H, core_hours, driver_dbus, worker_dbus, total_dbus, driver_compute_cost,
+      |worker_compute_cost, driver_dbu_cost, worker_dbu_cost, total_compute_cost, total_DBU_cost, total_driver_cost,
+      |total_worker_cost, total_cost, driverSpecs, workerSpecs
       |""".stripMargin
 
   protected val sparkJobViewColumnMapping: String =
