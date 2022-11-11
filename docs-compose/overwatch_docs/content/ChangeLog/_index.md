@@ -4,13 +4,24 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.0.0.3 (PATCH)
+This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
+the same as 0700 with the bug fixes closed in [PR 602](https://github.com/databrickslabs/overwatch/pull/602).
+* This update includes all bug fixes published in [07002](#07002-patch)
+* No upgrade needed - the Jars may simply be swapped out -- do this on all workspaces
+* If you were affected by one of the issues fixed and you would like to repair the historical data,
+  please do so using this script. Instructions are in the notebook.
+  [HTML](/assets/ChangeLog/0700x_data_repair.html) | [DBC](/assets/ChangeLog/0700x_data_repair.dbc)
+
+
 ## 0.7.0.0.2 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
 the same as 0700 with the bug fixes closed in [PR 580](https://github.com/databrickslabs/overwatch/pull/580).
 * This update includes all bug fixes published in [07001](#07001-patch)
 * No upgrade needed - the Jars may simply be swapped out -- do this on all workspaces
-* An optional cleanup script will be published shortly for any customers with affected data. More details to come
-  shortly for historical cleanup.
+* If you were affected by one of the issues fixed in the PR above and you would like to repair the historical data, 
+  please do so using this script. Instructions are in the notebook. 
+  [HTML](/assets/ChangeLog/0700x_data_repair.html) | [DBC](/assets/ChangeLog/0700x_data_repair.dbc)
   
 ## 0.7.0.0.1 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is 
