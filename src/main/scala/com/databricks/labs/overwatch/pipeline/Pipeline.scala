@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
 import com.databricks.labs.overwatch.utils._
@@ -380,6 +381,7 @@ class Pipeline(
     // if failure doesn't allow pipeline to get here, temp dir will be cleansed on workspace init
     if (!config.externalizeOptimize) postProcessor.optimize(this, Pipeline.OPTIMIZESCALINGCOEF)
     Helpers.fastrm(Array(config.tempWorkingDir))
+    dbutils.fs.rm(config.tempWorkingDir)
 
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
 

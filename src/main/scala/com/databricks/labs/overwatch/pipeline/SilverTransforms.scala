@@ -789,12 +789,13 @@ trait SilverTransforms extends SparkSessionWrapper {
         ))
     } else (None, None)
 
+    val basePoolsDF = auditRawTable.asDF
+      .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
+      .cache()
 
-    val (driverPoolLookup: Option[DataFrame], workerPoolLookup: Option[DataFrame]) = if ( // if instance pools found in audit logs
-      !auditRawTable.asDF
-        .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit")).isEmpty) {
-      val basePoolsDF = auditRawTable.asDF
-        .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
+    basePoolsDF.count
+
+    val (driverPoolLookup: Option[DataFrame], workerPoolLookup: Option[DataFrame]) = if (!basePoolsDF.isEmpty) { // if instance pools found in audit logs
       (
         Some(basePoolsDF.select(
           'timestamp, 'organization_id,
@@ -816,14 +817,14 @@ trait SilverTransforms extends SparkSessionWrapper {
     } else (None, None)
 
     val filledDriverType =
-      when('driver_instance_pool_id.isNotNull, coalesce('pool_driver_node_type, 'pool_snap_driver_node_type))
-        .when('instance_pool_id.isNotNull && 'driver_instance_pool_id.isNull, coalesce('pool_node_type, 'pool_snap_node_type))
+      when('driver_instance_pool_id.isNotNull, coalesce('pool_driver_node_type, 'pool_snap_driver_node_type, 'driver_node_type_id))
+        .when('instance_pool_id.isNotNull && 'driver_instance_pool_id.isNull, coalesce('pool_node_type, 'pool_snap_node_type, 'node_type_id))
         .when('cluster_name.like("job-%-run-%"), coalesce('driver_node_type_id, 'node_type_id)) // when jobs clusters workers == driver driver node type is not defined
         .when(isSingleNode, 'node_type_id) // null
         .otherwise(coalesce('driver_node_type_id, first('driver_node_type_id, true).over(clusterBefore), 'node_type_id))
 
     val filledWorkerType = when(isSingleNode, lit(null).cast("string")) // singleNode clusters don't have worker nodes
-      .when('instance_pool_id.isNotNull, coalesce('pool_node_type, 'pool_snap_node_type))
+      .when('instance_pool_id.isNotNull, coalesce('pool_node_type, 'pool_snap_node_type, 'node_type_id))
       .otherwise('node_type_id)
 
     val clusterSpecBaseCols = Array[Column](
@@ -877,6 +878,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('rnk === 1 && 'rn === 1)
       .select('organization_id, 'cluster_id, $"default_tags.Creator".alias("cluster_creator_lookup"))
 
+
     // lookup pools node types from audit logs if records present
     val clusterBaseWithPools = if (driverPoolLookup.nonEmpty) {
       clusterBaseFilled
@@ -893,30 +895,49 @@ trait SilverTransforms extends SparkSessionWrapper {
         ).df
     } else { // driver pool does not exist -- filter and add null lookup cols
       clusterBaseFilled.filter('actionName.isin("create", "edit", "snapImpute"))
-        .withColumn("driver_instance_pool_id", lit(null).cast("string"))
         .withColumn("driver_instance_pool_name", lit(null).cast("string"))
+        .withColumn("instance_pool_name", lit(null).cast("string"))
         .withColumn("pool_driver_node_type", lit(null).cast("string"))
         .withColumn("pool_node_type", lit(null).cast("string"))
     }
 
     // lookup pools node types from pools snapshots when snapshots exist
     val clusterBaseWithPoolsAndSnapPools = if (driverPoolSnapLookup.nonEmpty) {
+      // initialize snap pools for when snap is after pool creation set timestamp to 0 to provide a historical record
+      // without needing to look ahead
+      // the following will copy the first record but set the timestamp to 0 to ensure the first record will appear before
+      // the cluster action even if the snap date is after the cluster action timestamp
+      val initPoolW = Window.partitionBy('organization_id, 'instance_pool_id).orderBy('timestamp)
+      val initDriverPoolW = Window.partitionBy('organization_id, 'driver_instance_pool_id).orderBy('timestamp)
+
+      val initSnapPool = workerPoolSnapLookup.get
+        .withColumn("rnk", rank().over(initPoolW))
+        .withColumn("rn", row_number().over(initPoolW))
+        .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+        .withColumn("timestamp", lit(0))
+
+      val initDriverSnapPool = driverPoolSnapLookup.get
+        .withColumn("rnk", rank().over(initDriverPoolW))
+        .withColumn("rn", row_number().over(initDriverPoolW))
+        .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+        .withColumn("timestamp", lit(0))
+
       clusterBaseWithPools
         .toTSDF("timestamp", "organization_id", "instance_pool_id")
         .lookupWhen(
-          workerPoolSnapLookup.get
+          workerPoolSnapLookup.get.unionByName(initSnapPool)
             .toTSDF("timestamp", "organization_id", "instance_pool_id")
         ).df
         .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         .lookupWhen(
-          driverPoolSnapLookup.get
+          driverPoolSnapLookup.get.unionByName(initDriverSnapPool, allowMissingColumns = true)
             .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         ).df
     } else {
       clusterBaseWithPools
         .withColumn("pool_snap_driver_instance_pool_name", lit(null).cast("string"))
-        .withColumn("pool_snap_driver_node_type", lit(null).cast("string"))
         .withColumn("pool_snap_instance_pool_name", lit(null).cast("string"))
+        .withColumn("pool_snap_driver_node_type", lit(null).cast("string"))
         .withColumn("pool_snap_node_type", lit(null).cast("string"))
     }
 
@@ -940,7 +961,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       )
       .withColumn("rnk", rank().over(onlyOnceSemanticsW))
       .withColumn("rn", row_number().over(onlyOnceSemanticsW))
-      .filter('rnk > 1 || 'rn > 1)
+      .filter('rnk === 1 && 'rn === 1)
       .withColumn("createdBy",
         when(isAutomated('cluster_name) && 'actionName === "create", lit("JobsService"))
           .when(!isAutomated('cluster_name) && 'actionName === "create", 'userEmail))
@@ -957,7 +978,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   def buildClusterStateDetail(
-                               pipelineSnapTime: TimeTypes
+                               untilTime: TimeTypes
                              )(clusterEventsDF: DataFrame): DataFrame = {
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
@@ -1066,7 +1087,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("unixTimeMS_state_start", 'timestamp)
       .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
         lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
-        lit(pipelineSnapTime.asUnixTimeMilli)
+        lit(untilTime.asUnixTimeMilli)
       ))
       .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
       .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
@@ -1248,7 +1269,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
       .transform(jobRunsAppendTaskAndClusterDetails)
       .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
-      .transform(jobRunsRollupWorkflowsAndChildren)
+//      .transform(jobRunsRollupWorkflowsAndChildren)
       .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
   }
 

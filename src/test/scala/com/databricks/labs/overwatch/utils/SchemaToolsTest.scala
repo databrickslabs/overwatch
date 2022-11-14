@@ -213,6 +213,52 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
         df.select(SchemaTools.flattenSchema(df): _*).schema.toDDL
       }
     }
+
+    it("should return a field with the appropriate name and default null type") {
+      val df = Seq(1).toDF("key")
+      val field = SchemaTools.colByName(df)("Properties")
+      assertResult("properties")(field.name)
+      assertResult(StringType)(field.dataType)
+      assertResult("string")(field.dataType.typeName)
+    }
+
+    it("should return a field with the appropriate name and the overridden null type") {
+      val df = Seq(1).toDF("key")
+      val field = SchemaTools.colByName(df)("Properties", missingNullType = IntegerType)
+      assertResult("properties")(field.name)
+      assertResult(IntegerType)(field.dataType)
+      assertResult("integer")(field.dataType.typeName)
+    }
+
+    it("should return the existing field") {
+      val df = Seq(1).toDF("key")
+        .withColumn("Properties", lit("myString"))
+      val field = SchemaTools.colByName(df)("Properties")
+      assertResult("Properties")(field.name)
+      assertResult(StringType)(field.dataType)
+      assertResult("string")(field.dataType.typeName)
+    }
+
+    it("should respect case sensitivity") {
+      spark.conf.set("spark.sql.caseSensitive", "true")
+
+      val df = Seq(1).toDF("key")
+        .withColumn("Properties", lit(42))
+      val field = SchemaTools.colByName(df)("Properties")
+      assertResult("Properties")(field.name)
+      assertResult(IntegerType)(field.dataType)
+      assertResult("integer")(field.dataType.typeName)
+
+      val df2 = Seq(1).toDF("key")
+        .withColumn("properties", lit(42))
+      val field2 = SchemaTools.colByName(df2)("Properties")
+      assertResult("Properties")(field2.name)
+      assertResult(StringType)(field2.dataType) // converted to default null type because field is missing
+
+      spark.conf.set("spark.sql.caseSensitive", "false")
+    }
+
+
   }
 
   describe("Test cases for SchemaTools.structFromJson function") {
