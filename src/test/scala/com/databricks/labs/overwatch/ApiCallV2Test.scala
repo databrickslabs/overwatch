@@ -287,9 +287,11 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       val sqlQueryHistoryEndpoint = "sql/history/queries"
       val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
 //      val startTime =  "1665878400000".toLong // subtract 2 days for running query merge
-      val startTime =  "1666224000010".toLong -(1000*60*60*24)// subtract 2 days for running query merge
-      val untilTime = "1666224000010".toLong
+//      val startTime =  "1669026035073".toLong -(1000*60*60*24)// subtract 2 days for running query merge
+      val startTime =  "1669026035073".toLong
+      val untilTime = "1669112526676".toLong
       val tempWorkingDir = ""
+      println("test_started")
       val jsonQuery = Map(
         "max_results" -> "50",
         "include_metrics" -> "true",
@@ -329,10 +331,14 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
       val tmpSqlQueryHistorySuccessPath = "/tmp/test/"
       val tmpSqlQueryHistoryErrorPath = ""
-      val untilTimeMs = "1666182197381".toLong
+      val startTime =  "1669026035073".toLong
+      val untilTimeMs = "1669112526676".toLong
+
+//      val untilTimeMs = "1666182197381".toLong
 //      val untilTimeMs = "1662249600000".toLong
 //      var fromTimeMs = "1662249600000".toLong - (1000*60*60*24*2)  //subtracting 2 days for running query merge
-      var fromTimeMs = "1666182197381".toLong - (1000*60*60*24*2)
+//      var fromTimeMs = "1666182197381".toLong - (1000*60*60*24*2)
+      var fromTimeMs = "1669026035073".toLong
       val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
 
       while (fromTimeMs < untilTimeMs){
