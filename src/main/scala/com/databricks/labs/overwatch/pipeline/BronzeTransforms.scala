@@ -480,14 +480,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val future = Future {
         val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
         synchronized {
-          apiObj.forEach(
-            obj => if (obj.contains("events")) {
-              apiResponseArray.add(obj)
-            }else{
-              logger.log(Level.INFO,"NO real events found:"+obj)
-            }
-
-          )
           apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= apiEnv.successBatchSize) {
             PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
