@@ -280,7 +280,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           throw new Exception(e)
       }
     } else {
-      println(s"""No Data is present in for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs}""")
+      println(s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs}""")
+      logger.log(Level.INFO,s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs}""")
       spark.emptyDataFrame
     }
   }
