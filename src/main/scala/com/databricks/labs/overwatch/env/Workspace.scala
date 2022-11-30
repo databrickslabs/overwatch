@@ -280,7 +280,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           throw new Exception(e)
       }
     } else {
-      println("No Data is present in temporary Path")
+      println(s"""No Data is present in temporary Path from - ${fromTimeMs} to - ${untilTimeMs}""")
       spark.emptyDataFrame
     }
   }
