@@ -171,7 +171,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val untilTimeMs = untilTime.asUnixTimeMilli
     var fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
     val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
-
     while (fromTimeMs < untilTimeMs){
       val (startTime, endTime) = if ((untilTimeMs- fromTimeMs)/(1000*60*60) > 1) {
         (fromTimeMs,
@@ -181,7 +180,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         (fromTimeMs,
           untilTimeMs)
       }
-
       //create payload for the API calls
       val jsonQuery = Map(
         "max_results" -> "50",
@@ -233,6 +231,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       }
       fromTimeMs = fromTimeMs+(1000*60*60)
     }
+
     val timeoutThreshold = config.apiEnv.apiWaitingTime // 5 minutes
     var currentSleepTime = 0
     var accumulatorCountWhileSleeping = acc.value
@@ -271,9 +270,19 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
     logger.log(Level.INFO, " sql query history landing completed")
-    spark.read.json(tmpSqlQueryHistorySuccessPath)
-      .select(explode(col("res")).alias("res")).select(col("res" + ".*"))
-      .withColumn("organization_id", lit(config.organizationId))
+    if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
+      try {
+        spark.read.json(tmpSqlQueryHistorySuccessPath)
+          .select(explode(col("res")).alias("res")).select(col("res" + ".*"))
+          .withColumn("organization_id", lit(config.organizationId))
+      } catch {
+        case e: Throwable =>
+          throw new Exception(e)
+      }
+    } else {
+      println("No Data is present in temporary Path")
+      spark.emptyDataFrame
+    }
   }
 
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {
