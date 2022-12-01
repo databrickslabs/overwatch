@@ -3,6 +3,19 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+## 0.7.0.0.4 (PATCH)
+This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
+the same as 0700 with the bug fixes closed in [PR 633](https://github.com/databrickslabs/overwatch/pull/633).
+
+* This update includes all bug fixes published in [07003](#07003-patch).
+* No upgrade needed - the Jars may simply be swapped out -- do this on all workspaces.
+* If you were affected by one of the issues fixed in the PR above and you would like to repair the historical data,
+  please do so using this script. Instructions are in the notebook.
+  [HTML](/assets/ChangeLog/07004_data_repair.html) | [DBC](/assets/ChangeLog/07004_data_repair.dbc)
+  
+### Bug Fixes
+* Bug fix related to dbu utilization and cost calculation [Issue 632](https://github.com/databrickslabs/overwatch/issues/632).
+* Bug fix related to sqlQueryHistory [Issue 625](https://github.com/databrickslabs/overwatch/issues/625).
 
 ## 0.7.0.0.3 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
