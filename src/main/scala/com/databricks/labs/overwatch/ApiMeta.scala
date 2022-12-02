@@ -95,6 +95,10 @@ trait ApiMeta {
     true
   }
 
+  /**
+   * Function generates a basic HttpRequest based on the ApiMeta.
+   * @return
+   */
   private[overwatch] def getBaseRequest(): HttpRequest = {
     var request = Http(s"""${apiEnv.workspaceURL}/${apiV}/${apiName}""")
       .copy(headers = httpHeaders)
