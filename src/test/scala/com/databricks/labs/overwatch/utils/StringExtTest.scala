@@ -27,11 +27,11 @@ class StringExtTest extends AnyFunSpec {
     }
 
     it("String with white % characters") {
-      assert("""Business %Name""".containsNoSpecialChars)
+      assert(!"""Business %Name""".containsNoSpecialChars)
     }
 
     it("String with white $ characters") {
-      assert("""Business $Name""".containsNoSpecialChars)
+      assert(!"""Business $Name""".containsNoSpecialChars)
     }
   }
 }

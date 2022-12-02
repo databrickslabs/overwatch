@@ -697,10 +697,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
                           processedLogFilesTracker: PipelineTable,
                           organizationId: String,
                           runID: String,
-                          pipelineSnapTime: Column
+                          pipelineSnapTime: TimeTypes
                          )(eventLogsDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Searching for Event logs")
+    val tempDir = processedLogFilesTracker.config.tempWorkingDir
     // Caching is done to ensure a single scan of the event log file paths
     // From here forward there should be no more direct scans for new records, just loading data direct from paths
     // eager force cache
@@ -725,7 +726,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           logger.log(Level.INFO, "Updating Tracker with new files")
           // appends all newly scanned files including files that were scanned but not loaded due to OutOfTime window
           // and/or failed during lookup -- these are kept for tracking
-          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime)
+          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime.asColumnTS)
         } catch {
           case e: Throwable => {
             val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +
@@ -774,10 +775,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
             TransformFunctions.stringTsToUnixMillis('timestamp)
           } else col("Timestamp")
 
+          // persist to temp to ensure all raw files are not read multiple times
+          val sparkEventsTempPath = s"$tempDir/sparkEventsBronze/${pipelineSnapTime.asUnixTimeMilli}"
           baseDF
             .withColumn("Timestamp", fixDupTimestamps)
             .drop("timestamp")
+            .write.format("delta")
+            .mode("overwrite")
+            .save(sparkEventsTempPath)
 
+          spark.read.format("delta")
+            .load(sparkEventsTempPath)
 
         } catch {
           case e: Throwable => {
@@ -849,10 +857,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
           .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
           .withColumnRenamed("executorId", "blackListedExecutorIds")
-          .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
           .withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
+          .verifyMinimumSchema(Schema.sparkEventsRawMasterSchema)
+          .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
 
         spark.conf.set("spark.sql.caseSensitive", "false")
         // TODO -- PERF test without unpersist, may be unpersisted before re-utilized

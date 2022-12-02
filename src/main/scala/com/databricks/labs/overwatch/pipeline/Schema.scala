@@ -257,6 +257,28 @@ object Schema extends SparkSessionWrapper {
     StructField("TaskType", StringType, nullable = true),
     StructField("TaskEndReason",
       StructType(Seq(
+        StructField("AccumulatorUpdates", ArrayType(
+          StructType(Seq(
+            StructField("CountFailedValues",BooleanType, nullable = true),
+            StructField("ID",LongType, nullable = true),
+            StructField("Internal",BooleanType, nullable = true),
+            StructField("Update",StringType, nullable = true)
+          )), containsNull = true
+        )),
+        StructField("StackTrace", ArrayType(
+          StructType(Seq(
+            StructField("DeclaringClass",StringType, nullable = true),
+            StructField("FileName",StringType, nullable = true),
+            StructField("LineNumber",LongType, nullable = true),
+            StructField("MethodName",StringType, nullable = true)
+          )), containsNull = true
+        )),
+        StructField("BlockManagerAddress",
+          StructType(Seq(
+            StructField("ExecutorID",StringType, nullable = true),
+            StructField("Host",StringType, nullable = true),
+            StructField("Port",LongType, nullable = true)
+        )), nullable = true),
         StructField("ClassName", StringType, nullable = true),
         StructField("Description", StringType, nullable = true),
         StructField("FullStackTrace", StringType, nullable = true),
