@@ -19,12 +19,26 @@ import scala.annotation.tailrec
  */
 object ApiCallV2 extends SparkSessionWrapper {
 
+  /**
+   * Companion Object which takes two parameter and initialise the ApiCallV2.
+   * @param apiEnv ApiEnv which contains api related information.
+   * @param apiName Name of the api.
+   * @return
+   */
   def apply(apiEnv: ApiEnv, apiName: String): ApiCallV2 = {
     new ApiCallV2(apiEnv)
       .setEndPoint(apiName)
       .buildMeta(apiName)
   }
 
+  /**
+   * Companion Object which takes three parameter and initialise the ApiCallV2.
+   *
+   * @param apiEnv  ApiEnv which contains api related information.
+   * @param apiName Name of the api.
+   * @param queryJsonString query as json string.
+   * @return
+   */
   def apply(apiEnv: ApiEnv, apiName: String, queryJsonString: String): ApiCallV2 = {
     new ApiCallV2(apiEnv)
       .setEndPoint(apiName)
@@ -33,7 +47,15 @@ object ApiCallV2 extends SparkSessionWrapper {
   }
 
 
-
+  /**
+   * Companion Object which takes five parameter and initialise the ApiCallV2.
+   * @param apiEnv ApiEnv which contains api related information.
+   * @param apiName Name of the api.
+   * @param queryMap Map containing the filter conditions.
+   * @param tempSuccessPath Path in which the api response will be written.
+   * @param accumulator To make track of number of api request.
+   * @return
+   */
   def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], tempSuccessPath: String, accumulator: LongAccumulator): ApiCallV2 = {
     new ApiCallV2(apiEnv)
       .setEndPoint(apiName)
@@ -43,6 +65,14 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setAccumulator(accumulator)
   }
 
+  /**
+   * Companion Object which takes three parameter and initialise the ApiCallV2.
+   *
+   * @param apiEnv ApiEnv which contains api related information.
+   * @param apiName Name of the api.
+   * @param queryMap Map containing the filter conditions.
+   * @return
+   */
   def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String]): ApiCallV2 = {
     new ApiCallV2(apiEnv)
       .setEndPoint(apiName)
@@ -50,6 +80,15 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setQueryMap(queryMap)
   }
 
+  /**
+   * Companion Object which takes three parameter and initialise the ApiCallV2.
+   *
+   * @param apiEnv   ApiEnv which contains api related information.
+   * @param apiName  Name of the api.
+   * @param queryMap Map containing the filter conditions.
+   * @param apiVersion Version of the Api call.
+   * @return
+   */
   def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], apiVersion: Double = 2.0): ApiCallV2 = {
     new ApiCallV2(apiEnv)
       .setEndPoint(apiName)
@@ -86,7 +125,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private var _apiFailureCount: Int = 0
   private var _printFinalStatusFlag: Boolean = true
   private var _queryMap: Map[String, String] = Map[String, String]()
-  private var _accumulator: LongAccumulator = sc.longAccumulator("ApiAccumulator")
+  private var _accumulator: LongAccumulator = sc.longAccumulator("ApiAccumulator") //Multithreaded call accumulator will make track of the request.
 
   protected def accumulator: LongAccumulator = _accumulator
   protected def apiSuccessCount: Int = _apiSuccessCount
@@ -489,6 +528,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     newJsonObject.toString
   }
 
+  /**
+   * Checks the contains of the response and decide whether the response contains actual data or not.
+   * @param apiResultDF
+   * @return
+   */
   private def emptyDFCheck(apiResultDF: DataFrame): Boolean = {
     if (apiResultDF.columns.length == 0) { //Check number of columns in result Dataframe
       true
@@ -500,6 +544,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   }
 
 
+  /**
+   * Performs api calls in parallel.
+   * @return
+   */
   def executeMultiThread(): util.ArrayList[String] = {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
@@ -548,7 +596,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
 
   /**
-   * Function responsible for making the API request.
+   * Performs the Api call.
    *
    * @return
    */
