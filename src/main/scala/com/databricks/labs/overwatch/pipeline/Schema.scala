@@ -235,7 +235,7 @@ object Schema extends SparkSessionWrapper {
     )), nullable = true),
     StructField("StageID", LongType, nullable = true),
     StructField("StageAttemptID", LongType, nullable = true),
-    StructField("ExecutorID", LongType, nullable = true),
+    StructField("ExecutorID", StringType, nullable = true),
     StructField("RemovedReason", StringType, nullable = true),
     StructField("executorInfo",
       StructType(Seq(
@@ -291,13 +291,13 @@ object Schema extends SparkSessionWrapper {
         StructField("Attempt", LongType, nullable = true),
         StructField("Host", StringType, nullable = true),
         StructField("LaunchTime", LongType, nullable = true),
-        StructField("ExecutorID", LongType, nullable = true),
+        StructField("ExecutorID", StringType, nullable = true),
         StructField("FinishTime", LongType, nullable = true),
         StructField("ParentIDs", StringType, nullable = true)
       )), nullable = true),
     StructField("StageInfo",
       StructType(Seq(
-        StructField("StageID", StringType, nullable = true),
+        StructField("StageID", LongType, nullable = true),
         StructField("SubmissionTime", LongType, nullable = true),
         StructField("StageAttemptID", LongType, nullable = true),
         StructField("CompletionTime", LongType, nullable = true),
