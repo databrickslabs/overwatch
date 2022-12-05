@@ -692,6 +692,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
     struct(filename, byCluster, byClusterHost, bySparkContextID)
   }
 
+  private def getSparkEventsSchemaScrubber(df: DataFrame): SchemaScrubber = {
+    val propertiesScrubException = SanitizeFieldException(
+      field = SchemaTools.colByName(df)("Properties"),
+      rules = List(
+        SanitizeRule("\\s", ""),
+        SanitizeRule("\\.", ""),
+        SanitizeRule("[^a-zA-Z0-9]", "_")
+      ),
+      recursive = true
+    )
+    SchemaScrubber(exceptions = Array(propertiesScrubException))
+  }
+
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
                           processedLogFilesTracker: PipelineTable,
@@ -775,17 +788,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
             TransformFunctions.stringTsToUnixMillis('timestamp)
           } else col("Timestamp")
 
-          // persist to temp to ensure all raw files are not read multiple times
-          val sparkEventsTempPath = s"$tempDir/sparkEventsBronze/${pipelineSnapTime.asUnixTimeMilli}"
           baseDF
             .withColumn("Timestamp", fixDupTimestamps)
             .drop("timestamp")
-            .write.format("delta")
-            .mode("overwrite")
-            .save(sparkEventsTempPath)
 
-          spark.read.format("delta")
-            .load(sparkEventsTempPath)
 
         } catch {
           case e: Throwable => {
@@ -799,17 +805,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
             throw e
           }
         }
-
-        val propertiesScrubException = SanitizeFieldException(
-          field = SchemaTools.colByName(baseEventsDF)("Properties"),
-          rules = List(
-            SanitizeRule("\\s", ""),
-            SanitizeRule("\\.", ""),
-            SanitizeRule("[^a-zA-Z0-9]", "_")
-          ),
-          recursive = true
-        )
-        val bronzeSparkEventsScrubber = SchemaScrubber(exceptions = Array(propertiesScrubException))
 
         // Handle custom metrics and listeners in streams
         val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
@@ -828,6 +823,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
           when('Event === "org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted", col("stageAttemptId"))
             .otherwise(col("Stage Attempt ID"))
         } else col("Stage Attempt ID")
+
+        val bronzeSparkEventsScrubber = getSparkEventsSchemaScrubber(baseEventsDF)
 
         val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
           baseEventsDF
@@ -853,13 +850,21 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .scrubSchema(bronzeSparkEventsScrubber)
         }
 
-        val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+        // persist to temp to ensure all raw files are not read multiple times
+        val sparkEventsTempPath = s"$tempDir/sparkEventsBronze/${pipelineSnapTime.asUnixTimeMilli}"
+
+        rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
           .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
           .withColumnRenamed("executorId", "blackListedExecutorIds")
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
           .withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
+          .write.format("delta")
+          .mode("overwrite")
+          .save(sparkEventsTempPath)
+
+        val bronzeEventsFinal = spark.read.format("delta").load(sparkEventsTempPath)
           .verifyMinimumSchema(Schema.sparkEventsRawMasterSchema)
           .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
 
