@@ -47,7 +47,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                error: Option[ErrorDetail]
                              )
 
-
   protected def setNewDataRetrievedFlag(value: Boolean): this.type = {
     _newDataRetrieved = value
     this
@@ -489,7 +488,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
             }
 
           )
-          apiResponseArray.addAll(apiObj)
           if (apiResponseArray.size() >= apiEnv.successBatchSize) {
             PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
             apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
@@ -1000,7 +998,5 @@ trait BronzeTransforms extends SparkSessionWrapper {
     eventLogPaths
 
   }
-
-
 
 }
