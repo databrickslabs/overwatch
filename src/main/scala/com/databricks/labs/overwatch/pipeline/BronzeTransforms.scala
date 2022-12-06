@@ -571,6 +571,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
           val clusterEventsDF = tdf
             .modifyStruct(changeInventory)
+            .withColumn("organization_id", lit(organizationId))
 
           val clusterEventsCaptured = clusterEventsDF.count
           val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
@@ -632,7 +633,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       )
       logger.log(Level.INFO, "Persist error completed")
     }
+    spark.conf.set("spark.sql.caseSensitive", "true")
     val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
+    spark.conf.set("spark.sql.caseSensitive", "false")
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
     clusterEventDf
