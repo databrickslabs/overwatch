@@ -554,18 +554,23 @@ trait BronzeTransforms extends SparkSessionWrapper {
             spark.read.json(tmpClusterEventsSuccessPath)
               .select(explode('events).alias("events"))
               .select(col("events.*"))
-          )
+          ).scrubSchema
+
           val changeInventory = Map[String, Column](
             "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
             "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
+            "details.attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.azure_attributes"),
+            "details.attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.aws_attributes"),
             "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
             "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
             "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
+            "details.previous_attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.azure_attributes"),
+            "details.previous_attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.aws_attributes"),
             "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
           )
 
-          val clusterEventsDF = SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
-            .withColumn("organization_id", lit(organizationId))
+          val clusterEventsDF = tdf
+            .modifyStruct(changeInventory)
 
           val clusterEventsCaptured = clusterEventsDF.count
           val logEventsMSG = s"CLUSTER EVENTS CAPTURED: ${clusterEventsCaptured}"
