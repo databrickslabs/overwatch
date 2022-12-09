@@ -287,8 +287,12 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005))
   lazy private val appendClusterStateDetailProcess = ETLDefinition(
-    BronzeTargets.clusterEventsTarget.asIncrementalDF(clusterStateDetailModule, "timestamp"),
-    Seq(buildClusterStateDetail(pipelineSnapTime)),
+    BronzeTargets.clusterEventsTarget.asIncrementalDF(
+      clusterStateDetailModule,
+      BronzeTargets.clusterEventsTarget.incrementalColumns,
+      SilverTargets.clusterStateDetailTarget.maxMergeScanDates // pick up last state up to 30 days ago
+    ),
+    Seq(buildClusterStateDetail(clusterStateDetailModule.untilTime)),
     append(SilverTargets.clusterStateDetailTarget)
   )
 
@@ -313,9 +317,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.notebookStatusTarget)
   )
 
-  lazy private[overwatch] val sqlQueryHistoryModule = Module(2020, "Silver_SQLQueryHistory", this)
+  lazy private[overwatch] val sqlQueryHistoryModule = Module(2020, "Silver_SQLQueryHistory", this, Array(1004))
   lazy private val appendSqlQueryHistoryProcess = ETLDefinition(
-    workspace.getSqlQueryHistoryDF(sqlQueryHistoryModule.fromTime, sqlQueryHistoryModule.untilTime),
+    workspace.getSqlQueryHistoryParallelDF(sqlQueryHistoryModule.fromTime, sqlQueryHistoryModule.untilTime),
     Seq(enhanceSqlQueryHistory),
     append(SilverTargets.sqlQueryHistoryTarget)
   )
