@@ -50,7 +50,7 @@ class Module(
    */
   def shuffleFactor: Double = {
     val daysBucket = 30
-    val derivedShuffleFactor = _shuffleFactor * Math.floor(daysToProcess / daysBucket).toInt
+    val derivedShuffleFactor = _shuffleFactor * Math.max(Math.floor(daysToProcess / daysBucket).toInt, 1)
     logger.info(s"SHUFFLE FACTOR: Set to $derivedShuffleFactor")
 
     derivedShuffleFactor

@@ -243,7 +243,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     append(SilverTargets.dbJobsStatusTarget)
   )
 
-  lazy private[overwatch] val jobRunsModule = Module(2011, "Silver_JobsRuns", this, Array(1004, 2010, 2014))
+  lazy private[overwatch] val jobRunsModule = Module(2011, "Silver_JobsRuns", this, Array(1004, 2010, 2014), shuffleFactor = 12.0)
   lazy private val appendJobRunsProcess = ETLDefinition(
     BronzeTargets.auditLogsTarget.asIncrementalDF(jobRunsModule, BronzeTargets.auditLogsTarget.incrementalColumns, 30),
     Seq(
