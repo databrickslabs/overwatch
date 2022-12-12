@@ -3,6 +3,10 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+
+## 0.7.1.0 (Feature Release)
+HOLD -- INITIAL COMMIT
+
 ## 0.7.0.0.4 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
 the same as 0700 with the bug fixes closed in [PR 633](https://github.com/databrickslabs/overwatch/pull/633).
