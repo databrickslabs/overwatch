@@ -554,17 +554,23 @@ trait BronzeTransforms extends SparkSessionWrapper {
             spark.read.json(tmpClusterEventsSuccessPath)
               .select(explode('events).alias("events"))
               .select(col("events.*"))
-          )
+          ).scrubSchema
+
           val changeInventory = Map[String, Column](
             "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
             "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
+            "details.attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.azure_attributes"),
+            "details.attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.aws_attributes"),
             "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
             "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
             "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
+            "details.previous_attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.azure_attributes"),
+            "details.previous_attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.aws_attributes"),
             "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
           )
 
-          val clusterEventsDF = SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+          val clusterEventsDF = tdf
+            .modifyStruct(changeInventory)
             .withColumn("organization_id", lit(organizationId))
 
           val clusterEventsCaptured = clusterEventsDF.count
@@ -627,7 +633,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       )
       logger.log(Level.INFO, "Persist error completed")
     }
+    spark.conf.set("spark.sql.caseSensitive", "true")
     val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
+    spark.conf.set("spark.sql.caseSensitive", "false")
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
     clusterEventDf
