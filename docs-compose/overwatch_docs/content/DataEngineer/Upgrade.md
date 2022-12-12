@@ -1,7 +1,7 @@
 ---
 title: "Upgrade"
 date: 2021-05-20T21:27:44-04:00
-weight: 3
+weight: 4
 ---
 
 Sometimes upgrading from one version to the next requires a schema change. In these cases, the 
