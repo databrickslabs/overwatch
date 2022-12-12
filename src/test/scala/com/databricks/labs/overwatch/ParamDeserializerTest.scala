@@ -32,7 +32,7 @@ class ParamDeserializerTest extends AnyFunSpec {
         .asInstanceOf[ObjectMapper with ScalaObjectMapper]
 
       val expected = OverwatchParams(
-        AuditLogConfig(
+        auditLogConfig = AuditLogConfig(
           azureAuditLogEventhubConfig = Some(AzureAuditLogEventhubConfig(
             connectionString = "test",
             eventHubName = "overwatch-evhub",
@@ -40,20 +40,18 @@ class ParamDeserializerTest extends AnyFunSpec {
             maxEventsPerTrigger = 10001
           ))
         ),
-        None,
-        None,
-        Some("/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords"),
-        Some(Seq("audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools")),
-        60,
-        DatabricksContractPrices(),
-        None,
-        IntelligentScaling(),
-        Some("myTestWorkspace"),
-        false,
-        None,
-        None,
-        Some(ApiEnvConfig()),
-        ""
+        tokenSecret = None,
+        dataTarget = None,
+        badRecordsPath = Some("/tmp/overwatch_dev/overwatch_etl_dev/sparkEventsBadrecords"),
+        overwatchScope = Some(Seq("audit","accounts","jobs","sparkEvents","clusters","clusterEvents","notebooks","pools")),
+        maxDaysToLoad = 60,
+        databricksContractPrices = DatabricksContractPrices(),
+        primordialDateString = None,
+        intelligentScaling = IntelligentScaling(),
+        workspace_name = Some("myTestWorkspace"),
+        externalizeOptimize = false,
+        apiEnvConfig = None,
+        tempWorkingDir = ""
       )
       assertResult(expected)(mapper.readValue[OverwatchParams](incomplete))
 

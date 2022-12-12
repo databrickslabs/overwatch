@@ -882,7 +882,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     //Cleaning the data for cluster log path
     val formattedInputDf = inputDataframe.withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
       .withColumn("cluster_mount_point_temp", regexp_replace('cluster_log_conf, "dbfs:", ""))
-      .withColumn("cluster_mount_point", regexp_replace('cluster_mount_point_temp, "//", "/"))
+      .withColumn("cluster_mount_point", 'cluster_mount_point_temp)
+//      .withColumn("cluster_mount_point", regexp_replace('cluster_mount_point_temp, "//", "/"))
 
 
     //Joining the cluster log data with mount point data
@@ -900,7 +901,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("topLevelTargets", array(col("derivedSource"), col("cluster_id"), lit("eventlog")))
       .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
 
-    val result = pathsDF.select('wildPrefix, 'cluster_id).distinct()
+    val result = pathsDF.select('wildPrefix, 'cluster_id)
     result
   }
 
@@ -964,7 +965,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val allEventLogPrefixes =
     if(isMultiWorkSpaceDeployment) {
       getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
-        .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix)
+        .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
      } else {
       newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging)
