@@ -5,8 +5,9 @@ draft: true
 weight: 1
 ---
 
-## Choose Your Cloud
-* AWS
-* Azure
-* GCP (Coming Soon)
+This section will walk you through the steps necessary to deploy Overwatch.
 
+## Cloud Infrastructure Setup
+* Azure
+* AWS
+* GCP (Coming Soon)
