@@ -1,7 +1,7 @@
 ---
 title: "Productionizing"
 date: 2022-07-20T15:03:23-04:00
-weight: 4
+weight: 5
 ---
 
 ## Moving To Production
