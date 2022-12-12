@@ -8,10 +8,9 @@ import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.validation.{Rule, RuleSet}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.Trigger
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
-import org.apache.spark.storage.StorageLevel
 
 import java.time.temporal.ChronoUnit
 import java.time.{LocalDate, LocalDateTime}
@@ -149,7 +148,6 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   }
 
-
   /**
    * Performs clusters/list api call to check the access to the workspace
    * @param conf
@@ -164,7 +162,23 @@ object DeploymentValidation extends SparkSessionWrapper {
          |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
     try {
       val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
-      val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
+      val apiProxyConfig = ApiProxyConfig(conf.proxy_host, conf.proxy_port, conf.proxy_user_name, conf.proxy_password_scope, conf.proxy_password_key)
+      val derivedApiEnvConfig = ApiEnvConfig(conf.success_batch_size.getOrElse(200),
+        conf.error_batch_size.getOrElse(500),
+        conf.enable_unsafe_SSL.getOrElse(false),
+        conf.thread_pool_size.getOrElse(4),
+        conf.api_waiting_time.getOrElse(300000),
+        Some(apiProxyConfig))
+
+      val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
+      val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion, derivedApiEnvConfig.successBatchSize,
+        derivedApiEnvConfig.errorBatchSize, "runID", derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
+        derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
+        derivedApiProxy.proxyUserName, derivedApiProxy.proxyPasswordScope, derivedApiProxy.proxyPasswordKey
+      )
+
+
+
       val endPoint = "clusters/list"
       ApiCallV2(apiEnv, endPoint).execute().asDF()
       DeploymentValidationReport(true,
@@ -538,6 +552,7 @@ object DeploymentValidation extends SparkSessionWrapper {
     var validationStatus: ArrayBuffer[DeploymentValidationReport] = new ArrayBuffer[DeploymentValidationReport]()
     //csv data validation
 
+    multiWorkspaceConfig.map(validateApiUrlConnectivity)
     val gropedRules = Seq[Rule](
       validateDistinct("Common_ETLStoragePrefix",MultiWorkspaceConfigColumns.etl_storage_prefix.toString),
       validateDistinct("Common_ETLDatabase",MultiWorkspaceConfigColumns.etl_database_name.toString),
