@@ -173,7 +173,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.processedEventLogs,
         config.organizationId,
         config.runID,
-        pipelineSnapTime.asColumnTS
+        pipelineSnapTime
       ) //,
     ),
     append(BronzeTargets.sparkEventLogsTarget) // Not new data only -- date filters handled in function logic
