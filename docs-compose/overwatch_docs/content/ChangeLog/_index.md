@@ -64,7 +64,7 @@ the same as 0700 with the bug fixes closed in [PR 559](https://github.com/databr
   * DBSQL Query History is our first step into first-party support for DBSQL. Warehouses are expected to follow shortly 
   but was unable to make the cut for this release
   * Be sure to enable the new scope "dbsql" or use the new 
-  [0.7.0 Runner Notebook]({{%relref "GettingStarted/"%}}#jump-start-notebooks) to ensure you're loading 
+  [0.7.0 Runner Notebook]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy"%}}/#jump-start-notebooks) to ensure you're loading 
   the DBSQL tables if your workspace[s] are using DBSQL.
   * Limitation - Databricks does not publish Warehouse events yet and as such, explicit cost anlaysis is not yet 
   possible for DBSQL. As soon as this is made available the Overwatch Dev team will begin work to integrate it.
@@ -80,11 +80,11 @@ the same as 0700 with the bug fixes closed in [PR 559](https://github.com/databr
   * The API management libraries were completely rebuilt from the ground up to maximize throughput, capabilities, 
   and safety for your environment.
   * The new API manager offers users much deeper control on how Overwatch uses the APIs. See the 
-  [APIEnv Configs]({{%relref "GettingStarted/Configuration.md"%}}/#apienv) on the Configurations details page.
+  [APIEnv Configs]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}/#apienv) on the Configurations details page.
 * **Support for Authenticated PROXY**
   * Most customers are able to configure proxies with cluster configs and init scripts but Overwatch now offers 
   deeper, first-party suppot for authenticated Proxy configs. See more details in the
-  [APIEnv Configs]({{%relref "GettingStarted/Configuration.md"%}}/#apienv) section.
+  [APIEnv Configs]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}/#apienv) section.
 * **SparkJob User-Email Coverage & Accuracy**
   * User_Email in sparkJob table now has complete coverage **but may require some action**
     * The user_email had incompletions and inaccuracies. Databricks was not publishing the user data for users using 
@@ -150,7 +150,7 @@ For questions / issues with the upgrade, please file a [git ticket](https://gith
   * Add Overwatch databases and contents to a workspace not running Overwatch (i.e. remote only)
   * Ability to specify custom temporary working directories
     * Used to default to a dir in /tmp but due to some root policies allowing it to be overridden for more details 
-    see [Configs]({{%relref "GettingStarted/Configuration.md"%}}/#overwatchparams)
+    see [Configs]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}/#overwatchparams)
   * Pipeline Management simplifications
 * Major Fixes
   * Data Quality Enhancements
@@ -293,7 +293,7 @@ table causing a couple of gold layer costing tables to error out. If this is you
 a fix until 0.5.0.4 comes out with the fix.
 {{% /notice %}}
 
-* [Initialize the Environment]({{%relref "GettingStarted/"%}}#initializing-the-environment) -- note this is the standard
+* Initialize the Environment -- note this is the standard
   getting started process. The only difference is to stop after Bronze(workspace) and not continue.
   * Execute through "Bronze(workspace)" **DO NOT RUN THE PIPELINE** (i.e. Don't use Bronze(workspace).run()), just 
   initialize it.
@@ -357,10 +357,10 @@ val workspace = Initializer(args, debugFlag = true)
 
 ### Major Features & Enhancements
 Below are the major feature and enhancements in 0.4.2
-* Improved [Getting Started Example Notebooks]({{%relref "GettingStarted"%}}/#initializing-the-environment)
+* Getting Started Example Notebooks
 * Kitana
   * Testing framework, currently meant for advanced usage, documentation will roll out asap.
-* [Intelligent scaling]({{%relref "GettingStarted/configuration.md"%}}/#intelligentscaling)
+* [Intelligent scaling]({{%relref "DeployOverwatch/ConfigureOverwatch/configuration.md"%}}/#intelligentscaling)
 * [Audit Log Formats (AWS)](https://github.com/databrickslabs/overwatch/issues/151)
   * For AWS the input format of the audit logs is now configurable to json (default), delta, parquet
 * [Contract costs through time](https://github.com/databrickslabs/overwatch/issues/49)
@@ -371,7 +371,7 @@ Below are the major feature and enhancements in 0.4.2
   * Costing for additional SKUs were added to the configuration such that they can be tracked. Note that as of 0.4.2 
   release, no calculation changes in costing as it relates to sku have yet been incorporated. These recalculations for
   jobs light and DatabricksSQL are in progress.
-* Enabled [Main class execution]({{%relref "GettingStarted"%}}/#via-main-class) to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily 
+* Enabled [Main class execution]({{%relref "DeployOverwatch/RunningOverwatch/JarLegacy"%}}/#via-main-class) to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily 
   enabled for future enablement with jobs pipelines and for development / testing purposes.
   * User can now pass 2 arguments to the databricks job where the first is 'bronze', 'silver', or 'gold' and the second
   is the escaped configuration string and only that pipeline layer will execute.

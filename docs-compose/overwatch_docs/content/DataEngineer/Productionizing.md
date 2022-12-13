@@ -67,4 +67,4 @@ Documentation in progress -- publishing soon
 ### Ensure Externalize Optimize is Enabled
 To ensure Overwatch is efficient it's important to remove the optimize and z-order steps from the integrated pipeline. 
 To do this, follow the instructions for 
-[Externalizing Optimize & Z-Order]({{%relref "gettingstarted/advancedtopics"%}}#externalize-optimize--z-order-as-of-060) 
+[Externalizing Optimize & Z-Order]({{%relref "DataEngineer/AdvancedTopics"%}}#externalize-optimize--z-order-as-of-060) 

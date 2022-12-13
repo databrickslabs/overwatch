@@ -1,8 +1,7 @@
 ---
-title: "Job"
-date: 2022-12-12T12:04:53-05:00
-draft: true
-weight: 2
+title: "As A JAR"
+date: 2022-12-13T16:09:01-05:00
+weight: 3
 ---
 
 ## This section will walk you through the steps necessary to deploy Overwatch through Job.
@@ -17,11 +16,10 @@ The main class for job is `com.databricks.labs.overwatch.MultiWorkspaceRunner`<b
 
 ### Parameters
 
-**Job takes 3 arguments** 
+**Job takes 3 arguments**
 * Args(0): Path of Config.csv.
 * Args(1): Number of threads to complete the task in parallel.
 * Args(2): Deployment zone, it must be either "Bronze", "Silver", "Gold" to deploy a particular zone or "Bronze,Silver,Gold" to deploy all the zones.
 
 
 ![newUIJarSetup](/images/GettingStarted/mswjob.png)
-

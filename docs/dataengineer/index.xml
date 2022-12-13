@@ -22,7 +22,7 @@
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
       <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. The general upgrade process is:
- Use the compactString of parameters to instantiate the workspace  The compact string can be found in your original runner notebook which you got from here   Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object  Basic pseudocode can be found below as a reference.</description>
+Use the compactString of parameters to instantiate the workspace The compact string can be found in your original runner notebook which you got from here Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object Basic pseudocode can be found below as a reference.</description>
     </item>
     
     <item>
@@ -33,7 +33,7 @@
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</guid>
       <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch
 Cluster Logging Simplify and Unify your cluster logging directories
- Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
+Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
     </item>
     
   </channel>

@@ -1,12 +1,23 @@
 ---
-title: "Modules"
+title: "Modules / Scopes"
 date: 2022-12-12T11:40:34-05:00
-draft: true
 weight: 2
 ---
 
 ## Modules
-Modules are the method by which Overwatch is segmented; currently, the modules available include:
+A module is a single workload that builds a target table. More details about all the modules are available in 
+[Pipeline Management]({{%relref "DataEngineer/Pipeline_Management"%}}/#module-dependencies).
+
+## Scopes
+Scopes are the method by which Overwatch is segmented and a scope will contain all the related modules to build 
+the output from Bronze through to Gold. For example there's one scope called "jobs" but it contains all the modules 
+for jobs and job runs from bronze through gold as well as the jobruncostpotentialfact gold fact table.
+
+Certain scopes depend on others; those dependencies are noted below and in 
+[Module Dependencies]({{%relref "DataEngineer/Pipeline_Management"%}}/#module-dependencies) section of Pipeline 
+Management.
+
+Scopes are:
 * [audit](#audit)
 * [clusters](#clusters)
 * [clusterEvents](#clusterevents)
@@ -14,16 +25,16 @@ Modules are the method by which Overwatch is segmented; currently, the modules a
 * [jobs](#jobs)
 * [accounts](#accounts)
 * [notebooks](#notebooks)
-* [DBSQL](#dbsql-preview)
+* [DBSQL](#dbsql)
 * [sparkEvents](#sparkevents)
 
-The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently,
+The default is to use all scopes so if none are specified in the configuration, all scopes will be enabled. Currently,
 under normal, daily operations, there no significant cost to any of these modules. It's likely best to leave them
 all turned on unless there's a specific reason not to.
 {{% notice warning%}}
 The very first run can be an exception to "no significant cost". The historical load of 60+ days can take some time
 to load depending on the size of the workspace and quantity of historical data to be loaded. See
-[Advanced Topics]({{%relref "GettingStarted/AdvancedTopics.md"%}}) for more details on optimizing the first run.
+[Advanced Topics]({{%relref "DataEngineer/AdvancedTopics.md"%}}) for more details on optimizing the first run.
 {{% /notice %}}
 
 These modules control which parts of Overwatch are run when the Overwatch job executes. Many of the modules
@@ -51,7 +62,7 @@ repo](https://github.com/databrickslabs/overwatch) for release updates.
 Audit is the base, fundamental module from which the other modules build upon. This module is required.
 
 For details on how to configure audit logging please refer to the Databricks docs online and/or the [environment
-setup]({{%relref "EnvironmentSetup"%}}) details for your cloud provider.
+setup]({{%relref "DeployOverwatch/CloudInfra/_index.md"%}}) details for your cloud provider.
 
 The source data is landed in the bronze layer table `audit_log_bronze`. The schema is ultimately inferred but a minimum
 base, required schema is defined to ensure requisite data fields are present. Additional data will land in the audit
@@ -156,8 +167,8 @@ Overwatch should not be used as single source of truth for any audit requirement
 
 Currently a very simple module that just enables the materialization of notebooks as slow changing dimensions.
 
-### DBSQL (Preview)
-Preview as of 0.7.0
+### DBSQL
+As of 0.7.0
 *Requires:* Audit
 
 *Gold Entities:* sqlQueryHistory
@@ -186,7 +197,7 @@ It's best practice to configure cluster logs to be delivered to a location with 
 Files can be configured to be deleted or moved to cold storage after some defined timeframe. The raw files are very
 inefficient to store long-term and once the data has been captured by Overwatch, it's stored in an efficient way;
 therefore, there's little to no reason to keep the files in warm/hot storage for greater than some a few weeks.
-More information can be found on this topic in the [Advanced Topics]({{%relref "GettingStarted/AdvancedTopics.md"%}})
+More information can be found on this topic in the [Advanced Topics]({{%relref "DataEngineer/AdvancedTopics.md"%}})
 section.
 {{% /notice %}}
 

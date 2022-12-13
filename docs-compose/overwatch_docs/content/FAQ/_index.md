@@ -9,7 +9,7 @@ The answers and examples to the questions below assume that a workspace is insta
 There are many ways to instantiate a workspace, below is a simple way but it doesn't matter how you create the 
 Workspace, just so long as the state of the workspace and/or pipeline can be referenced and utilized. 
 A simple example is below. There are much more verbose details in the 
-[Advanced Topics Section]({{%relref "GettingStarted/AdvancedTopics.md"%}}/#interacting-with-overwatch-and-its-state) 
+[Advanced Topics Section]({{%relref "DataEngineer/AdvancedTopics.md"%}}/#interacting-with-overwatch-and-its-state) 
 if you'd like a deeper explanation.
 ```scala
 import com.databricks.labs.overwatch.utils.Upgrade
@@ -28,7 +28,7 @@ display(upgradeReport)
 I can't seem to get a clean state from which to begin though.**
 
 Overwatch tables are intentionally created as external tables. When the 
-[etlDataPathPrefix]({{%relref "GettingStarted/Configuration.md"%}}/#datatarget) is configured (as recommended) 
+[etlDataPathPrefix]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}/#datatarget) is configured (as recommended) 
 the target data does not live underneath the database directory and as such is not deleted when the database is dropped. 
 This is considered an "external table" and this is done by design to protect the org from someone accidentally dropping 
 all data globally. For a FULL cleanup you may use the functions below but these are destructive, be sure that 
@@ -56,7 +56,7 @@ workspace for a clean run.
 [multi_workspace_cleanup.html](/assets/FAQ/multi_workspace_cleanup.html)
 
 ## Q2: The incorrect costs were entered for a specific time range, I'd like to correct them, how should I do that?
-Please refer to the [Configuring Custom Costs]({{%relref "GettingStarted"%}}#configuring-custom-costs) 
+Please refer to the [Configuring Custom Costs]({{%relref "DeployOverwatch/ConfigureOverwatch/CustomCosts"%}}#configuring-custom-costs) 
 to baseline your understanding. Also, closely review the details of the 
 [instanceDetails]({{%relref "dataengineer/definitions/_index.md"%}}/#instancedetails)
 table definition as that's where costs are stored and this is what will need to be accurate. Lastly, 
@@ -126,7 +126,7 @@ More Details: [https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Descri
 
 ## Q4: How to config the cluster logs path?
 The cluster logging paths are automatically acquired within Overwatch. There's no need to tell Overwatch where to load those from. 
-[Click here]({{%relref "EnvironmentSetup/azure.md"%}}/#configuring-overwatch-on-azure-databricks) for more details.
+[Click here]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#configuring-overwatch-on-azure-databricks) for more details.
 ![FAQ4](/images/_index/faq4.png)
 
 ## Q5: Can I configure custom log4j appender settings

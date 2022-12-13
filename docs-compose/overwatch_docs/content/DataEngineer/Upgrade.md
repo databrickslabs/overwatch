@@ -9,7 +9,7 @@ Sometimes upgrading from one version to the next requires a schema change. In th
 **before the pipeline is executed**. The general upgrade process is:
 * Use the compactString of parameters to instantiate the workspace
   * The compact string can be found in your original runner notebook which you got from 
-    [here]({{%relref "GettingStarted/"%}}#jump-start-notebooks)
+    [here]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy"%}}#jump-start-notebooks)
 * Call the upgrade function for the version to which you're upgrading and pass in the workspace object
 
 Basic pseudocode can be found below as a reference. For actual version upgrade scripts please reference the upgrade 

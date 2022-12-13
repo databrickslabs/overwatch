@@ -12,7 +12,7 @@
       <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</guid>
-      <description>Consumption Layer  Column Descriptions   ETL Tables  Bronze Silver Gold    Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
+      <description>Consumption Layer Column Descriptions ETL Tables Bronze Silver Gold Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
     </item>
     
   </channel>

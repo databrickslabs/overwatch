@@ -5,14 +5,60 @@
     <link>https://databrickslabs.github.io/overwatch/</link>
     <description>Recent content in Welcome To OverWatch on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Mon, 26 Sep 2022 08:47:24 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 13 Dec 2022 14:48:09 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Deployment</title>
+      <link>https://databrickslabs.github.io/overwatch/troubleshooting/deployment/</link>
+      <pubDate>Tue, 13 Dec 2022 13:50:22 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/troubleshooting/deployment/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>CustomCosts</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</link>
+      <pubDate>Tue, 13 Dec 2022 14:35:00 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</guid>
+      <description>Configuring Custom Costs There are three essential components to the cost function:
+The node type (instanceDetails.Api_Name) and its associated contract price (instanceDetails.Compute_Contract_Price) The node type (instanceDetails.Api_Name) and its associated DBUs per hour (instanceDetails.Hourly_DBUs) The DBU contract prices for the SKU under which your DBUs are charged such as: Interactive Automated DatabricksSQL Databricks currently has 3 SKUs (classic/pro/serverless) but Overwatch is not able to accurately report on DBSQL pricing at this time due to data not available in the Databricks Product.</description>
+    </item>
+    
+    <item>
+      <title>Pipeline</title>
+      <link>https://databrickslabs.github.io/overwatch/troubleshooting/pipeline/</link>
+      <pubDate>Tue, 13 Dec 2022 13:50:43 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/troubleshooting/pipeline/</guid>
+      <description></description>
+    </item>
+    
     <item>
       <title>Data Dictionary - 0.6.1.x</title>
       <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</link>
       <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</guid>
-      <description>Consumption Layer  Column Descriptions   ETL Tables  Bronze Silver Gold    Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
+      <description>Consumption Layer Column Descriptions ETL Tables Bronze Silver Gold Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
+    </item>
+    
+    <item>
+      <title>Security Considerations</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</link>
+      <pubDate>Tue, 13 Dec 2022 14:48:09 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</guid>
+      <description>API Access Overwatch utilizes several APIs to normalize the platform data. Overwatch leverages secret scopes and keys to acquire a token that is authorized to access the platform. The account that owns the token (i.e. dapi token) must have read access to the assets you wish to manage. If the token owner is a non-admin account the account must be granted read level access to the assets to be monitored.</description>
+    </item>
+    
+    <item>
+      <title>Deployment (Legacy)</title>
+      <link>https://databrickslabs.github.io/overwatch/troubleshooting/deploymentlegacy/</link>
+      <pubDate>Tue, 13 Dec 2022 13:50:26 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/troubleshooting/deploymentlegacy/</guid>
+      <description></description>
     </item>
     
     <item>
@@ -25,32 +71,13 @@
     </item>
     
     <item>
-      <title>Configuration</title>
-      <link>https://databrickslabs.github.io/overwatch/gettingstarted/configuration/</link>
-      <pubDate>Wed, 28 Oct 2020 11:55:12 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/configuration/</guid>
-      <description>Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.databricks.labs.overwatch.BatchRunner. When passed in as a json string, it is serialized into an instance of OverwatchParams. This provides strong validation on the input parameters and strong typing for additional validation options. All configs attempt to be defaulted to a reasonable default where possible. If a default is set, passing in a value will overwrite the default.</description>
-    </item>
-    
-    <item>
       <title>Upgrade</title>
       <link>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</link>
       <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
       <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. The general upgrade process is:
- Use the compactString of parameters to instantiate the workspace  The compact string can be found in your original runner notebook which you got from here   Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object  Basic pseudocode can be found below as a reference.</description>
-    </item>
-    
-    <item>
-      <title>Modules</title>
-      <link>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/modules/</guid>
-      <description>Modules Modules are the method by which Overwatch is segmented; currently, the modules available include:
- audit clusters clusterEvents pools jobs accounts notebooks DBSQL sparkEvents  The default is to use all modules so if none are specified in the configuration, all modules will be enabled. Currently, under normal, daily operations, there no significant cost to any of these modules. It&amp;rsquo;s likely best to leave them all turned on unless there&amp;rsquo;s a specific reason not to.</description>
+Use the compactString of parameters to instantiate the workspace The compact string can be found in your original runner notebook which you got from here Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object Basic pseudocode can be found below as a reference.</description>
     </item>
     
     <item>
@@ -61,37 +88,7 @@
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</guid>
       <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch
 Cluster Logging Simplify and Unify your cluster logging directories
- Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
-    </item>
-    
-    <item>
-      <title>Advanced Topics</title>
-      <link>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</link>
-      <pubDate>Wed, 28 Oct 2020 13:43:52 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/gettingstarted/advancedtopics/</guid>
-      <description>Quick Reference  Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch  Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run. For small/medium workspaces, 20-40 minutes should be expected for each run.</description>
-    </item>
-    
-    <item>
-      <title>Azure</title>
-      <link>https://databrickslabs.github.io/overwatch/environmentsetup/azure/</link>
-      <pubDate>Wed, 28 Oct 2020 09:12:32 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/environmentsetup/azure/</guid>
-      <description>Configuring Overwatch on Azure Databricks Reference Architecture Configuring Audit Log Delivery Through Event Hub Setting up Storage Accounts Mount Storage Accounts  Configuring Overwatch on Azure Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
-There are two primary sources of data that need to be configured:</description>
-    </item>
-    
-    <item>
-      <title>AWS</title>
-      <link>https://databrickslabs.github.io/overwatch/environmentsetup/aws/</link>
-      <pubDate>Wed, 28 Oct 2020 09:12:28 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/environmentsetup/aws/</guid>
-      <description>Configuring Overwatch on AWS - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
-There are two primary sources of data that need to be configured:
- Audit Logs  These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
+Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
     </item>
     
   </channel>

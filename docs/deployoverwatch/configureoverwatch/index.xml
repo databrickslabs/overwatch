@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Configure Overwatch on Overwatch</title>
+    <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/</link>
+    <description>Recent content in Configure Overwatch on Overwatch</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Mon, 12 Dec 2022 11:34:59 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>CustomCosts</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</link>
+      <pubDate>Tue, 13 Dec 2022 14:35:00 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</guid>
+      <description>Configuring Custom Costs There are three essential components to the cost function:
+The node type (instanceDetails.Api_Name) and its associated contract price (instanceDetails.Compute_Contract_Price) The node type (instanceDetails.Api_Name) and its associated DBUs per hour (instanceDetails.Hourly_DBUs) The DBU contract prices for the SKU under which your DBUs are charged such as: Interactive Automated DatabricksSQL Databricks currently has 3 SKUs (classic/pro/serverless) but Overwatch is not able to accurately report on DBSQL pricing at this time due to data not available in the Databricks Product.</description>
+    </item>
+    
+    <item>
+      <title>Security Considerations</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</link>
+      <pubDate>Tue, 13 Dec 2022 14:48:09 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</guid>
+      <description>API Access Overwatch utilizes several APIs to normalize the platform data. Overwatch leverages secret scopes and keys to acquire a token that is authorized to access the platform. The account that owns the token (i.e. dapi token) must have read access to the assets you wish to manage. If the token owner is a non-admin account the account must be granted read level access to the assets to be monitored.</description>
+    </item>
+    
+  </channel>
+</rss>
