@@ -175,7 +175,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.processedEventLogs,
         config.organizationId,
         config.runID,
-        pipelineSnapTime.asColumnTS,
+        pipelineSnapTime,
         sparkEventLogsModule.daysToProcess
       ) //,
     ),

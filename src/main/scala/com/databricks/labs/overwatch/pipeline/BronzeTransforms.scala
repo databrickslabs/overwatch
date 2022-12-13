@@ -554,17 +554,23 @@ trait BronzeTransforms extends SparkSessionWrapper {
             spark.read.json(tmpClusterEventsSuccessPath)
               .select(explode('events).alias("events"))
               .select(col("events.*"))
-          )
+          ).scrubSchema
+
           val changeInventory = Map[String, Column](
             "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
             "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
+            "details.attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.azure_attributes"),
+            "details.attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.aws_attributes"),
             "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
             "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
             "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
+            "details.previous_attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.azure_attributes"),
+            "details.previous_attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.aws_attributes"),
             "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
           )
 
-          val clusterEventsDF = SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+          val clusterEventsDF = tdf
+            .modifyStruct(changeInventory)
             .withColumn("organization_id", lit(organizationId))
 
           val clusterEventsCaptured = clusterEventsDF.count
@@ -627,7 +633,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       )
       logger.log(Level.INFO, "Persist error completed")
     }
+    spark.conf.set("spark.sql.caseSensitive", "true")
     val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
+    spark.conf.set("spark.sql.caseSensitive", "false")
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
     clusterEventDf
@@ -693,16 +701,30 @@ trait BronzeTransforms extends SparkSessionWrapper {
     struct(filename, byCluster, byClusterHost, bySparkContextID)
   }
 
+  private def getSparkEventsSchemaScrubber(df: DataFrame): SchemaScrubber = {
+    val propertiesScrubException = SanitizeFieldException(
+      field = SchemaTools.colByName(df)("Properties"),
+      rules = List(
+        SanitizeRule("\\s", ""),
+        SanitizeRule("\\.", ""),
+        SanitizeRule("[^a-zA-Z0-9]", "_")
+      ),
+      recursive = true
+    )
+    SchemaScrubber(exceptions = Array(propertiesScrubException))
+  }
+
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
                           processedLogFilesTracker: PipelineTable,
                           organizationId: String,
                           runID: String,
-                          pipelineSnapTime: Column,
+                          pipelineSnapTime: TimeTypes,
                           daysToProcess: Int
                          )(eventLogsDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Searching for Event logs")
+    val tempDir = processedLogFilesTracker.config.tempWorkingDir
     // Caching is done to ensure a single scan of the event log file paths
     // From here forward there should be no more direct scans for new records, just loading data direct from paths
     // eager force cache
@@ -727,7 +749,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           logger.log(Level.INFO, "Updating Tracker with new files")
           // appends all newly scanned files including files that were scanned but not loaded due to OutOfTime window
           // and/or failed during lookup -- these are kept for tracking
-          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime, daysToProcess)
+          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime.asColumnTS,daysToProcess)
         } catch {
           case e: Throwable => {
             val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +
@@ -794,17 +816,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
           }
         }
 
-        val propertiesScrubException = SanitizeFieldException(
-          field = SchemaTools.colByName(baseEventsDF)("Properties"),
-          rules = List(
-            SanitizeRule("\\s", ""),
-            SanitizeRule("\\.", ""),
-            SanitizeRule("[^a-zA-Z0-9]", "_")
-          ),
-          recursive = true
-        )
-        val bronzeSparkEventsScrubber = SchemaScrubber(exceptions = Array(propertiesScrubException))
-
         // Handle custom metrics and listeners in streams
         val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
           to_json(col("progress")).alias("progress")
@@ -822,6 +833,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
           when('Event === "org.apache.spark.scheduler.SparkListenerSpeculativeTaskSubmitted", col("stageAttemptId"))
             .otherwise(col("Stage Attempt ID"))
         } else col("Stage Attempt ID")
+
+        val bronzeSparkEventsScrubber = getSparkEventsSchemaScrubber(baseEventsDF)
 
         val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
           baseEventsDF
@@ -847,14 +860,23 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .scrubSchema(bronzeSparkEventsScrubber)
         }
 
-        val bronzeEventsFinal = rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+        // persist to temp to ensure all raw files are not read multiple times
+        val sparkEventsTempPath = s"$tempDir/sparkEventsBronze/${pipelineSnapTime.asUnixTimeMilli}"
+
+        rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
           .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
           .withColumnRenamed("executorId", "blackListedExecutorIds")
-          .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
           .withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))
+          .write.format("delta")
+          .mode("overwrite")
+          .save(sparkEventsTempPath)
+
+        val bronzeEventsFinal = spark.read.format("delta").load(sparkEventsTempPath)
+          .verifyMinimumSchema(Schema.sparkEventsRawMasterSchema)
+          .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
 
         spark.conf.set("spark.sql.caseSensitive", "false")
         // TODO -- PERF test without unpersist, may be unpersisted before re-utilized
