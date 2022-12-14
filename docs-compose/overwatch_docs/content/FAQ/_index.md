@@ -195,4 +195,15 @@ This can be due to a large resulting dataset. To validate download the appropria
 `spark.rpc.message.maxSize`. If you don't find skip ahead, if you do find it, add the following parameter to 
 the spark config of the Overwatch cluster. `spark.rpc.message.maxSize 1024`. 
 
-If the issue wasn't the RPC size reduce the size of the "SuccessBatchSize" in the APIENV configuration (as of 0.7.0)
+If the issue wasn't the RPC size reduce the size of the "SuccessBatchSize" in the APIENV configuration (as of 0.7.0)  
+
+## Q12: How to edit or update the instance details table ?  
+
+#### Steps to edit/append hourly DBUs for the instances:  
+1. Merge the new CSV with the existing [instance_details](https://databrickslabs.github.io/overwatch/dataengineer/definitions/#instancedetails) Delta Table  
+1. Rebuild Clusterstatefact and jobruncostpotentialfact
+   - delete from table overwatch_etl.jobruncostpotentialfact_gold;
+   - delete from table overwatch_etl.clusterstatefact_gold;                    
+   - update overwatch_etl.pipeline_report set  status == "ROLLED_BACK" where moduleID in (3005, 3015);
+
+### NOTE: We do not update the instanceDetails table automatically, customer can manually update the hourly DBU values. Also note that we're working on finding / building a more automated process for this
