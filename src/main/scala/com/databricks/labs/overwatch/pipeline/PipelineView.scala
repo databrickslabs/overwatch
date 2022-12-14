@@ -14,9 +14,17 @@ case class PipelineView(name: String,
 
   def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
     if (dataSource.exists) {
-      val pubStatementSB = new StringBuilder("create or replace view ")
-      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
-      println(s"pubStatementSB in pipelineview is ${pubStatementSB}")
+//      val pubStatementSB = new StringBuilder("create or replace view ")
+//      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
+//      println(s"pubStatementSB in pipelineview is ${pubStatementSB}")
+
+
+      val pubStatementSB = new StringBuilder("create table ")
+      pubStatementSB.append(s"${dbTarget}.${name} as select * from delta.`${config.etlDataPathPrefix}/${dataSource.name}`")
+//      println(s"testSB in pipelineview is ${testSB}")
+
+
+
 
       // link partition columns
       if (dataSource.partitionBy.nonEmpty) {
@@ -50,6 +58,7 @@ case class PipelineView(name: String,
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
       try {
+        println(s"pubStatement is ${pubStatement}")
         spark.sql(pubStatement)
       } catch {
         case e: Throwable =>

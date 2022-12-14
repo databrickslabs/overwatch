@@ -700,7 +700,7 @@ object Helpers extends SparkSessionWrapper {
     val newConfigParams = remoteWorkspace.getConfig.inputConfig.copy(dataTarget = Some(localDataTarget))
     val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
     val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
-    val registrationReport = localTempWorkspace.addToMetastore()
+    val registrationReport = localTempWorkspace.addToMetastore(workspacesAllowed)
     val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
     val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
 
