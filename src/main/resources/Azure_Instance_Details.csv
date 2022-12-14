@@ -126,3 +126,25 @@ E80is v4,Standard_E80is_v4,80,504,5.04,5.04,3.036,20
 F4,Standard_F4,4,8,0.2,0.2,0.12,0.5
 F8,Standard_F8,8,16,0.4,0.4,0.24,1
 F16,Standard_F16,16,32,0.8,0.8,0.48,2
+M5DN Metal,m5dn.metal,384,96,6.528,6.528,19.58,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,3600 GB (4 * 900 GB NVMe SSD),100 Gigabit,19000,2375,TRUE,FALSE,4.113,0
+G4DN Metal,g4dn.metal,384,96,7.824,7.824,17.12,8,NVIDIA T4 Tensor Core,128,Intel Xeon Family,2.5,1800 GB(2 * 900 GB NVMe SSD),100 Gigabit,19000,2375,TRUE,TRUE,4.929,0
+G5 Graphics and Machine Learning GPU Quadruple Extra Large,g5.4xlarge,64,16,1.624,1.624,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,600 GB NVMe SSD,Up to 25 Gigabit,4750,593.75,TRUE,TRUE,0,0
+R5N Metal,r5n.metal,768,96,7.152,7.152,21.6,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),2.5,EBS only,100 Gigabit,19000,2375,TRUE,FALSE,4.506,0
+G5 Graphics and Machine Learning GPU 12xlarge,g5.12xlarge,192,48,5.672,5.672,,4,NVIDIA A10G,96,AMD EPYC 7R32,2.8,3800 GB NVMe SSD,40 Gigabit,16000,2000,TRUE,TRUE,0,0
+G4AD 16xlarge,g4ad.16xlarge,256,64,3.468,3.468,8.21,4,AMD Radeon Pro V520,32,AMD EPYC 7R32,2.8,2400 GB(2 * 1200 GB NVMe SSD),25 Gigabit,6300,787.5,TRUE,TRUE,2.1848,0
+G5 Graphics and Machine Learning GPU Eight Extra Large,g5.8xlarge,128,32,2.448,2.448,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,900 GB NVMe SSD,25 Gigabit,16000,2000,TRUE,TRUE,0,0
+G4AD Quadruple Extra Large,g4ad.4xlarge,64,16,0.867,0.867,2.05,1,AMD Radeon Pro V520,8,AMD EPYC 7R32,2.8,600 GB NVMe SSD,Up to 10 Gigabit,3170,396.25,TRUE,TRUE,0.5462,0
+D3 Eight Extra Large,d3.8xlarge,256,32,3.9955,3.9955,12.8,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,47520 GB(24 * 1980 GB HDD),25 Gigabit,5000,625,TRUE,TRUE,2.5172,0
+G5 Graphics and Machine Learning GPU Double Extra Large,g5.2xlarge,32,8,1.212,1.212,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,450 GB NVMe SSD,Up to 10 Gigabit,3500,437.5,TRUE,TRUE,0,0
+R5DN Metal,r5dn.metal,768,96,8.016,8.016,25.06,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,3600 GB(4 * 900 GB NVMe SSD),100 Gigabit,19000,2375,TRUE,FALSE,5.05,0
+G4AD Eight Extra Large,g4ad.8xlarge,128,32,1.734,1.734,4.1,2,AMD Radeon Pro V520,16,AMD EPYC 7R32,2.8,1200 GB NVMe SSD,15 Gigabit,3170,396.25,TRUE,TRUE,1.0924,0
+G5 Graphics and Machine Learning GPU Extra Large,g5.xlarge,16,4,1.006,1.006,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,250 GB NVMe SSD,Up to 10 Gigabit,3500,437.5,TRUE,TRUE,0,0
+D3EN Eight Extra Large,d3en.8xlarge,128,32,4.206,4.206,13.44,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,223680 GB(16 * 13980 GB HDD),50 Gigabit,5000,625,TRUE,TRUE,0,0
+G5 Graphics and Machine Learning GPU 48xlarge,g5.48xlarge,768,192,16.288,16.288,,8,NVIDIA A10G,192,AMD EPYC 7R32,2.8,7600 GB(2 * 3800 GB NVMe SSD),100 Gigabit,19000,2375,TRUE,TRUE,0,0
+C5N Metal,c5n.metal,192,72,3.888,3.888,13.97,0,None,0,Intel Xeon Platinum 8124M,3,EBS only,100 Gigabit,19000,2375,TRUE,TRUE,2.449,0
+G5 Graphics and Machine Learning GPU 16xlarge,g5.16xlarge,256,64,4.096,4.096,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,1900 GB NVMe SSD,25 Gigabit,16000,2000,TRUE,TRUE,0,0
+D3EN 12xlarge,d3en.12xlarge,192,48,6.308,6.308,20.16,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,335520 GB(24 * 13980 GB HDD),75 Gigabit,7000,875,TRUE,TRUE,0,0
+G5 Graphics and Machine Learning GPU 24xlarge,g5.24xlarge,384,96,8.144,8.144,,4,NVIDIA A10G,96,AMD EPYC 7R32,2.8,3800 GB NVMe SSD,50 Gigabit,19000,2375,TRUE,TRUE,0,0
+P4D Highest Performance GPU 24xlarge,p4d.24xlarge,1152,96,32.7726,32.7726,44.45,8,NVIDIA A100,320,Intel Xeon Platinum 8275L,3,8000 GB(8 * 1000 GB NVMe SSD),4x 100 Gigabit,19000,2375,TRUE,FALSE,20.1755,0
+M5N Metal,m5n.metal,384,96,5.712,5.712,17.14,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,EBS only,100 Gigabit,19000,2375,TRUE,FALSE,3.599,0
+M5ZN Metal,m5zn.metal,192,48,3.9641,3.9641,12,0,None,0,Intel Xeon Platinum 8252,4.5,EBS only,100 Gigabit,19000,2375,TRUE,TRUE,2.4974,0
