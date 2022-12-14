@@ -14,34 +14,26 @@ case class PipelineView(name: String,
 
   def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
     if (dataSource.exists) {
-//      val pubStatementSB = new StringBuilder("create or replace view ")
-//      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
-//      println(s"pubStatementSB in pipelineview is ${pubStatementSB}")
-
-
       val pubStatementSB = new StringBuilder("create table ")
-      pubStatementSB.append(s"${dbTarget}.${name} as select * from delta.`${config.etlDataPathPrefix}/${dataSource.name}`")
-//      println(s"testSB in pipelineview is ${testSB}")
-
-
-
-
+      val dataSourceName = dataSource.name.toLowerCase()
+      pubStatementSB.append(s"${config.consumerDatabaseName}.${name} as select ${colDefinition} from delta.`${config.etlDataPathPrefix}/${dataSourceName}`")
       // link partition columns
       if (dataSource.partitionBy.nonEmpty) {
-        val partMap: Map[String, String] = if (partitionMapOverrides.isEmpty) {
-          dataSource.partitionBy.map({ case (pCol) => (pCol, pCol) }).toMap
-        } else {
-          partitionMapOverrides
-        }
-        pubStatementSB.append(s"where ${partMap.head._1} = ${dataSource.name}.${partMap.head._2} ")
-        if (partMap.keys.toArray.length > 1) {
-          partMap.tail.foreach(pCol => {
-            pubStatementSB.append(s"and ${pCol._1} = ${dataSource.name}.${pCol._2} ")
-          })
-        }
+//        val partMap: Map[String, String] = if (partitionMapOverrides.isEmpty) {
+//          dataSource.partitionBy.map({ case (pCol) => (pCol, pCol) }).toMap
+//        } else {
+//          partitionMapOverrides
+//        }
+//        print(s"partmap is ${partMap}")
+//        pubStatementSB.append(s"where ${partMap.head._1} = ${dataSource.name}.${partMap.head._2} ")
+//        if (partMap.keys.toArray.length > 1) {
+//          partMap.tail.foreach(pCol => {
+//            pubStatementSB.append(s"and ${pCol._1} = ${dataSource.name}.${pCol._2} ")
+//          })
+//        }
         if (workspacesAllowed.nonEmpty){
           val workspacesAllowedString = workspacesAllowed.mkString("'", "','", "'")
-          pubStatementSB.append(s" and organization_id in (${workspacesAllowedString})")
+          pubStatementSB.append(s" where organization_id in (${workspacesAllowedString})")
         }
         if (sorted) {
           val orderDef = if (reverse) {
@@ -58,7 +50,6 @@ case class PipelineView(name: String,
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
       try {
-        println(s"pubStatement is ${pubStatement}")
         spark.sql(pubStatement)
       } catch {
         case e: Throwable =>
