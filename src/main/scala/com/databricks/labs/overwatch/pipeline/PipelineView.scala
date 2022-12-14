@@ -7,7 +7,7 @@ case class PipelineView(name: String,
                         dataSource: PipelineTable,
                         config: Config,
                         partitionMapOverrides: Map[String, String] = Map(),
-                        dbTargetOverride: Option[String] = None,
+                        dbTargetOverride: Option[String] = None
                        ) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
@@ -31,9 +31,8 @@ case class PipelineView(name: String,
           })
         }
         if (workspacesAllowed.nonEmpty){
-          val workspacesAllowedString = workspacesAllowed.mkString(",")
+          val workspacesAllowedString = workspacesAllowed.mkString("'", "','", "'")
           pubStatementSB.append(s" and organization_id in (${workspacesAllowedString})")
-          println("pubStatementSB after workspacesAllowedString is ",pubStatementSB)
         }
         if (sorted) {
           val orderDef = if (reverse) {
@@ -50,7 +49,6 @@ case class PipelineView(name: String,
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
       try {
-        println("pubStatement is ",pubStatement)
         spark.sql(pubStatement)
       } catch {
         case e: Throwable =>

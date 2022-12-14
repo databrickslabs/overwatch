@@ -619,23 +619,6 @@ object Helpers extends SparkSessionWrapper {
    *                        or direct access via s3:// or abfss:// or dbfs:/mnt/ etc.
    * @return
    */
-//  def registerRemoteOverwatchIntoLocalMetastore(
-//                                                 remoteWorkspace: Workspace,
-//                                                 localDataTarget: DataTarget
-//                                               ): Seq[WorkspaceMetastoreRegistrationReport] = {
-//
-//    val newConfigParams = remoteWorkspace.getConfig.inputConfig.copy(dataTarget = Some(localDataTarget))
-//    val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
-//    val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
-//    val registrationReport = localTempWorkspace.addToMetastore()
-//    val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
-//    val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
-//
-//    b.refreshViews()
-//    g.refreshViews()
-//    registrationReport
-//
-//  }
   def registerRemoteOverwatchIntoLocalMetastore(
                                                  remoteStoragePrefix: String,
                                                  remoteWorkspaceID: String,
@@ -654,12 +637,11 @@ object Helpers extends SparkSessionWrapper {
     // Check whether eltDatapathPrefix Contains PipReport
     val pipReportPath = eltDataPathPrefix+"/pipeline_report"
     try{
-      dbutils.fs.ls(pipReportPath)
-      logger.log(Level.INFO, s"${pipReportPath} is a Delta table.....Proceed")
+      dbutils.fs.ls(s"$pipReportPath/_delta_log").nonEmpty
+      logger.log(Level.INFO, s"Overwatch has being deployed with ${pipReportPath} location...proceed")
     }catch {
-
       case e: FileNotFoundException =>
-        val msg = s"${pipReportPath} is not a Delta table.....Exit"
+        val msg = s"Overwatch has not been deployed with ${pipReportPath} location...can not proceed"
         logger.log(Level.ERROR, msg)
         throw new BadConfigException(msg)
     }
@@ -725,7 +707,6 @@ object Helpers extends SparkSessionWrapper {
     b.refreshViews(workspacesAllowed)
     g.refreshViews(workspacesAllowed)
     registrationReport
-    //    Helpers.registerRemoteOverwatchIntoLocalMetastore(remoteWorkspace, localDataTarget)
   }
 
   private def rollbackTargetToTimestamp(
