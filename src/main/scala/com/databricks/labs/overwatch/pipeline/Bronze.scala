@@ -32,7 +32,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.instanceProfilesSnapshotTarget,
       BronzeTargets.tokensSnapshotTarget,
       BronzeTargets.globalInitScSnapshotTarget,
-      BronzeTargets.jobRunsSnapshotTarget
+      BronzeTargets.jobRunsSnapshotTarget,
+      BronzeTargets.warehousesSnapshotTarget
     )
   }
 
@@ -44,6 +45,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => Array(jobsSnapshotModule)
       case OverwatchScope.pools => Array(poolsSnapshotModule)
       case OverwatchScope.sparkEvents => Array(sparkEventLogsModule)
+      case OverwatchScope.dbsql => Array(warehousesSnapshotModule)
       case _ => Array[Module]()
     }
   }
@@ -270,6 +272,16 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   }
 
 
+  lazy private[overwatch] val warehousesSnapshotModule = Module(1013, "Bronze_Warehouses_Snapshot", this)
+  lazy private val appendWarehousesAPIProcess: () => ETLDefinition = {
+    () =>
+    ETLDefinition (
+    workspace.getWarehousesDF,
+    Seq(cleanseRawWarehouseSnapDF),
+    append(BronzeTargets.warehousesSnapshotTarget)
+    )
+  }
+
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
 
@@ -316,6 +328,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.accounts =>
         tokenSnapshotModule.execute(appendTokenProcess)
         globalInitScSnapshotModule.execute(appendGlobalInitScProcess)
+      case OverwatchScope.dbsql => warehousesSnapshotModule.execute(appendWarehousesAPIProcess)
       case _ =>
     }
   }

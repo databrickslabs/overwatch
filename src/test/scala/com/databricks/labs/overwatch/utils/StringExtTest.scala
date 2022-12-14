@@ -1,8 +1,10 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.utils.StringExt.StringHelpers
+import org.scalatest.Ignore
 import org.scalatest.funspec.AnyFunSpec
 
+//@Ignore
 class StringExtTest extends AnyFunSpec {
 
   describe("StringHelpers Test") {
@@ -27,11 +29,11 @@ class StringExtTest extends AnyFunSpec {
     }
 
     it("String with white % characters") {
-      assert("""Business %Name""".containsNoSpecialChars)
+      assert(!"""Business %Name""".containsNoSpecialChars)
     }
 
     it("String with white $ characters") {
-      assert("""Business $Name""".containsNoSpecialChars)
-    }
+      assert(!"""Business $Name""".containsNoSpecialChars)
   }
+ }
 }

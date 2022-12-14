@@ -28,7 +28,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.clustersSpecTarget,
       SilverTargets.dbJobsStatusTarget,
       SilverTargets.notebookStatusTarget,
-      SilverTargets.sqlQueryHistoryTarget
+      SilverTargets.sqlQueryHistoryTarget,
+      SilverTargets.warehousesSpecTarget
     )
   }
 
@@ -51,7 +52,10 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         Array(jobStatusModule, jobRunsModule)
       }
-      case OverwatchScope.dbsql => Array(sqlQueryHistoryModule)
+      case OverwatchScope.dbsql => {
+        Array(sqlQueryHistoryModule,
+          warehouseSpecModule)
+      }
       case _ => Array[Module]()
     }
   }
@@ -371,6 +375,21 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
+  lazy private[overwatch] val warehouseSpecModule = Module(2021, "Silver_WarehouseSpec", this, Array(1004))
+  lazy private val appendWarehouseSpecProcess: () => ETLDefinition = {
+    () =>
+    ETLDefinition(
+      BronzeTargets.auditLogsTarget.asIncrementalDF(warehouseSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+      Seq(
+        buildWarehouseSpec(
+          BronzeTargets.warehousesSnapshotTarget,
+          warehouseSpecModule.isFirstRun,
+          warehouseSpecModule.untilTime
+        )),
+      append(SilverTargets.warehousesSpecTarget)
+    )
+  }
+
   private def processSparkEvents(): Unit = {
 
     executorsModule.execute(appendExecutorsProcess)
@@ -393,6 +412,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.clusterEvents => clusterStateDetailModule.execute(appendClusterStateDetailProcess)
       case OverwatchScope.dbsql => {
         sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
+        warehouseSpecModule.execute(appendWarehouseSpecProcess)
       }
       case OverwatchScope.sparkEvents => {
         processSparkEvents()

@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
+import com.databricks.labs.overwatch.pipeline.DbsqlTransforms._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
@@ -624,11 +625,11 @@ trait SilverTransforms extends SparkSessionWrapper {
         .withColumn("rnk", rank().over(exactlyOnceFilterW))
         .withColumn("rn", row_number().over(exactlyOnceFilterW))
         .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-        .toTSDF("timestamp", "organization_id", "instance_pool_id")
-        .lookupWhen(
-          poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
-          maxLookAhead = Long.MaxValue
-        ).df
+          .toTSDF("timestamp", "organization_id", "instance_pool_id")
+          .lookupWhen(
+            poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
+            maxLookAhead = Long.MaxValue
+          ).df
     } else spark.emptyDataFrame
 
     //    val newPoolsHasRecords = !newPoolsRecords.isEmpty
@@ -1353,4 +1354,63 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
+  // Below function is deprecated and can be removed
+  private def warehouseBase(auditRawDF: DataFrame): DataFrame = {
+    val warehouse_id_gen_w = Window.partitionBy('organization_id, 'warehouse_name)
+      .orderBy('timestamp).rowsBetween(Window.currentRow, 1000)           // remove this
+    val warehouse_name_gen_w = Window.partitionBy('organization_id, 'warehouse_id)
+      .orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
+    val warehouse_id_gen = first('warehouse_id, true).over(warehouse_id_gen_w) // remove this
+    val warehouse_name_gen = first('warehouse_name, true).over(warehouse_name_gen_w)
+
+    val warehouseSummaryCols = auditBaseCols ++ Array[Column](
+      when('actionName === "createEndpoint" || 'actionName === "createWarehouse",
+        get_json_object($"response.result", "$.id"))
+        .when(('actionName =!= "createEndpoint" && 'id.isNull)
+          || ('actionName =!= "createWarehouse" && 'id.isNull), 'warehouseId)
+        .otherwise('id).alias("warehouse_id"),
+      'name.alias("warehouse_name"),
+      'cluster_size,
+      'min_num_clusters.cast("long"),
+      'max_num_clusters.cast("long"),
+      'auto_stop_mins.cast("long"),
+      'spot_instance_policy,
+      'enable_photon.cast("boolean"),
+      'channel,
+      'tags,
+      'enable_serverless_compute.cast("boolean"),
+      'warehouse_type
+    )
+
+    val warehouseRaw = auditRawDF
+      .filter('serviceName === "databrickssql")
+      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .select(warehouseSummaryCols: _*)
+      .withColumn("warehouse_id", PipelineFunctions.fillForward("warehouse_id", warehouse_id_gen_w))
+      .withColumn("warehouse_name", PipelineFunctions.fillForward("warehouse_name", warehouse_name_gen_w))
+
+    val warehouseWithStructs = warehouseRaw
+      .withColumn("channel", SchemaTools.structFromJson(spark, warehouseRaw, "channel"))
+      .withColumn("tags", SchemaTools.structFromJson(spark, warehouseRaw, "tags"))
+      .scrubSchema
+
+    warehouseWithStructs
+        .withColumn("tags", SchemaTools.structToMap(warehouseWithStructs, "tags"))
+  }
+
+  protected def buildWarehouseSpec(
+                                  bronze_warehouse_snap: PipelineTable,
+                                  isFirstRun: Boolean,
+                                  untilTime: TimeTypes
+                                )(df: DataFrame): DataFrame = {
+    val bronzeWarehouseSnapUntilCurrent = bronze_warehouse_snap.asDF
+      .filter('Pipeline_SnapTS <= untilTime.asColumnTS)
+
+    val filteredDf = df
+          .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
+            "editWarehouse", "deleteEndpoint", "deleteWarehouse"))
+
+    deriveWarehouseBase(filteredDf)
+      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapUntilCurrent))
+  }
 }

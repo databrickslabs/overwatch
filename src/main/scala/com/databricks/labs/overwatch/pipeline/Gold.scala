@@ -31,7 +31,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkExecutionTarget,
       GoldTargets.sparkStreamTarget,
       GoldTargets.sparkExecutorTarget,
-      GoldTargets.sqlQueryHistoryTarget
+      GoldTargets.sqlQueryHistoryTarget,
+      GoldTargets.warehouseTarget
     )
   }
 
@@ -66,7 +67,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         )
       }
       case OverwatchScope.dbsql => {
-        Array(sqlQueryHistoryModule)
+        Array(sqlQueryHistoryModule,
+          warehouseModule)
       }
       case _ => Array[Module]()
     }
@@ -286,6 +288,15 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
+  lazy private[overwatch] val warehouseModule = Module(3018, "Gold_Warehouse", this, Array(2021))
+  lazy private val appendWarehouseProcess: () => ETLDefinition = {
+    () =>
+    ETLDefinition(
+      SilverTargets.warehousesSpecTarget.asIncrementalDF(warehouseModule, SilverTargets.warehousesSpecTarget.incrementalColumns),
+      Seq(buildWarehouse()),
+      append(GoldTargets.warehouseTarget)
+    )
+  }
   private def processSparkEvents(): Unit = {
 
     sparkExecutorModule.execute(appendSparkExecutorProcess)
@@ -302,6 +313,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
     GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
     GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
+    GoldTargets.warehouseViewTarget.publish(warehouseViewColumnMapping)
 
   }
 
@@ -340,7 +352,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case OverwatchScope.dbsql => {
         sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
+        warehouseModule.execute(appendWarehouseProcess)
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
+        GoldTargets.warehouseViewTarget.publish(warehouseViewColumnMapping)
       }
       case OverwatchScope.sparkEvents => {
         processSparkEvents()
@@ -396,6 +410,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case OverwatchScope.dbsql => {
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.warehouseViewTarget.publish(warehouseViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case _ =>
     }
