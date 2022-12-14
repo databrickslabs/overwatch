@@ -180,7 +180,7 @@ view, try the following code snipped to try and repair it.
 import com.databricks.labs.overwatch.pipeline.Gold
 import com.databricks.labs.overwatch.utils.Helpers
 
-val myETLDB = "overwatch_etl" // CHANGE ME
+val myConsumerDB = "overwatch" // CHANGE ME
 val nameOfMisbehavingView = "jobrun" // CHANGE ME
 
 spark.sql(s"drop view ${myETLDB}.${nameOfMisbehavingView}")
