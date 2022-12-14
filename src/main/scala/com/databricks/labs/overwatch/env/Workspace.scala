@@ -222,8 +222,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * @return Seq[WorkspaceMetastoreRegistrationReport]
    */
   def addToMetastore(): Seq[WorkspaceMetastoreRegistrationReport] = {
+
     require(Helpers.pathExists(config.etlDataPathPrefix), s"This function can only register the Overwatch data tables " +
       s"to the Data Target configured in Overwatch. The location ${config.etlDataPathPrefix} does not exist.")
+
     val datasets = getWorkspaceDatasets.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(getDriverCores * 2))
     datasets.tasksupport = taskSupport
@@ -231,6 +233,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val addReport = datasets.map(dataset => {
       val fullTableName = s"${config.databaseName}.${dataset.name}"
       val stmt = s"CREATE TABLE $fullTableName USING DELTA LOCATION '${dataset.path}'"
+      println(s"the stmt in workspace.scala is ${stmt}")
       logger.log(Level.INFO, stmt)
       try {
         if (spark.catalog.tableExists(fullTableName)) throw new BadConfigException(s"TABLE EXISTS: SKIPPING")

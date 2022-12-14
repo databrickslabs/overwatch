@@ -16,6 +16,7 @@ case class PipelineView(name: String,
     if (dataSource.exists) {
       val pubStatementSB = new StringBuilder("create or replace view ")
       pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
+      println(s"pubStatementSB in pipelineview is ${pubStatementSB}")
 
       // link partition columns
       if (dataSource.partitionBy.nonEmpty) {
