@@ -28,4 +28,10 @@ multiWorkspaceDeployment.deploy(2,"Bronze,Silver,Gold")
 //     multiWorkspaceDeployment.deploy(2,"Silver")
 //     multiWorkspaceDeployment.deploy(2,"Gold")
 ```
-
+### Validating the deployment
+The deployment report will be generated in /<etl_storage_prefix>/report/deploymentReport as delta table.
+Run the below query to check the deployment report.
+```roomsql
+%sql
+select * from delta.`/<etl_storage_prefix>/report/deploymentReport`
+```
