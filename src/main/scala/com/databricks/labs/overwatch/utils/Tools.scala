@@ -666,7 +666,7 @@ object Helpers extends SparkSessionWrapper {
     }
 
     // Derive Remote Workspace
-    val remoteWorkspace = Helpers.getRemoteWorkspaceByPath(pipReportPath,remoteWorkspaceID)
+    val remoteWorkspace = Helpers.getRemoteWorkspaceByPath(pipReportPath,successfulOnly= true,remoteWorkspaceID)
 
     val remoteConfig = remoteWorkspace.getConfig
     val etlDatabaseNameToCreate = if (localETLDatabaseName == "" & !usingExternalMetastore)  {remoteConfig.databaseName} else {localETLDatabaseName}
