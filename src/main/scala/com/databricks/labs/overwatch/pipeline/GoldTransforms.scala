@@ -796,7 +796,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       |job_trigger_type, task_type, created_by, last_edited_by, running_days, avg_cluster_share,
       |avg_overlapping_runs, max_overlapping_runs, run_cluster_states, worker_potential_core_H, driver_compute_cost,
       |driver_dbu_cost, worker_compute_cost, worker_dbu_cost, total_driver_cost, total_worker_cost,
-      |total_compute_cost, total_dbu_cost, total_cost, spark_task_runtimeMS, spark_task_runtime_H,
+      |total_compute_cost, total_dbu_cost, total_cost, total_dbus, spark_task_runtimeMS, spark_task_runtime_H,
       |job_run_cluster_util
       |""".stripMargin
 

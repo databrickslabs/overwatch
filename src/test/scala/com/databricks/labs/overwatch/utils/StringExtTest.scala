@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.utils.StringExt.StringHelpers
 import org.scalatest.funspec.AnyFunSpec
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
 
-class StringExtTest extends AnyFunSpec with SparkSessionTestWrapper {
+class StringExtTest extends AnyFunSpec {
 
   describe("StringHelpers Test") {
     it("Simple String Test No Special Characters") {
