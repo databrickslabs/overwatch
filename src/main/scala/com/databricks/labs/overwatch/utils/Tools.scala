@@ -604,10 +604,17 @@ object Helpers extends SparkSessionWrapper {
    * Get the remote workspace using 'getRemoteWorkspaceByPath' function, build a localDataTarget to define the local
    * etl and consumer database details
    *
-   * @param remoteWorkspace remote workspace can be retrieved through getRemoteWorkspaceByPath
-   * @param localDataTarget DataTarget defined for local database names and locations
-   *                        the etlStoragePrefix must point to the existing Overwatch dataset whether it's mounted
-   *                        or direct access via s3:// or abfss:// or dbfs:/mnt/ etc.
+   * @param remoteStoragePrefix remote storage prefix for the remote workspace where overwatch has been deployed
+   * @param remoteWorkspaceID   workSpaceID for the remoteworkspace which will be used in getRemoteWorkspaceByPath
+   * @param localETLDatabaseName ETLDatabaseName that user want to override. If not provided then etlDatabase name
+   *                             from the remoteWorkspace would be used as etlDatabase for current workspace
+   * @param localConsumerDatabaseName ConsumerDatabase that user want to override. If not provided then ConsumerDatabase name
+   *                             from the remoteWorkspace would be used as ConsumerDatabase for current workspace
+   * @param remoteETLDataPathPrefixOverride Param to override StoragePrefix. If not provided then remoteStoragePrefix+"/global_share"
+   *                                        would be used as StoragePrefix
+   * @param usingExternalMetastore If user using any ExternalMetastore.
+   * @param workspacesAllowed  If we want to fill the data for a specific workSpaceID. In that case only ConsumerDB would be
+   *                           visible to the customer
    * @return
    */
   def registerRemoteOverwatchIntoLocalMetastore(
