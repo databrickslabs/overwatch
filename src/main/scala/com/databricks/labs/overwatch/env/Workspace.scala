@@ -238,20 +238,12 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         if (spark.catalog.tableExists(fullTableName)) throw new BadConfigException(s"TABLE EXISTS: SKIPPING")
         if (dataset.name == "tempworkingdir") throw new UnsupportedTypeException(s"Can not Create table using '${dataset.path}'")
         else {
+          spark.sql(stmt)
           if (workspacesAllowed.nonEmpty){
-            try {
-              println(s"Drop Database ${config.databaseName}")
-              spark.sql(s"Drop Database ${config.databaseName}")
-            }catch{
-              case e: Throwable =>
-                val msg = s"ETL Database Deleted: ${e.getMessage}"
-                logger.log(Level.ERROR, msg)
-            }
-
-          }else{
-            spark.sql(stmt)
+            if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"Drop Database ${config.databaseName}")
           }
         }
+
         WorkspaceMetastoreRegistrationReport(dataset, stmt, "SUCCESS")
 
       } catch {
@@ -265,8 +257,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           WorkspaceMetastoreRegistrationReport(dataset, stmt, msg)
       }
     }).toArray.toSeq
-
-    spark.sql(s"refresh ${config.databaseName}")
+    if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"refresh ${config.databaseName}")
     addReport
   }
 
