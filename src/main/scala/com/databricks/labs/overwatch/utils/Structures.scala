@@ -54,11 +54,11 @@ case class ApiEnv(
 
 
 case class ApiEnvConfig(
-                         successBatchSize: Option[Int] = Some(200),
-                         errorBatchSize: Option[Int] = Some(500),
-                         enableUnsafeSSL: Option[Boolean] = Some(false),
-                         threadPoolSize: Option[Int] = Some(4),
-                         apiWaitingTime: Option[Long] = Some(300000),
+                         successBatchSize: Int = 200,
+                         errorBatchSize: Int = 500,
+                         enableUnsafeSSL: Boolean = false,
+                         threadPoolSize: Int = 4,
+                         apiWaitingTime: Long = 300000,
                          apiProxyConfig: Option[ApiProxyConfig] = None
                        )
 
