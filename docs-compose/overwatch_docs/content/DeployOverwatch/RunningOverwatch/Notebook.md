@@ -21,12 +21,16 @@ val multiWorkspaceDeployment = com.databricks.labs.overwatch.MultiWorkspaceDeplo
 
 ### Step-3: Run the deployment
 ```scala
-multiWorkspaceDeployment.deploy(2,"Bronze,Silver,Gold")
-//Args(0) is the number of threads it will be using to perform deployment.
-//Args(1) is the Zone for which the deployment will be performed, if you want to perform deployment for a particular zone then it also can be given as
-// ex: multiWorkspaceDeployment.deploy(2,"Bronze")
+multiWorkspaceDeployment.deploy()//To deploy Bronze,Silver and Gold with 4 parallel threads
+
+//deploy() method can take 2 argument
+//Args(0) is the number of threads it will be using to perform deployment.(Default is 4)
+//Args(1) is the pipeline for which the deployment will be performed, if you want to perform deployment for a particular pipeline then it also can be given as
+// ex: multiWorkspaceDeployment.deploy(2,"Bronze") 
 //     multiWorkspaceDeployment.deploy(2,"Silver")
 //     multiWorkspaceDeployment.deploy(2,"Gold")
+//     multiWorkspaceDeployment.deploy(2,"Bronze,Silver")
+//     multiWorkspaceDeployment.deploy(2,"Silver,Gold")
 ```
 ### Checking the Status of the deployment
 The deployment report will be generated in /<etl_storage_prefix>/report/deploymentReport as delta table.
