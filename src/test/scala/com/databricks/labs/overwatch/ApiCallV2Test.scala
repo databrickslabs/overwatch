@@ -50,6 +50,11 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       ApiCallV2(apiEnv, endPoint, query, 2.1).execute().asDF()
     }
 
+    it("Consume data from dbfs/search-mounts API") {
+      val endPoint = "dbfs/search-mounts"
+      ApiCallV2(apiEnv, endPoint).execute().asDF()
+    }
+
     it("Consume data from clusters/list API") {
       val endPoint = "clusters/list"
       assert(ApiCallV2(apiEnv, endPoint).execute().asDF() != null)

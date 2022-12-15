@@ -165,7 +165,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         sparkEventLogsModule.daysToProcess,
         BronzeTargets.auditLogsTarget.asIncrementalDF(sparkEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, 30),
         BronzeTargets.clustersSnapshotTarget,
-        sparkLogClusterScaleCoefficient
+        sparkLogClusterScaleCoefficient,
+        config.apiEnv,
+        config.isMultiworkspaceDeployment
       ),
       generateEventLogsDF(
         database,
@@ -173,7 +175,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.processedEventLogs,
         config.organizationId,
         config.runID,
-        pipelineSnapTime
+        pipelineSnapTime,
+        sparkEventLogsModule.daysToProcess
       ) //,
     ),
     append(BronzeTargets.sparkEventLogsTarget) // Not new data only -- date filters handled in function logic
@@ -181,17 +184,17 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
-    val isFirstAuditRun = !BronzeTargets.auditLogsTarget.exists(dataValidation = true)
+
     val rawAzureAuditEvents = landAzureAuditLogDF(
       BronzeTargets.auditLogAzureLandRaw,
       config.auditLogConfig.azureAuditLogEventhubConfig.get,
       config.etlDataPathPrefix, config.databaseLocation, config.consumerDatabaseLocation,
-      isFirstAuditRun,
+      auditLogsModule.isFirstRun,
       config.organizationId,
       config.runID
     )
 
-    database.write(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
+    database.writeWithRetry(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)
 
     val rawProcessCompleteMsg = "Azure audit ingest process complete"
     if (config.debugFlag) println(rawProcessCompleteMsg)
@@ -200,7 +203,11 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   private def executeModules(): Unit = {
     config.overwatchScope.foreach {
-      case OverwatchScope.audit => auditLogsModule.execute(appendAuditLogsProcess)
+      case OverwatchScope.audit =>
+        if (config.cloudProvider == "azure") {
+          landAzureAuditEvents()
+        }
+        auditLogsModule.execute(appendAuditLogsProcess)
       case OverwatchScope.clusters => clustersSnapshotModule.execute(appendClustersAPIProcess)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
@@ -221,10 +228,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     restoreSparkConf()
 
     if (config.debugFlag) println(s"DEBUG: CLOUD PROVIDER = ${config.cloudProvider}")
-
-    if (config.cloudProvider == "azure") {
-      landAzureAuditEvents()
-    }
 
     executeModules()
     initiatePostProcessing()

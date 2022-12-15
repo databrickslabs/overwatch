@@ -107,7 +107,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                              orgId: String
                            ): Unit = {
     if (!errorsDF.isEmpty) {
-      database.write(
+      database.writeWithRetry(
         errorsDF.withColumn("organization_id", lit(orgId)),
         errorsTarget,
         pipelineSnapTS.asColumnTS
@@ -178,7 +178,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
 
       if (exists && isFirstRun) { // Path cannot already exist on first run
-        val errMsg = s"$baseErrMsg\nPATH: ${p} is not empty. First run requires empty checkpoints."
+        val errMsg = s"$baseErrMsg\nPATH: ${p} is not empty. First run requires empty checkpoints. exists:${exists}, isFirstRun:${isFirstRun}"
         logger.log(Level.ERROR, errMsg)
         println(errMsg)
         throw new BadConfigException(errMsg)
@@ -554,17 +554,23 @@ trait BronzeTransforms extends SparkSessionWrapper {
             spark.read.json(tmpClusterEventsSuccessPath)
               .select(explode('events).alias("events"))
               .select(col("events.*"))
-          )
+          ).scrubSchema
+
           val changeInventory = Map[String, Column](
             "details.attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.attributes.custom_tags"),
             "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
+            "details.attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.azure_attributes"),
+            "details.attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.aws_attributes"),
             "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
             "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
             "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
+            "details.previous_attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.azure_attributes"),
+            "details.previous_attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.aws_attributes"),
             "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
           )
 
-          val clusterEventsDF = SchemaScrubber.scrubSchema(tdf.select(SchemaTools.modifyStruct(tdf.schema, changeInventory): _*))
+          val clusterEventsDF = tdf
+            .modifyStruct(changeInventory)
             .withColumn("organization_id", lit(organizationId))
 
           val clusterEventsCaptured = clusterEventsDF.count
@@ -627,7 +633,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       )
       logger.log(Level.INFO, "Persist error completed")
     }
+    spark.conf.set("spark.sql.caseSensitive", "true")
     val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
+    spark.conf.set("spark.sql.caseSensitive", "false")
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
     clusterEventDf
@@ -638,13 +646,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       newFiles: DataFrame,
                                       trackerTarget: PipelineTable,
                                       orgId: String,
-                                      pipelineSnapTime: Column
+                                      pipelineSnapTime: Column,
+                                      daysToProcess: Int
                                      ): Unit = {
     val fileTrackerDF = newFiles
       .withColumn("failed", lit(false))
       .withColumn("organization_id", lit(orgId))
     //      .coalesce(4) // narrow, short table -- each append will == spark event log files processed
-    database.write(fileTrackerDF, trackerTarget, pipelineSnapTime)
+    database.writeWithRetry(fileTrackerDF, trackerTarget, pipelineSnapTime, Array(), Some(daysToProcess))
   }
 
   /**
@@ -710,7 +719,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                           processedLogFilesTracker: PipelineTable,
                           organizationId: String,
                           runID: String,
-                          pipelineSnapTime: TimeTypes
+                          pipelineSnapTime: TimeTypes,
+                          daysToProcess: Int
                          )(eventLogsDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Searching for Event logs")
@@ -739,7 +749,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           logger.log(Level.INFO, "Updating Tracker with new files")
           // appends all newly scanned files including files that were scanned but not loaded due to OutOfTime window
           // and/or failed during lookup -- these are kept for tracking
-          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime.asColumnTS)
+          appendNewFilesToTracker(database, validNewFilesWMetaDF, processedLogFilesTracker, organizationId, pipelineSnapTime.asColumnTS,daysToProcess)
         } catch {
           case e: Throwable => {
             val appendTrackerErrorMsg = s"Append to Event Log File Tracker Failed. Event Log files glob included files " +
@@ -885,13 +895,53 @@ trait BronzeTransforms extends SparkSessionWrapper {
     }
   }
 
+
+  private[overwatch] def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
+    val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
+      .withColumn("source", when('source.endsWith("/"), 'source.substr(lit(0), length('source) - 1)).otherwise('source))
+      .filter(col("mount_point") =!= "/")
+
+    //Cleaning the data for cluster log path
+    val formattedInputDf = inputDataframe.withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
+      .withColumn("cluster_mount_point_temp", regexp_replace('cluster_log_conf, "dbfs:", ""))
+      .withColumn("cluster_mount_point", 'cluster_mount_point_temp)
+//      .withColumn("cluster_mount_point", regexp_replace('cluster_mount_point_temp, "//", "/"))
+
+
+    //Joining the cluster log data with mount point data
+    val joinDF = formattedInputDf
+      .join(mountMap, formattedInputDf.col("cluster_mount_point").startsWith(mountMap.col("mount_point")), "left") //starts with then when
+
+    val clusterMountPointAr = split('cluster_mount_point, "/")
+    val mountPointAr = split('mount_point, "/")
+    val hasSubFolders = size(clusterMountPointAr) > size(mountPointAr)
+    val buildSubfolderSources = concat_ws("/", 'source, array_join(array_except(split('cluster_mount_point, "/"), split('mount_point, "/")), "/"))
+
+    //Generating the final source path for mount points
+    val pathsDF = joinDF.withColumn("source_temp", when(hasSubFolders, buildSubfolderSources) otherwise ('source))
+      .withColumn("derivedSource", when('source.isNull, 'cluster_mount_point) otherwise ('source_temp))
+      .withColumn("topLevelTargets", array(col("derivedSource"), col("cluster_id"), lit("eventlog")))
+      .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
+
+    val result = pathsDF.select('wildPrefix, 'cluster_id)
+    result
+  }
+
+  private def getMountPointMapping(apiEnv: ApiEnv): DataFrame = {
+    val endPoint = "dbfs/search-mounts"
+    ApiCallV2(apiEnv, endPoint).execute().asDF()
+  }
+
+
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
                                       untilTime: TimeTypes,
                                       daysToProcess: Int,
                                       historicalAuditLookupDF: DataFrame,
                                       clusterSnapshotTable: PipelineTable,
-                                      sparkLogClusterScaleCoefficient: Double
+                                      sparkLogClusterScaleCoefficient: Double,
+                                      apiEnv: ApiEnv,
+                                      isMultiWorkSpaceDeployment: Boolean
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -934,13 +984,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
-    val allEventLogPrefixes = newLogDirsNotIdentifiedInAudit
-      .unionByName(incrementalClusterWLogging)
-      .withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
-      .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
-      .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
-      .select('wildPrefix)
-      .distinct()
+    val allEventLogPrefixes =
+    if(isMultiWorkSpaceDeployment) {
+      getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
+        .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
+     } else {
+      newLogDirsNotIdentifiedInAudit
+        .unionByName(incrementalClusterWLogging)
+        .withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)) .otherwise('cluster_log_conf))
+        .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
+        .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
+        .select('wildPrefix)
+        .distinct()
+    }
 
     // all files considered for ingest
     val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
@@ -961,7 +1017,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .repartition().cache()
 
     // eager execution to minimize secondary compute downstream
-    eventLogPaths.count()
+    logger.log(Level.INFO,s"""Count of log path: ${eventLogPaths.count()}""")
     eventLogPaths
 
   }
