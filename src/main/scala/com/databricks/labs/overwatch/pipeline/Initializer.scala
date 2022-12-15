@@ -263,6 +263,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
   }
 
 
+
   /**
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
@@ -291,19 +292,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      *
      * Otherwise -- read from the args passed in and serialize into OverwatchParams
      */
-    val rawParams = if (config.isLocalTesting) {
-      //      config.buildLocalOverwatchParams()
-      //      val synthArgs = config.buildLocalOverwatchParams()
-      //      mapper.readValue[OverwatchParams](synthArgs)
-      mapper.readValue[OverwatchParams](overwatchArgs)
-    } else {
-      logger.log(Level.INFO, "Validating Input Parameters")
-      mapper.readValue[OverwatchParams](overwatchArgs)
-    }
-
-    // Now that the input parameters have been parsed -- set them in the config
+    logger.log(Level.INFO, "Validating Input Parameters")
+    val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
     config.setInputConfig(rawParams)
-
 
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
@@ -315,7 +306,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
      * between one deployment and the next. To resolve this, PVC customers will be REQUIRED to provide a canonical
      * name for each workspace (i.e. workspaceName) to provide consistency across deployments.
      */
-    if (isPVC) pvcOverrideOrganizationId
+    if (isPVC && !config.isMultiworkspaceDeployment) pvcOverrideOrganizationId
 
     config.setExternalizeOptimize(rawParams.externalizeOptimize)
 
@@ -387,7 +378,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     )
 
     // must happen AFTER data target validation
-    if (!disableValidations && !config.isLocalTesting) { // temp working dir is not necessary for disabled validations as pipelines cannot be
+    if (!disableValidations) { // temp working dir is not necessary for disabled validations as pipelines cannot be
       // executed without validations
       prepAndSetTempWorkingDir(rawParams.tempWorkingDir, config.etlDataPathPrefix)
     }
@@ -572,13 +563,19 @@ object Initializer extends SparkSessionWrapper {
     } else dbutils.notebook.getContext.tags("orgId")
   }
 
-  private def initConfigState(debugFlag: Boolean): Config = {
+  private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-    val orgId = if (config.isLocalTesting) System.getenv("ORGID") else {
-      getOrgId
+    if(organizationID.isEmpty) {
+      config.setOrganizationId(getOrgId)
+    }else{
+      logger.log(Level.INFO, "Setting multiworkspace deployment")
+      config.setOrganizationId(organizationID.get)
+      if (apiUrl.nonEmpty) {
+        config.setApiUrl(apiUrl)
+      }
+      config.setIsMultiworkspaceDeployment(true)
     }
-    config.setOrganizationId(orgId)
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
@@ -641,10 +638,12 @@ object Initializer extends SparkSessionWrapper {
                                 debugFlag: Boolean = false,
                                 isSnap: Boolean = false,
                                 disableValidations: Boolean = false,
-                                initializeDatabase: Boolean = true
+                                initializeDatabase: Boolean = true,
+                                apiURL: Option[String] = None ,
+                                organizationID: Option[String] = None,
                               ): Workspace = {
 
-    val config = initConfigState(debugFlag)
+    val config = initConfigState(debugFlag,organizationID,apiURL)
 
     logger.log(Level.INFO, "Initializing Environment")
     val initializer = new Initializer(config)
