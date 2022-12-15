@@ -627,7 +627,7 @@ object Helpers extends SparkSessionWrapper {
                                                  remoteETLDataPathPrefixOverride: String = "",
                                                  usingExternalMetastore: Boolean = false,
                                                  workspacesAllowed: Array[String] = Array()
-                                               ): Seq[WorkspaceMetastoreRegistrationReport]  = {
+                                               ): Seq[WorkspaceMetastoreRegistrationReport] = {
 
     // Derive eltDatapathPrefix
     val eltDataPathPrefix = if (remoteETLDataPathPrefixOverride == "") {

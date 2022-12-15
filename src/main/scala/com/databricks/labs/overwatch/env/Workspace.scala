@@ -233,15 +233,23 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val addReport = datasets.map(dataset => {
       val fullTableName = s"${config.databaseName}.${dataset.name}"
       val stmt = s"CREATE TABLE $fullTableName USING DELTA LOCATION '${dataset.path}'"
-      println(s"the stmt in workspace.scala is ${stmt}")
       logger.log(Level.INFO, stmt)
       try {
         if (spark.catalog.tableExists(fullTableName)) throw new BadConfigException(s"TABLE EXISTS: SKIPPING")
-        if (dataset.name == "tempworkingdir") throw new UnsupportedTypeException(s"Cant Create table using '${dataset.path}'")
+        if (dataset.name == "tempworkingdir") throw new UnsupportedTypeException(s"Can not Create table using '${dataset.path}'")
         else {
-          spark.sql(stmt)
           if (workspacesAllowed.nonEmpty){
-            spark.sql(s"Drop Database ${config.databaseName}")
+            try {
+              println(s"Drop Database ${config.databaseName}")
+              spark.sql(s"Drop Database ${config.databaseName}")
+            }catch{
+              case e: Throwable =>
+                val msg = s"ETL Database Deleted: ${e.getMessage}"
+                logger.log(Level.ERROR, msg)
+            }
+
+          }else{
+            spark.sql(stmt)
           }
         }
         WorkspaceMetastoreRegistrationReport(dataset, stmt, "SUCCESS")
