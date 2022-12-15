@@ -235,7 +235,7 @@ object Schema extends SparkSessionWrapper {
     )), nullable = true),
     StructField("StageID", LongType, nullable = true),
     StructField("StageAttemptID", LongType, nullable = true),
-    StructField("ExecutorID", LongType, nullable = true),
+    StructField("ExecutorID", StringType, nullable = true),
     StructField("RemovedReason", StringType, nullable = true),
     StructField("executorInfo",
       StructType(Seq(
@@ -257,6 +257,28 @@ object Schema extends SparkSessionWrapper {
     StructField("TaskType", StringType, nullable = true),
     StructField("TaskEndReason",
       StructType(Seq(
+        StructField("AccumulatorUpdates", ArrayType(
+          StructType(Seq(
+            StructField("CountFailedValues",BooleanType, nullable = true),
+            StructField("ID",LongType, nullable = true),
+            StructField("Internal",BooleanType, nullable = true),
+            StructField("Update",StringType, nullable = true)
+          )), containsNull = true
+        )),
+        StructField("StackTrace", ArrayType(
+          StructType(Seq(
+            StructField("DeclaringClass",StringType, nullable = true),
+            StructField("FileName",StringType, nullable = true),
+            StructField("LineNumber",LongType, nullable = true),
+            StructField("MethodName",StringType, nullable = true)
+          )), containsNull = true
+        )),
+        StructField("BlockManagerAddress",
+          StructType(Seq(
+            StructField("ExecutorID",StringType, nullable = true),
+            StructField("Host",StringType, nullable = true),
+            StructField("Port",LongType, nullable = true)
+        )), nullable = true),
         StructField("ClassName", StringType, nullable = true),
         StructField("Description", StringType, nullable = true),
         StructField("FullStackTrace", StringType, nullable = true),
@@ -269,13 +291,13 @@ object Schema extends SparkSessionWrapper {
         StructField("Attempt", LongType, nullable = true),
         StructField("Host", StringType, nullable = true),
         StructField("LaunchTime", LongType, nullable = true),
-        StructField("ExecutorID", LongType, nullable = true),
+        StructField("ExecutorID", StringType, nullable = true),
         StructField("FinishTime", LongType, nullable = true),
         StructField("ParentIDs", StringType, nullable = true)
       )), nullable = true),
     StructField("StageInfo",
       StructType(Seq(
-        StructField("StageID", StringType, nullable = true),
+        StructField("StageID", LongType, nullable = true),
         StructField("SubmissionTime", LongType, nullable = true),
         StructField("StageAttemptID", LongType, nullable = true),
         StructField("CompletionTime", LongType, nullable = true),
