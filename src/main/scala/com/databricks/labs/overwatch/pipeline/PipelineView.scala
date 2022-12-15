@@ -12,11 +12,11 @@ case class PipelineView(name: String,
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
 
-  def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false): Unit = {
+  def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
     if (dataSource.exists) {
-      val pubStatementSB = new StringBuilder("create or replace view ")
-      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${dataSource.tableFullName} ")
-
+      val pubStatementSB = new StringBuilder("create table ")
+      val dataSourceName = dataSource.name.toLowerCase()
+      pubStatementSB.append(s"${config.consumerDatabaseName}.${name} as select ${colDefinition} from delta.`${config.etlDataPathPrefix}/${dataSourceName}`")
       // link partition columns
       if (dataSource.partitionBy.nonEmpty) {
         val partMap: Map[String, String] = if (partitionMapOverrides.isEmpty) {
@@ -24,11 +24,16 @@ case class PipelineView(name: String,
         } else {
           partitionMapOverrides
         }
-        pubStatementSB.append(s"where ${partMap.head._1} = ${dataSource.name}.${partMap.head._2} ")
+        print(s"partmap is ${partMap}")
+        pubStatementSB.append(s"where ${partMap.head._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${partMap.head._2} ")
         if (partMap.keys.toArray.length > 1) {
           partMap.tail.foreach(pCol => {
-            pubStatementSB.append(s"and ${pCol._1} = ${dataSource.name}.${pCol._2} ")
+            pubStatementSB.append(s"and ${pCol._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${pCol._2} ")
           })
+        }
+        if (workspacesAllowed.nonEmpty){
+          val workspacesAllowedString = workspacesAllowed.mkString("'", "','", "'")
+          pubStatementSB.append(s" and organization_id in (${workspacesAllowedString})")
         }
         if (sorted) {
           val orderDef = if (reverse) {

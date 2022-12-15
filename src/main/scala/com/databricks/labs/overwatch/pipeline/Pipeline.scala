@@ -299,6 +299,9 @@ class Pipeline(
     setPipelineSnapTime()
     if (pipelineState.nonEmpty && !_supressRangeReport) showRangeReport()
     this
+
+
+
   }
 
   def primordialTime: TimeTypes = primordialTime(None)

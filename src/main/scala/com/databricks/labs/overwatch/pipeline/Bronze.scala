@@ -217,10 +217,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
-  def refreshViews(): Unit = {
+  def refreshViews(workspacesAllowed: Array[String] = Array()): Unit = {
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
-    BronzeTargets.dbuCostDetailViewTarget.publish("*")
-    BronzeTargets.cloudMachineDetailViewTarget.publish("*")
+    BronzeTargets.dbuCostDetailViewTarget.publish("*",workspacesAllowed = workspacesAllowed)
+    BronzeTargets.cloudMachineDetailViewTarget.publish("*",workspacesAllowed = workspacesAllowed)
   }
 
   def run(): Pipeline = {
