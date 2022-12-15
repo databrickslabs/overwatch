@@ -580,35 +580,7 @@ object Helpers extends SparkSessionWrapper {
    *                           to this pipeline_report output
    * @return
    */
-//  def getRemoteWorkspaceByPath(pipelineReportPath: String, workspaceID: String): Workspace = {
-//    // handle non-nullable field between azure and aws
-//    val workspaceID = Initializer.getOrgId
-//
-//
-//    val addNewConfigs = Map(
-//      "auditLogConfig.azureAuditLogEventhubConfig" ->
-//        when($"auditLogConfig.rawAuditPath".isNotNull, lit(null))
-//          .otherwise($"auditLogConfig.azureAuditLogEventhubConfig")
-//          .alias("azureAuditLogEventhubConfig")
-//    )
-//
-//    // acquires the config for the workspaceId from the latest run
-//    val orgRunDetailsBase = spark.read.format("delta").load(pipelineReportPath)
-//      .filter('organization_id === workspaceID)
-//      .select('organization_id, 'Pipeline_SnapTS, 'inputConfig)
-//      .orderBy('Pipeline_SnapTS.desc)
-//      .select($"inputConfig.*")
-//
-//    // get latest workspace config by org_id
-//    val overwatchParams = orgRunDetailsBase
-//      .select(SchemaTools.modifyStruct(orgRunDetailsBase.schema, addNewConfigs): _*)
-//      .limit(1)
-//      .as[OverwatchParams]
-//      .first
-//
-//    val compactString = JsonUtils.objToJson(overwatchParams).compactString
-//    Initializer(compactString, disableValidations = true, initializeDatabase = false)
-//  }
+
   def getRemoteWorkspaceByPath(pipelineReportPath: String, successfulOnly: Boolean = true,workspaceID: String): Workspace = {
 
     //val workspaceID = Initializer.getOrgId
@@ -719,7 +691,7 @@ object Helpers extends SparkSessionWrapper {
     val newConfigParams = remoteWorkspace.getConfig.inputConfig.copy(dataTarget = Some(localDataTarget))
     val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
     val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
-    val registrationReport = localTempWorkspace.addToMetastore(workspacesAllowed)
+    val registrationReport = localTempWorkspace.addToMetastore()
     val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = false)
     val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = false)
 

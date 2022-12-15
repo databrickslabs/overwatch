@@ -19,21 +19,21 @@ case class PipelineView(name: String,
       pubStatementSB.append(s"${config.consumerDatabaseName}.${name} as select ${colDefinition} from delta.`${config.etlDataPathPrefix}/${dataSourceName}`")
       // link partition columns
       if (dataSource.partitionBy.nonEmpty) {
-//        val partMap: Map[String, String] = if (partitionMapOverrides.isEmpty) {
-//          dataSource.partitionBy.map({ case (pCol) => (pCol, pCol) }).toMap
-//        } else {
-//          partitionMapOverrides
-//        }
-//        print(s"partmap is ${partMap}")
-//        pubStatementSB.append(s"where ${partMap.head._1} = ${dataSource.name}.${partMap.head._2} ")
-//        if (partMap.keys.toArray.length > 1) {
-//          partMap.tail.foreach(pCol => {
-//            pubStatementSB.append(s"and ${pCol._1} = ${dataSource.name}.${pCol._2} ")
-//          })
-//        }
+        val partMap: Map[String, String] = if (partitionMapOverrides.isEmpty) {
+          dataSource.partitionBy.map({ case (pCol) => (pCol, pCol) }).toMap
+        } else {
+          partitionMapOverrides
+        }
+        print(s"partmap is ${partMap}")
+        pubStatementSB.append(s"where ${partMap.head._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${partMap.head._2} ")
+        if (partMap.keys.toArray.length > 1) {
+          partMap.tail.foreach(pCol => {
+            pubStatementSB.append(s"and ${pCol._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${pCol._2} ")
+          })
+        }
         if (workspacesAllowed.nonEmpty){
           val workspacesAllowedString = workspacesAllowed.mkString("'", "','", "'")
-          pubStatementSB.append(s" where organization_id in (${workspacesAllowedString})")
+          pubStatementSB.append(s" and organization_id in (${workspacesAllowedString})")
         }
         if (sorted) {
           val orderDef = if (reverse) {

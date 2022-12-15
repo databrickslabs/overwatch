@@ -354,7 +354,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    *
    * @return Seq[WorkspaceMetastoreRegistrationReport]
    */
-  def addToMetastore(workspacesAllowed: Array[String] = Array()): Seq[WorkspaceMetastoreRegistrationReport] = {
+  def addToMetastore(): Seq[WorkspaceMetastoreRegistrationReport] = {
 
     require(Helpers.pathExists(config.etlDataPathPrefix), s"This function can only register the Overwatch data tables " +
       s"to the Data Target configured in Overwatch. The location ${config.etlDataPathPrefix} does not exist.")
@@ -372,9 +372,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         if (dataset.name == "tempworkingdir") throw new UnsupportedTypeException(s"Can not Create table using '${dataset.path}'")
         else {
           spark.sql(stmt)
-          if (workspacesAllowed.nonEmpty){
-            if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"Drop Database ${config.databaseName} cascade")
-          }
+//          if (workspacesAllowed.nonEmpty){
+//            if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"Drop Database ${config.databaseName} cascade")
+//          }
         }
 
         WorkspaceMetastoreRegistrationReport(dataset, stmt, "SUCCESS")
