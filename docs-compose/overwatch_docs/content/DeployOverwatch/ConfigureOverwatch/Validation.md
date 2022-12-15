@@ -6,16 +6,27 @@ weight: 4
 ## This section will walk you through the steps necessary to validate the Config.csv.
 ### What is validation
 The config csv should be validated before performing the deployment.Below are some validations that will be perform in this process
-* Validate API URL should.
-* Validate secret Scope.
-* Validate Event Hub connection(Azure).
-* Validate S3 Audit log location(AWS).
-* Validate number of mount points. Mount point numbers in a workspace should not exceed 50(Azure).
-* Validate read/write access.
-* Validate primordial date.
-* Validate max date.
-* Validate ETL storage prefix(It should be common for all the workspaces)
-* Validate consumer/etl database name(It should be common for all the workspaces)
+
+### Validation rules
+
+Name | Validation Rule | Impacted columns
+:------|:----------------|:--------------------------
+Api Url Validation| API URL should give some response with provided scope and key. |api_url
+Primordial data validation|Primordial Date should in yyyy-MM-dd format(Ex:2022-01-30) and should be less than current date.|primordial_date
+Excluded scope validation|Excluded scope can be audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts:dbsql.|excluded_scopes
+Consuming data from event hub(Azure)| Consuming data from event hub with provided ehName,scope and eh_key.|eh_name,eh_scope_key,secret_scope
+Common consumer database name|Workspaces should have a common consumer database name.|consumer_database_name
+Common ETL database name|Workspaces should have a common ETL database name.|etl_database_name
+ETL storage prefix validation|ETL storage prefix should be common for all the workspaces and should have read,write and create access.|etl_storage_prefix
+Cloud provider validation|Cloud provider should be either Azure or AWS.|cloud
+Max days validation|Max days should be a number.|max_days
+Secrete scope validation|Secrete scope schold not be empty.|secret_scope
+PAT key validation| Dbpat should not be empty.|secret_key_dbpat
+Audit log location validation(AWS)|Audit log should be present with read permission.|auditlogprefix_source_aws
+Mount point validation|Each workspace should not have more than 50 mount points.|
+
+
+
 
 ### Perform the below steps to validate the Config.csv
 #### Step-1: Provide config.csv path
