@@ -1,9 +1,8 @@
 // Databricks notebook source
-import com.databricks.labs.overwatch.pipeline.{Initializer, Bronze, Silver, Gold}
+import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.pipeline.TransformFunctions
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
 
 // COMMAND ----------
 
