@@ -701,11 +701,14 @@ object Helpers extends SparkSessionWrapper {
     val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
     val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
     val registrationReport = localTempWorkspace.addToMetastore(workspacesAllowed)
-    val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
-    val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
+    val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = false)
+    val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = false)
 
     b.refreshViews(workspacesAllowed)
     g.refreshViews(workspacesAllowed)
+    if (workspacesAllowed.nonEmpty){
+      if (spark.catalog.databaseExists(etlDatabaseNameToCreate)) spark.sql(s"Drop Database ${etlDatabaseNameToCreate} cascade")
+    }
     registrationReport
   }
 

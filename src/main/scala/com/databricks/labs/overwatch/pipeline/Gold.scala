@@ -376,6 +376,7 @@ object Gold {
                                 readOnly: Boolean = false,
                                 suppressReport: Boolean = false,
                                 suppressStaticDatasets: Boolean = false
+
                               ): Gold = {
     val goldPipeline = new Gold(workspace, workspace.database, workspace.getConfig)
       .setReadOnly(if (workspace.isValidated) readOnly else true) // if workspace is not validated set it read only

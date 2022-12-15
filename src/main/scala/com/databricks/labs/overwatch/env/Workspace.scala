@@ -240,7 +240,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         else {
           spark.sql(stmt)
           if (workspacesAllowed.nonEmpty){
-            if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"Drop Database ${config.databaseName}")
+            if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"Drop Database ${config.databaseName} cascade")
           }
         }
 
