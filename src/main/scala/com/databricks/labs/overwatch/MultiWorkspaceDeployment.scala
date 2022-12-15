@@ -355,7 +355,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    * @param parallelism the number of threads which will run in parallel to perform the deployment
    * @param zones       the zone can be Bronze,Silver or Gold by default it will be Bronze
    */
-  def deploy(parallelism: Int = 4, zones: String = "Bronze"): Unit = {
+  def deploy(parallelism: Int = 4, zones: String = "Bronze,Silver,Gold"): Unit = {
     val processingStartTime = System.currentTimeMillis();
     println("ParallelismLevel :" + parallelism)
 
