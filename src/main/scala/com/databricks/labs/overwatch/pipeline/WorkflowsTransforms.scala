@@ -1304,6 +1304,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       'driver_dbu_cost,
       'worker_dbu_cost,
       'total_compute_cost,
+      'total_DBUs,
       'total_DBU_cost,
       'total_driver_cost,
       'total_worker_cost,
@@ -1377,6 +1378,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'organization_id, 'run_id, 'cluster_id, 'run_state_start_epochMS, 'run_state_end_epochMS,
         'unixTimeMS_state_start, 'unixTimeMS_state_end
       )
+      .repartition()
+      .cache()
+
+    simplifiedJobRunByClusterState.count() // eager cache as its used several times below
 
     // sum of run_state_times starting before ending during
     val runStateBeforeEndsDuring = simplifiedJobRunByClusterState.alias("obs")
@@ -1431,6 +1436,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
       .withColumn("overlapping_run_states", when('cluster_type === "interactive", 'overlapping_run_states).otherwise(lit(0)))
       .withColumn("running_days", sequence($"task_runtime.startTS".cast("date"), $"task_runtime.endTS".cast("date")))
+      .withColumn("total_dbus", 'total_dbus * 'state_utilization_percent * 'run_state_utilization)
       .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
       .withColumn("driver_dbu_cost", 'driver_dbu_cost * 'state_utilization_percent * 'run_state_utilization)
       .withColumn("worker_compute_cost", 'worker_compute_cost * 'state_utilization_percent * 'run_state_utilization)
@@ -1488,6 +1494,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         greatest(round(sum('total_driver_cost), 6), lit(0)).alias("total_driver_cost"),
         greatest(round(sum('total_worker_cost), 6), lit(0)).alias("total_worker_cost"),
         greatest(round(sum('total_compute_cost), 6), lit(0)).alias("total_compute_cost"),
+        greatest(round(sum('total_dbus), 6), lit(0)).alias("total_dbus"),
         greatest(round(sum('total_dbu_cost), 6), lit(0)).alias("total_dbu_cost"),
         greatest(round(sum('total_cost), 6), lit(0)).alias("total_cost")
       )

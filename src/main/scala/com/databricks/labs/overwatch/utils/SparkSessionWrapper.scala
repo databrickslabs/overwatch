@@ -29,7 +29,7 @@ trait SparkSessionWrapper extends Serializable {
   lazy val spark: SparkSession = if (System.getenv("OVERWATCH") != "LOCAL") {
     logger.log(Level.INFO, "Using Databricks SparkSession")
     SparkSession
-      .builder().appName("OverwatchBatch")
+      .builder().master("local").appName("OverwatchBatch")
       .getOrCreate()
   } else {
     logger.log(Level.INFO, "Using Custom, local SparkSession")
@@ -53,7 +53,11 @@ trait SparkSessionWrapper extends Serializable {
 
   def getNumberOfWorkerNodes: Int = sc.statusTracker.getExecutorInfos.length - 1
 
-  def getTotalCores: Int = getCoresPerWorker * getNumberOfWorkerNodes
+  def getTotalCores: Int = {
+    val totalWorkCores = getCoresPerWorker * getNumberOfWorkerNodes
+    // handle for single node clusters
+    if (totalWorkCores == 0) getDriverCores else totalWorkCores
+  }
 
   def getCoresPerTask: Int = {
     try {

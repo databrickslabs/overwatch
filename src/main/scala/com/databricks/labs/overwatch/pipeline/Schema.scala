@@ -235,7 +235,7 @@ object Schema extends SparkSessionWrapper {
     )), nullable = true),
     StructField("StageID", LongType, nullable = true),
     StructField("StageAttemptID", LongType, nullable = true),
-    StructField("ExecutorID", LongType, nullable = true),
+    StructField("ExecutorID", StringType, nullable = true),
     StructField("RemovedReason", StringType, nullable = true),
     StructField("executorInfo",
       StructType(Seq(
@@ -257,6 +257,28 @@ object Schema extends SparkSessionWrapper {
     StructField("TaskType", StringType, nullable = true),
     StructField("TaskEndReason",
       StructType(Seq(
+        StructField("AccumulatorUpdates", ArrayType(
+          StructType(Seq(
+            StructField("CountFailedValues",BooleanType, nullable = true),
+            StructField("ID",LongType, nullable = true),
+            StructField("Internal",BooleanType, nullable = true),
+            StructField("Update",StringType, nullable = true)
+          )), containsNull = true
+        )),
+        StructField("StackTrace", ArrayType(
+          StructType(Seq(
+            StructField("DeclaringClass",StringType, nullable = true),
+            StructField("FileName",StringType, nullable = true),
+            StructField("LineNumber",LongType, nullable = true),
+            StructField("MethodName",StringType, nullable = true)
+          )), containsNull = true
+        )),
+        StructField("BlockManagerAddress",
+          StructType(Seq(
+            StructField("ExecutorID",StringType, nullable = true),
+            StructField("Host",StringType, nullable = true),
+            StructField("Port",LongType, nullable = true)
+        )), nullable = true),
         StructField("ClassName", StringType, nullable = true),
         StructField("Description", StringType, nullable = true),
         StructField("FullStackTrace", StringType, nullable = true),
@@ -269,13 +291,13 @@ object Schema extends SparkSessionWrapper {
         StructField("Attempt", LongType, nullable = true),
         StructField("Host", StringType, nullable = true),
         StructField("LaunchTime", LongType, nullable = true),
-        StructField("ExecutorID", LongType, nullable = true),
+        StructField("ExecutorID", StringType, nullable = true),
         StructField("FinishTime", LongType, nullable = true),
         StructField("ParentIDs", StringType, nullable = true)
       )), nullable = true),
     StructField("StageInfo",
       StructType(Seq(
-        StructField("StageID", StringType, nullable = true),
+        StructField("StageID", LongType, nullable = true),
         StructField("SubmissionTime", LongType, nullable = true),
         StructField("StageAttemptID", LongType, nullable = true),
         StructField("CompletionTime", LongType, nullable = true),
@@ -1006,4 +1028,38 @@ object Schema extends SparkSessionWrapper {
   def get(module: Module): Option[StructType] = minimumSchemasByModule.get(module.moduleId)
 
   def get(moduleId: Int): Option[StructType] = minimumSchemasByModule.get(moduleId)
+
+  val deployementMinimumSchema:StructType = StructType(Seq(
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("workspace_id", StringType, nullable = true),
+    StructField("workspace_url", StringType, nullable = true),
+    StructField("api_url", StringType, nullable = true),
+    StructField("cloud", StringType, nullable = true),
+    StructField("primordial_date", DateType, nullable = true),
+    StructField("etl_storage_prefix", StringType, nullable = true),
+    StructField("etl_database_name", StringType, nullable = true),
+    StructField("consumer_database_name", StringType, nullable = true),
+    StructField("secret_scope", StringType, nullable = true),
+    StructField("secret_key_dbpat", StringType, nullable = true),
+    StructField("auditlogprefix_source_aws", StringType, nullable = true),
+    StructField("eh_name", StringType, nullable = true),
+    StructField("eh_scope_key", StringType, nullable = true),
+    StructField("interactive_dbu_price", DoubleType, nullable = true),
+    StructField("automated_dbu_price", DoubleType, nullable = true),
+    StructField("sql_compute_dbu_price", DoubleType, nullable = true),
+    StructField("jobs_light_dbu_price", DoubleType, nullable = true),
+    StructField("max_days", IntegerType, nullable = true),
+    StructField("excluded_scopes", StringType, nullable = true),
+    StructField("active", BooleanType, nullable = true),
+    StructField("proxy_host", StringType, nullable = true),
+    StructField("proxy_port", IntegerType, nullable = true),
+    StructField("proxy_user_name", StringType, nullable = true),
+    StructField("proxy_password_scope", StringType, nullable = true),
+    StructField("proxy_password_key", StringType, nullable = true),
+    StructField("success_batch_size", IntegerType, nullable = true),
+    StructField("error_batch_size", IntegerType, nullable = true),
+    StructField("enable_unsafe_SSL", BooleanType, nullable = true),
+    StructField("thread_pool_size", IntegerType, nullable = true),
+    StructField("api_waiting_time", LongType, nullable = true)
+  ))
 }
