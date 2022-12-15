@@ -29,7 +29,7 @@ trait SparkSessionWrapper extends Serializable {
   lazy val spark: SparkSession = if (System.getenv("OVERWATCH") != "LOCAL") {
     logger.log(Level.INFO, "Using Databricks SparkSession")
     SparkSession
-      .builder().appName("OverwatchBatch")
+      .builder().master("local").appName("OverwatchBatch")
       .getOrCreate()
   } else {
     logger.log(Level.INFO, "Using Custom, local SparkSession")
