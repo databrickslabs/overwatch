@@ -273,37 +273,35 @@ class Pipeline(
    */
   protected def initPipelineRun(): this.type = {
     logger.log(Level.INFO, "INIT: Pipeline Run")
-    if (spark.catalog.databaseExists(config.databaseName)) {
-      val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName)
-      val dbProperties = dbMeta.properties
-      val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
-      if (overwatchSchemaVersion != config.overwatchSchemaVersion && !readOnly) { // If schemas don't match and the pipeline is being written to
-        throw new BadConfigException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
-          s" version of Overwatch requires ${config.overwatchSchemaVersion}. Upgrade Overwatch Schema to proceed " +
-          s"or drop existing database and allow Overwatch to recreate.")
-      }
 
-      if (pipelineStateTarget.exists(dataValidation = true)) { // data must exist for this workspace or this is fresh start
-        val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
-        pipelineStateTarget.asDF
-          .filter('status === "SUCCESS" || 'status.startsWith("EMPTY"))
-          .withColumn("rnk", rank().over(w))
-          .withColumn("rn", row_number().over(w))
-          .filter('rnk === 1 && 'rn === 1)
-          .drop("inputConfig", "parsedConfig")
-          .as[SimplifiedModuleStatusReport]
-          .collect()
-          .foreach(updateModuleState)
-      } else {
-        Array[SimplifiedModuleStatusReport]()
-      }
-      setPipelineSnapTime()
-      if (pipelineState.nonEmpty && !_supressRangeReport) showRangeReport()
-      this
+    val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName)
+    val dbProperties = dbMeta.properties
+    val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
+    if (overwatchSchemaVersion != config.overwatchSchemaVersion && !readOnly) { // If schemas don't match and the pipeline is being written to
+      throw new BadConfigException(s"The overwatch DB Schema version is: $overwatchSchemaVersion but this" +
+        s" version of Overwatch requires ${config.overwatchSchemaVersion}. Upgrade Overwatch Schema to proceed " +
+        s"or drop existing database and allow Overwatch to recreate.")
     }
-    else{
-      this
+
+    if (pipelineStateTarget.exists(dataValidation = true)) { // data must exist for this workspace or this is fresh start
+      val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
+      pipelineStateTarget.asDF
+        .filter('status === "SUCCESS" || 'status.startsWith("EMPTY"))
+        .withColumn("rnk", rank().over(w))
+        .withColumn("rn", row_number().over(w))
+        .filter('rnk === 1 && 'rn === 1)
+        .drop("inputConfig", "parsedConfig")
+        .as[SimplifiedModuleStatusReport]
+        .collect()
+        .foreach(updateModuleState)
+    } else {
+      Array[SimplifiedModuleStatusReport]()
     }
+    setPipelineSnapTime()
+    if (pipelineState.nonEmpty && !_supressRangeReport) showRangeReport()
+    this
+
+
 
   }
 
