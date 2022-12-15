@@ -580,31 +580,50 @@ object Helpers extends SparkSessionWrapper {
    *                           to this pipeline_report output
    * @return
    */
-  def getRemoteWorkspaceByPath(pipelineReportPath: String, workspaceID: String): Workspace = {
-    // handle non-nullable field between azure and aws
-    val addNewConfigs = Map(
-      "auditLogConfig.azureAuditLogEventhubConfig" ->
-        when($"auditLogConfig.rawAuditPath".isNotNull, lit(null))
-          .otherwise($"auditLogConfig.azureAuditLogEventhubConfig")
-          .alias("azureAuditLogEventhubConfig")
-    )
+//  def getRemoteWorkspaceByPath(pipelineReportPath: String, workspaceID: String): Workspace = {
+//    // handle non-nullable field between azure and aws
+//    val workspaceID = Initializer.getOrgId
+//
+//
+//    val addNewConfigs = Map(
+//      "auditLogConfig.azureAuditLogEventhubConfig" ->
+//        when($"auditLogConfig.rawAuditPath".isNotNull, lit(null))
+//          .otherwise($"auditLogConfig.azureAuditLogEventhubConfig")
+//          .alias("azureAuditLogEventhubConfig")
+//    )
+//
+//    // acquires the config for the workspaceId from the latest run
+//    val orgRunDetailsBase = spark.read.format("delta").load(pipelineReportPath)
+//      .filter('organization_id === workspaceID)
+//      .select('organization_id, 'Pipeline_SnapTS, 'inputConfig)
+//      .orderBy('Pipeline_SnapTS.desc)
+//      .select($"inputConfig.*")
+//
+//    // get latest workspace config by org_id
+//    val overwatchParams = orgRunDetailsBase
+//      .select(SchemaTools.modifyStruct(orgRunDetailsBase.schema, addNewConfigs): _*)
+//      .limit(1)
+//      .as[OverwatchParams]
+//      .first
+//
+//    val compactString = JsonUtils.objToJson(overwatchParams).compactString
+//    Initializer(compactString, disableValidations = true, initializeDatabase = false)
+//  }
+  def getRemoteWorkspaceByPath(pipelineReportPath: String, successfulOnly: Boolean = true,workspaceID: String): Workspace = {
 
-    // acquires the config for the workspaceId from the latest run
-    val orgRunDetailsBase = spark.read.format("delta").load(pipelineReportPath)
+    //val workspaceID = Initializer.getOrgId
+
+  val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
+    val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
+    val testConfig = spark.read.format("delta").load(pipelineReportPath)
+      .filter(statusFilter)
+      .withColumn("rnk", rank().over(latestConfigByOrg))
+      .withColumn("rn", row_number().over(latestConfigByOrg))
+      .filter('rnk === 1 && 'rn === 1)
       .filter('organization_id === workspaceID)
-      .select('organization_id, 'Pipeline_SnapTS, 'inputConfig)
-      .orderBy('Pipeline_SnapTS.desc)
-      .select($"inputConfig.*")
-
-    // get latest workspace config by org_id
-    val overwatchParams = orgRunDetailsBase
-      .select(SchemaTools.modifyStruct(orgRunDetailsBase.schema, addNewConfigs): _*)
-      .limit(1)
-      .as[OverwatchParams]
-      .first
-
-    val compactString = JsonUtils.objToJson(overwatchParams).compactString
-    Initializer(compactString, disableValidations = true, initializeDatabase = false)
+      .select(to_json('inputConfig).alias("compactString"))
+      .as[String].first()
+    Initializer(testConfig, disableValidations = true, initializeDatabase = false)
   }
 
   /**
