@@ -3,51 +3,68 @@ title: "Configuration"
 date: 2022-12-12T11:35:40-05:00
 weight: 1
 ---
-## This section will walk you through the steps necessary to configure Overwatch.
+## Overwatch Deployment Configuration
 
 ### How it works
-Overwatch deployment is driven by a configuration file which will be in csv format. This csv file will contain all the necessary details to perform the deployment
+Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as 
+a csv format. This csv file will contain all the necessary details to perform the deployment. Since CSVs are a bit 
+cantankerous we've offered two different methods for building the configuration file. If you're good at VSCode or 
+similar text editor and want to edit the CSV directly feel free to do so.
 
-Please follow the below steps to create a config.csv.
-### Creating Config.csv file
+**IF YOU INTEND TO USE EXCEL** note that Excel may alter several pieces of the CSV; thus we recommend you **complete 
+all your edits in the .xlsx file** and then Save As a .csv extension. Before you upload the file spot-check the CSV 
+to ensure everything looks correct. Rest assured though, there are many 
+[validations]({{%relref "DeployOverwatch/ConfigureOverwatch/Validation.md"%}}) that will alert you if there are 
+any issues.
 
-Please use the template [advance_mws_config.csv](/assets/DeployOverwatch/mws_advance_config.csv).
+**IF YOU INTEND TO USE CSV** do not open or edit the CSV in Excel unless you're skilled with editing CSVs in Excel. 
+Excel may attempt to auto-format certain fields and can break the required format, especially workspace_id and date 
+fields.
+
+Regardless of the method you choose, **DO NOT DELETE FIELDS** you don't think you need. If the field doesn't pertain 
+to you just leave it blank to avoid any strange issues when parsing the CSV.
+
+### Building Your Config
+
+Please use the template **071x_overwatch_deployment_config_template** 
+([.XLSX](/assets/DeployOverwatch/071x_overwatch_deployment_config_template.xlsx) | 
+[.CSV](/assets/DeployOverwatch/071x_overwatch_deployment_config_template.csv))
+
+**To Download** Right-click the file type you want and click "Save link as..." or "Save target as..."
 
 ### Column description
+Below are the full details of each column in the config
 
 Column | Type    | IsRequired     | Description
 :------|:--------|:---------------|:----------------
 workspace_name| String  | True           |Name of the workspace.
 workspace_id| String  | True           |Id of the workspace.
 workspace_url| String  | True           |URL of the workspace.
-api_url| String  | True           |API URL for the Workspace (execute in scala dbutils.notebook.getContext().apiUrl.get to get the API URL for the workspace.NOTE: Workspace_URL and API_URL can be different for a workspace).
-cloud| String  | True           |Cloud provider( Azure or AWS).
-primordial_date| String  | True           |The date from which Overwatch will capture the details(The format should be yyyy-MM-dd ex:2022-05-20).
-etl_storage_prefix	| String  | True           |The location on which Overwatch will store the data.
-etl_database_name| String  | True           |The name of the ETL data base for Overwatch.
-consumer_database_name| String  | True           |The name of the Consumer database for Overwatch.
-secret_scope	| String  | True           |Secrate scope name(This should be created on the workspace on which Overwatch job will execute).
-secret_key_dbpat	| String  | True           | This will contain the PAT token of the workspace(The key should be present in the secret_scope).
-auditlogprefix_source_aws| String  | True for AWS   |Location of auditlog (Only for AWS).
-eh_name| String  | True for Azure | Event hub name (Only for Azure ,The event hub will contain the audit logs of the workspace)
-eh_scope_key	| String  | True for Azure           |Key to connect with event hub(Only for Azure ,this key should be present in the secret scope)
-interactive_dbu_price	| Double  | True           |Price of the interactive dbu.
-automated_dbu_price	| Double  | True           |Price of the automated dbu.
-sql_compute_dbu_price| Double  | True           |Price of the sql compute dbu.
-jobs_light_dbu_price	| Double  | True           | Price of the jobs light dbu.
-max_days| Integer | True           |Incase of very old primordial date the max_days will be used to batch the data(Recommendation: 30)
-excluded_scopes	| String  | False          |Scopes that should not be performed in the run for that workspace.You can choose between audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql(scopes should be separated by “:” .Note:Please don't fill this column if you want to run all the scopes)
-active| Boolean | True           |If active this config row will be considered for deployment.
+api_url| String  | True           |API URL for the Workspace (execute in scala `dbutils.notebook.getContext().apiUrl.get` **ON THE TARGET WORKSPACE NOT DEPLOYMENT WORKSPACE** to get the API URL for the workspace. NOTE: Workspace_URL and API_URL can be different for a workspace but may be the same even for multiple workspaces).
+cloud| String  | True           |Cloud provider (Azure or AWS).
+primordial_date| String  | True           |The date from which Overwatch will capture the details. The **format** should be **yyyy-MM-dd** ex: 2022-05-20 == May 20 2022
+etl_storage_prefix	| String  | True           |The location on which Overwatch will store the data. You can think of this as the Overwatch working directory. dbfs:/mnt/path/... or abfss://container@myStorageAccount.dfs.core.windows.net/... or s3://myBucket/...
+etl_database_name| String  | True           |The name of the ETL data base for Overwatch (i.e. overwatch_etl or custom)
+consumer_database_name| String  | True           |The name of the Consumer database for Overwatch. (i.e. overwatch or custom)
+secret_scope	| String  | True           |Name of the secret scope. This must be created on the workspace which the Overwatch job will execute.
+secret_key_dbpat	| String  | True           | This will contain the PAT token of the workspace. The key should be present in the secret_scope and should start with dapi.
+auditlogprefix_source_aws| String  | True (**AWS**)   |Location of auditlog (**AWS Only**). The contents under this directory must have the folders with the date partitions like date=2022-12-01
+eh_name| String  | True (**AZURE**) | Event hub name (**Azure Only**) The event hub will contain the audit logs of the workspace
+eh_scope_key	| String  | True (**AZURE**)           |(**Azure Only**) Key that holds the connection string to the Event Hub -- See [EH Configuration]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#step-2) for details
+interactive_dbu_price	| Double  | True           |Contract (or list) Price for interactive DBUs. The provided template has the list prices by default.
+automated_dbu_price	| Double  | True           |Contract (or list) Price for automated DBUs. The provided template has the list prices by default.
+sql_compute_dbu_price| Double  | True           |Contract (or list) Price for DBSQL DBUs. This should be the closest average price across your DBSQL Skus (classic / Pro / Serverless) for now. See [Custom Costs]({{%relref "DeployOverwatch/ConfigureOverwatch/CustomCosts.md"%}}) for more details. The provided template has the DBSQL Classic list prices by default.
+jobs_light_dbu_price	| Double  | True           |Contract (or list) Price for interactive DBUs. The provided template has the list prices by default.
+max_days| Integer | True           |This is the max incrementals days that will be loaded. Usually only relevant for historical loading and rebuilds. Recommendation == 30
+excluded_scopes	| String  | False          |[Scopes]({{%relref "DataEngineer/Modules.md"%}}/#scopes) that should not be excluded from the pipelines. Since this is a CSV, it's critical that these are **colon delimited**. Leave blank if you'd like to load all overwatch scopes.
+active| Boolean | True           |Whether or not the workspace should be validated / deployed.
 proxy_host	| String  | False          |Proxy url for the workspace.
 proxy_port	| String  | False          |Proxy port for the workspace
 proxy_user_name	| String  | False          |Proxy user name for the workspace.
 proxy_password_scope	| String  | False          |Scope which contains the proxy password key.
 proxy_password_key| String  | False          |Key which contains proxy password. 
-success_batch_size	| Integer | False          |Overwatch makes multiple api calls and stores the interim results to a temp location, success_batch_size indicates the  size of the buffer on filling of which the result will be written to a temp location.This is used to boost the performance.Default value:200.
-error_batch_size	| Integer | False          |Overwatch makes multiple api calls and stores the interim results to a temp location error_batch_size indicates the  size of the buffer which contains the error incase of the api call failure on filling of which the result will be written to a temp location.This is used to boost the performance.Default value:500.
-enable_unsafe_SSL	| Boolean | False          |Enables unsafe ssl.Default value:False.
-thread_pool_size	| Integer | False          |Overwatch makes multiple api calls in parallel thread_pool_size indicates the level of parallelism.Default value:4.
-api_waiting_time	| Long    | False          |Overwatch makes multiple async api calls in parallel api_waiting_time signifies the waiting time incase of no response received from the api call.Default value:300000.(5 minutes)
-
-
-Document [OverwatchMultiworkspaceUserGuide.docx](/assets/DeployOverwatch/mws_guide.docx) will explain all the column details present in  [advance_mws_config.csv](/assets/DeployOverwatch/mws_advance_config.csv).
+success_batch_size	| Integer | False          |API Tunable - Indicates the size of the buffer on filling of which the result will be written to a temp location. This is used to tune performance in certain circumstances. Leave default except for special circumstances. Default == 200
+error_batch_size	| Integer | False          |API Tunable - Indicates the size of the error writer buffer containing API call errors. This is used to tune performance in certain circumstances. Leave default except for special circumstances. Default == 500
+enable_unsafe_SSL	| Boolean | False          |API Tunable - Enables unsafe SSL. Default == False
+thread_pool_size	| Integer | False          |API Tunable - Max number of API calls Overwatch is allowed to make in parallel. Default == 4. Increase for faster bronze but if workspace is busy, risks API endpoint saturation. Overwatch will detect saturation and back-off when detected but for safety never go over 8 without testing.
+api_waiting_time	| Long    | False          |API Tunable - Overwatch makes async api calls in parallel, api_waiting_time signifies the max wait time in case of no response received from the api call. Default = 300000(5 minutes)

@@ -3,6 +3,14 @@ title: "Configuration (Legacy)"
 date: 2022-12-12T11:35:49-05:00
 ---
 
+{{% notice warning%}}
+**NEW CUSTOMERS** -- This is a legacy configuration, please use the 
+[new deployment model]({{%relref "DeployOverwatch"%}}).
+**EXISTING CUSTOMERS COMING FROM VERSION < 0.7.1.0** As of version 0.7.1.0 Overwatch will begin sunsetting
+this "legacy" deployment method and configuration. Please review the
+benefits of the new deployment method and plan to switch to this new deployment method by end of Q3 2023.
+{{% /notice %}}
+
 ## Configuration Basics
 The Overwatch configuration can be created as a case class of [OverwatchParams](#overwatchparams) or as a json string passed into
 the main class `com.databricks.labs.overwatch.BatchRunner`. When passed in as a json string, it is

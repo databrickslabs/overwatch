@@ -4,6 +4,14 @@ date: 2022-12-12T11:28:39-05:00
 weight: 2
 ---
 
+{{% notice warning%}}
+**EXISTING CUSTOMERS COMING FROM VERSION < 0.7.1.0** As of version 0.7.1.0 Overwatch will begin sunsetting
+the "legacy" deployment method and
+[configuration]({{%relref "DeployOverwatch/ConfigureOverwatch/ConfigurationLegacy.md"%}}). Please review the
+benefits of using the new deployment method and plan to switch to this new deployment method by end of Q3 2023.
+**New customers may disregard this notice.**
+{{% /notice %}}
+
 Overwatch is a pipeline that executes to aggregate and normalize all of the logs from all the supported sources and 
 make them easy to interrogate for insights. The steps to deploying Overwatch are pretty simple but there are some 
 specific details that may pertain to your deployment. Below are the top level steps that this section will walk you 

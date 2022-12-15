@@ -1,20 +1,30 @@
 ---
-title: "CustomCosts"
+title: "Custom Costs"
 date: 2022-12-13T14:35:00-05:00
 weight: 2
 ---
 
+## Fine-Tuning Your Costs
+Every customer has their own contracts and this means that the costs associated with cloud compute and DBUs may differ 
+between customers. To ensure the costs in Overwatch are as accurate as possible it's important that these costs are 
+configured as accurately as possible.
+
 ### Configuring Custom Costs
 There are three essential components to the cost function:
-* The node type (instanceDetails.Api_Name) and its associated contract price (instanceDetails.Compute_Contract_Price)
-* The node type (instanceDetails.Api_Name) and its associated DBUs per hour (instanceDetails.Hourly_DBUs)
+* The node type (instanceDetails.Api_Name) and its associated contract price (instanceDetails.Compute_Contract_Price) 
+  by Workspace
+* The node type (instanceDetails.Api_Name) and its associated DBUs per hour (instanceDetails.Hourly_DBUs). 
+  These should be accurate from the default load but Databricks may adjust their DBUs/Hour by node type. This is 
+  especially true when a node goes from beta to GA.
 * The DBU contract prices for the SKU under which your DBUs are charged such as:
     * Interactive
     * Automated
     * DatabricksSQL
         * Databricks currently has 3 SKUs (classic/pro/serverless) but Overwatch is not able to accurately report
-          on DBSQL pricing at this time due to data not available in the Databricks Product. When this data becomes
-          available, Overwatch will integrate it and enable DBSQL cost tracking.
+          on DBSQL pricing at this time due to data not available in the customer-facing Databricks Product. 
+          When this data becomes available, Overwatch will integrate it and enable DBSQL cost tracking. In the 
+          meantime Overwatch will does it's best to estimate DBSQL pricing so for this SKU just put your average 
+          $DBU cost or a close estimate to your sku price here.
     * JobsLight
 
 The DBU contract costs are captured from the

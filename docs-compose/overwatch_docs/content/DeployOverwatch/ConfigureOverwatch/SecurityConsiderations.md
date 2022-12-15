@@ -56,9 +56,39 @@ For more information on how to configure the separation of ETL and consumption d
 Additional steps can be taken to secure the storage location of the ETL entities as necessary. The method for
 securing access to these tables would be the same as with any set of tables in your organization.
 
+### Recommended Authorizations Approach
+* **For AWS** -- Create an IAM Role and provision it with the following authorizations and then enable an Instance 
+  Profile to utilize the IAM Role for the cluster
+  * read/write access to the [Overwatch Output Storage](#overwatch-target-location)
+  * read access to all locations where cluster logs are stored
+* **For Azure** -- Create an SPN and provision it with and then add the configuration [below](#azure-storage-auth-config) 
+  to authorize the cluster to use the SPN to access the storage locations.
+  * read/write access to the [Overwatch Output Storage](#overwatch-target-location)
+  * read access to all locations where cluster logs are stored
+
 ## Event Hub Access (AZURE ONLY)
 In Azure the audit logs must be acquired through an Event Hub stream. The details for configuring and provisioning 
 access are detailed in the 
 [Azure Cloud Infrastructure]({{%relref "DeployOverwatch/CloudInfra/Azure"%}}/#audit-log-delivery-via-event-hub) Section
 
+
+##### Azure Storage Auth Config 
+Fill out the following and add it to your cluster as a spark config. For more information please reference 
+the [Azure DOCS](https://learn.microsoft.com/en-us/azure/databricks/dbfs/mounts#--mount-adls-gen2-or-blob-storage-with-abfs)
+
+Note that there are two sets of configs, both are required as both spark on the executors and the driver must be 
+authorized to the storage.
+```
+fs.azure.account.auth.type OAuth
+fs.azure.account.oauth.provider.type org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider
+fs.azure.account.oauth2.client.id <application-id>
+fs.azure.account.oauth2.client.secret {{secrets/<SCOPE_NAME>/<KEY_NAME>}}
+fs.azure.account.oauth2.client.endpoint https://login.microsoftonline.com/<directory-id>/oauth2/token
+
+spark.hadoop.fs.azure.account.auth.type OAuth
+spark.hadoop.fs.azure.account.oauth.provider.type org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider
+spark.hadoop.fs.azure.account.oauth2.client.id <application-id>
+spark.hadoop.fs.azure.account.oauth2.client.secret {{secrets/<SCOPE_NAME>/<KEY_NAME>}}
+spark.hadoop.fs.azure.account.oauth2.client.endpoint https://login.microsoftonline.com/<directory-id>/oauth2/token
+```
 
