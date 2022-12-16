@@ -1,19 +1,17 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
-
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions.lit
 
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.util
-import java.util.{Collections, Date}
 import java.util.concurrent.Executors
+import java.util.{Collections, Date}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -175,7 +173,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   private def startBronzeDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
     try {
       println(s"""************Bronze Deployment Started workspaceID:${multiWorkspaceParams.workspaceId}  args:${multiWorkspaceParams.args}**********  """)
-      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = true,
+      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = false,
         apiURL = Some(multiWorkspaceParams.apiUrl),
         organizationID = Some(multiWorkspaceParams.workspaceId))
 
@@ -199,7 +197,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   private def startSilverDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
     try {
       println(s"""************Silver Deployment Started workspaceID:${multiWorkspaceParams.workspaceId} args:${multiWorkspaceParams.args} ************""")
-      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = true,
+      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = false,
         apiURL = Some(multiWorkspaceParams.apiUrl),
         organizationID = Some(multiWorkspaceParams.workspaceId))
 
@@ -223,7 +221,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   private def startGoldDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
     try {
       println(s"""************Gold Deployment Started workspaceID:${multiWorkspaceParams.workspaceId} args:${multiWorkspaceParams.args} ************"""")
-      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = true,
+      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = false,
         apiURL = Some(multiWorkspaceParams.apiUrl),
         organizationID = Some(multiWorkspaceParams.workspaceId))
 
