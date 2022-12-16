@@ -33,17 +33,17 @@ This function currently support below arguments:
   * If we want to populate the table for a specific workSpaceID. In that case only ConsumerDB would be visible to the user.
 
 Below is the snapshot for the function:
-![OverwatchSharing](/assets/OverwatchSharing.jpg)
+![OverwatchSharing](/images/_index/overwatchsharing.png)
 
 ### How it Works
 Below is the steps on how the above function work:
 * We have deployed Overwatch on one of our Workspace with WorkspaceID 2222170229861029 with the below params:
   
-![Runner](/assets/Runner.jpg)
+![Runner](/images/_index/Runner.png)
 
 * Now if we want to deploy the tables from this workspace to a new workspace with WorkspaceID 5206439413157315.
   * Run the below command
-![Function](/assets/Function.jpg)
+![Function](/images/_index/Function.png)
 
 * As we can see the tables are loaded in new workspace.
-![Tables](/assets/Tables.jpg)
+![Tables](/images/_index/Tables.png)
