@@ -23,3 +23,5 @@ Legacy deployment models can still executed on 0710+ but this deployment model w
 and you should consider switching to the new model as time permits.
 * [Running Overwatch as a Notebook (Legacy)]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy.md"%}})
 * [Running Overwatch as a JAR (Legacy)]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy.md"%}})
+
+## Migrating From Legacy Deployments

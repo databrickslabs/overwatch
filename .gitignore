@@ -21,3 +21,5 @@ project/target/
 \.terraform
 terraform.tfstate*
 \.terraform.lock.hcl
+\.metals
+.\vscode
