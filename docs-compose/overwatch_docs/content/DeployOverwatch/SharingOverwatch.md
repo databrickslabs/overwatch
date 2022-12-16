@@ -14,36 +14,36 @@ that must be run on the workspace that wants to consumer the Overwatch Data.
 ### Requirements
 
 The customer who want to access the data have to run the below function.
->>> registerRemoteOverwatchIntoLocalMetastore
+* registerRemoteOverwatchIntoLocalMetastore
 
 This function currently support below arguments:
-* remoteStoragePrefix (String)
-  * Remote storage prefix for the remote workspace where overwatch has been deployed
-* remoteWorkspaceID (String)
-  * workSpaceID for the remoteworkspace where overwatch has been deployed. This will be used in getRemoteWorkspaceByPath()
-* localETLDatabaseName (String) -- Default value "" 
-  * ETLDatabaseName that user want to override. If not provided then by default etlDatabase name from the remoteWorkspace would be used as same for current workspace
-* localConsumerDatabaseName (String) -- Default value "" 
-  * ConsumerDatabase that user want to override. If not provided then by default ConsumerDatabase name from the remoteWorkspace would be used as same for current workspace
-* remoteETLDataPathPrefixOverride (String) -- Default value ""
-  * Param to override StoragePrefix. If not provided then remoteStoragePrefix+"/global_share" would be used as StoragePrefix                                  
-* usingExternalMetastore (Boolean) -- Default value false 
-  * Used in case if user using any ExternalMetastore.
-* workspacesAllowed (Array[String]) -- Default value Array()
-  * If we want to populate the table for a specific workSpaceID. In that case only ConsumerDB would be visible to the user.
 
-Below is the snapshot for the function:
-![OverwatchSharing](/images/DeployOverwatch/overwatchsharing.png)
+Key | Type | Default Value | Description
+:--------------------------|:---|:----------|:----------|:--------|:--------------------------------------------------
+remoteStoragePrefix|String|NA|Remote storage prefix for the remote workspace where overwatch has been deployed
+remoteWorkspaceID|String|NA|workSpaceID for the remoteworkspace where overwatch has been deployed. This will be used in getRemoteWorkspaceByPath()
+localETLDatabaseName|String|""|ETLDatabaseName that user want to override. If not provided then by default etlDatabase name from the remoteWorkspace would be used as same for current workspace
+localConsumerDatabaseName|String|""|ConsumerDatabase that user want to override. If not provided then by default ConsumerDatabase name from the remoteWorkspace would be used as same for current workspace
+remoteETLDataPathPrefixOverride|String|""|Param to override StoragePrefix. If not provided then remoteStoragePrefix+"/global_share" would be used as StoragePrefix  
+usingExternalMetastore|Boolean|false|Used in case if user using any ExternalMetastore.
+workspacesAllowed|Array[String]|Array()|If we want to populate the table for a specific workSpaceID. In that case only ConsumerDB would be visible to the user.
+ 
 
 ### How it Works
 Below is the steps on how the above function work:
-* We have deployed Overwatch on one of our Workspace with WorkspaceID 2222170229861029 with the below params:
+* We have deployed Overwatch on one of our Workspace with WorkspaceID Workspace1 with the below params:
   
 ![Runner](/images/DeployOverwatch/Runner.png)
 
-* Now if we want to deploy the tables from this workspace to a new workspace with WorkspaceID 5206439413157315.
+* Now if we want to deploy the tables from this workspace to a new workspace with WorkspaceID Workspace2.
   * Run the below command
-![Function](/images/DeployOverwatch/Function.png)
+```scala
+Helpers.registerRemoteOverwatchIntoLocalMetastore(remoteStoragePrefix = "/mnt/overwatch_global/overwatch-5434",remoteWorkspaceID = "Workspace1",workspacesAllowed = Array())
+```
 
 * As we can see the tables are loaded in new workspace.
+```sql
+use overwatch_dev_5434;
+show tables;
+```
 ![Tables](/images/DeployOverwatch/Tables.png)
