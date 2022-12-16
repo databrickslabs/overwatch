@@ -72,7 +72,7 @@ access are detailed in the
 [Azure Cloud Infrastructure]({{%relref "DeployOverwatch/CloudInfra/Azure"%}}/#audit-log-delivery-via-event-hub) Section
 
 
-##### Azure Storage Auth Config 
+## Azure Storage Auth Config 
 Fill out the following and add it to your cluster as a spark config. For more information please reference 
 the [Azure DOCS](https://learn.microsoft.com/en-us/azure/databricks/dbfs/mounts#--mount-adls-gen2-or-blob-storage-with-abfs)
 

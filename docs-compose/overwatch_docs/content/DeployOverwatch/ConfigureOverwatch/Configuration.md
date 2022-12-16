@@ -11,7 +11,7 @@ a csv format. This csv file will contain all the necessary details to perform th
 cantankerous we've offered two different methods for building the configuration file. If you're good at VSCode or 
 similar text editor and want to edit the CSV directly feel free to do so.
 
-**IF YOU INTEND TO USE EXCEL** note that Excel may alter several pieces of the CSV; thus we recommend you **complete 
+**IF YOU INTEND TO USE EXCEL (RECOMMENDED)** note that Excel may alter several pieces of the CSV; thus we recommend you **complete 
 all your edits in the .xlsx file** and then Save As a .csv extension. Before you upload the file spot-check the CSV 
 to ensure everything looks correct. Rest assured though, there are many 
 [validations]({{%relref "DeployOverwatch/ConfigureOverwatch/Validation.md"%}}) that will alert you if there are 

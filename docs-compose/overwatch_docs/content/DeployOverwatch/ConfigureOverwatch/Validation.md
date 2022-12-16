@@ -78,6 +78,8 @@ and does not support pagination. Databricks is aware of this limitation and is w
 the meantime the dev team is looking for work-arounds and will publish updates as soon as a viable alternative can be 
 found.
 
+**If Using AWS And All Cluster Logs are going to s3:// direct paths**
+
 Currently, workspaces with more than 50 mount points must have a local Overwatch deployment due to this limitation. 
 Deactivate / Remove the workspace in question from the config and add the workspace to a new config where it is the 
 only configured workspace. Create a local Overwatch deployment for that one deployment local to that workspace.
