@@ -23,6 +23,7 @@ through the process.
 3. Configure Overwatch
 4. Run and Schedule the Job\[s\]
 5. Productionize Your Deployment
+6. Share The Data
 
 ### Configuring Your Cloud
 Select your cloud to find the details for cloud configuration here. 
@@ -51,3 +52,7 @@ It's recommended to run Overwatch as a JAR as it unifies the deployment and does
 Now that you're live it's important to 
 [optimize everything]({{%relref "DataEngineer/AdvancedTopics"%}}/#optimizing-overwatch) and ensure the data is safe 
 in case something unexpected happens -- see [Productionizing]({{%relref "DataEngineer/Productionizing.md"%}})
+
+### Share The Data
+Now you're ready to onboard consumers across your workspaces. Details about how to do that can be found in the 
+[Sharing Overwatch]({{%relref "DeployOverwatch/SharingOverwatch.md"%}}) page.
