@@ -14,7 +14,7 @@ case class PipelineView(name: String,
 
   def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
     if (dataSource.exists) {
-      val pubStatementSB = new StringBuilder("create table ")
+      val pubStatementSB = new StringBuilder("Create OR replace view ")
       val dataSourceName = dataSource.name.toLowerCase()
       pubStatementSB.append(s"${config.consumerDatabaseName}.${name} as select ${colDefinition} from delta.`${config.etlDataPathPrefix}/${dataSourceName}`")
       // link partition columns
@@ -25,7 +25,7 @@ case class PipelineView(name: String,
           partitionMapOverrides
         }
         print(s"partmap is ${partMap}")
-        pubStatementSB.append(s"where ${partMap.head._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${partMap.head._2} ")
+        pubStatementSB.append(s" where ${partMap.head._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${partMap.head._2} ")
         if (partMap.keys.toArray.length > 1) {
           partMap.tail.foreach(pCol => {
             pubStatementSB.append(s"and ${pCol._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${pCol._2} ")
