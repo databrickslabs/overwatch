@@ -5,7 +5,17 @@
     <link>https://databrickslabs.github.io/overwatch/dataengineer/</link>
     <description>Recent content in Data Engineering on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Mon, 26 Sep 2022 08:47:24 -0400</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Mon, 12 Dec 2022 11:41:13 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Modules / Scopes</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/modules/</link>
+      <pubDate>Mon, 12 Dec 2022 11:40:34 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/modules/</guid>
+      <description>Modules A module is a single workload that builds a target table. More details about all the modules are available in Pipeline Management.
+Scopes Scopes are the method by which Overwatch is segmented and a scope will contain all the related modules to build the output from Bronze through to Gold. For example there&amp;rsquo;s one scope called &amp;ldquo;jobs&amp;rdquo; but it contains all the modules for jobs and job runs from bronze through gold as well as the jobruncostpotentialfact gold fact table.</description>
+    </item>
+    
     <item>
       <title>Pipeline_Management</title>
       <link>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</link>
@@ -16,13 +26,13 @@
     </item>
     
     <item>
-      <title>Upgrade</title>
+      <title>Upgrades</title>
       <link>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</link>
       <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
       <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. The general upgrade process is:
- Use the compactString of parameters to instantiate the workspace  The compact string can be found in your original runner notebook which you got from here   Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object  Basic pseudocode can be found below as a reference.</description>
+Use the compactString of parameters to instantiate the workspace The compact string can be found in your original runner notebook which you got from here Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object Basic pseudocode can be found below as a reference.</description>
     </item>
     
     <item>
@@ -33,7 +43,16 @@
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</guid>
       <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch
 Cluster Logging Simplify and Unify your cluster logging directories
- Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
+Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
+    </item>
+    
+    <item>
+      <title>AdvancedTopics</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/</link>
+      <pubDate>Mon, 12 Dec 2022 11:41:13 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/</guid>
+      <description>Quick Reference Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run. For small/medium workspaces, 20-40 minutes should be expected for each run.</description>
     </item>
     
   </channel>

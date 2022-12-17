@@ -1,7 +1,7 @@
 ---
 title: "Pipeline_Management"
 date: 2021-01-11T12:21:46-05:00
-weight: 2
+weight: 3
 ---
 
 ## Overwatch Data Promotion Process
@@ -13,7 +13,7 @@ suffixed in the ETL database with *\_layer*.
 
 {{% notice note %}}
 Note, the ETL database and consumption database are usually different,
-determined by the [**configuration**]({{%relref "GettingStarted/Configuration.md"%}}).
+determined by the [**configuration**]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}).
 {{% /notice %}}
 
 ## Common Terms & Concepts
@@ -42,14 +42,14 @@ a very different entity than a Spark Job. The documentation attempts to be very 
 find a section in which the difference is not made clear.
 {{% /notice %}}
 
-### [Spark Context Composition & Hierarchy]({{%relref "GettingStarted/Modules.md"%}})
+### [Spark Context Composition & Hierarchy]({{%relref "DataEngineer/Modules.md"%}})
 
 ## Data Ingestion and Resume Process
 The specificities can vary slightly between cloud provider but the general methodology is the exact same. 
 Specific differences will be discussed in [Cloud-Specific Variations](#cloud-specific-variations) section. 
 
 Each module is responsible for building certain entities at each layer, bronze, silver, gold, and presentation.
-The mapping between module and gold entity can be found in the [Modules]({{%relref "GettingStarted/Modules.md"%}}) section.
+The mapping between module and gold entity can be found in the [Modules]({{%relref "DataEngineer/Modules.md"%}}) section.
 Each module is also tracked individually in the primary tracking tabe, [**Pipeline_Report**](#the-pipeline-report).
 
 ### The Overwatch Execution Process
@@ -61,12 +61,12 @@ be used to determine exactly when a record was loaded.
 The "from_time" will be derived dynamically for each module as per the previous run snapshot time
 for the given module plus one millisecond. If the module has never been executed, the primordialDateString will be
 used which is defined as current_date - 60 days, by default. This can be overridden in the 
-[config]({{%relref "GettingStarted/Configuration.md"%}}). Some modules can be very slow / time-consuming on the 
+[config]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}). Some modules can be very slow / time-consuming on the 
 first run due to the data volume and/or trickle loads from APIs. Best practice is to set your primordialDateString 
 (if desired > 60d) AND set "*maxDaysToLoad*" to a low number like 5. It's important to balance sufficient data to 
 fully build out the implicit schemas and small enough data to get through an initial valid test.
 
-More best practices can be found in the [Best Practices]({{%relref "GettingStarted/AdvancedTopics.md"%}}#best-practices) 
+More best practices can be found in the [Best Practices]({{%relref "DataEngineer/AdvancedTopics.md"%}}#best-practices) 
 section; these are especially important to reference when getting started.
 
 ## The Pipeline Report
@@ -112,7 +112,7 @@ fromTS                      |long             |The snapshot start time from whic
 untilTS                     |long             |The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS
 dataFrequency               |string           |(milliSecond OR Daily) Most modules have a time resolution at the millisecond level; however there are certain modules that can only be run daily. This column is used by Overwatch internals to calculate start/stops for new data 
 status                      |string           |Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues 
-recordsAppended             |long             |Count of records appended. Not always enabled for performance reasons, see [advanced topics]({{%relref "GettingStarted/AdvancedTopics.md"%}}) for additional information. 
+recordsAppended             |long             |Count of records appended. Not always enabled for performance reasons, see [advanced topics]({{%relref "DataEngineer/AdvancedTopics.md"%}}) for additional information. 
 lastOptimizedTS             |long             |Epoch millis of the last delta optimize run. Used by Overwatch internals to maintain healthy and optimized tables.
 vacuumRetentionHours        |int              |Retention hours for delta -- How long to retain deleted data
 inputConfig                 |struct           |Captured input of OverwatchParams config at time of module run
@@ -243,6 +243,6 @@ no new data is ingested into bronze, no modules outside of the two we rolled_bac
 will essentially be skipped resulting in the re-processing of only the two tables we're working on. 
 
 The main class parameters allows for a single pipeline (bronze, silver, or gold) or all to be run. Refer to the 
-[Getting Started - Run Via Main Class]({{%relref "GettingStarted"%}}#via-main-class) for more 
+[Getting Started - Run Via Main Class]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy.md"%}}) for more 
 information on how to run a single pipeline from main class. The same can also be done via a notebook run, refer to 
-[Getting Started - Run Via Notebook]({{%relref "GettingStarted"%}}#via-a-notebook) for more information on this.
+[Getting Started - Run Via Notebook]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy.md"%}}) for more information on this.

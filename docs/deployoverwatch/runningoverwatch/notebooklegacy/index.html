@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en" class="js csstransforms3d">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="Hugo 0.108.0">
+    <meta name="description" content="Overwatch Documentation">
+<meta name="author" content="Daniel Tomes -- DatabricksLabs">
+
+    <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
+
+    <title>As A Notebook (Legacy) :: Overwatch</title>
+
+    
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1671311759" rel="stylesheet">
+    
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1671311759" rel="stylesheet">
+    
+    
+
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1671311759"></script>
+
+    <style>
+      :root #header + #content > #left > #rlblock_left{
+          display:none !important;
+      }
+      
+    </style>
+    
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+  </head>
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebooklegacy/">
+    <nav id="sidebar" class="">
+
+
+
+  <div id="header-wrapper">
+    <div id="header">
+      <a id="logo" href="https://databrickslabs.github.io/overwatch/">
+    <img src="https://databrickslabs.github.io/overwatch/images/tmp_logo4.png", width="85%">
+</a>
+
+    </div>
+    
+        <div class="searchbox">
+    <label for="search-by"><i class="fas fa-search"></i></label>
+    <input data-search-input id="search-by" type="search" placeholder="Search...">
+    <span data-search-clear=""><i class="fas fa-times"></i></span>
+</div>
+
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1671311759"></script>
+<script type="text/javascript">
+    
+        var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
+    
+</script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1671311759"></script>
+
+    
+  </div>
+  
+  <section id="homelinks">
+    <ul>
+      <li>
+        <a class="padding" href='https://databrickslabs.github.io/overwatch/'><i class='fas fa-home'></i> Home</a>
+      </li>
+    </ul>
+  </section>
+  
+
+    <div class="highlightable">
+    <ul class="topics">
+
+        
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/deployoverwatch/" title="Deploy Overwatch" class="dd-item
+        parent
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/">
+          Deploy Overwatch
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+            
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/deployoverwatch/cloudinfra/" title="Cloud Infrastructure" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/">
+          Cloud Infrastructure
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/cloudinfra/azure/" title="Azure" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/">
+        Azure
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/">
+        AWS
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/deployoverwatch/configureoverwatch/" title="Configure Overwatch" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/">
+          Configure Overwatch
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/configuration/" title="Configuration" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/">
+        Configuration
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/customcosts/" title="Custom Costs" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/">
+        Custom Costs
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/securityconsiderations/" title="Security Considerations" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/">
+        Security Considerations
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/validation/" title="Validation" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/">
+        Validation
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/configurationlegacy/" title="Configuration (Legacy)" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configurationlegacy/">
+        Configuration (Legacy)
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/deployoverwatch/runningoverwatch/" title="Running Overwatch" class="dd-item
+        parent
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/">
+          Running Overwatch
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/clusterconfig/" title="Cluster Configuration" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/">
+        Cluster Configuration
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/notebook/" title="As A Notebook" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/">
+        As A Notebook
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/jar/" title="As A JAR" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/">
+        As A JAR
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/notebooklegacy/" title="As A Notebook (Legacy)" class="dd-item active">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebooklegacy/">
+        As A Notebook (Legacy)
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/jarlegacy/" title="As A JAR (Legacy)" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jarlegacy/">
+        As A JAR (Legacy)
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/sharingoverwatch/" title="Sharing Overwatch Data" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/">
+        Sharing Overwatch Data
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/dataengineer/" title="Data Engineering" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dataengineer/">
+          Data Engineering
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+            
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/dataengineer/definitions/" title="Data Dictionary (Latest)" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions/">
+          Data Dictionary (Latest)
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/definitions/061x/" title="Data Dictionary - 0.6.1.x" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/">
+        Data Dictionary - 0.6.1.x
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/modules/" title="Modules / Scopes" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/modules/">
+        Modules / Scopes
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/pipeline_management/" title="Pipeline_Management" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/">
+        Pipeline_Management
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/upgrade/" title="Upgrades" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/upgrade/">
+        Upgrades
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/productionizing/" title="Productionizing" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/productionizing/">
+        Productionizing
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/advancedtopics/" title="AdvancedTopics" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/">
+        AdvancedTopics
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/changelog/" title="ChangeLog" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/changelog/">
+          ChangeLog
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/faq/" title="FAQ" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/faq/">
+          FAQ
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/troubleshooting/" title="Troubleshooting" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/troubleshooting/">
+          Troubleshooting
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/contributing/" title="" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/contributing/">
+          
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+        
+    </ul>
+
+    
+    
+
+    
+    <section id="footer">
+      <center>
+
+    
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch/subscription"
+       data-icon="octicon-eye" data-show-count="true" aria-label="Watch Overwatch on GitHub">Watch</a>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch" data-icon="octicon-star" data-show-count="true" aria-label="Star databrickslabs/overwatch on GitHub">Star</a>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch/fork"
+       data-icon="octicon-repo-forked" data-show-count="true" aria-label="Fork Overwatch on GitHub">Fork</a>
+
+    <p>A <a href="https://www.databricks.com/learn/labs">Databricks Labs</a> project.</p>
+</center>
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+    </section>
+  </div>
+</nav>
+
+
+
+
+        <section id="body">
+        <div id="overlay"></div>
+        <div class="padding highlightable">
+              
+              <div>
+                <div id="top-bar">
+                
+                
+                <div id="breadcrumbs" itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb">
+                    <span id="sidebar-toggle-span">
+                        <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
+                          <i class="fas fa-bars"></i>
+                        </a>
+                    </span>
+                  
+                  <span id="toc-menu"><i class="fas fa-list-alt"></i></span>
+                  
+                  <span class="links">
+                 
+                 
+                    
+          
+          
+            
+            
+          
+          
+            
+            
+          
+          
+            
+            
+          
+          
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/'>Running Overwatch</a> > As A Notebook (Legacy)
+          
+        
+          
+        
+          
+        
+          
+        
+                 
+                  </span>
+                </div>
+                
+                    <div class="progress">
+    <div class="wrapper">
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#legacy-deployment-method">Legacy Deployment Method</a>
+      <ul>
+        <li><a href="#the-process">The Process</a></li>
+        <li><a href="#jump-start-notebooks">Jump Start Notebooks</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+    </div>
+</div>
+
+                
+              </div>
+            </div>
+            
+        <div id="head-tags">
+        
+        </div>
+        
+        <div id="body-inner">
+          
+            <h1>
+              
+              As A Notebook (Legacy)
+            </h1>
+          
+
+        
+
+
+
+<div class="notices warning" ><p>As of version 0.7.1.0 Overwatch will begin sunsetting this deployment method. Please reference
+<a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/">Running A Job As A Notebook</a> for the updated method for
+deploying Overwatch. This method will likely be deprecated in Overwatch version 0.8 and no longer be supported in 0.9.</p>
+</div>
+
+<p>The new deployment method provides support for a &ldquo;single-workspace deployment&rdquo; or &ldquo;multi-workspace deployment&rdquo; where
+a single Overwatch job is configured and loads data from all workspaces. More details available in
+<a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/">Running A Job As A Notebook</a>.</p>
+<h2 id="legacy-deployment-method">Legacy Deployment Method</h2>
+<p>The legacy deployment method requires an Overwatch job to run locally on each workspace that is to be monitored.</p>
+<h3 id="the-process">The Process</h3>
+<ul>
+<li>Use a &ldquo;Runner Notebook&rdquo; to build a JSON config string</li>
+<li>Use the JSON config string to Initialize Overwatch Workspace</li>
+<li>Use the Overwatch Workspace Object to launch the Pipelines</li>
+</ul>
+<p>Below is a pseudocode example. This is essentially all that is happening. All the commands and widgets in the
+runner notebooks are just there to help customers derive the json config string.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">val</span> myJsonConfig <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;&#34;&#34;someJSONString&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> workspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Initializer</span><span style="color:#f92672">(</span>myJsonConfig<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Bronze</span><span style="color:#f92672">(</span>workspace<span style="color:#f92672">).</span>run<span style="color:#f92672">()</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Silver</span><span style="color:#f92672">(</span>workspace<span style="color:#f92672">).</span>run<span style="color:#f92672">()</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Gold</span><span style="color:#f92672">(</span>workspace<span style="color:#f92672">).</span>run<span style="color:#f92672">()</span>
+</span></span></code></pre></div>
+<div class="notices note" ><p>Getting a strong first run is critical. Please review
+<a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics//getting-a-strong-first-run">Getting A Strong First Run</a> in
+advanced topics before continuing if this is your first deployment.</p>
+</div>
+
+<h3 id="jump-start-notebooks">Jump Start Notebooks</h3>
+<p>The following notebooks will demonstrate a typical setup for Overwatch deployments.
+Populate the necessary variables/widgets for your environment.</p>
+<ul>
+<li>AZURE (<a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example_070.html">HTML 0.7.0+</a> / <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example_070.dbc">DBC 0.7.0+</a>)</li>
+<li>AWS (<a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example_070.html">HTML 0.7.0+</a> / <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example_070.dbc">DBC 0.7.0+</a>)</li>
+<li>AZURE (<a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example_060.html">HTML 0.6.0+</a> / <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example_060.dbc">DBC 0.6.0+</a>)</li>
+<li>AWS (<a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example_060.html">HTML 0.6.0+</a> / <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example_060.dbc">DBC 0.6.0+</a>)</li>
+<li>AZURE (<a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example_0504.html">HTML 0.5.0.4+</a> / <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/azure_runner_docs_example_0504.dbc">DBC 0.5.0.4+</a>)</li>
+<li>AWS (<a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example_042.html">HTML 0.5.x</a> / <a href="https://databrickslabs.github.io/overwatch/assets/GettingStarted/aws_runner_docs_example_042.dbc">DBC 0.5.x</a>)</li>
+</ul>
+
+
+<footer class="footline">
+	
+</footer>
+
+        
+        </div> 
+        
+
+      </div>
+
+    <div id="navigation">
+        
+        
+        
+        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+        
+        
+
+
+	 
+	 
+		
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/" title="As A JAR"> <i class="fa fa-chevron-left"></i></a>
+		
+		
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jarlegacy/" title="As A JAR (Legacy)" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+	
+    </div>
+
+    </section>
+    
+    <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
+      <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
+    </div>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1671311759"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1671311759"></script>
+
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1671311759" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1671311759"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    
+
+  </body>
+</html>
+
