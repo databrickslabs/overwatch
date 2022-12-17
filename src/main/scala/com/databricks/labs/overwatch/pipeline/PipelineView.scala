@@ -14,9 +14,9 @@ case class PipelineView(name: String,
 
   def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
     if (dataSource.exists) {
-      val pubStatementSB = new StringBuilder("Create OR replace view ")
+      val pubStatementSB = new StringBuilder("create or replace view ")
       val dataSourceName = dataSource.name.toLowerCase()
-      pubStatementSB.append(s"${config.consumerDatabaseName}.${name} as select ${colDefinition} from delta.`${config.etlDataPathPrefix}/${dataSourceName}`")
+      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from delta.`${config.etlDataPathPrefix}/${dataSourceName}`")
       // link partition columns
       if (dataSource.partitionBy.nonEmpty) {
         val partMap: Map[String, String] = if (partitionMapOverrides.isEmpty) {

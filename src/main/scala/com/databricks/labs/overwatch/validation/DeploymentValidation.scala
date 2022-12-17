@@ -155,9 +155,14 @@ object DeploymentValidation extends SparkSessionWrapper {
    */
   private def validateApiUrlConnectivity(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
+    val apiUrl = if (conf.api_url.trim.charAt(conf.api_url.length - 1) == '/') {
+      conf.api_url.trim.substring(0, conf.api_url.length - 1)
+    } else {
+      conf.api_url.trim
+    }
     val testDetails =
       s"""WorkSpaceURLConnectivityTest
-         |APIURL:${conf.api_url}
+         |APIURL:${apiUrl}
          |DBPATWorkspaceScope:${conf.secret_scope}
          |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
     try {
@@ -171,7 +176,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         Some(apiProxyConfig))
 
       val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
-      val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion, derivedApiEnvConfig.successBatchSize,
+      val apiEnv = ApiEnv(false, apiUrl, patToken, getClass.getPackage.getImplementationVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, "runID", derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
         derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
         derivedApiProxy.proxyUserName, derivedApiProxy.proxyPasswordScope, derivedApiProxy.proxyPasswordKey
@@ -192,7 +197,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         val msg =
           s"""No Data retrieved
              |WorkspaceId:${conf.workspace_id}
-             |APIURL:${conf.api_url}
+             |APIURL:${apiUrl}
              | DBPATWorkspaceScope:${conf.secret_scope}
              | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
@@ -301,41 +306,54 @@ object DeploymentValidation extends SparkSessionWrapper {
   private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: String, primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
     try {
       val fromDT = new java.sql.Date(primordial_date.getTime()).toLocalDate()
-      var untilDT = fromDT.plusDays(maxDate)
+      var untilDT = fromDT.plusDays(maxDate.toLong)
       val dateCompare = untilDT.compareTo(LocalDate.now())
+      val msgBuffer = new StringBuffer()
       if (dateCompare > 0) { //Changing the max date to current date
-        untilDT = LocalDate.now().minusDays(1)
+        untilDT = LocalDate.now()
       }
       val daysBetween = ChronoUnit.DAYS.between(fromDT, untilDT)
       var validationFlag = false
       if (daysBetween == 0) {
         validationFlag = Helpers.pathExists(s"${auditlogprefix_source_aws}/date=${fromDT.toString}")
       } else {
+        val pathsToCheck = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
+          .map(dt => s"${auditlogprefix_source_aws}/date=${dt}")
         val presentPaths = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
           .map(dt => s"${auditlogprefix_source_aws}/date=${dt}")
           .filter(Helpers.pathExists)
         if (presentPaths.length == daysBetween) {
           validationFlag = true
         }
+        else if(presentPaths.length >0){
+         val presentPathSet = presentPaths.toSet
+          msgBuffer.append("Warning: unable to find below paths: ")
+          pathsToCheck.filterNot(presentPathSet).foreach(path=>msgBuffer.append(path+","))
+        }else{
+          msgBuffer.append("Exception: audit logs not found ")
+        }
+
       }
       if (validationFlag) {
         DeploymentValidationReport(true,
           getSimpleMsg("Validate_AuditLogPrefix"),
-          s"""Folder should be present from :${fromDT} to:${untilDT} """,
+          s"""Audit log folders should be present from :${fromDT} to:${untilDT} """,
           Some("SUCCESS"),
           Some(workspace_id)
         )
       } else {
         val msg =
           s"""ReValidate the folder existence
-             | Make sure folder with required date folder exist inside ${auditlogprefix_source_aws}/workspaceId=${workspace_id}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
+
+        msgBuffer.append(msg)
         logger.log(Level.ERROR, msg)
         DeploymentValidationReport(false,
           getSimpleMsg("Validate_AuditLogPrefix"),
-          s"""Folder should be present from :${fromDT} to:${untilDT} """,
-          Some(msg),
+          s"""Audit log folders should be present from :${fromDT} to:${untilDT} """,
+          Some(msgBuffer.toString),
           Some(workspace_id)
         )
       }
@@ -344,7 +362,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case exception: Exception =>
         val msg =
           s"""AuditLogPrefixTest workspace_id:${workspace_id}
-             | Make sure folder with required date folder exist inside ${auditlogprefix_source_aws}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
@@ -442,7 +460,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       )
     } catch {
       case exception: Exception =>
-        val msg = s"""Unable to retrieve data from ehName:${ehName} scope:${scope} SecretKey_DBPAT:${key}"""
+        val msg = s"""Unable to retrieve data from ehName:${ehName} scope:${scope} eh_scope_key:${key}"""
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
         DeploymentValidationReport(false,
@@ -510,7 +528,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case "Valid_PrimordialDate" => "Primordial Date should in yyyy-MM-dd format(Ex:2022-01-30) and should be less than current date."
       case "Valid_MaxDays" => "Max Days should be a number."
       case "APIURL_Connectivity" => "API URL should give some response with provided scope and key."
-      case "Validate_AuditLogPrefix" => "Folder with Primordial date should be present inside AuditLogPrefix."
+      case "Validate_AuditLogPrefix" => "Folder with audit logs should be present inside AuditLogPrefix."
       case "Validate_EventHub" => "Consuming data from EventHub."
       case "Valid_Excluded_Scopes" => "Excluded scope can be audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts."
       case "Storage_Access" => "ETL_STORAGE_PREFIX should have read,write and create access"
@@ -552,7 +570,7 @@ object DeploymentValidation extends SparkSessionWrapper {
     var validationStatus: ArrayBuffer[DeploymentValidationReport] = new ArrayBuffer[DeploymentValidationReport]()
     //csv data validation
 
-    multiWorkspaceConfig.map(validateApiUrlConnectivity)
+
     val gropedRules = Seq[Rule](
       validateDistinct("Common_ETLStoragePrefix",MultiWorkspaceConfigColumns.etl_storage_prefix.toString),
       validateDistinct("Common_ETLDatabase",MultiWorkspaceConfigColumns.etl_database_name.toString),
