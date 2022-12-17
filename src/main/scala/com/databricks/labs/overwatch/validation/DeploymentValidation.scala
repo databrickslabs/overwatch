@@ -344,7 +344,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       } else {
         val msg =
           s"""ReValidate the folder existence
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws}/workspaceId=${workspace_id}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
 
