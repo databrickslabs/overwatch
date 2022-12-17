@@ -5,12 +5,17 @@ weight: 1
 ---
 
 ## Cluster Requirements
-* DBR 10.4LTS as of 0.6.1
-    * Overwatch will likely run on later versions but is built and tested on 10.4LTS since 0.6.1
+* DBR 11.3LTS as of 0.7.1.0
+    * Overwatch will likely run on different versions of DBR but is built and tested on 11.3LTS since 0.7.1
+    * Overwatch < 0.7.1 -- DBR 10.4LTS
     * Overwatch < 0.6.1 -- DBR 9.1LTS
-    * Overwatch version 0.6.1+ -- DBR 10.4LTS
-* Do not use Photon
-    * Photon optimization will begin with DBR 11.x LTS please wait on photon
+* Using Photon
+    * As of 0.7.1.0 **Photon is recommended** so long as the Overwatch cluster is using DBR 11.3LTS+. 
+      Photon does increase the DBU spend but the performance boost often results
+      in the code running significantly more efficiently netting out a benefit. Mileage can vary between customers so 
+      if you really want to know which is most efficient, feel free to run on both and use Overwatch to determine which is 
+      best for you.
+    * Prior to 0.7.1.0 and DBR 11.3LTS Photon was untested
 * Disable Autoscaling - See [Notes On Autoscaling](#notes-on-autoscaling)
     * External optimize cluster recommendations are different.
       See [External Optimize]({{%relref "DataEngineer/AdvancedTopics.md"%}}/#externalize-optimize--z-order-as-of-060) for more details
@@ -25,13 +30,13 @@ Add the following dependencies to your cluster
 ### Cluster Config Recommendations
 * Azure
     * Node Type (Driver & Worker) - Standard_D16s_v3
-        * Use n Standard_E*d[s]_v4 for workers for historical loads
+        * Use n Standard_E*d[s]_v4 for workers for historical loads and Photon
         * Large / Very Large workspaces may see a significant improvement using Standard_E16d[s]_v4 workers but mileage varies, cost/benefit analysis required
     * Node Count - 2
         * This may be increased if necessary but note that bronze is not linearly scalable; thus, increasing core count
           may not improve runtimes. Please see [Optimizing Overwatch]({{%relref "DataEngineer/AdvancedTopics.md"%}}/#optimizing-overwatch) for more information.
 * AWS
-    * Node Type (Driver & Worker) - R5.4xlarge
+    * Node Type (Driver & Worker) - R5d.4xlarge
         * Use n i3.*xlarge for workers for historical loads
         * Large / Very Large workspaces may see a significant improvement using i3.4xlarge workers but mileage varies, cost/benefit analysis required
     * Node Count - 2

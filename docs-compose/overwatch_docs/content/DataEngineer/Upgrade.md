@@ -1,5 +1,5 @@
 ---
-title: "Upgrade"
+title: "Upgrades"
 date: 2021-05-20T21:27:44-04:00
 weight: 4
 ---

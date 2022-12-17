@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="en" class="js csstransforms3d">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="Hugo 0.108.0">
+    <meta name="description" content="Overwatch Documentation">
+<meta name="author" content="Daniel Tomes -- DatabricksLabs">
+
+    <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
+
+    <title>Sharing Overwatch Data :: Overwatch</title>
+
+    
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1671311759" rel="stylesheet">
+    
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1671311759" rel="stylesheet">
+    
+    
+
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1671311759"></script>
+
+    <style>
+      :root #header + #content > #left > #rlblock_left{
+          display:none !important;
+      }
+      
+    </style>
+    
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+  </head>
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/">
+    <nav id="sidebar" class="">
+
+
+
+  <div id="header-wrapper">
+    <div id="header">
+      <a id="logo" href="https://databrickslabs.github.io/overwatch/">
+    <img src="https://databrickslabs.github.io/overwatch/images/tmp_logo4.png", width="85%">
+</a>
+
+    </div>
+    
+        <div class="searchbox">
+    <label for="search-by"><i class="fas fa-search"></i></label>
+    <input data-search-input id="search-by" type="search" placeholder="Search...">
+    <span data-search-clear=""><i class="fas fa-times"></i></span>
+</div>
+
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1671311759"></script>
+<script type="text/javascript">
+    
+        var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
+    
+</script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1671311759"></script>
+
+    
+  </div>
+  
+  <section id="homelinks">
+    <ul>
+      <li>
+        <a class="padding" href='https://databrickslabs.github.io/overwatch/'><i class='fas fa-home'></i> Home</a>
+      </li>
+    </ul>
+  </section>
+  
+
+    <div class="highlightable">
+    <ul class="topics">
+
+        
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/deployoverwatch/" title="Deploy Overwatch" class="dd-item
+        parent
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/">
+          Deploy Overwatch
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+            
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/deployoverwatch/cloudinfra/" title="Cloud Infrastructure" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/">
+          Cloud Infrastructure
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/cloudinfra/azure/" title="Azure" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/">
+        Azure
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/">
+        AWS
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/deployoverwatch/configureoverwatch/" title="Configure Overwatch" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/">
+          Configure Overwatch
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/configuration/" title="Configuration" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/">
+        Configuration
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/customcosts/" title="Custom Costs" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/">
+        Custom Costs
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/securityconsiderations/" title="Security Considerations" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/">
+        Security Considerations
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/validation/" title="Validation" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/">
+        Validation
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/configureoverwatch/configurationlegacy/" title="Configuration (Legacy)" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configurationlegacy/">
+        Configuration (Legacy)
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/deployoverwatch/runningoverwatch/" title="Running Overwatch" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/">
+          Running Overwatch
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/clusterconfig/" title="Cluster Configuration" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/">
+        Cluster Configuration
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/notebook/" title="As A Notebook" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/">
+        As A Notebook
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/jar/" title="As A JAR" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/">
+        As A JAR
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/notebooklegacy/" title="As A Notebook (Legacy)" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebooklegacy/">
+        As A Notebook (Legacy)
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/runningoverwatch/jarlegacy/" title="As A JAR (Legacy)" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jarlegacy/">
+        As A JAR (Legacy)
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/sharingoverwatch/" title="Sharing Overwatch Data" class="dd-item active">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/">
+        Sharing Overwatch Data
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/dataengineer/" title="Data Engineering" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dataengineer/">
+          Data Engineering
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+            
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/dataengineer/definitions/" title="Data Dictionary (Latest)" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions/">
+          Data Dictionary (Latest)
+          
+      </a>
+      
+      
+        <ul>
+          
+          
+          
+
+        
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/definitions/061x/" title="Data Dictionary - 0.6.1.x" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/">
+        Data Dictionary - 0.6.1.x
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/modules/" title="Modules / Scopes" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/modules/">
+        Modules / Scopes
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/pipeline_management/" title="Pipeline_Management" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/">
+        Pipeline_Management
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/upgrade/" title="Upgrades" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/upgrade/">
+        Upgrades
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/productionizing/" title="Productionizing" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/productionizing/">
+        Productionizing
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/dataengineer/advancedtopics/" title="AdvancedTopics" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/">
+        AdvancedTopics
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+        
+        </ul>
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/changelog/" title="ChangeLog" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/changelog/">
+          ChangeLog
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/faq/" title="FAQ" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/faq/">
+          FAQ
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/troubleshooting/" title="Troubleshooting" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/troubleshooting/">
+          Troubleshooting
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/contributing/" title="" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/contributing/">
+          
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+        
+    </ul>
+
+    
+    
+
+    
+    <section id="footer">
+      <center>
+
+    
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch/subscription"
+       data-icon="octicon-eye" data-show-count="true" aria-label="Watch Overwatch on GitHub">Watch</a>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch" data-icon="octicon-star" data-show-count="true" aria-label="Star databrickslabs/overwatch on GitHub">Star</a>
+
+
+    <a class="github-button" href="https://github.com/databrickslabs/overwatch/fork"
+       data-icon="octicon-repo-forked" data-show-count="true" aria-label="Fork Overwatch on GitHub">Fork</a>
+
+    <p>A <a href="https://www.databricks.com/learn/labs">Databricks Labs</a> project.</p>
+</center>
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+    </section>
+  </div>
+</nav>
+
+
+
+
+        <section id="body">
+        <div id="overlay"></div>
+        <div class="padding highlightable">
+              
+              <div>
+                <div id="top-bar">
+                
+                
+                <div id="breadcrumbs" itemscope="" itemtype="http://data-vocabulary.org/Breadcrumb">
+                    <span id="sidebar-toggle-span">
+                        <a href="#" id="sidebar-toggle" data-sidebar-toggle="">
+                          <i class="fas fa-bars"></i>
+                        </a>
+                    </span>
+                  
+                  <span id="toc-menu"><i class="fas fa-list-alt"></i></span>
+                  
+                  <span class="links">
+                 
+                 
+                    
+          
+          
+            
+            
+          
+          
+            
+            
+          
+          
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > Sharing Overwatch Data
+          
+        
+          
+        
+          
+        
+                 
+                  </span>
+                </div>
+                
+                    <div class="progress">
+    <div class="wrapper">
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#providing-access-to-consumers">Providing Access to Consumers</a>
+      <ul>
+        <li><a href="#registering-overwatch-on-remote-workspaces">Registering Overwatch On Remote Workspaces</a></li>
+        <li><a href="#requirements">Requirements</a></li>
+        <li><a href="#function-argument-details">Function Argument Details</a></li>
+        <li><a href="#how-it-works">How it Works</a></li>
+        <li><a href="#example-with-screenshots">Example With Screenshots</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav>
+    </div>
+</div>
+
+                
+              </div>
+            </div>
+            
+        <div id="head-tags">
+        
+        </div>
+        
+        <div id="body-inner">
+          
+            <h1>
+              
+              Sharing Overwatch Data
+            </h1>
+          
+
+        
+
+
+<h2 id="providing-access-to-consumers">Providing Access to Consumers</h2>
+<p>Now that Overwatch is deployed, it&rsquo;s likely that you want to share some or all of the data with stakeholders.
+We&rsquo;ve made that easy to do across workspaces with a single function and it&rsquo;s parameters
+<code>Helpers.registerRemoteOverwatchIntoLocalMetastore</code>. This is a one time command
+that must be run on the workspace that wants to consumer the Overwatch Data.</p>
+<h3 id="registering-overwatch-on-remote-workspaces">Registering Overwatch On Remote Workspaces</h3>
+<p>The command below is the simplest version and will publish the etl and consumer databases with all the data to the
+workspace on which the command is run. Note, this must be run on the target workspace, not the deployment workspace.</p>
+<p>The following are just a few basic examples, please refer to the <a href="#function-argument-details">optional parameters</a>
+below for a full list of options and details that can be passed to the function.</p>
+<p>As an example let&rsquo;s say we have two workspaces. Overwatch was deployed on workspace 123 (i.e. 123 is the workspace ID)
+and is configured to monitor workspaces 123 and 234. After initial deployment users on workspace 234 will not be able to
+see the databases. If you wish for the users on 234 to be able to see the database[s] simply run the function below
+based on your needs</p>
+<p><strong>You want users of workspace 234 to see all Overwatch data</strong></p>
+<p>Run the following command on workspace 234 and the ETL and Consumer databases and all tables and all data will appear
+in the metastore for workspace 234.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Helpers
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>registerRemoteOverwatchIntoLocalMetastore<span style="color:#f92672">(</span>remoteStoragePrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_global/overwatch-5434&#34;</span><span style="color:#f92672">,</span> remoteWorkspaceID <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;123&#34;</span><span style="color:#f92672">)</span>
+</span></span></code></pre></div><p><strong>You want users of workspace 234 to see only their data</strong></p>
+<p>If you only want workspace 234 users to see their data (i.e. from workspace 234 not 123) then run the following
+command. This will register only the consumer database and only the records that pertain to workspace 234. The ETL
+database will not be published.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Helpers
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>registerRemoteOverwatchIntoLocalMetastore<span style="color:#f92672">(</span>remoteStoragePrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_global/overwatch-5434&#34;</span><span style="color:#f92672">,</span> remoteWorkspaceID <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;123&#34;</span><span style="color:#f92672">,</span> workspacesAllowed <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Array</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;234&#34;</span><span style="color:#f92672">))</span>
+</span></span></code></pre></div><p><strong>You want users of workspace 234 to see Overwatch data for several workspaces</strong></p>
+<p>If there were many workspaces and you wanted to share data from multiple workspaces it&rsquo;s the same command just add to
+the additional workspaceIDs to the &ldquo;workspacesAllowed&rdquo; Array. Obviously this would require Overwatch to be configured
+for more workspaces but this is meant to extend the examples above.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Helpers
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>registerRemoteOverwatchIntoLocalMetastore<span style="color:#f92672">(</span>remoteStoragePrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_global/overwatch-5434&#34;</span><span style="color:#f92672">,</span> remoteWorkspaceID <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;123&#34;</span><span style="color:#f92672">,</span> workspacesAllowed <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Array</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;234&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;345&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;456&#34;</span><span style="color:#f92672">))</span>
+</span></span></code></pre></div><h3 id="requirements">Requirements</h3>
+<ul>
+<li><strong>Overwatch JAR</strong> - The cluster used to run the commands above on workspace 234 must have Overwatch JAR 0.7.1.0+ attached to the cluster.</li>
+<li><strong>Security</strong> - Any compute that will be reading the data must have storage access to read the storage prefix, in the example
+above, &ldquo;/mnt/overwatch_global/overwatch-5434&rdquo;. If the path is mounted on workspace 234, this access will be available
+to all compute in the workspace. If only certain clusters should have access the cluster must be configured with
+an Instance Profile (AWS) or
+<a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations//#azure-storage-auth-config">SPN permissions (AZURE)</a></li>
+<li><strong>Database Names</strong> - The local database names don&rsquo;t already exist. Unless overridden, these names will be the same as on workspace 123.</li>
+</ul>
+
+<div class="notices note" ><p>This feature will not work with legacy deployments. The databases and views are registered by default during the
+Overwatch pipeline run. Consider upgrading if you would like to use this feature.</p>
+</div>
+
+<h3 id="function-argument-details">Function Argument Details</h3>
+<p>This function currently support below arguments:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Key</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Default Value</th>
+<th style="text-align:left">Description</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">remoteStoragePrefix</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">NA</td>
+<td style="text-align:left">Remote storage prefix for the remote workspace where overwatch has been deployed</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align:left">remoteWorkspaceID</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">NA</td>
+<td style="text-align:left">workSpaceID for the remoteworkspace where overwatch has been deployed. This will be used in getRemoteWorkspaceByPath()</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align:left">localETLDatabaseName</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Same name as the ETL database on the deployment workspace</td>
+<td style="text-align:left">ETLDatabaseName that user want to override. If not provided then by default etlDatabase name from the remoteWorkspace would be used as same for current workspace</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align:left">localConsumerDatabaseName</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Same name as the Consumer database on the deployment workspace</td>
+<td style="text-align:left">ConsumerDatabase that user want to override. If not provided then by default ConsumerDatabase name from the remoteWorkspace would be used as same for current workspace</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align:left">remoteETLDataPathPrefixOverride</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">&quot;&quot;</td>
+<td style="text-align:left">Param to override StoragePrefix. If not provided then remoteStoragePrefix+&quot;/global_share&quot; would be used as StoragePrefix</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align:left">usingExternalMetastore</td>
+<td style="text-align:left">Boolean</td>
+<td style="text-align:left">false</td>
+<td style="text-align:left">Used in case if user using any ExternalMetastore.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align:left">workspacesAllowed</td>
+<td style="text-align:left">Array[String]</td>
+<td style="text-align:left">Array()</td>
+<td style="text-align:left">If we want to populate the table for a specific workSpaceID. In that case only ConsumerDB would be visible to the user.</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-it-works">How it Works</h3>
+<p>The consumer database is just a database full of views, so when you pass in a list of workspaceIds into
+the &ldquo;workspacesAllowed&rdquo; parameter, it registers</p>
+<h3 id="example-with-screenshots">Example With Screenshots</h3>
+<p>Below are the details of how the function works:</p>
+<ul>
+<li>We have deployed Overwatch on one of our workspaces (workspace with id 123) with the below params:</li>
+</ul>
+<p><img src="https://databrickslabs.github.io/overwatch/images/DeployOverwatch/Runner.png" alt="Runner"></p>
+<ul>
+<li>Now if we want to deploy the tables from this workspace to a new workspace, say workspaceID 234 to continue our
+previous example.
+<ul>
+<li>Run the below command on workspace 234</li>
+</ul>
+</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>registerRemoteOverwatchIntoLocalMetastore<span style="color:#f92672">(</span>remoteStoragePrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_global/overwatch-5434&#34;</span><span style="color:#f92672">,</span>remoteWorkspaceID <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;123&#34;</span><span style="color:#f92672">,</span> workspacesAllowed <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Array</span><span style="color:#f92672">())</span>
+</span></span></code></pre></div><ul>
+<li>As we can see the tables are loaded in new workspace.</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="color:#75715e">-- from workspace 234
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>use overwatch_dev_5434;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">show</span> tables;
+</span></span></code></pre></div><p><img src="https://databrickslabs.github.io/overwatch/images/DeployOverwatch/Tables.png" alt="Tables"></p>
+
+
+<footer class="footline">
+	
+</footer>
+
+        
+        </div> 
+        
+
+      </div>
+
+    <div id="navigation">
+        
+        
+        
+        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+        
+        
+
+
+	 
+	 
+		
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jarlegacy/" title="As A JAR (Legacy)"> <i class="fa fa-chevron-left"></i></a>
+		
+		
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/dataengineer/" title="Data Engineering" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+		
+	
+    </div>
+
+    </section>
+    
+    <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
+      <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
+    </div>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1671311759"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1671311759"></script>
+
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1671311759" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1671311759"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    
+
+  </body>
+</html>
+

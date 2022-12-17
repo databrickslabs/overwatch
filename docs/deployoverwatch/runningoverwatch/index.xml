@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Running Overwatch on Overwatch</title>
+    <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/</link>
+    <description>Recent content in Running Overwatch on Overwatch</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Mon, 12 Dec 2022 11:37:52 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Cluster Configuration</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</link>
+      <pubDate>Tue, 13 Dec 2022 17:01:49 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</guid>
+      <description>Cluster Requirements DBR 11.3LTS as of 0.7.1.0 Overwatch will likely run on different versions of DBR but is built and tested on 11.3LTS since 0.7.1 Overwatch &amp;lt; 0.7.1 &amp;ndash; DBR 10.4LTS Overwatch &amp;lt; 0.6.1 &amp;ndash; DBR 9.1LTS Using Photon As of 0.7.1.0 Photon is recommended so long as the Overwatch cluster is using DBR 11.3LTS+. Photon does increase the DBU spend but the performance boost often results in the code running significantly more efficiently netting out a benefit.</description>
+    </item>
+    
+    <item>
+      <title>As A Notebook</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</link>
+      <pubDate>Mon, 12 Dec 2022 12:04:26 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</guid>
+      <description>Deploying Overwatch As A Notebook Notebooks can either be run manually or scheduled to run as a job. While the notebook can be scheduled as a job, it&amp;rsquo;s strongly recommended that Overwatch be run as a JAR instead of a notebook. Notebook execution is great for rapid testing and validation.
+This deployment method requires Overwatch Version 0.7.1.0+
+Jumpstart Notebook Below is an example deployment. When you&amp;rsquo;re ready to get started simply download the rapid start linked notebook below.</description>
+    </item>
+    
+    <item>
+      <title>As A JAR</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</link>
+      <pubDate>Tue, 13 Dec 2022 16:09:01 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</guid>
+      <description>Deploying Overwatch As A JAR On Databricks Workflows This deployment method requires Overwatch Version 0.7.1.0+
+Main Class The main class for job is com.databricks.labs.overwatch.MultiWorkspaceRunner
+Dependent Library com.databricks.labs:overwatch_2.12:0.7.1.x
+com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only)
+Parameters Job can take upto 3 arguments
+Args(0): Path of Config.csv (Mandatory) EX: [&amp;quot;dbfs:/path/to/config.csv&amp;quot;] Args(1): Number of threads to complete the task in parallel. Default == 4. (Optional) EX: [&amp;quot;dbfs:/path/to/config.csv&amp;quot;, &amp;quot;4&amp;quot;] Args(2): Pipelines to be executed. Default == &amp;ldquo;Bronze,Silver,Gold&amp;rdquo; If you wanted to split Bronze into one task and Silver/Gold into another task the arguments would look like the examples below.</description>
+    </item>
+    
+    <item>
+      <title>As A Notebook (Legacy)</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebooklegacy/</link>
+      <pubDate>Mon, 12 Dec 2022 12:04:43 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebooklegacy/</guid>
+      <description>As of version 0.7.1.0 Overwatch will begin sunsetting this deployment method. Please reference Running A Job As A Notebook for the updated method for deploying Overwatch. This method will likely be deprecated in Overwatch version 0.8 and no longer be supported in 0.9.
+The new deployment method provides support for a &amp;ldquo;single-workspace deployment&amp;rdquo; or &amp;ldquo;multi-workspace deployment&amp;rdquo; where a single Overwatch job is configured and loads data from all workspaces. More details available in Running A Job As A Notebook.</description>
+    </item>
+    
+    <item>
+      <title>As A JAR (Legacy)</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jarlegacy/</link>
+      <pubDate>Tue, 13 Dec 2022 16:09:07 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jarlegacy/</guid>
+      <description>As of version 0.7.1.0 Overwatch will begin sunsetting this deployment method. Please reference Running A Job As A Jar for the updated method for deploying Overwatch. This method will likely be deprecated in Overwatch version 0.8 and no longer be supported in 0.9.
+The new deployment method provides support for a &amp;ldquo;single-workspace deployment&amp;rdquo; or &amp;ldquo;multi-workspace deployment&amp;rdquo; where a single Overwatch job is configured and loads data from all workspaces. More importantly, there are at most 3 parameters that can be passed in much more simplistically.</description>
+    </item>
+    
+  </channel>
+</rss>

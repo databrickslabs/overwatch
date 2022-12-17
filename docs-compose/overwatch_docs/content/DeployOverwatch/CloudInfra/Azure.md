@@ -3,8 +3,10 @@ title: "Azure"
 date: 2022-12-12T11:29:59-05:00
 ---
 
+## Fast Travel
 * [Configuring Overwatch on Azure Databricks](#configuring-overwatch-on-azure-databricks)
 * [Reference Architecture](#reference-architecture)
+* [Reference Architecture (Legacy)](#reference-architecture-legacy)
 * [Configuring Audit Log Delivery Through Event Hub](#audit-log-delivery-via-event-hub)
 * [Setting up Storage Accounts](#setting-up-storage-accounts)
 * [Mount Storage Accounts](https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html)
@@ -33,9 +35,20 @@ There are two primary sources of data that need to be configured:
 ![AzureClusterLogging](/images/EnvironmentSetup/Cluster_Logs_Azure.png)
 
 ## Reference Architecture
+As of 0.7.1 Overwatch can be deployed on a single workspace and retrieve data from all workspaces. For more details 
+on requirements see [Multi-Workspace Consideration]({{%relref "DeployOverwatch"%}}/#multi-workspace-monitoring---considerations). 
+There are many cases where some workspaces should be able to monitor many workspaces and others should only monitor 
+themselves. Additionally, co-location of the output data and who should be able to access what data also comes into play, 
+this reference architecture can accommodate all of these needs. To learn more about the details walk through the 
+[deployment steps]({{%relref "DeployOverwatch"%}})
+![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure.png)
+
+## Reference Architecture (Legacy)
+The legacy architecture method (pre 0.7.1.0) required that Overwtach be deployed as a job on all workspaces. Since 
+0.7.1 this is no longer the case. See [Reference Architecture](#reference-architecture)
 | Basic Deployment       | Multi-Region Deployment |
 | ---------------------- | ----------------------  |
-| ![BasicAzureArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_Azure.png)| ![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure.png)|
+| ![BasicAzureArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_Azure.png)| ![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure_Legacy.png)|
 
 ### Audit Log Delivery via Event Hub
 * Audit Log Delivery

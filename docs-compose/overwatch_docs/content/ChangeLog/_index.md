@@ -5,7 +5,35 @@ weight: 4
 ---
 
 ## 0.7.1.0 (Feature Release)
-HOLD -- INITIAL COMMIT
+**Multi-Workspace Deployments Are Here!!** 
+
+If you're tired of managing and maintaining Overwatch jobs on all your workspaces, be tired no more. Migrate your 
+configurations to the new, enhanced configuration method and simplify your deployment with this release. Existing 
+customers wanting to migrate to this deployment method, 
+[**START HERE**]({{%relref "DeployOverwatch/RunningOverwatch"%}}/#migrating-from-legacy-deployments)
+
+### Requirements
+You must be running 0.7.0.x before upgrading to this version. No upgrade script is required but steps are required to 
+migrate to the new deployment method.
+
+### Additional Changes
+* Enhanced Documentation
+* Enhanced API Manager
+* Updated Default hourly DBUs and Node Pricing
+* Upgrade to DBR 11.3LTS as default DBR
+* Performance Improvements
+* Photon Tested and Validated with significant efficiency gains (in most cases)
+
+[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/13)
+
+## 0.7.0.0.5 (PATCH)
+Patch for 0.7.0.0.4. Fixes a [regression introduced in 0.7.0.0.4](https://github.com/databrickslabs/overwatch/pull/649) 
+for clusterEventsBronze. This patch also promotes total_dbus field to JRCP table.
+
+* **If you previously ran 0.7.0.0.4 you must run the following repair script** to correct data in cluster_events_bronze. 
+  If you don't you will receive schema merge errors in clusterEvents bronze module. If you did not run 07004, you do not 
+  need to run this script. 
+  * [HTML](/assets/ChangeLog/07005_clusterEventsSchemaRepair.html) | [DBC](/assets/ChangeLog/07005_clusterEventsSchemaRepair.dbc)
 
 ## 0.7.0.0.4 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
