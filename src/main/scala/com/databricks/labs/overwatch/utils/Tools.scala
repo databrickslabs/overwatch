@@ -2,6 +2,8 @@ package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
 import com.databricks.labs.overwatch.pipeline._
@@ -578,31 +580,22 @@ object Helpers extends SparkSessionWrapper {
    *                           to this pipeline_report output
    * @return
    */
-  def getRemoteWorkspaceByPath(pipelineReportPath: String, workspaceID: String): Workspace = {
-    // handle non-nullable field between azure and aws
-    val addNewConfigs = Map(
-      "auditLogConfig.azureAuditLogEventhubConfig" ->
-        when($"auditLogConfig.rawAuditPath".isNotNull, lit(null))
-          .otherwise($"auditLogConfig.azureAuditLogEventhubConfig")
-          .alias("azureAuditLogEventhubConfig")
-    )
 
-    // acquires the config for the workspaceId from the latest run
-    val orgRunDetailsBase = spark.read.format("delta").load(pipelineReportPath)
+  def getRemoteWorkspaceByPath(pipelineReportPath: String, successfulOnly: Boolean = true,workspaceID: String): Workspace = {
+
+    //val workspaceID = Initializer.getOrgId
+
+  val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
+    val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
+    val testConfig = spark.read.format("delta").load(pipelineReportPath)
+      .filter(statusFilter)
+      .withColumn("rnk", rank().over(latestConfigByOrg))
+      .withColumn("rn", row_number().over(latestConfigByOrg))
+      .filter('rnk === 1 && 'rn === 1)
       .filter('organization_id === workspaceID)
-      .select('organization_id, 'Pipeline_SnapTS, 'inputConfig)
-      .orderBy('Pipeline_SnapTS.desc)
-      .select($"inputConfig.*")
-
-    // get latest workspace config by org_id
-    val overwatchParams = orgRunDetailsBase
-      .select(SchemaTools.modifyStruct(orgRunDetailsBase.schema, addNewConfigs): _*)
-      .limit(1)
-      .as[OverwatchParams]
-      .first
-
-    val compactString = JsonUtils.objToJson(overwatchParams).compactString
-    Initializer(compactString, disableValidations = true, initializeDatabase = false)
+      .select(to_json('inputConfig).alias("compactString"))
+      .as[String].first()
+    Initializer(testConfig, disableValidations = true, initializeDatabase = false)
   }
 
   /**
@@ -611,28 +604,110 @@ object Helpers extends SparkSessionWrapper {
    * Get the remote workspace using 'getRemoteWorkspaceByPath' function, build a localDataTarget to define the local
    * etl and consumer database details
    *
-   * @param remoteWorkspace remote workspace can be retrieved through getRemoteWorkspaceByPath
-   * @param localDataTarget DataTarget defined for local database names and locations
-   *                        the etlStoragePrefix must point to the existing Overwatch dataset whether it's mounted
-   *                        or direct access via s3:// or abfss:// or dbfs:/mnt/ etc.
+   * @param remoteStoragePrefix remote storage prefix for the remote workspace where overwatch has been deployed
+   * @param remoteWorkspaceID   workSpaceID for the remoteworkspace which will be used in getRemoteWorkspaceByPath
+   * @param localETLDatabaseName ETLDatabaseName that user want to override. If not provided then etlDatabase name
+   *                             from the remoteWorkspace would be used as etlDatabase for current workspace
+   * @param localConsumerDatabaseName ConsumerDatabase that user want to override. If not provided then ConsumerDatabase name
+   *                             from the remoteWorkspace would be used as ConsumerDatabase for current workspace
+   * @param remoteETLDataPathPrefixOverride Param to override StoragePrefix. If not provided then remoteStoragePrefix+"/global_share"
+   *                                        would be used as StoragePrefix
+   * @param usingExternalMetastore If user using any ExternalMetastore.
+   * @param workspacesAllowed  If we want to fill the data for a specific workSpaceID. In that case only ConsumerDB would be
+   *                           visible to the customer
    * @return
    */
   def registerRemoteOverwatchIntoLocalMetastore(
-                                                 remoteWorkspace: Workspace,
-                                                 localDataTarget: DataTarget
+                                                 remoteStoragePrefix: String,
+                                                 remoteWorkspaceID: String,
+                                                 localETLDatabaseName: String = "",
+                                                 localConsumerDatabaseName: String = "",
+                                                 remoteETLDataPathPrefixOverride: String = "",
+                                                 usingExternalMetastore: Boolean = false,
+                                                 workspacesAllowed: Array[String] = Array()
                                                ): Seq[WorkspaceMetastoreRegistrationReport] = {
 
+    // Derive eltDatapathPrefix
+    val eltDataPathPrefix = if (remoteETLDataPathPrefixOverride == "") {
+      remoteStoragePrefix + "/global_share"
+    } else remoteETLDataPathPrefixOverride
+
+    // Check whether eltDatapathPrefix Contains PipReport
+    val pipReportPath = eltDataPathPrefix+"/pipeline_report"
+    try{
+      dbutils.fs.ls(s"$pipReportPath/_delta_log").nonEmpty
+      logger.log(Level.INFO, s"Overwatch has being deployed with ${pipReportPath} location...proceed")
+    }catch {
+      case e: FileNotFoundException =>
+        val msg = s"Overwatch has not been deployed with ${pipReportPath} location...can not proceed"
+        logger.log(Level.ERROR, msg)
+        throw new BadConfigException(msg)
+    }
+
+    // Derive Remote Workspace
+    val remoteWorkspace = Helpers.getRemoteWorkspaceByPath(pipReportPath,successfulOnly= true,remoteWorkspaceID)
+
+    val remoteConfig = remoteWorkspace.getConfig
+    val etlDatabaseNameToCreate = if (localETLDatabaseName == "" & !usingExternalMetastore)  {remoteConfig.databaseName} else {localETLDatabaseName}
+    val consumerDatabaseNameToCreate = 	if (localConsumerDatabaseName == "" & !usingExternalMetastore) {remoteConfig.consumerDatabaseName} else {localConsumerDatabaseName}
+    val LocalWorkSpaceID = if (dbutils.notebook.getContext.tags("orgId") == "0") {
+      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+    } else dbutils.notebook.getContext.tags("orgId")
+
+    val localETLDBPath = if (!usingExternalMetastore ){
+      Some(s"${remoteStoragePrefix}/${LocalWorkSpaceID}/${etlDatabaseNameToCreate}.db")
+    }else{
+      val storagePrefix = remoteETLDataPathPrefixOverride.split("/").dropRight(1).mkString("/")
+      Some(s"${storagePrefix}/${LocalWorkSpaceID}/${etlDatabaseNameToCreate}.db")
+    }
+    val localConsumerDBPath = if (!usingExternalMetastore) {
+      Some(s"${remoteStoragePrefix}/${LocalWorkSpaceID}/${consumerDatabaseNameToCreate}.db")
+    }else{
+      val storagePrefix = remoteETLDataPathPrefixOverride.split("/").dropRight(1).mkString("/")
+      Some(s"${storagePrefix}/${LocalWorkSpaceID}/${consumerDatabaseNameToCreate}.db")
+    }
+
+
+    if (usingExternalMetastore){
+      try {
+        if (localConsumerDatabaseName == localETLDatabaseName) {
+          logger.log(Level.INFO, s"ExternalMetastore Flag is true and localConsumerDatabaseName is same as localETLDatabaseName")
+        } else {
+          throw new BadConfigException(s"ExternalMetastore Flag is true and localConsumerDatabaseName is not same as localETLDatabaseName")
+        }
+      }catch{
+        case e: BadConfigException =>
+          val msg = s"TABLE REGISTRATION FAILED: ${e.getMessage}"
+          logger.log(Level.ERROR, msg)
+          throw new BadConfigException(msg)
+      }
+    }else{
+      logger.log(Level.INFO, s"External Metastore Flag set as ${usingExternalMetastore}")
+    }
+
+    //    if (usingExternalMetastore & localConsumerDatabaseName == localETLDatabaseName){
+    //      println("localConsumerDatabaseName and localETLDatabaseName both are same...Proceed")
+    //    }else{
+    //      println("localConsumerDatabaseName and localETLDatabaseName both are Not same...Does not Proceed")
+    //    }
+
+    val localDataTarget = DataTarget(
+      Some(etlDatabaseNameToCreate), localETLDBPath, Some(eltDataPathPrefix),
+      Some(consumerDatabaseNameToCreate), localConsumerDBPath
+    )
     val newConfigParams = remoteWorkspace.getConfig.inputConfig.copy(dataTarget = Some(localDataTarget))
     val newConfigArgs = JsonUtils.objToJson(newConfigParams).compactString
     val localTempWorkspace = Initializer(newConfigArgs, disableValidations = true)
     val registrationReport = localTempWorkspace.addToMetastore()
-    val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
-    val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = true)
+    val b = Bronze(localTempWorkspace, suppressReport = true, suppressStaticDatasets = false)
+    val g = Gold(localTempWorkspace, suppressReport = true, suppressStaticDatasets = false)
 
-    b.refreshViews()
-    g.refreshViews()
+    b.refreshViews(workspacesAllowed)
+    g.refreshViews(workspacesAllowed)
+    if (workspacesAllowed.nonEmpty){
+      if (spark.catalog.databaseExists(etlDatabaseNameToCreate)) spark.sql(s"Drop Database ${etlDatabaseNameToCreate} cascade")
+    }
     registrationReport
-
   }
 
   private def rollbackTargetToTimestamp(

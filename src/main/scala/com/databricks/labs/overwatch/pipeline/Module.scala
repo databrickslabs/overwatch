@@ -50,7 +50,7 @@ class Module(
    */
   def shuffleFactor: Double = {
     val daysBucket = 30
-    val derivedShuffleFactor = _shuffleFactor * Math.floor(daysToProcess / daysBucket).toInt
+    val derivedShuffleFactor = _shuffleFactor * Math.max(Math.floor(daysToProcess / daysBucket).toInt, 1)
     logger.info(s"SHUFFLE FACTOR: Set to $derivedShuffleFactor")
 
     derivedShuffleFactor
@@ -216,7 +216,7 @@ class Module(
   private def finalizeModule(report: ModuleStatusReport): Unit = {
     pipeline.updateModuleState(report.simple)
     if (!pipeline.readOnly) {
-      pipeline.database.write(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
+      pipeline.database.writeWithRetry(Seq(report).toDF, pipeline.pipelineStateTarget, pipeline.pipelineSnapTime.asColumnTS)
     }
   }
 
@@ -335,7 +335,7 @@ class Module(
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
 
-    val startMsg = s"\nBeginning: $moduleId-$moduleName\nTIME RANGE: ${fromTime.asTSString} -> ${untilTime.asTSString}"
+    val startMsg = s"\nBeginning: $moduleId-$moduleName\nTIME RANGE: ${fromTime.asTSString} -> ${untilTime.asTSString} --> Workspace ID: ${config.organizationId}"
     println(startMsg)
 
     if (config.debugFlag) println(startMsg)
