@@ -310,39 +310,39 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
-  def refreshViews(): Unit = {
+  def refreshViews(workspacesAllowed: Array[String] = Array()): Unit = {
     config.overwatchScope.foreach {
       case OverwatchScope.accounts => {
-        GoldTargets.accountLoginViewTarget.publish(accountLoginViewColumnMappings)
-        GoldTargets.accountModsViewTarget.publish(accountModViewColumnMappings)
+        GoldTargets.accountLoginViewTarget.publish(accountLoginViewColumnMappings,workspacesAllowed = workspacesAllowed)
+        GoldTargets.accountModsViewTarget.publish(accountModViewColumnMappings,workspacesAllowed = workspacesAllowed)
       }
       case OverwatchScope.notebooks => {
-        GoldTargets.notebookViewTarget.publish(notebookViewColumnMappings)
+        GoldTargets.notebookViewTarget.publish(notebookViewColumnMappings,workspacesAllowed = workspacesAllowed)
       }
       case OverwatchScope.pools => {
-        GoldTargets.poolsViewTarget.publish(poolsViewColumnMapping)
+        GoldTargets.poolsViewTarget.publish(poolsViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case OverwatchScope.clusters => {
-        GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping)
+        GoldTargets.clusterViewTarget.publish(clusterViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case OverwatchScope.clusterEvents => {
-        GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings)
+        GoldTargets.clusterStateFactViewTarget.publish(clusterStateFactViewColumnMappings,workspacesAllowed = workspacesAllowed)
       }
       case OverwatchScope.jobs => {
-        GoldTargets.jobViewTarget.publish(jobViewColumnMapping)
-        GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping)
-        GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
+        GoldTargets.jobViewTarget.publish(jobViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.jobRunsViewTarget.publish(jobRunViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case OverwatchScope.sparkEvents => {
-        GoldTargets.sparkJobViewTarget.publish(sparkJobViewColumnMapping)
-        GoldTargets.sparkStageViewTarget.publish(sparkStageViewColumnMapping)
-        GoldTargets.sparkTaskViewTarget.publish(sparkTaskViewColumnMapping)
-        GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping)
-        GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
-        GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
+        GoldTargets.sparkJobViewTarget.publish(sparkJobViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.sparkStageViewTarget.publish(sparkStageViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.sparkTaskViewTarget.publish(sparkTaskViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.sparkExecutionViewTarget.publish(sparkExecutionViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case OverwatchScope.dbsql => {
-        GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
+        GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case _ =>
     }
@@ -376,6 +376,7 @@ object Gold {
                                 readOnly: Boolean = false,
                                 suppressReport: Boolean = false,
                                 suppressStaticDatasets: Boolean = false
+
                               ): Gold = {
     val goldPipeline = new Gold(workspace, workspace.database, workspace.getConfig)
       .setReadOnly(if (workspace.isValidated) readOnly else true) // if workspace is not validated set it read only
