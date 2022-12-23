@@ -3,6 +3,8 @@ package com.databricks.labs.overwatch.utils
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
+import java.util.concurrent.ConcurrentHashMap
+import scala.collection.JavaConverters._
 
 /**
  * Enables access to the Spark variable.
@@ -13,6 +15,8 @@ trait SparkSessionWrapper extends Serializable {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  private val sessionsMap = new ConcurrentHashMap[Long, SparkSession]().asScala
+
   /**
    * Init environment. This structure alows for multiple calls to "reinit" the environment. Important in the case of
    * autoscaling. When the cluster scales up/down envInit and then check for current cluster cores.
@@ -20,13 +24,32 @@ trait SparkSessionWrapper extends Serializable {
   @transient
   lazy protected val _envInit: Boolean = envInit()
 
+
+  private def buildSpark(): SparkSession = {
+    println("calling buildSpark global session"+Thread.currentThread().getId()+" hashcode for sessionMap "+sessionsMap.hashCode())
+    sessionsMap.hashCode()
+    SparkSession
+      .builder()
+      .appName("GlobalSession")
+      .getOrCreate()
+  }
   /**
    * Access to spark
    * If testing locally or using DBConnect, the System variable "OVERWATCH" is set to "LOCAL" to make the code base
    * behavior differently to work in remote execution AND/OR local only mode but local only mode
    * requires some additional setup.
    */
-  lazy val spark: SparkSession = if (System.getenv("OVERWATCH") != "LOCAL") {
+  val spark: SparkSession = {
+
+    val currentThreadID = Thread.currentThread().getId()
+    println(sessionsMap.size+":Session Map size,Contains key: "+sessionsMap.contains(currentThreadID)+"Thread id:"+currentThreadID)
+    val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
+    sessionsMap.put(currentThreadID, sparkSession)
+    sparkSession
+  }
+
+
+/*  lazy val spark: SparkSession = if (System.getenv("OVERWATCH") != "LOCAL") {
     logger.log(Level.INFO, "Using Databricks SparkSession")
     SparkSession
       .builder().master("local").appName("OverwatchBatch")
@@ -43,7 +66,7 @@ trait SparkSessionWrapper extends Serializable {
 //      .enableHiveSupport()
 //      .config("spark.warehouse.dir", "metastore")
       .getOrCreate()
-  }
+  }*/
 
   lazy val sc: SparkContext = spark.sparkContext
 //  sc.setLogLevel("WARN")
