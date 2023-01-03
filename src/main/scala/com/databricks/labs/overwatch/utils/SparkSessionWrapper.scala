@@ -6,6 +6,14 @@ import org.apache.spark.sql.SparkSession
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConverters._
 
+
+object SparkSessionWrapper {
+
+//  private var parSessionsOn = false
+  private[overwatch] val sessionsMap = new ConcurrentHashMap[Long, SparkSession]().asScala
+
+}
+
 /**
  * Enables access to the Spark variable.
  * Additional logic can be added to the if statement to enable different types of spark environments
@@ -14,8 +22,7 @@ import scala.collection.JavaConverters._
 trait SparkSessionWrapper extends Serializable {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-
-  private val sessionsMap = new ConcurrentHashMap[Long, SparkSession]().asScala
+  private val sessionsMap = SparkSessionWrapper.sessionsMap
 
   /**
    * Init environment. This structure alows for multiple calls to "reinit" the environment. Important in the case of
@@ -25,7 +32,7 @@ trait SparkSessionWrapper extends Serializable {
   lazy protected val _envInit: Boolean = envInit()
 
 
-  private def buildSpark(): SparkSession = {
+  protected def buildSpark(): SparkSession = {
     println("calling buildSpark global session"+Thread.currentThread().getId()+" hashcode for sessionMap "+sessionsMap.hashCode())
     sessionsMap.hashCode()
     SparkSession
@@ -39,13 +46,20 @@ trait SparkSessionWrapper extends Serializable {
    * behavior differently to work in remote execution AND/OR local only mode but local only mode
    * requires some additional setup.
    */
-  val spark: SparkSession = {
+  def spark: SparkSession = {
 
-    val currentThreadID = Thread.currentThread().getId()
-    println(sessionsMap.size+":Session Map size,Contains key: "+sessionsMap.contains(currentThreadID)+"Thread id:"+currentThreadID)
-    val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
-    sessionsMap.put(currentThreadID, sparkSession)
-    sparkSession
+    val parSession = buildSpark().conf.get("overwatch.parSession.enabled")
+
+    if (parSession.toBoolean) {
+      val currentThreadID = Thread.currentThread().getId()
+      println(sessionsMap.size+":Session Map size,Contains key: "+sessionsMap.contains(currentThreadID)+"Thread id:"+currentThreadID)
+      val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
+      sparkSession.conf.set("overwatch.parSession.enabled", parSession.toString)
+      sessionsMap.put(currentThreadID, sparkSession)
+      sparkSession
+    } else {
+      buildSpark()
+    }
   }
 
 
