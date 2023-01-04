@@ -7,8 +7,8 @@ version := "0.7.0.0.4"
 scalaVersion := "2.12.12"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 
-fork in Test := true
-envVars in Test := Map("OVERWATCH_ENV" -> " ","OVERWATCH_TOKEN" -> " ","OVERWATCH" -> " ")
+Test / fork  := true
+Test / envVars := Map("OVERWATCH_ENV" -> " ","OVERWATCH_TOKEN" -> " ","OVERWATCH" -> " ")
 
 val sparkVersion = "3.1.2"
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
@@ -29,8 +29,8 @@ libraryDependencies += "com.github.mrpowers" %% "spark-fast-tests" % "0.23.0" % 
 libraryDependencies += "org.mockito" % "mockito-core" % "3.5.15" % Test
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.2" % Test
 
-run in Compile := Defaults.runTask(fullClasspath in Compile, mainClass in (Compile, run), runner in (Compile, run)).evaluated
-runMain in Compile := Defaults.runMainTask(fullClasspath in Compile, runner in(Compile, run)).evaluated
+Compile / run := Defaults.runTask(Compile / fullClasspath ,Compile/ run / mainClass, Compile / run / runner).evaluated
+Compile / runMain  := Defaults.runMainTask(Compile / fullClasspath,Compile / run /  runner ).evaluated
 
 // groupId, SCM, license information
 homepage := Some(url("https://github.com/databrickslabs/overwatch"))
@@ -38,8 +38,7 @@ scmInfo := Some(ScmInfo(url("https://github.com/databrickslabs/overwatch"), "git
 developers := List(Developer("geeksheikh", "Daniel Tomes", "daniel@databricks.com", url("https://github.com/GeekSheikh")))
 licenses += ("Databricks", url("https://github.com/databrickslabs/overwatch/blob/develop/LICENSE"))
 publishMavenStyle := true
-
-parallelExecution in Test := false //TO avoid object collision happening in PipelineFunctionsTest
+Test / parallelExecution := false //TO avoid object collision happening in PipelineFunctionsTest
 
 publishTo := Some(
   if (version.value.endsWith("SNAPSHOT"))
@@ -48,26 +47,8 @@ publishTo := Some(
     Opts.resolver.sonatypeStaging
 )
 
-// enforce execution of tests during packaging - uncomment next line when we fix dependencies
-// Keys.`package` := (Compile / Keys.`package` dependsOn Test / test).value
-
-//coverageEnabled := true
-//coverageMinimum := 80
-//coverageFailOnMinimum := true
-
-//test in assembly := {}
-
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
   case x => MergeStrategy.first
 }
-assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
-
-// exclude scala-library dependency
-// assemblyExcludedJars in assembly := {
-//   val cp = (fullClasspath in assembly).value
-//   cp filter { f =>
-//     f.data.getName.contains("eventhubs") ||
-//     f.data.getName.contains("msal4j")
-//   }
-// }
+ assembly / assemblyOption := (assembly / assemblyOption).value.copy(includeScala = false)
