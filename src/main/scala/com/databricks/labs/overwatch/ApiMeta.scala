@@ -95,6 +95,10 @@ trait ApiMeta {
     true
   }
 
+  /**
+   * Function generates a basic HttpRequest based on the ApiMeta.
+   * @return
+   */
   private[overwatch] def getBaseRequest(): HttpRequest = {
     var request = Http(s"""${apiEnv.workspaceURL}/${apiV}/${apiName}""")
       .copy(headers = httpHeaders)
@@ -151,12 +155,28 @@ class ApiMetaFactory {
       case "workspace/list" => new WorkspaceListApi
       case "sql/history/queries" => new SqlQueryHistoryApi
       case "clusters/resize" => new ClusterResizeApi
-      case _ => logger.log(Level.WARN, "API not configured, returning full dataset"); throw new Exception("API NOT SUPPORTED")
+      case "jobs/runs/get" => new JobRunGetApi
+      case "dbfs/search-mounts" => new DbfsSearchMountsApi
+      case _ => new UnregisteredApi
     }
     logger.log(Level.INFO, meta.toString)
     meta
   }
 }
+
+class UnregisteredApi extends ApiMeta {
+  setApiCallType("GET")
+}
+
+class DbfsSearchMountsApi extends ApiMeta{
+  setApiCallType("GET")
+  setDataframeColumn("mounts")
+}
+
+class JobRunGetApi extends ApiMeta{
+  setApiCallType("GET")
+}
+
 
 class ClusterResizeApi extends ApiMeta {
   setApiCallType("POST")
