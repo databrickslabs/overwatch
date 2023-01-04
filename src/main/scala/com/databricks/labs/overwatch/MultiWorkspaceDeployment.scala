@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
@@ -354,9 +355,11 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    * @param zones       the zone can be Bronze,Silver or Gold by default it will be Bronze
    */
   def deploy(parallelism: Int = 4, zones: String = "Bronze,Silver,Gold"): Unit = {
+    SparkSessionWrapper.parSessionsOn =true
     val processingStartTime = System.currentTimeMillis();
     println("ParallelismLevel :" + parallelism)
-
+    spark.conf.set("overwatch_session_id", "-99")
+    println(s"""GLOBAL SPARK SESSION ID = ${spark.conf.getOption("overwatch_session_id").getOrElse("0")}""")
     val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
     snapshotConfig(multiWorkspaceConfig)
     val params = DeploymentValidation
@@ -369,6 +372,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val responseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
       params.foreach(deploymentParams => {
+        println(s"""ThreadID: ${Thread.currentThread().getId()}""")
+        spark.conf.set("overwatch_session_id", Thread.currentThread().getId())
+        println(s"""THREADED SPARK SESSION ID = ${spark.conf.getOption("overwatch_session_id").getOrElse("null")} ThreadID: ${Thread.currentThread().getId()}""")
+
         val future = Future {
           zone.toLowerCase match {
             case "bronze" =>
@@ -389,6 +396,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       }
     })
     saveDeploymentReport(deploymentReport, multiWorkspaceConfig.head.etl_storage_prefix, "deploymentReport")
+    SparkSessionWrapper.sessionsMap.clear()
+    println("Map size"+SparkSessionWrapper.sessionsMap.size)
     println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
 
   }

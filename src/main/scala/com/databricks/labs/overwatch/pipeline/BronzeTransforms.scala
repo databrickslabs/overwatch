@@ -464,6 +464,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 apiEnv: ApiEnv,
                                 tmpClusterEventsSuccessPath: String,
                                 tmpClusterEventsErrorPath: String) = {
+    SparkSessionWrapper.parSessionsOn = false
     val finalResponseCount = clusterIDs.length
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
@@ -543,6 +544,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
     logger.log(Level.INFO, " Cluster event landing completed")
+    SparkSessionWrapper.parSessionsOn = true
   }
 
   private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
@@ -633,9 +635,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       )
       logger.log(Level.INFO, "Persist error completed")
     }
+    println(s"""bronze start THREADED SPARK SESSION ID = ${spark.conf.getOption("overwatch_session_id").getOrElse("null")} Thread id=${Thread.currentThread().getId}""")
     spark.conf.set("spark.sql.caseSensitive", "true")
     val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
     spark.conf.set("spark.sql.caseSensitive", "false")
+    println(s"""bronze end THREADED SPARK SESSION ID = ${spark.conf.getOption("overwatch_session_id").getOrElse("null")} Thread id=${Thread.currentThread().getId}""")
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
     clusterEventDf

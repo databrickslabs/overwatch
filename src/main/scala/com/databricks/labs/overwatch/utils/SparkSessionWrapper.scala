@@ -1,15 +1,17 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper.parSessionsOn
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
+
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConverters._
 
 
 object SparkSessionWrapper {
 
-//  private var parSessionsOn = false
+   var parSessionsOn = false
   private[overwatch] val sessionsMap = new ConcurrentHashMap[Long, SparkSession]().asScala
 
 }
@@ -33,10 +35,10 @@ trait SparkSessionWrapper extends Serializable {
 
 
   protected def buildSpark(): SparkSession = {
-    println("calling buildSpark global session"+Thread.currentThread().getId()+" hashcode for sessionMap "+sessionsMap.hashCode())
+    logger.log(Level.INFO, "Building Spark global session for:"+Thread.currentThread().getId()+" parSessionsOn: "+parSessionsOn)
     sessionsMap.hashCode()
     SparkSession
-      .builder()
+      .builder().master("local")
       .appName("GlobalSession")
       .getOrCreate()
   }
@@ -46,15 +48,13 @@ trait SparkSessionWrapper extends Serializable {
    * behavior differently to work in remote execution AND/OR local only mode but local only mode
    * requires some additional setup.
    */
-  def spark: SparkSession = {
+  val spark: SparkSession = {
+    val parSession = SparkSessionWrapper.parSessionsOn
 
-    val parSession = buildSpark().conf.get("overwatch.parSession.enabled")
-
-    if (parSession.toBoolean) {
+    if (parSession) {
       val currentThreadID = Thread.currentThread().getId()
-      println(sessionsMap.size+":Session Map size,Contains key: "+sessionsMap.contains(currentThreadID)+"Thread id:"+currentThreadID)
+      logger.log(Level.INFO,s"""Session Map size:${sessionsMap.size},Session Map Contains Thread:${sessionsMap.contains(currentThreadID)} Thread id:${currentThreadID}""")
       val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
-      sparkSession.conf.set("overwatch.parSession.enabled", parSession.toString)
       sessionsMap.put(currentThreadID, sparkSession)
       sparkSession
     } else {
