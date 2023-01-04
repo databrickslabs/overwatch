@@ -277,13 +277,15 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated
       zOrderBy = Array("runId", "jobId"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      persistBeforeWrite = true
     )
 
     lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
       name = "account_login_silver",
       _keys = Array("timestamp", "login_type", "requestId", "sourceIPAddress"),
       config,
+      _permitDuplicateKeys = false,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -340,6 +342,16 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
 
+    lazy private[overwatch] val sqlQueryHistoryTarget: PipelineTable = PipelineTable(
+      name = "sql_query_history_silver",
+      _keys = Array("warehouse_id", "query_id", "query_start_time_ms"),
+      config,
+      _mode = WriteMode.merge,
+      _permitDuplicateKeys = false,
+      incrementalColumns = Array("query_start_time_ms"),
+      partitionBy = Seq("organization_id")
+    )
+
   }
 
   object GoldTargets {
@@ -393,6 +405,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("run_id", "startEpochMS"),
       config,
       _mode = WriteMode.merge,
+      zOrderBy = Array("job_id", "run_id"),
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -408,6 +421,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("run_id", "startEpochMS"),
       config,
       _mode = WriteMode.merge,
+      zOrderBy = Array("job_id", "run_id"),
       incrementalColumns = Array("startEpochMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -451,6 +465,7 @@ abstract class PipelineTargets(config: Config) {
       name = "account_login_gold",
       _keys = Array("request_id", "login_type", "login_unixTimeMS", "from_ip_address"),
       config,
+      _permitDuplicateKeys = false,
       incrementalColumns = Array("login_unixTimeMS"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -579,8 +594,24 @@ abstract class PipelineTargets(config: Config) {
     )
 
     lazy private[overwatch] val sparkStreamViewTarget: PipelineView = PipelineView(
-      name = "sparkStream_Preview",
+      name = "sparkStream",
       sparkStreamTarget,
+      config
+    )
+
+    lazy private[overwatch] val sqlQueryHistoryTarget: PipelineTable = PipelineTable(
+      name = "sql_query_history_gold",
+      _keys = Array("warehouse_id", "query_id", "query_start_time_ms"),
+      config,
+      _mode = WriteMode.merge,
+      _permitDuplicateKeys = false,
+      incrementalColumns = Array("query_start_time_ms"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val sqlQueryHistoryViewTarget: PipelineView = PipelineView(
+      name = "sqlQueryHistory",
+      sqlQueryHistoryTarget,
       config
     )
 

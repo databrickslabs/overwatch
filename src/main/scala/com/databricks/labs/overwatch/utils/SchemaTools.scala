@@ -129,7 +129,7 @@ object SchemaTools extends SparkSessionWrapper {
   }
 
   /**
-   * recurse through a struct and apply a transformation to all fields in the structed as noted in the
+   * recurse through a struct and apply a transformation to all fields in the structure as noted in the
    * changeInventory. Enabled for nested fields, they can be accessed through dot notation such as
    * parent.child.grandchild
    * @param structToModify which struct to modify, recursion supported through dot notation
@@ -184,9 +184,10 @@ object SchemaTools extends SparkSessionWrapper {
    * @param spark sparkSession to use for json parsing
    * @param df Dataframe containing column to parse
    * @param c column name as a string -- supports recursion via dot map notation parent.child.grandchild
+   * @param isArrayWrapped if the struct is wrapped inside an array set this to true
    * @return
    */
-  def structFromJson(spark: SparkSession, df: DataFrame, c: String): Column = {
+  def structFromJson(spark: SparkSession, df: DataFrame, c: String, isArrayWrapped: Boolean = false, allNullMinimumSchema: DataType = NullType): Column = {
     import spark.implicits._
     require(SchemaTools.getAllColumnNames(df.schema).contains(c), s"The dataframe does not contain col $c")
     require(df.select(SchemaTools.flattenSchema(df): _*).schema.fields.map(_.name).contains(c.replaceAllLiterally(".", "_")), "Column must be a json formatted string")
@@ -195,9 +196,10 @@ object SchemaTools extends SparkSessionWrapper {
       println(s"WARNING: The json schema for column $c was not parsed correctly, please review.")
     }
     if (jsonSchema.isEmpty) {
-      lit(null)
+      lit(null).cast(allNullMinimumSchema).alias(c)
     } else {
-      from_json(col(c), jsonSchema).alias(c)
+      if (isArrayWrapped) from_json(col(c), ArrayType(jsonSchema)).alias(c)
+      else from_json(col(c), jsonSchema).alias(c)
     }
   }
 

@@ -139,6 +139,7 @@ class Database(config: Config) extends SparkSessionWrapper {
    * @return
    */
   private def persistAndLoad(df: DataFrame, target: PipelineTable): DataFrame = {
+    spark.conf.set("spark.databricks.delta.formatCheck.enabled", "false")
     val tempPrefix = target.config.tempWorkingDir
     val tempSuffix = UUID.randomUUID().toString.replace("-", "")
     val dfTempPath = s"${tempPrefix}/${target.name.toLowerCase}/$tempSuffix"
@@ -151,6 +152,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     df.write.format("delta").save(dfTempPath)
 
     spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16) // maximize parallelism on re-read and let
+    spark.conf.set("spark.databricks.delta.formatCheck.enabled", "true")
     // AQE bring it back down
     spark.read.format("delta").load(dfTempPath)
   }
@@ -164,15 +166,17 @@ class Database(config: Config) extends SparkSessionWrapper {
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
   def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array()): Boolean = {
-    var finalDF: DataFrame = df
+    var finalSourceDF: DataFrame = df
 
     // apend metadata to source DF
-    finalDF = if (target.withCreateDate) finalDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalDF
-    finalDF = if (target.withOverwatchRunID) finalDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalDF
-    finalDF = if (target.workspaceName) finalDF.withColumn("workspace_name", lit(config.workspaceName)) else finalDF
+    finalSourceDF = if (target.withCreateDate) finalSourceDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalSourceDF
+    finalSourceDF = if (target.withOverwatchRunID) finalSourceDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalSourceDF
+    finalSourceDF = if (target.workspaceName) finalSourceDF.withColumn("workspace_name", lit(config.workspaceName)) else finalSourceDF
 
     // if target is to be deduped, dedup it by keys
-    finalDF = if (!target.permitDuplicateKeys) finalDF.dedupByKey(target.keys, target.incrementalColumns) else finalDF
+    finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
+
+    val finalDF = if (target.persistBeforeWrite) persistAndLoad(finalSourceDF, target) else finalSourceDF
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT

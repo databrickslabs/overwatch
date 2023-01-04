@@ -1,14 +1,14 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
-import com.github.mrpowers.spark.fast.tests.DataFrameComparer
-import org.scalatest.funspec.AnyFunSpec
-import org.scalatest.{Ignore, PrivateMethodTester}
-import com.databricks.labs.overwatch.utils.{BadConfigException, Config, OverwatchScope}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.OverwatchScope._
-import com.fasterxml.jackson.core.io.JsonEOFException
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config, OverwatchScope}
 import com.fasterxml.jackson.core.JsonParseException
+import com.fasterxml.jackson.core.io.JsonEOFException
+import com.github.mrpowers.spark.fast.tests.DataFrameComparer
+import org.scalatest.PrivateMethodTester
+import org.scalatest.funspec.AnyFunSpec
 
 class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with PrivateMethodTester {
   describe("Tests for Initializer.isPVC") {
@@ -257,7 +257,6 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
   }
 
   describe("Tests for validateScope function") {
-    import com.databricks.labs.overwatch.utils.DataTarget
     it("validateScope function should throw exception when the variable in scope is not one of the valid scope") {
 
       val conf = new Config
