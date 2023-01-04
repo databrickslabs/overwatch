@@ -159,7 +159,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+  def getSqlQueryHistoryParallelDF_v0(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
     val sqlQueryHistoryEndpoint = "sql/history/queries"
     val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
@@ -270,6 +270,78 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
     logger.log(Level.INFO, " sql query history landing completed")
+    if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
+      try {
+        spark.read.json(tmpSqlQueryHistorySuccessPath)
+          .select(explode(col("res")).alias("res")).select(col("res" + ".*"))
+          .withColumn("organization_id", lit(config.organizationId))
+      } catch {
+        case e: Throwable =>
+          throw new Exception(e)
+      }
+    } else {
+      println(s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs}""")
+      logger.log(Level.INFO,s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs}""")
+      spark.emptyDataFrame
+    }
+  }
+
+  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+    val sqlQueryHistoryEndpoint = "sql/history/queries"
+    val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+    var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+    var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
+    val apiResponseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
+    val tmpSqlQueryHistorySuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
+    val tmpSqlQueryHistoryErrorPath = s"${config.tempWorkingDir}/errors/sqlqueryhistory_silver/${System.currentTimeMillis()}"
+
+    val untilTimeMs = untilTime.asUnixTimeMilli
+    var fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
+    val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
+
+    while (fromTimeMs < untilTimeMs){
+      val (startTime, endTime) = if ((untilTimeMs- fromTimeMs)/(1000*60*60) > 1) {
+        (fromTimeMs,
+          fromTimeMs+(1000*60*60))
+      }
+      else{
+        (fromTimeMs,
+          untilTimeMs)
+      }
+      //create payload for the API calls
+      val jsonQuery = Map(
+        "max_results" -> "50",
+        "include_metrics" -> "true",
+        "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime",
+        "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
+      )
+
+      apiResponseCounter = ParallelApiCallUtils.makeParallelApiCalls(
+        sqlQueryHistoryEndpoint,
+        jsonQuery,
+        result_key="res",
+        config,
+        apiResponseArray,
+        apiErrorArray,
+        tmpSqlQueryHistorySuccessPath,
+        tmpSqlQueryHistoryErrorPath,
+        apiResponseCounter,
+        acc
+      )
+
+      fromTimeMs = fromTimeMs+(1000*60*60)
+    }
+
+    ParallelApiCallUtils.processParallelApiCallsResult(apiResponseCounter,
+      finalResponseCount,
+      tmpSqlQueryHistorySuccessPath,
+      tmpSqlQueryHistoryErrorPath,
+      apiResponseArray,
+      apiErrorArray,
+      config,
+      acc,
+      sqlQueryHistoryEndpoint)
+
     if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
       try {
         spark.read.json(tmpSqlQueryHistorySuccessPath)
