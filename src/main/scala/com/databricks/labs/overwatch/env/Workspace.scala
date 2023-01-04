@@ -100,7 +100,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
-
   }
 
   /**
@@ -356,8 +355,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * @return Seq[WorkspaceMetastoreRegistrationReport]
    */
   def addToMetastore(): Seq[WorkspaceMetastoreRegistrationReport] = {
+
     require(Helpers.pathExists(config.etlDataPathPrefix), s"This function can only register the Overwatch data tables " +
       s"to the Data Target configured in Overwatch. The location ${config.etlDataPathPrefix} does not exist.")
+
     val datasets = getWorkspaceDatasets.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(getDriverCores * 2))
     datasets.tasksupport = taskSupport
@@ -368,10 +369,20 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, stmt)
       try {
         if (spark.catalog.tableExists(fullTableName)) throw new BadConfigException(s"TABLE EXISTS: SKIPPING")
-        spark.sql(stmt)
+        if (dataset.name == "tempworkingdir") throw new UnsupportedTypeException(s"Can not Create table using '${dataset.path}'")
+        else {
+          spark.sql(stmt)
+//          if (workspacesAllowed.nonEmpty){
+//            if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"Drop Database ${config.databaseName} cascade")
+//          }
+        }
+
         WorkspaceMetastoreRegistrationReport(dataset, stmt, "SUCCESS")
+
       } catch {
         case e: BadConfigException =>
+          WorkspaceMetastoreRegistrationReport(dataset, stmt, e.getMessage)
+        case e: UnsupportedTypeException =>
           WorkspaceMetastoreRegistrationReport(dataset, stmt, e.getMessage)
         case e: Throwable =>
           val msg = s"TABLE REGISTRATION FAILED: ${e.getMessage}"
@@ -379,7 +390,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           WorkspaceMetastoreRegistrationReport(dataset, stmt, msg)
       }
     }).toArray.toSeq
-    spark.sql(s"refresh ${config.databaseName}")
+    if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"refresh ${config.databaseName}")
     addReport
   }
 
