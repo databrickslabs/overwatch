@@ -514,9 +514,9 @@ object PipelineFunctions extends SparkSessionWrapper {
     val isJobsLight = sparkVersion.like("apache_spark_%")
     when(isAutomated && isJobsLight, "jobsLight")
       .when(isAutomated && !isJobsLight, "automated")
+      .when(!isAutomated, "interactive")
       .when(clusterType === "SQL Analytics", lit("sqlCompute"))
       .when(clusterType === "Serverless", lit("serverless"))
-      .when(!isAutomated, "interactive")
       .otherwise("unknown")
   }
 
