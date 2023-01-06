@@ -193,8 +193,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           Some(multiWorkspaceParams.deploymentId)
         ))
     } finally {
-      SparkSessionWrapper.sessionsMap.remove(Thread.currentThread().getId)
-      logger.log(Level.INFO, s"""Removed ${Thread.currentThread().getId} from sessionMap""")
+      clearThreadFromSessionsMap()
     }
   }
 
@@ -220,8 +219,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           Some(multiWorkspaceParams.deploymentId)
         ))
     } finally {
-      SparkSessionWrapper.sessionsMap.remove(Thread.currentThread().getId)
-      logger.log(Level.INFO, s"""Removed ${Thread.currentThread().getId} from sessionMap""")
+      clearThreadFromSessionsMap()
     }
   }
 
@@ -247,8 +245,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           Some(multiWorkspaceParams.deploymentId)
         ))
     }finally {
-        SparkSessionWrapper.sessionsMap.remove(Thread.currentThread().getId)
-        logger.log(Level.INFO, s"""Removed ${Thread.currentThread().getId} from sessionMap""")
+      clearThreadFromSessionsMap()
     }
   }
 

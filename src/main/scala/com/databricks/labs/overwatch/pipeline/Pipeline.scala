@@ -386,7 +386,7 @@ class Pipeline(
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
     //TODO clearcache will clear global cache multithread performance issue
    // spark.catalog.clearCache()
-    SparkSessionWrapper.sessionsMap.remove(Thread.currentThread().getId)
+    clearThreadFromSessionsMap()
   }
 
   private[overwatch] def restoreSparkConf(): Unit = {

@@ -741,7 +741,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val pathsGlob = validNewFilesWMetaDF
         .filter(!'failed && 'withinSpecifiedTimeRange)
         .orderBy('fileSize.desc)
-        .select('filename)
+        .select('fileName)
         .as[String].collect
       if (pathsGlob.nonEmpty) { // new files less bad files and already-processed files
         logger.log(Level.INFO, s"VALID NEW EVENT LOGS FOUND: COUNT --> ${pathsGlob.length}")
@@ -798,7 +798,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
             TransformFunctions.stringTsToUnixMillis('timestamp)
           } else col("Timestamp")
 
-          logger.log(Level.INFO, s"DEBUG: SparkEventsBronze Case Sensitivity set to: ${spark.conf.get("spark.sql.caseSensitive")}")
           baseDF
             .withColumn("Timestamp", fixDupTimestamps)
             .drop("timestamp")

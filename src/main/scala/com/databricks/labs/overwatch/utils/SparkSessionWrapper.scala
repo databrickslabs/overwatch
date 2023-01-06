@@ -30,11 +30,10 @@ trait SparkSessionWrapper extends Serializable {
    * Init environment. This structure alows for multiple calls to "reinit" the environment. Important in the case of
    * autoscaling. When the cluster scales up/down envInit and then check for current cluster cores.
    */
-  @transient
   lazy protected val _envInit: Boolean = envInit()
 
 
-  protected def buildSpark(): SparkSession = {
+  private def buildSpark(): SparkSession = {
     sessionsMap.hashCode()
     SparkSession
       .builder()
@@ -47,7 +46,7 @@ trait SparkSessionWrapper extends Serializable {
    * behavior differently to work in remote execution AND/OR local only mode but local only mode
    * requires some additional setup.
    */
-  def spark(globalSession : Boolean = false): SparkSession = {
+  private[overwatch] def spark(globalSession : Boolean = false): SparkSession = {
 
     if(SparkSessionWrapper.parSessionsOn){
       if(globalSession){
@@ -68,6 +67,11 @@ trait SparkSessionWrapper extends Serializable {
 
   lazy val sc: SparkContext = spark.sparkContext
 //  sc.setLogLevel("WARN")
+
+  def clearThreadFromSessionsMap(): Unit ={
+    sessionsMap.remove(Thread.currentThread().getId)
+    logger.log(Level.INFO, s"""Removed ${Thread.currentThread().getId} from sessionMap""")
+  }
 
   def getCoresPerWorker: Int = sc.parallelize("1", 1)
     .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0)
