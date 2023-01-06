@@ -35,7 +35,6 @@ object MultiWorkspaceRunner  extends SparkSessionWrapper{
    * @param args
    */
   def main(args: Array[String]): Unit = {
-    spark.conf.set("overwatch.parSession.enabled", "true")
     envInit()
     setGlobalDeltaOverrides()
     if (args.length == 1) { //Deploy Bronze,Silver and Gold with default parallelism.
@@ -57,9 +56,6 @@ object MultiWorkspaceRunner  extends SparkSessionWrapper{
         s"docs to compose the input arguments appropriately."
       throw new BadConfigException(errMsg)
     }
-    // ADD TO FINALLY && ALL CATCH BLOCKs if exist
-    buildSpark().conf.set("overwatch.parSession.enabled", "false")
-    SparkSessionWrapper.sessionsMap.clear()
   }
 
 }

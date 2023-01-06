@@ -21,7 +21,6 @@ object BatchRunner extends SparkSessionWrapper {
    * @param args
    */
   def main(args: Array[String]): Unit = {
-    SparkSessionWrapper.parSessionsOn =true
     envInit()
     setGlobalDeltaOverrides()
 
@@ -69,7 +68,6 @@ object BatchRunner extends SparkSessionWrapper {
       Gold(workspace).run()
     }
 
-    SparkSessionWrapper.sessionsMap.clear()
   }
 
 

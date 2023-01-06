@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper.parSessionsOn
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper.{ parSessionsOn}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
@@ -35,10 +35,9 @@ trait SparkSessionWrapper extends Serializable {
 
 
   protected def buildSpark(): SparkSession = {
-    logger.log(Level.INFO, "Building Spark global session for:"+Thread.currentThread().getId()+" parSessionsOn: "+parSessionsOn)
     sessionsMap.hashCode()
     SparkSession
-      .builder().master("local")
+      .builder()
       .appName("GlobalSession")
       .getOrCreate()
   }
@@ -48,39 +47,24 @@ trait SparkSessionWrapper extends Serializable {
    * behavior differently to work in remote execution AND/OR local only mode but local only mode
    * requires some additional setup.
    */
-  val spark: SparkSession = {
-    val parSession = SparkSessionWrapper.parSessionsOn
+  def spark(globalSession : Boolean = false): SparkSession = {
 
-    if (parSession) {
-      val currentThreadID = Thread.currentThread().getId()
-      logger.log(Level.INFO,s"""Session Map size:${sessionsMap.size},Session Map Contains Thread:${sessionsMap.contains(currentThreadID)} Thread id:${currentThreadID}""")
-      val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
-      sessionsMap.put(currentThreadID, sparkSession)
-      sparkSession
-    } else {
+    if(SparkSessionWrapper.parSessionsOn){
+      if(globalSession){
+        buildSpark()
+      }
+      else{
+        val currentThreadID = Thread.currentThread().getId()
+        val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
+        sessionsMap.put(currentThreadID, sparkSession)
+        sparkSession
+      }
+    }else{
       buildSpark()
     }
   }
-
-
-/*  lazy val spark: SparkSession = if (System.getenv("OVERWATCH") != "LOCAL") {
-    logger.log(Level.INFO, "Using Databricks SparkSession")
-    SparkSession
-      .builder().master("local").appName("OverwatchBatch")
-      .getOrCreate()
-  } else {
-    logger.log(Level.INFO, "Using Custom, local SparkSession")
-    SparkSession.builder()
-      .master("local[*]")
-      .config("spark.driver.maxResultSize", "8g")
-      .appName("OverwatchBatch")
-//    Useful configs for local spark configs and/or using labs/spark-local-execution
-//    https://github.com/databricks-academy/spark-local-execution
-//      .config("spark.driver.bindAddress", "0.0.0.0")
-//      .enableHiveSupport()
-//      .config("spark.warehouse.dir", "metastore")
-      .getOrCreate()
-  }*/
+  @transient
+  lazy val spark:SparkSession = spark(false)
 
   lazy val sc: SparkContext = spark.sparkContext
 //  sc.setLogLevel("WARN")

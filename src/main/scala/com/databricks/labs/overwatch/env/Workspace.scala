@@ -150,8 +150,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       config.apiEnv,
       sqlQueryHistoryEndpoint,
       jsonQuery,
-      tempSuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}",
-      accumulator = acc
+      tempSuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
     )
       .execute()
       .asDF()
@@ -159,6 +158,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   }
 
   def getSqlQueryHistoryParallelDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+    SparkSessionWrapper.parSessionsOn = false
     val sqlQueryHistoryEndpoint = "sql/history/queries"
     val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
@@ -195,9 +195,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           config.apiEnv,
           sqlQueryHistoryEndpoint,
           jsonQuery,
-          tempSuccessPath = tmpSqlQueryHistorySuccessPath,
-          accumulator = acc
-        ).executeMultiThread()
+          tempSuccessPath = tmpSqlQueryHistorySuccessPath
+        ).executeMultiThread(acc)
 
         synchronized {
           apiObj.forEach(
@@ -269,6 +268,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
     logger.log(Level.INFO, " sql query history landing completed")
+    SparkSessionWrapper.parSessionsOn = true
     if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
       try {
         spark.read.json(tmpSqlQueryHistorySuccessPath)

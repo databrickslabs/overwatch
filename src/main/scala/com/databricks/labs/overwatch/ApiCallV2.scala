@@ -56,13 +56,12 @@ object ApiCallV2 extends SparkSessionWrapper {
    * @param accumulator To make track of number of api request.
    * @return
    */
-  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], tempSuccessPath: String, accumulator: LongAccumulator): ApiCallV2 = {
+  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String], tempSuccessPath: String): ApiCallV2 = {
     new ApiCallV2(apiEnv)
       .setEndPoint(apiName)
       .buildMeta(apiName)
       .setQueryMap(queryMap)
       .setSuccessTempPath(tempSuccessPath)
-      .setAccumulator(accumulator)
   }
 
   /**
@@ -125,9 +124,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private var _apiFailureCount: Int = 0
   private var _printFinalStatusFlag: Boolean = true
   private var _queryMap: Map[String, String] = Map[String, String]()
-  private var _accumulator: LongAccumulator = sc.longAccumulator("ApiAccumulator") //Multithreaded call accumulator will make track of the request.
 
-  protected def accumulator: LongAccumulator = _accumulator
   protected def apiSuccessCount: Int = _apiSuccessCount
 
   protected def apiFailureCount: Int = _apiFailureCount
@@ -148,10 +145,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   protected def queryMap: Map[String, String] = _queryMap
 
-  private[overwatch] def setAccumulator(value: LongAccumulator): this.type = {
-    _accumulator = value
-    this
-  }
 
   private[overwatch] def setApiV(value: Double): this.type = {
     apiMeta.setApiV("api/"+value)
@@ -549,7 +542,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * Performs api calls in parallel.
    * @return
    */
-  def executeMultiThread(): util.ArrayList[String] = {
+  def executeMultiThread(accumulator: LongAccumulator): util.ArrayList[String] = {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
@@ -607,7 +600,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       responseCodeHandler(response)
       _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
-        accumulator.add(1)
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
           if (responseFlag) { //Clearing the resultArray in-case of successful write
