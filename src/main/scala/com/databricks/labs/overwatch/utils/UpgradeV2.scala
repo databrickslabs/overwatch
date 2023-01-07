@@ -54,17 +54,10 @@ class UpgradeTo0610(prodWorkspace: Workspace, startStep: Int = 1, endStep: Int =
           checkIfTargetExists(etlDatabaseName, targetName)
           initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
           val jobSilverDF = spark.table(s"${etlDatabaseName}.${targetName}")
-          SchemaTools.cullNestedColumns(jobSilverDF, "new_settings", Array("tasks", "job_clusters"))
-            .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
-            .write
-            .format("delta")
-            .partitionBy("organization_id", "__overwatch_ctrl_noise")
-            .mode("overwrite")
-            .option("overwriteSchema", "true")
-            .saveAsTable(s"${etlDatabaseName}.${targetName}")
+          removeNestedColumnsAndSaveAsTable(jobSilverDF,"new_settings", Array("tasks", "job_clusters"),etlDatabaseName,targetName)
           upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
         } catch {
-          case e => handleUpgradeException(e, upgradeStatus, etlDatabaseName, stepMsg, targetName)
+          case e:Throwable => handleUpgradeException(e, upgradeStatus, etlDatabaseName, stepMsg, targetName)
         }
         verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
       case 2 =>
@@ -77,18 +70,11 @@ class UpgradeTo0610(prodWorkspace: Workspace, startStep: Int = 1, endStep: Int =
           checkIfTargetExists(etlDatabaseName, targetName)
           initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
           val jobGoldDF = spark.table(s"${etlDatabaseName}.${targetName}")
-          SchemaTools.cullNestedColumns(jobGoldDF, "new_settings", Array("tasks", "job_clusters"))
-            .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
-            .write
-            .format("delta")
-            .partitionBy("organization_id", "__overwatch_ctrl_noise")
-            .mode("overwrite")
-            .option("overwriteSchema", "true")
-            .saveAsTable(s"${etlDatabaseName}.${targetName}")
+          removeNestedColumnsAndSaveAsTable(jobGoldDF,"new_settings", Array("tasks", "job_clusters"),etlDatabaseName,targetName)
           upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
         } catch {
 
-          case e => handleUpgradeException(e, upgradeStatus, etlDatabaseName, stepMsg, targetName)
+          case e:Throwable => handleUpgradeException(e, upgradeStatus, etlDatabaseName, stepMsg, targetName)
         }
         verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)
 
@@ -144,7 +130,7 @@ class UpgradeTo0610(prodWorkspace: Workspace, startStep: Int = 1, endStep: Int =
           }
           upgradeStatus.append(UpgradeReport(etlDatabaseName, targetName, Some("SUCCESS"), stepMsg))
         } catch {
-          case e => handleUpgradeException(e, upgradeStatus, etlDatabaseName, stepMsg, targetName)
+          case e:Throwable => handleUpgradeException(e, upgradeStatus, etlDatabaseName, stepMsg, targetName)
 
         }
         verifyUpgradeStatus(upgradeStatus.toArray, initialSourceVersions.toMap, tempDir)

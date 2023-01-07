@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.utils.Upgrade.{logger, spark}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{lit, rank, row_number, to_json}
+import org.apache.spark.sql.functions.{col, lit, rank, row_number, to_json}
 
 import scala.collection.mutable.ArrayBuffer
 import spark.implicits._
@@ -131,6 +131,18 @@ abstract class UpgradeHandler extends  SparkSessionWrapper{
         etlDatabaseName, targetName, Some("1"), failUpgrade = false
       )
     }
+  }
+
+  protected def removeNestedColumnsAndSaveAsTable(df: DataFrame, structToModify: String, nestedFieldsToCull: Array[String],db:String,tbl:String)={
+    SchemaTools.cullNestedColumns(df, structToModify, nestedFieldsToCull)
+      .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
+      .write
+      .format("delta")
+      .partitionBy("organization_id", "__overwatch_ctrl_noise")
+      .mode("overwrite")
+      .option("overwriteSchema", "true")
+      .saveAsTable(s"${db}.${tbl}")
+
   }
 }
 
