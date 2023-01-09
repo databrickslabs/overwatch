@@ -11,11 +11,11 @@ class InitializerFunctionsTest extends AnyFunSpec with DataFrameComparer with Sp
 
   describe("Tests for InitializerFunctions.loadLocalResource") {
     it("should throw exception for non-existing resource") {
-      assertThrows[RuntimeException](InitializerFunctions.loadLocalResource("/non-existent"))
+      assertThrows[RuntimeException](PipelineFunctions.loadLocalResource("/non-existent"))
     }
 
     it("should read text file") {
-      val data = InitializerFunctions.loadLocalResource("/file.txt")
+      val data = PipelineFunctions.loadLocalResource("/file.txt")
       assertResult(false)(data.isEmpty)
       assertResult(2)(data.size)
       assertResult("test1")(data(1))
