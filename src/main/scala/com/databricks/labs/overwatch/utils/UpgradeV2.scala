@@ -20,7 +20,7 @@ class UpgradeTo0610(prodWorkspace: Workspace, startStep: Int = 1, endStep: Int =
 
 
   def this(workspace: Workspace) {
-    this(workspace, 1, 3)
+    this(workspace, 1, 3,false)
   }
 
 
