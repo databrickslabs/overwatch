@@ -46,19 +46,12 @@ class InitializerV2(config: Config, disableValidations: Boolean, isSnap: Boolean
      *
      * Otherwise -- read from the args passed in and serialize into OverwatchParams
      */
-    val rawParams = if (config.isLocalTesting) {
-      //      config.buildLocalOverwatchParams()
-      //      val synthArgs = config.buildLocalOverwatchParams()
-      //      mapper.readValue[OverwatchParams](synthArgs)
-      mapper.readValue[OverwatchParams](overwatchArgs)
-    } else {
-      logger.log(Level.INFO, "Validating Input Parameters")
-      mapper.readValue[OverwatchParams](overwatchArgs)
-    }
+    logger.log(Level.INFO, "Validating Input Parameters")
+    val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
+    config.setInputConfig(rawParams)
 
     // Now that the input parameters have been parsed -- set them in the config
     config.setInputConfig(rawParams)
-
 
     // Add the workspace name (friendly) if provided by the customer
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
@@ -71,15 +64,14 @@ class InitializerV2(config: Config, disableValidations: Boolean, isSnap: Boolean
      * between one deployment and the next. To resolve this, PVC customers will be REQUIRED to provide a canonical
      * name for each workspace (i.e. workspaceName) to provide consistency across deployments.
      */
-    if (Init.isPVC) Init.pvcOverrideOrganizationId()
-
-
+    if (Init.isPVC && !config.isMultiworkspaceDeployment) Init.pvcOverrideOrganizationId()
 
     // Set external optimize if customer specified otherwise use default
     config.setExternalizeOptimize(rawParams.externalizeOptimize)
 
     /** Retrieve scope from user inputs, validate it, and add it to the config */
     val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
+
     if (overwatchScope.head == "all") {
       config.setOverwatchScope(config.orderedOverwatchScope)
     } else {
@@ -166,13 +158,22 @@ object InitializerV2 extends SparkSessionWrapper {
     } else dbutils.notebook.getContext.tags("orgId")
   }
 
-  private def initConfigState(debugFlag: Boolean): Config = {
+  private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
     val orgId = if (config.isLocalTesting) System.getenv("ORGID") else {
       getOrgId
     }
-    config.setOrganizationId(orgId)
+    if(organizationID.isEmpty) {
+      config.setOrganizationId(getOrgId)
+    }else{
+      logger.log(Level.INFO, "Setting multiworkspace deployment")
+      config.setOrganizationId(organizationID.get)
+      if (apiUrl.nonEmpty) {
+        config.setApiUrl(apiUrl)
+      }
+      config.setIsMultiworkspaceDeployment(true)
+    }
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
