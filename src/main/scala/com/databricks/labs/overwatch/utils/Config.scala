@@ -328,7 +328,7 @@ class Config() {
     this
   }
 
-  private def setApiEnv(value: ApiEnv): this.type = {
+  def setApiEnv(value: ApiEnv): this.type = {
     _apiEnv = value
     this
   }

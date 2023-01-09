@@ -336,9 +336,9 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       if (keyCheck.length == 0) throw new BadConfigException(s"Key ${tokenSecret.get.key} does not exist " +
         s"within the provided scope: ${tokenSecret.get.scope}. Please provide a scope and key " +
         s"available and accessible to this account.")
-      config.registerWorkspaceMeta(Some(TokenSecret(scopeName, keyCheck.head.key)),rawParams.apiEnvConfig)
+      config.buildApiEnv(Some(TokenSecret(scopeName, keyCheck.head.key)),rawParams.apiEnvConfig)
       validateApiEnv(config.apiEnv)
-    } else config.registerWorkspaceMeta(None,None)
+    } else config.buildApiEnv(None,None)
 
     // Validate data Target
     if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
@@ -633,7 +633,7 @@ object Initializer extends SparkSessionWrapper {
    *                           init.
    * @return
    */
-  private[overwatch] def apply(
+  def apply(
                                 overwatchArgs: String,
                                 debugFlag: Boolean = false,
                                 isSnap: Boolean = false,

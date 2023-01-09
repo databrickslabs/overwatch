@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions.getClass
 import com.databricks.labs.overwatch.utils.OverwatchScope.{accounts, audit, clusterEvents, clusters, dbsql, jobs, notebooks, pools, sparkEvents}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -12,6 +13,9 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
   extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+
+
+
 
   object Init {
 
@@ -367,6 +371,33 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
 
       Database(config)
     }
+    /**
+     * Load text file
+     *
+     * @param path path to the local resource
+     * @return sequence of lines read from the file
+     */
+    def loadLocalResource(path: String): Seq[String] = {
+      val fileLocation = getClass.getResourceAsStream(path)
+      if (fileLocation == null)
+        throw new RuntimeException(s"There is no resource at path: $path")
+      val source = scala.io.Source.fromInputStream(fileLocation).mkString.stripMargin
+      source.split("\\r?\\n").filter(_.trim.nonEmpty).toSeq
+    }
+
+    /**
+     * Load database for cloud provider node details
+     *
+     * @param path path to the local resource
+     * @return
+     */
+    def loadLocalCSVResource(spark: SparkSession, path: String): DataFrame = {
+      import spark.implicits._
+
+      val csvData = loadLocalResource(path).toDS()
+      spark.read.option("header", "true").option("inferSchema", "true").csv(csvData).coalesce(1)
+    }
+
 
   }
 }
