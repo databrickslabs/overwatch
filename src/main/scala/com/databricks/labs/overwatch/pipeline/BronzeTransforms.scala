@@ -178,7 +178,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
 
       if (exists && isFirstRun) { // Path cannot already exist on first run
-        val errMsg = s"$baseErrMsg\nPATH: ${p} is not empty. First run requires empty checkpoints."
+        val errMsg = s"$baseErrMsg\nPATH: ${p} is not empty. First run requires empty checkpoints. exists:${exists}, isFirstRun:${isFirstRun}"
         logger.log(Level.ERROR, errMsg)
         println(errMsg)
         throw new BadConfigException(errMsg)
@@ -877,7 +877,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       daysToProcess: Int,
                                       historicalAuditLookupDF: DataFrame,
                                       clusterSnapshotTable: PipelineTable,
-                                      sparkLogClusterScaleCoefficient: Double
+                                      sparkLogClusterScaleCoefficient: Double,
+                                      apiEnv: ApiEnv,
+                                      isMultiWorkSpaceDeployment: Boolean
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -920,13 +922,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
-    val allEventLogPrefixes = newLogDirsNotIdentifiedInAudit
-      .unionByName(incrementalClusterWLogging)
-      .withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
-      .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
-      .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
-      .select('wildPrefix)
-      .distinct()
+    val allEventLogPrefixes =
+    if(isMultiWorkSpaceDeployment) {
+      getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
+        .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix)
+     } else {
+      newLogDirsNotIdentifiedInAudit
+        .unionByName(incrementalClusterWLogging)
+        .withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)) .otherwise('cluster_log_conf))
+        .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
+        .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
+        .select('wildPrefix)
+        .distinct()
+    }
 
     // all files considered for ingest
     val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
@@ -947,9 +955,47 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .repartition().cache()
 
     // eager execution to minimize secondary compute downstream
-    eventLogPaths.count()
+    logger.log(Level.INFO,s"""Count of log path: ${eventLogPaths.count()}""")
     eventLogPaths
 
   }
+
+  protected def getMountPointMapping(apiEnv: ApiEnv): DataFrame = {
+    val endPoint = "dbfs/search-mounts"
+    ApiCallV2(apiEnv, endPoint).execute().asDF()
+  }
+
+  protected def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
+    val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
+      .withColumn("source", when('source.endsWith("/"), 'source.substr(lit(0), length('source) - 1)).otherwise('source))
+      .filter(col("mount_point") =!= "/")
+
+    //Cleaning the data for cluster log path
+    val formattedInputDf = inputDataframe.withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
+      .withColumn("cluster_mount_point_temp", regexp_replace('cluster_log_conf, "dbfs:", ""))
+      .withColumn("cluster_mount_point", regexp_replace('cluster_mount_point_temp, "//", "/"))
+
+
+    //Joining the cluster log data with mount point data
+    val joinDF = formattedInputDf
+      .join(mountMap, formattedInputDf.col("cluster_mount_point").startsWith(mountMap.col("mount_point")), "left")//starts with then when
+
+    val clusterMountPointAr = split('cluster_mount_point, "/")
+    val mountPointAr = split('mount_point, "/")
+    val hasSubFolders = size(clusterMountPointAr) > size(mountPointAr)
+    val buildSubfolderSources = concat_ws("/", 'source, array_join(array_except(split('cluster_mount_point, "/"), split('mount_point, "/")), "/"))
+
+    //Generating the final source path for mount points
+    val pathsDF = joinDF.withColumn("source_temp", when(hasSubFolders, buildSubfolderSources) otherwise ('source))
+      .withColumn("derivedSource", when('source.isNull, 'cluster_mount_point) otherwise ('source_temp))
+      .withColumn("topLevelTargets", array(col("derivedSource"), col("cluster_id"), lit("eventlog")))
+      .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
+
+    val result = pathsDF.select('wildPrefix, 'cluster_id).distinct()
+    result
+  }
+
+
+
 
 }

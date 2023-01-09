@@ -14,7 +14,7 @@ class Config() {
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
   private var _debugFlag: Boolean = false
-  private var _overwatchSchemaVersion = "0.700"
+  private var _overwatchSchemaVersion = "0.701"
   private var _organizationId: String = _
   private var _workspaceName: String = _
   private var _tempWorkingDir: String = _
@@ -203,6 +203,16 @@ class Config() {
     this
   }
 
+  private[overwatch] def setIsMultiworkspaceDeployment(value: Boolean): this.type = {
+    _isMultiworkspaceDeployment = value
+    this
+  }
+
+  private[overwatch] def setApiUrl(value: Option[String]): this.type = {
+    _apiUrl = value
+    this
+  }
+
   private[overwatch] def setInitialWorkerCount(value: Int): this.type = {
     _initialWorkerCount = value
     this
@@ -351,7 +361,12 @@ class Config() {
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty && !_isLocalTesting) { // not local testing and secret passed
-        _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+        if (isMultiworkspaceDeployment && apiUrl.nonEmpty) {
+          _workspaceUrl = apiUrl.get
+          logger.log(Level.INFO, "Multiworkspace Deployment setting the workspaceURL :" + _workspaceUrl)
+        } else {
+          _workspaceUrl = dbutils.notebook.getContext().apiUrl.get
+        }
         _cloudProvider = if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws"
         scope = tokenSecret.get.scope
         key = tokenSecret.get.key
@@ -524,25 +539,4 @@ class Config() {
     this
   }
 
-  /**
-   * Manual setters for DB Remote and Local Testing. This is not used if "isLocalTesting" == false
-   * This function allows for hard coded parameters for rapid integration testing and prototyping
-   *
-   * @return
-   */
-  def buildLocalOverwatchParams(): String = {
-
-    registerWorkspaceMeta(None,None)
-    _overwatchScope = Array(OverwatchScope.audit, OverwatchScope.clusters)
-    _databaseName = "overwatch_local"
-    _badRecordsPath = "/tmp/tomes/overwatch/sparkEventsBadrecords"
-    //    _databaseLocation = "/Dev/git/Databricks--Overwatch/spark-warehouse/overwatch.db"
-
-    // AWS TEST
-    _cloudProvider = "azure"
-    """
-      |{String for testing. Run string without escape chars. Do not commit secrets to git}
-      |""".stripMargin
-
-  }
 }

@@ -27,6 +27,7 @@ class Database(config: Config) extends SparkSessionWrapper {
 
   /**
    * register an Overwatch target table in the configured Overwatch deployment
+   *
    * @param target Pipeline table (i.e. target) as per the Overwatch deployed config
    */
   def registerTarget(target: PipelineTable): Unit = {
@@ -191,8 +192,8 @@ class Database(config: Config) extends SparkSessionWrapper {
       val explicitDatePartitionCondition = if (datePartitionFields.nonEmpty & maxMergeScanDates.nonEmpty) {
         s" AND target.${datePartitionFields.get} in (${maxMergeScanDates.mkString("'", "', '", "'")})"
       } else ""
-      val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")  + " " +
-        s"AND target.organization_id = '${config.organizationId}'" +  // force partition filter for concurrent merge
+      val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ") + " " +
+        s"AND target.organization_id = '${config.organizationId}'" + // force partition filter for concurrent merge
         explicitDatePartitionCondition // force right side scan to only scan relevant dates
 
       val mergeDetailMsg =
