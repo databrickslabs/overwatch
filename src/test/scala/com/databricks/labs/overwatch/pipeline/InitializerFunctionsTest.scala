@@ -7,7 +7,7 @@ import org.scalatest.funspec.AnyFunSpec
 class InitializerFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
   val conf = new Config
   conf.setOrganizationId("demo")
-  val Initializer = new InitializerV2(conf, disableValidations = false, isSnap = false, initDB = true)
+  val Initializer = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
 
   describe("Tests for InitializerFunctions.loadLocalResource") {
     it("should throw exception for non-existing resource") {
