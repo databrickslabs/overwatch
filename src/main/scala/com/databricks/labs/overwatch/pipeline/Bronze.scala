@@ -197,13 +197,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val instanceProfileSnapshotModule = Module(1009, "Bronze_Instance_Profile_Snapshot", this)
   lazy private val appendInstanceProfileProcess = ETLDefinition(
     workspace.getProfilesDF,
-    append(BronzeTargets.instanceProfileSnapshotTarget)
+    append(BronzeTargets.instanceProfilesSnapshotTarget)
   )
 
   lazy private[overwatch] val tokenSnapshotModule = Module(1010, "Bronze_Token_Snapshot", this)
   lazy private val appendTokenProcess = ETLDefinition(
     workspace.getTokens,
-    append(BronzeTargets.tokenSnapshotTarget)
+    append(BronzeTargets.tokensSnapshotTarget)
   )
 
   lazy private[overwatch] val globalInitScSnapshotModule = Module(1011, "Bronze_Global_Init_Scripts_Snapshot", this)

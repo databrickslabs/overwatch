@@ -170,16 +170,16 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id")
     )
 
-    lazy private[overwatch] val instanceProfileSnapshotTarget: PipelineTable = PipelineTable(
-      name = "instance_profile_snapshot_bronze",
+    lazy private[overwatch] val instanceProfilesSnapshotTarget: PipelineTable = PipelineTable(
+      name = "instance_profiles_snapshot_bronze",
       _keys = Array("cluster_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
       partitionBy = Seq("organization_id")
     )
 
-    lazy private[overwatch] val tokenSnapshotTarget: PipelineTable = PipelineTable(
-      name = "token_snapshot_bronze",
+    lazy private[overwatch] val tokensSnapshotTarget: PipelineTable = PipelineTable(
+      name = "tokens_snapshot_bronze",
       _keys = Array("token_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
