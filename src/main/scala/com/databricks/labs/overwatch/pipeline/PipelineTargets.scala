@@ -154,6 +154,53 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
+    lazy private[overwatch] val libsSnapshotTarget: PipelineTable = PipelineTable(
+      name = "libs_snapshot_bronze",
+      _keys = Array("cluster_id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val policiesSnapshotTarget: PipelineTable = PipelineTable(
+      name = "policies_snapshot_bronze",
+      _keys = Array("policy_id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val instanceProfileSnapshotTarget: PipelineTable = PipelineTable(
+      name = "instance_profile_snapshot_bronze",
+      _keys = Array("cluster_id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val tokenSnapshotTarget: PipelineTable = PipelineTable(
+      name = "token_snapshot_bronze",
+      _keys = Array("token_id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val globalInitScSnapshotTarget: PipelineTable = PipelineTable(
+      name = "global_inits_snapshot_bronze",
+      _keys = Array("script_id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val jobRunsSnapshotTarget: PipelineTable = PipelineTable(
+      name = "job_runs_snapshot_bronze",
+      _keys = Array("job_id", "run_id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id")
+    )
   }
 
   /**

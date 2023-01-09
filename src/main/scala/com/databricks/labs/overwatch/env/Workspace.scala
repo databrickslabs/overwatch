@@ -317,6 +317,51 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       })
   }
 
+  def getClusterLibraries: DataFrame = {
+    val libsEndpoint = "libraries/all-cluster-statuses"
+    ApiCallV2(config.apiEnv, libsEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getClusterPolicies: DataFrame = {
+    val policiesEndpoint = "policies/clusters/list"
+    ApiCallV2(config.apiEnv, policiesEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getTokens: DataFrame = {
+    val tokenEndpoint = "token/list"
+    ApiCallV2(config.apiEnv, tokenEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getGlobalInitScripts: DataFrame = {
+    val globalInitScEndpoint = "global-init-scripts"
+    ApiCallV2(config.apiEnv, globalInitScEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  /**
+   * Function to get the the list of Job Runs
+   * @return
+   */
+  def getJobRunsDF: DataFrame = {
+    val jobsRunsEndpoint = "jobs/runs/list"
+    val jsonQuery = """{"expand_tasks":true}"""
+    ApiCallV2(config.apiEnv,jobsRunsEndpoint, jsonQuery)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
   /**
    * Create a backup of the Overwatch datasets
    *
