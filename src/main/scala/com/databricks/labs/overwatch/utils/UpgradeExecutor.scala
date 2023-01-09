@@ -49,14 +49,14 @@ class UpgradeExecutor(val etldbname: String, val fromVersion: Int, val toVersion
     val upgradeResults = mutable.MutableList[DataFrame]()
     getUpgradeChain(upgradeChain)
 
-    val upgradePath: Array[String] = Array()
-    upgradeChain.foreach(f => upgradePath + f.getClass.getCanonicalName)
+    val upgradePath= mutable.MutableList[String]()
+    upgradeChain.foreach(f => upgradePath += f.getClass.getCanonicalName)
     println(s"Upgrade Path ${upgradePath.mkString("->")}")
-    /*upgradeChain.foreach({
+    upgradeChain.foreach({
       f =>
         upgradeResults += f.upgrade()
     })
-*/
+
 
 
     upgradeResults
