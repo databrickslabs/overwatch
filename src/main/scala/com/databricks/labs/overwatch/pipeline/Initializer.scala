@@ -329,7 +329,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     if (overwatchScope.head == "all") config.setOverwatchScope(config.orderedOverwatchScope)
     else config.setOverwatchScope(validateScope(overwatchScope))
 
-    // validate token secret requirements
+    // validate token secret requirements  // Pass in InitFunction as validateTokenSecret
     // TODO - Validate if token has access to necessary assets. Warn/Fail if not
     if (tokenSecret.nonEmpty && !disableValidations && !config.isLocalTesting) {
       if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
@@ -349,7 +349,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
       validateApiEnv(config.apiEnv)
     } else config.registerWorkspaceMeta(None,None)
 
-    // Validate data Target
+    // Validate data Target  // Pass in InitFunction validateAndSetDataTarget
     if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
 
     // If data target is valid get db name and location and set it
@@ -510,7 +510,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
    * @throws com.databricks.labs.overwatch.utils.BadConfigException
    * @return
    */
-  @throws(classOf[BadConfigException])
+  @throws(classOf[BadConfigException])  // Pass to InitializerFunction
   private def validateScope(scopes: Seq[String]): Seq[OverwatchScope.OverwatchScope] = {
     val lcScopes = scopes.map(_.toLowerCase)
 
