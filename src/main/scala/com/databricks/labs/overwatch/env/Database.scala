@@ -269,7 +269,16 @@ class Database(config: Config) extends SparkSessionWrapper {
       } catch {
         case e: Throwable =>
           val exceptionMsg = e.getMessage.toLowerCase()
-          if (exceptionMsg != null && (exceptionMsg.contains("concurrent") || exceptionMsg.contains("conflicting")) && retryCount < 5) {
+          logger.log(Level.WARN,
+            s"""
+               |DELTA Table Write Failure:
+               |$exceptionMsg
+               |Attempting Retry
+               |""".stripMargin)
+          val concurrentWriteFailure = exceptionMsg.contains("concurrent") ||
+            exceptionMsg.contains("conflicting") ||
+            exceptionMsg.contains("all nested columns must match")
+          if (exceptionMsg != null && concurrentWriteFailure && retryCount < 5) {
             coolDown(target.tableFullName)
             true
           } else {
@@ -309,8 +318,9 @@ class Database(config: Config) extends SparkSessionWrapper {
    */
   private def coolDown(tableName: String): Unit = {
     val rnd = new scala.util.Random
-    val number:Long = (rnd.nextFloat() * 30 + 30).toLong*1000
-    logger.log(Level.INFO,"Slowing multithreaded writing for " + tableName + "sleeping..." + number+" thread name "+Thread.currentThread().getName)
+    val number:Long = ((rnd.nextFloat() * 30) + 30 + (rnd.nextFloat() * 30)).toLong*1000
+    logger.log(Level.INFO,"DELTA WRITE COOLDOWN: Slowing multithreaded writing for " +
+      tableName + "sleeping..." + number + " thread name " + Thread.currentThread().getName)
     Thread.sleep(number)
   }
 

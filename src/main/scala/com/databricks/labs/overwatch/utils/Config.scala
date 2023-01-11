@@ -153,15 +153,9 @@ class Config() {
       "spark.databricks.delta.optimizeWrite.numShuffleBlocks" ->
         value.getOrElse("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "50000"),
       "spark.databricks.delta.optimizeWrite.binSize" ->
-        value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
-      "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
-      "spark.sql.caseSensitive" -> "false",
-      "spark.sql.autoBroadcastJoinThreshold" -> "10485760",
-      "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "10485760",
-      "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
-      "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365
+        value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512")
     )
-    _initialSparkConf = value ++ manualOverrides
+    _initialSparkConf = value ++ manualOverrides ++ SparkSessionWrapper.globalSparkConfOverrides
     this
   }
 

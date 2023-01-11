@@ -13,6 +13,14 @@ object SparkSessionWrapper {
 
    var parSessionsOn = false
   private[overwatch] val sessionsMap = new ConcurrentHashMap[Long, SparkSession]().asScala
+  private[overwatch] val globalSparkConfOverrides = Map(
+    "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
+    "spark.sql.caseSensitive" -> "false",
+    "spark.sql.autoBroadcastJoinThreshold" -> "10485760",
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "10485760",
+    "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
+    "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365
+  )
 
 }
 
@@ -34,7 +42,6 @@ trait SparkSessionWrapper extends Serializable {
 
 
   private def buildSpark(): SparkSession = {
-    sessionsMap.hashCode()
     SparkSession
       .builder()
       .appName("GlobalSession")
@@ -53,7 +60,7 @@ trait SparkSessionWrapper extends Serializable {
         buildSpark()
       }
       else{
-        val currentThreadID = Thread.currentThread().getId()
+        val currentThreadID = Thread.currentThread().getId
         val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
         sessionsMap.put(currentThreadID, sparkSession)
         sparkSession
@@ -62,8 +69,8 @@ trait SparkSessionWrapper extends Serializable {
       buildSpark()
     }
   }
-  @transient
-  lazy val spark:SparkSession = spark(false)
+
+  @transient lazy val spark:SparkSession = spark(false)
 
   lazy val sc: SparkContext = spark.sparkContext
 //  sc.setLogLevel("WARN")
