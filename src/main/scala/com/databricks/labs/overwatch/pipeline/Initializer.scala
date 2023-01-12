@@ -217,14 +217,19 @@ object Initializer extends SparkSessionWrapper {
    */
   def apply(overwatchArgs: String): Workspace = {
     apply(
-      overwatchArgs
+      overwatchArgs,
+      debugFlag = false,
+      isSnap = false,
+      disableValidations = false
     )
   }
 
   def apply(overwatchArgs: String, debugFlag: Boolean): Workspace = {
     apply(
       overwatchArgs,
-      debugFlag
+      debugFlag,
+      isSnap = false,
+      disableValidations = false
     )
   }
 
@@ -262,7 +267,7 @@ object Initializer extends SparkSessionWrapper {
       .validateAndRegisterArgs(overwatchArgs)
 
     println("initializeDatabase Function Working Started")
-    val database = initializer.initializeDatabase()
+    val database = if (initializeDatabase) initializer.initializeDatabase() else Database(config)
 
     println("Initializing Workspace")
     logger.log(Level.INFO, "Initializing Workspace")
