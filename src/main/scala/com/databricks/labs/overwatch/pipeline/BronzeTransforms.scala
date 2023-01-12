@@ -1022,4 +1022,29 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  protected def cleanseRawLibsSnapDF(df: DataFrame): DataFrame = {
+    val outputDF = SchemaScrubber.scrubSchema(df)
+
+    outputDF
+      .withColumn("library_statuses", explode(col("library_statuses")))
+  }
+
+  protected def cleanseRawPoliciesSnapDF(df: DataFrame): DataFrame = {
+    val outputDF = SchemaScrubber.scrubSchema(df)
+
+    outputDF
+      .withColumn("definition", SchemaTools.structFromJson(spark,outputDF, "definition"))
+  }
+
+  protected def cleanseRawJobRunsSnapDF(df: DataFrame): DataFrame = {
+    val outputDF = SchemaScrubber.scrubSchema(df)
+
+    outputDF
+      .withColumn("cluster_instance", SchemaTools.structToMap(outputDF, "cluster_instance"))
+      .withColumn("cluster_spec", SchemaTools.structToMap(outputDF, "cluster_spec"))
+      .withColumn("schedule", SchemaTools.structToMap(outputDF, "schedule"))
+      .withColumn("state", SchemaTools.structToMap(outputDF, "state"))
+      .withColumn("task", SchemaTools.structToMap(outputDF, "task"))
+  }
+
 }
