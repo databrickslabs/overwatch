@@ -14,7 +14,6 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
   extends InitializerFunctions(config, disableValidations, isSnap, initDB)
     with SparkSessionWrapper {
 
-  // class vars
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   /**
@@ -63,8 +62,6 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
      * between one deployment and the next. To resolve this, PVC customers will be REQUIRED to provide a canonical
      * name for each workspace (i.e. workspaceName) to provide consistency across deployments.
      */
-    println("isPVC Function Working Started")
-    println("pvcOverrideOrganizationId Function Working Started")
 
     if (Init.isPVC && !config.isMultiworkspaceDeployment) Init.pvcOverrideOrganizationId()
 
@@ -82,12 +79,10 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
 
     /** Retrieve raw token secret, validate it and add it to the config if valid */
     val tokenSecret = rawParams.tokenSecret
-    println("validateTokenSecret Function Working Started")
     val validatedTokenSecret = Init.validateTokenSecret(tokenSecret)
 
     /** Build and validate workspace meta including API ENV */
     val rawApiEnv = config.buildApiEnv(validatedTokenSecret,rawParams.apiEnvConfig)
-    println("validateApiEnv Function Working Started")
     val validatedApiEnv = Init.validateApiEnv(rawApiEnv)
     config.setApiEnv(validatedApiEnv)
 
@@ -95,7 +90,6 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     val rawDataTarget = rawParams.dataTarget.getOrElse(
       DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None)
     )
-    println("validateAndSetDataTarget Function Working Started")
     Init.validateAndSetDataTarget(rawDataTarget)
 
 
@@ -111,7 +105,6 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     /** Validate and set Audit Log Configs */
     val rawAuditLogConfig = rawParams.auditLogConfig
-    println("validateAuditLogConfigs Function Working Started")
     val validatedAuditLogConfig = Init.validateAuditLogConfigs(rawAuditLogConfig)
     config.setAuditLogConfig(validatedAuditLogConfig)
 
@@ -127,7 +120,6 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     // must happen AFTER data target is set validation since the etlDataPrefix must already be set in the config
     /** Validate and set Temp Working Dir */
     val rawTempWorkingDir = rawParams.tempWorkingDir
-    println("validateTempWorkingDir Function Working Started")
     val validatedTempWorkingDir = Init.validateTempWorkingDir(rawTempWorkingDir)
     config.setTempWorkingDir(validatedTempWorkingDir)
 
@@ -136,7 +128,6 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
 
     /** Validate and set Intelligent Scaling Params */
     val rawISConfig = rawParams.intelligentScaling
-    println("validateIntelligentScaling Function Working Started")
     val validatedISConfig = Init.validateIntelligentScaling(rawISConfig)
     config.setIntelligentScaling(validatedISConfig)
 
@@ -169,13 +160,10 @@ object Initializer extends SparkSessionWrapper {
   }
 
   private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
-    println("Initializing Config")
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-//    val orgId = getOrgId
 
     // If MW take orgID from arg
-    println("initConfigState Checkpoint 1")
     if(organizationID.isEmpty) {
       config.setOrganizationId(getOrgId)
     }else{
@@ -186,13 +174,9 @@ object Initializer extends SparkSessionWrapper {
       }
       config.setIsMultiworkspaceDeployment(true)
     }
-    println("initConfigState Checkpoint 2")
     config.registerInitialSparkConf(spark.conf.getAll)
-    println("initConfigState Checkpoint 3")
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
-    println("initConfigState Checkpoint 3")
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
-    println("initConfigState Checkpoint 4")
     if (debugFlag) {
       envInit("DEBUG")
       config.setDebugFlag(debugFlag)
@@ -266,10 +250,8 @@ object Initializer extends SparkSessionWrapper {
     val initializer = new Initializer(config, disableValidations, isSnap, initializeDatabase)
       .validateAndRegisterArgs(overwatchArgs)
 
-    println("initializeDatabase Function Working Started")
     val database = if (initializeDatabase) initializer.initializeDatabase() else Database(config)
 
-    println("Initializing Workspace")
     logger.log(Level.INFO, "Initializing Workspace")
     val workspace = Workspace(database, config)
       .setValidated(!disableValidations)

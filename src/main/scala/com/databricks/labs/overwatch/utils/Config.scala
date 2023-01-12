@@ -218,16 +218,6 @@ class Config() {
     this
   }
 
-  private[overwatch] def setWorkspaceURL(value: String): this.type = {
-    _workspaceUrl = value
-    this
-  }
-
-  private[overwatch] def setTokenType(value: String): this.type = {
-    _tokenType = value
-    this
-  }
-
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
     this
@@ -342,6 +332,16 @@ class Config() {
 
   def setInputConfig(value: OverwatchParams): this.type = {
     _inputConfig = value
+    this
+  }
+
+  private[overwatch] def setWorkspaceURL(value: String): this.type = {
+    _workspaceUrl = value
+    this
+  }
+
+  private[overwatch] def setTokenType(value: String): this.type = {
+    _tokenType = value
     this
   }
 
@@ -469,9 +469,6 @@ class Config() {
         throw new BadConfigException(e.getMessage, failPipeline = true)
     }
   }
-
-
-
 
   /**
    * Set Overwatch DB and location
