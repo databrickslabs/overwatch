@@ -257,6 +257,33 @@ class Database(config: Config) extends SparkSessionWrapper {
     true
   }
 
+  /**
+   * Check if a table is locked and if it is wait until max timeout for it to be unlocked and fail the write if
+   * the timeout is reached
+   * @param tableName name of the table to be written
+   * @param timeout timeout // TODO -- max this externally configurable -- historical loads for long-running modules may lock a table for a long time
+   * @return
+   */
+  private def targetNotLocked(tableName: String, timeout: Long = 1200000): Boolean = {
+    val timerStart = System.currentTimeMillis()
+
+    @tailrec def testLock(retryCount: Int): Boolean = {
+      val currWaitTime = System.currentTimeMillis() - timerStart
+      val withinTimeout = currWaitTime < timeout
+      if (SparkSessionWrapper.globalTableLock.contains(tableName)) {
+        if (withinTimeout) {
+          logger.log(Level.WARN, s"TABLE LOCKED: $tableName for $currWaitTime -- waiting for parallel writes to complete")
+          Thread.sleep(retryCount * 10000) // add 10 seconds to sleep for each lock test
+          testLock(retryCount + 1)
+        } else {
+          throw new Exception(s"TABLE LOCK TIMEOUT - The table $tableName remained locked for more than the configured " +
+            s"max timeout of $timeout millis")
+        }
+      } else true // table not locked
+    }
+    testLock(retryCount = 1)
+  }
+
 
   def performRetry(inputDf: DataFrame,
                    target: PipelineTable,
@@ -308,7 +335,20 @@ class Database(config: Config) extends SparkSessionWrapper {
       df.persist()
     } else df
     if (needsCache) inputDf.count()
-    performRetry(inputDf,target, pipelineSnapTime, maxMergeScanDates)
+//    performRetry(inputDf,target, pipelineSnapTime, maxMergeScanDates)
+    // TODO -- build the finalDF here and use persistAndLoad here as well to ensure that is done before the write
+    //   target gets locked. Due to lazy execution, if not persist, the entire module timer may be executed
+    //   from the write function
+    if (targetNotLocked(target.tableFullName)) {
+      try {
+        SparkSessionWrapper.globalTableLock.add(target.tableFullName)
+        write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
+      } catch {
+        case e: Throwable => throw e
+      } finally {
+        SparkSessionWrapper.globalTableLock.remove(target.tableFullName)
+      }
+    }
     true
   }
 
