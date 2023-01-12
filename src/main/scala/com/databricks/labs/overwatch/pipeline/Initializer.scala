@@ -161,6 +161,8 @@ object Initializer extends SparkSessionWrapper {
   envInit()
 
   def getOrgId: String = {
+
+    print("tags are ", dbutils.notebook.getContext.tags)
     if (dbutils.notebook.getContext.tags("orgId") == "0") {
       dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
     } else dbutils.notebook.getContext.tags("orgId")
@@ -170,11 +172,12 @@ object Initializer extends SparkSessionWrapper {
     println("Initializing Config")
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-    val orgId = getOrgId
+//    val orgId = getOrgId
 
+    // If MW take orgID from arg
     println("initConfigState Checkpoint 1")
     if(organizationID.isEmpty) {
-      config.setOrganizationId(orgId)
+      config.setOrganizationId(getOrgId)
     }else{
       logger.log(Level.INFO, "Setting multiworkspace deployment")
       config.setOrganizationId(organizationID.get)
