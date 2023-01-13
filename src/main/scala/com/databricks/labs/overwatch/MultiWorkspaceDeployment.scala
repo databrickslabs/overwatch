@@ -166,7 +166,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       config.enable_unsafe_SSL.getOrElse(false),
       config.thread_pool_size.getOrElse(4),
       config.api_waiting_time.getOrElse(300000),
-      Some(apiProxyConfig))
+      Some(apiProxyConfig),
+      Some(config.mount_mapping_path))
     apiEnvConfig
   }
 
