@@ -941,7 +941,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .withColumn("pool_snap_node_type", lit(null).cast("string"))
     }
 
-    val onlyOnceSemanticsW = Window.partitionBy('organization_id, 'cluster_id, 'actionName).orderBy('timestamp)
+    val onlyOnceSemanticsW = Window.partitionBy('organization_id, 'cluster_id, 'actionName,'timestamp).orderBy('timestamp)
     clusterBaseWithPoolsAndSnapPools
       .select(clusterSpecBaseCols: _*)
       .join(creatorLookup, Seq("organization_id", "cluster_id"), "left")
