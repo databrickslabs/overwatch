@@ -360,7 +360,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
     val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
     snapshotConfig(multiWorkspaceConfig)
-
     val params = DeploymentValidation
       .performMandatoryValidation(multiWorkspaceConfig, parallelism)
       .map(buildParams)
