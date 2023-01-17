@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.functions.{length, lit, when}
 
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
@@ -115,7 +115,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val sqlComputerDBUPrice: Double = config.sql_compute_dbu_price
       val jobsLightDBUPrice: Double = config.jobs_light_dbu_price
       val customWorkspaceName: String = config.workspace_name
-      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts".split(",").toBuffer
+      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".split(",").toBuffer
       if (config.excluded_scopes != null) {
         config.excluded_scopes.split(":").foreach(scope => standardScopes -= scope)
       }
@@ -327,6 +327,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .scrubSchema
         .verifyMinimumSchema(Schema.deployementMinimumSchema)
         .filter(MultiWorkspaceConfigColumns.active.toString)
+        .withColumn("api_url", when('api_url.endsWith("/"), 'api_url.substr(lit(0), length('api_url) - 1)).otherwise('api_url))
         .withColumn("deployment_id", lit(deploymentId))
         .withColumn("output_path", lit(outputPath))
         .as[MultiWorkspaceConfig]
@@ -358,7 +359,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     println("ParallelismLevel :" + parallelism)
 
     val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
-    snapshotConfig(multiWorkspaceConfig)
+//    snapshotConfig(multiWorkspaceConfig)
+    multiWorkspaceConfig.map(buildParams)
     val params = DeploymentValidation
       .performMandatoryValidation(multiWorkspaceConfig, parallelism)
       .map(buildParams)
