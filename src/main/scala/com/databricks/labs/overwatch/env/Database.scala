@@ -166,12 +166,9 @@ class Database(config: Config) extends SparkSessionWrapper {
       .map(_.name).headOption
   }
 
-  // TODO - refactor this write function and the writer from the target
-  //  write function has gotten overly complex
-  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array()): Boolean = {
+  def preWriteActions(df: DataFrame, target: PipelineTable,pipelineSnapTime: Column): DataFrame =
+  {
     var finalSourceDF: DataFrame = df
-
-    // apend metadata to source DF
     finalSourceDF = if (target.withCreateDate) finalSourceDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalSourceDF
     finalSourceDF = if (target.withOverwatchRunID) finalSourceDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalSourceDF
     finalSourceDF = if (target.workspaceName) finalSourceDF.withColumn("workspace_name", lit(config.workspaceName)) else finalSourceDF
@@ -180,8 +177,30 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
 
     val finalDF = if (target.persistBeforeWrite) persistAndLoad(finalSourceDF, target) else finalSourceDF
+    finalDF
+  }
 
-    // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
+  // TODO - refactor this write function and the writer from the target
+  //  write function has gotten overly complex
+  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array(),perWritePerformed: Boolean =  false): Boolean = {
+    var finalSourceDF: DataFrame = df
+
+    val finalDF: DataFrame = if(!perWritePerformed){
+      finalSourceDF = if (target.withCreateDate) finalSourceDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalSourceDF
+      finalSourceDF = if (target.withOverwatchRunID) finalSourceDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalSourceDF
+      finalSourceDF = if (target.workspaceName) finalSourceDF.withColumn("workspace_name", lit(config.workspaceName)) else finalSourceDF
+
+      // if target is to be deduped, dedup it by keys
+      finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
+      if (target.persistBeforeWrite) persistAndLoad(finalSourceDF, target) else finalSourceDF
+    }else{
+      finalSourceDF
+    }
+
+    // apend metadata to source DF
+
+
+   // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
       val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")
@@ -285,43 +304,6 @@ class Database(config: Config) extends SparkSessionWrapper {
   }
 
 
-  def performRetry(inputDf: DataFrame,
-                   target: PipelineTable,
-                   pipelineSnapTime: Column,
-                   maxMergeScanDates: Array[String] = Array()): this.type = {
-    @tailrec def executeRetry(retryCount: Int): this.type = {
-      val rerunFlag = try {
-        write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
-        false
-      } catch {
-        case e: Throwable =>
-          val exceptionMsg = e.getMessage.toLowerCase()
-          logger.log(Level.WARN,
-            s"""
-               |DELTA Table Write Failure:
-               |$exceptionMsg
-               |Attempting Retry
-               |""".stripMargin)
-          val concurrentWriteFailure = exceptionMsg.contains("concurrent") ||
-            exceptionMsg.contains("conflicting") ||
-            exceptionMsg.contains("all nested columns must match")
-          if (exceptionMsg != null && concurrentWriteFailure && retryCount < 5) {
-            coolDown(target.tableFullName)
-            true
-          } else {
-            throw e
-          }
-      }
-      if (retryCount < 5 && rerunFlag) executeRetry(retryCount + 1) else this
-    }
-    try {
-      executeRetry(1)
-    } catch {
-      case e: Throwable =>
-        throw e
-    }
-
-  }
 
   def writeWithRetry(df: DataFrame,
                      target: PipelineTable,
@@ -339,10 +321,12 @@ class Database(config: Config) extends SparkSessionWrapper {
     // TODO -- build the finalDF here and use persistAndLoad here as well to ensure that is done before the write
     //   target gets locked. Due to lazy execution, if not persist, the entire module timer may be executed
     //   from the write function
+
+   val withMetaDf =  preWriteActions(df, target, pipelineSnapTime)
     if (targetNotLocked(target.tableFullName)) {
       try {
         SparkSessionWrapper.globalTableLock.add(target.tableFullName)
-        write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
+        write(withMetaDf, target, pipelineSnapTime, maxMergeScanDates,true)
       } catch {
         case e: Throwable => throw e
       } finally {
@@ -352,17 +336,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     true
   }
 
-  /**
-   * Function forces the thread to sleep for a random 30-60 seconds.
-   * @param tableName
-   */
-  private def coolDown(tableName: String): Unit = {
-    val rnd = new scala.util.Random
-    val number:Long = ((rnd.nextFloat() * 30) + 30 + (rnd.nextFloat() * 30)).toLong*1000
-    logger.log(Level.INFO,"DELTA WRITE COOLDOWN: Slowing multithreaded writing for " +
-      tableName + "sleeping..." + number + " thread name " + Thread.currentThread().getName)
-    Thread.sleep(number)
-  }
 
 }
 
