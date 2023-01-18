@@ -965,6 +965,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val incrementalClusterWLogging = historicalAuditLookupDF
       .withColumn("global_cluster_id", cluster_idFromAudit)
       .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
+      // Change for #357
       .join(incrementalClusterIDs.hint("SHUFFLE_HASH"), Seq("cluster_id"))
       .withColumn("cluster_log_conf", coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
       .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
