@@ -702,7 +702,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val enableElasticDisk = when('enable_elastic_disk === "false", lit(false))
       .otherwise(lit(true))
     val deriveClusterType = when(isSingleNode, lit("Single Node"))
-      .when(isServerless, lit("Serverless"))
+      .when(isServerless, lit("High-Concurrency"))
       .when(isSQLAnalytics, lit("SQL Analytics"))
       .otherwise("Standard").alias("cluster_type")
 

@@ -515,7 +515,7 @@ object PipelineFunctions extends SparkSessionWrapper {
     when(isAutomated && isJobsLight, "jobsLight")
       .when(isAutomated && !isJobsLight, "automated")
       .when(clusterType === "SQL Analytics", lit("sqlCompute"))
-      .when(clusterType === "Serverless", lit("serverless"))
+      .when(clusterType === "High-Concurrency", lit("HighConcurrency"))
       .when(!isAutomated, "interactive")
       .otherwise("unknown")
   }
