@@ -650,9 +650,6 @@ object Helpers extends SparkSessionWrapper {
     val remoteConfig = remoteWorkspace.getConfig
     val etlDatabaseNameToCreate = if (localETLDatabaseName == "" & !usingExternalMetastore)  {remoteConfig.databaseName} else {localETLDatabaseName}
     val consumerDatabaseNameToCreate = 	if (localConsumerDatabaseName == "" & !usingExternalMetastore) {remoteConfig.consumerDatabaseName} else {localConsumerDatabaseName}
-//    val LocalWorkSpaceID = if (dbutils.notebook.getContext.tags("orgId") == "0") {
-//      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-//    } else dbutils.notebook.getContext.tags("orgId")
     val LocalWorkSpaceID = Initializer.getOrgId
 
     val localETLDBPath = if (!usingExternalMetastore ){
