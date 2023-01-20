@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
@@ -964,7 +965,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       clusterSnapshotTable: PipelineTable,
                                       sparkLogClusterScaleCoefficient: Double,
                                       apiEnv: ApiEnv,
-                                      isMultiWorkSpaceDeployment: Boolean
+                                      isMultiWorkSpaceDeployment: Boolean,
+                                      organisationId: String
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -1008,7 +1010,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes =
-    if(isMultiWorkSpaceDeployment) {
+    if(isMultiWorkSpaceDeployment && organisationId != spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")) {
       getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
      } else {

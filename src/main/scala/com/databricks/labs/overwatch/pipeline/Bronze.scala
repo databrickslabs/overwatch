@@ -167,7 +167,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget,
         sparkLogClusterScaleCoefficient,
         config.apiEnv,
-        config.isMultiworkspaceDeployment
+        config.isMultiworkspaceDeployment,
+        config.organizationId
       ),
       generateEventLogsDF(
         database,
