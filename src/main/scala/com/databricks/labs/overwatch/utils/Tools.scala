@@ -653,11 +653,7 @@ object Helpers extends SparkSessionWrapper {
 //    val LocalWorkSpaceID = if (dbutils.notebook.getContext.tags("orgId") == "0") {
 //      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
 //    } else dbutils.notebook.getContext.tags("orgId")
-    val LocalWorkSpaceID = if (spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId") == " ") {
-                    dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-                } else spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
-
-
+    val LocalWorkSpaceID = Initializer.getOrgId
 
     val localETLDBPath = if (!usingExternalMetastore ){
       Some(s"${remoteStoragePrefix}/${LocalWorkSpaceID}/${etlDatabaseNameToCreate}.db")
