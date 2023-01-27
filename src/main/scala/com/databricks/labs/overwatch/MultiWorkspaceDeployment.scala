@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.lit
 
 import java.text.SimpleDateFormat
@@ -313,17 +314,43 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     true
   }
 
+
+  private def generateBaseConfig(configCsvPath: String): DataFrame = {
+    try {
+      if (configCsvPath.toLowerCase().contains("csv")) {
+        println(s"Config source: csv path ${configCsvPath}")
+        validateFileExistence(configCsvPath)
+        spark.read.option("header", "true")
+          .option("ignoreLeadingWhiteSpace", true)
+          .option("ignoreTrailingWhiteSpace", true)
+          .csv(configCsvPath)
+      } else if (configCsvPath.contains("/")) {
+        println(s"Config source: delta path ${configCsvPath}")
+        validateFileExistence(configCsvPath)
+        spark.read.format("delta").load(configCsvPath)
+      } else {
+        println(s"Config source: delta table ${configCsvPath}")
+        if (!spark.catalog.tableExists(configCsvPath)) {
+          throw new BadConfigException("Unable to find Delta table" + configCsvPath)
+        }
+        spark.read.table(configCsvPath)
+      }
+    } catch {
+      case e: Exception =>
+        println("Exception while reading config , please provide config csv path/config delta path/config delta table")
+        throw e
+    }
+
+  }
+
   private def generateMultiWorkspaceConfig(
                                             configCsvPath: String,
                                             deploymentId: String,
                                             outputPath: String = ""
                                           ): Array[MultiWorkspaceConfig] = { // Array[MultiWorkspaceConfig] = {
     try {
-      validateFileExistence(configCsvPath)
-      val multiWorkspaceConfig = spark.read.option("header", "true")
-        .option("ignoreLeadingWhiteSpace", true)
-        .option("ignoreTrailingWhiteSpace", true)
-        .csv(configCsvPath)
+      val baseConfig =generateBaseConfig(configCsvPath)
+      val multiWorkspaceConfig = baseConfig
         .scrubSchema
         .verifyMinimumSchema(Schema.deployementMinimumSchema)
         .filter(MultiWorkspaceConfigColumns.active.toString)
