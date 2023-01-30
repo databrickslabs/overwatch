@@ -87,8 +87,9 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     config.setApiEnv(validatedApiEnv)
 
     /** Validate and set the data target details */
+      // uc change
     val rawDataTarget = rawParams.dataTarget.getOrElse(
-      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None)
+      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"),Some("overwatch"), None)
     )
     Init.validateAndSetDataTarget(rawDataTarget)
 

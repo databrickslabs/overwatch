@@ -163,7 +163,7 @@ object Helpers extends SparkSessionWrapper {
    * @return
    */
   def pathExists(name: String): Boolean = {
-    val path = new Path(name)
+    val path = new Path(name) //uc_change
     val fs = path.getFileSystem(spark.sparkContext.hadoopConfiguration)
     fs.exists(path)
   }

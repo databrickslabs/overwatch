@@ -32,9 +32,12 @@ class Database(config: Config) extends SparkSessionWrapper {
    */
   def registerTarget(target: PipelineTable): Unit = {
     if (!target.exists(catalogValidation = true) && target.exists(pathValidation = true)) {
+//      val createStatement = s"create table if not exists ${target.tableFullName} " +
+//        s"USING DELTA location '${target.tableLocation}'"
       val createStatement = s"create table if not exists ${target.tableFullName} " +
-        s"USING DELTA location '${target.tableLocation}'"
-      val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
+        s"USING DELTA "
+//      val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
+      val logMessage = s"CREATING TABLE: ${target.tableFullName} \n$createStatement\n\n"
       logger.log(Level.INFO, logMessage)
       if (config.debugFlag) println(logMessage)
       spark.sql(createStatement)
@@ -101,9 +104,12 @@ class Database(config: Config) extends SparkSessionWrapper {
   private def initializeStreamTarget(df: DataFrame, target: PipelineTable): Unit = {
     val dfWSchema = spark.createDataFrame(new util.ArrayList[Row](), df.schema)
     val staticDFWriter = target.copy(checkpointPath = None).writer(dfWSchema)
+//    staticDFWriter
+//      .asInstanceOf[DataFrameWriter[Row]]
+//      .save(target.tableLocation)
     staticDFWriter
       .asInstanceOf[DataFrameWriter[Row]]
-      .save(target.tableLocation)
+      .saveAsTable(target.tableFullName)
 
     registerTarget(target)
   }
@@ -183,7 +189,8 @@ class Database(config: Config) extends SparkSessionWrapper {
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
-      val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
+//      val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target") // uc_change
+      val deltaTarget = DeltaTable.forName(target.tableFullName).alias("target") //uc_change
       val updatesDF = finalDF.alias("updates")
 
       val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
@@ -225,13 +232,19 @@ class Database(config: Config) extends SparkSessionWrapper {
         val beginMsg = s"Stream to ${target.tableFullName} beginning."
         if (config.debugFlag) println(beginMsg)
         logger.log(Level.INFO, beginMsg)
-        if (!spark.catalog.tableExists(config.databaseName, target.name)) {
-          initializeStreamTarget(finalDF, target)
+        if (!spark.catalog.tableExists(s"${config.catalogName}.${config.databaseName}.${target.name}")) { //uc_change
+          initializeStreamTarget(finalDF, target) //uc_change
         }
+//        val streamWriter = target.writer(finalDF)
+//          .asInstanceOf[DataStreamWriter[Row]]
+//          .option("path", target.tableLocation)
+//          .start()
+//          uc_change
+
         val streamWriter = target.writer(finalDF)
           .asInstanceOf[DataStreamWriter[Row]]
-          .option("path", target.tableLocation)
-          .start()
+          .toTable(target.tableFullName)
+
         val streamManager = getQueryListener(streamWriter, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
         spark.streams.addListener(streamManager)
         val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
@@ -243,7 +256,8 @@ class Database(config: Config) extends SparkSessionWrapper {
 
       } else { // DF Standard Writer append/overwrite
         try {
-          target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
+//          target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation) //uc_change
+          target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
         } catch {
           case e: Throwable =>
             val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception in writeMethod:")

@@ -68,7 +68,7 @@ object PipelineFunctions extends SparkSessionWrapper {
           new URI(rawPathString).normalize().toString
         }
       case None =>
-        "dbfs:%s".format(rawPathString.replaceAllLiterally("//", "/"))
+        "dbfs:%s".format(rawPathString.replaceAllLiterally("//", "/")) //uc_change
     }
   }
 
@@ -549,7 +549,8 @@ object PipelineFunctions extends SparkSessionWrapper {
 
   def getDeltaHistory(spark: SparkSession, target: PipelineTable, n: Int = 9999): DataFrame = {
     import spark.implicits._
-    DeltaTable.forPath(target.tableLocation).history(n)
+//    DeltaTable.forPath(target.tableLocation).history(n) //uc_change
+    DeltaTable.forName(target.tableFullName).history(n)
       .select(
         'version,
         'timestamp,

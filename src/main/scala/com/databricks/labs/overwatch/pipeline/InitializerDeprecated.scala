@@ -314,7 +314,7 @@ class InitializerDeprecated(config: Config) extends SparkSessionWrapper {
     val tokenSecret = rawParams.tokenSecret
     // TODO -- PRIORITY -- If data target is null -- default table gets dbfs:/null
     val dataTarget = rawParams.dataTarget.getOrElse(
-      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None))
+      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), Some("overwatch_uc"), None))
     val auditLogConfig = rawParams.auditLogConfig
 
     if (overwatchScope.head == "all") config.setOverwatchScope(config.orderedOverwatchScope)

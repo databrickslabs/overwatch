@@ -168,15 +168,27 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     @throws(classOf[IllegalArgumentException])
     private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
       val dbName = dataTarget.databaseName.getOrElse("overwatch")
+      val catalogName = dataTarget.catalogName
       val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
       val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
       val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
       val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
+      println(s"rawDBLocation-----${rawDBLocation}")
+      println(s"dbLocation-----${dbLocation}")
+      println(s"rawETLDataLocation-----${rawETLDataLocation}")
+      println(s"etlDataLocation-----${etlDataLocation}")
       var switch = true
+      if (catalogName != "hive_metastore") {
+        println("since this is a uc deployment no need to validate external location")
+        switch = true
+      }
+        //Adding else for the uc hackathon
+      else {
       if (spark.catalog.databaseExists(dbName)) {
         val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
         val dbProperties = dbMeta.properties
         val existingDBLocation = dbMeta.locationUri.toString
+        //remove the check for existingDBLocation and dbLocation for uc_hackathon
         if (existingDBLocation != dbLocation) {
           switch = false
           throw new BadConfigException(s"The DB: $dbName exists " +
@@ -191,7 +203,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
           throw new BadConfigException(s"The Database: $dbName was not created by overwatch. Specify a " +
             s"database name that does not exist or was created by Overwatch.")
         }
-      } else { // Database does not exist
+      } // commenting the else path for uc_hackathon
+      else { // Database does not exist
         if (!Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
           logger.log(Level.INFO, s"Target location " +
             s"is valid: will create database: $dbName at location: ${dbLocation}")
@@ -229,7 +242,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
               s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
               s"dbfs:/...")
           }
-        } else { // consumer DB is different from ETL DB AND db does not exist
+        } // commenting the else path for uc_hackathon
+        else { // consumer DB is different from ETL DB AND db does not exist
           if (!Helpers.pathExists(consumerDBLocation)) { // consumer db path is empty
             logger.log(Level.INFO, s"Consumer DB location " +
               s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}")
@@ -252,7 +266,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
           throw new BadConfigException("Consumer DB cannot match ETL DB Name while having different locations.")
         }
       }
-
+    }
       switch
     }
     /**
@@ -266,14 +280,17 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
 
       // If data target is valid get db name and location and set it
       val dbName = dataTarget.databaseName.get
-      val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
-      val dataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
-
+      val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db") //uc_change
+      val dataLocation = dataTarget.etlDataPathPrefix.getOrElse("hive_metastore")
+      println(s"dataTarget.catalogName----------${dataTarget.catalogName.get}")
+      val catalogName = dataTarget.catalogName.get
+      println(s"catalogName from validateAndSetDataTarget ------ ${catalogName}")
       val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
-      val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+      val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db") //uc_change
 
       config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
       config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
+      config.setCatalogName(catalogName)
     }
 
     private def quickBuildAuditLogConfig(auditLogConfig: AuditLogConfig): AuditLogConfig = {
@@ -435,12 +452,28 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
         logger.log(Level.INFO, "Initializing ETL Database")
         "OVERWATCHDB='TRUE'"
       }
-      if (!spark.catalog.databaseExists(config.databaseName)) {
+      if (!config.catalogName.isEmpty){
+        val createDBIfNotExists =
+          s"create database if not exists ${config.catalogName}.${config.databaseName} " +
+            s"WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
+        spark.sql(s"use catalog ${config.catalogName}")
+        println(s"config.catalogName------ ${config.catalogName}")
+        println(s"config.databaseName------ ${config.databaseName}")
+        println(s"config.databaseLocation------ ${config.databaseLocation}")
+        println(createDBIfNotExists)
+        spark.sql(createDBIfNotExists)
+        logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
+      }
+      else if (!spark.catalog.databaseExists(config.databaseName)) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
           s"${config.databaseLocation}.")
-        val createDBIfNotExists = if (!config.isLocalTesting) {
-          s"create database if not exists ${config.databaseName} location '" +
-            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
+//        val createDBIfNotExists = if (!config.isLocalTesting) {
+//          s"create database if not exists ${config.databaseName} MANAGED location '" +
+//            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
+          val createDBIfNotExists = if (!config.isLocalTesting) {
+          s"create database if not exists ${config.catalogName}.${config.databaseName}" +
+            s" WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
+
         } else {
           s"create database if not exists ${config.databaseName} " +
             s"WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
@@ -452,13 +485,25 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
         logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
       }
 
+      // Create consumer database if one is configured and catalog name is provided
+      if (config.consumerDatabaseName != config.databaseName && config.catalogName.nonEmpty) {
+        logger.log(Level.INFO, "Initializing Consumer Database")
+        if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
+          val createConsumerDBSTMT = s"create database if not exists ${config.catalogName}.${config.consumerDatabaseName} "
+          spark.sql(s"use catalog ${config.catalogName}")
+          spark.sql(createConsumerDBSTMT)
+          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+        }
+      }
+
       // Create consumer database if one is configured
       if (config.consumerDatabaseName != config.databaseName) {
         logger.log(Level.INFO, "Initializing Consumer Database")
         if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
-          val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
-            s"location '${config.consumerDatabaseLocation}'"
-
+//          val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
+//            s"location '${config.consumerDatabaseLocation}'"
+          val createConsumerDBSTMT = s"create database if not exists ${config.catalogName}.${config.consumerDatabaseName} "
+          spark.sql(s"use catalog ${config.catalogName}")
           spark.sql(createConsumerDBSTMT)
           logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
         }

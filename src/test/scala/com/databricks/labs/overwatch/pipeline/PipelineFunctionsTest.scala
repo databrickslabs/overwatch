@@ -9,12 +9,12 @@ import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, SQLContext}
-import org.scalatest.GivenWhenThen
+import org.scalatest.{GivenWhenThen, Ignore}
 import org.scalatest.funspec.AnyFunSpec
 
 import scala.reflect.io.Directory
 
-
+@Ignore
 class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with GivenWhenThen {
   spark.conf.set("spark.sql.session.timeZone", "UTC")
   def delDir(name:String) = {

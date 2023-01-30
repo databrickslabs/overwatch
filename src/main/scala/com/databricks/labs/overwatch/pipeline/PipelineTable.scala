@@ -48,7 +48,8 @@ case class PipelineTable(
   import spark.implicits._
 
   val databaseName: String = if (_databaseName == "default") config.databaseName else _databaseName
-  val tableFullName: String = s"${databaseName}.${name}"
+  val catalogName: String = config.catalogName
+  val tableFullName: String = s"${catalogName}.${databaseName}.${name}"
 
   // Minimum Schema Enforcement Management
   private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
@@ -133,8 +134,8 @@ case class PipelineTable(
    * @return
    */
   def exists: Boolean = {
-    //    spark.catalog.tableExists(tableFullName)
-    exists()
+        spark.catalog.tableExists(tableFullName) //uncommented for uc_change
+//    exists() //uc_change commented for uc_change
   }
 
   /**
@@ -147,13 +148,22 @@ case class PipelineTable(
    */
   def exists(pathValidation: Boolean = true, dataValidation: Boolean = false, catalogValidation: Boolean = false): Boolean = {
     var entityExists = true
-    if (pathValidation || dataValidation) entityExists = Helpers.pathExists(tableLocation)
-    if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)
-    if (dataValidation) { // if other validation is enabled it must first pass those for this test to be attempted
+      if ((pathValidation || dataValidation) && config.catalogName == "hive_metastore") entityExists = Helpers.pathExists(tableLocation)
+      if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)
+      if (dataValidation && config.catalogName == "hive_metastore") { // if other validation is enabled it must first pass those for this test to be attempted
+        // opposite -- when result is empty source data does not exist
+        entityExists = entityExists && !spark.read.format("delta").load(tableLocation)
+          .filter(col("organization_id") === config.organizationId)
+          .isEmpty
+    }
+    if (dataValidation && config.catalogName != "hive_metastore") { // if other validation is enabled it must first pass those for this test to be attempted
       // opposite -- when result is empty source data does not exist
-      entityExists = entityExists && !spark.read.format("delta").load(tableLocation)
-        .filter(col("organization_id") === config.organizationId)
-        .isEmpty
+      if (spark.catalog.tableExists(tableFullName)) {
+        entityExists = entityExists && !spark.read.format("delta").table(tableFullName)
+          .filter(col("organization_id") === config.organizationId)
+          .isEmpty
+      }
+      else entityExists = spark.catalog.tableExists(tableFullName)
     }
     entityExists
   }
@@ -188,10 +198,13 @@ case class PipelineTable(
     val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters"
     try {
       if (exists) {
+        println("inside asDF....")
         val fullDF = if (withMasterMinimumSchema) { // infer master schema if true and available
           logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for $tableFullName")
-          spark.read.format(format).load(tableLocation).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
-        } else spark.read.format(format).load(tableLocation)
+//          spark.read.format(format).load(tableLocation).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag) //uc_change
+          spark.read.format(format).table(tableFullName).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
+        } else spark.read.format(format).table(tableFullName)
+//        else spark.read.format(format).load(tableLocation) //uc_change
         if (withGlobalFilters && config.globalFilters.nonEmpty)
           PipelineFunctions.applyFilters(fullDF, config.globalFilters, config.debugFlag)
         else fullDF
@@ -244,11 +257,17 @@ case class PipelineTable(
     val noExistsMsg = s"${tableFullName} does not exist or cannot apply global filters"
 
     if (exists) {
+      println("inside if with exists....")
       val instanceDF = if (withMasterMinimumSchema) { // infer master schema if true and available
         logger.log(Level.INFO, s"SCHEMA -> Minimum Schema enforced for Module: " +
           s"$moduleId --> $moduleName for Table: $tableFullName")
-        spark.read.format(format).load(tableLocation).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
-      } else spark.read.format(format).load(tableLocation)
+        println("inside if.. withMasterMinimumSchema ")
+        println(s"SCHEMA -> Minimum Schema enforced for Module: " +
+          s"$moduleId --> $moduleName for Table: $tableFullName")
+//        spark.read.format(format).load(tableLocation).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag) //uc_change
+        spark.read.format(format).table(tableFullName).verifyMinimumSchema(masterSchema, enforceNonNullable, config.debugFlag)
+      } else spark.read.format(format).table(tableFullName)
+//      else spark.read.format(format).load(tableLocation) //uc_change
       val incrementalFilters = PipelineFunctions.buildIncrementalFilters(
         this, instanceDF, module.fromTime, module.untilTime, additionalLagDays, moduleName
       )
@@ -258,6 +277,7 @@ case class PipelineTable(
       )
     } else { // Source doesn't exist
       logger.log(Level.WARN, noExistsMsg)
+      println(noExistsMsg)
       if (config.debugFlag) println(noExistsMsg)
       spark.emptyDataFrame
     }

@@ -46,6 +46,7 @@ class Config() {
   private var _contractJobsLightDBUPrice: Double = _
   private var _isMultiworkspaceDeployment: Boolean = false
   private var _apiUrl: Option[String] = None
+  private var _catalogName: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -124,6 +125,8 @@ class Config() {
       col("organization_id") === organizationId
     )
   }
+
+  def catalogName: String = _catalogName
 
   /**
    * OverwatchScope defines the modules active for the current run
@@ -471,16 +474,18 @@ class Config() {
   }
 
   /**
-   * Set Overwatch DB and location
+   * Set Overwatch Catalog, DB and location
    *
    * @param dbName
    * @param dbLocation
    * @return
    */
-  private[overwatch] def setDatabaseNameAndLoc(dbName: String, dbLocation: String, dataLocation: String): this.type = {
-    val cleanDBLocation = PipelineFunctions.cleansePathURI(dbLocation)
+  private[overwatch] def setDatabaseNameAndLoc(dbName: String,
+                                               dbLocation: String, //uc_change
+                                               dataLocation: String): this.type = {
+    val cleanDBLocation = PipelineFunctions.cleansePathURI(dbLocation) //uc_change
     val cleanETLDataLocation = PipelineFunctions.cleansePathURI(dataLocation)
-    _databaseLocation = cleanDBLocation
+    _databaseLocation = cleanDBLocation //uc_change
     _databaseName = dbName
     _etlDataPathPrefix = dataLocation
     println(s"DEBUG: Database Name and Location set to ${_databaseName} and ${_databaseLocation}.\n\n " +
@@ -492,15 +497,28 @@ class Config() {
     if (cleanDBLocation.toLowerCase == cleanETLDataLocation.toLowerCase) println("\n\nWARNING!! The ETL Database " +
       "AND ETL Data Prefix locations " +
       "are equal. If ETL database is accidentally dropped ALL data from all workspaces will be lost in spite of the " +
-      "tables being external. Specify a separate prefix for the ETL data to avoid this from happening.")
+      "tables being external. Specify a separate prefix for the ETL data to avoid this  from happening.")
     this
   }
 
-  private[overwatch] def setConsumerDatabaseNameandLoc(consumerDBName: String, consumerDBLocation: String): this.type = {
+  private[overwatch] def setConsumerDatabaseNameandLoc(consumerDBName: String
+                                                       ,consumerDBLocation: String
+                                                      ): this.type = {
     val cleanConsumerDBLocation = PipelineFunctions.cleansePathURI(consumerDBLocation)
     _consumerDatabaseLocation = cleanConsumerDBLocation
     _consumerDatabaseName = consumerDBName
     println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
+    this
+  }
+
+  /**
+   *
+   * @param catalogName
+   * @return
+   */
+  private[overwatch] def setCatalogName(catalogName: String): this.type = {
+    _catalogName = catalogName
+    println(s"DEBUG: Catalog name set to ${_catalogName}")
     this
   }
 
