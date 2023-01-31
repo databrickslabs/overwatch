@@ -173,10 +173,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
       val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
       val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
-      println(s"rawDBLocation-----${rawDBLocation}")
-      println(s"dbLocation-----${dbLocation}")
-      println(s"rawETLDataLocation-----${rawETLDataLocation}")
-      println(s"etlDataLocation-----${etlDataLocation}")
+
       var switch = true
       if (catalogName != "hive_metastore") {
         println("since this is a uc deployment no need to validate external location")
@@ -282,9 +279,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val dbName = dataTarget.databaseName.get
       val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db") //uc_change
       val dataLocation = dataTarget.etlDataPathPrefix.getOrElse("hive_metastore")
-      println(s"dataTarget.catalogName----------${dataTarget.catalogName.get}")
       val catalogName = dataTarget.catalogName.get
-      println(s"catalogName from validateAndSetDataTarget ------ ${catalogName}")
       val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
       val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db") //uc_change
 
@@ -457,9 +452,6 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
           s"create database if not exists ${config.catalogName}.${config.databaseName} " +
             s"WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
         spark.sql(s"use catalog ${config.catalogName}")
-        println(s"config.catalogName------ ${config.catalogName}")
-        println(s"config.databaseName------ ${config.databaseName}")
-        println(s"config.databaseLocation------ ${config.databaseLocation}")
         println(createDBIfNotExists)
         spark.sql(createDBIfNotExists)
         logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")

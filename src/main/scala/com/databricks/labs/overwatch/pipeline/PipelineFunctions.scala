@@ -68,7 +68,7 @@ object PipelineFunctions extends SparkSessionWrapper {
           new URI(rawPathString).normalize().toString
         }
       case None =>
-        "dbfs:%s".format(rawPathString.replaceAllLiterally("//", "/")) //uc_change
+        "dbfs:%s".format(rawPathString.replaceAllLiterally("//", "/"))
     }
   }
 

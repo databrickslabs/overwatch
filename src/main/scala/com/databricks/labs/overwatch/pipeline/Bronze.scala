@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.utils.{CloneDetail, Config, Helpers, Overwa
 import org.apache.log4j.{Level, Logger}
 
 
-class Bronze (_workspace: Workspace, _database: Database, _config: Config)
+class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
     with BronzeTransforms {
 
