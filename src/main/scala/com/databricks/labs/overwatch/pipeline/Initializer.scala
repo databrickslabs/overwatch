@@ -578,7 +578,7 @@ object Initializer extends SparkSessionWrapper {
     }
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
-    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
+    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions"))
     if (debugFlag) {
       envInit("DEBUG")
       config.setDebugFlag(debugFlag)
