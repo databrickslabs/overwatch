@@ -46,6 +46,7 @@ class Config() {
   private var _contractJobsLightDBUPrice: Double = _
   private var _isMultiworkspaceDeployment: Boolean = false
   private var _apiUrl: Option[String] = None
+  private var _catalogName: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -124,6 +125,8 @@ class Config() {
       col("organization_id") === organizationId
     )
   }
+
+  def catalogName: String = _catalogName
 
   /**
    * OverwatchScope defines the modules active for the current run
@@ -501,6 +504,17 @@ class Config() {
     _consumerDatabaseLocation = cleanConsumerDBLocation
     _consumerDatabaseName = consumerDBName
     println(s"DEBUG: Consumer Database Name and Location set to ${_consumerDatabaseName} and ${_consumerDatabaseLocation}")
+    this
+  }
+
+  /**
+   *
+   * @param catalogName
+   * @return
+   */
+  private[overwatch] def setCatalogName(catalogName: String): this.type = {
+    _catalogName = catalogName
+    println(s"DEBUG: Catalog name set to ${_catalogName}")
     this
   }
 

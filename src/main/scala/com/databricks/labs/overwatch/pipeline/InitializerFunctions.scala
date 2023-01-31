@@ -169,6 +169,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
       val dbName = dataTarget.databaseName.getOrElse("overwatch")
       val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
+      val catalogName = dataTarget.catalogName
       val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
       val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
       val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
@@ -268,12 +269,14 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val dbName = dataTarget.databaseName.get
       val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
       val dataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
+      val catalogName = dataTarget.catalogName.get
 
       val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
       val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
 
       config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
       config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
+      config.setCatalogName(catalogName)
     }
 
     private def quickBuildAuditLogConfig(auditLogConfig: AuditLogConfig): AuditLogConfig = {
@@ -435,7 +438,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
         logger.log(Level.INFO, "Initializing ETL Database")
         "OVERWATCHDB='TRUE'"
       }
-      if (!spark.catalog.databaseExists(config.databaseName)) {
+      if (!spark.catalog.databaseExists(s"${config.catalogName}.${config.databaseName}")) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
           s"${config.databaseLocation}.")
         val createDBIfNotExists = if (!config.isLocalTesting) {
@@ -445,6 +448,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
           s"create database if not exists ${config.databaseName} " +
             s"WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
         }
+        spark.sql(s"use catalog ${config.catalogName}")
         spark.sql(createDBIfNotExists)
         logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
       } else {
@@ -458,7 +462,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
         if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
             s"location '${config.consumerDatabaseLocation}'"
-
+          spark.sql(s"use catalog ${config.catalogName}")
           spark.sql(createConsumerDBSTMT)
           logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
         }

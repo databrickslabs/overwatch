@@ -225,7 +225,7 @@ class Database(config: Config) extends SparkSessionWrapper {
         val beginMsg = s"Stream to ${target.tableFullName} beginning."
         if (config.debugFlag) println(beginMsg)
         logger.log(Level.INFO, beginMsg)
-        if (!spark.catalog.tableExists(config.databaseName, target.name)) {
+        if (!spark.catalog.tableExists(s"${config.catalogName}.${config.databaseName}.${target.name}")) {
           initializeStreamTarget(finalDF, target)
         }
         val streamWriter = target.writer(finalDF)

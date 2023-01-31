@@ -48,7 +48,8 @@ case class PipelineTable(
   import spark.implicits._
 
   val databaseName: String = if (_databaseName == "default") config.databaseName else _databaseName
-  val tableFullName: String = s"${databaseName}.${name}"
+  val catalogName: String = config.catalogName
+  val tableFullName: String = s"${catalogName}.${databaseName}.${name}"
 
   // Minimum Schema Enforcement Management
   private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
