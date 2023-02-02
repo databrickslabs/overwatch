@@ -77,7 +77,7 @@ trait SparkSessionWrapper extends Serializable {
   lazy val sc: SparkContext = spark.sparkContext
 //  sc.setLogLevel("WARN")
 
-  def clearThreadFromSessionsMap(): Unit ={
+  protected def clearThreadFromSessionsMap(): Unit ={
     sessionsMap.remove(Thread.currentThread().getId)
     logger.log(Level.INFO, s"""Removed ${Thread.currentThread().getId} from sessionMap""")
   }

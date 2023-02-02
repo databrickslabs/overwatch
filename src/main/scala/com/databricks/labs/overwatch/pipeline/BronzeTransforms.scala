@@ -741,7 +741,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val pathsGlob = validNewFilesWMetaDF
         .filter(!'failed && 'withinSpecifiedTimeRange)
         .orderBy('fileSize.desc)
-        .select('fileName)
+        .select('filename)
         .as[String].collect
       if (pathsGlob.nonEmpty) { // new files less bad files and already-processed files
         logger.log(Level.INFO, s"VALID NEW EVENT LOGS FOUND: COUNT --> ${pathsGlob.length}")
