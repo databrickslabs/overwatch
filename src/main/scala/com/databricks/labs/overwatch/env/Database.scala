@@ -324,6 +324,13 @@ class Database(config: Config) extends SparkSessionWrapper {
       } catch {
         case e: Throwable =>
           val exceptionMsg = e.getMessage.toLowerCase()
+          logger.log(Level.WARN,
+            s"""
+               |DELTA Table Write Failure:
+               |$exceptionMsg
+               |Will Retry After a small delay.
+               |This is usually caused by multiple writes attempting to evolve the schema simultaneously
+               |""".stripMargin)
           if (exceptionMsg != null && (exceptionMsg.contains("concurrent") || exceptionMsg.contains("conflicting")) && retryCount < 5) {
             coolDown(target.tableFullName, 30, 30)
             true
