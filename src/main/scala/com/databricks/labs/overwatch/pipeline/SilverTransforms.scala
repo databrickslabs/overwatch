@@ -688,7 +688,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .orderBy('timestamp).rowsBetween(-1000, Window.currentRow)
     val isSingleNode = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
       "$.spark_databricks_cluster_profile") === lit("singleNode")
-    val isServerless = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
+    val isHC = get_json_object(regexp_replace('spark_conf, "\\.", "_"),
       "$.spark_databricks_cluster_profile") === lit("serverless")
     val isSQLAnalytics = get_json_object('custom_tags, "$.SqlEndpointId").isNotNull
     val tableAcls = coalesce(get_json_object(regexp_replace('spark_conf, "\\.", "_"), "$.spark_databricks_acl_dfAclsEnabled").cast("boolean"), lit(false)).alias("table_acls_enabled")
@@ -702,7 +702,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val enableElasticDisk = when('enable_elastic_disk === "false", lit(false))
       .otherwise(lit(true))
     val deriveClusterType = when(isSingleNode, lit("Single Node"))
-      .when(isServerless, lit("High-Concurrency"))
+      .when(isHC, lit("High-Concurrency"))
       .when(isSQLAnalytics, lit("SQL Analytics"))
       .otherwise("Standard").alias("cluster_type")
 
