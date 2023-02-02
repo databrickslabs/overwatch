@@ -375,7 +375,9 @@ class Database(config: Config) extends SparkSessionWrapper {
           testLock(retryCount + 1)
         } else {
           throw new Exception(s"TABLE LOCK TIMEOUT - The table $tableName remained locked for more than the configured " +
-            s"max timeout of $timeout millis")
+            s"max timeout of $timeout millis. This may be increased by setting the following spark config in the cluster" +
+            s"to something higher than the default (20 minutes). Usually only necessary for historical loads. \n" +
+            s"overwatch.tableLockTimeout")
         }
       } else true // table not locked
     }
