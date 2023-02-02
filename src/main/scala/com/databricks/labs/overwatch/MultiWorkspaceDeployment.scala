@@ -365,6 +365,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     try {
       if (parallelism > 1) SparkSessionWrapper.parSessionsOn = true
       SparkSessionWrapper.sessionsMap.clear()
+      SparkSessionWrapper.globalTableLock.clear()
 
       // initialize spark overrides for global spark conf
       PipelineFunctions.setSparkOverrides(spark(globalSession = true), SparkSessionWrapper.globalSparkConfOverrides)
@@ -406,6 +407,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       case e: Exception => throw e
     } finally {
       SparkSessionWrapper.sessionsMap.clear()
+      SparkSessionWrapper.globalTableLock.clear()
     }
     println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
   }

@@ -7,6 +7,8 @@ import org.apache.log4j.{Level, Logger}
 object BatchRunner extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+  SparkSessionWrapper.sessionsMap.clear()
+  SparkSessionWrapper.globalTableLock.clear()
 
   private def setGlobalDeltaOverrides(): Unit = {
     spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)

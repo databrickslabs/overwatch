@@ -1,9 +1,10 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.utils.SparkSessionWrapper.{ parSessionsOn}
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper.parSessionsOn
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
+import org.eclipse.jetty.util.ConcurrentHashSet
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConverters._
@@ -13,6 +14,7 @@ object SparkSessionWrapper {
 
    var parSessionsOn = false
   private[overwatch] val sessionsMap = new ConcurrentHashMap[Long, SparkSession]().asScala
+  private[overwatch] val globalTableLock = new ConcurrentHashSet[String]
   private[overwatch] val globalSparkConfOverrides = Map(
     "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
     "spark.sql.caseSensitive" -> "false",
