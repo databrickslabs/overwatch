@@ -185,14 +185,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val libsSnapshotModule = Module(1007, "Bronze_Libraries_Snapshot", this)
   lazy private val appendLibsProcess = ETLDefinition(
     workspace.getClusterLibraries,
-    Seq(cleanseRawLibsSnapDF),
     append(BronzeTargets.libsSnapshotTarget)
   )
 
   lazy private[overwatch] val policiesSnapshotModule = Module(1008, "Bronze_Policies_Snapshot", this)
   lazy private val appendPoliciesProcess = ETLDefinition(
     workspace.getClusterPolicies,
-    Seq(cleanseRawPoliciesSnapDF),
     append(BronzeTargets.policiesSnapshotTarget)
   )
 
