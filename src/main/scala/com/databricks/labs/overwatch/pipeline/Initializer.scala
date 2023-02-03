@@ -558,9 +558,6 @@ object Initializer extends SparkSessionWrapper {
   envInit()
 
   def getOrgId: String = {
-//    if (dbutils.notebook.getContext.tags("orgId") == "0") {
-//      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-//    } else dbutils.notebook.getContext.tags("orgId")
     if (spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId") == " ") {
       dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
     } else spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
