@@ -157,15 +157,31 @@ object Helpers extends SparkSessionWrapper {
   }
 
   /**
+   * Check whether a external location exists
+   *
+   * @param name file/directory name
+   * @return
+   */
+  def extLocationExists(name: String = " "): Boolean = {
+      println("inside extLocationExists....")
+      val pathToValidate = name.split("/").last+"/"
+      val extLocPath = name.substring(0,name.lastIndexOf("/")+1)
+      println(s"pathToValidate ...... ${pathToValidate}")
+      println(s"extLocPath....${extLocPath}")
+      val pathExists = spark.sql(s"list '$extLocPath'").filter('name === pathToValidate).count == 1L
+      pathExists
+  }
+
+  /**
    * Check whether a path exists
    *
    * @param name file/directory name
    * @return
    */
   def pathExists(name: String): Boolean = {
-    val path = new Path(name)
-    val fs = path.getFileSystem(spark.sparkContext.hadoopConfiguration)
-    fs.exists(path)
+      val path = new Path(name)
+      val fs = path.getFileSystem(spark.sparkContext.hadoopConfiguration)
+      fs.exists(path)
   }
 
   /**

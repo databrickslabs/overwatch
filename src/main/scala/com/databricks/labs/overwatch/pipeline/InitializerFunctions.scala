@@ -169,12 +169,18 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
       val dbName = dataTarget.databaseName.getOrElse("overwatch")
       val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
-      val catalogName = dataTarget.catalogName
+      val catalogName = dataTarget.catalogName.get
       val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
       val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
       val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
       var switch = true
-      if (spark.catalog.databaseExists(dbName)) {
+      println(s"rawDBLocation----${rawDBLocation}")
+      println(s"dbLocation----${dbLocation}")
+      println(s"rawETLDataLocation----${rawETLDataLocation}")
+      println(s"catalogName----${catalogName}")
+      println(s"etlDataLocation----${etlDataLocation}")
+      if (spark.catalog.databaseExists(s"$catalogName.$dbName")) {
+        spark.sql(s"use catalog ${catalogName}")
         val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
         val dbProperties = dbMeta.properties
         val existingDBLocation = dbMeta.locationUri.toString
@@ -193,10 +199,16 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
             s"database name that does not exist or was created by Overwatch.")
         }
       } else { // Database does not exist
-        if (!Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
+        if (catalogName != "hive_metastore" && !Helpers.extLocationExists(dbLocation)) { // db path does not already exist -- valid
+          println("inside if.....")
           logger.log(Level.INFO, s"Target location " +
             s"is valid: will create database: $dbName at location: ${dbLocation}")
-        } else { // db does not exist AND path already exists
+        }
+        else if (catalogName == "hive_metastore" && !Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
+          logger.log(Level.INFO, s"Target location " +
+            s"is valid: will create database: $dbName at location: ${dbLocation}")
+        }
+        else { // db does not exist AND path already exists
           switch = false
           throw new BadConfigException(
             s"""The target database location: ${dbLocation}
@@ -205,10 +217,14 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
           to reference the shared physical data location.""".stripMargin)
         }
       }
-
-      if (Helpers.pathExists(etlDataLocation)) println(s"\n\nWARNING!! The ETL Data Prefix exists. Verify that only " +
-        s"Overwatch data exists in this path.")
-
+      if (catalogName != "hive_metastore") {
+        if (Helpers.extLocationExists(etlDataLocation)) println(s"\n\nWARNING!! The ETL Data Prefix exists. Verify that only " +
+          s"Overwatch data exists in this path.")
+      }
+      else {
+        if (Helpers.pathExists(etlDataLocation)) println(s"\n\nWARNING!! The ETL Data Prefix exists. Verify that only " +
+          s"Overwatch data exists in this path.")
+      }
       // todo - refactor away duplicity
       /**
        * Many of the validation above are required for the consumer DB but the consumer DB will only contain
@@ -220,7 +236,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
       val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
       if (consumerDBName != dbName) { // separate consumer db
-        if (spark.catalog.databaseExists(consumerDBName)) {
+        if (spark.catalog.databaseExists(s"${catalogName}.${consumerDBName}")) {
+          spark.sql(s"use catalog ${catalogName}")
           val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
           val existingConsumerDBLocation = consumerDBMeta.locationUri.toString
           if (existingConsumerDBLocation != consumerDBLocation) { // separated consumer DB but same location FAIL
@@ -231,7 +248,11 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
               s"dbfs:/...")
           }
         } else { // consumer DB is different from ETL DB AND db does not exist
-          if (!Helpers.pathExists(consumerDBLocation)) { // consumer db path is empty
+          if (catalogName != "hive_metastore" && !Helpers.extLocationExists(consumerDBLocation)) { // consumer db path is empty
+            logger.log(Level.INFO, s"Consumer DB location " +
+              s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}")
+          }
+          else if (catalogName == "hive_metastore" && !Helpers.pathExists(consumerDBLocation)) { // consumer db path is empty
             logger.log(Level.INFO, s"Consumer DB location " +
               s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}")
           } else {
@@ -392,8 +413,17 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
           s"$tempPath/${config.organizationId}"
         }
         val hadoopConf = new SerializableConfiguration(spark.sparkContext.hadoopConfiguration)
-        if (Helpers.pathExists(workspaceTempWorkingDir)) { // if temp path exists clean it
-          Helpers.fastrm(Helpers.parListFiles(workspaceTempWorkingDir, hadoopConf))
+        println(s"config.catalogName .......... ${config.catalogName}")
+        println(s"workspaceTempWorkingDir.......${workspaceTempWorkingDir}")
+        if (config.catalogName != "hive_metastore") {
+          if (Helpers.extLocationExists(workspaceTempWorkingDir)) { // if temp path exists clean it
+            Helpers.fastrm(Helpers.parListFiles(workspaceTempWorkingDir, hadoopConf))
+          }
+        }
+        else {
+          if (Helpers.pathExists(workspaceTempWorkingDir)) { // if temp path exists clean it
+            Helpers.fastrm(Helpers.parListFiles(workspaceTempWorkingDir, hadoopConf))
+          }
         }
         // ensure path exists at init
         dbutils.fs.mkdirs(workspaceTempWorkingDir)
@@ -459,7 +489,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       // Create consumer database if one is configured
       if (config.consumerDatabaseName != config.databaseName) {
         logger.log(Level.INFO, "Initializing Consumer Database")
-        if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
+        if (!spark.catalog.databaseExists(s"${config.catalogName}.$config.consumerDatabaseName")) {
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
             s"location '${config.consumerDatabaseLocation}'"
           spark.sql(s"use catalog ${config.catalogName}")
