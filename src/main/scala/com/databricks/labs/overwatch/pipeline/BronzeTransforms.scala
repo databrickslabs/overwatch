@@ -1032,4 +1032,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  protected def cleanseRawJobRunsSnapDF(df: DataFrame): DataFrame = {
+    val outputDF = df.scrubSchema
+
+    outputDF
+      .modifyStruct(PipelineFunctions.newClusterCleaner(outputDF, "cluster_spec.new_cluster"))
+  }
+
 }

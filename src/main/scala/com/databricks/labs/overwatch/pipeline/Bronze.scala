@@ -182,6 +182,43 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.sparkEventLogsTarget) // Not new data only -- date filters handled in function logic
   )
 
+  lazy private[overwatch] val libsSnapshotModule = Module(1007, "Bronze_Libraries_Snapshot", this)
+  lazy private val appendLibsProcess = ETLDefinition(
+    workspace.getClusterLibraries,
+    append(BronzeTargets.libsSnapshotTarget)
+  )
+
+  lazy private[overwatch] val policiesSnapshotModule = Module(1008, "Bronze_Policies_Snapshot", this)
+  lazy private val appendPoliciesProcess = ETLDefinition(
+    workspace.getClusterPolicies,
+    append(BronzeTargets.policiesSnapshotTarget)
+  )
+
+  lazy private[overwatch] val instanceProfileSnapshotModule = Module(1009, "Bronze_Instance_Profile_Snapshot", this)
+  lazy private val appendInstanceProfileProcess = ETLDefinition(
+    workspace.getProfilesDF,
+    append(BronzeTargets.instanceProfilesSnapshotTarget)
+  )
+
+  lazy private[overwatch] val tokenSnapshotModule = Module(1010, "Bronze_Token_Snapshot", this)
+  lazy private val appendTokenProcess = ETLDefinition(
+    workspace.getTokens,
+    append(BronzeTargets.tokensSnapshotTarget)
+  )
+
+  lazy private[overwatch] val globalInitScSnapshotModule = Module(1011, "Bronze_Global_Init_Scripts_Snapshot", this)
+  lazy private val appendGlobalInitScProcess = ETLDefinition(
+    workspace.getGlobalInitScripts,
+    append(BronzeTargets.globalInitScSnapshotTarget)
+  )
+
+  lazy private[overwatch] val jobRunsSnapshotModule = Module(1012, "Bronze_Job_Runs_Snapshot", this) // check module number
+  lazy private val appendJobRunsProcess = ETLDefinition(
+    workspace.getJobRunsDF,
+    Seq(cleanseRawJobRunsSnapDF),
+    append(BronzeTargets.jobRunsSnapshotTarget)
+  )
+
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
 
@@ -208,11 +245,22 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
           landAzureAuditEvents()
         }
         auditLogsModule.execute(appendAuditLogsProcess)
-      case OverwatchScope.clusters => clustersSnapshotModule.execute(appendClustersAPIProcess)
+      case OverwatchScope.clusters =>
+        clustersSnapshotModule.execute(appendClustersAPIProcess)
+        libsSnapshotModule.execute(appendLibsProcess)
+        policiesSnapshotModule.execute(appendPoliciesProcess)
+        if (config.cloudProvider== "aws") {
+          instanceProfileSnapshotModule.execute(appendInstanceProfileProcess)
+        }
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
-      case OverwatchScope.jobs => jobsSnapshotModule.execute(appendJobsProcess)
+      case OverwatchScope.jobs =>
+        jobsSnapshotModule.execute(appendJobsProcess)
+        jobRunsSnapshotModule.execute(appendJobRunsProcess)
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
+      case OverwatchScope.accounts =>
+        tokenSnapshotModule.execute(appendTokenProcess)
+        globalInitScSnapshotModule.execute(appendGlobalInitScProcess)
       case _ =>
     }
   }
