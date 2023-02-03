@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper.parSessionsOn
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
 import org.apache.log4j.{Level, Logger}
@@ -191,6 +192,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           fullMsg,
           Some(multiWorkspaceParams.deploymentId)
         ))
+    } finally {
+      clearThreadFromSessionsMap()
     }
   }
 
@@ -215,6 +218,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           fullMsg,
           Some(multiWorkspaceParams.deploymentId)
         ))
+    } finally {
+      clearThreadFromSessionsMap()
     }
   }
 
@@ -239,6 +244,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           fullMsg,
           Some(multiWorkspaceParams.deploymentId)
         ))
+    }finally {
+      clearThreadFromSessionsMap()
     }
   }
 
@@ -355,42 +362,54 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   def deploy(parallelism: Int = 4, zones: String = "Bronze,Silver,Gold"): Unit = {
     val processingStartTime = System.currentTimeMillis();
-    println("ParallelismLevel :" + parallelism)
+    try {
+      if (parallelism > 1) SparkSessionWrapper.parSessionsOn = true
+      SparkSessionWrapper.sessionsMap.clear()
+      SparkSessionWrapper.globalTableLock.clear()
 
-    val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
-    snapshotConfig(multiWorkspaceConfig)
-    val params = DeploymentValidation
-      .performMandatoryValidation(multiWorkspaceConfig, parallelism)
-      .map(buildParams)
+      // initialize spark overrides for global spark conf
+      PipelineFunctions.setSparkOverrides(spark(globalSession = true), SparkSessionWrapper.globalSparkConfOverrides)
 
-    println("Workspace to be Deployed :" + params.size)
-    val zoneArray = zones.split(",")
-    zoneArray.foreach(zone => {
-      val responseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
-      implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
-      params.foreach(deploymentParams => {
-        val future = Future {
-          zone.toLowerCase match {
-            case "bronze" =>
-              startBronzeDeployment(deploymentParams)
-            case "silver" =>
-              startSilverDeployment(deploymentParams)
-            case "gold" =>
-              startGoldDeployment(deploymentParams)
+      println("ParallelismLevel :" + parallelism)
+      val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
+      snapshotConfig(multiWorkspaceConfig)
+      val params = DeploymentValidation
+        .performMandatoryValidation(multiWorkspaceConfig, parallelism)
+        .map(buildParams)
+      println("Workspace to be Deployed :" + params.size)
+
+      val zoneArray = zones.split(",")
+      zoneArray.foreach(zone => {
+        val responseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
+        implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
+        params.foreach(deploymentParams => {
+          val future = Future {
+            zone.toLowerCase match {
+              case "bronze" =>
+                startBronzeDeployment(deploymentParams)
+              case "silver" =>
+                startSilverDeployment(deploymentParams)
+              case "gold" =>
+                startGoldDeployment(deploymentParams)
+            }
           }
-        }
-        future.onComplete {
-          case _ =>
-            responseCounter.add(1)
+          future.onComplete {
+            case _ =>
+              responseCounter.add(1)
+          }
+        })
+        while (responseCounter.size() < params.length) {
+          Thread.sleep(5000)
         }
       })
-      while (responseCounter.size() < params.length) {
-        Thread.sleep(5000)
-      }
-    })
-    saveDeploymentReport(deploymentReport, multiWorkspaceConfig.head.etl_storage_prefix, "deploymentReport")
+      saveDeploymentReport(deploymentReport, multiWorkspaceConfig.head.etl_storage_prefix, "deploymentReport")
+    } catch {
+      case e: Exception => throw e
+    } finally {
+      SparkSessionWrapper.sessionsMap.clear()
+      SparkSessionWrapper.globalTableLock.clear()
+    }
     println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
-
   }
 
   /**

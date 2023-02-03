@@ -478,7 +478,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         "limit" -> "500"
       )
       val future = Future {
-        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
+        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread(accumulator)
         synchronized {
           apiObj.forEach(
             obj => if (obj.contains("events")) {
@@ -741,7 +741,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val pathsGlob = validNewFilesWMetaDF
         .filter(!'failed && 'withinSpecifiedTimeRange)
         .orderBy('fileSize.desc)
-        .select('fileName)
+        .select('filename)
         .as[String].collect
       if (pathsGlob.nonEmpty) { // new files less bad files and already-processed files
         logger.log(Level.INFO, s"VALID NEW EVENT LOGS FOUND: COUNT --> ${pathsGlob.length}")
@@ -834,10 +834,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .otherwise(col("Stage Attempt ID"))
         } else col("Stage Attempt ID")
 
+        // raw data contains both "Executor ID" and "executorId" at root for different events
+        val executorIdOverride: Column = if(baseEventsDF.columns.contains("Executor ID")) {
+          if (baseEventsDF.columns.contains("executorId")) { // blacklisted executor ids cannot exist if executor ids do not
+            concat(col("Executor ID"), 'executorId)
+          } else col("Executor ID")
+        } else { // handle missing Executor ID field
+          lit(null).cast("long")
+        }
+
         val bronzeSparkEventsScrubber = getSparkEventsSchemaScrubber(baseEventsDF)
 
         val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
           baseEventsDF
+            .withColumn("Executor ID", executorIdOverride)
             .withColumn("progress", progressCol)
             .withColumn("filename", input_file_name)
             .withColumn("pathSize", size(split('filename, "/")))
@@ -845,17 +855,18 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
             .withColumn("StageID", stageIDColumnOverride)
             .withColumn("StageAttemptID", stageAttemptIDColumnOverride)
-            .drop("pathSize", "Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId")
+            .drop("pathSize", "executorId", "Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId")
             .withColumn("filenameGroup", groupFilename('filename))
             .scrubSchema(bronzeSparkEventsScrubber)
         } else {
           baseEventsDF
+            .withColumn("Executor ID", executorIdOverride)
             .withColumn("progress", progressCol)
             .withColumn("filename", input_file_name)
             .withColumn("pathSize", size(split('filename, "/")))
             .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-            .drop("pathSize")
+            .drop("pathSize", "executorId")
             .withColumn("filenameGroup", groupFilename('filename))
             .scrubSchema(bronzeSparkEventsScrubber)
         }
@@ -866,7 +877,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
         rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
           .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
-          .withColumnRenamed("executorId", "blackListedExecutorIds")
           .join(eventLogsDF, Seq("filename"))
           .withColumn("organization_id", lit(organizationId))
           .withColumn("Properties", expr("map_filter(Properties, (k,v) -> k not in ('sparkexecutorextraClassPath'))"))

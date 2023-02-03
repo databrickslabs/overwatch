@@ -1,8 +1,30 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper.parSessionsOn
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
+import org.eclipse.jetty.util.ConcurrentHashSet
+
+import java.util.concurrent.ConcurrentHashMap
+import scala.collection.JavaConverters._
+
+
+object SparkSessionWrapper {
+
+   var parSessionsOn = false
+  private[overwatch] val sessionsMap = new ConcurrentHashMap[Long, SparkSession]().asScala
+  private[overwatch] val globalTableLock = new ConcurrentHashSet[String]
+  private[overwatch] val globalSparkConfOverrides = Map(
+    "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
+    "spark.sql.caseSensitive" -> "false",
+    "spark.sql.autoBroadcastJoinThreshold" -> "10485760",
+    "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "10485760",
+    "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
+    "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365
+  )
+
+}
 
 /**
  * Enables access to the Spark variable.
@@ -12,41 +34,53 @@ import org.apache.spark.sql.SparkSession
 trait SparkSessionWrapper extends Serializable {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+  private val sessionsMap = SparkSessionWrapper.sessionsMap
 
   /**
    * Init environment. This structure alows for multiple calls to "reinit" the environment. Important in the case of
    * autoscaling. When the cluster scales up/down envInit and then check for current cluster cores.
    */
-  @transient
   lazy protected val _envInit: Boolean = envInit()
 
+
+  private def buildSpark(): SparkSession = {
+    SparkSession
+      .builder()
+      .appName("GlobalSession")
+      .getOrCreate()
+  }
   /**
    * Access to spark
    * If testing locally or using DBConnect, the System variable "OVERWATCH" is set to "LOCAL" to make the code base
    * behavior differently to work in remote execution AND/OR local only mode but local only mode
    * requires some additional setup.
    */
-  lazy val spark: SparkSession = if (System.getenv("OVERWATCH") != "LOCAL") {
-    logger.log(Level.INFO, "Using Databricks SparkSession")
-    SparkSession
-      .builder().master("local").appName("OverwatchBatch")
-      .getOrCreate()
-  } else {
-    logger.log(Level.INFO, "Using Custom, local SparkSession")
-    SparkSession.builder()
-      .master("local[*]")
-      .config("spark.driver.maxResultSize", "8g")
-      .appName("OverwatchBatch")
-//    Useful configs for local spark configs and/or using labs/spark-local-execution
-//    https://github.com/databricks-academy/spark-local-execution
-//      .config("spark.driver.bindAddress", "0.0.0.0")
-//      .enableHiveSupport()
-//      .config("spark.warehouse.dir", "metastore")
-      .getOrCreate()
+  private[overwatch] def spark(globalSession : Boolean = false): SparkSession = {
+
+    if(SparkSessionWrapper.parSessionsOn){
+      if(globalSession){
+        buildSpark()
+      }
+      else{
+        val currentThreadID = Thread.currentThread().getId
+        val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
+        sessionsMap.put(currentThreadID, sparkSession)
+        sparkSession
+      }
+    }else{
+      buildSpark()
+    }
   }
+
+  @transient lazy val spark:SparkSession = spark(false)
 
   lazy val sc: SparkContext = spark.sparkContext
 //  sc.setLogLevel("WARN")
+
+  protected def clearThreadFromSessionsMap(): Unit ={
+    sessionsMap.remove(Thread.currentThread().getId)
+    logger.log(Level.INFO, s"""Removed ${Thread.currentThread().getId} from sessionMap""")
+  }
 
   def getCoresPerWorker: Int = sc.parallelize("1", 1)
     .map(_ => java.lang.Runtime.getRuntime.availableProcessors).collect()(0)

@@ -150,8 +150,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       config.apiEnv,
       sqlQueryHistoryEndpoint,
       jsonQuery,
-      tempSuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}",
-      accumulator = acc
+      tempSuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
     )
       .execute()
       .asDF()
@@ -195,9 +194,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           config.apiEnv,
           sqlQueryHistoryEndpoint,
           jsonQuery,
-          tempSuccessPath = tmpSqlQueryHistorySuccessPath,
-          accumulator = acc
-        ).executeMultiThread()
+          tempSuccessPath = tmpSqlQueryHistorySuccessPath
+        ).executeMultiThread(acc)
 
         synchronized {
           apiObj.forEach(

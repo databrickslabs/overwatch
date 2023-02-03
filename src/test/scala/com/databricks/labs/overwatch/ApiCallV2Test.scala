@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
-import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv}
+import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv, SparkSessionWrapper}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
@@ -96,8 +96,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         apiEnv,
         endPoint,
         query,
-        tempSuccessPath = "src/test/scala/tempDir/sqlqueryhistory",
-        accumulator = acc
+        tempSuccessPath = "src/test/scala/tempDir/sqlqueryhistory"
       ).execute().asDF() != null)
     }
 
@@ -206,6 +205,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
     }
     it("test multithreading") {
+      SparkSessionWrapper.parSessionsOn =true
       val endPoint = "clusters/list"
       val clusterIDsDf = ApiCallV2(apiEnv, endPoint).execute().asDF().select("cluster_id")
       clusterIDsDf.show(false)
@@ -226,7 +226,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         )
         println(jsonQuery)
         val future = Future {
-          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
+          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread(accumulator)
           synchronized {
             apiResponseArray.addAll(apiObj)
             if (apiResponseArray.size() >= apiEnv.successBatchSize) {
@@ -306,8 +306,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         apiEnv,
         sqlQueryHistoryEndpoint,
         jsonQuery,
-        tempSuccessPath = s"${tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}",
-        accumulator = acc
+        tempSuccessPath = s"${tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
       )
         .execute()
         .asDF()
@@ -371,9 +370,8 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
             apiEnv,
             sqlQueryHistoryEndpoint,
             jsonQuery,
-            tempSuccessPath = tmpSqlQueryHistorySuccessPath,
-            accumulator = acc
-          ).executeMultiThread()
+            tempSuccessPath = tmpSqlQueryHistorySuccessPath
+          ).executeMultiThread(acc)
 
           synchronized {
             apiObj.forEach(

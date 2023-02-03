@@ -568,7 +568,7 @@ object Initializer extends SparkSessionWrapper {
     val config = new Config()
     if(organizationID.isEmpty) {
       config.setOrganizationId(getOrgId)
-    }else{
+    }else{ // is multiWorkspace deployment since orgID is passed
       logger.log(Level.INFO, "Setting multiworkspace deployment")
       config.setOrganizationId(organizationID.get)
       if (apiUrl.nonEmpty) {
@@ -576,6 +576,7 @@ object Initializer extends SparkSessionWrapper {
       }
       config.setIsMultiworkspaceDeployment(true)
     }
+    // set spark overrides in scoped spark session
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
