@@ -162,14 +162,71 @@ object Helpers extends SparkSessionWrapper {
    * @param name file/directory name
    * @return
    */
-  def extLocationExists(name: String = " "): Boolean = {
+  def extLocationExists_v1(name: String): Boolean = {
       println("inside extLocationExists....")
-      val pathToValidate = name.split("/").last+"/"
-      val extLocPath = name.substring(0,name.lastIndexOf("/")+1)
+     val (pathToValidate, extLocPath) =   if (name.contains("tempworkingdir") || name.contains("global_share")){
+       (name.split("/").takeRight(2).mkString("/")+"/",
+       name.split("tempworkingdir").take(1).mkString
+       )
+      }
+     else {
+       (name.split("/").last+"/" ,
+       name.substring(0,name.lastIndexOf("/")+1))
+     }
       println(s"pathToValidate ...... ${pathToValidate}")
       println(s"extLocPath....${extLocPath}")
       val pathExists = spark.sql(s"list '$extLocPath'").filter('name === pathToValidate).count == 1L
       pathExists
+  }
+
+
+  def extLocationExists_v2(name: String): Boolean = {
+    println("inside extLocationExists....")
+    if (name.contains("tempworkingdir") || name.contains("global_share")){
+      var pathExists = false
+      var pathToValidate = ""
+      val pathToValidateArray =  name.split("/").takeRight(2)
+      print("pathToValidateArray---"+pathToValidateArray.mkString)
+      var extLocPath=  name.split("tempworkingdir|global_share").take(1).mkString
+      println("extLocPath-----"+extLocPath)
+      pathToValidate = pathToValidate+pathToValidateArray(0)+"/"
+      for (dir <- 0 until pathToValidateArray.length) {  //change 1 -> 0, removed +1
+        println("inside for loop"+dir)
+        println("pathToValidate-----"+pathToValidateArray(dir)+"/")
+        println("extLocPath-----"+extLocPath)
+        pathExists = spark.sql(s"list '$extLocPath'").filter('name === pathToValidateArray(dir)+"/").count == 1L
+        println("pathExists-----"+pathExists)
+        if (pathExists) {
+          extLocPath = extLocPath+pathToValidate
+        }
+        pathExists
+      }
+      pathExists
+    }
+    else {
+      val pathToValidate= name.split("/").last+"/"
+      val extLocPath=  name.substring(0,name.lastIndexOf("/")+1)
+      println(s"pathToValidate ...... ${pathToValidate}")
+      println(s"extLocPath....${extLocPath}")
+      val pathExists = spark.sql(s"list '$extLocPath'").filter('name === pathToValidate).count == 1L
+      pathExists
+    }
+  }
+
+  def extLocationExists(name: String): Boolean = {
+    var pathExists = false
+    var extLocPath=  "abfss://overwatch-external-loc@aottlrs.dfs.core.windows.net"+"/"
+    val pathToValidateArray = name.split(extLocPath).last.split("/")
+//    println("extLocPath-----"+extLocPath)
+    for (dir <- 0 until pathToValidateArray.length) {  //change 1 -> 0, removed +1
+      //         println("inside for loop"+dir)
+      //         println("pathToValidate-----"+pathToValidateArray(dir)+"/")
+      //         println("extLocPath-----"+extLocPath)
+      pathExists = spark.sql(s"list '$extLocPath'").filter('name === pathToValidateArray(dir)+"/").count == 1L
+      //         println("pathExists-----"+pathExists)
+      if (pathExists) extLocPath = extLocPath + pathToValidateArray(dir)+"/"
+    }
+    pathExists
   }
 
   /**

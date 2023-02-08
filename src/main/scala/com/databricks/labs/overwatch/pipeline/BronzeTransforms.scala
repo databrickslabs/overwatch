@@ -153,7 +153,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                   ehConfig: AzureAuditLogEventhubConfig,
                                   etlDataPathPrefix: String,
                                   etlDBLocation: String,
-                                  consumerDBLocation: String
+                                  consumerDBLocation: String,
+                                  catalogName: String
                                 ): Unit = {
 
     val pathsToValidate = Array(
@@ -166,7 +167,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val baseErrMsg = "ERROR: Azure Event Hub checkpoint directory issue."
     pathsToValidate.foreach(p => {
       logger.log(Level.INFO, s"Validating: $p")
-      val exists = Helpers.pathExists(p)
+      val exists = if (catalogName == "hive_metastore") Helpers.pathExists(p)
+      else Helpers.extLocationExists(p)
+
 
       if (isFirstRun && dataTargetPaths.contains(p.toLowerCase)) { // on new pipeline, data target paths != eh paths
         val errMsg = s"$baseErrMsg\nOne or more data target paths == the event hub state parent directory. Event Hub checkpoint " +
@@ -210,7 +213,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     consumerDBLocation: String,
                                     isFirstRun: Boolean,
                                     organizationId: String,
-                                    runID: String): DataFrame = {
+                                    runID: String,
+                                    catalogName: String): DataFrame = {
 
     val connectionString = ConnectionStringBuilder(
       PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
@@ -218,7 +222,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .build
 
     val ehConf = try {
-      validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
+      validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix,
+        etlDBLocation, consumerDBLocation, catalogName)
 
       if (isFirstRun) {
         EventHubsConf(connectionString)
@@ -545,9 +550,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, " Cluster event landing completed")
   }
 
-  private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
+  private def processClusterEvents(tmpClusterEventsSuccessPath: String,
+                                   organizationId: String, erroredBronzeEventsTarget: PipelineTable,
+                                   catalogName: String): DataFrame = {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
-    if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
+    val pathExistsFlag = if(catalogName != "hive_metastore") Helpers.extLocationExists(tmpClusterEventsSuccessPath)
+    else Helpers.pathExists(tmpClusterEventsSuccessPath)
+
+    if (pathExistsFlag) {
       if (spark.read.json(tmpClusterEventsSuccessPath).columns.contains("events")) {
         try {
           val tdf = SchemaScrubber.scrubSchema(
@@ -604,7 +614,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       organizationId: String,
                                       database: Database,
                                       erroredBronzeEventsTarget: PipelineTable,
-                                      tempWorkingDir: String
+                                      tempWorkingDir: String,
+                                      catalogName: String
                                     )(clusterSnapshotDF: DataFrame): DataFrame = {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
@@ -621,7 +632,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val tmpClusterEventsErrorPath = s"$tempWorkingDir/clusterEventsBronze/error" + apiEnv.runID
 
     landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath, tmpClusterEventsErrorPath)
-    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
+    val pathExistsFlag = if(catalogName != "hive_metastore") Helpers.extLocationExists(tmpClusterEventsErrorPath)
+    else Helpers.pathExists(tmpClusterEventsErrorPath)
+
+    if (pathExistsFlag) {
       persistErrors(
         spark.read.json(tmpClusterEventsErrorPath)
           .withColumn("from_ts", toTS(col("from_epoch")))
@@ -634,7 +648,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       logger.log(Level.INFO, "Persist error completed")
     }
     spark.conf.set("spark.sql.caseSensitive", "true")
-    val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget)
+    val clusterEventDf = processClusterEvents(tmpClusterEventsSuccessPath, organizationId, erroredBronzeEventsTarget, catalogName)
     spark.conf.set("spark.sql.caseSensitive", "false")
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))

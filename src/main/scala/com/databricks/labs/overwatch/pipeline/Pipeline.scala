@@ -382,8 +382,13 @@ class Pipeline(
     // cleanse the temp dir
     // if failure doesn't allow pipeline to get here, temp dir will be cleansed on workspace init
     if (!config.externalizeOptimize) postProcessor.optimize(this, Pipeline.OPTIMIZESCALINGCOEF)
-    Helpers.fastrm(Array(config.tempWorkingDir))
-    dbutils.fs.rm(config.tempWorkingDir)
+    if(config.catalogName != "hive_metastore"){
+      dbutils.fs.rm(config.tempWorkingDir, true)
+    }
+    else {
+      Helpers.fastrm(Array(config.tempWorkingDir)) // commenting for uc implementation
+      dbutils.fs.rm(config.tempWorkingDir)
+    }
 
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
 

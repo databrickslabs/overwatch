@@ -148,7 +148,8 @@ case class PipelineTable(
    */
   def exists(pathValidation: Boolean = true, dataValidation: Boolean = false, catalogValidation: Boolean = false): Boolean = {
     var entityExists = true
-    if (pathValidation || dataValidation) entityExists = Helpers.pathExists(tableLocation)
+    if ((pathValidation || dataValidation) && config.catalogName == "hive_metastore") entityExists = Helpers.pathExists(tableLocation)
+    if ((pathValidation || dataValidation) && config.catalogName != "hive_metastore") entityExists = Helpers.extLocationExists(tableLocation)
     if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)
     if (dataValidation) { // if other validation is enabled it must first pass those for this test to be attempted
       // opposite -- when result is empty source data does not exist

@@ -139,7 +139,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         config.organizationId,
         database,
         BronzeTargets.clusterEventsErrorsTarget,
-        config.tempWorkingDir
+        config.tempWorkingDir,
+        config.catalogName
       )
     ),
     append(BronzeTargets.clusterEventsTarget)
@@ -191,7 +192,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       config.etlDataPathPrefix, config.databaseLocation, config.consumerDatabaseLocation,
       auditLogsModule.isFirstRun,
       config.organizationId,
-      config.runID
+      config.runID,
+      config.catalogName
     )
 
     database.writeWithRetry(rawAzureAuditEvents, BronzeTargets.auditLogAzureLandRaw, pipelineSnapTime.asColumnTS)

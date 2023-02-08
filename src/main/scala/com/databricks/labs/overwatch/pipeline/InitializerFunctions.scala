@@ -471,10 +471,14 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       if (!spark.catalog.databaseExists(s"${config.catalogName}.${config.databaseName}")) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
           s"${config.databaseLocation}.")
-        val createDBIfNotExists = if (!config.isLocalTesting) {
+        val createDBIfNotExists = if (!config.isLocalTesting && config.catalogName != "hive_metastore") {
+          s"create database if not exists ${config.databaseName} managed location '" +
+            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
+        } else if (!config.isLocalTesting && config.catalogName != "hive_metastore") {
           s"create database if not exists ${config.databaseName} location '" +
             s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
-        } else {
+        }
+        else {
           s"create database if not exists ${config.databaseName} " +
             s"WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
         }
@@ -489,7 +493,16 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       // Create consumer database if one is configured
       if (config.consumerDatabaseName != config.databaseName) {
         logger.log(Level.INFO, "Initializing Consumer Database")
-        if (!spark.catalog.databaseExists(s"${config.catalogName}.$config.consumerDatabaseName")) {
+        if (!spark.catalog.databaseExists(s"${config.catalogName}.${config.consumerDatabaseName}")
+          && config.catalogName!="hive_metastore") {
+          val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
+            s"managed location '${config.consumerDatabaseLocation}'"
+          spark.sql(s"use catalog ${config.catalogName}")
+          spark.sql(createConsumerDBSTMT)
+          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+        }
+        if (!spark.catalog.databaseExists(s"${config.catalogName}.${config.consumerDatabaseName}")
+          && config.catalogName =="hive_metastore") {
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
             s"location '${config.consumerDatabaseLocation}'"
           spark.sql(s"use catalog ${config.catalogName}")
