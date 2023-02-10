@@ -2,8 +2,8 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
-import io.delta.tables.DeltaTable
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode, MergeScope}
+import io.delta.tables.{DeltaMergeBuilder, DeltaTable}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.streaming.StreamingQueryListener._
@@ -191,6 +191,40 @@ class Database(config: Config) extends SparkSessionWrapper {
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
 
+  private def deriveDeltaMergeBuilder(
+                                     deltaTarget: DeltaTable,
+                                     updatesDF: DataFrame,
+                                     mergeCondition: String,
+                                     target: PipelineTable
+                                     ): DeltaMergeBuilder = {
+
+    val mergeScope = target.mergeScope
+    logger.log(Level.INFO, s"BEGINNING MERGE for target ${target.tableFullName}. \nMERGE SCOPE: " +
+      s"$mergeScope")
+
+    if (mergeScope == MergeScope.insertOnly) {
+      deltaTarget
+        .merge(updatesDF, mergeCondition)
+        .whenNotMatched
+        .insertAll()
+    } else if (mergeScope == MergeScope.updateOnly) {
+      deltaTarget
+        .merge(updatesDF, mergeCondition)
+        .whenMatched
+        .updateAll()
+    }
+    else if (mergeScope == MergeScope.full) {
+      deltaTarget
+        .merge(updatesDF, mergeCondition)
+        .whenMatched
+        .updateAll()
+        .whenNotMatched
+        .insertAll()
+    } else {
+      throw new Exception("Merge Scope Not Supported")
+    }
+  }
+
   /**
    * Write the dataframe to the target
    *
@@ -238,12 +272,7 @@ class Database(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, mergeDetailMsg)
       spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", config.runID)
       // TODO -- when DBR 9.1 LTS GA, use LSM (low-shuffle-merge) to improve pipeline
-      deltaTarget
-        .merge(updatesDF, mergeCondition)
-        .whenMatched
-        .updateAll()
-        .whenNotMatched
-        .insertAll()
+      deriveDeltaMergeBuilder(deltaTarget, updatesDF, mergeCondition, target)
         .execute()
 
       spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")

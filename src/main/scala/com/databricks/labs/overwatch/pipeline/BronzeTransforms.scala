@@ -471,9 +471,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
     //TODO identify the best practice to implement the future.
     val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
+    val sub24hMillis = 1000*60*60*24 // 1 day in millis
     for (i <- clusterIDs.indices) {
       val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
-        "start_time" -> s"""${startTime.asUnixTimeMilli}""",
+        "start_time" -> s"""${startTime.asUnixTimeMilli - sub24hMillis}""", // subtract 1d to resolve ISSUE_729
         "end_time" -> s"""${endTime.asUnixTimeMilli}""",
         "limit" -> "500"
       )

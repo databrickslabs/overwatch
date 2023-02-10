@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, WriteMode}
+import com.databricks.labs.overwatch.utils.{Config, MergeScope, WriteMode}
 
 abstract class PipelineTargets(config: Config) {
 // TODO -- Refactor -- this class should extend workspace so these are "WorkspaceTargets"
@@ -92,6 +92,8 @@ abstract class PipelineTargets(config: Config) {
       name = "cluster_events_bronze",
       _keys = Array("cluster_id", "type", "timestamp"),
       config,
+      _mode = WriteMode.merge,
+      mergeScope = MergeScope.insertOnly,
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("timestamp"),
       statsColumns = "cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID".split(", "),
