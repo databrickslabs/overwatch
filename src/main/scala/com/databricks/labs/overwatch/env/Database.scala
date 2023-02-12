@@ -188,9 +188,14 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalDF
   }
 
-  // TODO - refactor this write function and the writer from the target
-  //  write function has gotten overly complex
-
+  /**
+   *
+   * @param deltaTarget Delta table to which to write
+   * @param updatesDF DF to be merged into the delta table
+   * @param mergeCondition merge logic as a string
+   * @param target Pipeline Table target to write to
+   * @return
+   */
   private def deriveDeltaMergeBuilder(
                                      deltaTarget: DeltaTable,
                                      updatesDF: DataFrame,
@@ -225,6 +230,8 @@ class Database(config: Config) extends SparkSessionWrapper {
     }
   }
 
+  // TODO - refactor this write function and the writer from the target
+  //  write function has gotten overly complex
   /**
    * Write the dataframe to the target
    *
