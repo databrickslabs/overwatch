@@ -88,6 +88,7 @@ object Schema extends SparkSessionWrapper {
     StructField("requestId", StringType, nullable = true),
     StructField("sessionId", StringType, nullable = true),
     StructField("version", StringType, nullable = true),
+    StructField("hashKey", LongType, nullable = true),
     StructField("requestParams",
       StructType(Seq(
         StructField("clusterId", StringType, nullable = true),

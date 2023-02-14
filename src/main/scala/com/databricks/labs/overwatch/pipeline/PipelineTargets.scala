@@ -65,12 +65,15 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val auditLogsTarget: PipelineTable = PipelineTable(
       name = "audit_log_bronze",
-      _keys = Array("serviceName", "actionName", "requestId"),
+      _keys = Array("timestamp", "serviceName", "actionName", "requestId", "hashKey"),
       config,
       incrementalColumns = Array("date", "timestamp"),
       partitionBy = Seq("organization_id", "date"),
       statsColumns = ("actionName, requestId, serviceName, sessionId, " +
         "timestamp, date, Pipeline_SnapTS, Overwatch_RunID").split(", "),
+      _permitDuplicateKeys = false,
+      _mode = WriteMode.merge,
+      mergeScope = MergeScope.insertOnly,
       masterSchema = Some(Schema.auditMasterSchema)
     )
 

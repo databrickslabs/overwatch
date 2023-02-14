@@ -302,7 +302,8 @@ object TransformFunctions {
                      incrementalFields: Seq[String]
                      ): DataFrame = {
 //       val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
-      val w = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
+      val distinctKeys = (keys ++ incrementalFields).toSet.toArray
+      val w = Window.partitionBy(distinctKeys map col: _*).orderBy(incrementalFields map col: _*)
       df
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
