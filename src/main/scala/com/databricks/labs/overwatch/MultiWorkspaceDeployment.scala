@@ -118,7 +118,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val customWorkspaceName: String = config.workspace_name
       val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".split(",").toBuffer
       if (config.excluded_scopes != null) {
-        config.excluded_scopes.split(":").foreach(scope => standardScopes -= scope)
+        config.excluded_scopes.toLowerCase().split(":").foreach(scope => standardScopes -= scope)
       }
 
       val maxDaysToLoad: Int = config.max_days
