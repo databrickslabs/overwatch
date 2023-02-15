@@ -131,7 +131,7 @@ trait ApiMeta {
        |""".stripMargin
   }
 
-  private[overwatch] def getAPIJsonQuery(startValue: Int, endValue: Int, jsonInput: Map[String, String]): Map[String, String] = {
+  private[overwatch] def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
     null
   }
 
@@ -185,7 +185,7 @@ class SqlQueryHistoryApi extends ApiMeta {
     requestMap.filterNot { case (k, _) => k.toLowerCase.startsWith("filter_by")} ++ Map(s"page_token" -> s"${_jsonValue}")
   }
 
-  private[overwatch] override def getAPIJsonQuery(startValue: Int, endValue: Int, jsonInput: Map[String, String]): Map[String, String] = {
+  private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
     val (startTime, endTime) = if ((endValue - startValue)/(1000*60*60) > 1) {
       (startValue,
         startValue+(1000*60*60))
@@ -261,12 +261,12 @@ class ClusterEventsApi extends ApiMeta {
   setApiCallType("POST")
   setStoreInTempLocation(true)
 
-  private[overwatch] override def getAPIJsonQuery(startValue: Int, endValue: Int,jsonInput: Map[String, String]): Map[String, String] = {
-    val clusterIDs = jsonInput.get("cluster_list").get.split(",").map(_.trim).toArray
-    val startTime = Integer.parseInt(jsonInput.get("cluster_start_time").get)
-    val endTime = Integer.parseInt(jsonInput.get("cluster_end_time").get)
+  private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long,jsonInput: Map[String, String]): Map[String, String] = {
+    val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
+    val startTime = jsonInput.get("start_time").get.toLong
+    val endTime = jsonInput.get("end_time").get.toLong
 
-    Map("cluster_id" -> s"""${clusterIDs(startValue)}""",
+    Map("cluster_id" -> s"""${clusterIDs(startValue.toInt)}""",
       "start_time" -> s"""${startTime}""",
       "end_time" -> s"""${endTime}""",
       "limit" -> "500"

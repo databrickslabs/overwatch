@@ -633,22 +633,27 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   def makeParallelApiCalls(endpoint: String, jsonInput: Map[String, String], config: Config): String = {
-    var startValue = Integer.parseInt(jsonInput.get("start_value").get)
-    val endValue = Integer.parseInt(jsonInput.get("end_value").get)
-    val incrementCounter = Integer.parseInt(jsonInput.get("increment_counter").get)
-    val finalResponseCount = Integer.parseInt(jsonInput.get("final_response_count").get)
+    var startValue = jsonInput.get("start_value").get.toLong
+    val endValue = jsonInput.get("end_value").get.toLong
+    val incrementCounter = jsonInput.get("increment_counter").get.toLong
+    val finalResponseCount = jsonInput.get("final_response_count").get.toLong
     val tempEndpointLocation = endpoint.replaceAll("/","")
     val acc = sc.longAccumulator(tempEndpointLocation)
-    val tmpSuccessPath = s"${config.tempWorkingDir}/${tempEndpointLocation}/${System.currentTimeMillis()}"
-    val tmpErrorPath = s"${config.tempWorkingDir}/errors/${tempEndpointLocation}/${System.currentTimeMillis()}"
+
+    val tmpSuccessPath = if(jsonInput.contains("tmp_success_path")) jsonInput.get("tmp_success_path").get
+    else s"${config.tempWorkingDir}/${tempEndpointLocation}/${System.currentTimeMillis()}"
+
+    val tmpErrorPath = if(jsonInput.contains("tmp_error_path")) jsonInput.get("tmp_error_path").get
+    else s"${config.tempWorkingDir}/errors/${tempEndpointLocation}/${System.currentTimeMillis()}"
+
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     val apiResponseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(
       Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
-
+    val apiMetaFactoryObj = new ApiMetaFactory().getApiClass(endpoint)
+    val dataFrame_column = apiMetaFactoryObj.dataframeColumn
     while (startValue < endValue){
-      val apiMetaFactoryObj = new ApiMetaFactory().getApiClass(endpoint)
       val jsonQuery = apiMetaFactoryObj.getAPIJsonQuery(startValue, endValue, jsonInput)
 
       //call future
@@ -663,7 +668,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
         synchronized {
           apiObj.forEach(
-            obj=>if(obj.contains("res")){
+            obj=>if(obj.contains(dataFrame_column)){
               apiResponseArray.add(obj)
             }
           )

@@ -163,14 +163,15 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val sqlQueryHistoryEndpoint = "sql/history/queries"
     val untilTimeMs = untilTime.asUnixTimeMilli
     val fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
-    val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
+    val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)).toLong// Total no. of API Calls
 
     // creating Json input for parallel API calls
     val jsonInput = Map(
       "start_value" -> s"${fromTimeMs}",
       "end_value" -> s"${untilTimeMs}",
       "increment_counter" -> "3600000",
-      "finalResponseCount" -> s"${finalResponseCount}"
+      "final_response_count" -> s"${finalResponseCount}",
+      "result_key" -> "res"
     )
 
     // calling function to make parallel API calls
