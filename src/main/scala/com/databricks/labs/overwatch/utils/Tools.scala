@@ -1,8 +1,9 @@
 package com.databricks.labs.overwatch.utils
 
 import com.amazonaws.services.s3.model.AmazonS3Exception
+import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.env.Workspace
-import com.databricks.labs.overwatch.{ApiCallV2, pipeline}
+import com.databricks.labs.overwatch.{ApiCallV2, ApiMetaFactory, pipeline}
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
 import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
@@ -768,117 +769,6 @@ object Helpers extends SparkSessionWrapper {
     )
     rollbackTargetToTimestamp(targetsToRollback, dryRun)
 
-  }
-
-
-}
-
-object ParallelApiCallUtils {
-  private val logger: Logger = Logger.getLogger(this.getClass)
-
-  def makeParallelApiCalls(endpoint: String,
-                           payload: Map[String, String],
-                           result_key: String,
-                           config: Config,
-                           apiResponseArray: util.List[String],
-                           apiErrorArray: util.List[String],
-                           tmpSqlQueryHistorySuccessPath: String,
-                           tmpSqlQueryHistoryErrorPath: String,
-                           apiResponseCounter: util.ArrayList[Int],
-                           acc: LongAccumulator
-                          ): util.ArrayList[Int] = {
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
-
-    val future = Future {
-      val apiObj = ApiCallV2(
-        config.apiEnv,
-        endpoint,
-        payload,
-        tempSuccessPath = tmpSqlQueryHistorySuccessPath,
-        accumulator = acc
-      ).executeMultiThread()
-
-      synchronized {
-        apiObj.forEach(
-          obj=>if(obj.contains(result_key)){
-            apiResponseArray.add(obj)
-          }
-        )
-        if (apiResponseArray.size() >= config.apiEnv.successBatchSize) {
-          PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
-          apiResponseArray.clear()
-        }
-      }
-    }
-    future.onComplete {
-      case Success(_) =>
-        apiResponseCounter.add(1)
-
-      case Failure(e) =>
-        if (e.isInstanceOf[ApiCallFailureV2]) {
-          synchronized {
-            apiErrorArray.add(e.getMessage)
-            if (apiErrorArray.size() >= config.apiEnv.errorBatchSize) {
-              PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistoryErrorPath, apiErrorArray.toString)
-              apiErrorArray.clear()
-            }
-          }
-          logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
-        }
-        apiResponseCounter.add(1)
-    }
-    apiResponseCounter
-  }
-
-  def processParallelApiCallsResult(
-    apiResponseCounter: util.ArrayList[Int],
-    finalResponseCount: Double,
-    tmpSqlQueryHistorySuccessPath: String,
-    tmpSqlQueryHistoryErrorPath: String,
-    apiResponseArray: util.List[String],
-    apiErrorArray: util.List[String],
-    config: Config,
-    acc: LongAccumulator,
-    endpoint: String
-  ): Unit = {
-    val timeoutThreshold = config.apiEnv.apiWaitingTime // 5 minutes
-    var currentSleepTime = 0
-    var accumulatorCountWhileSleeping = acc.value
-    while (apiResponseCounter.size() < finalResponseCount && currentSleepTime < timeoutThreshold) {
-      //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed
-      // the execution or not. If we have not received the response from all the threads then we are waiting for 5
-      // seconds and again revalidating the count.
-      if (currentSleepTime > 120000) //printing the waiting message only if the waiting time is more than 2 minutes.
-      {
-        println(
-          s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000}
-             |seconds; Api response yet to receive ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
-      }
-      Thread.sleep(5000)
-      currentSleepTime += 5000
-      if (accumulatorCountWhileSleeping < acc.value) { //new API response received while waiting.
-        currentSleepTime = 0 //resetting the sleep time.
-        accumulatorCountWhileSleeping = acc.value
-      }
-    }
-    if (apiResponseCounter.size() != finalResponseCount) { // Checking whether all the api responses has been received or not.
-      logger.log(Level.ERROR,
-        s"""Unable to receive all the ${endpoint} api responses; Api response
-           |received ${apiResponseCounter.size()};Api response not
-           |received ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
-      throw new Exception(
-        s"""Unable to receive all the ${endpoint} api responses; Api response received
-           |${apiResponseCounter.size()};Api response not received ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
-    }
-    if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
-      PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistorySuccessPath, apiResponseArray.toString)
-      apiResponseArray.clear()
-    }
-    if (apiErrorArray.size() > 0) { //In case of error array didn't hit the batch-size as a final step we will write it to the persistent storage.
-      PipelineFunctions.writeMicroBatchToTempLocation(tmpSqlQueryHistoryErrorPath, apiErrorArray.toString)
-      apiErrorArray.clear()
-    }
-    logger.log(Level.INFO, "${endpoint} landing completed")
   }
 
 }
