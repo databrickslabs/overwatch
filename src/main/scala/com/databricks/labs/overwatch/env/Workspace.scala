@@ -351,12 +351,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * Function to get the the list of Job Runs
    * @return
    */
-  def getJobRunsDF: DataFrame = {
+  def getJobRunsDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
     val jobsRunsEndpoint = "jobs/runs/list"
     val jsonQuery = Map(
       "limit" -> "25",
       "expand_tasks" -> "true",
-      "offset" -> "0"
+      "offset" -> "0",
+      "start_time_from" -> s"${fromTime.asUnixTimeMilli}",
+      "start_time_to" -> s"${untilTime.asUnixTimeMilli}"
     )
     ApiCallV2(config.apiEnv,jobsRunsEndpoint, jsonQuery, 2.1)
       .execute()

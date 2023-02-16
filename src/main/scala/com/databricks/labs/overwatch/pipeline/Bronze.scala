@@ -214,7 +214,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   lazy private[overwatch] val jobRunsSnapshotModule = Module(1012, "Bronze_Job_Runs_Snapshot", this) // check module number
   lazy private val appendJobRunsProcess = ETLDefinition(
-    workspace.getJobRunsDF,
+    workspace.getJobRunsDF(jobRunsSnapshotModule.fromTime, jobRunsSnapshotModule.untilTime),
     Seq(cleanseRawJobRunsSnapDF),
     append(BronzeTargets.jobRunsSnapshotTarget)
   )

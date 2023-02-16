@@ -271,6 +271,7 @@ class JobRunsApi extends ApiMeta {
   setApiCallType("GET")
   setPaginationKey("has_more")
   setIsDerivePaginationLogic(true)
+  setStoreInTempLocation(true)
 
   private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
     jsonObject.get(paginationKey).asBoolean()
