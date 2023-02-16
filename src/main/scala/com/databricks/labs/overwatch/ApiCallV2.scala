@@ -225,6 +225,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     this
   }
 
+  def asStrings: Array[String] = _apiResponseArray.toArray(new Array[String](_apiResponseArray.size))
+
   /**
    * Setting up the api name and api metadata for that api.
    *
