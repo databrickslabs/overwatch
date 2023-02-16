@@ -378,31 +378,29 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .performMandatoryValidation(multiWorkspaceConfig, parallelism)
         .map(buildParams)
       println("Workspace to be Deployed :" + params.size)
-
-      val zoneArray = zones.split(",")
-      zoneArray.foreach(zone => {
-        val responseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
-        implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
-        params.foreach(deploymentParams => {
-          val future = Future {
-            zone.toLowerCase match {
-              case "bronze" =>
-                startBronzeDeployment(deploymentParams)
-              case "silver" =>
-                startSilverDeployment(deploymentParams)
-              case "gold" =>
-                startGoldDeployment(deploymentParams)
-            }
+      val responseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
+      implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
+      params.foreach(deploymentParams => {
+        val future = Future {
+          if (zones.toLowerCase().contains("bronze")) {
+            startBronzeDeployment(deploymentParams)
           }
-          future.onComplete {
-            case _ =>
-              responseCounter.add(1)
+          if (zones.toLowerCase().contains("silver")) {
+            startSilverDeployment(deploymentParams)
           }
-        })
-        while (responseCounter.size() < params.length) {
-          Thread.sleep(5000)
+          if (zones.toLowerCase().contains("gold")) {
+            startGoldDeployment(deploymentParams)
+          }
+        }
+        future.onComplete {
+          case _ =>
+            responseCounter.add(1)
         }
       })
+      while (responseCounter.size() < params.length) {
+        Thread.sleep(5000)
+      }
+
       saveDeploymentReport(deploymentReport, multiWorkspaceConfig.head.etl_storage_prefix, "deploymentReport")
     } catch {
       case e: Exception => throw e
