@@ -349,7 +349,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
       PipelineFunctions.cleanseCorruptAuditLogs(spark, baselineAuditLogs)
         .withColumn("response", structFromJson(spark, schemaBuilders, "response"))
-        .drop("logId")
+        .withColumn("requestParamsJson", to_json('requestParams))
+        .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsJson))
+        .drop("logId", "requestParamsJson")
 
     } else {
 
@@ -357,7 +359,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val datesGlob = if (fromDT == untilDT) {
         Array(s"${auditLogConfig.rawAuditPath.get}/date=${fromDT.toString}")
       } else {
-        getDatesGlob(fromDT, untilDT)
+        getDatesGlob(fromDT, untilDT.plusDays(1)) // add one day to until to ensure intra-day audit logs prior to untilTS are captured.
           .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
           .filter(Helpers.pathExists)
       }
@@ -387,6 +389,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         baseDF
           // When globbing the paths, the date must be reconstructed and re-added manually
           .withColumn("organization_id", lit(organizationId))
+          .withColumn("requestParamsJson", to_json('requestParams))
+          .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsJson))
+          .drop("requestParamsJson")
           .withColumn("filename", input_file_name)
           .withColumn("filenameAR", split(input_file_name, "/"))
           .withColumn("date",
