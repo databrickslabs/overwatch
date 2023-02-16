@@ -329,6 +329,18 @@ object WriteMode extends Enumeration {
   val merge: Value = Value("merge")
 }
 
+/**
+ * insertOnly = whenNotMatched --> Insert
+ * updateOnly = whenMatched --> update
+ * full = both insert and update
+ */
+object MergeScope extends Enumeration {
+  type MergeScope = Value
+  val full: Value = Value("full")
+  val insertOnly: Value = Value("insertOnly")
+  val updateOnly: Value = Value("updateOnly")
+}
+
 // Todo Issue_56
 private[overwatch] class NoNewDataException(s: String, val level: Level, val allowModuleProgression: Boolean = false) extends Exception(s) {}
 
