@@ -360,7 +360,11 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "start_time_from" -> s"${fromTime.asUnixTimeMilli}",
       "start_time_to" -> s"${untilTime.asUnixTimeMilli}"
     )
-    ApiCallV2(config.apiEnv,jobsRunsEndpoint, jsonQuery, 2.1)
+    ApiCallV2(config.apiEnv,
+      jobsRunsEndpoint,
+      jsonQuery,
+      tempSuccessPath = s"${config.tempWorkingDir}/jobrunslist_bronze/${System.currentTimeMillis()}",
+      2.1)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
