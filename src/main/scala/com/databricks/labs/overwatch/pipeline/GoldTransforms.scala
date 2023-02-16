@@ -304,11 +304,11 @@ trait GoldTransforms extends SparkSessionWrapper {
       .lookupWhen(
         nodeTypeLookup.toTSDF("timestamp", "organization_id", "cluster_id"),
         maxLookAhead = 1,
-        tsPartitionVal = 16
+        tsPartitionVal = 4
       ).lookupWhen(
       nodeTypeLookup2.toTSDF("timestamp", "organization_id", "cluster_id"),
       maxLookAhead = 1,
-      tsPartitionVal = 16
+      tsPartitionVal = 4
     ).df.drop("timestamp")
       .alias("clusterPotential")
       .join( // estimated node type details at start time of run. If contract changes during state, not handled but very infrequent and negligible impact
