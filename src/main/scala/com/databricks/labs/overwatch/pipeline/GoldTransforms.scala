@@ -342,8 +342,8 @@ trait GoldTransforms extends SparkSessionWrapper {
     val workerDBUs = when('databricks_billable, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H * photonDBUMultiplier).otherwise(lit(0)).alias("worker_dbus")
     val driverComputeCost = Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H).alias("driver_compute_cost")
     val workerComputeCost = Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H).alias("worker_compute_cost")
-    val driverDBUCost = Costs.dbu('databricks_billable, driverDBUs, 'dbu_rate, lit(1), 'uptime_in_state_H)
-    val workerDBUCost = Costs.dbu('databricks_billable, driverDBUs, 'dbu_rate, 'current_num_workers, 'uptime_in_state_H)
+    val driverDBUCost = Costs.dbu('databricks_billable, driverDBUs, 'dbu_rate, lit(1), 'uptime_in_state_H).alias("driver_dbu_cost")
+    val workerDBUCost = Costs.dbu('databricks_billable, driverDBUs, 'dbu_rate, 'current_num_workers, 'uptime_in_state_H).alias("worker_dbu_cost")
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
