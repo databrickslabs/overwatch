@@ -136,7 +136,8 @@ trait ApiMeta {
   }
 
   private[overwatch] def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
-    null
+    logger.log(Level.INFO, s"""Needs to be override for specific API for manipulating the input JSON Query""")
+    Map[String, String]()
   }
 
 }
