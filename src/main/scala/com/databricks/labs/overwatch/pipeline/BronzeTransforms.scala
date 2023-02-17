@@ -273,7 +273,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "settings.job_clusters" -> col("cleansedJobsClusters"),
       "settings.tags" -> SchemaTools.structToMap(outputDF, "settings.tags"),
       "settings.notebook_task.base_parameters" -> SchemaTools.structToMap(outputDF, "settings.notebook_task.base_parameters")
-    ) ++ PipelineFunctions.newClusterCleaner(outputDF, "settings.tasks.new_cluster")
+    ) ++ PipelineFunctions.newClusterCleaner(outputDF, "settings.tasks.new_cluster") ++
+      PipelineFunctions.newClusterCleaner(outputDF, "settings.new_cluster")
 
     outputDF
       .join(cleansedTasksDF, keys.toSeq, "left")

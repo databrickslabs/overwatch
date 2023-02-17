@@ -256,44 +256,45 @@ object TransformFunctions {
                   keys: Seq[String],
                   incrementalFields: Seq[String],
                   orderedLookups: Seq[Column] = Seq[Column](),
-                  noiseBuckets: Int = 0
-                ): DataFrame = {
+                  noiseBuckets: Int = 1
+                ) : DataFrame = {
+
       val dfFields = df.columns
 
       // generate noise as per the number of noise buckets created
-      val stepDF = if (noiseBuckets > 0) {
-        val keysWithNoise = keys :+ "__overwatch_ctrl_noiseBucket"
-        val wNoise = Window.partitionBy(keysWithNoise map col: _*).orderBy(incrementalFields map col: _*)
-        val wNoisePrev = wNoise.rowsBetween(Window.unboundedPreceding, Window.currentRow)
-        val wNoiseNext = wNoise.rowsBetween(Window.currentRow, Window.unboundedFollowing)
+      val noiseBucketCount = round(rand() * noiseBuckets, 0)
+      val keysWithNoise = keys :+ "__overwatch_ctrl_noiseBucket"
 
-        val selectsWithFills = dfFields.map(f => {
-          if (fieldsToFill.map(_.toLowerCase).contains(f.toLowerCase)) { // field to fill
-            bidirectionalFill(f, wNoisePrev, wNoiseNext, orderedLookups)
-          } else { // not a fill field just return original value
-            col(f)
-          }
-        })
-        df
-          .withColumn("__overwatch_ctrl_noiseBucket", round(rand() * noiseBuckets, 0))
-          .select(selectsWithFills: _*)
+      val dfc = df
+        .withColumn("__overwatch_ctrl_noiseBucket", lit(noiseBucketCount))
+        .cache()
 
-      } else df
+      dfc.count()
 
-      val wRaw = Window.partitionBy(keys map col: _*).orderBy(incrementalFields map col: _*)
-      val wPrev = wRaw.rowsBetween(Window.unboundedPreceding, Window.currentRow)
-      val wNext = wRaw.rowsBetween(Window.currentRow, Window.unboundedFollowing)
+      val wNoise = Window.partitionBy(keysWithNoise map col: _*).orderBy(incrementalFields map col: _*)
+      val wNoisePrev = wNoise.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+      val wNoiseNext = wNoise.rowsBetween(Window.currentRow, Window.unboundedFollowing)
 
       val selectsWithFills = dfFields.map(f => {
-        if (fieldsToFill.map(_.toLowerCase).contains(f.toLowerCase)) { // field to fill
-          bidirectionalFill(f, wPrev, wNext, orderedLookups)
+        if(fieldsToFill.map(_.toLowerCase).contains(f.toLowerCase)) { // field to fill
+          bidirectionalFill(f, wNoisePrev, wNoiseNext, orderedLookups)
         } else { // not a fill field just return original value
           col(f)
         }
       })
-      stepDF
-        .drop("__overwatch_ctrl_noiseBucket") // drop noise col if exists
-        .select(selectsWithFills: _*)
+
+      val stepDF = dfc
+        .select(selectsWithFills :+ col("__overwatch_ctrl_noiseBucket"): _*)
+
+      val lookupSelects = (keys ++ fieldsToFill) ++ Array("unixTimeMS_state_start")
+      val lookupTSDF = stepDF
+        .select(lookupSelects map col: _*)
+        .distinct
+        .toTSDF("unixTimeMS_state_start", keys: _*)
+
+      dfc.toTSDF("unixTimeMS_state_start", keys: _*)
+        .lookupWhen(lookupTSDF, maxLookAhead = 1000L)
+        .df
     }
 
     /**
