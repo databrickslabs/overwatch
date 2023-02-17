@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.ApiEnv
+import com.databricks.labs.overwatch.utils.{ApiEnv, TimeTypes}
 import com.fasterxml.jackson.databind.JsonNode
 import org.apache.log4j.{Level, Logger}
 import scalaj.http.{Http, HttpRequest}
@@ -135,6 +135,10 @@ trait ApiMeta {
        |""".stripMargin
   }
 
+  private[overwatch] def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
+    null
+  }
+
 }
 
 /**
@@ -205,6 +209,23 @@ class SqlQueryHistoryApi extends ApiMeta {
 //    logger.info(s"DEBUG - NEXT_PAGE_TOKEN = ${_jsonValue}")
     requestMap.filterNot { case (k, _) => k.toLowerCase.startsWith("filter_by")} ++ Map(s"page_token" -> s"${_jsonValue}")
   }
+
+  private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
+    val (startTime, endTime) = if ((endValue - startValue)/(1000*60*60) > 1) {
+      (startValue,
+        startValue+(1000*60*60))
+    }
+    else{
+      (startValue,
+        endValue)
+    }
+    Map(
+      "max_results" -> "50",
+      "include_metrics" -> "true",
+      "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime",
+      "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
+    )
+  }
 }
 
 class WorkspaceListApi extends ApiMeta {
@@ -264,6 +285,18 @@ class ClusterEventsApi extends ApiMeta {
   setDataframeColumn("events")
   setApiCallType("POST")
   setStoreInTempLocation(true)
+
+  private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long,jsonInput: Map[String, String]): Map[String, String] = {
+    val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
+    val startTime = jsonInput.get("start_time").get.toLong
+    val endTime = jsonInput.get("end_time").get.toLong
+
+    Map("cluster_id" -> s"""${clusterIDs(startValue.toInt)}""",
+      "start_time" -> s"""${startTime}""",
+      "end_time" -> s"""${endTime}""",
+      "limit" -> "500"
+    )
+  }
 }
 
 class JobRunsApi extends ApiMeta {

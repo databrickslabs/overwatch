@@ -468,86 +468,28 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 endTime: TimeTypes,
                                 apiEnv: ApiEnv,
                                 tmpClusterEventsSuccessPath: String,
-                                tmpClusterEventsErrorPath: String) = {
+                                tmpClusterEventsErrorPath: String,
+                                config: Config) = {
     val finalResponseCount = clusterIDs.length
-    var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
-    var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
-    val apiResponseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
-    //TODO identify the best practice to implement the future.
-    val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
-    val sub24hMillis = 1000*60*60*24 // 1 day in millis
-    for (i <- clusterIDs.indices) {
-      val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i)}""",
-        "start_time" -> s"""${startTime.asUnixTimeMilli - sub24hMillis}""", // subtract 1d to resolve ISSUE_729
-        "end_time" -> s"""${endTime.asUnixTimeMilli}""",
-        "limit" -> "500"
-      )
-      val future = Future {
-        val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread(accumulator)
-        synchronized {
-          apiObj.forEach(
-            obj => if (obj.contains("events")) {
-              apiResponseArray.add(obj)
-            }else{
-              logger.log(Level.INFO,"NO real events found:"+obj)
-            }
+    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
+    val clusterEventsEndpoint = "clusters/events"
 
-          )
-          if (apiResponseArray.size() >= apiEnv.successBatchSize) {
-            PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
-            apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
-          }
-        }
+    // creating Json input for parallel API calls
+    val jsonInput = Map(
+      "start_value" -> "0",
+      "end_value" -> s"${finalResponseCount}",
+      "increment_counter" -> "1",
+      "final_response_count" -> s"${finalResponseCount}",
+      "cluster_ids" -> s"${clusterIDs.mkString(",")}",
+      "start_time" -> s"${startTime.asUnixTimeMilli}",
+      "end_time" -> s"${endTime.asUnixTimeMilli}",
+      "tmp_success_path" -> tmpClusterEventsSuccessPath,
+      "tmp_error_path" -> tmpClusterEventsErrorPath
+    )
 
-      }
-      future.onComplete {
-        case Success(_) =>
-          apiResponseCounter.add(1)
-
-        case Failure(e) =>
-          if (e.isInstanceOf[ApiCallFailureV2]) {
-            synchronized {
-              apiErrorArray.add(e.getMessage)
-              if (apiErrorArray.size() >= apiEnv.errorBatchSize) {
-                PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
-                apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
-              }
-            }
-            logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
-          }
-          apiResponseCounter.add(1)
-      }
-    }
-    val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
-    var currentSleepTime = 0
-    var accumulatorCountWhileSleeping = accumulator.value
-    while (apiResponseCounter.size() < finalResponseCount && currentSleepTime < timeoutThreshold) {
-      //As we are using Futures and running 4 threads in parallel, We are checking if all the treads has completed the execution or not.
-      // If we have not received the response from all the threads then we are waiting for 5 seconds and again revalidating the count.
-      if (currentSleepTime > 120000) //printing the waiting message only if the waiting time is more than 2 minutes.
-      {
-        println(s"""Waiting for other queued API Calls to complete; cumulative wait time ${currentSleepTime / 1000} seconds; Api response yet to receive ${finalResponseCount - apiResponseCounter.size()}""")
-      }
-      Thread.sleep(5000)
-      currentSleepTime += 5000
-      if (accumulatorCountWhileSleeping < accumulator.value) { //new API response received while waiting.
-        currentSleepTime = 0 //resetting the sleep time.
-        accumulatorCountWhileSleeping = accumulator.value
-      }
-    }
-    if (apiResponseCounter.size() != finalResponseCount) { // Checking whether all the api responses has been received or not.
-      logger.log(Level.ERROR, s"""Unable to receive all the clusters/events api responses; Api response received ${apiResponseCounter.size()};Api response not received ${finalResponseCount - apiResponseCounter.size()}""")
-      throw new Exception(s"""Unable to receive all the clusters/events api responses; Api response received ${apiResponseCounter.size()};Api response not received ${finalResponseCount - apiResponseCounter.size()}""")
-    }
-    if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
-      PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsSuccessPath, apiResponseArray.toString)
-      apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
-    }
-    if (apiErrorArray.size() > 0) { //In case of error array didn't hit the batch-size as a final step we will write it to the persistent storage.
-      PipelineFunctions.writeMicroBatchToTempLocation(tmpClusterEventsErrorPath, apiErrorArray.toString)
-      apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
-    }
+    // calling function to make parallel API calls
+    val apiCallV2Obj = new ApiCallV2(config.apiEnv)
+    apiCallV2Obj.makeParallelApiCalls(clusterEventsEndpoint, jsonInput, config)
     logger.log(Level.INFO, " Cluster event landing completed")
   }
 
@@ -610,7 +552,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       organizationId: String,
                                       database: Database,
                                       erroredBronzeEventsTarget: PipelineTable,
-                                      tempWorkingDir: String
+                                      tempWorkingDir: String,
+                                      config: Config
                                     )(clusterSnapshotDF: DataFrame): DataFrame = {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
@@ -626,7 +569,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val tmpClusterEventsSuccessPath = s"$tempWorkingDir/clusterEventsBronze/success" + apiEnv.runID
     val tmpClusterEventsErrorPath = s"$tempWorkingDir/clusterEventsBronze/error" + apiEnv.runID
 
-    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath, tmpClusterEventsErrorPath)
+    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath,
+      tmpClusterEventsErrorPath, config)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
         spark.read.json(tmpClusterEventsErrorPath)
