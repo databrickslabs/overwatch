@@ -710,8 +710,13 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterBaseWMetaDF = clusterBaseDF
       // remove start, startResults, and permanentDelete as they do not contain sufficient metadata
       .filter('actionName.isin("create", "edit"))
-    val bronzeClusterSnapUntilCurrent = bronze_cluster_snap.asDF
-      .filter('Pipeline_SnapTS <= untilTime.asColumnTS)
+
+    val lastClusterSnapW = Window.partitionBy('organization_id, 'cluster_id)
+      .orderBy('Pipeline_SnapTS.desc)
+    val bronzeClusterSnapLatest = bronze_cluster_snap.asDF
+      .withColumn("rnk", rank().over(lastClusterSnapW))
+      .withColumn("rn", row_number().over(lastClusterSnapW))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
     /**
      * clusterBaseFilled - if first run, baseline cluster spec for existing clusters that haven't been edited since
@@ -724,14 +729,14 @@ trait SilverTransforms extends SparkSessionWrapper {
         "current initial state for all existing clusters."
       logger.log(Level.INFO, firstRunMsg)
       println(firstRunMsg)
-      val missingClusterIds = bronzeClusterSnapUntilCurrent.select('organization_id, 'cluster_id).distinct
+      val missingClusterIds = bronzeClusterSnapLatest.select('organization_id, 'cluster_id).distinct
         .join(
           clusterBaseWMetaDF
             .select('organization_id, 'cluster_id).distinct,
           Seq("organization_id", "cluster_id"), "anti"
         )
       val latestClusterSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
-      val missingClusterBaseFromSnap = bronzeClusterSnapUntilCurrent
+      val missingClusterBaseFromSnap = bronzeClusterSnapLatest
         .join(missingClusterIds, Seq("organization_id", "cluster_id"))
         .withColumn("rnk", rank().over(latestClusterSnapW))
         .filter('rnk === 1).drop("rnk")
