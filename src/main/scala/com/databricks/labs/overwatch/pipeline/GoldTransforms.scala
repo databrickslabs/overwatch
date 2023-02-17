@@ -335,12 +335,15 @@ trait GoldTransforms extends SparkSessionWrapper {
 
 
     val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
-    val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H).otherwise(lit(0)).alias("driver_dbus")
-    val workerDBUs = when('databricks_billable, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)).alias("worker_dbus")
+    val isPhotonEnabled = upper('runtime_engine).equalTo("PHOTON")
+    val isNotAnSQlWarehouse = !upper('sku).equalTo("SQLCOMPUTE")
+    val photonDBUMultiplier = when(isPhotonEnabled && isNotAnSQlWarehouse, lit(2)).otherwise(lit(1))
+    val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H * photonDBUMultiplier).otherwise(lit(0)).alias("driver_dbus")
+    val workerDBUs = when('databricks_billable, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H * photonDBUMultiplier).otherwise(lit(0)).alias("worker_dbus")
     val driverComputeCost = Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H).alias("driver_compute_cost")
     val workerComputeCost = Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H).alias("worker_compute_cost")
-    val driverDBUCost = Costs.dbu('databricks_billable, $"driverSpecs.Hourly_DBUs", 'dbu_rate, lit(1), 'uptime_in_state_H, runtimeEngine = 'runtime_engine, sku = 'sku).alias("driver_dbu_cost")
-    val workerDBUCost = Costs.dbu('databricks_billable, $"workerSpecs.Hourly_DBUs", 'dbu_rate, 'current_num_workers, 'uptime_in_state_H, runtimeEngine = 'runtime_engine, sku = 'sku).alias("worker_dbu_cost")
+    val driverDBUCost = Costs.dbu('databricks_billable, driverDBUs, 'dbu_rate, lit(1), 'uptime_in_state_H)
+    val workerDBUCost = Costs.dbu('databricks_billable, driverDBUs, 'dbu_rate, 'current_num_workers, 'uptime_in_state_H)
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
