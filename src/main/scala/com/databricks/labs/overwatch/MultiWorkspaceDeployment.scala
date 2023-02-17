@@ -116,7 +116,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val sqlComputerDBUPrice: Double = config.sql_compute_dbu_price
       val jobsLightDBUPrice: Double = config.jobs_light_dbu_price
       val customWorkspaceName: String = config.workspace_name
-      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".split(",").toBuffer
+      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".toLowerCase().split(",").toBuffer
       if (config.excluded_scopes != null) {
         config.excluded_scopes.toLowerCase().split(":").foreach(scope => standardScopes -= scope)
       }
