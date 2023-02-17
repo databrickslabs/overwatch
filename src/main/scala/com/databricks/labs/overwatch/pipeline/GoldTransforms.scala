@@ -292,7 +292,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .lookupWhen(dbuCostDetailsTSDF)
       .df
     val clusterPotMetaToFill = Array(
-      "cluster_name", "custom_tags", "driver_node_type_id",
+      "cluster_name", "custom_tags", "driver_node_type_id", "runtime_engine",
       "node_type_id", "spark_version", "sku", "dbu_rate", "driverSpecs", "workerSpecs"
     )
     val clusterPotKeys = Seq("organization_id", "cluster_id")
