@@ -124,7 +124,11 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     config.setTempWorkingDir(validatedTempWorkingDir)
 
     /** Set Max Days */
-    config.setMaxDays(rawParams.maxDaysToLoad)
+    if (rawParams.maxDaysToLoad <= 0) {
+      throw new BadConfigException(s"maxDaysToLoad should be greater than 0.")
+    }else {
+      config.setMaxDays(rawParams.maxDaysToLoad)
+    }
 
     /** Validate and set Intelligent Scaling Params */
     val rawISConfig = rawParams.intelligentScaling
