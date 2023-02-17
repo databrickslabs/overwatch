@@ -107,7 +107,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     def validateTokenSecret(tokenSecret: Option[TokenSecret]): Option[TokenSecret] = {
       // validate token secret requirements
       // TODO - Validate if token has access to necessary assets. Warn/Fail if not
-      if (tokenSecret.nonEmpty && !disableValidations && !config.isLocalTesting) {
+      if (tokenSecret.nonEmpty && !disableValidations) {
         if (tokenSecret.get.scope.isEmpty || tokenSecret.get.key.isEmpty) {
           throw new BadConfigException(s"Secret AND Key must be provided together or neither of them. " +
             s"Either supply both or neither.")
@@ -262,7 +262,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     def validateAndSetDataTarget(dataTarget: DataTarget): Unit = {
       // Validate data Target
       // todo UC enablement
-      if (!disableValidations && !config.isLocalTesting) dataTargetIsValid(dataTarget)
+      if (!disableValidations) dataTargetIsValid(dataTarget)
 
       // If data target is valid get db name and location and set it
       val dbName = dataTarget.databaseName.get
@@ -313,7 +313,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
             throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
           }
 
-          if (auditLogPath.nonEmpty && !config.isLocalTesting)
+          if (auditLogPath.nonEmpty)
             dbutils.fs.ls(auditLogPath.get).foreach(auditFolder => {
               if (auditFolder.isDir) require(auditFolder.name.startsWith("date="), s"Audit directory must contain " +
                 s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
@@ -370,7 +370,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
      * issues. Can be overridden in config
      * @param tempPath defaults to "" (nullstring) in the config
      */
-    def validateTempWorkingDir(tempPath: String): String = {
+    def prepTempWorkingDir(tempPath: String): String = {
       val storagePrefix = config.etlDataPathPrefix.split("/").dropRight(1).mkString("/")
       val defaultTempPath = s"$storagePrefix/tempworkingdir/${config.organizationId}"
 
@@ -438,13 +438,9 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       if (!spark.catalog.databaseExists(config.databaseName)) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
           s"${config.databaseLocation}.")
-        val createDBIfNotExists = if (!config.isLocalTesting) {
-          s"create database if not exists ${config.databaseName} location '" +
+        val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
             s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
-        } else {
-          s"create database if not exists ${config.databaseName} " +
-            s"WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
-        }
+
         spark.sql(createDBIfNotExists)
         logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
       } else {

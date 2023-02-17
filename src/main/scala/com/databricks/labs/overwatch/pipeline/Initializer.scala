@@ -46,7 +46,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
      */
     logger.log(Level.INFO, "Validating Input Parameters")
     val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
-    config.setInputConfig(rawParams)
+
 
     // Now that the input parameters have been parsed -- set them in the config
     config.setInputConfig(rawParams)
@@ -120,7 +120,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     // must happen AFTER data target is set validation since the etlDataPrefix must already be set in the config
     /** Validate and set Temp Working Dir */
     val rawTempWorkingDir = rawParams.tempWorkingDir
-    val validatedTempWorkingDir = Init.validateTempWorkingDir(rawTempWorkingDir)
+    val validatedTempWorkingDir = Init.prepTempWorkingDir(rawTempWorkingDir)
     config.setTempWorkingDir(validatedTempWorkingDir)
 
     /** Set Max Days */
@@ -152,8 +152,6 @@ object Initializer extends SparkSessionWrapper {
   envInit()
 
   def getOrgId: String = {
-
-    print("tags are ", dbutils.notebook.getContext.tags)
     if (dbutils.notebook.getContext.tags("orgId") == "0") {
       dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
     } else dbutils.notebook.getContext.tags("orgId")
