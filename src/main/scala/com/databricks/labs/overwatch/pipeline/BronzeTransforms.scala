@@ -928,6 +928,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     result
     }catch {
       case e:Exception=>
+          logger.log(Level.ERROR,"Unable to get all the event log prefix",e)
           throw e
     }
 
