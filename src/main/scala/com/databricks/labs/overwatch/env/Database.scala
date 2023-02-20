@@ -155,9 +155,9 @@ class Database(config: Config) extends SparkSessionWrapper {
          |""".stripMargin)
     df.write.format("delta").save(dfTempPath)
 
-    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16) // maximize parallelism on re-read and let
+    // maximize parallelism on re-read and let AQE bring it back down
+    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 16)
     spark.conf.set("spark.databricks.delta.formatCheck.enabled", "true")
-    // AQE bring it back down
     spark.read.format("delta").load(dfTempPath)
   }
 

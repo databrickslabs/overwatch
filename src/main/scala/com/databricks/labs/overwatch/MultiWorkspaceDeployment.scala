@@ -397,12 +397,13 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   def deploy(parallelism: Int = 4, zones: String = "Bronze,Silver,Gold"): Unit = {
     val processingStartTime = System.currentTimeMillis();
     try {
+      // initialize spark overrides for global spark conf
+      // global overrides should be set BEFORE parSessionsOn is set to true
+      PipelineFunctions.setSparkOverrides(spark(globalSession = true), SparkSessionWrapper.globalSparkConfOverrides)
+
       if (parallelism > 1) SparkSessionWrapper.parSessionsOn = true
       SparkSessionWrapper.sessionsMap.clear()
       SparkSessionWrapper.globalTableLock.clear()
-
-      // initialize spark overrides for global spark conf
-      PipelineFunctions.setSparkOverrides(spark(globalSession = true), SparkSessionWrapper.globalSparkConfOverrides)
 
       println("ParallelismLevel :" + parallelism)
       val multiWorkspaceConfig = generateMultiWorkspaceConfig(configLocation, deploymentId, outputPath)

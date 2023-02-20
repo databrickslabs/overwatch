@@ -10,11 +10,6 @@ object MultiWorkspaceRunner  extends SparkSessionWrapper{
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  private def setGlobalDeltaOverrides(): Unit = {
-    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
-    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 128)
-  }
-
   private def validateInputZone(zones: String): Unit = {
     val zoneArray = zones.split(",").distinct
     zoneArray.foreach(zone => {
@@ -36,7 +31,6 @@ object MultiWorkspaceRunner  extends SparkSessionWrapper{
    */
   def main(args: Array[String]): Unit = {
     envInit()
-    setGlobalDeltaOverrides()
     if (args.length == 1) { //Deploy Bronze,Silver and Gold with default parallelism.
       logger.log(Level.INFO, "Deploying Bronze,Silver and Gold")
       MultiWorkspaceDeployment(args(0)).deploy(4,"Bronze,Silver,Gold")
