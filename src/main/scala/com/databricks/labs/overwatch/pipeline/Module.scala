@@ -6,6 +6,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
 import java.time.Duration
+import scala.util.parsing.json.JSON.number
 
 class Module(
               val moduleId: Int,
@@ -331,7 +332,9 @@ class Module(
 
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
-    if (spark.conf.get("spark.sql.shuffle.partitions").toLowerCase().trim != "auto") {
+    val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
+    val autoShufflePartitions = shufflePartitions.forall(Character.isDigit)
+    if (!autoShufflePartitions) {
       optimizeShufflePartitions()
     }
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
