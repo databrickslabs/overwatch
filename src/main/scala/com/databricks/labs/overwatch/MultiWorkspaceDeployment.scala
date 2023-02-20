@@ -19,7 +19,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 /** *
  * MultiWorkspaceDeployment class is the main class which runs the deployment for multiple workspaces.
  *
- * @params configPath: can be either a delta table or path of the delta table or fully qualified path of the csv file which contains the configuration,
+ * @params configLocation: can be either a delta table or path of the delta table or fully qualified path of the csv file which contains the configuration,
  * @params tempOutputPath: location which will be used as a temp storage.It will be automatically cleaned after each run.
  * @params apiEnvConfig: configs related to api call.
  */
