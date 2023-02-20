@@ -26,7 +26,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.processedEventLogs,
       BronzeTargets.cloudMachineDetail,
       BronzeTargets.dbuCostDetail,
-      BronzeTargets.clusterEventsErrorsTarget
+      BronzeTargets.clusterEventsErrorsTarget,
+      BronzeTargets.libsSnapshotTarget,
+      BronzeTargets.policiesSnapshotTarget,
+      BronzeTargets.instanceProfilesSnapshotTarget,
+      BronzeTargets.tokensSnapshotTarget,
+      BronzeTargets.globalInitScSnapshotTarget,
+      BronzeTargets.jobRunsSnapshotTarget
     )
   }
 
@@ -215,7 +221,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val jobRunsSnapshotModule = Module(1012, "Bronze_Job_Runs_Snapshot", this) // check module number
   lazy private val appendJobRunsProcess = ETLDefinition(
     workspace.getJobRunsDF(jobRunsSnapshotModule.fromTime, jobRunsSnapshotModule.untilTime),
-    Seq(cleanseRawJobRunsSnapDF),
+    Seq(cleanseRawJobRunsSnapDF(BronzeTargets.jobRunsSnapshotTarget.keys, config.runID)),
     append(BronzeTargets.jobRunsSnapshotTarget)
   )
 
