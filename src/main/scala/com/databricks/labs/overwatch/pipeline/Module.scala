@@ -331,7 +331,9 @@ class Module(
 
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
-    optimizeShufflePartitions()
+    if (spark.conf.get("spark.sql.shuffle.partitions").toLowerCase().trim != "auto") {
+      optimizeShufflePartitions()
+    }
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
 
