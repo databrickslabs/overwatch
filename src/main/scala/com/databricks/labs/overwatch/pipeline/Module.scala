@@ -332,11 +332,13 @@ class Module(
 
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
+
     val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
-    val noAutoShuffle = shufflePartitions.forall(Character.isDigit)
-    if (noAutoShuffle) {
+    val notAQEAutoOptimizeShuffle = spark.conf.getOption("spark.databricks.adaptive.autoOptimizeShuffle.enabled").getOrElse("false").toBoolean
+    if (Helpers.isNumeric(shufflePartitions) && notAQEAutoOptimizeShuffle){
       optimizeShufflePartitions()
     }
+
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
 
