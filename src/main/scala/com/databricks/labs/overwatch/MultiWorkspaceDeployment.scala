@@ -19,20 +19,20 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 /** *
  * MultiWorkspaceDeployment class is the main class which runs the deployment for multiple workspaces.
  *
- * @params configCsv: path of the csv file/Delta table which will contain the different configs for the workspaces.
+ * @params configPath: path of the csv file/Delta table which will contain the different configs for the workspaces.
  * @params tempOutputPath: location which will be used as a temp storage.It will be automatically cleaned after each run.
  * @params apiEnvConfig: configs related to api call.
  */
 object MultiWorkspaceDeployment extends SparkSessionWrapper {
 
 
-  def apply(configCsv: String): MultiWorkspaceDeployment = {
-    apply(configCsv, "/mnt/tmp/overwatch")
+  def apply(configPath: String): MultiWorkspaceDeployment = {
+    apply(configPath, "/mnt/tmp/overwatch")
   }
 
-  def apply(configCsv: String, tempOutputPath: String) = {
+  def apply(configPath: String, tempOutputPath: String) = {
     new MultiWorkspaceDeployment()
-      .setConfigCsv(configCsv)
+      .setConfigPath(configPath)
       .setOutputPath(tempOutputPath)
       .setPipelineSnapTime()
   }
@@ -45,7 +45,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  private var _configCsv: String = _
+  private var _configPath: String = _
 
   private var _outputPath: String = _
 
@@ -59,13 +59,13 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private def outputPath: String = _outputPath
 
-  protected def configCsv: String = _configCsv
+  protected def configPath: String = _configPath
 
   private var _pipelineSnapTime: Long = _
 
 
-  private def setConfigCsv(value: String): this.type = {
-    _configCsv = value
+  private def setConfigPath(value: String): this.type = {
+    _configPath = value
     this
   }
 
@@ -256,7 +256,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     multiworkspaceConfigs.toSeq.toDS().toDF()
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
-      .withColumn("configFile", lit(configCsv))
+      .withColumn("configFile", lit(configPath))
       .write.format("delta")
       .mode("append")
       .option("mergeSchema", "true")
@@ -307,33 +307,33 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   /**
    * Validates the config csv file existence.
    */
-  private[overwatch] def validateFileExistence(configCsv: String): Boolean = {
-    if (!Helpers.pathExists(configCsv)) {
-      throw new BadConfigException("Unable to find config file in the given location:" + configCsv)
+  private[overwatch] def validateFileExistence(configPath: String): Boolean = {
+    if (!Helpers.pathExists(configPath)) {
+      throw new BadConfigException("Unable to find config file in the given location:" + configPath)
     }
     true
   }
 
 
-  private def generateBaseConfig(configCsv: String): DataFrame = {
+  private def generateBaseConfig(configPath: String): DataFrame = {
     try {
-      if (configCsv.toLowerCase().contains("csv")) {
-        println(s"Config source: csv path ${configCsv}")
-        validateFileExistence(configCsv)
+      if (configPath.toLowerCase().endsWith(".csv")) {
+        println(s"Config source: csv path ${configPath}")
+        validateFileExistence(configPath)
         spark.read.option("header", "true")
           .option("ignoreLeadingWhiteSpace", true)
           .option("ignoreTrailingWhiteSpace", true)
-          .csv(configCsv)
-      } else if (configCsv.contains("/")) {
-        println(s"Config source: delta path ${configCsv}")
-        validateFileExistence(configCsv)
-        spark.read.format("delta").load(configCsv)
+          .csv(configPath)
+      } else if (configPath.contains("/")) {
+        println(s"Config source: delta path ${configPath}")
+        validateFileExistence(configPath)
+        spark.read.format("delta").load(configPath)
       } else {
-        println(s"Config source: delta table ${configCsv}")
-        if (!spark.catalog.tableExists(configCsv)) {
-          throw new BadConfigException("Unable to find Delta table" + configCsv)
+        println(s"Config source: delta table ${configPath}")
+        if (!spark.catalog.tableExists(configPath)) {
+          throw new BadConfigException("Unable to find Delta table" + configPath)
         }
-        spark.read.table(configCsv)
+        spark.read.table(configPath)
       }
     } catch {
       case e: Exception =>
@@ -344,12 +344,12 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   }
 
   private def generateMultiWorkspaceConfig(
-                                            configCsv: String,
+                                            configPath: String,
                                             deploymentId: String,
                                             outputPath: String = ""
                                           ): Array[MultiWorkspaceConfig] = { // Array[MultiWorkspaceConfig] = {
     try {
-      val baseConfig =generateBaseConfig(configCsv)
+      val baseConfig =generateBaseConfig(configPath)
       val multiWorkspaceConfig = baseConfig
         .scrubSchema
         .verifyMinimumSchema(Schema.deployementMinimumSchema)
@@ -359,7 +359,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .as[MultiWorkspaceConfig]
         .collect()
       if(multiWorkspaceConfig.size<1){
-        throw new BadConfigException("Config file has 0 record, config file:" + configCsv)
+        throw new BadConfigException("Config file has 0 record, config file:" + configPath)
       }
       multiWorkspaceConfig
     } catch {
@@ -384,7 +384,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     val processingStartTime = System.currentTimeMillis();
     println("ParallelismLevel :" + parallelism)
 
-    val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsv, deploymentId, outputPath)
+    val multiWorkspaceConfig = generateMultiWorkspaceConfig(configPath, deploymentId, outputPath)
     snapshotConfig(multiWorkspaceConfig)
     val params = DeploymentValidation
       .performMandatoryValidation(multiWorkspaceConfig, parallelism)
@@ -428,7 +428,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   def validate(parallelism: Int = 4): Unit = {
     val processingStartTime = System.currentTimeMillis()
-    val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsv, deploymentId, outputPath)
+    val multiWorkspaceConfig = generateMultiWorkspaceConfig(configPath, deploymentId, outputPath)
     val validations = DeploymentValidation.performValidation(multiWorkspaceConfig, parallelism)
     val notValidatedCount = validations.filterNot(_.validated).length
 
