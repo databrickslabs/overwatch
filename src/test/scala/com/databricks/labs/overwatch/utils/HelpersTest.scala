@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.utils
 
 import org.scalatest.funspec.AnyFunSpec
 
-class ToolTest extends AnyFunSpec {
+class HelpersTest extends AnyFunSpec {
 
   describe("Helpers Test") {
     it("Numeric test"){
