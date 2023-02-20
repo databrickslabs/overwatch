@@ -333,8 +333,8 @@ class Module(
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
     val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
-    val autoShufflePartitions = shufflePartitions.forall(Character.isDigit)
-    if (!autoShufflePartitions) {
+    val noAutoShuffle = shufflePartitions.forall(Character.isDigit)
+    if (noAutoShuffle) {
       optimizeShufflePartitions()
     }
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
