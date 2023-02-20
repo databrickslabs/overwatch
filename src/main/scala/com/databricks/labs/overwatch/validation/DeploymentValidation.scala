@@ -100,7 +100,7 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
-    if (conf.cloud.toLowerCase == "azure") {
+    if (conf.cloud.toLowerCase == "azure" &&  conf.workspace_id.trim != spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")) {
       val testDetails =
         s"""WorkSpaceMountTest
            |APIURL:${conf.api_url}
@@ -148,7 +148,7 @@ object DeploymentValidation extends SparkSessionWrapper {
     } else {
       DeploymentValidationReport(true,
         getSimpleMsg("Validate_Mount"),
-        "AWS: skipping mount point check",
+        "Skipping mount point check",
         Some("SUCCESS"),
         Some(conf.workspace_id)
       )
