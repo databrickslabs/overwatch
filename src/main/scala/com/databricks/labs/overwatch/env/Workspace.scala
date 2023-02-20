@@ -150,8 +150,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       config.apiEnv,
       sqlQueryHistoryEndpoint,
       jsonQuery,
-      tempSuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}",
-      accumulator = acc
+      tempSuccessPath = s"${config.tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
     )
       .execute()
       .asDF()
@@ -195,9 +194,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           config.apiEnv,
           sqlQueryHistoryEndpoint,
           jsonQuery,
-          tempSuccessPath = tmpSqlQueryHistorySuccessPath,
-          accumulator = acc
-        ).executeMultiThread()
+          tempSuccessPath = tmpSqlQueryHistorySuccessPath
+        ).executeMultiThread(acc)
 
         synchronized {
           apiObj.forEach(
@@ -315,6 +313,91 @@ class Workspace(config: Config) extends SparkSessionWrapper {
         val name = if (dataset.name.endsWith("/")) dataset.name.dropRight(1) else dataset.name
         WorkspaceDataset(uri.getPath, name)
       })
+  }
+
+  def getClusterLibraries: DataFrame = {
+    val libsEndpoint = "libraries/all-cluster-statuses"
+    ApiCallV2(config.apiEnv, libsEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getClusterPolicies: DataFrame = {
+    val policiesEndpoint = "policies/clusters/list"
+    ApiCallV2(config.apiEnv, policiesEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getTokens: DataFrame = {
+    val tokenEndpoint = "token/list"
+    ApiCallV2(config.apiEnv, tokenEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  def getGlobalInitScripts: DataFrame = {
+    val globalInitScEndpoint = "global-init-scripts"
+    ApiCallV2(config.apiEnv, globalInitScEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  /**
+   * Function to get the the list of Job Runs
+   * @return
+   */
+  def getJobRunsDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+    val jobsRunsEndpoint = "jobs/runs/list"
+    val jsonQuery = Map(
+      "limit" -> "25",
+      "expand_tasks" -> "true",
+      "offset" -> "0",
+      "start_time_from" -> s"${fromTime.asUnixTimeMilli}",
+      "start_time_to" -> s"${untilTime.asUnixTimeMilli}"
+    )
+    val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+    var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+    val tempWorkingDir = s"${config.tempWorkingDir}/jobrunslist_bronze/${System.currentTimeMillis()}"
+
+    val apiObj = ApiCallV2(config.apiEnv,
+      jobsRunsEndpoint,
+      jsonQuery,
+      tempSuccessPath = tempWorkingDir,
+      2.1).executeMultiThread(acc)
+
+    apiObj.forEach(
+      obj => if (obj.contains("runs")) {
+        apiResponseArray.add(obj)
+      }
+    )
+
+    if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
+      PipelineFunctions.writeMicroBatchToTempLocation(tempWorkingDir, apiResponseArray.toString)
+    }
+
+    if(Helpers.pathExists(tempWorkingDir)) {
+      try {
+        spark.conf.set("spark.sql.caseSensitive", "true")
+        val df = spark.read.json(tempWorkingDir)
+          .select(explode(col("runs")).alias("runs")).select(col("runs" + ".*"))
+          .withColumn("organization_id", lit(config.organizationId))
+        spark.conf.set("spark.sql.caseSensitive", "false")
+        df
+      } catch {
+        case e: Throwable =>
+          throw new Exception(e)
+      }
+    } else {
+      println(s"""No Data is present for jobs/runs/list from - ${fromTime.asUnixTimeMilli} to - ${untilTime.asUnixTimeMilli}""")
+      logger.log(Level.INFO,s"""No Data is present for jobs/runs/list from - ${fromTime.asUnixTimeMilli} to - ${untilTime.asUnixTimeMilli}""")
+      spark.emptyDataFrame
+    }
+
   }
 
   /**

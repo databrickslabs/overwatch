@@ -88,6 +88,7 @@ object Schema extends SparkSessionWrapper {
     StructField("requestId", StringType, nullable = true),
     StructField("sessionId", StringType, nullable = true),
     StructField("version", StringType, nullable = true),
+    StructField("hashKey", LongType, nullable = true),
     StructField("requestParams",
       StructType(Seq(
         StructField("clusterId", StringType, nullable = true),
@@ -1060,6 +1061,7 @@ object Schema extends SparkSessionWrapper {
     StructField("error_batch_size", IntegerType, nullable = true),
     StructField("enable_unsafe_SSL", BooleanType, nullable = true),
     StructField("thread_pool_size", IntegerType, nullable = true),
-    StructField("api_waiting_time", LongType, nullable = true)
+    StructField("api_waiting_time", LongType, nullable = true),
+    StructField("mount_mapping_path", StringType, nullable = true)
   ))
 }

@@ -2,8 +2,8 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode}
-import io.delta.tables.DeltaTable
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode, MergeScope}
+import io.delta.tables.{DeltaMergeBuilder, DeltaTable}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.streaming.StreamingQueryListener._
@@ -13,6 +13,7 @@ import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 import java.util
 import java.util.UUID
 import scala.annotation.tailrec
+import scala.util.Random
 
 class Database(config: Config) extends SparkSessionWrapper {
 
@@ -166,12 +167,16 @@ class Database(config: Config) extends SparkSessionWrapper {
       .map(_.name).headOption
   }
 
-  // TODO - refactor this write function and the writer from the target
-  //  write function has gotten overly complex
-  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array()): Boolean = {
+  /**
+   * Add metadata, cleanse duplicates, and persistBeforeWrite for perf as needed based on target
+   *
+   * @param df               original dataframe that is to be written
+   * @param target           target to which the df is to be written
+   * @param pipelineSnapTime pipelineSnapTime
+   * @return
+   */
+  private def preWriteActions(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column): DataFrame = {
     var finalSourceDF: DataFrame = df
-
-    // apend metadata to source DF
     finalSourceDF = if (target.withCreateDate) finalSourceDF.withColumn("Pipeline_SnapTS", pipelineSnapTime) else finalSourceDF
     finalSourceDF = if (target.withOverwatchRunID) finalSourceDF.withColumn("Overwatch_RunID", lit(config.runID)) else finalSourceDF
     finalSourceDF = if (target.workspaceName) finalSourceDF.withColumn("workspace_name", lit(config.workspaceName)) else finalSourceDF
@@ -180,6 +185,76 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
 
     val finalDF = if (target.persistBeforeWrite) persistAndLoad(finalSourceDF, target) else finalSourceDF
+    finalDF
+  }
+
+  /**
+   *
+   * @param deltaTarget Delta table to which to write
+   * @param updatesDF DF to be merged into the delta table
+   * @param mergeCondition merge logic as a string
+   * @param target Pipeline Table target to write to
+   * @return
+   */
+  private def deriveDeltaMergeBuilder(
+                                     deltaTarget: DeltaTable,
+                                     updatesDF: DataFrame,
+                                     mergeCondition: String,
+                                     target: PipelineTable
+                                     ): DeltaMergeBuilder = {
+
+    val mergeScope = target.mergeScope
+    logger.log(Level.INFO, s"BEGINNING MERGE for target ${target.tableFullName}. \nMERGE SCOPE: " +
+      s"$mergeScope")
+
+    if (mergeScope == MergeScope.insertOnly) {
+      deltaTarget
+        .merge(updatesDF, mergeCondition)
+        .whenNotMatched
+        .insertAll()
+    } else if (mergeScope == MergeScope.updateOnly) {
+      deltaTarget
+        .merge(updatesDF, mergeCondition)
+        .whenMatched
+        .updateAll()
+    }
+    else if (mergeScope == MergeScope.full) {
+      deltaTarget
+        .merge(updatesDF, mergeCondition)
+        .whenMatched
+        .updateAll()
+        .whenNotMatched
+        .insertAll()
+    } else {
+      throw new Exception("Merge Scope Not Supported")
+    }
+  }
+
+  // TODO - refactor this write function and the writer from the target
+  //  write function has gotten overly complex
+  /**
+   * Write the dataframe to the target
+   *
+   * @param df                 df with data to be written
+   * @param target             target to where data should be saved
+   * @param pipelineSnapTime   pipelineSnapTime
+   * @param maxMergeScanDates  perf -- max dates to scan on a merge write. If populated this will filter the target source
+   *                           df to minimize the right-side scan.
+   * @param preWritesPerformed whether pre-write actions have already been completed prior to calling write. This is
+   *                           defaulted to false and should only be set to true in specific circumstances when
+   *                           preWriteActions was called prior to calling the write function. Typically used for
+   *                           concurrency locking.
+   * @return
+   */
+  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array(), preWritesPerformed: Boolean = false): Unit = {
+    val finalSourceDF: DataFrame = df
+
+    // append metadata to source DF and cleanse as necessary
+    val finalDF = if (!preWritesPerformed) {
+      preWriteActions(finalSourceDF, target, pipelineSnapTime)
+    } else {
+      finalSourceDF
+    }
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
@@ -204,12 +279,7 @@ class Database(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, mergeDetailMsg)
       spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", config.runID)
       // TODO -- when DBR 9.1 LTS GA, use LSM (low-shuffle-merge) to improve pipeline
-      deltaTarget
-        .merge(updatesDF, mergeCondition)
-        .whenMatched
-        .updateAll()
-        .whenNotMatched
-        .insertAll()
+      deriveDeltaMergeBuilder(deltaTarget, updatesDF, mergeCondition, target)
         .execute()
 
       spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
@@ -254,30 +324,59 @@ class Database(config: Config) extends SparkSessionWrapper {
       logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
     }
     registerTarget(target)
-    true
   }
 
+  /**
+   * Function forces the thread to sleep for some specified time.
+   * @param tableName Name of table for logging only
+   * @param minimumSeconds minimum number of seconds for which to sleep
+   * @param maxRandomSeconds max random seconds to add
+   */
+  private def coolDown(tableName: String, minimumSeconds: Long, maxRandomSeconds: Long): Unit = {
+    val rnd = new scala.util.Random
+    val number: Long = ((rnd.nextFloat() * maxRandomSeconds) + minimumSeconds).toLong * 1000L
+    logger.log(Level.INFO,"Slowing parallel writes to " + tableName + "sleeping..." + number +
+      " thread name " + Thread.currentThread().getName)
+    Thread.sleep(number)
+  }
 
-  def performRetry(inputDf: DataFrame,
+  /**
+   * Perform write retry after cooldown for legacy deployments
+   * race conditions can occur when multiple workspaces attempt to modify the schema at the same time, when this
+   * occurs, simply retry the write after some cooldown
+   * @param inputDf DF to write
+   * @param target target to where to write
+   * @param pipelineSnapTime pipelineSnapTime
+   * @param maxMergeScanDates same as write function
+   */
+  private def performRetry(inputDf: DataFrame,
                    target: PipelineTable,
                    pipelineSnapTime: Column,
-                   maxMergeScanDates: Array[String] = Array()): this.type = {
-    @tailrec def executeRetry(retryCount: Int): this.type = {
+                   maxMergeScanDates: Array[String] = Array()): Unit = {
+    @tailrec def executeRetry(retryCount: Int): Unit = {
       val rerunFlag = try {
         write(inputDf, target, pipelineSnapTime, maxMergeScanDates)
         false
       } catch {
         case e: Throwable =>
           val exceptionMsg = e.getMessage.toLowerCase()
+          logger.log(Level.WARN,
+            s"""
+               |DELTA Table Write Failure:
+               |$exceptionMsg
+               |Will Retry After a small delay.
+               |This is usually caused by multiple writes attempting to evolve the schema simultaneously
+               |""".stripMargin)
           if (exceptionMsg != null && (exceptionMsg.contains("concurrent") || exceptionMsg.contains("conflicting")) && retryCount < 5) {
-            coolDown(target.tableFullName)
+            coolDown(target.tableFullName, 30, 30)
             true
           } else {
             throw e
           }
       }
-      if (retryCount < 5 && rerunFlag) executeRetry(retryCount + 1) else this
+      if (retryCount < 5 && rerunFlag) executeRetry(retryCount + 1)
     }
+
     try {
       executeRetry(1)
     } catch {
@@ -287,11 +386,59 @@ class Database(config: Config) extends SparkSessionWrapper {
 
   }
 
-  def writeWithRetry(df: DataFrame,
-                     target: PipelineTable,
-                     pipelineSnapTime: Column,
-                     maxMergeScanDates: Array[String] = Array(),
-                     daysToProcess: Option[Int] = None): Boolean = {
+  /**
+   * Used for multithreaded multiworkspace deployments
+   * Check if a table is locked and if it is wait until max timeout for it to be unlocked and fail the write if
+   * the timeout is reached
+   * Table Lock Timeout can be overridden by setting cluster spark config overwatch.tableLockTimeout -- in milliseconds
+   * default table lock timeout is 20 minutes or 1200000 millis
+   *
+   * @param tableName name of the table to be written
+   * @return
+   */
+  private def targetNotLocked(tableName: String): Boolean = {
+    val defaultTimeout: String = "1200000"
+    val timeout = spark(globalSession = true).conf.getOption("overwatch.tableLockTimeout").getOrElse(defaultTimeout).toLong
+    val timerStart = System.currentTimeMillis()
+
+    @tailrec def testLock(retryCount: Int): Boolean = {
+      val currWaitTime = System.currentTimeMillis() - timerStart
+      val withinTimeout = currWaitTime < timeout
+      if (SparkSessionWrapper.globalTableLock.contains(tableName)) {
+        if (withinTimeout) {
+          logger.log(Level.WARN, s"TABLE LOCKED: $tableName for $currWaitTime -- waiting for parallel writes to complete")
+          coolDown(tableName, retryCount * 10, 2) // add 10 to 12 seconds to sleep for each lock test
+          testLock(retryCount + 1)
+        } else {
+          throw new Exception(s"TABLE LOCK TIMEOUT - The table $tableName remained locked for more than the configured " +
+            s"max timeout of $timeout millis. This may be increased by setting the following spark config in the cluster" +
+            s"to something higher than the default (20 minutes). Usually only necessary for historical loads. \n" +
+            s"overwatch.tableLockTimeout")
+        }
+      } else true // table not locked
+    }
+
+    testLock(retryCount = 1)
+  }
+
+
+  /**
+   * Wrapper for the write function
+   * If legacy deployment retry delta write in event of race condition
+   * If multiworkspace -- implement table locking to alleviate race conditions on parallelize workspace loads
+   *
+   * @param df
+   * @param target
+   * @param pipelineSnapTime
+   * @param maxMergeScanDates
+   * @param daysToProcess
+   * @return
+   */
+  private[overwatch] def writeWithRetry(df: DataFrame,
+                                        target: PipelineTable,
+                                        pipelineSnapTime: Column,
+                                        maxMergeScanDates: Array[String] = Array(),
+                                        daysToProcess: Option[Int] = None): Unit = {
 
     val needsCache = daysToProcess.getOrElse(1000) < 5 && !target.autoOptimize
     val inputDf = if (needsCache) {
@@ -299,20 +446,24 @@ class Database(config: Config) extends SparkSessionWrapper {
       df.persist()
     } else df
     if (needsCache) inputDf.count()
-    performRetry(inputDf,target, pipelineSnapTime, maxMergeScanDates)
-    true
+
+    if (!target.config.isMultiworkspaceDeployment) { // legacy deployment
+      performRetry(inputDf, target, pipelineSnapTime, maxMergeScanDates)
+    } else { // multi-workspace deployment
+      val withMetaDf = preWriteActions(df, target, pipelineSnapTime)
+      if (targetNotLocked(target.tableFullName)) {
+        try {
+          SparkSessionWrapper.globalTableLock.add(target.tableFullName)
+          write(withMetaDf, target, pipelineSnapTime, maxMergeScanDates, preWritesPerformed = true)
+        } catch {
+          case e: Throwable => throw e
+        } finally {
+          SparkSessionWrapper.globalTableLock.remove(target.tableFullName)
+        }
+      }
+    }
   }
 
-  /**
-   * Function forces the thread to sleep for a random 30-60 seconds.
-   * @param tableName
-   */
-  private def coolDown(tableName: String): Unit = {
-    val rnd = new scala.util.Random
-    val number:Long = (rnd.nextFloat() * 30 + 30).toLong*1000
-    logger.log(Level.INFO,"Slowing multithreaded writing for " + tableName + "sleeping..." + number+" thread name "+Thread.currentThread().getName)
-    Thread.sleep(number)
-  }
 
 }
 

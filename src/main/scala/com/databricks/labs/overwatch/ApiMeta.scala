@@ -157,6 +157,11 @@ class ApiMetaFactory {
       case "clusters/resize" => new ClusterResizeApi
       case "jobs/runs/get" => new JobRunGetApi
       case "dbfs/search-mounts" => new DbfsSearchMountsApi
+      case "jobs/runs/list" => new JobRunsApi
+      case "libraries/all-cluster-statuses" => new ClusterLibraryApi
+      case "policies/clusters/list" => new ClusterPolicesApi
+      case "token/list" => new TokensApi
+      case "global-init-scripts" => new GlobalInitsScriptsApi
       case _ => new UnregisteredApi
     }
     logger.log(Level.INFO, meta.toString)
@@ -259,4 +264,48 @@ class ClusterEventsApi extends ApiMeta {
   setDataframeColumn("events")
   setApiCallType("POST")
   setStoreInTempLocation(true)
+}
+
+class JobRunsApi extends ApiMeta {
+  setDataframeColumn("runs")
+  setApiCallType("GET")
+  setPaginationKey("has_more")
+  setIsDerivePaginationLogic(true)
+  setStoreInTempLocation(true)
+
+  private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
+    jsonObject.get(paginationKey).asBoolean()
+  }
+
+  private[overwatch] override def getPaginationLogic(jsonObject: JsonNode, requestMap: Map[String, String]): Map[String, String] = {
+    val limit = Integer.parseInt(requestMap.get("limit").get)
+    var offset = Integer.parseInt(requestMap.get("offset").get)
+    val expand_tasks = requestMap.get("expand_tasks").get
+    offset = offset + limit
+    Map(
+      "limit" -> s"${limit}",
+      "expand_tasks" -> s"${expand_tasks}",
+      "offset" -> s"${offset}"
+    )
+  }
+}
+
+class ClusterLibraryApi extends ApiMeta {
+  setDataframeColumn("statuses")
+  setApiCallType("GET")
+}
+
+class ClusterPolicesApi extends ApiMeta {
+  setDataframeColumn("policies")
+  setApiCallType("GET")
+}
+
+class TokensApi extends  ApiMeta {
+  setDataframeColumn("token_infos")
+  setApiCallType("GET")
+}
+
+class GlobalInitsScriptsApi extends ApiMeta {
+  setDataframeColumn("scripts")
+  setApiCallType("GET")
 }

@@ -49,7 +49,8 @@ case class ApiEnv(
                    proxyPort: Option[Int] = None,
                    proxyUserName: Option[String] = None,
                    proxyPasswordScope: Option[String] = None,
-                   proxyPasswordKey: Option[String] = None
+                   proxyPasswordKey: Option[String] = None,
+                   mountMappingPath: Option[String] = None
                  )
 
 
@@ -59,7 +60,8 @@ case class ApiEnvConfig(
                          enableUnsafeSSL: Boolean = false,
                          threadPoolSize: Int = 4,
                          apiWaitingTime: Long = 300000,
-                         apiProxyConfig: Option[ApiProxyConfig] = None
+                         apiProxyConfig: Option[ApiProxyConfig] = None,
+                         mountMappingPath: Option[String] = None
                        )
 
 case class ApiProxyConfig(
@@ -101,6 +103,7 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 enable_unsafe_SSL: Option[Boolean]= None,
                                 thread_pool_size:  Option[Int] = None,
                                 api_waiting_time:  Option[Long] = None,
+                                mount_mapping_path: String,
                                 deployment_id: String,
                                 output_path: String
                                )
@@ -327,6 +330,18 @@ object WriteMode extends Enumeration {
   val append: Value = Value("append")
   val overwrite: Value = Value("overwrite")
   val merge: Value = Value("merge")
+}
+
+/**
+ * insertOnly = whenNotMatched --> Insert
+ * updateOnly = whenMatched --> update
+ * full = both insert and update
+ */
+object MergeScope extends Enumeration {
+  type MergeScope = Value
+  val full: Value = Value("full")
+  val insertOnly: Value = Value("insertOnly")
+  val updateOnly: Value = Value("updateOnly")
 }
 
 // Todo Issue_56
