@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.validation
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCallV2
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.pipeline.{Pipeline, PipelineFunctions, Schema}
+import com.databricks.labs.overwatch.pipeline.{Initializer, Pipeline, PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.validation.{Rule, RuleSet}
@@ -100,7 +100,10 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
-    if (conf.cloud.toLowerCase == "azure" &&  conf.workspace_id.trim != spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")) {
+    val isAzure = conf.cloud.toLowerCase == "azure" //Mount-point validation is only done for Azure
+    val isRemoteWorkspace = conf.workspace_id.trim != Initializer.getOrgId // No need to perform mount-point validation for driver workspace.
+
+    if (isAzure &&  isRemoteWorkspace) {
       val testDetails =
         s"""WorkSpaceMountTest
            |APIURL:${conf.api_url}
