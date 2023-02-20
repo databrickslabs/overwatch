@@ -1040,11 +1040,29 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
-  protected def cleanseRawJobRunsSnapDF(df: DataFrame): DataFrame = {
+  protected def cleanseRawJobRunsSnapDF(keys: Array[String], runId: String)(df: DataFrame): DataFrame = {
     val outputDF = df.scrubSchema
-
-    outputDF
+    val rawDf = outputDF
+      .withColumn("Overwatch_RunID", lit(runId))
       .modifyStruct(PipelineFunctions.newClusterCleaner(outputDF, "cluster_spec.new_cluster"))
+
+//    val keys = Array("organization_id", "job_id", "run_id", "Overwatch_RunID")
+    val emptyKeysDF = Seq.empty[(String, Long, Long, String)].toDF("organization_id", "job_id", "run_id", "Overwatch_RunID")
+    val cleansedTasksDF = workflowsCleanseTasks(rawDf, keys, emptyKeysDF, "tasks")
+    val cleansedJobClustersDF = workflowsCleanseJobClusters(rawDf, keys, emptyKeysDF, "job_clusters")
+
+    val changeInventory = Map[String, Column](
+      "tasks" -> col("cleansedTasks"),
+      "job_clusters" -> col("cleansedJobsClusters"),
+    )
+
+    val cleanDF = rawDf
+      .join(cleansedTasksDF, keys.toSeq, "left")
+      .join(cleansedJobClustersDF, keys.toSeq, "left")
+      .modifyStruct(changeInventory)
+      .drop("cleansedTasks", "cleansedJobsClusters")
+      .scrubSchema(SchemaScrubber(cullNullTypes = true))
+    cleanDF
   }
 
 }

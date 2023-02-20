@@ -351,17 +351,53 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * Function to get the the list of Job Runs
    * @return
    */
-  def getJobRunsDF: DataFrame = {
+  def getJobRunsDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
     val jobsRunsEndpoint = "jobs/runs/list"
     val jsonQuery = Map(
       "limit" -> "25",
       "expand_tasks" -> "true",
-      "offset" -> "0"
+      "offset" -> "0",
+      "start_time_from" -> s"${fromTime.asUnixTimeMilli}",
+      "start_time_to" -> s"${untilTime.asUnixTimeMilli}"
     )
-    ApiCallV2(config.apiEnv,jobsRunsEndpoint, jsonQuery, 2.1)
-      .execute()
-      .asDF()
-      .withColumn("organization_id", lit(config.organizationId))
+    val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
+    var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+    val tempWorkingDir = s"${config.tempWorkingDir}/jobrunslist_bronze/${System.currentTimeMillis()}"
+
+    val apiObj = ApiCallV2(config.apiEnv,
+      jobsRunsEndpoint,
+      jsonQuery,
+      tempSuccessPath = tempWorkingDir,
+      2.1).executeMultiThread(acc)
+
+    apiObj.forEach(
+      obj => if (obj.contains("runs")) {
+        apiResponseArray.add(obj)
+      }
+    )
+
+    if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
+      PipelineFunctions.writeMicroBatchToTempLocation(tempWorkingDir, apiResponseArray.toString)
+    }
+
+    if(Helpers.pathExists(tempWorkingDir)) {
+      try {
+        spark.conf.set("spark.sql.caseSensitive", "true")
+        val df = spark.read.json(tempWorkingDir)
+          .select(explode(col("runs")).alias("runs")).select(col("runs" + ".*"))
+          .withColumn("organization_id", lit(config.organizationId))
+        spark.conf.set("spark.sql.caseSensitive", "false")
+        df
+      } catch {
+        case e: Throwable =>
+          throw new Exception(e)
+      }
+    } else {
+      println(s"""No Data is present for jobs/runs/list from - ${fromTime.asUnixTimeMilli} to - ${untilTime.asUnixTimeMilli}""")
+      logger.log(Level.INFO,s"""No Data is present for jobs/runs/list from - ${fromTime.asUnixTimeMilli} to - ${untilTime.asUnixTimeMilli}""")
+      spark.emptyDataFrame
+    }
+
   }
 
   /**

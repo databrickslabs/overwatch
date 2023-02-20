@@ -64,6 +64,7 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setSuccessTempPath(tempSuccessPath)
   }
 
+
   /**
    * Companion Object which takes three parameter and initialise the ApiCallV2.
    *
@@ -93,6 +94,25 @@ object ApiCallV2 extends SparkSessionWrapper {
       .setEndPoint(apiName)
       .buildMeta(apiName)
       .setQueryMap(queryMap)
+      .setApiV(apiVersion)
+  }
+
+  /**
+   *
+   * @param apiEnv
+   * @param apiName
+   * @param queryMap
+   * @param tempSuccessPath
+   * @param apiVersion
+   * @return
+   */
+  def apply(apiEnv: ApiEnv, apiName: String, queryMap: Map[String, String],
+            tempSuccessPath: String, apiVersion: Double): ApiCallV2 = {
+    new ApiCallV2(apiEnv)
+      .setEndPoint(apiName)
+      .buildMeta(apiName)
+      .setQueryMap(queryMap)
+      .setSuccessTempPath(tempSuccessPath)
       .setApiV(apiVersion)
   }
 
