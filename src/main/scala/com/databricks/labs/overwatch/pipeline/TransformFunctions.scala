@@ -25,6 +25,7 @@ object TransformFunctions {
 
     /**
      * drops columns that contain only nulls
+     *
      * @param df dataframe to more data
      * @return
      *
@@ -79,12 +80,13 @@ object TransformFunctions {
      * EX: startEvent.joinWithLag(endEvent, keyColumn[s], "laggingDateCol", lagDays = 30, joinType = "left")
      * The above example with match the join condition on all keyColumn[s] AND where left.laggingDateCol >=
      * date_sub(right.laggingDateCol, 30)
-     * @param df2 df to be joined
-     * @param usingColumns key columns ** less the lagDateColumn
+     *
+     * @param df2               df to be joined
+     * @param usingColumns      key columns ** less the lagDateColumn
      * @param lagDateColumnName name of the lag control column
-     * @param laggingSide which side of the join is the lagging side
-     * @param lagDays how many days to allow for lag
-     * @param joinType join type, one of left | inner | right
+     * @param laggingSide       which side of the join is the lagging side
+     * @param lagDays           how many days to allow for lag
+     * @param joinType          join type, one of left | inner | right
      * @return
      */
     def joinWithLag(
@@ -100,7 +102,7 @@ object TransformFunctions {
         s"supported, you selected $joinType, switch to supported join type")
       require( // both sides contain the lagDateColumnName
         df.schema.fields.exists(_.name == lagDateColumnName) &&
-        df2.schema.fields.exists(_.name == lagDateColumnName),
+          df2.schema.fields.exists(_.name == lagDateColumnName),
         s"$lagDateColumnName must exist on both sides of the join"
       )
 
@@ -108,9 +110,9 @@ object TransformFunctions {
         df.schema.fields
           .filter(f => f.name == lagDateColumnName)
           .exists(f => f.dataType == TimestampType || f.dataType == DateType) &&
-        df2.schema.fields
-          .filter(f => f.name == lagDateColumnName)
-          .exists(f => f.dataType == TimestampType || f.dataType == DateType),
+          df2.schema.fields
+            .filter(f => f.name == lagDateColumnName)
+            .exists(f => f.dataType == TimestampType || f.dataType == DateType),
         s"$lagDateColumnName must be either a Date or Timestamp type on both sides of the join"
       )
 
@@ -121,16 +123,17 @@ object TransformFunctions {
         (df, df2.suffixDFCols(rightSuffix, allJoinCols, caseSensitive = true))
       } else (df.suffixDFCols(leftSuffix, allJoinCols, caseSensitive = true), df2)
 
-      val baseJoinCondition = if (joinType == "left" || joinType == "inner"){
+      val baseJoinCondition = if (joinType == "left" || joinType == "inner") {
         usingColumns.map(k => s"$k = ${k}${rightSuffix}").mkString(" AND ")
       } else usingColumns.map(k => s"$k = ${k}${leftSuffix}").mkString(" AND ")
 
       val joinConditionWLag = if (joinType == "left" || joinType == "inner") {
         if (laggingSide == "left") {
-        expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${rightSuffix}, $lagDays)")
+          expr(s"$baseJoinCondition AND ${lagDateColumnName} >= date_sub(${lagDateColumnName}${rightSuffix}, $lagDays)")
+        } else {
+          expr(s"$baseJoinCondition AND ${lagDateColumnName}${rightSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
+        }
       } else {
-        expr(s"$baseJoinCondition AND ${lagDateColumnName}${rightSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
-      }} else {
         if (laggingSide == "left") {
           expr(s"$baseJoinCondition AND ${lagDateColumnName}${leftSuffix} >= date_sub(${lagDateColumnName}, $lagDays)")
         } else {
@@ -149,6 +152,7 @@ object TransformFunctions {
     }
 
     def requireFields(fieldName: Seq[String]): DataFrame = requireFields(false, fieldName: _*)
+
     def requireFields(caseSensitive: Boolean, fieldName: String*): DataFrame = {
       fieldName.map(f => {
         val fWithCase = if (caseSensitive) f else f.toLowerCase
@@ -237,13 +241,14 @@ object TransformFunctions {
      * fills metadata columns in a dataframe using windows
      * the windows will use the keys and the incrementals to go back as far as needed to get a value
      * if a value cannot be filled from previous data, first future value will be used to fill
-     * @param fieldsToFill Array of fields to fill
-     * @param keys keys by which to partition the window
+     *
+     * @param fieldsToFill      Array of fields to fill
+     * @param keys              keys by which to partition the window
      * @param incrementalFields fields by which to order the window
-     * @param orderedLookups Seq of columns that provide a secondary lookup for the value within the row
-     * @param noiseBuckets Optional number of buckets to split lookup window
-     *                     creates an intermediate step that can help shrink skew on large datasets with
-     *                     heavily skewed lookups
+     * @param orderedLookups    Seq of columns that provide a secondary lookup for the value within the row
+     * @param noiseBuckets      Optional number of buckets to split lookup window
+     *                          creates an intermediate step that can help shrink skew on large datasets with
+     *                          heavily skewed lookups
      * @return
      */
     def fillMeta(
@@ -294,27 +299,29 @@ object TransformFunctions {
 
     /**
      * remove dups via a window
-     * @param keys seq of keys for the df
+     *
+     * @param keys              seq of keys for the df
      * @param incrementalFields seq of incremental fields for the df
      * @return
      */
     def dedupByKey(
-                     keys: Seq[String],
-                     incrementalFields: Seq[String]
-                     ): DataFrame = {
-//       val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
+                    keys: Seq[String],
+                    incrementalFields: Seq[String]
+                  ): DataFrame = {
+      //       val keysLessIncrementals = (keys.toSet -- incrementalFields.toSet).toArray
       val distinctKeys = (keys ++ incrementalFields).toSet.toArray
       val w = Window.partitionBy(distinctKeys map col: _*).orderBy(incrementalFields map col: _*)
       df
         .withColumn("rnk", rank().over(w))
         .withColumn("rn", row_number().over(w))
-        .filter(col("rnk") === 1  && col("rn") === 1)
+        .filter(col("rnk") === 1 && col("rn") === 1)
         .drop("rnk", "rn")
     }
 
     /**
      * Supports strings, numericals, booleans. Defined keys don't contain any other types thus this function should
      * ensure no nulls present for keys
+     *
      * @return
      */
     def fillAllNAs: DataFrame = {
@@ -365,13 +372,14 @@ object TransformFunctions {
 
     /**
      * appends fields to an existing struct
-     * @param structFieldName name of struct to which namedColumns should be applied
-     * @param namedColumns Array of NamedColumn
+     *
+     * @param structFieldName            name of struct to which namedColumns should be applied
+     * @param namedColumns               Array of NamedColumn
      * @param overrideExistingStructCols Whether or not to override the value of existing struct field if it exists
-     * @param newStructFieldName If not provided, the original struct will be morphed, if a secondary struct is desired
-     *                           provide a name here and the original struct will not be altered.
-     *                           New, named struct will be added to the top level
-     * @param caseSensitive whether or not the field names are case sensitive
+     * @param newStructFieldName         If not provided, the original struct will be morphed, if a secondary struct is desired
+     *                                   provide a name here and the original struct will not be altered.
+     *                                   New, named struct will be added to the top level
+     * @param caseSensitive              whether or not the field names are case sensitive
      * @return
      */
     def appendToStruct(
@@ -383,8 +391,8 @@ object TransformFunctions {
                       ): DataFrame = {
       require(df.hasFieldNamed(structFieldName, caseSensitive),
         s"ERROR: Dataframe must contain the struct field to be altered. " +
-        s"$structFieldName was not found. Struct fields include " +
-        s"${df.schema.fields.filter(_.dataType.typeName == "struct").map(_.name).mkString(", ")}"
+          s"$structFieldName was not found. Struct fields include " +
+          s"${df.schema.fields.filter(_.dataType.typeName == "struct").map(_.name).mkString(", ")}"
       )
 
       val fieldToAlterTypeName = df.select(structFieldName).schema.fields.head.dataType.typeName
@@ -402,9 +410,9 @@ object TransformFunctions {
 
   }
 
-  private def bidirectionalFill(colToFillName: String, wPrev: WindowSpec, wNext: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()) : Column = {
+  private def bidirectionalFill(colToFillName: String, wPrev: WindowSpec, wNext: WindowSpec, orderedLookups: Seq[Column] = Seq[Column]()): Column = {
     val colToFill = col(colToFillName)
-    if (orderedLookups.nonEmpty){ // TODO -- omit nulls from lookup
+    if (orderedLookups.nonEmpty) { // TODO -- omit nulls from lookup
       val coalescedLookup = Array(colToFill) ++ orderedLookups.map(lookupCol => {
         last(lookupCol, true).over(wPrev)
       }) ++ orderedLookups.map(lookupCol => {
@@ -431,31 +439,28 @@ object TransformFunctions {
       )
     }
 
+    /**
+     * Calculates DBU Costs
+     * @param isDatabricksBillable is state in DBU Billable State
+     * @param dbus dbus from the state
+     * @param dbuRate_H cost of a dbu per hour for the given sku
+     * @param nodeCount number of nodes considered in the calculation
+     * @param stateTime uptime (wall time) in state
+     * @param smoothingCol coefficient derived from the smooth function
+     * @return
+     */
     def dbu(
              isDatabricksBillable: Column,
-             dbu_H: Column,
+             dbus: Column,
              dbuRate_H: Column,
              nodeCount: Column,
-             computeTime_H: Column,
-             runtimeEngine: Column,
-             sku: Column,
+             stateTime: Column,
              smoothingCol: Option[Column] = None
            ): Column = {
-      //Check if the cluster is enabled with Photon or not
-      val isPhotonEnabled = upper(runtimeEngine).equalTo("PHOTON")
-      //Check if the cluster is not a SQL warehouse/endpoint
-      val isNotAnSQlWarehouse = !upper(sku).equalTo("SQLCOMPUTE")
-      //This is the default logic for DBU calculation
-      val defaultCalculation = dbu_H * computeTime_H * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))
-      val dbuMultiplier = 2
 
-      //assign the variables and return column with calculation
-      coalesce(
-        when(isDatabricksBillable && isPhotonEnabled && isNotAnSQlWarehouse , defaultCalculation * dbuMultiplier)
-          .when(isDatabricksBillable, defaultCalculation)
-          .otherwise(lit(0)),
-        lit(0) // don't allow costs to be null (i.e. missing worker node type and/or single node workers
-      )
+      //This is the default logic for DBU calculation
+      val defaultCalculation = dbus * stateTime * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))
+      when(isDatabricksBillable, defaultCalculation).otherwise(lit(0.0))
     }
 
     /**
