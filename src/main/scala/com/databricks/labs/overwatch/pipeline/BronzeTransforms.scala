@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
@@ -914,16 +915,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
 
   private[overwatch] def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
+    try{
     val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
+      .withColumn("mount_point", when('mount_point.endsWith("/"), 'mount_point.substr(lit(0), length('mount_point) - 1)).otherwise('mount_point))
       .withColumn("source", when('source.endsWith("/"), 'source.substr(lit(0), length('source) - 1)).otherwise('source))
       .filter(col("mount_point") =!= "/")
-
     //Cleaning the data for cluster log path
     val formattedInputDf = inputDataframe.withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
       .withColumn("cluster_mount_point_temp", regexp_replace('cluster_log_conf, "dbfs:", ""))
       .withColumn("cluster_mount_point", 'cluster_mount_point_temp)
 //      .withColumn("cluster_mount_point", regexp_replace('cluster_mount_point_temp, "//", "/"))
-
 
     //Joining the cluster log data with mount point data
     val joinDF = formattedInputDf
@@ -942,11 +943,35 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val result = pathsDF.select('wildPrefix, 'cluster_id)
     result
+    }catch {
+      case e:Exception=>
+          logger.log(Level.ERROR,"Unable to get all the event log prefix",e)
+          throw e
+    }
+
   }
 
   private def getMountPointMapping(apiEnv: ApiEnv): DataFrame = {
-    val endPoint = "dbfs/search-mounts"
-    ApiCallV2(apiEnv, endPoint).execute().asDF()
+    try{
+      if (apiEnv.mountMappingPath.nonEmpty) {
+        logger.log(Level.INFO, "Reading cluster logs from " + apiEnv.mountMappingPath)
+         spark.read.option("header", "true")
+          .option("ignoreLeadingWhiteSpace", true)
+          .option("ignoreTrailingWhiteSpace", true)
+          .csv(apiEnv.mountMappingPath.get)
+          .withColumnRenamed("mountPoint","mount_point")
+          .select("mount_point", "source")
+      } else {
+        logger.log(Level.INFO,"Calling dbfs/search-mounts for cluster logs")
+        val endPoint = "dbfs/search-mounts"
+        ApiCallV2(apiEnv, endPoint).execute().asDF()
+      }
+    }catch {
+      case e:Exception=>
+        logger.log(Level.ERROR,"ERROR while reading mount point",e)
+        throw e
+    }
+
   }
 
 
@@ -958,7 +983,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       clusterSnapshotTable: PipelineTable,
                                       sparkLogClusterScaleCoefficient: Double,
                                       apiEnv: ApiEnv,
-                                      isMultiWorkSpaceDeployment: Boolean
+                                      isMultiWorkSpaceDeployment: Boolean,
+                                      organisationId: String
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -1003,7 +1029,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes =
-    if(isMultiWorkSpaceDeployment) {
+    if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId) {
       getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
      } else {
