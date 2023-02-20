@@ -146,6 +146,15 @@ object Helpers extends SparkSessionWrapper {
   import spark.implicits._
 
   /**
+   * Checks whether the provided String value is numeric.
+   * @param value
+   * @return
+   */
+  def isNumeric(value:String):Boolean={
+    value.forall(Character.isDigit)
+  }
+
+  /**
    * Getter for parallelism between 8 and driver cores
    *
    * @return
