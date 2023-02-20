@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.validation
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCallV2
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.pipeline.{Pipeline, PipelineFunctions, Schema}
+import com.databricks.labs.overwatch.pipeline.{Initializer, Pipeline, PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.validation.{Rule, RuleSet}
@@ -100,51 +100,63 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
-    val testDetails =
-      s"""WorkSpaceMountTest
-         |APIURL:${conf.api_url}
-         |DBPATWorkspaceScope:${conf.secret_scope}
-         |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
-    try {
-      val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
-      val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
-      val endPoint = "dbfs/search-mounts"
-      val mountCount = ApiCallV2(apiEnv, endPoint).execute().asDF().count()
-      if(mountCount<50)
-        {
+    val isAzure = conf.cloud.toLowerCase == "azure" //Mount-point validation is only done for Azure
+    val isRemoteWorkspace = conf.workspace_id.trim != Initializer.getOrgId // No need to perform mount-point validation for driver workspace.
+
+    if (isAzure &&  isRemoteWorkspace) {
+      val testDetails =
+        s"""WorkSpaceMountTest
+           |APIURL:${conf.api_url}
+           |DBPATWorkspaceScope:${conf.secret_scope}
+           |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+      try {
+        val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
+        val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
+        val endPoint = "dbfs/search-mounts"
+        val mountCount = ApiCallV2(apiEnv, endPoint).execute().asDF().count()
+        if (mountCount < 50) {
           DeploymentValidationReport(true,
             getSimpleMsg("Validate_Mount"),
             testDetails,
             Some("SUCCESS"),
             Some(conf.workspace_id)
           )
-        }else{
-        DeploymentValidationReport(false,
-          getSimpleMsg("Validate_Mount"),
-          testDetails,
-          Some("Number of mounts found in workspace is more than 50"),
-          Some(conf.workspace_id)
-        )
+        } else {
+          DeploymentValidationReport(false,
+            getSimpleMsg("Validate_Mount"),
+            testDetails,
+            Some("Number of mounts found in workspace is more than 50"),
+            Some(conf.workspace_id)
+          )
+        }
+
+      } catch {
+        case exception: Exception =>
+          val msg =
+            s"""No Data retrieved
+               |WorkspaceId:${conf.workspace_id}
+               |APIURL:${conf.api_url}
+               | DBPATWorkspaceScope:${conf.secret_scope}
+               | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+          val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
+          logger.log(Level.ERROR, fullMsg)
+          DeploymentValidationReport(false,
+            getSimpleMsg("Validate_Mount"),
+            testDetails,
+            Some(fullMsg),
+            Some(conf.workspace_id)
+          )
+
       }
-
-    } catch {
-      case exception: Exception =>
-        val msg =
-          s"""No Data retrieved
-             |WorkspaceId:${conf.workspace_id}
-             |APIURL:${conf.api_url}
-             | DBPATWorkspaceScope:${conf.secret_scope}
-             | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
-        val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
-        logger.log(Level.ERROR, fullMsg)
-        DeploymentValidationReport(false,
-          getSimpleMsg("Validate_Mount"),
-          testDetails,
-          Some(fullMsg),
-          Some(conf.workspace_id)
-        )
-
+    } else {
+      DeploymentValidationReport(true,
+        getSimpleMsg("Validate_Mount"),
+        "Skipping mount point check",
+        Some("SUCCESS"),
+        Some(conf.workspace_id)
+      )
     }
+
 
   }
 
