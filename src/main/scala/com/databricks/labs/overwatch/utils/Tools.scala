@@ -146,7 +146,10 @@ object Helpers extends SparkSessionWrapper {
   import spark.implicits._
 
   /**
-   * Checks whether the provided String value is numeric.//We also need to check for double/float, ticket #770 has been created for the same.
+   * Checks whether the provided String value is numeric.//We also need to check for double/float,
+   * ticket TODO#770 has been created for the same.
+   *        TODO Unit test case for the function.
+   *
    * @param value
    * @return
    */
