@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.utils.MergeScope.MergeScope
 import com.databricks.labs.overwatch.utils.WriteMode.WriteMode
 import com.databricks.labs.overwatch.utils._
 import io.delta.tables.DeltaTable
@@ -24,6 +25,7 @@ case class PipelineTable(
                           format: String = "delta", // TODO -- Convert to Enum
                           persistBeforeWrite: Boolean = false,
                           _mode: WriteMode = WriteMode.append,
+                          mergeScope: MergeScope = MergeScope.full,
                           maxMergeScanDates: Int = 33, // used to create explicit date merge condition -- should be removed after merge dynamic partition pruning is enabled DBR 11.x LTS
                           private val _permitDuplicateKeys: Boolean = true,
                           private val _databaseName: String = "default",

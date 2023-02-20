@@ -384,8 +384,9 @@ class Pipeline(
     dbutils.fs.rm(config.tempWorkingDir)
 
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
-
-    spark.catalog.clearCache()
+    //TODO clearcache will clear global cache multithread performance issue
+   // spark.catalog.clearCache()
+    clearThreadFromSessionsMap()
   }
 
   private[overwatch] def restoreSparkConf(): Unit = {

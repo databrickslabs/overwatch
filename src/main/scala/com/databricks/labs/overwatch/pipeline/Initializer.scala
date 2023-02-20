@@ -558,9 +558,9 @@ object Initializer extends SparkSessionWrapper {
   envInit()
 
   def getOrgId: String = {
-    if (dbutils.notebook.getContext.tags("orgId") == "0") {
+    if (spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId") == " ") {
       dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-    } else dbutils.notebook.getContext.tags("orgId")
+    } else spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
   }
 
   private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
@@ -568,7 +568,7 @@ object Initializer extends SparkSessionWrapper {
     val config = new Config()
     if(organizationID.isEmpty) {
       config.setOrganizationId(getOrgId)
-    }else{
+    }else{ // is multiWorkspace deployment since orgID is passed
       logger.log(Level.INFO, "Setting multiworkspace deployment")
       config.setOrganizationId(organizationID.get)
       if (apiUrl.nonEmpty) {
@@ -576,6 +576,7 @@ object Initializer extends SparkSessionWrapper {
       }
       config.setIsMultiworkspaceDeployment(true)
     }
+    // set spark overrides in scoped spark session
     config.registerInitialSparkConf(spark.conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
     config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions"))

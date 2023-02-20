@@ -551,9 +551,19 @@ object Helpers extends SparkSessionWrapper {
    * Cannot derive schemas < 0.6.0.3
    *
    * @param etlDB Overwatch ETL database
+   * @param organization_id Optional - Use only when trying to instantiate remote deployment - org id of remote workspace
+   * @param apiUrl Optiona - Use only when trying to instantiate remote deployment apiURL of remote workspace
+   * @param successfullOnly Only consider successful runs when looking for latest config
+   * @param disableValidations Whether or not to have initializer disable validations
    * @return
    */
-  def getWorkspaceByDatabase(etlDB: String, successfulOnly: Boolean = true, disableValidations: Boolean = false): Workspace = {
+  def getWorkspaceByDatabase(
+                              etlDB: String,
+                              organization_id: Option[String] = None,
+                              apiUrl: Option[String] = None,
+                              successfullOnly: Boolean = true,
+                              disableValidations: Boolean = false
+                            ): Workspace = {
     // verify database exists
     assert(spark.catalog.databaseExists(etlDB), s"The database provided, $etlDB, does not exist.")
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
@@ -561,9 +571,9 @@ object Helpers extends SparkSessionWrapper {
 
     // verify database is owned and managed by Overwatch
     assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided, $etlDB, is not an Overwatch managed Database. Please provide an Overwatch managed database")
-    val workspaceID = Initializer.getOrgId
+    val workspaceID = if (organization_id.nonEmpty) organization_id.get else Initializer.getOrgId
 
-    val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
+    val statusFilter = if (successfullOnly) 'status === "SUCCESS" else lit(true)
 
     val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
     val testConfig = spark.table(s"${etlDB}.pipeline_report")
@@ -575,7 +585,16 @@ object Helpers extends SparkSessionWrapper {
       .select(to_json('inputConfig).alias("compactString"))
       .as[String].first()
 
-    Initializer(testConfig, disableValidations = disableValidations)
+    if (organization_id.isEmpty) { // single workspace deployment
+      Initializer(testConfig, disableValidations = true)
+    } else { // multi workspace deployment
+      Initializer(
+        testConfig,
+        disableValidations = disableValidations,
+        apiURL = apiUrl,
+        organizationID = organization_id
+      )
+    }
   }
 
   /**
@@ -662,9 +681,7 @@ object Helpers extends SparkSessionWrapper {
     val remoteConfig = remoteWorkspace.getConfig
     val etlDatabaseNameToCreate = if (localETLDatabaseName == "" & !usingExternalMetastore)  {remoteConfig.databaseName} else {localETLDatabaseName}
     val consumerDatabaseNameToCreate = 	if (localConsumerDatabaseName == "" & !usingExternalMetastore) {remoteConfig.consumerDatabaseName} else {localConsumerDatabaseName}
-    val LocalWorkSpaceID = if (dbutils.notebook.getContext.tags("orgId") == "0") {
-      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-    } else dbutils.notebook.getContext.tags("orgId")
+    val LocalWorkSpaceID = Initializer.getOrgId
 
     val localETLDBPath = if (!usingExternalMetastore ){
       Some(s"${remoteStoragePrefix}/${LocalWorkSpaceID}/${etlDatabaseNameToCreate}.db")

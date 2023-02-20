@@ -2,10 +2,11 @@ package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.utils.SparkSessionWrapper.parSessionsOn
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.functions.{length, lit, when}
 
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
@@ -115,9 +116,9 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val sqlComputerDBUPrice: Double = config.sql_compute_dbu_price
       val jobsLightDBUPrice: Double = config.jobs_light_dbu_price
       val customWorkspaceName: String = config.workspace_name
-      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts".split(",").toBuffer
+      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".split(",").toBuffer
       if (config.excluded_scopes != null) {
-        config.excluded_scopes.split(":").foreach(scope => standardScopes -= scope)
+        config.excluded_scopes.toLowerCase().split(":").foreach(scope => standardScopes.map(_.toLowerCase) -= scope)
       }
 
       val maxDaysToLoad: Int = config.max_days
@@ -166,7 +167,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       config.enable_unsafe_SSL.getOrElse(false),
       config.thread_pool_size.getOrElse(4),
       config.api_waiting_time.getOrElse(300000),
-      Some(apiProxyConfig))
+      Some(apiProxyConfig),
+      Some(config.mount_mapping_path))
     apiEnvConfig
   }
 
@@ -191,6 +193,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           fullMsg,
           Some(multiWorkspaceParams.deploymentId)
         ))
+    } finally {
+      clearThreadFromSessionsMap()
     }
   }
 
@@ -215,6 +219,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           fullMsg,
           Some(multiWorkspaceParams.deploymentId)
         ))
+    } finally {
+      clearThreadFromSessionsMap()
     }
   }
 
@@ -239,6 +245,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           fullMsg,
           Some(multiWorkspaceParams.deploymentId)
         ))
+    }finally {
+      clearThreadFromSessionsMap()
     }
   }
 
@@ -327,6 +335,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .scrubSchema
         .verifyMinimumSchema(Schema.deployementMinimumSchema)
         .filter(MultiWorkspaceConfigColumns.active.toString)
+        .withColumn("api_url", when('api_url.endsWith("/"), 'api_url.substr(lit(0), length('api_url) - 1)).otherwise('api_url))
         .withColumn("deployment_id", lit(deploymentId))
         .withColumn("output_path", lit(outputPath))
         .as[MultiWorkspaceConfig]
@@ -355,28 +364,33 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   def deploy(parallelism: Int = 4, zones: String = "Bronze,Silver,Gold"): Unit = {
     val processingStartTime = System.currentTimeMillis();
-    println("ParallelismLevel :" + parallelism)
+    try {
+      if (parallelism > 1) SparkSessionWrapper.parSessionsOn = true
+      SparkSessionWrapper.sessionsMap.clear()
+      SparkSessionWrapper.globalTableLock.clear()
 
-    val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
-    snapshotConfig(multiWorkspaceConfig)
-    val params = DeploymentValidation
-      .performMandatoryValidation(multiWorkspaceConfig, parallelism)
-      .map(buildParams)
+      // initialize spark overrides for global spark conf
+      PipelineFunctions.setSparkOverrides(spark(globalSession = true), SparkSessionWrapper.globalSparkConfOverrides)
 
-    println("Workspace to be Deployed :" + params.size)
-    val zoneArray = zones.split(",")
-    zoneArray.foreach(zone => {
+      println("ParallelismLevel :" + parallelism)
+      val multiWorkspaceConfig = generateMultiWorkspaceConfig(configCsvPath, deploymentId, outputPath)
+      snapshotConfig(multiWorkspaceConfig)
+      val params = DeploymentValidation
+        .performMandatoryValidation(multiWorkspaceConfig, parallelism)
+        .map(buildParams)
+      println("Workspace to be Deployed :" + params.size)
       val responseCounter = Collections.synchronizedList(new util.ArrayList[Int]())
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
       params.foreach(deploymentParams => {
         val future = Future {
-          zone.toLowerCase match {
-            case "bronze" =>
-              startBronzeDeployment(deploymentParams)
-            case "silver" =>
-              startSilverDeployment(deploymentParams)
-            case "gold" =>
-              startGoldDeployment(deploymentParams)
+          if (zones.toLowerCase().contains("bronze")) {
+            startBronzeDeployment(deploymentParams)
+          }
+          if (zones.toLowerCase().contains("silver")) {
+            startSilverDeployment(deploymentParams)
+          }
+          if (zones.toLowerCase().contains("gold")) {
+            startGoldDeployment(deploymentParams)
           }
         }
         future.onComplete {
@@ -387,10 +401,15 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       while (responseCounter.size() < params.length) {
         Thread.sleep(5000)
       }
-    })
-    saveDeploymentReport(deploymentReport, multiWorkspaceConfig.head.etl_storage_prefix, "deploymentReport")
-    println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
 
+      saveDeploymentReport(deploymentReport, multiWorkspaceConfig.head.etl_storage_prefix, "deploymentReport")
+    } catch {
+      case e: Exception => throw e
+    } finally {
+      SparkSessionWrapper.sessionsMap.clear()
+      SparkSessionWrapper.globalTableLock.clear()
+    }
+    println(s"""Deployment completed in sec ${(System.currentTimeMillis() - processingStartTime) / 1000}""")
   }
 
   /**
