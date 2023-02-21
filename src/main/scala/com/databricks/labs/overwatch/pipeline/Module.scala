@@ -6,6 +6,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
 import java.time.Duration
+import scala.util.parsing.json.JSON.number
 
 class Module(
               val moduleId: Int,
@@ -331,7 +332,13 @@ class Module(
 
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
-    optimizeShufflePartitions()
+
+    val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
+    val notAQEAutoOptimizeShuffle = spark.conf.getOption("spark.databricks.adaptive.autoOptimizeShuffle.enabled").getOrElse("false").toBoolean
+    if (Helpers.isNumeric(shufflePartitions) && notAQEAutoOptimizeShuffle){
+      optimizeShufflePartitions()
+    }
+
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
 

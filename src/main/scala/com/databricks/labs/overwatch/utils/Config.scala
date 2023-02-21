@@ -39,7 +39,7 @@ class Config() {
   private var _inputConfig: OverwatchParams = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
   private var _initialSparkConf: Map[String, String] = Map()
-  private var _intialShuffleParts: Int = 200
+  private var _intialShuffleParts: String = "200"
   private var _contractInteractiveDBUPrice: Double = _
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
@@ -77,7 +77,7 @@ class Config() {
 
   def cloudProvider: String = _cloudProvider
 
-  def initialShuffleParts: Int = _intialShuffleParts
+  def initialShuffleParts: String = _intialShuffleParts
 
   def maxDays: Int = _maxDays
 
@@ -187,7 +187,7 @@ class Config() {
    * @param value number of shuffle partitions to be set
    * @return
    */
-  private[overwatch] def setInitialShuffleParts(value: Int): this.type = {
+  private[overwatch] def setInitialShuffleParts(value: String): this.type = {
     _intialShuffleParts = value
     this
   }
