@@ -9,7 +9,7 @@ Bug Fixes Plus a Few New Features
 
 **Upgrade Script** -- Simple but necessary script to be run once per Overawtch Deployment (i.e. storage prefix) the 
 details of script are in the script.
-* **[HTML](/assets/ChangeLog/xx.html) | [DBC](/assets/ChangeLog/xx.dbc)**
+* **[HTML](/assets/ChangeLog/Upgrade_0711.html) | [DBC](/assets/ChangeLog/Upgrade_0711.dbc)**
 
 ### Noteworthy Bug Fixes
 * Significant Improvement in DBU / Cost calculations
