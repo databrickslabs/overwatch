@@ -4,7 +4,9 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
-## 0.7.1.0 (Feature Release)
+## 0.7.1.1
+
+## 0.7.1.0
 **Multi-Workspace Deployments Are Here!!** 
 
 If you're tired of managing and maintaining Overwatch jobs on all your workspaces, be tired no more. Migrate your 
