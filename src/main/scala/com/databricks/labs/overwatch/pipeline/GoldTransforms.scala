@@ -793,7 +793,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val jobRunCostPotentialFactViewColumnMapping: String =
     """
       |organization_id, workspace_name, job_id, job_name, run_id, job_run_id, task_run_id, task_key, repair_id, run_name,
-      |startEpochMS, cluster_id, cluster_name, cluster_tags, driver_node_type_id, node_type_id, dbu_rate,
+      |startEpochMS, cluster_id, cluster_name, cluster_type, cluster_tags, driver_node_type_id, node_type_id, dbu_rate,
       |multitask_parent_run_id, parent_run_id, task_runtime, task_execution_runtime, terminal_state,
       |job_trigger_type, task_type, created_by, last_edited_by, running_days, avg_cluster_share,
       |avg_overlapping_runs, max_overlapping_runs, run_cluster_states, worker_potential_core_H, driver_compute_cost,
