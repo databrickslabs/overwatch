@@ -660,10 +660,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   def makeParallelApiCalls(endpoint: String, jsonInput: Map[String, String], config: Config): String = {
-//    var startValue = jsonInput.get("start_value").get.toLong
-//    val endValue = jsonInput.get("end_value").get.toLong
-//    val incrementCounter = jsonInput.get("increment_counter").get.toLong
-//    val finalResponseCount = jsonInput.get("final_response_count").get.toLong
     val tempEndpointLocation = endpoint.replaceAll("/","")
     val acc = sc.longAccumulator(tempEndpointLocation)
 
