@@ -1064,4 +1064,10 @@ object Schema extends SparkSessionWrapper {
     StructField("api_waiting_time", LongType, nullable = true),
     StructField("mount_mapping_path", StringType, nullable = true)
   ))
+
+  val mountMinimumSchema: StructType = StructType(Seq(
+    StructField("mountPoint", StringType, nullable = true),
+    StructField("source", StringType, nullable = true),
+    StructField("workspace_id", StringType, nullable = false)
+  ))
 }
