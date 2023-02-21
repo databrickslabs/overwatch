@@ -140,6 +140,11 @@ trait ApiMeta {
     Map[String, String]()
   }
 
+  private[overwatch] def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    logger.log(Level.INFO, s"""Needs to be override for specific API for intializing Parallel API call function""")
+    Map[String, String]()
+  }
+
 }
 
 /**
@@ -227,6 +232,15 @@ class SqlQueryHistoryApi extends ApiMeta {
       "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
     )
   }
+
+  private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    Map(
+      "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
+      "end_value" -> s"""${jsonInput.get("end_value").get.toLong}""",
+      "increment_counter" -> s"""${jsonInput.get("increment_counter").get.toLong}""",
+      "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
+    )
+  }
 }
 
 class WorkspaceListApi extends ApiMeta {
@@ -298,6 +312,16 @@ class ClusterEventsApi extends ApiMeta {
       "limit" -> "500"
     )
   }
+
+  private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    Map(
+      "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
+      "end_value" -> s"""${jsonInput.get("end_value").get.toLong}""",
+      "increment_counter" -> s"""${jsonInput.get("increment_counter").get.toLong}""",
+      "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
+    )
+  }
+
 }
 
 class JobRunsApi extends ApiMeta {

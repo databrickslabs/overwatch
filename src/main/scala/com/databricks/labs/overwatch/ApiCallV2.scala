@@ -660,10 +660,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   def makeParallelApiCalls(endpoint: String, jsonInput: Map[String, String], config: Config): String = {
-    var startValue = jsonInput.get("start_value").get.toLong
-    val endValue = jsonInput.get("end_value").get.toLong
-    val incrementCounter = jsonInput.get("increment_counter").get.toLong
-    val finalResponseCount = jsonInput.get("final_response_count").get.toLong
+//    var startValue = jsonInput.get("start_value").get.toLong
+//    val endValue = jsonInput.get("end_value").get.toLong
+//    val incrementCounter = jsonInput.get("increment_counter").get.toLong
+//    val finalResponseCount = jsonInput.get("final_response_count").get.toLong
     val tempEndpointLocation = endpoint.replaceAll("/","")
     val acc = sc.longAccumulator(tempEndpointLocation)
 
@@ -680,6 +680,12 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
     val apiMetaFactoryObj = new ApiMetaFactory().getApiClass(endpoint)
     val dataFrame_column = apiMetaFactoryObj.dataframeColumn
+    val parallelApiCallsParams = apiMetaFactoryObj.getParallelAPIParams(jsonInput)
+    var startValue = parallelApiCallsParams.get("start_value").get.toLong
+    val endValue = parallelApiCallsParams.get("end_value").get.toLong
+    val incrementCounter = parallelApiCallsParams.get("increment_counter").get.toLong
+    val finalResponseCount = parallelApiCallsParams.get("final_response_count").get.toLong
+
     while (startValue < endValue){
       val jsonQuery = apiMetaFactoryObj.getAPIJsonQuery(startValue, endValue, jsonInput)
 
