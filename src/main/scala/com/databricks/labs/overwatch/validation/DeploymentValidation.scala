@@ -98,6 +98,15 @@ object DeploymentValidation extends SparkSessionWrapper {
     }
   }
 
+  /**
+   * Validates the content of provided mount_mapping_path csv file.Below are the validation rules.
+   * 1)validate for file existence.
+   * 2)validate the provided csv file belongs to the provided workspace_id.
+   * 3)validate the provided csv file contains columns "mountPoint", "source","workspace_id" and has some values in it.
+   *
+   * @param conf
+   * @return
+   */
   private def validateMountMappingPath(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
     val path = conf.mount_mapping_path.trim
@@ -119,9 +128,9 @@ object DeploymentValidation extends SparkSessionWrapper {
           .option("ignoreLeadingWhiteSpace", true)
           .option("ignoreTrailingWhiteSpace", true)
           .csv(path)
-          .scrubSchema
           .verifyMinimumSchema(Schema.mountMinimumSchema)
           .select("mountPoint", "source","workspace_id")
+          .filter('source.isNotNull)
           .filter('workspace_id === conf.workspace_id)
 
 
@@ -131,7 +140,7 @@ object DeploymentValidation extends SparkSessionWrapper {
             getSimpleMsg("Validate_Mount"),
             s"""WorkSpaceMountTest
                |mount_mapping_path:${path}
-               |mount point found:${dataCount}
+               |mount points found:${dataCount}
                """.stripMargin,
             Some("SUCCESS"),
             Some(conf.workspace_id)
@@ -147,7 +156,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       }
     } catch {
       case e: Exception =>
-        val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception while reading the mount_mapping_path")
+        val fullMsg = PipelineFunctions.appendStackStrace(e, s"""Exception while reading the mount_mapping_path :${path}""")
         logger.log(Level.ERROR, fullMsg)
         DeploymentValidationReport(false,
           getSimpleMsg("Validate_Mount"),

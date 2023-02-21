@@ -1066,8 +1066,8 @@ object Schema extends SparkSessionWrapper {
   ))
 
   val mountMinimumSchema: StructType = StructType(Seq(
-    StructField("mountPoint", StringType, nullable = true),
-    StructField("source", StringType, nullable = true),
+    StructField("mountPoint", StringType, nullable = false),
+    StructField("source", StringType, nullable = false),
     StructField("workspace_id", StringType, nullable = false)
   ))
 }
