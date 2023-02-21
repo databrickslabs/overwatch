@@ -98,26 +98,50 @@ object DeploymentValidation extends SparkSessionWrapper {
     }
   }
 
-  private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
+  /**
+   * Validates the content of provided mount_mapping_path csv file.Below are the validation rules.
+   * 1)validate for file existence.
+   * 2)validate the provided csv file belongs to the provided workspace_id.
+   * 3)validate the provided csv file contains columns "mountPoint", "source","workspace_id" and has some values in it.
+   *
+   * @param conf
+   * @return
+   */
+  private def validateMountMappingPath(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
-    val isAzure = conf.cloud.toLowerCase == "azure" //Mount-point validation is only done for Azure
-    val isRemoteWorkspace = conf.workspace_id.trim != Initializer.getOrgId // No need to perform mount-point validation for driver workspace.
+    val path = conf.mount_mapping_path.trim
+    val testDetails =
+      s"""WorkSpaceMountTest
+         |mount_mapping_path:${path}
+         """.stripMargin
 
-    if (isAzure &&  isRemoteWorkspace) {
-      val testDetails =
-        s"""WorkSpaceMountTest
-           |APIURL:${conf.api_url}
-           |DBPATWorkspaceScope:${conf.secret_scope}
-           |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
-      try {
-        val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
-        val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
-        val endPoint = "dbfs/search-mounts"
-        val mountCount = ApiCallV2(apiEnv, endPoint).execute().asDF().count()
-        if (mountCount < 50) {
+    try {
+      if (!Helpers.pathExists(path)) {
+        DeploymentValidationReport(false,
+          getSimpleMsg("Validate_Mount"),
+          testDetails,
+          Some("Unable to find the provided csv: " + path),
+          Some(conf.workspace_id)
+        )
+      } else {
+        val inputDf = spark.read.option("header", "true")
+          .option("ignoreLeadingWhiteSpace", true)
+          .option("ignoreTrailingWhiteSpace", true)
+          .csv(path)
+          .filter('source.isNotNull)
+          .verifyMinimumSchema(Schema.mountMinimumSchema)
+          .select("mountPoint", "source","workspace_id")
+          .filter('workspace_id === conf.workspace_id)
+
+
+        val dataCount = inputDf.count()
+        if (dataCount > 0) {
           DeploymentValidationReport(true,
             getSimpleMsg("Validate_Mount"),
-            testDetails,
+            s"""WorkSpaceMountTest
+               |mount_mapping_path:${path}
+               |mount points found:${dataCount}
+               """.stripMargin,
             Some("SUCCESS"),
             Some(conf.workspace_id)
           )
@@ -125,28 +149,78 @@ object DeploymentValidation extends SparkSessionWrapper {
           DeploymentValidationReport(false,
             getSimpleMsg("Validate_Mount"),
             testDetails,
-            Some("Number of mounts found in workspace is more than 50"),
+            Some(s"""No data found for workspace_id: ${conf.workspace_id} in provided csv: ${path}"""),
             Some(conf.workspace_id)
           )
         }
+      }
+    } catch {
+      case e: Exception =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, s"""Exception while reading the mount_mapping_path :${path}""")
+        logger.log(Level.ERROR, fullMsg)
+        DeploymentValidationReport(false,
+          getSimpleMsg("Validate_Mount"),
+          testDetails,
+          Some(fullMsg),
+          Some(conf.workspace_id)
+        )
+    }
 
-      } catch {
-        case exception: Exception =>
-          val msg =
-            s"""No Data retrieved
-               |WorkspaceId:${conf.workspace_id}
-               |APIURL:${conf.api_url}
-               | DBPATWorkspaceScope:${conf.secret_scope}
-               | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
-          val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
-          logger.log(Level.ERROR, fullMsg)
-          DeploymentValidationReport(false,
-            getSimpleMsg("Validate_Mount"),
-            testDetails,
-            Some(fullMsg),
-            Some(conf.workspace_id)
-          )
+  }
+  private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
+    val isAzure = conf.cloud.toLowerCase == "azure" //Mount-point validation is only done for Azure
+    val isRemoteWorkspace = conf.workspace_id.trim != Initializer.getOrgId // No need to perform mount-point validation for driver workspace.
+    val isMountMappingPathProvided = !conf.mount_mapping_path.trim.isEmpty
+
+    if (isAzure && isRemoteWorkspace) { //Performing mount test
+      if (isMountMappingPathProvided) {
+        validateMountMappingPath(conf)
+      } else {
+        val testDetails =
+          s"""WorkSpaceMountTest
+             |APIURL:${conf.api_url}
+             |DBPATWorkspaceScope:${conf.secret_scope}
+             |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+        try {
+          val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
+          val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
+          val endPoint = "dbfs/search-mounts"
+          val mountCount = ApiCallV2(apiEnv, endPoint).execute().asDF().count()
+          if (mountCount < 50) {
+            DeploymentValidationReport(true,
+              getSimpleMsg("Validate_Mount"),
+              testDetails,
+              Some("SUCCESS"),
+              Some(conf.workspace_id)
+            )
+          } else {
+            DeploymentValidationReport(false,
+              getSimpleMsg("Validate_Mount"),
+              testDetails,
+              Some("Number of mounts found in workspace is more than 50"),
+              Some(conf.workspace_id)
+            )
+          }
+
+        } catch {
+          case exception: Exception =>
+            val msg =
+              s"""No Data retrieved
+                 |WorkspaceId:${conf.workspace_id}
+                 |APIURL:${conf.api_url}
+                 | DBPATWorkspaceScope:${conf.secret_scope}
+                 | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+            val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
+            logger.log(Level.ERROR, fullMsg)
+            DeploymentValidationReport(false,
+              getSimpleMsg("Validate_Mount"),
+              testDetails,
+              Some(fullMsg),
+              Some(conf.workspace_id)
+            )
+
+        }
       }
     } else {
       DeploymentValidationReport(true,
