@@ -389,10 +389,17 @@ class Pipeline(
     clearThreadFromSessionsMap()
   }
 
+  /**
+   * restore the spark config to the way it was when config / workspace were first instantiated
+   */
   private[overwatch] def restoreSparkConf(): Unit = {
     restoreSparkConf(config.initialSparkConf)
   }
 
+  /**
+   * restore spark configs that are passed into this function
+   * @param value map of configs to be overridden
+   */
   protected def restoreSparkConf(value: Map[String, String]): Unit = {
     PipelineFunctions.setSparkOverrides(spark, value, config.debugFlag)
   }

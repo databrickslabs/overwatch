@@ -12,15 +12,24 @@ import scala.collection.JavaConverters._
 
 object SparkSessionWrapper {
 
-   var parSessionsOn = false
+  var parSessionsOn = false
   private[overwatch] val sessionsMap = new ConcurrentHashMap[Long, SparkSession]().asScala
   private[overwatch] val globalTableLock = new ConcurrentHashSet[String]
   private[overwatch] val globalSparkConfOverrides = Map(
-    "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
+    "spark.sql.shuffle.partitions" -> "800", // allow aqe to shrink
+    "spark.databricks.adaptive.autoOptimizeShuffle.enabled" -> "true", // enable AQE
+    "spark.databricks.delta.optimize.maxFileSize" -> "134217728", // 128 MB default
+    "spark.sql.files.maxPartitionBytes" -> "134217728", // 128 MB default
     "spark.sql.caseSensitive" -> "false",
     "spark.sql.autoBroadcastJoinThreshold" -> "10485760",
     "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "10485760",
     "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
+    "spark.databricks.delta.properties.defaults.autoOptimize.autoCompact" -> "false",
+    "spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite" -> "false",
+    "spark.databricks.delta.retentionDurationCheck.enabled" -> "true",
+    "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "50000",
+    "spark.databricks.delta.optimizeWrite.binSize" -> "512",
+    "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "268435456", // reset to default 256MB
     "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365
   )
 
@@ -46,7 +55,7 @@ trait SparkSessionWrapper extends Serializable {
   private def buildSpark(): SparkSession = {
     SparkSession
       .builder()
-      .appName("GlobalSession")
+      .appName("Overwatch - GlobalSession")
       .getOrCreate()
   }
   /**

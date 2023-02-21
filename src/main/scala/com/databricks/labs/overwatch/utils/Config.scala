@@ -39,7 +39,6 @@ class Config() {
   private var _inputConfig: OverwatchParams = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
   private var _initialSparkConf: Map[String, String] = Map()
-  private var _intialShuffleParts: String = "200"
   private var _contractInteractiveDBUPrice: Double = _
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
@@ -76,8 +75,6 @@ class Config() {
   def externalizeOptimize: Boolean = _externalizeOptimize
 
   def cloudProvider: String = _cloudProvider
-
-  def initialShuffleParts: String = _intialShuffleParts
 
   def maxDays: Int = _maxDays
 
@@ -140,22 +137,17 @@ class Config() {
 
   def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
 
+  /**
+   * override spark confs with Overwatch global overrides
+   * meant to be used only from Initializer to ensure at the beginning of a PipelineRun all the spark Confs are set
+   * correctly
+   * @param value
+   * @return
+   */
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
-    val manualOverrides = Map(
-      "spark.databricks.delta.properties.defaults.autoOptimize.autoCompact" ->
-        value.getOrElse("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false"),
-      "spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite" ->
-        value.getOrElse("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false"),
-      "spark.databricks.delta.optimize.maxFileSize" ->
-        value.getOrElse("spark.databricks.delta.optimize.maxFileSize", (1024 * 1024 * 128).toString),
-      "spark.databricks.delta.retentionDurationCheck.enabled" ->
-        value.getOrElse("spark.databricks.delta.retentionDurationCheck.enabled", "true"),
-      "spark.databricks.delta.optimizeWrite.numShuffleBlocks" ->
-        value.getOrElse("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "50000"),
-      "spark.databricks.delta.optimizeWrite.binSize" ->
-        value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512")
-    )
-    _initialSparkConf = value ++ manualOverrides ++ SparkSessionWrapper.globalSparkConfOverrides
+    logger.log(Level.INFO, s"Config Initialized with Spark Overrides of:\n" +
+      s"${SparkSessionWrapper.globalSparkConfOverrides}")
+    _initialSparkConf = value ++ SparkSessionWrapper.globalSparkConfOverrides
     this
   }
 
@@ -178,19 +170,6 @@ class Config() {
   /**
    * BEGIN SETTERS
    */
-
-  /**
-   * Identify the initial value before overwatch for shuffle partitions. This value gets modified a lot through
-   * this process but should be set back to the same as the value before Overwatch process when Overwatch finishes
-   * its work
-   *
-   * @param value number of shuffle partitions to be set
-   * @return
-   */
-  private[overwatch] def setInitialShuffleParts(value: String): this.type = {
-    _intialShuffleParts = value
-    this
-  }
 
   private[overwatch] def setMaxDays(value: Int): this.type = {
     _maxDays = value

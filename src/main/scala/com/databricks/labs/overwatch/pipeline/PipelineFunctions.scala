@@ -378,7 +378,7 @@ object PipelineFunctions extends SparkSessionWrapper {
                         debugFlag: Boolean = false): Unit = {
     logger.info(
       s"""
-         |SPARK OVERRIDES BEING SET:
+         |SPARK OVERRIDES BEING SET FOR THREAD ${Thread.currentThread().getId}:
          |${sparkOverrides.mkString("\n")}
          |""".stripMargin)
     sparkOverrides foreach { case (k, v) =>

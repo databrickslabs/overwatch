@@ -576,10 +576,9 @@ object Initializer extends SparkSessionWrapper {
       }
       config.setIsMultiworkspaceDeployment(true)
     }
-    // set spark overrides in scoped spark session
-    config.registerInitialSparkConf(spark.conf.getAll)
+    // set spark overrides in scoped spark session and override the necessary values for Pipeline Run
+    config.registerInitialSparkConf(spark(globalSession = true).conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
-    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions"))
     if (debugFlag) {
       envInit("DEBUG")
       config.setDebugFlag(debugFlag)

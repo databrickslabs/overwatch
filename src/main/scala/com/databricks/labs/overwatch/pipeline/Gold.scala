@@ -83,7 +83,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     append(GoldTargets.clusterTarget)
   )
 
+  private val clsfSparkOverrides = Map(
+    "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
+  )
   lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(2019, 2014), 3.0)
+    .withSparkOverrides(clsfSparkOverrides)
   lazy private val appendClusterStateFactProccess = ETLDefinition(
     SilverTargets.clusterStateDetailTarget.asIncrementalDF(
       clusterStateFactModule,
@@ -122,7 +126,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   val jrcpSparkOverrides = Map(
-    "spark.sql.autoBroadcastJoinThreshold" -> "-1"
+    "spark.sql.autoBroadcastJoinThreshold" -> "-1",
+    "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
   )
   lazy private[overwatch] val jobRunCostPotentialFactModule = Module(3015, "Gold_jobRunCostPotentialFact", this, Array(3001, 3003, 3005), 3.0)
     .withSparkOverrides(jrcpSparkOverrides)
