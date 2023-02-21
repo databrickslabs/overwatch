@@ -128,9 +128,9 @@ object DeploymentValidation extends SparkSessionWrapper {
           .option("ignoreLeadingWhiteSpace", true)
           .option("ignoreTrailingWhiteSpace", true)
           .csv(path)
+          .filter('source.isNotNull)
           .verifyMinimumSchema(Schema.mountMinimumSchema)
           .select("mountPoint", "source","workspace_id")
-          .filter('source.isNotNull)
           .filter('workspace_id === conf.workspace_id)
 
 
