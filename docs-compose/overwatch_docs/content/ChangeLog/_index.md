@@ -5,6 +5,35 @@ weight: 4
 ---
 
 ## 0.7.1.1
+Bug Fixes Plus a Few New Features
+
+**Upgrade Script** -- Simple but necessary script to be run once per Overawtch Deployment (i.e. storage prefix) the 
+details of script are in the script.
+* **[HTML](/assets/ChangeLog/xx.html) | [DBC](/assets/ChangeLog/xx.dbc)**
+
+### Noteworthy Bug Fixes
+* Significant Improvement in DBU / Cost calculations
+  * DBU calculation accuracy improvement (especially for Photon clusters)
+* Significant Performance improvements
+* Delayed log arrival now ingested properly
+* Completeness of first-run record initialization
+
+### Noteworthy New Features
+* Remote workspaces with >50 mounts supported
+* Several new bronze tables
+  * job_runs_snapshot_bronze
+  * libs_snapshot_bronze
+  * policies_snapshot_bronze
+  * instance_profiles_snapshot_bronze (AWS)
+  * tokens_snapshot_bronze
+  * global_inits_snapshot_bronze
+* Multi-workspace config delta compatible now (instead of only CSV)
+  * Allows simple updates to config without download/upload of new config CSV
+* Threaded spark session to avoid collisions
+* Table locking for parallel workspace ingestion (avoids delta concurrent write errors)
+
+
+[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/16)
 
 ## 0.7.1.0
 **Multi-Workspace Deployments Are Here!!** 

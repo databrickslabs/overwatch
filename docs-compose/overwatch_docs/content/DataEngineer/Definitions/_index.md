@@ -65,7 +65,7 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [sparkJob](#sparkjob)
 * [sparkStage](#sparkstage)
 * [sparkTask](#sparktask)
-* [sparkStream](#sparkstream_preview) **preview
+* [sparkStream](#sparkstream)
 * [Common Meta Fields](#common-meta-fields)
   * There are several fields that are present in all tables. Instead of cluttering each table with them, this section
   was created as a reference to each of these.
@@ -849,7 +849,7 @@ to improve performance.
 | task_type        | string | Spark task Type (i.e. ResultTask, ShuffleMapTask, etc)                                                                           |
 | task_end_reason  | string | Task end status, state, and details plus stake trace when error                                                                  |
 
-#### SparkStream_preview
+#### SparkStream
 **KEY** -- organization_id + spark_context_id + cluster_id + stream_id + stream_run_id + stream_batch_id + stream_timestamp
 
 **Incremental Columns** -- date + stream_timestamp
@@ -859,9 +859,6 @@ to improve performance.
 **Z-Order Columns** -- cluster_id
 
 **Write Mode** -- Merge
-
-Remains in preview through version 0.6.0 as more feedback is requested from users and use-cases before this table 
-structure solidifes.
 
 | Column            | Type           | Description                                                                                                    |
 |:------------------|:---------------|:---------------------------------------------------------------------------------------------------------------|
