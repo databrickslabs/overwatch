@@ -543,3 +543,20 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
 
   }
 }
+
+class DeploymentMetaFactory (deploymentType: String) {
+  def getApiClass(_apiName: String): InitializerFunctions = {
+
+    val meta = _apiName match {
+      case "uce" => new uce
+      case "ucm" => new ucm
+      case "default" => IniT()
+    }
+  }
+}
+
+class uce extends InitializerFunctions {
+  override def dataTargetisValid(): Unit ={
+
+  }
+}

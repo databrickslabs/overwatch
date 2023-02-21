@@ -19,6 +19,10 @@ class Database(config: Config) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _databaseName: String = _
 
+  def selectRegisterTarget(config: Config)= {
+    if conig.deplyment == "ucm"
+    registerTarget()
+  }
 
   def setDatabaseName(value: String): this.type = {
     _databaseName = value
@@ -31,6 +35,17 @@ class Database(config: Config) extends SparkSessionWrapper {
    * @param target Pipeline table (i.e. target) as per the Overwatch deployed config
    */
   def registerTarget(target: PipelineTable): Unit = {
+    if (!target.exists(catalogValidation = true) && target.exists(pathValidation = true)) {
+      val createStatement = s"create table if not exists ${target.tableFullName} " +
+        s"USING DELTA location '${target.tableLocation}'"
+      val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
+      logger.log(Level.INFO, logMessage)
+      if (config.debugFlag) println(logMessage)
+      spark.sql(createStatement)
+    }
+  }
+
+  def registerTarget(target: PipelineTable, obj: ucm): Unit = {
     if (!target.exists(catalogValidation = true) && target.exists(pathValidation = true)) {
       val createStatement = s"create table if not exists ${target.tableFullName} " +
         s"USING DELTA location '${target.tableLocation}'"
@@ -104,7 +119,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     staticDFWriter
       .asInstanceOf[DataFrameWriter[Row]]
       .save(target.tableLocation)
-
     registerTarget(target)
   }
 
