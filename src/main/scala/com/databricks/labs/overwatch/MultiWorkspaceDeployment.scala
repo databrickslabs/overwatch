@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils._
@@ -178,78 +179,75 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     apiEnvConfig
   }
 
-  private def startBronzeDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
+  private def startBronzeDeployment(workspace: Workspace, deploymentId: String) = {
+    val workspaceId = workspace.getConfig.organizationId
+    val args = JsonUtils.objToJson(workspace.getConfig.inputConfig).compactString
     try {
-      println(s"""************Bronze Deployment Started workspaceID:${multiWorkspaceParams.workspaceId}  args:${multiWorkspaceParams.args}**********  """)
-      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = false,
-        apiURL = Some(multiWorkspaceParams.apiUrl),
-        organizationID = Some(multiWorkspaceParams.workspaceId))
+      println(s"""************Bronze Deployment Started workspaceID:$workspaceId  args:$args**********  """)
 
       Bronze(workspace).run()
-      println(s"""************Bronze Deployment Completed workspaceID:${multiWorkspaceParams.workspaceId}************ """)
-      deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Bronze", Some(multiWorkspaceParams.args),
+      println(s"""************Bronze Deployment Completed workspaceID:$workspaceId************ """)
+      deploymentReport.append(MultiWSDeploymentReport(workspaceId, "Bronze", Some(args),
         "SUCCESS",
-        Some(multiWorkspaceParams.deploymentId)
+        Some(deploymentId)
       ))
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Bronze", Some(multiWorkspaceParams.args),
+        deploymentReport.append(MultiWSDeploymentReport(workspaceId, "Bronze", Some(args),
           fullMsg,
-          Some(multiWorkspaceParams.deploymentId)
+          Some(deploymentId)
         ))
     } finally {
       clearThreadFromSessionsMap()
     }
   }
 
-  private def startSilverDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
+  private def startSilverDeployment(workspace: Workspace, deploymentId: String) = {
+    val workspaceId = workspace.getConfig.organizationId
+    val args = JsonUtils.objToJson(workspace.getConfig.inputConfig).compactString
     try {
-      println(s"""************Silver Deployment Started workspaceID:${multiWorkspaceParams.workspaceId} args:${multiWorkspaceParams.args} ************""")
-      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = false,
-        apiURL = Some(multiWorkspaceParams.apiUrl),
-        organizationID = Some(multiWorkspaceParams.workspaceId))
+      println(s"""************Silver Deployment Started workspaceID:$workspaceId args:$args ************""")
 
       Silver(workspace).run()
-      deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Silver", Some(multiWorkspaceParams.args),
+      deploymentReport.append(MultiWSDeploymentReport(workspaceId, "Silver", Some(args),
         "SUCCESS",
-        Some(multiWorkspaceParams.deploymentId)
+        Some(deploymentId)
       ))
-      println(s"""************Silver Deployment Completed workspaceID:${multiWorkspaceParams.workspaceId}************""")
+      println(s"""************Silver Deployment Completed workspaceID:$workspaceId************""")
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Silver", Some(multiWorkspaceParams.args),
+        deploymentReport.append(MultiWSDeploymentReport(workspaceId, "Silver", Some(args),
           fullMsg,
-          Some(multiWorkspaceParams.deploymentId)
+          Some(deploymentId)
         ))
     } finally {
       clearThreadFromSessionsMap()
     }
   }
 
-  private def startGoldDeployment(multiWorkspaceParams: MultiWorkspaceParams) = {
+  private def startGoldDeployment(workspace: Workspace, deploymentId: String) = {
+    val workspaceId = workspace.getConfig.organizationId
+    val args = JsonUtils.objToJson(workspace.getConfig.inputConfig).compactString
     try {
-      println(s"""************Gold Deployment Started workspaceID:${multiWorkspaceParams.workspaceId} args:${multiWorkspaceParams.args} ************"""")
-      val workspace = Initializer(multiWorkspaceParams.args, debugFlag = false,
-        apiURL = Some(multiWorkspaceParams.apiUrl),
-        organizationID = Some(multiWorkspaceParams.workspaceId))
+      println(s"""************Gold Deployment Started workspaceID:$workspaceId args:$args ************"""")
 
       Gold(workspace).run()
-      deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Gold", Some(multiWorkspaceParams.args),
+      deploymentReport.append(MultiWSDeploymentReport(workspaceId, "Gold", Some(args),
         "SUCCESS",
-        Some(multiWorkspaceParams.deploymentId)
+        Some(deploymentId)
       ))
-      println(s"""************Gold Deployment Completed workspaceID:${multiWorkspaceParams.workspaceId}************""")
+      println(s"""************Gold Deployment Completed workspaceID:$workspaceId************""")
     } catch {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        deploymentReport.append(MultiWSDeploymentReport(multiWorkspaceParams.workspaceId, "Gold", Some(multiWorkspaceParams.args),
+        deploymentReport.append(MultiWSDeploymentReport(workspaceId, "Gold", Some(args),
           fullMsg,
-          Some(multiWorkspaceParams.deploymentId)
+          Some(deploymentId)
         ))
     }finally {
       clearThreadFromSessionsMap()
@@ -416,14 +414,20 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
       params.foreach(deploymentParams => {
         val future = Future {
+
+          val deploymentId = deploymentParams.deploymentId
+          val workspace = Initializer(deploymentParams.args, debugFlag = false,
+            apiURL = Some(deploymentParams.apiUrl),
+            organizationID = Some(deploymentParams.workspaceId))
+
           if (zones.toLowerCase().contains("bronze")) {
-            startBronzeDeployment(deploymentParams)
+            startBronzeDeployment(workspace, deploymentId)
           }
           if (zones.toLowerCase().contains("silver")) {
-            startSilverDeployment(deploymentParams)
+            startSilverDeployment(workspace, deploymentId)
           }
           if (zones.toLowerCase().contains("gold")) {
-            startGoldDeployment(deploymentParams)
+            startGoldDeployment(workspace, deploymentId)
           }
         }
         future.onComplete {
