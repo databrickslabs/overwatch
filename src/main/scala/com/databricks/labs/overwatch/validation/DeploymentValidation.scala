@@ -105,6 +105,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       s"""WorkSpaceMountTest
          |mount_mapping_path:${path}
          """.stripMargin
+
     try {
       if (!Helpers.pathExists(path)) {
         DeploymentValidationReport(false,
@@ -118,12 +119,20 @@ object DeploymentValidation extends SparkSessionWrapper {
           .option("ignoreLeadingWhiteSpace", true)
           .option("ignoreTrailingWhiteSpace", true)
           .csv(path)
-          .select("mountPoint", "source")
+          .scrubSchema
+          .verifyMinimumSchema(Schema.mountMinimumSchema)
+          .select("mountPoint", "source","workspace_id")
+          .filter('workspace_id === conf.workspace_id)
 
-        if (inputDf.count() > 0) {
+
+        val dataCount = inputDf.count()
+        if (dataCount > 0) {
           DeploymentValidationReport(true,
             getSimpleMsg("Validate_Mount"),
-            testDetails,
+            s"""WorkSpaceMountTest
+               |mount_mapping_path:${path}
+               |mount point found:${dataCount}
+               """.stripMargin,
             Some("SUCCESS"),
             Some(conf.workspace_id)
           )
@@ -131,7 +140,7 @@ object DeploymentValidation extends SparkSessionWrapper {
           DeploymentValidationReport(false,
             getSimpleMsg("Validate_Mount"),
             testDetails,
-            Some("No data found in provided csv:" + path),
+            Some(s"""No data found for workspace_id: ${conf.workspace_id} in provided csv: ${path}"""),
             Some(conf.workspace_id)
           )
         }
