@@ -175,7 +175,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
 
       var switch = true
-      if (catalogName != "hive_metastore") {
+
+      if (catalogName != Option("hive_metastore")) {
         println("since this is a uc deployment no need to validate external location")
         switch = true
       }
