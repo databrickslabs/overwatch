@@ -7,7 +7,7 @@ import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{length, lit, when}
+import org.apache.spark.sql.functions._
 
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
@@ -329,19 +329,19 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
 
   private def generateBaseConfig(configLocation: String): DataFrame = {
-    try {
-      if (configLocation.toLowerCase().endsWith(".csv")) {
+    val rawBaseConfigDF = try {
+      if (configLocation.toLowerCase().endsWith(".csv")) { // CSV file
         println(s"Config source: csv path ${configLocation}")
         validateFileExistence(configLocation)
         spark.read.option("header", "true")
           .option("ignoreLeadingWhiteSpace", true)
           .option("ignoreTrailingWhiteSpace", true)
           .csv(configLocation)
-      } else if (configLocation.contains("/")) {
+      } else if (configLocation.contains("/")) { // delta path
         println(s"Config source: delta path ${configLocation}")
         validateFileExistence(configLocation)
         spark.read.format("delta").load(configLocation)
-      } else {
+      } else { // delta table
         println(s"Config source: delta table ${configLocation}")
         if (!spark.catalog.tableExists(configLocation)) {
           throw new BadConfigException("Unable to find Delta table" + configLocation)
@@ -354,6 +354,14 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         throw e
     }
 
+    val deploymentSelectsNoNullStrings = Schema.deployementMinimumSchema.fields.map(f => {
+      when(trim(lower(col(f.name))) === "null", lit(null).cast(f.dataType)).otherwise(col(f.name)).alias(f.name)
+    })
+
+    rawBaseConfigDF
+      .verifyMinimumSchema(Schema.deployementMinimumSchema)
+      .select(deploymentSelectsNoNullStrings: _*)
+
   }
 
   private def generateMultiWorkspaceConfig(
@@ -364,15 +372,13 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     try {
       val baseConfig =generateBaseConfig(configLocation)
       val multiWorkspaceConfig = baseConfig
-        .scrubSchema
-        .verifyMinimumSchema(Schema.deployementMinimumSchema)
-        .filter(MultiWorkspaceConfigColumns.active.toString)
         .withColumn("api_url", when('api_url.endsWith("/"), 'api_url.substr(lit(0), length('api_url) - 1)).otherwise('api_url))
         .withColumn("deployment_id", lit(deploymentId))
         .withColumn("output_path", lit(outputPath))
         .as[MultiWorkspaceConfig]
+        .filter(_.active)
         .collect()
-      if(multiWorkspaceConfig.size<1){
+      if(multiWorkspaceConfig.length < 1){
         throw new BadConfigException("Config file has 0 record, config file:" + configLocation)
       }
       multiWorkspaceConfig

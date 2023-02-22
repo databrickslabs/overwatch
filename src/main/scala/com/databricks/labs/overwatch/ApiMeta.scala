@@ -107,7 +107,17 @@ trait ApiMeta {
       logger.log(Level.INFO, s"""Proxy has been set to IP: ${apiEnv.proxyHost.get}  PORT:${apiEnv.proxyPort.get}""")
     }
     if (apiEnv.proxyUserName.nonEmpty && apiEnv.proxyPasswordScope.nonEmpty && apiEnv.proxyPasswordKey.nonEmpty) {
-      val password = dbutils.secrets.get(scope = apiEnv.proxyPasswordScope.get, apiEnv.proxyPasswordKey.get)
+      val password = try {
+        dbutils.secrets.get(scope = apiEnv.proxyPasswordScope.get, apiEnv.proxyPasswordKey.get)
+      } catch {
+        case e: IllegalArgumentException if e.getMessage.contains("Secret does not exist") =>
+          val failMsg =
+            s"""Error getting proxy secret details using:
+               |ProxyPasswordScope: ${apiEnv.proxyPasswordScope}
+               |ProxyPasswordKey: ${apiEnv.proxyPasswordKey}
+               |""".stripMargin
+          throw new Exception(failMsg, e)
+      }
       request = request.proxyAuth(apiEnv.proxyUserName.get, password)
       logger.log(Level.INFO, s"""Proxy UserName set to IP: ${apiEnv.proxyUserName.get}  scope:${apiEnv.proxyPasswordScope.get} key:${apiEnv.proxyPasswordKey.get}""")
     }
