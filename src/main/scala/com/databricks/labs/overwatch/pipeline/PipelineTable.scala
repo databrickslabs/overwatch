@@ -151,7 +151,9 @@ case class PipelineTable(
     var entityExists = true
     if (pathValidation || dataValidation) entityExists = Helpers.pathExists(tableLocation)
     if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)
-    if (dataValidation) { // if other validation is enabled it must first pass those for this test to be attempted
+
+    // if other validation is enabled it must first pass those for this test to be attempted
+    if (dataValidation && entityExists) { // ++ entity exists to ensure path validation complete
       // opposite -- when result is empty source data does not exist
       entityExists = entityExists && !spark.read.format("delta").load(tableLocation)
         .filter(col("organization_id") === config.organizationId)
