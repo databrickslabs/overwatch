@@ -624,9 +624,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'jobId.cast("long").alias("submissionJobId"),
         'runId.alias("jobRunId"),
         'timestamp.alias("submissionTime"),
-        'jobTriggerType,
-        'requestId.alias("submitRequestID"),
         'jobTriggerType.alias("jobTriggerType_Triggered"),
+        'requestId.alias("submitRequestID"),
         'response.alias("submitResponse"),
         'userIdentity.alias("submittedBy")
       )
