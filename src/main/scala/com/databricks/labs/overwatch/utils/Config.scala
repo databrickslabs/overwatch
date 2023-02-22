@@ -47,6 +47,7 @@ class Config() {
   private var _isMultiworkspaceDeployment: Boolean = false
   private var _apiUrl: Option[String] = None
   private var _deploymentType: String = _
+  private var _catalogName: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -121,6 +122,8 @@ class Config() {
   def intelligentScaling: IntelligentScaling = _intelligentScaling
 
   def deploymentType: String = _deploymentType
+
+  def catalogName: String = _catalogName
 
 
   def globalFilters: Seq[Column] = {
@@ -544,6 +547,11 @@ class Config() {
 
   private[overwatch] def setDeploymentType(value: String): this.type = {
     _deploymentType = value
+    this
+  }
+
+  private[overwatch] def setCatalogName(value: String): this.type = {
+    _catalogName = value
     this
   }
 
