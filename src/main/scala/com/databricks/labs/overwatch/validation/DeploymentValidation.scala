@@ -109,7 +109,8 @@ object DeploymentValidation extends SparkSessionWrapper {
    */
   private def validateMountMappingPath(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
-    val path = conf.mount_mapping_path.trim
+    // get fine here -- already verified non-empty in calling function
+    val path = conf.mount_mapping_path.get.trim
     val testDetails =
       s"""WorkSpaceMountTest
          |mount_mapping_path:${path}
@@ -171,7 +172,7 @@ object DeploymentValidation extends SparkSessionWrapper {
 
     val isAzure = conf.cloud.toLowerCase == "azure" //Mount-point validation is only done for Azure
     val isRemoteWorkspace = conf.workspace_id.trim != Initializer.getOrgId // No need to perform mount-point validation for driver workspace.
-    val isMountMappingPathProvided = !conf.mount_mapping_path.trim.isEmpty
+    val isMountMappingPathProvided = conf.mount_mapping_path.nonEmpty
 
     if (isAzure && isRemoteWorkspace) { //Performing mount test
       if (isMountMappingPathProvided) {
@@ -389,9 +390,12 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param primordial_date
    * @param maxDate
    */
-  private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: String, primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
+  private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: Option[String], primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
     try {
-      val fromDT = new java.sql.Date(primordial_date.getTime()).toLocalDate()
+      if (auditlogprefix_source_aws.isEmpty) throw new BadConfigException(
+        "auditlogprefix_source_aws cannot be null when cloud is AWS")
+      val auditLogPrefix = auditlogprefix_source_aws.get
+      val fromDT = new java.sql.Date(primordial_date.getTime).toLocalDate
       var untilDT = fromDT.plusDays(maxDate.toLong)
       val dateCompare = untilDT.compareTo(LocalDate.now())
       val msgBuffer = new StringBuffer()
@@ -401,12 +405,12 @@ object DeploymentValidation extends SparkSessionWrapper {
       val daysBetween = ChronoUnit.DAYS.between(fromDT, untilDT)
       var validationFlag = false
       if (daysBetween == 0) {
-        validationFlag = Helpers.pathExists(s"${auditlogprefix_source_aws}/date=${fromDT.toString}")
+        validationFlag = Helpers.pathExists(s"${auditLogPrefix}/date=${fromDT.toString}")
       } else {
         val pathsToCheck = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
-          .map(dt => s"${auditlogprefix_source_aws}/date=${dt}")
+          .map(dt => s"${auditLogPrefix}/date=${dt}")
         val presentPaths = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
-          .map(dt => s"${auditlogprefix_source_aws}/date=${dt}")
+          .map(dt => s"${auditLogPrefix}/date=${dt}")
           .filter(Helpers.pathExists)
         if (presentPaths.length == daysBetween) {
           validationFlag = true
@@ -430,7 +434,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       } else {
         val msg =
           s"""ReValidate the folder existence
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
 
@@ -448,7 +452,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case exception: Exception =>
         val msg =
           s"""AuditLogPrefixTest workspace_id:${workspace_id}
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
@@ -470,7 +474,18 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param key
    * @param ehName
    */
-  private def validateEventHub(workspace_id: String, scope: String, key: String, ehName: String, outputPath: String): DeploymentValidationReport = {
+  private def validateEventHub(
+                                workspace_id: String,
+                                scope: String,
+                                optKey: Option[String],
+                                optEHName: Option[String],
+                                outputPath: String
+                              ): DeploymentValidationReport = {
+    if (optKey.isEmpty || optEHName.isEmpty) throw new BadConfigException("When cloud is Azure, the eh_name and " +
+      "eh_scope_key are required fields but they were empty in the config")
+    // using gets here because if they were empty from above check, exception would already be thrown
+    val key = optKey.get
+    val ehName = optEHName.get
     val testDetails = s"""Connectivity test with ehName:${ehName} scope:${scope} SecretKey_DBPAT:${key}"""
     try {
       import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
