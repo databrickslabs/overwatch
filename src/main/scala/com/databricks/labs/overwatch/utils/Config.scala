@@ -46,6 +46,7 @@ class Config() {
   private var _contractJobsLightDBUPrice: Double = _
   private var _isMultiworkspaceDeployment: Boolean = false
   private var _apiUrl: Option[String] = None
+  private var _deploymentType: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -118,6 +119,9 @@ class Config() {
   def primordialDateString: Option[String] = _primordialDateString
 
   def intelligentScaling: IntelligentScaling = _intelligentScaling
+
+  def deploymentType: String = _deploymentType
+
 
   def globalFilters: Seq[Column] = {
     Seq(
@@ -535,6 +539,11 @@ class Config() {
    */
   private[overwatch] def setBadRecordsPath(value: String): this.type = {
     _badRecordsPath = value
+    this
+  }
+
+  private[overwatch] def setDeploymentType(value: String): this.type = {
+    _deploymentType = value
     this
   }
 
