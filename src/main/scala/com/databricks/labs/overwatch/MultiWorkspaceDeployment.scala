@@ -126,7 +126,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".split(",")
       val scopesToExecute = if (config.excluded_scopes != null) {
         (standardScopes.map(_.toLowerCase).toSet -- config.excluded_scopes.split(":").map(_.toLowerCase).toSet).toArray
-//        config.excluded_scopes.toLowerCase().split(":").foreach(scope => standardScopes.map(_.toLowerCase) -= scope)
       } else standardScopes
 
 
