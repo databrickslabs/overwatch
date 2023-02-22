@@ -123,10 +123,13 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val sqlComputerDBUPrice: Double = config.sql_compute_dbu_price
       val jobsLightDBUPrice: Double = config.jobs_light_dbu_price
       val customWorkspaceName: String = config.workspace_name
-      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".split(",").toBuffer
-      if (config.excluded_scopes != null) {
-        config.excluded_scopes.toLowerCase().split(":").foreach(scope => standardScopes.map(_.toLowerCase) -= scope)
-      }
+      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".split(",")
+      val scopesToExecute = if (config.excluded_scopes != null) {
+        (standardScopes.map(_.toLowerCase).toSet -- config.excluded_scopes.split(":").map(_.toLowerCase).toSet).toArray
+//        config.excluded_scopes.toLowerCase().split(":").foreach(scope => standardScopes.map(_.toLowerCase) -= scope)
+      } else standardScopes
+
+
 
       val maxDaysToLoad: Int = config.max_days
       val primordialDateString: Date = config.primordial_date
@@ -139,14 +142,13 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         dataTarget = Some(dataTarget),
         tokenSecret = Some(tokenSecret),
         badRecordsPath = Some(badRecordsPath),
-        overwatchScope = Some(standardScopes),
+        overwatchScope = Some(scopesToExecute),
         maxDaysToLoad = maxDaysToLoad,
         databricksContractPrices = DatabricksContractPrices(interactiveDBUPrice, automatedDBUPrice, sqlComputerDBUPrice, jobsLightDBUPrice),
         primordialDateString = Some(stringDate),
         workspace_name = Some(customWorkspaceName),
         externalizeOptimize = true,
-        apiEnvConfig = Some(apiEnvConfig),
-        tempWorkingDir = ""
+        apiEnvConfig = Some(apiEnvConfig)
       )
       MultiWorkspaceParams(JsonUtils.objToJson(params).compactString,
         s"""${config.api_url}""",
