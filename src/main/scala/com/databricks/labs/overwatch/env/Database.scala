@@ -184,8 +184,8 @@ class Database(config: Config) extends SparkSessionWrapper {
     // if target is to be deduped, dedup it by keys
     finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
 
-    val finalDF = if (target.persistBeforeWrite) persistAndLoad(finalSourceDF, target) else finalSourceDF
-    finalDF
+    // always persistAndLoad when parallelism > 1 to reduce table lock times
+    if (target.persistBeforeWrite || SparkSessionWrapper.parSessionsOn) persistAndLoad(finalSourceDF, target) else finalSourceDF
   }
 
   /**
@@ -440,7 +440,11 @@ class Database(config: Config) extends SparkSessionWrapper {
                                         maxMergeScanDates: Array[String] = Array(),
                                         daysToProcess: Option[Int] = None): Unit = {
 
-    val needsCache = daysToProcess.getOrElse(1000) < 5 && !target.autoOptimize
+    // needsCache when it's a small number of days and not in parallel and not autoOptimize
+    //  when in parallel disable cache because it will always use persistAndLoad to reduce table lock times.
+    //  persist and load will all be able to happen in parallel to temp location and use a simple read/write to
+    //  merge into target rather than locking the target for the entire time all the transforms are being executed.
+    val needsCache = daysToProcess.getOrElse(1000) < 5 && !target.autoOptimize && !SparkSessionWrapper.parSessionsOn
     val inputDf = if (needsCache) {
       logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
       df.persist()
