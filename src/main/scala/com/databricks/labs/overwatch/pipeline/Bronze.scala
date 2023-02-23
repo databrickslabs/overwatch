@@ -229,6 +229,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
 
+    println(s"Audit Logs Bronze: Land Stream Beginning for WorkspaceID: ${config.organizationId}")
     val rawAzureAuditEvents = landAzureAuditLogDF(
       BronzeTargets.auditLogAzureLandRaw,
       config.auditLogConfig.azureAuditLogEventhubConfig.get,

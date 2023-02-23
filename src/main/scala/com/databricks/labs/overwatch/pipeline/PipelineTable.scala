@@ -157,9 +157,14 @@ case class PipelineTable(
     // if other validation is enabled it must first pass those for this test to be attempted
     if (dataValidation && entityExists) { // ++ entity exists to ensure path validation complete
       // opposite -- when result is empty source data does not exist
-      entityExists = entityExists && !spark.read.format("delta").load(tableLocation)
-        .filter(col("organization_id") === config.organizationId)
-        .isEmpty
+      try {
+        entityExists = !spark.read.format("delta")
+          .load(tableLocation)
+          .filter(col("organization_id") === config.organizationId)
+          .isEmpty
+      } catch {
+        case e if e.getMessage.contains("doesn't exist") => entityExists = false
+      }
     }
     entityExists
   }

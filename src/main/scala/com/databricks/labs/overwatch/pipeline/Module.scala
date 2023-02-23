@@ -26,6 +26,8 @@ class Module(
 
   private var _isFirstRun: Boolean = false
 
+  private var _moduleStartMessage: String = ""
+
   private[overwatch] val moduleState: SimplifiedModuleStatusReport = {
     if (pipeline.getModuleState(moduleId).isEmpty) {
       initModuleState
@@ -36,6 +38,13 @@ class Module(
   private var sparkOverrides: Map[String, String] = Map[String, String]()
 
   def isFirstRun: Boolean = _isFirstRun
+
+  private[overwatch] def moduleStartMessage: String = _moduleStartMessage
+
+  private def setModuleStartMessage(value: String): this.type = {
+    _moduleStartMessage = value
+    this
+  }
 
   def daysToProcess: Int = {
     Duration.between(
@@ -342,11 +351,12 @@ class Module(
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
 
-    val startMsg = s"\nBeginning: $moduleId-$moduleName\nTIME RANGE: ${fromTime.asTSString} -> ${untilTime.asTSString} --> Workspace ID: ${config.organizationId}"
-    println(startMsg)
-
-    if (config.debugFlag) println(startMsg)
+    val startMsg = s"$moduleId-$moduleName --> Workspace ID: ${config.organizationId}\nTIME RANGE: " +
+      s"${fromTime.asTSString} -> ${untilTime.asTSString}\n"
+    setModuleStartMessage(startMsg)
+    println(s"\nBeginning: $startMsg")
     logger.log(Level.INFO, startMsg)
+
     try {
       if (fromTime.asUnixTimeMilli == untilTime.asUnixTimeMilli)
         throw new NoNewDataException("FROM and UNTIL times are identical. Likely due to upstream dependencies " +

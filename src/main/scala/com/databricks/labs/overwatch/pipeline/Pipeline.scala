@@ -456,9 +456,10 @@ class Pipeline(
     val rowsWritten = writeOpsMetrics.getOrElse("numOutputRows", "0")
     val execMins: Double = (endTime - startTime) / 1000.0 / 60.0
     val simplifiedExecMins: Double = execMins - (execMins % 0.01)
-    val msg = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: $simplifiedExecMins --> Workspace ID: ${config.organizationId}"
-    println(msg)
-    logger.log(Level.INFO, msg)
+    val successMessage = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: " +
+      s"$simplifiedExecMins --> Workspace ID: ${config.organizationId}"
+    println(s"COMPLETED: ${module.moduleStartMessage} $successMessage")
+    logger.log(Level.INFO, module.moduleStartMessage ++ successMessage)
 
     // Generate Success Report
     ModuleStatusReport(
