@@ -56,6 +56,8 @@ case class PipelineTable(
   private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
   private var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
 
+  def isStreaming: Boolean = if(checkpointPath.nonEmpty) true else false
+
   private def emitMissingMasterSchemaMessage(): Unit = {
     val msg = s"No Master Schema defined for Table $tableFullName"
     logger.log(Level.ERROR, msg)

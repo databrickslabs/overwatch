@@ -185,7 +185,8 @@ class Database(config: Config) extends SparkSessionWrapper {
     finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
 
     // always persistAndLoad when parallelism > 1 to reduce table lock times
-    if (target.persistBeforeWrite || SparkSessionWrapper.parSessionsOn) persistAndLoad(finalSourceDF, target) else finalSourceDF
+    val isParallelNotStreaming = SparkSessionWrapper.parSessionsOn && !target.isStreaming
+    if (target.persistBeforeWrite || isParallelNotStreaming) persistAndLoad(finalSourceDF, target) else finalSourceDF
   }
 
   /**
