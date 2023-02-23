@@ -13,7 +13,8 @@ import org.apache.log4j.{Level, Logger}
 class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
   extends InitializerFunctions(config, disableValidations, isSnap, initDB)
     with SparkSessionWrapper {
- val obj = DeploymentMetaFactory(Confg.deploymen)
+ val obj = new DeploymentMetaFactory(config, true,true, true)
+ val Init = obj.getDeploymentClass("deployment_type")
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   /**

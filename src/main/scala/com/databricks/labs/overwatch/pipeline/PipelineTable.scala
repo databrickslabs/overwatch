@@ -12,10 +12,42 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
+/**
+ * Define an abstract class for Pipeline Tables
+ * @param name
+ * @param _keys
+ * @param config
+ * @param incrementalColumns
+ * @param format
+ * @param persistBeforeWrite
+ * @param _mode
+ * @param maxMergeScanDates
+ * @param _permitDuplicateKeys
+ * @param _databaseName
+ * @param autoOptimize
+ * @param autoCompact
+ * @param partitionBy
+ * @param statsColumns
+ * @param optimizeFrequency_H
+ * @param zOrderBy
+ * @param vacuum_H
+ * @param enableSchemaMerge
+ * @param withCreateDate
+ * @param withOverwatchRunID
+ * @param workspaceName
+ * @param isTemp
+ * @param checkpointPath
+ * @param masterSchema
+ */
+
+
 //noinspection ScalaCustomHdfsFormat
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
 //  also add ruleStrategy: Enum(Kill, Quarantine, Ignore) to determine when to require them
 //  Perhaps add the strategy into the Rule definition in the Rules Engine
+
+// case class to extend abstract class
+// a separate case class to be created for a deployment type - UCEPipelineTable, UCMPipelineTable, DefaultPipelineTable
 case class PipelineTable(
                           name: String,
                           private val _keys: Array[String],

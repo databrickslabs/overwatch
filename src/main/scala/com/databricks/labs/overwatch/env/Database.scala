@@ -19,11 +19,6 @@ class Database(config: Config) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _databaseName: String = _
 
-  def selectRegisterTarget(config: Config)= {
-    if conig.deplyment == "ucm"
-    registerTarget()
-  }
-
   def setDatabaseName(value: String): this.type = {
     _databaseName = value
     this

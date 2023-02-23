@@ -13,7 +13,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  object Init {
+//  object Init {
 
     /**
      * Determine whether or not the workspace is configured on a PVC environment
@@ -541,22 +541,40 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     }
 
 
-  }
+//  }
 }
 
-class DeploymentMetaFactory (deploymentType: String) {
-  def getApiClass(_apiName: String): InitializerFunctions = {
+class DeploymentMetaFactory(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean) {
+  def getDeploymentClass(deploymentType: String): InitializerFunctions = {
 
-    val meta = _apiName match {
-      case "uce" => new uce
-      case "ucm" => new ucm
-      case "default" => IniT()
+    val meta = deploymentType match {
+      case "uce" => new uce(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
+      case "ucm" => new ucm(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
+      case "default" => new default(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
+      meta
     }
   }
 }
 
-class uce extends InitializerFunctions {
-  override def dataTargetisValid(): Unit ={
+class uce(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
+  extends InitializerFunctions(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean) {
+  override def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
+    /**
+     * write the logic here
+     */
+    val result = true
+    result
+  }
 
+
+}
+class ucm(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
+  extends InitializerFunctions(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean) {
+  override def dataTargetIsValid(dataTarget: DataTarget): Boolean ={
+    /**
+     * write the logic here
+     */
+    val result = true
+    result
   }
 }
