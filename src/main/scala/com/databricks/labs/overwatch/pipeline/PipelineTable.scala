@@ -151,7 +151,13 @@ case class PipelineTable(
    */
   def exists(pathValidation: Boolean = true, dataValidation: Boolean = false, catalogValidation: Boolean = false): Boolean = {
     var entityExists = true
-    if (pathValidation || dataValidation) entityExists = Helpers.pathExists(tableLocation)
+    if (pathValidation || dataValidation) { // when path or data validation is enabled
+      if (format == "delta") { // if delta verify the _delta_log is present not just the path
+        entityExists = Helpers.pathExists(s"$tableLocation/_delta_log")
+      } else { // not delta verify the parent dir exists
+        entityExists = Helpers.pathExists(tableLocation)
+      }
+    }
     if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)
 
     // if other validation is enabled it must first pass those for this test to be attempted
