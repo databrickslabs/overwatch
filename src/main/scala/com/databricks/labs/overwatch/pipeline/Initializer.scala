@@ -558,9 +558,10 @@ object Initializer extends SparkSessionWrapper {
   envInit()
 
   def getOrgId: String = {
-    if (spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId") == " ") {
+    val clusterOwnerOrgID = spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
+    if (clusterOwnerOrgID == " " || clusterOwnerOrgID == "0") {
       dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-    } else spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
+    } else clusterOwnerOrgID
   }
 
   private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
