@@ -49,6 +49,10 @@ thus should be run on a larger, autoscaling cluster. Lastly, by externalizing th
 need be carried out on a single workspace per Overwatch output target (i.e. storage prefix target).
 
 ### Additional Optimization Considerations
+* As of 0.7.0 Use DBR 11.3 LTS
+  * Photon can significantly improve runtimes. Mileage will vary by customer depending on data sizes and skews of 
+  certain modules, so feel free to turn it on and use Overwatch to determine whether Photon is the right answer for 
+  your needs.
 * As of 0.6.1 disable Photon
     * Photon will be the focus of optimization in DBR 11.xLTS+
 * 0.6.1+ Use DBR 10.4 LTS
@@ -306,7 +310,7 @@ scenario; the Overwatch cluster must have access to read from that location.
 In the image above, you likely noticed the alert. As of version 0.7.1.1, Overwatch can handle remote workspaces 
 with more than 50 mounts through an alternative process. 
 
-When a remote workspace has > 50 mounts and 1+ clusters utilize mounts for cluster logging, the following process must 
+When a remote workspace has > 50 mounts and 1 or more clusters log to a mounted location, the following process must 
 be followed to acquire the logs for that path. 
 
 #### Remote Workspaces With 50+ Mounts Config Process
