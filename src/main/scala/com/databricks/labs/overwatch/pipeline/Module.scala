@@ -342,6 +342,7 @@ class Module(
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
 
+    if (config.disabledModules.contains(moduleId)) throw new ModuleDisabled(moduleId, s"MODULE DISABLED: $moduleId-$moduleName")
     val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
     val notAQEAutoOptimizeShuffle = spark.conf.getOption("spark.databricks.adaptive.autoOptimizeShuffle.enabled").getOrElse("false").toBoolean
     if (Helpers.isNumeric(shufflePartitions) && notAQEAutoOptimizeShuffle){
@@ -374,6 +375,8 @@ class Module(
         noNewDataHandler(PipelineFunctions.appendStackStrace(e, e.apiCallDetail), Level.ERROR, allowModuleProgression = e.allowModuleProgression)
       case e: ApiCallFailure if e.failPipeline =>
         fail(PipelineFunctions.appendStackStrace(e, e.msg))
+      case e: ModuleDisabled =>
+        fail(e.getMessage)
       case e: FailedModuleException =>
         val errMessage = s"FAILED: $moduleId-$moduleName Module"
         logger.log(Level.ERROR, errMessage, e)

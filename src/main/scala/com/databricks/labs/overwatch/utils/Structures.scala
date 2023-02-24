@@ -355,6 +355,11 @@ private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val all
 
 private[overwatch] class ApiCallFailureV2(s: String) extends Exception(s) {}
 
+private[overwatch] class ModuleDisabled(moduleId: Int, s: String) extends Exception(s) {
+  private val logger = Logger.getLogger("ModuleDisabled")
+  logger.log(Level.INFO, s"MODULE DISABLED: MODULE_ID: $moduleId -- SKIPPING")
+}
+
 private[overwatch] class ApiCallFailure(
                                          val httpResponse: HttpResponse[String],
                                          apiCallDetail: String,

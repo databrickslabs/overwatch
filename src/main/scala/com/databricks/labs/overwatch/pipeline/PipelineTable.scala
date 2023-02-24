@@ -55,6 +55,10 @@ case class PipelineTable(
   // Minimum Schema Enforcement Management
   private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
   private var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
+  private var _existsConfirmed: Boolean = false
+
+  private def setExists(value: Boolean): Unit = _existsConfirmed = value
+  private def existsConfirmed: Boolean = _existsConfirmed
 
   def isStreaming: Boolean = if(checkpointPath.nonEmpty) true else false
 
@@ -132,6 +136,32 @@ case class PipelineTable(
   val tableLocation: String = s"${config.etlDataPathPrefix}/$name".toLowerCase
 
   /**
+   * is the schema evolving
+   * @return
+   */
+  def isEvolvingSchema: Boolean = {
+    name match { // when exists -- locking not necessary if schema does not evolve
+      case "pipeline_report" => false
+      case "instanceDetails" => false
+      case "dbuCostDetails" => false
+      case "spark_events_processedFiles" => false
+      case _ => true
+    }
+  }
+
+  private[overwatch] def requiresLocking: Boolean = {
+    // If target's schema is evolving or does not exist true
+    val enableLocking = if (!exists || isEvolvingSchema) true else false
+    val logMsg = if(enableLocking) {
+      s"LOCKING ENABLED for table $name"
+    } else {
+      s"LOCKING DISABLED for table $name"
+    }
+    logger.log(Level.INFO, logMsg)
+    enableLocking
+  }
+
+  /**
    * default catalog only validation
    *
    * @return
@@ -150,29 +180,33 @@ case class PipelineTable(
    * @return
    */
   def exists(pathValidation: Boolean = true, dataValidation: Boolean = false, catalogValidation: Boolean = false): Boolean = {
-    var entityExists = true
-    if (pathValidation || dataValidation) { // when path or data validation is enabled
-      if (format == "delta") { // if delta verify the _delta_log is present not just the path
-        entityExists = Helpers.pathExists(s"$tableLocation/_delta_log")
-      } else { // not delta verify the parent dir exists
-        entityExists = Helpers.pathExists(tableLocation)
+    // If target already confirmed to exist just return that it exists
+    //  only determine once per state
+    if (!existsConfirmed) { // if not already confirmed to exist -- check existence
+      if (pathValidation || dataValidation) { // when path or data validation is enabled
+        if (format == "delta") { // if delta verify the _delta_log is present not just the path
+          setExists(Helpers.pathExists(s"$tableLocation/_delta_log"))
+        } else { // not delta verify the parent dir exists
+          setExists(Helpers.pathExists(tableLocation))
+        }
       }
-    }
-    if (catalogValidation) entityExists = spark.catalog.tableExists(tableFullName)
+      if (catalogValidation) setExists(spark.catalog.tableExists(tableFullName))
 
-    // if other validation is enabled it must first pass those for this test to be attempted
-    if (dataValidation && entityExists) { // ++ entity exists to ensure path validation complete
-      // opposite -- when result is empty source data does not exist
-      try {
-        entityExists = !spark.read.format("delta")
-          .load(tableLocation)
-          .filter(col("organization_id") === config.organizationId)
-          .isEmpty
-      } catch {
-        case e if e.getMessage.contains("doesn't exist") => entityExists = false
+      // if other validation is enabled it must first pass those for this test to be attempted
+      if (dataValidation && existsConfirmed) { // ++ entity exists to ensure path validation complete
+        // opposite -- when result is empty source data does not exist
+        try {
+          val workspaceDataPresent = !spark.read.format("delta")
+            .load(tableLocation)
+            .filter(col("organization_id") === config.organizationId)
+            .isEmpty
+          setExists(workspaceDataPresent)
+        } catch {
+          case _: Throwable => setExists(false)
+        }
       }
     }
-    entityExists
+    existsConfirmed
   }
 
   /**

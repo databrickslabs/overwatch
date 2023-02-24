@@ -263,7 +263,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.clusterEvents => clusterEventLogsModule.execute(appendClusterEventLogsProcess)
       case OverwatchScope.jobs =>
         jobsSnapshotModule.execute(appendJobsProcess)
-        jobRunsSnapshotModule.execute(appendJobRunsProcess)
+        // setting this to experimental -- runtimes can be EXTREMELY long for customers with MANY job runs
+        if (spark(globalSession = true).conf.getOption("overwatch.experimental.enablejobrunsnapshot").getOrElse("false").toBoolean) {
+          jobRunsSnapshotModule.execute(appendJobRunsProcess)
+        }
       case OverwatchScope.pools => poolsSnapshotModule.execute(appendPoolsProcess)
       case OverwatchScope.sparkEvents => sparkEventLogsModule.execute(appendSparkEventLogsProcess)
       case OverwatchScope.accounts =>
