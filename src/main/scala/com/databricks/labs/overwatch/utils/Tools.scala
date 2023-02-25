@@ -766,6 +766,7 @@ object Helpers extends SparkSessionWrapper {
       val incrementalFilters = incrementalFields.map(f => {
         f.dataType.typeName match {
           case "long" => s"${f.name} >= ${rollbackToTime.asUnixTimeMilli}"
+          case "double" => s"""cast(${f.name} as long) >= ${rollbackToTime.asUnixTimeMilli}"""
           case "date" => s"${f.name} >= '${rollbackToTime.asDTString}'"
           case "timestamp" => s"${f.name} >= '${rollbackToTime.asTSString}'"
         }
@@ -832,7 +833,7 @@ object Helpers extends SparkSessionWrapper {
     if (dryRun) println("DRY RUN: Nothing will be changed")
     val config = workspace.getConfig
     val orgFilter = if (workspaceIds.isEmpty) {
-      'organization_id === config.organizationId
+      throw new Exception("""workspaceIDs cannot be empty. To rollback all workspaces use "global" in the array """)
     } else if (workspaceIds.headOption.getOrElse(config.organizationId) == "global") {
       lit(true)
     } else {
@@ -856,9 +857,10 @@ object Helpers extends SparkSessionWrapper {
       s"${rollbackTSByModule.map(_.organization_id).distinct.mkString(", ")}")
     rollbackPipelineStateToTimestamp(rollbackTSByModule, customRollbackStatus, config, dryRun)
 
-    val allTargets = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
+    val allTargets = (Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
-      Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets
+      Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets)
+        .filter(_.exists(pathValidation = false, catalogValidation = true))
 
     val targetsToRollback = rollbackTSByModule.map(rollback => {
       val targetTableName = PipelineFunctions.getTargetTableNameByModule(rollback.moduleId)

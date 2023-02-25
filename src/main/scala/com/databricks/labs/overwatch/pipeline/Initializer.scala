@@ -389,7 +389,7 @@ class Initializer(config: Config) extends SparkSessionWrapper {
     config.setIntelligentScaling(rawParams.intelligentScaling)
 
     // as of 0711
-    val disabledModulesString = spark(globalSession = true).conf.getOption("overwatch.modules.disabled").getOrElse("")
+    val disabledModulesString = spark(globalSession = true).conf.getOption("overwatch.modules.disabled").getOrElse("0")
     config.registerDisabledModules(disabledModulesString)
 
     this
