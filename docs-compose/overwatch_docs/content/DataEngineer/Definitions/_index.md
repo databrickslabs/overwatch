@@ -65,7 +65,7 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [sparkJob](#sparkjob)
 * [sparkStage](#sparkstage)
 * [sparkTask](#sparktask)
-* [sparkStream](#sparkstream_preview) **preview
+* [sparkStream](#sparkstream)
 * [Common Meta Fields](#common-meta-fields)
   * There are several fields that are present in all tables. Instead of cluttering each table with them, this section
   was created as a reference to each of these.
@@ -199,23 +199,25 @@ as much as 10%. To verify the cost functions and the elements therein feel free 
 your costs are off by a large margin, please review all the components of the cost function and correct any configurations 
 as necessary to align your reality with the Overwatch config. The default costs are list price and often do not 
 accurately reflect a customer's costs.
+* **cloudBillable**: Cluster is in a running state
+  * GAP: Note that cloud billable ends at the time the cluster is terminated even though the nodes remain provisioned
+    in the cloud provider for several more minutes; these additional minutes are not accounted for in this
+    cost function.
 * **driver_compute_cost**: when cloudBillable --> Driver Node Compute Contract Price Hourly (instanceDetails) * Uptime_In_State_H --> otherwise 0
 * **worker_compute_cost**: when cloudBillable --> Worker Node Compute Contract Price Hourly (instanceDetails) * Uptime_In_State_H * target_num_workers --> otherwise 0
   * target_num_workers used here is ambiguous. Assuming all targeted workers can be provisioned, the calculation is most accurate; 
   however, if some workers cannot be provisioned the worker_compute_cost will be slightly higher than actual while
   target_num_workers > current_num_workers. target_num_workers used here because the compute costs begin accumulating 
   as soon as the node is provisioned, not at the time it is added to the cluster.
-* **photon_kicker**: when runtime_engine == Photon 2 otherwise 1
-* **driver_dbu_cost**: when databricks_billable --> driver_hourly_dbus (instancedetails.hourlyDBUs) * houry_dbu_rate for dbu type (dbuCostDetails.contract_price) *
+* **photon_kicker**: when runtime_engine == "Photon" and sku != "SqlCompute then 2 otherwise 1
+* **worker_dbus**: when databricks_billable --> current_num_workers * driver_hourly_dbus (instancedetails.hourlyDBUs) *
   uptime_in_state_H * photon_kicker --> otherwise 0
-* **worker_dbu_cost**: when databricks_billable --> driver_hourly_dbus (instancedetails.hourlyDBUs) * houry_dbu_rate for dbu type (dbuCostDetails.contract_price) *
-  current_num_workers * uptime_in_state_H * photon_kicker --> otherwise 0
-  * current_num_workers used here as dbu costs do not begin until the node able to receive workloads (i.e. node is 
-    moved from target_worker to current_worker / "upsize_complete" state)
-* **cloudBillable**: Cluster is in a running state
-  * GAP: Note that cloud billable ends at the time the cluster is terminated even though the nodes remain provisioned 
-    in the cloud provider for several more minutes; these additional minutes are not accounted for in this 
-    cost function.
+  * current_num_workers used here as dbu costs do not begin until the node able to receive workloads (i.e. node is
+      moved from target_worker to current_worker / "upsize_complete" state)
+* **driver_dbus**: when databricks_billable --> driver_hourly_dbus (instancedetails.hourlyDBUs) *
+  uptime_in_state_H * photon_kicker --> otherwise 0
+* **worker_dbu_cost**: houry_dbu_rate for sku (dbuCostDetails.contract_price) * worker_dbus
+* **driver_dbu_cost**: houry_dbu_rate for sku (dbuCostDetails.contract_price) * driver_dbus
 
 
 #### InstanceDetails
@@ -508,7 +510,7 @@ across the concurrent runs but not the days running since this fact table is not
 | task_type               | string      | Type of task to be executed -- this should mirror the "type" selected in the "type" drop down in the job definition. May be null for submitRun as this jobType                                                                                                                                                                                                                                                                                                                                                           |
 | task_runtime            | struct      | The runtime of the task from launch to termination (including compute spin-up time)                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | task_execution_runtime  | struct      | The execution time of the task (excluding compute spin-up time)                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| cluster_type            | string      | Type of cluster used in the execution, one of "new", "job_cluster", "existing", "SQL Warehouse", null -- will be null for DLT pipelines and/or in situations where the type is not provided from Databricks                                                                                                                                                                                                                                                                                                              |
+| cluster_type            | string      | Type of type cluster used in the execution, one of "automated", "interactive, null -- will be null for DLT pipelines and/or in situations where the type is not provided from Databricks. In the future you can expect "SQL Warehouse" and other types of compute to show up here.                                                                                                                                                                                                                                       |
 | cluster_id              | string      | The cluster ID of the compute used to execute the task run. If task executed on a SQL Warehouse, the warehouse_id will be populated here.                                                                                                                                                                                                                                                                                                                                                                                |
 | cluster_name            | string      | The name of the compute asset used to execute the task run                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | cluster_tags            | map         | Tags present on the compute that executed the run                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -849,7 +851,7 @@ to improve performance.
 | task_type        | string | Spark task Type (i.e. ResultTask, ShuffleMapTask, etc)                                                                           |
 | task_end_reason  | string | Task end status, state, and details plus stake trace when error                                                                  |
 
-#### SparkStream_preview
+#### SparkStream
 **KEY** -- organization_id + spark_context_id + cluster_id + stream_id + stream_run_id + stream_batch_id + stream_timestamp
 
 **Incremental Columns** -- date + stream_timestamp
@@ -859,9 +861,6 @@ to improve performance.
 **Z-Order Columns** -- cluster_id
 
 **Write Mode** -- Merge
-
-Remains in preview through version 0.6.0 as more feedback is requested from users and use-cases before this table 
-structure solidifes.
 
 | Column            | Type           | Description                                                                                                    |
 |:------------------|:---------------|:---------------------------------------------------------------------------------------------------------------|
