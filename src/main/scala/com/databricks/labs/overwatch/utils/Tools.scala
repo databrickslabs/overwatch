@@ -568,10 +568,11 @@ object Helpers extends SparkSessionWrapper {
     assert(spark.catalog.databaseExists(etlDB), s"The database provided, $etlDB, does not exist.")
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
     val dbProperties = dbMeta.properties
+    val isRemoteWorkspace = organization_id.nonEmpty
 
     // verify database is owned and managed by Overwatch
     assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided, $etlDB, is not an Overwatch managed Database. Please provide an Overwatch managed database")
-    val workspaceID = if (organization_id.nonEmpty) organization_id.get else Initializer.getOrgId
+    val workspaceID = if (isRemoteWorkspace) organization_id.get else Initializer.getOrgId
 
     val statusFilter = if (successfullOnly) 'status === "SUCCESS" else lit(true)
 
@@ -585,7 +586,7 @@ object Helpers extends SparkSessionWrapper {
       .select(to_json('inputConfig).alias("compactString"))
       .as[String].first()
 
-    if (organization_id.isEmpty) { // single workspace deployment
+    val workspace = if (isRemoteWorkspace) { // single workspace deployment
       Initializer(testConfig, disableValidations = true)
     } else { // multi workspace deployment
       Initializer(
@@ -595,6 +596,15 @@ object Helpers extends SparkSessionWrapper {
         organizationID = organization_id
       )
     }
+
+    // set cloud provider for remote workspaces
+    if (isRemoteWorkspace && workspace.getConfig.auditLogConfig.rawAuditPath.nonEmpty) {
+      workspace.getConfig.setCloudProvider("aws")
+    }
+    if (isRemoteWorkspace && workspace.getConfig.auditLogConfig.rawAuditPath.isEmpty) {
+      workspace.getConfig.setCloudProvider("azure")
+    }
+    workspace
   }
 
   /**
@@ -756,6 +766,7 @@ object Helpers extends SparkSessionWrapper {
       val incrementalFilters = incrementalFields.map(f => {
         f.dataType.typeName match {
           case "long" => s"${f.name} >= ${rollbackToTime.asUnixTimeMilli}"
+          case "double" => s"""cast(${f.name} as long) >= ${rollbackToTime.asUnixTimeMilli}"""
           case "date" => s"${f.name} >= '${rollbackToTime.asDTString}'"
           case "timestamp" => s"${f.name} >= '${rollbackToTime.asTSString}'"
         }
@@ -822,7 +833,7 @@ object Helpers extends SparkSessionWrapper {
     if (dryRun) println("DRY RUN: Nothing will be changed")
     val config = workspace.getConfig
     val orgFilter = if (workspaceIds.isEmpty) {
-      'organization_id === config.organizationId
+      throw new Exception("""workspaceIDs cannot be empty. To rollback all workspaces use "global" in the array """)
     } else if (workspaceIds.headOption.getOrElse(config.organizationId) == "global") {
       lit(true)
     } else {
@@ -846,9 +857,10 @@ object Helpers extends SparkSessionWrapper {
       s"${rollbackTSByModule.map(_.organization_id).distinct.mkString(", ")}")
     rollbackPipelineStateToTimestamp(rollbackTSByModule, customRollbackStatus, config, dryRun)
 
-    val allTargets = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
+    val allTargets = (Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
-      Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets
+      Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets)
+        .filter(_.exists(pathValidation = false, catalogValidation = true))
 
     val targetsToRollback = rollbackTSByModule.map(rollback => {
       val targetTableName = PipelineFunctions.getTargetTableNameByModule(rollback.moduleId)

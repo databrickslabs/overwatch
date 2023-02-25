@@ -184,8 +184,10 @@ class Database(config: Config) extends SparkSessionWrapper {
     // if target is to be deduped, dedup it by keys
     finalSourceDF = if (!target.permitDuplicateKeys) finalSourceDF.dedupByKey(target.keys, target.incrementalColumns) else finalSourceDF
 
-    val finalDF = if (target.persistBeforeWrite) persistAndLoad(finalSourceDF, target) else finalSourceDF
-    finalDF
+    // always persistAndLoad when parallelism > 1 to reduce table lock times
+    // don't persist and load metadata tables with fixed schemas (isEvolvingSchema false)
+    val isParallelNotStreamingNotMeta = SparkSessionWrapper.parSessionsOn && !target.isStreaming && !target.isEvolvingSchema
+    if (target.persistBeforeWrite || isParallelNotStreamingNotMeta) persistAndLoad(finalSourceDF, target) else finalSourceDF
   }
 
   /**
@@ -407,7 +409,7 @@ class Database(config: Config) extends SparkSessionWrapper {
       if (SparkSessionWrapper.globalTableLock.contains(tableName)) {
         if (withinTimeout) {
           logger.log(Level.WARN, s"TABLE LOCKED: $tableName for $currWaitTime -- waiting for parallel writes to complete")
-          coolDown(tableName, retryCount * 10, 2) // add 10 to 12 seconds to sleep for each lock test
+          coolDown(tableName, retryCount * 5, 2) // add 5 to 7 seconds to sleep for each lock test
           testLock(retryCount + 1)
         } else {
           throw new Exception(s"TABLE LOCK TIMEOUT - The table $tableName remained locked for more than the configured " +
@@ -420,7 +422,6 @@ class Database(config: Config) extends SparkSessionWrapper {
 
     testLock(retryCount = 1)
   }
-
 
   /**
    * Wrapper for the write function
@@ -440,16 +441,23 @@ class Database(config: Config) extends SparkSessionWrapper {
                                         maxMergeScanDates: Array[String] = Array(),
                                         daysToProcess: Option[Int] = None): Unit = {
 
-    val needsCache = daysToProcess.getOrElse(1000) < 5 && !target.autoOptimize
+    // needsCache when it's a small number of days and not in parallel and not autoOptimize
+    //  when in parallel disable cache because it will always use persistAndLoad to reduce table lock times.
+    //  persist and load will all be able to happen in parallel to temp location and use a simple read/write to
+    //  merge into target rather than locking the target for the entire time all the transforms are being executed.
+    val needsCache = daysToProcess.getOrElse(1000) < 5 &&
+      !target.autoOptimize &&
+      !SparkSessionWrapper.parSessionsOn &&
+      target.isEvolvingSchema // don't cache small meta tables
+
+    logger.log(Level.INFO, s"PRE-CACHING TARGET ${target.tableFullName} ENABLED: $needsCache")
     val inputDf = if (needsCache) {
       logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
       df.persist()
     } else df
     if (needsCache) inputDf.count()
 
-    if (!target.config.isMultiworkspaceDeployment) { // legacy deployment
-      performRetry(inputDf, target, pipelineSnapTime, maxMergeScanDates)
-    } else { // multi-workspace deployment
+    if (target.config.isMultiworkspaceDeployment && target.requiresLocking) { // multi-workspace ++ locking
       val withMetaDf = preWriteActions(df, target, pipelineSnapTime)
       if (targetNotLocked(target.tableFullName)) {
         try {
@@ -461,6 +469,8 @@ class Database(config: Config) extends SparkSessionWrapper {
           SparkSessionWrapper.globalTableLock.remove(target.tableFullName)
         }
       }
+    } else { // not multiworkspace -- or if multiworkspace and does not require locking
+      performRetry(inputDf, target, pipelineSnapTime, maxMergeScanDates)
     }
   }
 

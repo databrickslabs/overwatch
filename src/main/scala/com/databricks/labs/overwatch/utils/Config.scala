@@ -33,6 +33,7 @@ class Config() {
   private var _badRecordsPath: String = _
   private var _primordialDateString: Option[String] = None
   private var _maxDays: Int = 60
+  private var _disabledModules: Array[Int] = Array[Int]()
   private var _initialWorkerCount: Int = _
   private var _intelligentScaling: IntelligentScaling = IntelligentScaling()
   private var _passthroughLogPath: Option[String] = None
@@ -54,6 +55,9 @@ class Config() {
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
+
+  // as of 0711
+  def disabledModules: Array[Int] = _disabledModules
   def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
 
   def apiUrl: Option[String] = _apiUrl
@@ -171,6 +175,13 @@ class Config() {
    * BEGIN SETTERS
    */
 
+  // as of 0711
+  private[overwatch] def registerDisabledModules(value: String): this.type = {
+    val disabledModulesArray = value.replaceAll("\\s", "").split(",").map(_.toInt)
+    _disabledModules = disabledModulesArray
+    logger.log(Level.INFO, s"DISABLING MODULES: ${disabledModulesArray.mkString(", ")}")
+    this
+  }
   private[overwatch] def setMaxDays(value: Int): this.type = {
     _maxDays = value
     this

@@ -24,7 +24,6 @@ case class PipelineView(name: String,
         } else {
           partitionMapOverrides
         }
-        print(s"partmap is ${partMap}")
         pubStatementSB.append(s" where ${partMap.head._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${partMap.head._2} ")
         if (partMap.keys.toArray.length > 1) {
           partMap.tail.foreach(pCol => {

@@ -450,17 +450,15 @@ object TransformFunctions {
      * @return
      */
     def dbu(
-             isDatabricksBillable: Column,
              dbus: Column,
              dbuRate_H: Column,
-             nodeCount: Column,
-             stateTime: Column,
              smoothingCol: Option[Column] = None
            ): Column = {
 
       //This is the default logic for DBU calculation
-      val defaultCalculation = dbus * stateTime * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))
-      when(isDatabricksBillable, defaultCalculation).otherwise(lit(0.0))
+      dbus * dbuRate_H
+//      val defaultCalculation = dbus * stateTime * nodeCount * dbuRate_H * smoothingCol.getOrElse(lit(1))
+//      when(isDatabricksBillable, defaultCalculation).otherwise(lit(0.0))
     }
 
     /**
