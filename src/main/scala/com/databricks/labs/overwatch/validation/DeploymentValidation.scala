@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.validation
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCallV2
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.pipeline.{Pipeline, PipelineFunctions, Schema}
+import com.databricks.labs.overwatch.pipeline.{Initializer, Pipeline, PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.validation.{Rule, RuleSet}
@@ -98,44 +98,66 @@ object DeploymentValidation extends SparkSessionWrapper {
     }
   }
 
-  private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
+  /**
+   * Validates the content of provided mount_mapping_path csv file.Below are the validation rules.
+   * 1)validate for file existence.
+   * 2)validate the provided csv file belongs to the provided workspace_id.
+   * 3)validate the provided csv file contains columns "mountPoint", "source","workspace_id" and has some values in it.
+   *
+   * @param conf
+   * @return
+   */
+  private def validateMountMappingPath(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
 
+    // get fine here -- already verified non-empty in calling function
+    val path = conf.mount_mapping_path.get.trim
     val testDetails =
       s"""WorkSpaceMountTest
-         |APIURL:${conf.api_url}
-         |DBPATWorkspaceScope:${conf.secret_scope}
-         |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+         |mount_mapping_path:${path}
+         """.stripMargin
+
     try {
-      val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
-      val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
-      val endPoint = "dbfs/search-mounts"
-      val mountCount = ApiCallV2(apiEnv, endPoint).execute().asDF().count()
-      if(mountCount<50)
-        {
-          DeploymentValidationReport(true,
-            getSimpleMsg("Validate_Mount"),
-            testDetails,
-            Some("SUCCESS"),
-            Some(conf.workspace_id)
-          )
-        }else{
+      if (!Helpers.pathExists(path)) {
         DeploymentValidationReport(false,
           getSimpleMsg("Validate_Mount"),
           testDetails,
-          Some("Number of mounts found in workspace is more than 50"),
+          Some("Unable to find the provided csv: " + path),
           Some(conf.workspace_id)
         )
-      }
+      } else {
+        val inputDf = spark.read.option("header", "true")
+          .option("ignoreLeadingWhiteSpace", true)
+          .option("ignoreTrailingWhiteSpace", true)
+          .csv(path)
+          .filter('source.isNotNull)
+          .verifyMinimumSchema(Schema.mountMinimumSchema)
+          .select("mountPoint", "source","workspace_id")
+          .filter('workspace_id === conf.workspace_id)
 
+
+        val dataCount = inputDf.count()
+        if (dataCount > 0) {
+          DeploymentValidationReport(true,
+            getSimpleMsg("Validate_Mount"),
+            s"""WorkSpaceMountTest
+               |mount_mapping_path:${path}
+               |mount points found:${dataCount}
+               """.stripMargin,
+            Some("SUCCESS"),
+            Some(conf.workspace_id)
+          )
+        } else {
+          DeploymentValidationReport(false,
+            getSimpleMsg("Validate_Mount"),
+            testDetails,
+            Some(s"""No data found for workspace_id: ${conf.workspace_id} in provided csv: ${path}"""),
+            Some(conf.workspace_id)
+          )
+        }
+      }
     } catch {
-      case exception: Exception =>
-        val msg =
-          s"""No Data retrieved
-             |WorkspaceId:${conf.workspace_id}
-             |APIURL:${conf.api_url}
-             | DBPATWorkspaceScope:${conf.secret_scope}
-             | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
-        val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
+      case e: Exception =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, s"""Exception while reading the mount_mapping_path :${path}""")
         logger.log(Level.ERROR, fullMsg)
         DeploymentValidationReport(false,
           getSimpleMsg("Validate_Mount"),
@@ -143,8 +165,73 @@ object DeploymentValidation extends SparkSessionWrapper {
           Some(fullMsg),
           Some(conf.workspace_id)
         )
-
     }
+
+  }
+  private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
+
+    val isAzure = conf.cloud.toLowerCase == "azure" //Mount-point validation is only done for Azure
+    val isRemoteWorkspace = conf.workspace_id.trim != Initializer.getOrgId // No need to perform mount-point validation for driver workspace.
+    val isMountMappingPathProvided = conf.mount_mapping_path.nonEmpty
+
+    if (isAzure && isRemoteWorkspace) { //Performing mount test
+      if (isMountMappingPathProvided) {
+        validateMountMappingPath(conf)
+      } else {
+        val testDetails =
+          s"""WorkSpaceMountTest
+             |APIURL:${conf.api_url}
+             |DBPATWorkspaceScope:${conf.secret_scope}
+             |SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+        try {
+          val patToken = dbutils.secrets.get(scope = conf.secret_scope, key = conf.secret_key_dbpat)
+          val apiEnv = ApiEnv(false, conf.api_url, patToken, getClass.getPackage.getImplementationVersion)
+          val endPoint = "dbfs/search-mounts"
+          val mountCount = ApiCallV2(apiEnv, endPoint).execute().asDF().count()
+          if (mountCount < 50) {
+            DeploymentValidationReport(true,
+              getSimpleMsg("Validate_Mount"),
+              testDetails,
+              Some("SUCCESS"),
+              Some(conf.workspace_id)
+            )
+          } else {
+            DeploymentValidationReport(false,
+              getSimpleMsg("Validate_Mount"),
+              testDetails,
+              Some("Number of mounts found in workspace is more than 50"),
+              Some(conf.workspace_id)
+            )
+          }
+
+        } catch {
+          case exception: Exception =>
+            val msg =
+              s"""No Data retrieved
+                 |WorkspaceId:${conf.workspace_id}
+                 |APIURL:${conf.api_url}
+                 | DBPATWorkspaceScope:${conf.secret_scope}
+                 | SecretKey_DBPAT:${conf.secret_key_dbpat}""".stripMargin
+            val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
+            logger.log(Level.ERROR, fullMsg)
+            DeploymentValidationReport(false,
+              getSimpleMsg("Validate_Mount"),
+              testDetails,
+              Some(fullMsg),
+              Some(conf.workspace_id)
+            )
+
+        }
+      }
+    } else {
+      DeploymentValidationReport(true,
+        getSimpleMsg("Validate_Mount"),
+        "Skipping mount point check",
+        Some("SUCCESS"),
+        Some(conf.workspace_id)
+      )
+    }
+
 
   }
 
@@ -303,9 +390,12 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param primordial_date
    * @param maxDate
    */
-  private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: String, primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
+  private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: Option[String], primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
     try {
-      val fromDT = new java.sql.Date(primordial_date.getTime()).toLocalDate()
+      if (auditlogprefix_source_aws.isEmpty) throw new BadConfigException(
+        "auditlogprefix_source_aws cannot be null when cloud is AWS")
+      val auditLogPrefix = auditlogprefix_source_aws.get
+      val fromDT = new java.sql.Date(primordial_date.getTime).toLocalDate
       var untilDT = fromDT.plusDays(maxDate.toLong)
       val dateCompare = untilDT.compareTo(LocalDate.now())
       val msgBuffer = new StringBuffer()
@@ -315,12 +405,12 @@ object DeploymentValidation extends SparkSessionWrapper {
       val daysBetween = ChronoUnit.DAYS.between(fromDT, untilDT)
       var validationFlag = false
       if (daysBetween == 0) {
-        validationFlag = Helpers.pathExists(s"${auditlogprefix_source_aws}/date=${fromDT.toString}")
+        validationFlag = Helpers.pathExists(s"${auditLogPrefix}/date=${fromDT.toString}")
       } else {
         val pathsToCheck = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
-          .map(dt => s"${auditlogprefix_source_aws}/date=${dt}")
+          .map(dt => s"${auditLogPrefix}/date=${dt}")
         val presentPaths = datesStream(fromDT).takeWhile(_.isBefore(untilDT)).toArray
-          .map(dt => s"${auditlogprefix_source_aws}/date=${dt}")
+          .map(dt => s"${auditLogPrefix}/date=${dt}")
           .filter(Helpers.pathExists)
         if (presentPaths.length == daysBetween) {
           validationFlag = true
@@ -344,7 +434,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       } else {
         val msg =
           s"""ReValidate the folder existence
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
 
@@ -362,7 +452,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case exception: Exception =>
         val msg =
           s"""AuditLogPrefixTest workspace_id:${workspace_id}
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
@@ -384,7 +474,18 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param key
    * @param ehName
    */
-  private def validateEventHub(workspace_id: String, scope: String, key: String, ehName: String, outputPath: String): DeploymentValidationReport = {
+  private def validateEventHub(
+                                workspace_id: String,
+                                scope: String,
+                                optKey: Option[String],
+                                optEHName: Option[String],
+                                outputPath: String
+                              ): DeploymentValidationReport = {
+    if (optKey.isEmpty || optEHName.isEmpty) throw new BadConfigException("When cloud is Azure, the eh_name and " +
+      "eh_scope_key are required fields but they were empty in the config")
+    // using gets here because if they were empty from above check, exception would already be thrown
+    val key = optKey.get
+    val ehName = optEHName.get
     val testDetails = s"""Connectivity test with ehName:${ehName} scope:${scope} SecretKey_DBPAT:${key}"""
     try {
       import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}

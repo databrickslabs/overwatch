@@ -292,7 +292,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .lookupWhen(dbuCostDetailsTSDF)
       .df
     val clusterPotMetaToFill = Array(
-      "cluster_name", "custom_tags", "driver_node_type_id",
+      "cluster_name", "custom_tags", "driver_node_type_id", "runtime_engine",
       "node_type_id", "spark_version", "sku", "dbu_rate", "driverSpecs", "workerSpecs"
     )
     val clusterPotKeys = Seq("organization_id", "cluster_id")
@@ -335,12 +335,15 @@ trait GoldTransforms extends SparkSessionWrapper {
 
 
     val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
-    val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H).otherwise(lit(0)).alias("driver_dbus")
-    val workerDBUs = when('databricks_billable, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H).otherwise(lit(0)).alias("worker_dbus")
+    val isPhotonEnabled = upper('runtime_engine).equalTo("PHOTON")
+    val isNotAnSQlWarehouse = !upper('sku).equalTo("SQLCOMPUTE")
+    val photonDBUMultiplier = when(isPhotonEnabled && isNotAnSQlWarehouse, lit(2)).otherwise(lit(1))
+    val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H * photonDBUMultiplier).otherwise(lit(0)).alias("driver_dbus")
+    val workerDBUs = when('databricks_billable, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H * photonDBUMultiplier).otherwise(lit(0)).alias("worker_dbus")
     val driverComputeCost = Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H).alias("driver_compute_cost")
     val workerComputeCost = Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H).alias("worker_compute_cost")
-    val driverDBUCost = Costs.dbu('databricks_billable, $"driverSpecs.Hourly_DBUs", 'dbu_rate, lit(1), 'uptime_in_state_H, runtimeEngine = 'runtime_engine, sku = 'sku).alias("driver_dbu_cost")
-    val workerDBUCost = Costs.dbu('databricks_billable, $"workerSpecs.Hourly_DBUs", 'dbu_rate, 'current_num_workers, 'uptime_in_state_H, runtimeEngine = 'runtime_engine, sku = 'sku).alias("worker_dbu_cost")
+    val driverDBUCost = Costs.dbu(driverDBUs, 'dbu_rate).alias("driver_dbu_cost")
+    val workerDBUCost = Costs.dbu(workerDBUs, 'dbu_rate).alias("worker_dbu_cost")
 
     val clusterStateFactCols: Array[Column] = Array(
       'organization_id,
@@ -790,7 +793,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val jobRunCostPotentialFactViewColumnMapping: String =
     """
       |organization_id, workspace_name, job_id, job_name, run_id, job_run_id, task_run_id, task_key, repair_id, run_name,
-      |startEpochMS, cluster_id, cluster_name, cluster_tags, driver_node_type_id, node_type_id, dbu_rate,
+      |startEpochMS, cluster_id, cluster_name, cluster_type, cluster_tags, driver_node_type_id, node_type_id, dbu_rate,
       |multitask_parent_run_id, parent_run_id, task_runtime, task_execution_runtime, terminal_state,
       |job_trigger_type, task_type, created_by, last_edited_by, running_days, avg_cluster_share,
       |avg_overlapping_runs, max_overlapping_runs, run_cluster_states, worker_potential_core_H, driver_compute_cost,

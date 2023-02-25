@@ -178,6 +178,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048",
     "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
+    "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 32).toString,
     "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString),
     "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString)
   )
@@ -213,7 +214,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
     "spark.databricks.delta.optimizeWrite.binSize" -> "2048", // output is very dense, shrink output file size
     "spark.sql.files.maxPartitionBytes" -> (1024 * 1024 * 64).toString,
-    "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 4).toString,
+    "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (1024 * 1024 * 8).toString,
     "spark.sql.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString),
     "spark.sql.adaptive.autoBroadcastJoinThreshold" -> ((1024 * 1024 * 2).toString)
   )

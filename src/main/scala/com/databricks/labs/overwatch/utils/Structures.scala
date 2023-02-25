@@ -49,7 +49,8 @@ case class ApiEnv(
                    proxyPort: Option[Int] = None,
                    proxyUserName: Option[String] = None,
                    proxyPasswordScope: Option[String] = None,
-                   proxyPasswordKey: Option[String] = None
+                   proxyPasswordKey: Option[String] = None,
+                   mountMappingPath: Option[String] = None
                  )
 
 
@@ -59,7 +60,8 @@ case class ApiEnvConfig(
                          enableUnsafeSSL: Boolean = false,
                          threadPoolSize: Int = 4,
                          apiWaitingTime: Long = 300000,
-                         apiProxyConfig: Option[ApiProxyConfig] = None
+                         apiProxyConfig: Option[ApiProxyConfig] = None,
+                         mountMappingPath: Option[String] = None
                        )
 
 case class ApiProxyConfig(
@@ -81,15 +83,15 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 consumer_database_name: String,
                                 secret_scope: String,
                                 secret_key_dbpat: String,
-                                auditlogprefix_source_aws: String,
-                                eh_name: String,
-                                eh_scope_key: String,
+                                auditlogprefix_source_aws: Option[String],
+                                eh_name: Option[String],
+                                eh_scope_key: Option[String],
                                 interactive_dbu_price: Double,
                                 automated_dbu_price: Double,
                                 sql_compute_dbu_price: Double,
                                 jobs_light_dbu_price: Double,
                                 max_days: Int,
-                                excluded_scopes: String,
+                                excluded_scopes: Option[String],
                                 active: Boolean,
                                 proxy_host: Option[String] = None,
                                 proxy_port: Option[Int] = None,
@@ -101,6 +103,7 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 enable_unsafe_SSL: Option[Boolean]= None,
                                 thread_pool_size:  Option[Int] = None,
                                 api_waiting_time:  Option[Long] = None,
+                                mount_mapping_path: Option[String],
                                 deployment_id: String,
                                 output_path: String
                                )
@@ -329,6 +332,18 @@ object WriteMode extends Enumeration {
   val merge: Value = Value("merge")
 }
 
+/**
+ * insertOnly = whenNotMatched --> Insert
+ * updateOnly = whenMatched --> update
+ * full = both insert and update
+ */
+object MergeScope extends Enumeration {
+  type MergeScope = Value
+  val full: Value = Value("full")
+  val insertOnly: Value = Value("insertOnly")
+  val updateOnly: Value = Value("updateOnly")
+}
+
 // Todo Issue_56
 private[overwatch] class NoNewDataException(s: String, val level: Level, val allowModuleProgression: Boolean = false) extends Exception(s) {}
 
@@ -339,6 +354,11 @@ private[overwatch] class IncompleteFilterException(s: String) extends Exception(
 private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val allowModuleProgression: Boolean) extends Exception(apiCallDetail)
 
 private[overwatch] class ApiCallFailureV2(s: String) extends Exception(s) {}
+
+private[overwatch] class ModuleDisabled(moduleId: Int, s: String) extends Exception(s) {
+  private val logger = Logger.getLogger("ModuleDisabled")
+  logger.log(Level.INFO, s"MODULE DISABLED: MODULE_ID: $moduleId -- SKIPPING")
+}
 
 private[overwatch] class ApiCallFailure(
                                          val httpResponse: HttpResponse[String],

@@ -6,6 +6,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 
 import java.time.Duration
+import scala.util.parsing.json.JSON.number
 
 class Module(
               val moduleId: Int,
@@ -25,6 +26,8 @@ class Module(
 
   private var _isFirstRun: Boolean = false
 
+  private var _moduleStartMessage: String = ""
+
   private[overwatch] val moduleState: SimplifiedModuleStatusReport = {
     if (pipeline.getModuleState(moduleId).isEmpty) {
       initModuleState
@@ -35,6 +38,13 @@ class Module(
   private var sparkOverrides: Map[String, String] = Map[String, String]()
 
   def isFirstRun: Boolean = _isFirstRun
+
+  private[overwatch] def moduleStartMessage: String = _moduleStartMessage
+
+  private def setModuleStartMessage(value: String): this.type = {
+    _moduleStartMessage = value
+    this
+  }
 
   def daysToProcess: Int = {
     Duration.between(
@@ -331,15 +341,23 @@ class Module(
 
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
-    optimizeShufflePartitions()
+
+    if (config.disabledModules.contains(moduleId)) throw new ModuleDisabled(moduleId, s"MODULE DISABLED: $moduleId-$moduleName")
+    val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
+    val notAQEAutoOptimizeShuffle = spark.conf.getOption("spark.databricks.adaptive.autoOptimizeShuffle.enabled").getOrElse("false").toBoolean
+    if (Helpers.isNumeric(shufflePartitions) && notAQEAutoOptimizeShuffle){
+      optimizeShufflePartitions()
+    }
+
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
 
-    val startMsg = s"\nBeginning: $moduleId-$moduleName\nTIME RANGE: ${fromTime.asTSString} -> ${untilTime.asTSString} --> Workspace ID: ${config.organizationId}"
-    println(startMsg)
-
-    if (config.debugFlag) println(startMsg)
+    val startMsg = s"$moduleId-$moduleName --> Workspace ID: ${config.organizationId}\nTIME RANGE: " +
+      s"${fromTime.asTSString} -> ${untilTime.asTSString}\n"
+    setModuleStartMessage(startMsg)
+    println(s"\nBeginning: $startMsg")
     logger.log(Level.INFO, startMsg)
+
     try {
       if (fromTime.asUnixTimeMilli == untilTime.asUnixTimeMilli)
         throw new NoNewDataException("FROM and UNTIL times are identical. Likely due to upstream dependencies " +
@@ -357,6 +375,8 @@ class Module(
         noNewDataHandler(PipelineFunctions.appendStackStrace(e, e.apiCallDetail), Level.ERROR, allowModuleProgression = e.allowModuleProgression)
       case e: ApiCallFailure if e.failPipeline =>
         fail(PipelineFunctions.appendStackStrace(e, e.msg))
+      case e: ModuleDisabled =>
+        fail(e.getMessage)
       case e: FailedModuleException =>
         val errMessage = s"FAILED: $moduleId-$moduleName Module"
         logger.log(Level.ERROR, errMessage, e)
