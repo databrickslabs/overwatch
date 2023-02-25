@@ -12,21 +12,21 @@
     <title>Data Dictionary (Latest) :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1677361329" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1677361329" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1677361329"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1671311759"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1677361329"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1677361329"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1677361329"></script>
 
     
   </div>
@@ -969,7 +969,7 @@ tirelessly to expose additional SparkUI data and will publish as soon as it&rsqu
 <li><a href="#sparkjob">sparkJob</a></li>
 <li><a href="#sparkstage">sparkStage</a></li>
 <li><a href="#sparktask">sparkTask</a></li>
-<li><a href="#sparkstream_preview">sparkStream</a> **preview</li>
+<li><a href="#sparkstream">sparkStream</a></li>
 <li><a href="#common-meta-fields">Common Meta Fields</a>
 <ul>
 <li>There are several fields that are present in all tables. Instead of cluttering each table with them, this section
@@ -1351,6 +1351,13 @@ your costs are off by a large margin, please review all the components of the co
 as necessary to align your reality with the Overwatch config. The default costs are list price and often do not
 accurately reflect a customer&rsquo;s costs.</p>
 <ul>
+<li><strong>cloudBillable</strong>: Cluster is in a running state
+<ul>
+<li>GAP: Note that cloud billable ends at the time the cluster is terminated even though the nodes remain provisioned
+in the cloud provider for several more minutes; these additional minutes are not accounted for in this
+cost function.</li>
+</ul>
+</li>
 <li><strong>driver_compute_cost</strong>: when cloudBillable &ndash;&gt; Driver Node Compute Contract Price Hourly (instanceDetails) * Uptime_In_State_H &ndash;&gt; otherwise 0</li>
 <li><strong>worker_compute_cost</strong>: when cloudBillable &ndash;&gt; Worker Node Compute Contract Price Hourly (instanceDetails) * Uptime_In_State_H * target_num_workers &ndash;&gt; otherwise 0
 <ul>
@@ -1360,23 +1367,18 @@ target_num_workers &gt; current_num_workers. target_num_workers used here becaus
 as soon as the node is provisioned, not at the time it is added to the cluster.</li>
 </ul>
 </li>
-<li><strong>photon_kicker</strong>: when runtime_engine == Photon 2 otherwise 1</li>
-<li><strong>driver_dbu_cost</strong>: when databricks_billable &ndash;&gt; driver_hourly_dbus (instancedetails.hourlyDBUs) * houry_dbu_rate for dbu type (dbuCostDetails.contract_price) *
-uptime_in_state_H * photon_kicker &ndash;&gt; otherwise 0</li>
-<li><strong>worker_dbu_cost</strong>: when databricks_billable &ndash;&gt; driver_hourly_dbus (instancedetails.hourlyDBUs) * houry_dbu_rate for dbu type (dbuCostDetails.contract_price) *
-current_num_workers * uptime_in_state_H * photon_kicker &ndash;&gt; otherwise 0
+<li><strong>photon_kicker</strong>: when runtime_engine == &ldquo;Photon&rdquo; and sku != &ldquo;SqlCompute then 2 otherwise 1</li>
+<li><strong>worker_dbus</strong>: when databricks_billable &ndash;&gt; current_num_workers * driver_hourly_dbus (instancedetails.hourlyDBUs) *
+uptime_in_state_H * photon_kicker &ndash;&gt; otherwise 0
 <ul>
 <li>current_num_workers used here as dbu costs do not begin until the node able to receive workloads (i.e. node is
 moved from target_worker to current_worker / &ldquo;upsize_complete&rdquo; state)</li>
 </ul>
 </li>
-<li><strong>cloudBillable</strong>: Cluster is in a running state
-<ul>
-<li>GAP: Note that cloud billable ends at the time the cluster is terminated even though the nodes remain provisioned
-in the cloud provider for several more minutes; these additional minutes are not accounted for in this
-cost function.</li>
-</ul>
-</li>
+<li><strong>driver_dbus</strong>: when databricks_billable &ndash;&gt; driver_hourly_dbus (instancedetails.hourlyDBUs) *
+uptime_in_state_H * photon_kicker &ndash;&gt; otherwise 0</li>
+<li><strong>worker_dbu_cost</strong>: houry_dbu_rate for sku (dbuCostDetails.contract_price) * worker_dbus</li>
+<li><strong>driver_dbu_cost</strong>: houry_dbu_rate for sku (dbuCostDetails.contract_price) * driver_dbus</li>
 </ul>
 <h4 id="instancedetails">InstanceDetails</h4>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_aws.tab"><strong>AWS Sample</strong></a> | <a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/instancedetails_azure.tab"><strong>AZURE_Sample</strong></a></p>
@@ -2145,7 +2147,7 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <tr>
 <td style="text-align:left">cluster_type</td>
 <td style="text-align:left">string</td>
-<td style="text-align:left">Type of cluster used in the execution, one of &ldquo;new&rdquo;, &ldquo;job_cluster&rdquo;, &ldquo;existing&rdquo;, &ldquo;SQL Warehouse&rdquo;, null &ndash; will be null for DLT pipelines and/or in situations where the type is not provided from Databricks</td>
+<td style="text-align:left">Type of type cluster used in the execution, one of &ldquo;automated&rdquo;, &ldquo;interactive, null &ndash; will be null for DLT pipelines and/or in situations where the type is not provided from Databricks. In the future you can expect &ldquo;SQL Warehouse&rdquo; and other types of compute to show up here.</td>
 </tr>
 <tr>
 <td style="text-align:left">cluster_id</td>
@@ -3117,14 +3119,12 @@ to improve performance.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="sparkstream_preview">SparkStream_preview</h4>
+<h4 id="sparkstream">SparkStream</h4>
 <p><strong>KEY</strong> &ndash; organization_id + spark_context_id + cluster_id + stream_id + stream_run_id + stream_batch_id + stream_timestamp</p>
 <p><strong>Incremental Columns</strong> &ndash; date + stream_timestamp</p>
 <p><strong>Partition Columns</strong> &ndash; organization_id + date</p>
 <p><strong>Z-Order Columns</strong> &ndash; cluster_id</p>
 <p><strong>Write Mode</strong> &ndash; Merge</p>
-<p>Remains in preview through version 0.6.0 as more feedback is requested from users and use-cases before this table
-structure solidifes.</p>
 <table>
 <thead>
 <tr>
@@ -4074,19 +4074,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1677361330"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1677361330"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1671311759" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1671311759"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1677361330" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1677361330"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

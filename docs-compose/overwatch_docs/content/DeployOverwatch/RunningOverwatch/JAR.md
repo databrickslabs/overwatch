@@ -17,6 +17,13 @@ The main class for job is `com.databricks.labs.overwatch.MultiWorkspaceRunner`<b
 
 ### Parameters
 
+As of 0.7.1.1 the config.csv referenced below can be any one of the following
+* "dbfs:/path/to/config.csv" -- original config csv approach still works (must end with .csv)
+* "dbfs:/path/to/deltaTable" -- path to a delta table containing the config
+* "myDatabase.myConfigTable" -- name of delta table that contains the config
+
+Note: any of the paths in examples above may be on any supported storage, dbfs:/ is not required.
+
 **Job can take upto 3 arguments**
 * Args(0): Path of Config.csv **(Mandatory)**
   * EX: `["dbfs:/path/to/config.csv"]`

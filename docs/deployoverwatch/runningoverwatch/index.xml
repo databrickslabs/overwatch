@@ -23,7 +23,7 @@
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</guid>
       <description>Deploying Overwatch As A Notebook Notebooks can either be run manually or scheduled to run as a job. While the notebook can be scheduled as a job, it&amp;rsquo;s strongly recommended that Overwatch be run as a JAR instead of a notebook. Notebook execution is great for rapid testing and validation.
 This deployment method requires Overwatch Version 0.7.1.0+
-Jumpstart Notebook Below is an example deployment. When you&amp;rsquo;re ready to get started simply download the rapid start linked notebook below.</description>
+Converting Your Config From CSV To Delta AS OF version 0.7.1.1 you may now use a CSV OR a Delta Table OR Delta Path for your config</description>
     </item>
     
     <item>
@@ -36,8 +36,8 @@ Jumpstart Notebook Below is an example deployment. When you&amp;rsquo;re ready t
 Main Class The main class for job is com.databricks.labs.overwatch.MultiWorkspaceRunner
 Dependent Library com.databricks.labs:overwatch_2.12:0.7.1.x
 com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only)
-Parameters Job can take upto 3 arguments
-Args(0): Path of Config.csv (Mandatory) EX: [&amp;quot;dbfs:/path/to/config.csv&amp;quot;] Args(1): Number of threads to complete the task in parallel. Default == 4. (Optional) EX: [&amp;quot;dbfs:/path/to/config.csv&amp;quot;, &amp;quot;4&amp;quot;] Args(2): Pipelines to be executed. Default == &amp;ldquo;Bronze,Silver,Gold&amp;rdquo; If you wanted to split Bronze into one task and Silver/Gold into another task the arguments would look like the examples below.</description>
+Parameters As of 0.7.1.1 the config.csv referenced below can be any one of the following
+&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .csv) &amp;ldquo;dbfs:/path/to/deltaTable&amp;rdquo; &amp;ndash; path to a delta table containing the config &amp;ldquo;myDatabase.myConfigTable&amp;rdquo; &amp;ndash; name of delta table that contains the config Note: any of the paths in examples above may be on any supported storage, dbfs:/ is not required.</description>
     </item>
     
     <item>

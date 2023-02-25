@@ -7,8 +7,11 @@ weight: 6
 ## Quick Reference
 * [Externalize Optimize & Z-Order](#externalize-optimize--z-order-as-of-060)
 * [Interacting With Overwatch and its State](#interacting-with-overwatch-and-its-state)
-* [Joining With Slow Changing Dimensions (SCD)](#joining-with-slow-changing-dimensions-scd)
 * [Optimizing Overwatch](#optimizing-overwatch)
+* [Maximizing First Run Potential](#getting-a-strong-first-run)
+  * [Historical Loads](#historical-loading)
+* [Cluster Logs Ingest Details](#cluster-logs-ingest-details)
+* [Joining With Slow Changing Dimensions (SCD)](#joining-with-slow-changing-dimensions-scd)
 
 ## Optimizing Overwatch
 **Expectation Check** Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline
@@ -46,6 +49,10 @@ thus should be run on a larger, autoscaling cluster. Lastly, by externalizing th
 need be carried out on a single workspace per Overwatch output target (i.e. storage prefix target).
 
 ### Additional Optimization Considerations
+* As of 0.7.0 Use DBR 11.3 LTS
+  * Photon can significantly improve runtimes. Mileage will vary by customer depending on data sizes and skews of 
+  certain modules, so feel free to turn it on and use Overwatch to determine whether Photon is the right answer for 
+  your needs.
 * As of 0.6.1 disable Photon
     * Photon will be the focus of optimization in DBR 11.xLTS+
 * 0.6.1+ Use DBR 10.4 LTS
@@ -200,6 +207,141 @@ val auditLogWorkspaceDF = auditLogTarget.asDF()
 val auditLogGlobalDF = auditLogTarget.asDF(withGlobalFilters = false)
 ```
 
+## Getting a Strong First Run
+The first run is likely the most important as it initializes all the slow-changing dimensions and sets the stage for 
+subsequent runs. Follow the steps below to get a strong start.
+
+### Test First
+Let's test before trying to dive right into loading a year+ of historical data. Set the primordial date to today - 
+5 days and run the pipeline. Then review the pipReport:
+```scala
+display(
+  table("overwatch_etl.pipReport")
+    .orderBy('Pipeline_SnapTS.desc)
+)
+```
+and validate that all the modules are operating as expected. Once you're certain all the modules are executing 
+properly, [run a full cleanup]({{%relref "FAQ"%}}/##q1-how-to-clean-re-deploy) and update the parameters to load 
+historical data and begin your production deployment.
+
+### Historical Loading
+Recommended max historical load is 30 days on AWS and 7 days on Azure.
+
+**DISABLE SPOT INSTANCES** -- when loading historical data, the last thing you want is to get nearly complete 
+loading non-splittable sources just to have the node killed to spot instance termination and have to restart the process. 
+It's likely more expensive to try and complete your first run with spot instances enabled. This may also be true in 
+production daily runs but it determines on your spot market availability and how often nodes are reclaimed during 
+your daily run.
+
+If you're in AWS and planning to load a year of historical data because you have the audit logs to warrant it, that's 
+great but note that several of the critical APIs such as clusterEvents and sqlQueryHistory don't store data for that 
+long. ClusterEvents in particular is key for calculating utilization and costs; thus you need to determine if the 
+historical data you're going to get is really worth loading all of this history. Additionally, sparkEvents will only 
+load so much history based on cluster log availability and will likely not load logs for historically transient clusters 
+since Overwatch will look for the clusterEvents, they will be missing for a jobs cluster from 6 months ago and Overwatch 
+will determine there's no activity on the cluster and not scan its directories.
+
+Lastly, note that several of the sources in bronze aren't highly parallelizable due to their sources; this means that 
+throwing more compute at this problem will only provide limited benefits.
+
+### Empty / Test / POC workspaces Aren't A Valid Test
+If most of your scopes are empty (i.e. you've never run any jobs and only have 1 cluster without logging enabled) most 
+of the modules will be skipped and provide no insight as to if Overwatch is configured correctly for production.
+
+## Cluster Logs Ingest Details
+For Overwatch to load the right-side of the ERD (Spark UI) the compute that executes the Spark Workloads must 
+have cluster logging enabled and Overwatch must be able to load these logs. To do this, Overwatch uses its own data to 
+determine the logging locations of all clusters and identifies clusters that have created logs within the Pipeline 
+run's time window (i.e. Jan 1 2023 --> Jan 2 2023).
+
+Historically (legacy deployments), this was fairly simple as all the logging locations were generally accessible 
+from the workspace on which Overwatch Pipeline was running (since there was one Overwatch Pipeline on each 
+workspace). There was massive demand to enable remote workspace monitoring such that Overwatch is only needed to be 
+deployed on a single workspace and can monitor one or many local/remote workspaces from a centralized location.
+
+As a result of this, the security requirements became a bit more involved to ensure the Overwatch cluster has access 
+to all the storage where clusters persist their logs. An Overwatch cluster on workspace 1 cannot simply access 
+logs on workspace 2 at some mounted location since the mounted location on workspace 2 may actually map to a different 
+target than it does on workspace 1. To solve this, Overwatch uses a "search-mounts" api to translate remote mounts to 
+fully-qualified storage paths; as such the Overwatch cluster must be authorized to directly access the fully-qualified 
+storage path hence the need for additional security authorizations. If this is not something that is possible for your 
+organization, you may still use the new deployment method and simply deploy Overwatch on each workspace similar to 
+the traditional method and nothing changes.
+
+**For AWS** -- ensure the Overwatch cluster has access to the remote s3:// paths to which clusters log
+
+**For Azure** -- An SPN should be provisioned and authorized to read to all abfss:// storage accounts / containers to 
+which cluters log. 
+See [Security Consideration]({{%relref "DeployOverwatch/configureoverwatch/securityconsiderations"%}}/#azure-storage-auth-config) 
+for more details on how to add the SPN configuration to the Overwatch Cluster..
+
+### Cluster Logs Loading Scenarios
+Examples often help simplify complex details so let's examine some scenarios. Given that Workspace 123 is where 
+Overwatch is deployed and you would like to monitor workspaces 123 and 456 with Overwatch from the single 123 
+deployment. You deploy Overwatch on Workspace 123 and configure 456 as a remote but now you need to figure out 
+how to get cluster on workspace 123 to access all the storage in the remote workspace\[s\]. This is where some 
+governance and cluster policies come in handy -- if you're organization is already forcing clusters to log to a 
+limited number of storage accounts / buckets then provisioning access here isn't too difficult.
+
+The image below illustrates how the traffic flows along with several notes about how cluster log acquisition works 
+for local and remote workspaces.
+![ClusterLogAcquisitionDiagram](/images/DataEngineer/Overwatch_Cluster_Log_Acquisition.png)
+
+Given the above diagram and a cluster logging path, below is a table of access scenarios. Notice the 
+"Overwatch Reads Logs From" field which demonstrates from which path Overwatch will load the logs in the given 
+scenario; the Overwatch cluster must have access to read from that location.
+
+| Workspace | Cluster Logging Path                | Is Mounted | Fully Qualified Storage Location       | Accessible From Deployment Workspace | Overwatch Reads Logs From              | Comments                                                                                       |
+|-----------|-------------------------------------|------------|----------------------------------------|--------------------------------------|----------------------------------------|------------------------------------------------------------------------------------------------|
+| 123       | dbfs:/mnt/cluster_logs (AWS)        | True       | s3://myCompany/logsBucket/123          | True                                 | dbfs:/mnt/cluster_logs                 | Locally mounted locations are directly accessed on deployment workspace                        |
+| 123       | dbfs:/mnt/cluster_logs (Azure)      | True       | abfss://mylogsContainer123@myComany... | True                                 | dbfs:/mnt/cluster_logs                 | Locally mounted locations are directly accessed on deployment workspace                        |
+| 123       | dbfs:/unmounted_local_path          | False      | dbfs:/unmounted_local_path             | True                                 | dbfs:/unmounted_local_path             | Locally mounted locations are directly accessed on deployment workspace                        |
+| 123       | s3://myCompany/logsBucket/123 (AWS) | False      | s3://myCompany/logsBucket/123          | True*                                | s3://myCompany/logsBucket/123          | AWS - Direct s3 path access as configured in cluster logs                                      |
+| 456       | dbfs:/mnt/cluster_logs (AWS)        | True       | s3://myCompany/logsBucket/456          | True*                                | s3://myCompany/logsBucket/456          | Remote mount point is translated to fully-qualified path and remote storage is access directly |
+| 456       | dbfs:/mnt/cluster_logs (Azure)      | True       | abfss://mylogsContainer456@myComany... | True*                                | abfss://mylogsContainer456@myComany... | Remote mount point is translated to fully-qualified path and remote storage is access directly | 
+| 456       | dbfs:/unmounted_local_path          | False      | dbfs:/unmounted_local_path             | False                                | Inaccessible                           | Root dbfs storage locations are never accessible from outside the workspace                    |
+| 456       | s3://myCompany/logsBucket/456 (AWS) | False      | s3://myCompany/logsBucket/456          | True*                                | s3://myCompany/logsBucket/456          | AWS - Direct s3 path access as configured in cluster logs                                      |
+
+\* (AWS) Assuming Instance Profile authroized to the fully qualified path location and configured
+
+\* (AZURE) Assuming SPN authroized to the fully qualified path location and configured on the Overwatch cluster
+
+### Exception - Remote Workspaces With 50+ Mounts
+In the image above, you likely noticed the alert. As of version 0.7.1.1, Overwatch can handle remote workspaces 
+with more than 50 mounts through an alternative process. 
+
+When a remote workspace has > 50 mounts and 1 or more clusters log to a mounted location, the following process must 
+be followed to acquire the logs for that path. 
+
+#### Remote Workspaces With 50+ Mounts Config Process
+The process below will allow you to bypass the API limitation and manually acquire all the mounts and their maps for 
+a workspace as a CSV. Upload this to an accessible location on the deployment workspace (i.e. Workspace 123) and add 
+it to the configuration for that workspace.
+
+Continuing the example from above, if Workspace 456 had > 50 mounts 
+* Log into the remote workspace (Workspace 456)
+* Import and Execute this Notebook **[HTML](/assets/DataEngineer/071x_Remote_Log_Mapping.html) | [DBC](/assets/DataEngineer/071x_Remote_Log_Mapping.dbc)**
+* Follow instruction in the notebook to download the results as CSV. 
+  * Download the results (all of them -- follow closely if > 1000 mounts)
+  * Name the file something meaningful so you know it corresponds to Workspace 456 (i.e. mounts_mapping_456.csv)
+* Upload to accessible location in deployment workspace (Workspace 123) such as dbfs:/Filestore/overwatch/mounts_mapping_456.csv
+* Add the path to the **mount_mapping_path** in the 
+[multi-workspace config]({{%relref "DeployOverwatch/configureoverwatch/configuration"%}}/#column-description).
+
+**Download Screenshot Example** If more than 1000 mounts use follow the screenshot exactly otherwise just hit the 
+down arrow to download
+![ClusterLogAcquisitionDiagram](/images/DataEngineer/mounts_download.png)
+
+Now Overwatch can bypass the API limitation of only being able to access 50 mounts for this remote workspace. 
+Repeat this process for all workspaces that have >50 mounts. Leave the *"mount_mapping_path"* emtpy for the workspaces
+that do not have >50 mounts and Overwatch will use the api to automatically map the mount points to 
+fully-qualified storage paths for you.
+
+**WHY SO COMPLICATED**
+The Databricks API does not support pagination and will only return a max of 50 results. This process is meant as a 
+work-around method until Databricks can update this API to support higher max results, filters, and/or pagination at 
+which time the subsequent release of Overwatch will omit this complexity.
+
 ## Joining With Slow Changing Dimensions (SCD)
 The nature of time throughout the Overwatch project has resulted in the need to for
 advanced time-series DataFrame management. As such, a vanilla version of
@@ -247,44 +389,3 @@ metricDf.toTSDF("timestamp", "cluster_id")
   .df
   .show(20, false)
 ```
-
-## Getting a Strong First Run
-The first run is likely the most important as it initializes all the slow-changing dimensions and sets the stage for 
-subsequent runs. Follow the steps below to get a strong start.
-
-### Test First
-Let's test before trying to dive right into loading a year+ of historical data. Set the primordial date to today - 
-5 days and run the pipeline. Then review the pipReport:
-```scala
-display(
-  table("overwatch_etl.pipReport")
-    .orderBy('Pipeline_SnapTS.desc)
-)
-```
-and validate that all the modules are operating as expected. Once you're certain all the modules are executing 
-properly, [run a full cleanup]({{%relref "FAQ"%}}/##q1-how-to-clean-re-deploy) and update the parameters to load 
-historical data and begin your production deployment.
-
-### Historical Loading
-Recommended max historical load is 30 days on AWS and 7 days on Azure.
-
-**DISABLE SPOT INSTANCES** -- when loading historical data, the last thing you want is to get nearly complete 
-loading non-splittable sources just to have the node killed to spot instance termination and have to restart the process. 
-It's likely more expensive to try and complete your first run with spot instances enabled. This may also be true in 
-production daily runs but it determines on your spot market availability and how often nodes are reclaimed during 
-your daily run.
-
-If you're in AWS and planning to load a year of historical data because you have the audit logs to warrant it, that's 
-great but note that several of the critical APIs such as clusterEvents and sqlQueryHistory don't store data for that 
-long. ClusterEvents in particular is key for calculating utilization and costs; thus you need to determine if the 
-historical data you're going to get is really worth loading all of this history. Additionally, sparkEvents will only 
-load so much history based on cluster log availability and will likely not load logs for historically transient clusters 
-since Overwatch will look for the clusterEvents, they will be missing for a jobs cluster from 6 months ago and Overwatch 
-will determine there's no activity on the cluster and not scan its directories.
-
-Lastly, note that several of the sources in bronze aren't highly parallelizable due to their sources; this means that 
-throwing more compute at this problem will only provide limited benefits.
-
-### Empty / Test / POC workspaces Aren't A Valid Test
-If most of your scopes are empty (i.e. you've never run any jobs and only have 1 cluster without logging enabled) most 
-of the modules will be skipped and provide no insight as to if Overwatch is configured correctly for production.

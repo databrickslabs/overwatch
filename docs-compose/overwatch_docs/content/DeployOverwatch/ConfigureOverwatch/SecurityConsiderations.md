@@ -10,14 +10,14 @@ a token that is authorized to access the platform. The account that owns the tok
 read access to the assets you wish to manage. If the token owner is a non-admin account the account must be granted 
 read level access to the assets to be monitored.
 
-Scope | Access Required
-:----------------|:-----------------------------------------
-**clusters**|Can Attach To -- all clusters
-**clusterEvents**|Can Attach To -- all clusters
-**pools**|Read -- all Pools
-**jobs**|Read -- all Jobs
-**dbsql**|Read -- all Warehouses
-**accounts**|Token **MUST BE ADMIN**
+| Scope             | Access Required               |
+|:------------------|:------------------------------|
+| **clusters**      | Can Attach To -- all clusters |
+| **clusterEvents** | Can Attach To -- all clusters |
+| **pools**         | Read -- all Pools             |
+| **jobs**          | Read -- all Jobs              |
+| **dbsql**         | Read -- all Warehouses        |
+| **accounts**      | Token **MUST BE ADMIN**       |
 
 If the scope is not referenced above it does not require API access
 
@@ -92,3 +92,13 @@ spark.hadoop.fs.azure.account.oauth2.client.secret {{secrets/<SCOPE_NAME>/<KEY_N
 spark.hadoop.fs.azure.account.oauth2.client.endpoint https://login.microsoftonline.com/<directory-id>/oauth2/token
 ```
 
+## Accessing The Data From DBSQL with UC enabled on the workspace
+To provide access to the views in DBSQL follow the steps below. Note, you will need an account admin to complete 
+these steps. More details on these steps can be found in the 
+[Databricks documentation](https://docs.databricks.com/sql/language-manual/sql-ref-external-locations.html). These 
+steps are necessary since the Overwatch tables are stored as external tables so direct access to the storage for the 
+users must be provisioned through DBSQL.
+* Grant user appropriate access to the schema / tables
+* Create a storage credential for DBSQL
+* Create an external location that points to the Overwatch Storage Credential
+* Grant users access to the External Location

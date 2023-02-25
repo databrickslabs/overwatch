@@ -52,7 +52,7 @@ Many users forget to enable cluster logging and without it Overwatch cannot prov
       <pubDate>Mon, 12 Dec 2022 11:41:13 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/</guid>
-      <description>Quick Reference Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run. For small/medium workspaces, 20-40 minutes should be expected for each run.</description>
+      <description>Quick Reference Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Optimizing Overwatch Maximizing First Run Potential Historical Loads Cluster Logs Ingest Details Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run.</description>
     </item>
     
   </channel>
