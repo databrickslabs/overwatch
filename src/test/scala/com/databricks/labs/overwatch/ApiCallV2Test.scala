@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
-import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv}
+import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv, SparkSessionWrapper}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
@@ -96,8 +96,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         apiEnv,
         endPoint,
         query,
-        tempSuccessPath = "src/test/scala/tempDir/sqlqueryhistory",
-        accumulator = acc
+        tempSuccessPath = "src/test/scala/tempDir/sqlqueryhistory"
       ).execute().asDF() != null)
     }
 
@@ -160,15 +159,15 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
     it("comparison test for jobs/list API") {
       val endPoint = "jobs/list"
       val oldAPI = ApiCall(endPoint, apiEnv).executeGet().asDF
-       val query = Map(
-         "limit"->"2",
-         "expand_tasks"->"true",
-         "offset"->"0"
-       )
-       val newAPI =  ApiCallV2(apiEnv, endPoint,query,2.1).execute().asDF()
-       println(oldAPI.count()+"old api count")
-       println(newAPI.count()+"new api count")
-       assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
+      val query = Map(
+        "limit" -> "2",
+        "expand_tasks" -> "true",
+        "offset" -> "0"
+      )
+      val newAPI = ApiCallV2(apiEnv, endPoint, query, 2.1).execute().asDF()
+      println(oldAPI.count() + "old api count")
+      println(newAPI.count() + "new api count")
+      assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
 
     }
     it("comparison test for clusters/list API") {
@@ -206,6 +205,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       assert(oldAPI.count() == newAPI.count() && oldAPI.except(newAPI).count() == 0 && newAPI.except(oldAPI).count() == 0)
     }
     it("test multithreading") {
+      SparkSessionWrapper.parSessionsOn = true
       val endPoint = "clusters/list"
       val clusterIDsDf = ApiCallV2(apiEnv, endPoint).execute().asDF().select("cluster_id")
       clusterIDsDf.show(false)
@@ -219,14 +219,14 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       val tmpClusterEventsErrorPath = ""
       val accumulator = sc.longAccumulator("ClusterEventsAccumulator")
       for (i <- clusterIDs.indices) {
-       val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i).get(0)}""",
-          "start_time"->"1052775426000",
-          "end_time"->"1655453826000",
+        val jsonQuery = Map("cluster_id" -> s"""${clusterIDs(i).get(0)}""",
+          "start_time" -> "1052775426000",
+          "end_time" -> "1655453826000",
           "limit" -> "500"
         )
         println(jsonQuery)
         val future = Future {
-          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath,accumulator).executeMultiThread()
+          val apiObj = ApiCallV2(apiEnv, "clusters/events", jsonQuery, tmpClusterEventsSuccessPath).executeMultiThread(accumulator)
           synchronized {
             apiResponseArray.addAll(apiObj)
             if (apiResponseArray.size() >= apiEnv.successBatchSize) {
@@ -268,9 +268,9 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         }
         Thread.sleep(5000)
         currentSleepTime += 5000
-        if (accumulatorCountWhileSleeping <  accumulator.value) {//new API response received while waiting
+        if (accumulatorCountWhileSleeping < accumulator.value) { //new API response received while waiting
           currentSleepTime = 0 //resetting the sleep time
-          accumulatorCountWhileSleeping =  accumulator.value
+          accumulatorCountWhileSleeping = accumulator.value
         }
       }
       if (responseCounter != finalResponseCount) {
@@ -278,7 +278,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       }
     }
 
-    it("test sqlHistoryDF"){
+    it("test sqlHistoryDF") {
       lazy val spark: SparkSession = {
         SparkSession
           .builder()
@@ -292,22 +292,21 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
       //      val startTime =  "1665878400000".toLong // subtract 2 days for running query merge
       //      val startTime =  "1669026035073".toLong -(1000*60*60*24)// subtract 2 days for running query merge
-      val startTime =  "1669026035073".toLong
+      val startTime = "1669026035073".toLong
       val untilTime = "1669112526676".toLong
       val tempWorkingDir = ""
       println("test_started")
       val jsonQuery = Map(
         "max_results" -> "50",
         "include_metrics" -> "true",
-        "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime",
-        "filter_by.query_start_time_range.end_time_ms" ->  s"${untilTime}"
+        "filter_by.query_start_time_range.start_time_ms" -> s"$startTime",
+        "filter_by.query_start_time_range.end_time_ms" -> s"${untilTime}"
       )
       ApiCallV2(
         apiEnv,
         sqlQueryHistoryEndpoint,
         jsonQuery,
-        tempSuccessPath = s"${tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}",
-        accumulator = acc
+        tempSuccessPath = s"${tempWorkingDir}/sqlqueryhistory_silver/${System.currentTimeMillis()}"
       )
         .execute()
         .asDF()
@@ -335,7 +334,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(apiEnv.threadPoolSize))
       val tmpSqlQueryHistorySuccessPath = "/tmp/test/"
       val tmpSqlQueryHistoryErrorPath = ""
-      val startTime =  "1669026035073".toLong
+      val startTime = "1669026035073".toLong
       val untilTimeMs = "1669112526676".toLong
 
       //      val untilTimeMs = "1666182197381".toLong
@@ -343,14 +342,14 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       //      var fromTimeMs = "1662249600000".toLong - (1000*60*60*24*2)  //subtracting 2 days for running query merge
       //      var fromTimeMs = "1666182197381".toLong - (1000*60*60*24*2)
       var fromTimeMs = "1669026035073".toLong
-      val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)) // Total no. of API Calls
+      val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble / (1000 * 60 * 60)) // Total no. of API Calls
 
-      while (fromTimeMs < untilTimeMs){
-        val (startTime, endTime) = if ((untilTimeMs- fromTimeMs)/(1000*60*60) > 1) {
+      while (fromTimeMs < untilTimeMs) {
+        val (startTime, endTime) = if ((untilTimeMs - fromTimeMs) / (1000 * 60 * 60) > 1) {
           (fromTimeMs,
-            fromTimeMs+(1000*60*60))
+            fromTimeMs + (1000 * 60 * 60))
         }
-        else{
+        else {
           (fromTimeMs,
             untilTimeMs)
         }
@@ -359,10 +358,10 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
         val jsonQuery = Map(
           "max_results" -> "50",
           "include_metrics" -> "true",
-          "filter_by.query_start_time_range.start_time_ms" ->  s"$startTime", // Do we need to subtract 2 days for every API call?
-          "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
+          "filter_by.query_start_time_range.start_time_ms" -> s"$startTime", // Do we need to subtract 2 days for every API call?
+          "filter_by.query_start_time_range.end_time_ms" -> s"$endTime"
         )
-        /**TODO:
+        /** TODO:
          * Refactor the below code to make it more generic
          */
         //call future
@@ -371,13 +370,12 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
             apiEnv,
             sqlQueryHistoryEndpoint,
             jsonQuery,
-            tempSuccessPath = tmpSqlQueryHistorySuccessPath,
-            accumulator = acc
-          ).executeMultiThread()
+            tempSuccessPath = tmpSqlQueryHistorySuccessPath
+          ).executeMultiThread(acc)
 
           synchronized {
             apiObj.forEach(
-              obj=>if(obj.contains("res")){
+              obj => if (obj.contains("res")) {
                 apiResponseArray.add(obj)
               }
             )
@@ -405,7 +403,7 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
             }
             responseCounter = responseCounter + 1
         }
-        fromTimeMs = fromTimeMs+(1000*60*60)
+        fromTimeMs = fromTimeMs + (1000 * 60 * 60)
       }
       val timeoutThreshold = apiEnv.apiWaitingTime // 5 minutes
       var currentSleepTime = 0
@@ -445,8 +443,58 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
 
     }
 
-  }
 
+    it("test jobRunsList") {
+      lazy val spark: SparkSession = {
+        SparkSession
+          .builder()
+          .master("local")
+          .appName("spark session")
+          .config("spark.sql.shuffle.partitions", "1")
+          .getOrCreate()
+      }
+      var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
+
+      lazy val sc: SparkContext = spark.sparkContext
+      val jobsRunsEndpoint = "jobs/runs/list"
+      val fromTime = "1676160000000".toLong
+      val untilTime = "1676574760631".toLong
+      val tempWorkingDir = "/tmp/test/"
+      println("test_started")
+
+      val jsonQuery = Map(
+        "limit" -> "25",
+        "expand_tasks" -> "true",
+        "offset" -> "0",
+        "start_time_from" -> s"${fromTime}",
+        "start_time_to" -> s"${untilTime}"
+      )
+      val acc = sc.longAccumulator("jobRunsListAccumulator")
+      val apiObj = ApiCallV2(
+        apiEnv,
+        jobsRunsEndpoint,
+        jsonQuery,
+        tempSuccessPath = tempWorkingDir,
+        2.1
+      ).executeMultiThread(acc)
+      //        .execute()
+      //        .asDF()
+      //        .withColumn("organization_id", lit("1234"))
+      //        .show(false)
+
+      apiObj.forEach(
+        obj => if (obj.contains("res")) {
+          apiResponseArray.add(obj)
+        }
+      )
+      println(apiObj.size())
+
+      if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a final step we will write it to the persistent storage.
+        PipelineFunctions.writeMicroBatchToTempLocation(tempWorkingDir, apiResponseArray.toString)
+      }
+
+    }
+  }
 
 }
 

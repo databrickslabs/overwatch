@@ -88,6 +88,7 @@ object Schema extends SparkSessionWrapper {
     StructField("requestId", StringType, nullable = true),
     StructField("sessionId", StringType, nullable = true),
     StructField("version", StringType, nullable = true),
+    StructField("hashKey", LongType, nullable = true),
     StructField("requestParams",
       StructType(Seq(
         StructField("clusterId", StringType, nullable = true),
@@ -1031,26 +1032,26 @@ object Schema extends SparkSessionWrapper {
 
   val deployementMinimumSchema:StructType = StructType(Seq(
     StructField("workspace_name", StringType, nullable = false),
-    StructField("workspace_id", StringType, nullable = true),
-    StructField("workspace_url", StringType, nullable = true),
-    StructField("api_url", StringType, nullable = true),
-    StructField("cloud", StringType, nullable = true),
-    StructField("primordial_date", DateType, nullable = true),
-    StructField("etl_storage_prefix", StringType, nullable = true),
-    StructField("etl_database_name", StringType, nullable = true),
-    StructField("consumer_database_name", StringType, nullable = true),
-    StructField("secret_scope", StringType, nullable = true),
-    StructField("secret_key_dbpat", StringType, nullable = true),
+    StructField("workspace_id", StringType, nullable = false),
+    StructField("workspace_url", StringType, nullable = false),
+    StructField("api_url", StringType, nullable = false),
+    StructField("cloud", StringType, nullable = false),
+    StructField("primordial_date", DateType, nullable = false),
+    StructField("etl_storage_prefix", StringType, nullable = false),
+    StructField("etl_database_name", StringType, nullable = false),
+    StructField("consumer_database_name", StringType, nullable = false),
+    StructField("secret_scope", StringType, nullable = false),
+    StructField("secret_key_dbpat", StringType, nullable = false),
     StructField("auditlogprefix_source_aws", StringType, nullable = true),
     StructField("eh_name", StringType, nullable = true),
     StructField("eh_scope_key", StringType, nullable = true),
-    StructField("interactive_dbu_price", DoubleType, nullable = true),
-    StructField("automated_dbu_price", DoubleType, nullable = true),
-    StructField("sql_compute_dbu_price", DoubleType, nullable = true),
-    StructField("jobs_light_dbu_price", DoubleType, nullable = true),
-    StructField("max_days", IntegerType, nullable = true),
+    StructField("interactive_dbu_price", DoubleType, nullable = false),
+    StructField("automated_dbu_price", DoubleType, nullable = false),
+    StructField("sql_compute_dbu_price", DoubleType, nullable = false),
+    StructField("jobs_light_dbu_price", DoubleType, nullable = false),
+    StructField("max_days", IntegerType, nullable = false),
     StructField("excluded_scopes", StringType, nullable = true),
-    StructField("active", BooleanType, nullable = true),
+    StructField("active", BooleanType, nullable = false),
     StructField("proxy_host", StringType, nullable = true),
     StructField("proxy_port", IntegerType, nullable = true),
     StructField("proxy_user_name", StringType, nullable = true),
@@ -1060,6 +1061,13 @@ object Schema extends SparkSessionWrapper {
     StructField("error_batch_size", IntegerType, nullable = true),
     StructField("enable_unsafe_SSL", BooleanType, nullable = true),
     StructField("thread_pool_size", IntegerType, nullable = true),
-    StructField("api_waiting_time", LongType, nullable = true)
+    StructField("api_waiting_time", LongType, nullable = true),
+    StructField("mount_mapping_path", StringType, nullable = true)
+  ))
+
+  val mountMinimumSchema: StructType = StructType(Seq(
+    StructField("mountPoint", StringType, nullable = false),
+    StructField("source", StringType, nullable = false),
+    StructField("workspace_id", StringType, nullable = false)
   ))
 }

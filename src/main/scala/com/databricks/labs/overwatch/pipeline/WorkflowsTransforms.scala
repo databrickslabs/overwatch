@@ -18,6 +18,15 @@ object WorkflowsTransforms extends SparkSessionWrapper {
    * BEGIN Workflow generic functions
    */
 
+  /**
+   * When colIfExists expression returns a null type due to conversion to a different type set it to null and
+   * type case it to the definedNullType
+   * @param df df to fix
+   * @param fieldName name of the field to test for null types
+   * @param colIfExists expression that creates the field
+   * @param definedNullType type to cast to when expression results in nullType
+   * @return
+   */
   private def handleRootNull(df: DataFrame, fieldName: String, colIfExists: Column, definedNullType: DataType): Column = {
     val nullField = lit(null).cast(definedNullType).alias(fieldName)
     if (SchemaTools.nestedColExists(df.schema, fieldName)) {
@@ -38,6 +47,16 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
   }
 
+  /**
+   * Clean "tasks" field. This is done by exploding the the tasks, cleaning them and then rewrapping them to array
+   * using collect_list
+   * @param df df that contains the "tasks" field within the jobs / jobruns context
+   * @param keys dataframe keys as defined in pipeline_target
+   * @param emptyKeysDF empty DF with the typed keys and no data to protect against empty arrays
+   * @param pathToTasksField dot-delimited location of tasks such as settings.tasks
+   * @param cleansedTaskAlias alias of the clean tasks to return
+   * @return
+   */
   def workflowsCleanseTasks(
                              df: DataFrame,
                              keys: Array[String],
@@ -72,6 +91,16 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     } else emptyDFWKeysAndCleansedTasks // build empty DF with keys to allow the subsequent joins
   }
 
+  /**
+   * Clean "job_clusters" field. This is done by exploding the the job_clusters, cleaning them and then
+   * rewrapping them to array using collect_list
+   * @param df df that contains the "job_clusters" field within the jobs / jobruns context
+   * @param keys dataframe keys as defined in pipeline_target
+   * @param emptyKeysDF empty DF with the typed keys and no data to protect against empty arrays
+   * @param pathToJobClustersField dot-delimited location of tasks such as settings.job_clusters
+   * @param cleansedJobClustersAlias alias of the clean job_clusters to return
+   * @return
+   */
   def workflowsCleanseJobClusters(
                                    df: DataFrame,
                                    keys: Array[String],
