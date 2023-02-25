@@ -12,21 +12,21 @@
     <title>AdvancedTopics :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1677361329" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1677361329" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1677361329"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1671311759"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1677361329"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1677361329"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1677361329"></script>
 
     
   </div>
@@ -888,7 +888,6 @@
         <li><a href="#using-the-workspace">Using the Workspace</a></li>
       </ul>
     </li>
-    <li><a href="#joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</a></li>
     <li><a href="#getting-a-strong-first-run">Getting a Strong First Run</a>
       <ul>
         <li><a href="#test-first">Test First</a></li>
@@ -896,6 +895,13 @@
         <li><a href="#empty--test--poc-workspaces-arent-a-valid-test">Empty / Test / POC workspaces Aren&rsquo;t A Valid Test</a></li>
       </ul>
     </li>
+    <li><a href="#cluster-logs-ingest-details">Cluster Logs Ingest Details</a>
+      <ul>
+        <li><a href="#cluster-logs-loading-scenarios">Cluster Logs Loading Scenarios</a></li>
+        <li><a href="#exception---remote-workspaces-with-50-mounts">Exception - Remote Workspaces With 50+ Mounts</a></li>
+      </ul>
+    </li>
+    <li><a href="#joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</a></li>
   </ul>
 </nav>
     </div>
@@ -924,8 +930,14 @@
 <ul>
 <li><a href="#externalize-optimize--z-order-as-of-060">Externalize Optimize &amp; Z-Order</a></li>
 <li><a href="#interacting-with-overwatch-and-its-state">Interacting With Overwatch and its State</a></li>
-<li><a href="#joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</a></li>
 <li><a href="#optimizing-overwatch">Optimizing Overwatch</a></li>
+<li><a href="#getting-a-strong-first-run">Maximizing First Run Potential</a>
+<ul>
+<li><a href="#historical-loading">Historical Loads</a></li>
+</ul>
+</li>
+<li><a href="#cluster-logs-ingest-details">Cluster Logs Ingest Details</a></li>
+<li><a href="#joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</a></li>
 </ul>
 <h2 id="optimizing-overwatch">Optimizing Overwatch</h2>
 <p><strong>Expectation Check</strong> Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline
@@ -962,6 +974,13 @@ thus should be run on a larger, autoscaling cluster. Lastly, by externalizing th
 need be carried out on a single workspace per Overwatch output target (i.e. storage prefix target).</p>
 <h3 id="additional-optimization-considerations">Additional Optimization Considerations</h3>
 <ul>
+<li>As of 0.7.0 Use DBR 11.3 LTS
+<ul>
+<li>Photon can significantly improve runtimes. Mileage will vary by customer depending on data sizes and skews of
+certain modules, so feel free to turn it on and use Overwatch to determine whether Photon is the right answer for
+your needs.</li>
+</ul>
+</li>
 <li>As of 0.6.1 disable Photon
 <ul>
 <li>Photon will be the focus of optimization in DBR 11.xLTS+</li>
@@ -1120,7 +1139,197 @@ reasonably helpful attributes making the target definition even more powerful.</
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e">// If you want to get the global dataframe
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> auditLogGlobalDF <span style="color:#66d9ef">=</span> auditLogTarget<span style="color:#f92672">.</span>asDF<span style="color:#f92672">(</span>withGlobalFilters <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">false</span><span style="color:#f92672">)</span>
-</span></span></code></pre></div><h2 id="joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</h2>
+</span></span></code></pre></div><h2 id="getting-a-strong-first-run">Getting a Strong First Run</h2>
+<p>The first run is likely the most important as it initializes all the slow-changing dimensions and sets the stage for
+subsequent runs. Follow the steps below to get a strong start.</p>
+<h3 id="test-first">Test First</h3>
+<p>Let&rsquo;s test before trying to dive right into loading a year+ of historical data. Set the primordial date to today -
+5 days and run the pipeline. Then review the pipReport:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span>display<span style="color:#f92672">(</span>
+</span></span><span style="display:flex;"><span>  table<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;overwatch_etl.pipReport&#34;</span><span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">.</span>orderBy<span style="color:#f92672">(</span>&#39;Pipeline_SnapTS<span style="color:#f92672">.</span>desc<span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>and validate that all the modules are operating as expected. Once you&rsquo;re certain all the modules are executing
+properly, <a href="https://databrickslabs.github.io/overwatch/faq//##q1-how-to-clean-re-deploy">run a full cleanup</a> and update the parameters to load
+historical data and begin your production deployment.</p>
+<h3 id="historical-loading">Historical Loading</h3>
+<p>Recommended max historical load is 30 days on AWS and 7 days on Azure.</p>
+<p><strong>DISABLE SPOT INSTANCES</strong> &ndash; when loading historical data, the last thing you want is to get nearly complete
+loading non-splittable sources just to have the node killed to spot instance termination and have to restart the process.
+It&rsquo;s likely more expensive to try and complete your first run with spot instances enabled. This may also be true in
+production daily runs but it determines on your spot market availability and how often nodes are reclaimed during
+your daily run.</p>
+<p>If you&rsquo;re in AWS and planning to load a year of historical data because you have the audit logs to warrant it, that&rsquo;s
+great but note that several of the critical APIs such as clusterEvents and sqlQueryHistory don&rsquo;t store data for that
+long. ClusterEvents in particular is key for calculating utilization and costs; thus you need to determine if the
+historical data you&rsquo;re going to get is really worth loading all of this history. Additionally, sparkEvents will only
+load so much history based on cluster log availability and will likely not load logs for historically transient clusters
+since Overwatch will look for the clusterEvents, they will be missing for a jobs cluster from 6 months ago and Overwatch
+will determine there&rsquo;s no activity on the cluster and not scan its directories.</p>
+<p>Lastly, note that several of the sources in bronze aren&rsquo;t highly parallelizable due to their sources; this means that
+throwing more compute at this problem will only provide limited benefits.</p>
+<h3 id="empty--test--poc-workspaces-arent-a-valid-test">Empty / Test / POC workspaces Aren&rsquo;t A Valid Test</h3>
+<p>If most of your scopes are empty (i.e. you&rsquo;ve never run any jobs and only have 1 cluster without logging enabled) most
+of the modules will be skipped and provide no insight as to if Overwatch is configured correctly for production.</p>
+<h2 id="cluster-logs-ingest-details">Cluster Logs Ingest Details</h2>
+<p>For Overwatch to load the right-side of the ERD (Spark UI) the compute that executes the Spark Workloads must
+have cluster logging enabled and Overwatch must be able to load these logs. To do this, Overwatch uses its own data to
+determine the logging locations of all clusters and identifies clusters that have created logs within the Pipeline
+run&rsquo;s time window (i.e. Jan 1 2023 &ndash;&gt; Jan 2 2023).</p>
+<p>Historically (legacy deployments), this was fairly simple as all the logging locations were generally accessible
+from the workspace on which Overwatch Pipeline was running (since there was one Overwatch Pipeline on each
+workspace). There was massive demand to enable remote workspace monitoring such that Overwatch is only needed to be
+deployed on a single workspace and can monitor one or many local/remote workspaces from a centralized location.</p>
+<p>As a result of this, the security requirements became a bit more involved to ensure the Overwatch cluster has access
+to all the storage where clusters persist their logs. An Overwatch cluster on workspace 1 cannot simply access
+logs on workspace 2 at some mounted location since the mounted location on workspace 2 may actually map to a different
+target than it does on workspace 1. To solve this, Overwatch uses a &ldquo;search-mounts&rdquo; api to translate remote mounts to
+fully-qualified storage paths; as such the Overwatch cluster must be authorized to directly access the fully-qualified
+storage path hence the need for additional security authorizations. If this is not something that is possible for your
+organization, you may still use the new deployment method and simply deploy Overwatch on each workspace similar to
+the traditional method and nothing changes.</p>
+<p><strong>For AWS</strong> &ndash; ensure the Overwatch cluster has access to the remote s3:// paths to which clusters log</p>
+<p><strong>For Azure</strong> &ndash; An SPN should be provisioned and authorized to read to all abfss:// storage accounts / containers to
+which cluters log.
+See <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations//#azure-storage-auth-config">Security Consideration</a>
+for more details on how to add the SPN configuration to the Overwatch Cluster..</p>
+<h3 id="cluster-logs-loading-scenarios">Cluster Logs Loading Scenarios</h3>
+<p>Examples often help simplify complex details so let&rsquo;s examine some scenarios. Given that Workspace 123 is where
+Overwatch is deployed and you would like to monitor workspaces 123 and 456 with Overwatch from the single 123
+deployment. You deploy Overwatch on Workspace 123 and configure 456 as a remote but now you need to figure out
+how to get cluster on workspace 123 to access all the storage in the remote workspace[s]. This is where some
+governance and cluster policies come in handy &ndash; if you&rsquo;re organization is already forcing clusters to log to a
+limited number of storage accounts / buckets then provisioning access here isn&rsquo;t too difficult.</p>
+<p>The image below illustrates how the traffic flows along with several notes about how cluster log acquisition works
+for local and remote workspaces.
+<img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/Overwatch_Cluster_Log_Acquisition.png" alt="ClusterLogAcquisitionDiagram"></p>
+<p>Given the above diagram and a cluster logging path, below is a table of access scenarios. Notice the
+&ldquo;Overwatch Reads Logs From&rdquo; field which demonstrates from which path Overwatch will load the logs in the given
+scenario; the Overwatch cluster must have access to read from that location.</p>
+<table>
+<thead>
+<tr>
+<th>Workspace</th>
+<th>Cluster Logging Path</th>
+<th>Is Mounted</th>
+<th>Fully Qualified Storage Location</th>
+<th>Accessible From Deployment Workspace</th>
+<th>Overwatch Reads Logs From</th>
+<th>Comments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>123</td>
+<td>dbfs:/mnt/cluster_logs (AWS)</td>
+<td>True</td>
+<td>s3://myCompany/logsBucket/123</td>
+<td>True</td>
+<td>dbfs:/mnt/cluster_logs</td>
+<td>Locally mounted locations are directly accessed on deployment workspace</td>
+</tr>
+<tr>
+<td>123</td>
+<td>dbfs:/mnt/cluster_logs (Azure)</td>
+<td>True</td>
+<td>abfss://mylogsContainer123@myComany&hellip;</td>
+<td>True</td>
+<td>dbfs:/mnt/cluster_logs</td>
+<td>Locally mounted locations are directly accessed on deployment workspace</td>
+</tr>
+<tr>
+<td>123</td>
+<td>dbfs:/unmounted_local_path</td>
+<td>False</td>
+<td>dbfs:/unmounted_local_path</td>
+<td>True</td>
+<td>dbfs:/unmounted_local_path</td>
+<td>Locally mounted locations are directly accessed on deployment workspace</td>
+</tr>
+<tr>
+<td>123</td>
+<td>s3://myCompany/logsBucket/123 (AWS)</td>
+<td>False</td>
+<td>s3://myCompany/logsBucket/123</td>
+<td>True*</td>
+<td>s3://myCompany/logsBucket/123</td>
+<td>AWS - Direct s3 path access as configured in cluster logs</td>
+</tr>
+<tr>
+<td>456</td>
+<td>dbfs:/mnt/cluster_logs (AWS)</td>
+<td>True</td>
+<td>s3://myCompany/logsBucket/456</td>
+<td>True*</td>
+<td>s3://myCompany/logsBucket/456</td>
+<td>Remote mount point is translated to fully-qualified path and remote storage is access directly</td>
+</tr>
+<tr>
+<td>456</td>
+<td>dbfs:/mnt/cluster_logs (Azure)</td>
+<td>True</td>
+<td>abfss://mylogsContainer456@myComany&hellip;</td>
+<td>True*</td>
+<td>abfss://mylogsContainer456@myComany&hellip;</td>
+<td>Remote mount point is translated to fully-qualified path and remote storage is access directly</td>
+</tr>
+<tr>
+<td>456</td>
+<td>dbfs:/unmounted_local_path</td>
+<td>False</td>
+<td>dbfs:/unmounted_local_path</td>
+<td>False</td>
+<td>Inaccessible</td>
+<td>Root dbfs storage locations are never accessible from outside the workspace</td>
+</tr>
+<tr>
+<td>456</td>
+<td>s3://myCompany/logsBucket/456 (AWS)</td>
+<td>False</td>
+<td>s3://myCompany/logsBucket/456</td>
+<td>True*</td>
+<td>s3://myCompany/logsBucket/456</td>
+<td>AWS - Direct s3 path access as configured in cluster logs</td>
+</tr>
+</tbody>
+</table>
+<p>* (AWS) Assuming Instance Profile authroized to the fully qualified path location and configured</p>
+<p>* (AZURE) Assuming SPN authroized to the fully qualified path location and configured on the Overwatch cluster</p>
+<h3 id="exception---remote-workspaces-with-50-mounts">Exception - Remote Workspaces With 50+ Mounts</h3>
+<p>In the image above, you likely noticed the alert. As of version 0.7.1.1, Overwatch can handle remote workspaces
+with more than 50 mounts through an alternative process.</p>
+<p>When a remote workspace has &gt; 50 mounts and 1 or more clusters log to a mounted location, the following process must
+be followed to acquire the logs for that path.</p>
+<h4 id="remote-workspaces-with-50-mounts-config-process">Remote Workspaces With 50+ Mounts Config Process</h4>
+<p>The process below will allow you to bypass the API limitation and manually acquire all the mounts and their maps for
+a workspace as a CSV. Upload this to an accessible location on the deployment workspace (i.e. Workspace 123) and add
+it to the configuration for that workspace.</p>
+<p>Continuing the example from above, if Workspace 456 had &gt; 50 mounts</p>
+<ul>
+<li>Log into the remote workspace (Workspace 456)</li>
+<li>Import and Execute this Notebook <strong><a href="https://databrickslabs.github.io/overwatch/assets/DataEngineer/071x_Remote_Log_Mapping.html">HTML</a> | <a href="https://databrickslabs.github.io/overwatch/assets/DataEngineer/071x_Remote_Log_Mapping.dbc">DBC</a></strong></li>
+<li>Follow instruction in the notebook to download the results as CSV.
+<ul>
+<li>Download the results (all of them &ndash; follow closely if &gt; 1000 mounts)</li>
+<li>Name the file something meaningful so you know it corresponds to Workspace 456 (i.e. mounts_mapping_456.csv)</li>
+</ul>
+</li>
+<li>Upload to accessible location in deployment workspace (Workspace 123) such as dbfs:/Filestore/overwatch/mounts_mapping_456.csv</li>
+<li>Add the path to the <strong>mount_mapping_path</strong> in the
+<a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration//#column-description">multi-workspace config</a>.</li>
+</ul>
+<p><strong>Download Screenshot Example</strong> If more than 1000 mounts use follow the screenshot exactly otherwise just hit the
+down arrow to download
+<img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/mounts_download.png" alt="ClusterLogAcquisitionDiagram"></p>
+<p>Now Overwatch can bypass the API limitation of only being able to access 50 mounts for this remote workspace.
+Repeat this process for all workspaces that have &gt;50 mounts. Leave the <em>&ldquo;mount_mapping_path&rdquo;</em> emtpy for the workspaces
+that do not have &gt;50 mounts and Overwatch will use the api to automatically map the mount points to
+fully-qualified storage paths for you.</p>
+<p><strong>WHY SO COMPLICATED</strong>
+The Databricks API does not support pagination and will only return a max of 50 results. This process is meant as a
+work-around method until Databricks can update this API to support higher max results, filters, and/or pagination at
+which time the subsequent release of Overwatch will omit this complexity.</p>
+<h2 id="joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</h2>
 <p>The nature of time throughout the Overwatch project has resulted in the need to for
 advanced time-series DataFrame management. As such, a vanilla version of
 <a href="https://github.com/databrickslabs/tempo">databrickslabs/tempo</a> was implemented
@@ -1159,39 +1368,7 @@ value at the time of some event in a driving table.</p>
 </span></span><span style="display:flex;"><span>  <span style="color:#f92672">)</span>
 </span></span><span style="display:flex;"><span>  <span style="color:#f92672">.</span>df
 </span></span><span style="display:flex;"><span>  <span style="color:#f92672">.</span>show<span style="color:#f92672">(</span><span style="color:#ae81ff">20</span><span style="color:#f92672">,</span> <span style="color:#66d9ef">false</span><span style="color:#f92672">)</span>
-</span></span></code></pre></div><h2 id="getting-a-strong-first-run">Getting a Strong First Run</h2>
-<p>The first run is likely the most important as it initializes all the slow-changing dimensions and sets the stage for
-subsequent runs. Follow the steps below to get a strong start.</p>
-<h3 id="test-first">Test First</h3>
-<p>Let&rsquo;s test before trying to dive right into loading a year+ of historical data. Set the primordial date to today -
-5 days and run the pipeline. Then review the pipReport:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span>display<span style="color:#f92672">(</span>
-</span></span><span style="display:flex;"><span>  table<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;overwatch_etl.pipReport&#34;</span><span style="color:#f92672">)</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">.</span>orderBy<span style="color:#f92672">(</span>&#39;Pipeline_SnapTS<span style="color:#f92672">.</span>desc<span style="color:#f92672">)</span>
-</span></span><span style="display:flex;"><span><span style="color:#f92672">)</span>
-</span></span></code></pre></div><p>and validate that all the modules are operating as expected. Once you&rsquo;re certain all the modules are executing
-properly, <a href="https://databrickslabs.github.io/overwatch/faq//##q1-how-to-clean-re-deploy">run a full cleanup</a> and update the parameters to load
-historical data and begin your production deployment.</p>
-<h3 id="historical-loading">Historical Loading</h3>
-<p>Recommended max historical load is 30 days on AWS and 7 days on Azure.</p>
-<p><strong>DISABLE SPOT INSTANCES</strong> &ndash; when loading historical data, the last thing you want is to get nearly complete
-loading non-splittable sources just to have the node killed to spot instance termination and have to restart the process.
-It&rsquo;s likely more expensive to try and complete your first run with spot instances enabled. This may also be true in
-production daily runs but it determines on your spot market availability and how often nodes are reclaimed during
-your daily run.</p>
-<p>If you&rsquo;re in AWS and planning to load a year of historical data because you have the audit logs to warrant it, that&rsquo;s
-great but note that several of the critical APIs such as clusterEvents and sqlQueryHistory don&rsquo;t store data for that
-long. ClusterEvents in particular is key for calculating utilization and costs; thus you need to determine if the
-historical data you&rsquo;re going to get is really worth loading all of this history. Additionally, sparkEvents will only
-load so much history based on cluster log availability and will likely not load logs for historically transient clusters
-since Overwatch will look for the clusterEvents, they will be missing for a jobs cluster from 6 months ago and Overwatch
-will determine there&rsquo;s no activity on the cluster and not scan its directories.</p>
-<p>Lastly, note that several of the sources in bronze aren&rsquo;t highly parallelizable due to their sources; this means that
-throwing more compute at this problem will only provide limited benefits.</p>
-<h3 id="empty--test--poc-workspaces-arent-a-valid-test">Empty / Test / POC workspaces Aren&rsquo;t A Valid Test</h3>
-<p>If most of your scopes are empty (i.e. you&rsquo;ve never run any jobs and only have 1 cluster without logging enabled) most
-of the modules will be skipped and provide no insight as to if Overwatch is configured correctly for production.</p>
-
+</span></span></code></pre></div>
 
 <footer class="footline">
 	
@@ -1724,19 +1901,19 @@ of the modules will be skipped and provide no insight as to if Overwatch is conf
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1677361330"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1677361330"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1671311759" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1671311759"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1677361330" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1677361330"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

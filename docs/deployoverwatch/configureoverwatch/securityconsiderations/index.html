@@ -12,21 +12,21 @@
     <title>Security Considerations :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1677361329" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1677361329" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1677361329"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1671311759"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1677361329"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1677361329"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1677361329"></script>
 
     
   </div>
@@ -889,6 +889,7 @@
     </li>
     <li><a href="#event-hub-access-azure-only">Event Hub Access (AZURE ONLY)</a></li>
     <li><a href="#azure-storage-auth-config">Azure Storage Auth Config</a></li>
+    <li><a href="#accessing-the-data-from-dbsql-with-uc-enabled-on-the-workspace">Accessing The Data From DBSQL with UC enabled on the workspace</a></li>
   </ul>
 </nav>
     </div>
@@ -1019,7 +1020,19 @@ spark.hadoop.fs.azure.account.oauth.provider.type org.apache.hadoop.fs.azurebfs.
 spark.hadoop.fs.azure.account.oauth2.client.id &lt;application-id&gt;
 spark.hadoop.fs.azure.account.oauth2.client.secret {{secrets/&lt;SCOPE_NAME&gt;/&lt;KEY_NAME&gt;}}
 spark.hadoop.fs.azure.account.oauth2.client.endpoint https://login.microsoftonline.com/&lt;directory-id&gt;/oauth2/token
-</code></pre>
+</code></pre><h2 id="accessing-the-data-from-dbsql-with-uc-enabled-on-the-workspace">Accessing The Data From DBSQL with UC enabled on the workspace</h2>
+<p>To provide access to the views in DBSQL follow the steps below. Note, you will need an account admin to complete
+these steps. More details on these steps can be found in the
+<a href="https://docs.databricks.com/sql/language-manual/sql-ref-external-locations.html">Databricks documentation</a>. These
+steps are necessary since the Overwatch tables are stored as external tables so direct access to the storage for the
+users must be provisioned through DBSQL.</p>
+<ul>
+<li>Grant user appropriate access to the schema / tables</li>
+<li>Create a storage credential for DBSQL</li>
+<li>Create an external location that points to the Overwatch Storage Credential</li>
+<li>Grant users access to the External Location</li>
+</ul>
+
 
 <footer class="footline">
 	
@@ -1553,19 +1566,19 @@ spark.hadoop.fs.azure.account.oauth2.client.endpoint https://login.microsoftonli
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1677361329"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1677361329"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1677361329"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1677361329"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1677361329"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1677361329"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1677361329"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1677361329"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1677361329"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1671311759" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1671311759"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1677361329" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1677361329"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

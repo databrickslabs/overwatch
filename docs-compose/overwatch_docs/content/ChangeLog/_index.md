@@ -21,7 +21,9 @@ details of script are in the script.
 ### Noteworthy New Features
 * Remote workspaces with >50 mounts supported
 * Several new bronze tables
-  * job_runs_snapshot_bronze
+  * job_runs_snapshot_bronze -- Experimental
+    * To enable add spark config to cluster `overwatch.experimental.enablejobrunsnapshot true`
+    * [more details here under the modules table]({{%relref "DataEngineer/Pipeline_Management"%}}/#module-dependencies-diagram)
   * libs_snapshot_bronze
   * policies_snapshot_bronze
   * instance_profiles_snapshot_bronze (AWS)
@@ -31,7 +33,6 @@ details of script are in the script.
   * Allows simple updates to config without download/upload of new config CSV
 * Threaded spark session to avoid collisions
 * Table locking for parallel workspace ingestion (avoids delta concurrent write errors)
-
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/16)
 

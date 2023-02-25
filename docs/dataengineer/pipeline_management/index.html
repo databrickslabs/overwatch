@@ -12,21 +12,21 @@
     <title>Pipeline_Management :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1671311759" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1677361329" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1677361329" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1671311759" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1677361329" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1677361329"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1671311759"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1677361329"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1677361329"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1671311759"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1677361329"></script>
 
     
   </div>
@@ -982,9 +982,9 @@ fully build out the implicit schemas and small enough data to get through an ini
 <p>More best practices can be found in the <a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/#best-practices">Best Practices</a>
 section; these are especially important to reference when getting started.</p>
 <h2 id="the-pipeline-report">The Pipeline Report</h2>
-<p>The Pipeline_Report table controls the start/stop points for each module and tracks the status of each run.
-Manipulating this table will change the way Overwatch executes so be sure to read the rest of this page before
-altering this table.</p>
+<p>The Pipeline_Report table is the state table for the Overwatch pipeline. This table controls the start/stop points
+for each module and tracks the status of each run. Manipulating this table will change the way Overwatch executes
+so be sure to read the rest of this page before altering this table.</p>
 <p>The Pipeline Report is very useful for identifying issues in the pipeline. Each module, each run is detailed here.
 The structure of the table is outlined <a href="#pipeline_report-structure">below</a>.</p>
 <p>A <em>pipReport</em> view has been created atop the pipeline_report table to simplify reviewing the historical runs. The
@@ -1112,6 +1112,7 @@ progression of the &ldquo;until&rdquo; time as no data is not considered an erro
 <th style="text-align:left">Module Name</th>
 <th style="text-align:left">Target Table Name</th>
 <th style="text-align:left">Module ID Dependencies</th>
+<th>As Of</th>
 </tr>
 </thead>
 <tbody>
@@ -1119,220 +1120,303 @@ progression of the &ldquo;until&rdquo; time as no data is not considered an erro
 <td style="text-align:left">1001</td>
 <td style="text-align:left">Bronze_Jobs_Snapshot</td>
 <td style="text-align:left">jobs_snapshot_bronze</td>
-<td></td>
+<td style="text-align:left"></td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">1002</td>
 <td style="text-align:left">Bronze_Clusters_Snapshot</td>
 <td style="text-align:left">clusters_snapshot_bronze</td>
-<td></td>
+<td style="text-align:left"></td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">1003</td>
 <td style="text-align:left">Bronze_Pools</td>
 <td style="text-align:left">pools_snapshot_bronze</td>
-<td></td>
+<td style="text-align:left"></td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">1004</td>
 <td style="text-align:left">Bronze_AuditLogs</td>
 <td style="text-align:left">audit_log_bronze</td>
-<td></td>
+<td style="text-align:left"></td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">1005</td>
 <td style="text-align:left">Bronze_ClusterEventLogs</td>
 <td style="text-align:left">cluster_events_bronze</td>
 <td style="text-align:left">1004</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">1006</td>
 <td style="text-align:left">Bronze_SparkEventLogs</td>
 <td style="text-align:left">spark_events_bronze</td>
 <td style="text-align:left">1004</td>
+<td>0.6.0</td>
+</tr>
+<tr>
+<td style="text-align:left">1007</td>
+<td style="text-align:left">Bronze_Libraries_Snapshot</td>
+<td style="text-align:left">libs_snapshot_bronze</td>
+<td style="text-align:left"></td>
+<td>0.7.1.1</td>
+</tr>
+<tr>
+<td style="text-align:left">1008</td>
+<td style="text-align:left">Bronze_Policies_Snapshot</td>
+<td style="text-align:left">policies_snapshot_bronze</td>
+<td style="text-align:left"></td>
+<td>0.7.1.1</td>
+</tr>
+<tr>
+<td style="text-align:left">1009</td>
+<td style="text-align:left">Bronze_Instance_Profile_Snapshot</td>
+<td style="text-align:left">instance_profiles_snapshot_bronze</td>
+<td style="text-align:left"></td>
+<td>0.7.1.1</td>
+</tr>
+<tr>
+<td style="text-align:left">1010</td>
+<td style="text-align:left">Bronze_Token_Snapshot</td>
+<td style="text-align:left">tokens_snapshot_bronze</td>
+<td style="text-align:left"></td>
+<td>0.7.1.1</td>
+</tr>
+<tr>
+<td style="text-align:left">1011</td>
+<td style="text-align:left">Bronze_Global_Init_Scripts_Snapshot</td>
+<td style="text-align:left">global_inits_snapshot_bronze</td>
+<td style="text-align:left"></td>
+<td>0.7.1.1</td>
+</tr>
+<tr>
+<td style="text-align:left">1012</td>
+<td style="text-align:left">Bronze_Job_Runs_Snapshot*</td>
+<td style="text-align:left">job_runs_snapshot_bronze</td>
+<td style="text-align:left"></td>
+<td>0.7.1.1</td>
 </tr>
 <tr>
 <td style="text-align:left">2003</td>
 <td style="text-align:left">Silver_SPARK_Executors</td>
 <td style="text-align:left">spark_executors_silver</td>
 <td style="text-align:left">1006</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2005</td>
 <td style="text-align:left">Silver_SPARK_Executions</td>
 <td style="text-align:left">spark_executions_silver</td>
 <td style="text-align:left">1006</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2006</td>
 <td style="text-align:left">Silver_SPARK_Jobs</td>
 <td style="text-align:left">spark_jobs_silver</td>
 <td style="text-align:left">1006</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2007</td>
 <td style="text-align:left">Silver_SPARK_Stages</td>
 <td style="text-align:left">spark_stages_silver</td>
 <td style="text-align:left">1006</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2008</td>
 <td style="text-align:left">Silver_SPARK_Tasks</td>
 <td style="text-align:left">spark_tasks_silver</td>
 <td style="text-align:left">1006</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2009</td>
 <td style="text-align:left">Silver_PoolsSpec</td>
 <td style="text-align:left">pools_silver</td>
 <td style="text-align:left">1003,1004</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2010</td>
 <td style="text-align:left">Silver_JobsStatus</td>
 <td style="text-align:left">job_status_silver</td>
 <td style="text-align:left">1004</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2011</td>
 <td style="text-align:left">Silver_JobsRuns</td>
 <td style="text-align:left">jobrun_silver</td>
 <td style="text-align:left">1004,2010,2014</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2014</td>
 <td style="text-align:left">Silver_ClusterSpec</td>
 <td style="text-align:left">cluster_spec_silver</td>
 <td style="text-align:left">1004</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2016</td>
 <td style="text-align:left">Silver_AccountLogins</td>
 <td style="text-align:left">accountlogin</td>
 <td style="text-align:left">1004</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2017</td>
 <td style="text-align:left">Silver_ModifiedAccounts</td>
 <td style="text-align:left">account_mods_silver</td>
 <td style="text-align:left">1004</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2018</td>
 <td style="text-align:left">Silver_Notebooks</td>
 <td style="text-align:left">notebook_silver</td>
 <td style="text-align:left">1004</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2019</td>
 <td style="text-align:left">Silver_ClusterStateDetail</td>
 <td style="text-align:left">cluster_state_detail_silver</td>
 <td style="text-align:left">1005</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">2020</td>
 <td style="text-align:left">Silver_SQLQueryHistory</td>
 <td style="text-align:left">sql_query_history_silver</td>
 <td style="text-align:left">1004</td>
+<td>0.7.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3001</td>
 <td style="text-align:left">Gold_Cluster</td>
 <td style="text-align:left">cluster_gold</td>
 <td style="text-align:left">2014</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3002</td>
 <td style="text-align:left">Gold_Job</td>
 <td style="text-align:left">job_gold</td>
 <td style="text-align:left">2010</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3003</td>
 <td style="text-align:left">Gold_JobRun</td>
 <td style="text-align:left">jobrun_gold</td>
 <td style="text-align:left">2011</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3004</td>
 <td style="text-align:left">Gold_Notebook</td>
 <td style="text-align:left">notebook_gold</td>
 <td style="text-align:left">2018</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3005</td>
 <td style="text-align:left">Gold_ClusterStateFact</td>
 <td style="text-align:left">clusterstatefact_gold</td>
 <td style="text-align:left">1005,2014</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3007</td>
 <td style="text-align:left">Gold_AccountMod</td>
 <td style="text-align:left">account_mods_gold</td>
 <td style="text-align:left">2017</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3008</td>
 <td style="text-align:left">Gold_AccountLogin</td>
 <td style="text-align:left">account_login_gold</td>
 <td style="text-align:left">2016</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3009</td>
 <td style="text-align:left">Gold_Pools</td>
 <td style="text-align:left">instancepool_gold</td>
 <td style="text-align:left">2009</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3010</td>
 <td style="text-align:left">Gold_SparkJob</td>
 <td style="text-align:left">sparkjob_gold</td>
 <td style="text-align:left">2006</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3011</td>
 <td style="text-align:left">Gold_SparkStage</td>
 <td style="text-align:left">sparkstage_gold</td>
 <td style="text-align:left">2007</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3012</td>
 <td style="text-align:left">Gold_SparkTask</td>
 <td style="text-align:left">sparktask_gold</td>
 <td style="text-align:left">2008</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3013</td>
 <td style="text-align:left">Gold_SparkExecution</td>
 <td style="text-align:left">sparkexecution_gold</td>
 <td style="text-align:left">2005</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3014</td>
 <td style="text-align:left">Gold_SparkExecutor</td>
 <td style="text-align:left">sparkexecutor_gold</td>
 <td style="text-align:left">2003</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3016</td>
 <td style="text-align:left">Gold_SparkStream</td>
 <td style="text-align:left">sparkstream_gold</td>
 <td style="text-align:left">1006,2005</td>
+<td>0.7.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3015</td>
 <td style="text-align:left">Gold_jobRunCostPotentialFact</td>
 <td style="text-align:left">jobruncostpotentialfact_gold</td>
 <td style="text-align:left">3001,3003,3005,3010,3012</td>
+<td>0.6.0</td>
 </tr>
 <tr>
 <td style="text-align:left">3017</td>
 <td style="text-align:left">Gold_Sql_QueryHistory</td>
 <td style="text-align:left">sql_query_history_gold</td>
 <td style="text-align:left">2020</td>
+<td>0.7.0</td>
 </tr>
 </tbody>
 </table>
+<p>* <strong>Bronze_Job_Runs_Snapshot</strong> is experimental as of 0711. The module works as expected but the API can only pull
+25 runs per API call; therefore, for some customers with many runs per day (i.e. thousands) this module can take
+several hours. If you truly want this module enabled you can enable it but additional optimization work may be
+required to make it efficient if your workspace executes thousands of job runs per day. <strong>TO ENABLE</strong> set the
+following as a cluster spark config <code>overwatch.experimental.enablejobrunsnapshot true</code></p>
 <h2 id="reloading-data">Reloading Data</h2>
 <p><strong>CAUTION</strong> Be very careful when attempting to reload bronze data, much of the bronze source data expires to
 minimize storage costs. Reloading bronze data should be a very rare task (hopefully never necessary)</p>
@@ -1346,14 +1430,34 @@ for the modules you wish to reload where:</p>
 <h3 id="reloading-data-example">Reloading Data Example</h3>
 <p><strong>Scenario</strong> Something has occurred and has corrupted the jobrun entity after 01-01-2021 but the issue wasn&rsquo;t
 identified until 02-02-2021. To fix this, all data from 12-31-2020 forward will be rolled back. Depending on the details,
-the fromTime or the Pipeline_SnapTS could be used; for this scenario we will go back an extra day and use
+the untilTime for the run on 12-31-2020 to ensure no data gaps or overlaps (for the examples below we&rsquo;ll assume the
+untilTime was midnight on 12-31-2020); for this scenario we will go back an extra day and use
 Pipeline_SnapTS as the incremental time column. Since we&rsquo;re using delta, we are safe to perform updates and deletes
-without fear of losing data (In the event of an issue we could simply restore a previous version of the table).</p>
+without fear of losing data (In the event of an issue the table could be restored to a previous version using
+delta time travel).</p>
 
 <div class="notices warning" ><p><a href="#reloading-spark-data-silver"><strong>Reloading spark silver</strong></a> requires one extra step. If reloading spark silver data click the link.</p>
 </div>
 
-<p>Steps:</p>
+<p>Steps &ndash; Automatic Method As Of version 0.7.0
+The following example will automatically detect the point in time at which the modules had a break point in the pipeline
+to ensure there are no data gaps or overlaps.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils.Helpers
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> workspace <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>getWorkspaceByDatabase<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;overwatch_etl&#34;</span><span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> rollbackToTS <span style="color:#66d9ef">=</span> <span style="color:#ae81ff">1609416000000L</span> <span style="color:#75715e">// unix millis midnight Dec 31 2020
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> moudlesToRollback <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Array</span><span style="color:#f92672">(</span><span style="color:#ae81ff">3005</span><span style="color:#f92672">,</span> <span style="color:#ae81ff">3015</span><span style="color:#f92672">)</span> <span style="color:#75715e">// gold cost tables
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> isDryRun <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span> <span style="color:#75715e">// switch to false when you&#39;re ready to run
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> rollbackStatusText <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;DataRepair_Example&#34;</span> <span style="color:#75715e">// text to appear in the status column after the rollback
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">val</span> workspaceIDs <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Array</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;123&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;456&#34;</span><span style="color:#f92672">)</span> <span style="color:#75715e">// two workspaces to rollback the modules in
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// val workspaceIDs = Array(&#34;global&#34;) // use &#34;global&#34; to rollback all workspaces
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// Putting it all together
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>rollbackPipelineForModule<span style="color:#f92672">(</span>workspace<span style="color:#f92672">,</span> rollbackToTS<span style="color:#f92672">,</span> moudlesToRollback<span style="color:#f92672">,</span> workspaceIDs<span style="color:#f92672">,</span> isDryRun<span style="color:#f92672">,</span> rollbackStatusText<span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>Steps &ndash; Manual Method:
+The method below is completely viable and the method used for years prior to the automated method above. It can be
+challenging to rollback each module to exactly the right timestamp to ensure no data gaps or overlaps. The method
+below assumes that the pipeline&rsquo;s <em>untilTime</em> (from pipReport) for the run ended exactly at midnight to ensure zero
+gaps or overlaps.</p>
 <ol>
 <li>Verify Overwatch isn&rsquo;t currently running and isn&rsquo;t about to kick off for this workspace.</li>
 <li>Delete from jobRun_silver table where Pipeline_SnapTS &gt;= &ldquo;2020-12-31&rdquo;</li>
@@ -1930,19 +2034,19 @@ information on how to run a single pipeline from main class. The same can also b
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1677361330"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1671311759"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1671311759"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1677361330"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1677361330"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1671311759" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1671311759"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1677361330" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1677361330"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
