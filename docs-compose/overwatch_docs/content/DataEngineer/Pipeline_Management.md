@@ -148,7 +148,7 @@ progression of the "until" time as no data is not considered an error. Below are
 | 1009      | Bronze_Instance_Profile_Snapshot    | instance_profiles_snapshot_bronze |                          | 0.7.1.1 |
 | 1010      | Bronze_Token_Snapshot               | tokens_snapshot_bronze            |                          | 0.7.1.1 |
 | 1011      | Bronze_Global_Init_Scripts_Snapshot | global_inits_snapshot_bronze      |                          | 0.7.1.1 |
-| 1012      | Bronze_Job_Runs_Snapshot            | job_runs_snapshot_bronze          |                          | 0.7.1.1 |
+| 1012      | Bronze_Job_Runs_Snapshot*           | job_runs_snapshot_bronze          |                          | 0.7.1.1 |
 | 2003      | Silver_SPARK_Executors              | spark_executors_silver            | 1006                     | 0.6.0   |
 | 2005      | Silver_SPARK_Executions             | spark_executions_silver           | 1006                     | 0.6.0   |
 | 2006      | Silver_SPARK_Jobs                   | spark_jobs_silver                 | 1006                     | 0.6.0   |
@@ -179,6 +179,12 @@ progression of the "until" time as no data is not considered an error. Below are
 | 3016      | Gold_SparkStream                    | sparkstream_gold                  | 1006,2005                | 0.7.0   |
 | 3015      | Gold_jobRunCostPotentialFact        | jobruncostpotentialfact_gold      | 3001,3003,3005,3010,3012 | 0.6.0   |
 | 3017      | Gold_Sql_QueryHistory               | sql_query_history_gold            | 2020                     | 0.7.0   |
+
+\* **Bronze_Job_Runs_Snapshot** is experimental as of 0711. The module works as expected but the API can only pull 
+25 runs per API call; therefore, for some customers with many runs per day (i.e. thousands) this module can take 
+several hours. If you truly want this module enabled you can enable it but additional optimization work may be 
+required to make it efficient if your workspace executes thousands of job runs per day. **TO ENABLE** set the 
+following as a cluster spark config `overwatch.experimental.enablejobrunsnapshot true`
 
 ## Reloading Data
 **CAUTION** Be very careful when attempting to reload bronze data, much of the bronze source data expires to 
@@ -213,9 +219,10 @@ import com.databricks.labs.overwatch.utils.Helpers
 val workspace = Helpers.getWorkspaceByDatabase("overwatch_etl")
 val rollbackToTS = 1609416000000L // unix millis midnight Dec 31 2020
 val moudlesToRollback = Array(3005, 3015) // gold cost tables
-val isDryRun = false // switch to true first to ensure the rollback looks correct
+val isDryRun = true // switch to false when you're ready to run
 val rollbackStatusText = "DataRepair_Example" // text to appear in the status column after the rollback
-val workspaceIDs = Array(123, 456) // two workspaces to rollback the modules in
+val workspaceIDs = Array("123", "456") // two workspaces to rollback the modules in
+// val workspaceIDs = Array("global") // use "global" to rollback all workspaces
 
 // Putting it all together
 Helpers.rollbackPipelineForModule(workspace, rollbackToTS, moudlesToRollback, workspaceIDs, isDryRun, rollbackStatusText)
