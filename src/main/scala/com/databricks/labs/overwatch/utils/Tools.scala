@@ -452,6 +452,7 @@ object Helpers extends SparkSessionWrapper {
     cloneDetailsPar.map(cloneSpec => {
       val baseCloneStatement = s"CREATE OR REPLACE TABLE delta.`${cloneSpec.target}` ${cloneSpec.cloneLevel} CLONE " +
         s"delta.`${cloneSpec.source}`"
+      println("baseCloneStatement is ",baseCloneStatement)
       val stmt = if (cloneSpec.asOfTS.isEmpty) { // asofTS empty
         baseCloneStatement
       } else { // asofTS provided
