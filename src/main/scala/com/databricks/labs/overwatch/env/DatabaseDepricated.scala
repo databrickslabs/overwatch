@@ -14,9 +14,11 @@ import java.util
 import java.util.UUID
 import scala.annotation.tailrec
 
-abstract class Database(config: Config) extends SparkSessionWrapper {
+class DatabaseDepricated(config: Config) extends SparkSessionWrapper {
+
   private val logger: Logger = Logger.getLogger(this.getClass)
   private var _databaseName: String = _
+
 
   def setDatabaseName(value: String): this.type = {
     _databaseName = value
@@ -28,18 +30,11 @@ abstract class Database(config: Config) extends SparkSessionWrapper {
    *
    * @param target Pipeline table (i.e. target) as per the Overwatch deployed config
    */
-
-  def getStatementsForRegisterTarget(target: PipelineTable): (String, String) = {
-    val createStatement = s"create table if not exists ${target.tableFullName} " + s"USING DELTA "
-    val logMessage = s"CREATING TABLE: ${target.tableFullName} \n$createStatement\n\n"
-
-    (createStatement, logMessage)
-  }
   def registerTarget(target: PipelineTable): Unit = {
     if (!target.exists(catalogValidation = true) && target.exists(pathValidation = true)) {
-
-      val (createStatement, logMessage) = getStatementsForRegisterTarget(target)
-
+      val createStatement = s"create table if not exists ${target.tableFullName} " +
+        s"USING DELTA location '${target.tableLocation}'"
+      val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
       logger.log(Level.INFO, logMessage)
       if (config.debugFlag) println(logMessage)
       spark.sql(createStatement)
@@ -103,7 +98,7 @@ abstract class Database(config: Config) extends SparkSessionWrapper {
     }
   }
 
-  private[env] def initializeStreamTarget(df: DataFrame, target: PipelineTable): Unit = {
+  private def initializeStreamTarget(df: DataFrame, target: PipelineTable): Unit = {
     val dfWSchema = spark.createDataFrame(new util.ArrayList[Row](), df.schema)
     val staticDFWriter = target.copy(checkpointPath = None).writer(dfWSchema)
     staticDFWriter
@@ -173,27 +168,6 @@ abstract class Database(config: Config) extends SparkSessionWrapper {
 
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
-
-  private[env] def getDeltaTable(target: PipelineTable): DeltaTable = {
-    val deltaTarget = DeltaTable.forName(target.tableFullName).alias("target")
-    deltaTarget
-  }
-
-  private[env] def getStreamWriterObject(finalDF: DataFrame, target: PipelineTable): StreamingQuery = {
-    val streamWriter = target.writer(finalDF)
-      .asInstanceOf[DataStreamWriter[Row]]
-      .toTable(target.tableFullName)
-
-    streamWriter
-  }
-
-  private[env] def tableNameForExistsCheck(target: PipelineTable): Boolean = {
-    target.exists(pathValidation = false, catalogValidation = true)
-  }
-
-  private[env] def targetWriter(finalDF: DataFrame, target: PipelineTable): Unit = {
-    target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].saveAsTable(target.tableFullName)
-  }
   def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array()): Boolean = {
     var finalSourceDF: DataFrame = df
 
@@ -209,7 +183,7 @@ abstract class Database(config: Config) extends SparkSessionWrapper {
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
-      val deltaTarget = getDeltaTable(target) //DeltaTable.forPath(target.tableLocation).alias("target")
+      val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")
 
       val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
@@ -251,10 +225,13 @@ abstract class Database(config: Config) extends SparkSessionWrapper {
         val beginMsg = s"Stream to ${target.tableFullName} beginning."
         if (config.debugFlag) println(beginMsg)
         logger.log(Level.INFO, beginMsg)
-        if (!tableNameForExistsCheck(target)) {
+        if (!spark.catalog.tableExists(config.databaseName, target.name)) {
           initializeStreamTarget(finalDF, target)
         }
-        val streamWriter = getStreamWriterObject(finalDF, target)
+        val streamWriter = target.writer(finalDF)
+          .asInstanceOf[DataStreamWriter[Row]]
+          .option("path", target.tableLocation)
+          .start()
         val streamManager = getQueryListener(streamWriter, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
         spark.streams.addListener(streamManager)
         val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
@@ -266,7 +243,7 @@ abstract class Database(config: Config) extends SparkSessionWrapper {
 
       } else { // DF Standard Writer append/overwrite
         try {
-          targetWriter(finalDF, target) //target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
+          target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
         } catch {
           case e: Throwable =>
             val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception in writeMethod:")
@@ -301,7 +278,6 @@ abstract class Database(config: Config) extends SparkSessionWrapper {
       }
       if (retryCount < 5 && rerunFlag) executeRetry(retryCount + 1) else this
     }
-
     try {
       executeRetry(1)
     } catch {
@@ -323,32 +299,27 @@ abstract class Database(config: Config) extends SparkSessionWrapper {
       df.persist()
     } else df
     if (needsCache) inputDf.count()
-    performRetry(inputDf, target, pipelineSnapTime, maxMergeScanDates)
+    performRetry(inputDf,target, pipelineSnapTime, maxMergeScanDates)
     true
   }
 
   /**
    * Function forces the thread to sleep for a random 30-60 seconds.
-   *
    * @param tableName
    */
   private def coolDown(tableName: String): Unit = {
     val rnd = new scala.util.Random
-    val number: Long = (rnd.nextFloat() * 30 + 30).toLong * 1000
-    logger.log(Level.INFO, "Slowing multithreaded writing for " + tableName + "sleeping..." + number + " thread name " + Thread.currentThread().getName)
+    val number:Long = (rnd.nextFloat() * 30 + 30).toLong*1000
+    logger.log(Level.INFO,"Slowing multithreaded writing for " + tableName + "sleeping..." + number+" thread name "+Thread.currentThread().getName)
     Thread.sleep(number)
   }
 
 }
 
+object Database_x {
 
-object Database {
-  def apply(config: Config): Database = {
-    config.deploymentType.toLowerCase.trim match {
-      case "ucm"     => new DatabaseUCM(config).setDatabaseName(config.databaseName)
-      case "uce"     => new DatabaseUCE(config).setDatabaseName(config.databaseName)
-      case "default" => new DatabaseDefault(config).setDatabaseName(config.databaseName)
-      case _         => throw new UnsupportedOperationException(s"The Deployment Type for ${config.deploymentType} is not supported.")
-    }
+  def apply(config: Config): DatabaseDepricated = {
+    new DatabaseDepricated(config).setDatabaseName(config.databaseName)
   }
+
 }
