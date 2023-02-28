@@ -19,7 +19,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
-
+import org.apache.spark.sql.streaming.Trigger
 import java.net.URI
 import java.time.LocalDate
 import scala.collection.parallel.ForkJoinTaskSupport
@@ -435,6 +435,54 @@ object Helpers extends SparkSessionWrapper {
     }
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "false")
     s"SHRED COMPLETE: ${target.tableFullName}"
+  }
+
+  def tableStream(cloneDetails: Seq[CloneDetail]): Seq[CloneReport] = {
+    val cloneDetailsPar = cloneDetails.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    cloneDetailsPar.tasksupport = taskSupport
+
+    logger.log(Level.INFO, "Streaming START:")
+    cloneDetailsPar.map(cloneSpec => {
+      val rawStreamingDF = spark.readStream.format("delta").load(s"`${cloneSpec.source}`")
+      print("source is ",s"`${cloneSpec.source}`")
+      print("Checkpoint is ",s"`${cloneSpec.target}`"+"checkpoint")
+      print("target is ",s"`${cloneSpec.target}`")
+
+
+//      val baseCloneStatement = s"CREATE OR REPLACE TABLE delta.`${cloneSpec.target}` ${cloneSpec.cloneLevel} CLONE " +
+//        s"delta.`${cloneSpec.source}`"
+//      println("baseCloneStatement is ", baseCloneStatement)
+//      val stmt = if (cloneSpec.asOfTS.isEmpty) { // asofTS empty
+//        baseCloneStatement
+//      } else { // asofTS provided
+//        val temporalCloneStatement = s"$baseCloneStatement TIMESTAMP AS OF '${cloneSpec.asOfTS.get}'"
+//        temporalCloneStatement
+//      }
+//      logger.log(Level.INFO, stmt)
+      try {
+        rawStreamingDF
+          .writeStream
+          .format("delta")
+          .trigger(Trigger.Once())
+          .option("checkpointLocation", s"`${cloneSpec.target}`" + "checkpoint")
+          .option("path", s"`${cloneSpec.target}`")
+        //        .start()
+        //        .awaitTermination()
+        logger.log(Level.INFO, s"CLONE COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
+        CloneReport(cloneSpec, s"`${cloneSpec.target}`" + "checkpoint", "SUCCESS")
+      } catch {
+        case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
+          val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
+            s"resulted in a temporally unsafe exception. Cloned the source without the as of timestamp arg. " +
+            s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
+          logger.log(Level.WARN, msg)
+//          spark.sql(baseCloneStatement)
+          CloneReport(cloneSpec, s"`${cloneSpec.target}`", msg)
+        }
+        case e: Throwable => CloneReport(cloneSpec, s"`${cloneSpec.target}`", e.getMessage)
+      }
+    }).toArray.toSeq
   }
 
   /**
