@@ -34,7 +34,6 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     // Now that the input parameters have been parsed -- set them in the config
     config.setInputConfig(rawParams)
 
-    // Add the workspace name (friendly) if provided by the customer
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
 
