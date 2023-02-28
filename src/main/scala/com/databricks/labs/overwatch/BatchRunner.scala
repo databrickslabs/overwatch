@@ -7,11 +7,8 @@ import org.apache.log4j.{Level, Logger}
 object BatchRunner extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-
-  private def setGlobalDeltaOverrides(): Unit = {
-    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * 128)
-    spark.conf.set("spark.sql.files.maxPartitionBytes", 1024 * 1024 * 128)
-  }
+  SparkSessionWrapper.sessionsMap.clear()
+  SparkSessionWrapper.globalTableLock.clear()
 
   /**
    * if args length == 2, 0 = pipeline of bronze, silver, or gold and 1 = overwatch args
@@ -22,7 +19,6 @@ object BatchRunner extends SparkSessionWrapper {
    */
   def main(args: Array[String]): Unit = {
     envInit()
-    setGlobalDeltaOverrides()
 
     //    JARS for databricks remote
     //    sc.addJar("C:\\Dev\\git\\Databricks--Overwatch\\target\\scala-2.11\\overwatch_2.11-0.2.jar")
@@ -67,7 +63,6 @@ object BatchRunner extends SparkSessionWrapper {
       logger.log(Level.INFO, "Starting Gold")
       Gold(workspace).run()
     }
-
 
   }
 

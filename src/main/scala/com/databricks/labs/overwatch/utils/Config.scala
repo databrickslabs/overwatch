@@ -33,13 +33,13 @@ class Config() {
   private var _badRecordsPath: String = _
   private var _primordialDateString: Option[String] = None
   private var _maxDays: Int = 60
+  private var _disabledModules: Array[Int] = Array[Int]()
   private var _initialWorkerCount: Int = _
   private var _intelligentScaling: IntelligentScaling = IntelligentScaling()
   private var _passthroughLogPath: Option[String] = None
   private var _inputConfig: OverwatchParams = _
   private var _overwatchScope: Seq[OverwatchScope.Value] = OverwatchScope.values.toSeq
   private var _initialSparkConf: Map[String, String] = Map()
-  private var _intialShuffleParts: Int = 200
   private var _contractInteractiveDBUPrice: Double = _
   private var _contractAutomatedDBUPrice: Double = _
   private var _contractSQLComputeDBUPrice: Double = _
@@ -55,6 +55,9 @@ class Config() {
    * The next section is getters that provide access to local configuration variables. Only adding details where
    * the getter may be obscure or more complicated.
    */
+
+  // as of 0711
+  def disabledModules: Array[Int] = _disabledModules
   def isMultiworkspaceDeployment: Boolean = _isMultiworkspaceDeployment
 
   def apiUrl: Option[String] = _apiUrl
@@ -76,8 +79,6 @@ class Config() {
   def externalizeOptimize: Boolean = _externalizeOptimize
 
   def cloudProvider: String = _cloudProvider
-
-  def initialShuffleParts: Int = _intialShuffleParts
 
   def maxDays: Int = _maxDays
 
@@ -140,28 +141,17 @@ class Config() {
 
   def overwatchScope: Seq[OverwatchScope.Value] = _overwatchScope
 
+  /**
+   * override spark confs with Overwatch global overrides
+   * meant to be used only from Initializer to ensure at the beginning of a PipelineRun all the spark Confs are set
+   * correctly
+   * @param value
+   * @return
+   */
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
-    val manualOverrides = Map(
-      "spark.databricks.delta.properties.defaults.autoOptimize.autoCompact" ->
-        value.getOrElse("spark.databricks.delta.properties.defaults.autoOptimize.autoCompact", "false"),
-      "spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite" ->
-        value.getOrElse("spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite", "false"),
-      "spark.databricks.delta.optimize.maxFileSize" ->
-        value.getOrElse("spark.databricks.delta.optimize.maxFileSize", (1024 * 1024 * 128).toString),
-      "spark.databricks.delta.retentionDurationCheck.enabled" ->
-        value.getOrElse("spark.databricks.delta.retentionDurationCheck.enabled", "true"),
-      "spark.databricks.delta.optimizeWrite.numShuffleBlocks" ->
-        value.getOrElse("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "50000"),
-      "spark.databricks.delta.optimizeWrite.binSize" ->
-        value.getOrElse("spark.databricks.delta.optimizeWrite.binSize", "512"),
-      "spark.sql.shuffle.partitions" -> "400", // allow aqe to shrink
-      "spark.sql.caseSensitive" -> "false",
-      "spark.sql.autoBroadcastJoinThreshold" -> "10485760",
-      "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "10485760",
-      "spark.databricks.delta.schema.autoMerge.enabled" -> "true",
-      "spark.sql.optimizer.collapseProjectAlwaysInline" -> "true" // temporary workaround ES-318365
-    )
-    _initialSparkConf = value ++ manualOverrides
+    logger.log(Level.INFO, s"Config Initialized with Spark Overrides of:\n" +
+      s"${SparkSessionWrapper.globalSparkConfOverrides}")
+    _initialSparkConf = value ++ SparkSessionWrapper.globalSparkConfOverrides
     this
   }
 
@@ -185,19 +175,13 @@ class Config() {
    * BEGIN SETTERS
    */
 
-  /**
-   * Identify the initial value before overwatch for shuffle partitions. This value gets modified a lot through
-   * this process but should be set back to the same as the value before Overwatch process when Overwatch finishes
-   * its work
-   *
-   * @param value number of shuffle partitions to be set
-   * @return
-   */
-  private[overwatch] def setInitialShuffleParts(value: Int): this.type = {
-    _intialShuffleParts = value
+  // as of 0711
+  private[overwatch] def registerDisabledModules(value: String): this.type = {
+    val disabledModulesArray = value.replaceAll("\\s", "").split(",").map(_.toInt)
+    _disabledModules = disabledModulesArray
+    logger.log(Level.INFO, s"DISABLING MODULES: ${disabledModulesArray.mkString(", ")}")
     this
   }
-
   private[overwatch] def setMaxDays(value: Int): this.type = {
     _maxDays = value
     this
@@ -398,7 +382,8 @@ class Config() {
       setApiEnv(ApiEnv(isLocalTesting, workspaceURL, rawToken, packageVersion, derivedApiEnvConfig.successBatchSize,
         derivedApiEnvConfig.errorBatchSize, runID, derivedApiEnvConfig.enableUnsafeSSL, derivedApiEnvConfig.threadPoolSize,
         derivedApiEnvConfig.apiWaitingTime, derivedApiProxy.proxyHost, derivedApiProxy.proxyPort,
-        derivedApiProxy.proxyUserName, derivedApiProxy.proxyPasswordScope, derivedApiProxy.proxyPasswordKey
+        derivedApiProxy.proxyUserName, derivedApiProxy.proxyPasswordScope, derivedApiProxy.proxyPasswordKey ,
+        derivedApiEnvConfig.mountMappingPath
       ))
 
       this

@@ -378,7 +378,7 @@ object PipelineFunctions extends SparkSessionWrapper {
                         debugFlag: Boolean = false): Unit = {
     logger.info(
       s"""
-         |SPARK OVERRIDES BEING SET:
+         |SPARK OVERRIDES BEING SET FOR THREAD ${Thread.currentThread().getId}:
          |${sparkOverrides.mkString("\n")}
          |""".stripMargin)
     sparkOverrides foreach { case (k, v) =>
@@ -515,7 +515,7 @@ object PipelineFunctions extends SparkSessionWrapper {
     when(isAutomated && isJobsLight, "jobsLight")
       .when(isAutomated && !isJobsLight, "automated")
       .when(clusterType === "SQL Analytics", lit("sqlCompute"))
-      .when(clusterType === "Serverless", lit("serverless"))
+      .when(clusterType === "High-Concurrency", lit("interactive"))
       .when(!isAutomated, "interactive")
       .otherwise("unknown")
   }
@@ -619,6 +619,12 @@ object PipelineFunctions extends SparkSessionWrapper {
       case 1004 => "audit_log_bronze"
       case 1005 => "cluster_events_bronze"
       case 1006 => "spark_events_bronze"
+      case 1007 => "libs_snapshot_bronze"
+      case 1008 => "policies_snapshot_bronze"
+      case 1009 => "instance_profiles_snapshot_bronze"
+      case 1010 => "tokens_snapshot_bronze"
+      case 1011 => "global_inits_snapshot_bronze"
+      case 1012 => "job_runs_snapshot_bronze"
       case 2003 => "spark_executors_silver"
       case 2005 => "spark_Executions_silver"
       case 2006 => "spark_jobs_silver"

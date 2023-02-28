@@ -386,14 +386,22 @@ class Pipeline(
     dbutils.fs.rm(config.tempWorkingDir)
 
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
-
-    spark.catalog.clearCache()
+    //TODO clearcache will clear global cache multithread performance issue
+   // spark.catalog.clearCache()
+    clearThreadFromSessionsMap()
   }
 
+  /**
+   * restore the spark config to the way it was when config / workspace were first instantiated
+   */
   private[overwatch] def restoreSparkConf(): Unit = {
     restoreSparkConf(config.initialSparkConf)
   }
 
+  /**
+   * restore spark configs that are passed into this function
+   * @param value map of configs to be overridden
+   */
   protected def restoreSparkConf(value: Map[String, String]): Unit = {
     PipelineFunctions.setSparkOverrides(spark, value, config.debugFlag)
   }
@@ -450,9 +458,10 @@ class Pipeline(
     val rowsWritten = writeOpsMetrics.getOrElse("numOutputRows", "0")
     val execMins: Double = (endTime - startTime) / 1000.0 / 60.0
     val simplifiedExecMins: Double = execMins - (execMins % 0.01)
-    val msg = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: $simplifiedExecMins --> Workspace ID: ${config.organizationId}"
-    println(msg)
-    logger.log(Level.INFO, msg)
+    val successMessage = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: " +
+      s"$simplifiedExecMins --> Workspace ID: ${config.organizationId}"
+    println(s"COMPLETED: ${module.moduleStartMessage} $successMessage")
+    logger.log(Level.INFO, module.moduleStartMessage ++ successMessage)
 
     // Generate Success Report
     ModuleStatusReport(

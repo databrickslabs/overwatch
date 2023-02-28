@@ -135,6 +135,10 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     val validatedISConfig = Init.validateIntelligentScaling(rawISConfig)
     config.setIntelligentScaling(validatedISConfig)
 
+    // as of 0711
+    val disabledModulesString = spark(globalSession = true).conf.getOption("overwatch.modules.disabled").getOrElse("0")
+    config.registerDisabledModules(disabledModulesString)
+
     this
   }
 
@@ -156,9 +160,10 @@ object Initializer extends SparkSessionWrapper {
   envInit()
 
   def getOrgId: String = {
-    if (dbutils.notebook.getContext.tags("orgId") == "0") {
+    val clusterOwnerOrgID = spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
+    if (clusterOwnerOrgID == " " || clusterOwnerOrgID == "0") {
       dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
-    } else dbutils.notebook.getContext.tags("orgId")
+    } else clusterOwnerOrgID
   }
 
   private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
@@ -168,7 +173,7 @@ object Initializer extends SparkSessionWrapper {
     // If MW take orgID from arg
     if(organizationID.isEmpty) {
       config.setOrganizationId(getOrgId)
-    }else{
+    }else{ // is multiWorkspace deployment since orgID is passed
       logger.log(Level.INFO, "Setting multiworkspace deployment")
       config.setOrganizationId(organizationID.get)
       if (apiUrl.nonEmpty) {
@@ -176,9 +181,9 @@ object Initializer extends SparkSessionWrapper {
       }
       config.setIsMultiworkspaceDeployment(true)
     }
-    config.registerInitialSparkConf(spark.conf.getAll)
+    // set spark overrides in scoped spark session and override the necessary values for Pipeline Run
+    config.registerInitialSparkConf(spark(globalSession = true).conf.getAll)
     config.setInitialWorkerCount(getNumberOfWorkerNodes)
-    config.setInitialShuffleParts(spark.conf.get("spark.sql.shuffle.partitions").toInt)
     if (debugFlag) {
       envInit("DEBUG")
       config.setDebugFlag(debugFlag)
