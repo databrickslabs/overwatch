@@ -168,6 +168,17 @@ object Helpers extends SparkSessionWrapper {
     fs.exists(path)
   }
 
+  def extLocationExists(name: String): Boolean = {
+    var pathExists = false
+    var extLocPath=  "abfss://overwatch-external-loc@aottlrs.dfs.core.windows.net"+"/"
+    val pathToValidateArray = name.split(extLocPath).last.split("/")
+    for (dir <- 0 until pathToValidateArray.length) {  //change 1 -> 0, removed +1
+      pathExists = spark.sql(s"list '$extLocPath'").filter('name === pathToValidateArray(dir)+"/").count == 1L
+      if (pathExists) extLocPath = extLocPath + pathToValidateArray(dir)+"/"
+    }
+    pathExists
+  }
+
   /**
    * Serialized / parallelized method for rapidly listing paths under a sub directory
    *

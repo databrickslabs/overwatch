@@ -9,11 +9,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.util.SerializableConfiguration
 
 abstract class InitializerFunctions(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
-  extends SparkSessionWrapper {
+  extends SparkSessionWrapper  {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-
-  object Init {
 
     /**
      * Determine whether or not the workspace is configured on a PVC environment
@@ -166,7 +164,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
      * @return
      */
     @throws(classOf[IllegalArgumentException])
-    private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
+    private[pipeline] def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
       val dbName = dataTarget.databaseName.getOrElse("overwatch")
       val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
       val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
@@ -425,7 +423,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
      *
      * @return
      */
-    def initializeDatabase(): Database = {
+     def initializeDatabase(): Database = {
       // TODO -- Add metadata table
       // TODO -- refactor and clean up duplicity
       val dbMeta = if (isSnap) {
@@ -489,6 +487,4 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       spark.read.option("header", "true").option("inferSchema", "true").csv(csvData).coalesce(1)
     }
 
-
-  }
 }

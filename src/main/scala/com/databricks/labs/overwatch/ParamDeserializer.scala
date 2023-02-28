@@ -128,6 +128,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         getOptionString(masterNode, "dataTarget.databaseName"),
         getOptionString(masterNode, "dataTarget.databaseLocation"),
         getOptionString(masterNode, "dataTarget.etlDataPathPrefix"),
+        getOptionString(masterNode, "dataTarget.catalogName"),
         getOptionString(masterNode, "dataTarget.consumerDatabaseName"),
         getOptionString(masterNode, "dataTarget.consumerDatabaseLocation")
       ))
@@ -166,6 +167,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val workspace_name = getOptionString(masterNode, "workspace_name")
     val externalizeOptimize = getOptionBoolean(masterNode, "externalizeOptimize").getOrElse(false)
     val tempWorkingDir = getOptionString(masterNode, "tempWorkingDir").getOrElse("") // will be set after data target validated if not overridden
+    val deploymentType = getOptionString(masterNode, "deploymentType").getOrElse("")
 
     val apiProxyNode = getNodeFromPath(masterNode, "apiEnvConfig.apiProxyConfig")
     val apiProxyNodeConfig = if (apiProxyNode.nonEmpty) {
@@ -207,7 +209,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       workspace_name,
       externalizeOptimize,
       apiEnvConfig,
-      tempWorkingDir
+      tempWorkingDir,
+      deploymentType
     )
   }
 }

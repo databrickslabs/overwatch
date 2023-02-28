@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.PipelineTable
 import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
-import com.sun.prism.impl.Disposer.Target
+//import com.sun.prism.impl.Disposer.Target
 import io.delta.tables.DeltaTable
 import org.apache.log4j.Logger
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery}

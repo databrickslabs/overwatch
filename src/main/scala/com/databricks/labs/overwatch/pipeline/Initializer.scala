@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+//import Initializer.{InitializerFunctions, InitializerFunctionsUCE, InitializerFunctionsUCM}
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ParamDeserializer
 import com.databricks.labs.overwatch.env.{Database, Workspace}
@@ -16,6 +17,19 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+
+  private def getDeploymentClass(deploymentType: String): InitializerFunctions= {
+    println(s"deployment type ------ ${deploymentType.toLowerCase.trim}")
+    deploymentType.toLowerCase.trim match {
+      case "uce" => InitializerFunctionsUCE.apply(config, disableValidations, isSnap, initDB)
+      case "ucm" => InitializerFunctionsUCM.apply(config, disableValidations, isSnap, initDB)
+      case "default" => InitializerFunctionsDefault.apply(config, disableValidations, isSnap, initDB)
+      case _ => throw new UnsupportedOperationException(s"The Deployment Type for ${deploymentType} is not supported.")
+    }
+  }
+
+
+  val Init = getDeploymentClass(config.deploymentType.toLowerCase.trim)
   /**
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
@@ -47,13 +61,13 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     logger.log(Level.INFO, "Validating Input Parameters")
     val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
 
-
     // Now that the input parameters have been parsed -- set them in the config
     config.setInputConfig(rawParams)
 
     // Add the workspace name (friendly) if provided by the customer
     val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
     config.setWorkspaceName(overwatchFriendlyName)
+
 
     /**
      * PVC: HARD OVERRIDE FOR PVC
@@ -88,7 +102,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
 
     /** Validate and set the data target details */
     val rawDataTarget = rawParams.dataTarget.getOrElse(
-      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None)
+      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"),Some("overwatch"), None)
     )
     Init.validateAndSetDataTarget(rawDataTarget)
 
@@ -138,11 +152,13 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     this
   }
 
-  private def initializeDatabase(): Database = {
+  override def initializeDatabase(): Database = {
     if (initDB) {
       Init.initializeDatabase()
-    } else {
+    }
+    else {
       Database(config)
+
     }
   }
 
@@ -161,7 +177,8 @@ object Initializer extends SparkSessionWrapper {
     } else dbutils.notebook.getContext.tags("orgId")
   }
 
-  private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
+  private def initConfigState(debugFlag: Boolean,organizationID: Option[String],
+                              apiUrl: Option[String], deploymentType: String): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
 
@@ -183,6 +200,7 @@ object Initializer extends SparkSessionWrapper {
       envInit("DEBUG")
       config.setDebugFlag(debugFlag)
     }
+    config.setDeploymentType(deploymentType)
     config
   }
 
@@ -219,6 +237,16 @@ object Initializer extends SparkSessionWrapper {
     )
   }
 
+  def apply(overwatchArgs: String, debugFlag: Boolean, deploymentType: String): Workspace = {
+    apply(
+      overwatchArgs,
+      debugFlag,
+      deploymentType,
+      isSnap = false,
+      disableValidations = false
+    )
+  }
+
   /**
    *
    * @param overwatchArgs Json string of args -- When passing into args in Databricks job UI, the json string must
@@ -237,6 +265,7 @@ object Initializer extends SparkSessionWrapper {
   private[overwatch] def apply(
                                 overwatchArgs: String,
                                 debugFlag: Boolean = false,
+                                deploymentType: String = "default",
                                 isSnap: Boolean = false,
                                 disableValidations: Boolean = false,
                                 initializeDatabase: Boolean = true,
@@ -245,7 +274,7 @@ object Initializer extends SparkSessionWrapper {
                               ): Workspace = {
 
 
-    val config = initConfigState(debugFlag,organizationID,apiURL)
+    val config = initConfigState(debugFlag,organizationID,apiURL,deploymentType)
 
     logger.log(Level.INFO, "Initializing Environment")
 
