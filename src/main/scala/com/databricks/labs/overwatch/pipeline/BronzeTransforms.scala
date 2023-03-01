@@ -295,7 +295,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
       .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
       .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
-
+      .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
@@ -305,6 +305,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
       .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
       .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
+      .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
   }
 
   //noinspection ScalaCustomHdfsFormat
@@ -511,11 +512,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
             "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
             "details.attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.azure_attributes"),
             "details.attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.aws_attributes"),
+            "details.attributes.gcp_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.gcp_attributes"),
             "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
             "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
             "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
             "details.previous_attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.azure_attributes"),
             "details.previous_attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.aws_attributes"),
+            "details.previous_attributes.gcp_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.gcp_attributes"),
             "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
           )
 

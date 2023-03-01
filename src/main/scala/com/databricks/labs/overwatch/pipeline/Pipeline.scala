@@ -238,6 +238,8 @@ class Pipeline(
         Initializer.Init.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
       case "azure" =>
         Initializer.Init.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
+      case "gcp" =>
+        Initializer.Init.loadLocalCSVResource(spark, "/Gcp_Instance_Details.csv")
       case _ =>
         throw new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure.")
     }
