@@ -316,7 +316,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def validateCloud(): Rule = {
-    Rule("Valid_Cloud_providers", lower(col(MultiWorkspaceConfigColumns.cloud.toString)), Array("aws", "azure"))
+    Rule("Valid_Cloud_providers", lower(col(MultiWorkspaceConfigColumns.cloud.toString)), Array("aws", "azure","gcp"))
   }
 
 
@@ -378,6 +378,13 @@ object DeploymentValidation extends SparkSessionWrapper {
           config.eh_scope_key,
           config.eh_name,
           config.output_path)
+      case "gcp" =>
+        validateAuditLog(
+          config.workspace_id,
+          config.auditlogprefix_source_aws,
+          config.primordial_date,
+          config.max_days
+        )
     }
 
   }

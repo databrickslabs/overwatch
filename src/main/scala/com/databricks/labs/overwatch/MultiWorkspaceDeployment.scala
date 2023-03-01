@@ -113,7 +113,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val badRecordsPath = s"${config.etl_storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
       val auditLogFormat = spark.conf.getOption("overwatch.aws.auditlogformat").getOrElse("json")
-      val auditLogConfig = if (s"${config.cloud}" == "AWS") {
+      val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure") {
         AuditLogConfig(rawAuditPath = config.auditlogprefix_source_aws, auditLogFormat = auditLogFormat)
       } else {
         val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
@@ -261,7 +261,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   private def snapshotConfig(multiworkspaceConfigs: Array[MultiWorkspaceConfig]) = {
     var configWriteLocation = multiworkspaceConfigs.head.etl_storage_prefix
-    if (!configWriteLocation.startsWith("dbfs:") && !configWriteLocation.startsWith("s3") && !configWriteLocation.startsWith("abfss")) {
+    if (!configWriteLocation.startsWith("dbfs:")
+      && !configWriteLocation.startsWith("s3")
+      && !configWriteLocation.startsWith("abfss")
+      && !configWriteLocation.startsWith("gs")) {
       configWriteLocation = s"""dbfs:${configWriteLocation}"""
     }
     multiworkspaceConfigs.toSeq.toDS().toDF()
@@ -283,7 +286,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   private def snapShotValidation(validationArray: Array[DeploymentValidationReport], path: String, reportName: String, deploymentId: String): Unit = {
     var validationPath = path
-    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
+    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss") && !path.startsWith("gs")) {
       validationPath = s"""dbfs:${path}"""
     }
     validationArray.toSeq.toDS().toDF()
@@ -306,7 +309,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   private def saveDeploymentReport(validationArray: Array[MultiWSDeploymentReport], path: String, reportName: String): Unit = {
     var reportPath = path
-    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
+    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss") && !path.startsWith("gs")) {
       reportPath = s"""dbfs:${path}"""
     }
     validationArray.toSeq.toDF()
@@ -445,7 +448,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .map(buildParams)
       println("Workspaces to be Deployed :" + params.length)
       val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
-      val deploymentReports = params.map(executePipelines(_, zones, ec))
+      val deploymentReports = params.filter(param => param != null)
+        .map(executePipelines(_, zones, ec))
         .flatMap(f => Await.result(f, Duration.Inf))
 
       deploymentReport.appendAll(deploymentReports)

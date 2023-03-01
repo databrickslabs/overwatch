@@ -158,6 +158,7 @@ object Schema extends SparkSessionWrapper {
         StructField("targetUserId", StringType, nullable = true),
         StructField("aws_attributes", StringType, nullable = true),
         StructField("azure_attributes", StringType, nullable = true),
+        StructField("gcp_attributes", StringType, nullable = true),
         StructField("instanceId", StringType, nullable = true),
         StructField("port", StringType, nullable = true),
         StructField("publicKey", StringType, nullable = true),
@@ -581,7 +582,8 @@ object Schema extends SparkSessionWrapper {
     StructField("max_capacity", LongType, nullable = true),
     StructField("preloaded_spark_versions", ArrayType(StringType, containsNull = true), nullable = true),
     StructField("aws_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
-    StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true)
+    StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("gcp_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true)
   ))
 
   val poolsDeleteSchema: StructType = StructType(Seq(
@@ -921,6 +923,7 @@ object Schema extends SparkSessionWrapper {
       StructField("preloaded_spark_versions", StringType, nullable = true),
       StructField("aws_attributes",MapType(StringType,StringType, valueContainsNull = true), nullable = true),
       StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+      StructField("gcp_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
       StructField("custom_tags",MapType(StringType,StringType, valueContainsNull = true), nullable = true),
       StructField("create_details", poolsCreateSchema, nullable = true),
       StructField("delete_details", poolsDeleteSchema, nullable = true),

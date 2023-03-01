@@ -397,6 +397,16 @@ class Config() {
     }
   }
 
+  /**
+   * Function derives the cloud from workspaceUrl.
+   * @return
+   */
+  private def deriveCloudProvider(): String = {
+    if (_workspaceUrl.toLowerCase().contains("azure")) "azure"
+    else if (_workspaceUrl.toLowerCase().contains("aws")) "aws"
+    else "gcp"
+  }
+
   private[overwatch] def buildApiEnv(tokenSecret: Option[TokenSecret], apiEnvConfig: Option[ApiEnvConfig]): ApiEnv = {
     var rawToken = ""
     var scope = ""
@@ -407,7 +417,7 @@ class Config() {
     } else {
       setWorkspaceURL(dbutils.notebook.getContext().apiUrl.get)
     }
-    setCloudProvider(if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws")
+    setCloudProvider(deriveCloudProvider)
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty) { // not local testing and secret passed
