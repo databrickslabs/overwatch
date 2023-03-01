@@ -170,7 +170,19 @@ object Helpers extends SparkSessionWrapper {
 
   def extLocationExists(name: String): Boolean = {
     var pathExists = false
-    var extLocPath=  "abfss://overwatch-external-loc@aottlrs.dfs.core.windows.net"+"/"
+    var extLocPath =  "abfss://overwatch-external-loc@aottlrs.dfs.core.windows.net"+"/"
+    val pathToValidateArray = name.split(extLocPath).last.split("/")
+    for (dir <- 0 until pathToValidateArray.length) {  //change 1 -> 0, removed +1
+      pathExists = spark.sql(s"list '$extLocPath'").filter('name === pathToValidateArray(dir)+"/").count == 1L
+      if (pathExists) extLocPath = extLocPath + pathToValidateArray(dir)+"/"
+    }
+    pathExists
+  }
+
+  def extLocationExists_v1(extLocationName: String, name: String): Boolean = {
+    var pathExists = false
+    val extLocPathURL = spark.sql("show external locations").filter('name === extLocationName).select('url).as[String].first
+    var extLocPath =  extLocPathURL+"/"
     val pathToValidateArray = name.split(extLocPath).last.split("/")
     for (dir <- 0 until pathToValidateArray.length) {  //change 1 -> 0, removed +1
       pathExists = spark.sql(s"list '$extLocPath'").filter('name === pathToValidateArray(dir)+"/").count == 1L
