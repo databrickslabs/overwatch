@@ -473,7 +473,9 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   def validate(parallelism: Int = 4): Unit = {
     val processingStartTime = System.currentTimeMillis()
     val multiWorkspaceConfig = generateMultiWorkspaceConfig(configLocation, deploymentId, outputPath)
-    val validations = DeploymentValidation.performValidation(multiWorkspaceConfig, parallelism)
+    val currentOrgID = Initializer.getOrgId
+    println("currentOrgID is", currentOrgID)
+    val validations = DeploymentValidation.performValidation(multiWorkspaceConfig, parallelism,currentOrgID)
     val notValidatedCount = validations.filterNot(_.validated).length
 
     snapShotValidation(validations, multiWorkspaceConfig.head.etl_storage_prefix, "validationReport", deploymentId)
