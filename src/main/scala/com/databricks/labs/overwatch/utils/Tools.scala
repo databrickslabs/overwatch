@@ -24,6 +24,7 @@ import java.net.URI
 import java.time.LocalDate
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
+import org.apache.spark.sql.streaming.Trigger
 
 // TODO -- Add loggers to objects with throwables
 object JsonUtils {
@@ -435,6 +436,45 @@ object Helpers extends SparkSessionWrapper {
     }
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "false")
     s"SHRED COMPLETE: ${target.tableFullName}"
+  }
+
+  /**
+   * Execute a parallelized streaming to follow the instructions provided through CloneDetail class
+   *
+   * @param cloneDetails details required to execute the parallelized clone
+   * @return
+   */
+  def tableStream(cloneDetails: Seq[CloneDetail]): Seq[CloneReport] = {
+    val cloneDetailsPar = cloneDetails.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    cloneDetailsPar.tasksupport = taskSupport
+
+    logger.log(Level.INFO, "Streaming START:")
+    cloneDetailsPar.map(cloneSpec => {
+      try {
+        val rawStreamingDF = spark.readStream.format("delta").load(s"${cloneSpec.source}")
+        rawStreamingDF
+          .writeStream
+          .format("delta")
+          .trigger(Trigger.Once())
+          .option("checkpointLocation", s"${cloneSpec.target}_checkpoint")
+          .option("path", s"${cloneSpec.target}")
+          .start()
+          .awaitTermination()
+        logger.log(Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
+        CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}"+ "checkpoint", "SUCCESS")
+      } catch {
+        case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
+          val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
+            s"resulted in a temporally unsafe exception. Cloned the source without the as of timestamp arg. " +
+            s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
+          logger.log(Level.WARN, msg)
+          //          spark.sql(baseCloneStatement)
+          CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", msg)
+        }
+        case e: Throwable => CloneReport(cloneSpec, s"`${cloneSpec.target}`", e.getMessage)
+      }
+    }).toArray.toSeq
   }
 
   /**
