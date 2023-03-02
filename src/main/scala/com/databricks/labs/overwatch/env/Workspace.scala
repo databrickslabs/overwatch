@@ -252,8 +252,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       case e: Exception =>
         val warnMsg = s"Got exception while receiving the response."
         val fullMsg = PipelineFunctions.appendStackStrace(e, warnMsg)
-        logger.log(Level.INFO, fullMsg)
-        throw new BadConfigException(warnMsg, failPipeline = false)
+        logger.warn(fullMsg)
+        println(fullMsg)
+        spark.emptyDataFrame
     }
   }
 
@@ -268,8 +269,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       case e: Exception => {
         val warnMsg = s"Got exception while receiving the response."
         val fullMsg = PipelineFunctions.appendStackStrace(e, warnMsg)
-        logger.log(Level.INFO, fullMsg)
-        throw new BadConfigException(warnMsg, failPipeline = false)
+        logger.warn(fullMsg)
+        println(fullMsg)
+        spark.emptyDataFrame
       }
     }
   }
