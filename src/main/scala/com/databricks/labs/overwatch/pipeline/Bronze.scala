@@ -114,7 +114,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       .filter(_.exists()) // source path must exist
       .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
 
-    val finalTargetPathPrefix = targetPrefix + "bckup"
+    val finalTargetPathPrefix = s"${targetPrefix}/bckup"
     // !Overwrite - targetPrefix/currDateString/timestampMillisString
 
     // build clone details

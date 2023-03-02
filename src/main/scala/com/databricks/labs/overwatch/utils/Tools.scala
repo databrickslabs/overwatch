@@ -444,10 +444,9 @@ object Helpers extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Streaming START:")
     cloneDetailsPar.map(cloneSpec => {
-      val rawStreamingDF = spark.readStream.format("delta").load(s"`${cloneSpec.source}`")
-      print("source is ",s"`${cloneSpec.source}`")
-      print("Checkpoint is ",s"`${cloneSpec.target}`"+"checkpoint")
-      print("target is ",s"`${cloneSpec.target}`")
+      println("source is ",s"${cloneSpec.source}")
+      println("Checkpoint is ",s"${cloneSpec.target}/checkpoint")
+      println("target is ",s"${cloneSpec.target}")
 
 
 //      val baseCloneStatement = s"CREATE OR REPLACE TABLE delta.`${cloneSpec.target}` ${cloneSpec.cloneLevel} CLONE " +
@@ -461,14 +460,15 @@ object Helpers extends SparkSessionWrapper {
 //      }
 //      logger.log(Level.INFO, stmt)
       try {
+        val rawStreamingDF = spark.readStream.format("delta").load(s"${cloneSpec.source}")
         rawStreamingDF
           .writeStream
           .format("delta")
           .trigger(Trigger.Once())
-          .option("checkpointLocation", s"`${cloneSpec.target}`" + "checkpoint")
-          .option("path", s"`${cloneSpec.target}`")
-        //        .start()
-        //        .awaitTermination()
+          .option("checkpointLocation", s"${cloneSpec.target}_checkpoint")
+          .option("path", s"${cloneSpec.target}")
+          .start()
+          .awaitTermination()
         logger.log(Level.INFO, s"CLONE COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
         CloneReport(cloneSpec, s"`${cloneSpec.target}`" + "checkpoint", "SUCCESS")
       } catch {
