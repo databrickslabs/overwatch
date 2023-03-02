@@ -242,19 +242,36 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   }
 
   def getTokens: DataFrame = {
-    val tokenEndpoint = "token/list"
-    ApiCallV2(config.apiEnv, tokenEndpoint)
-      .execute()
-      .asDF()
-      .withColumn("organization_id", lit(config.organizationId))
+    try {
+      val tokenEndpoint = "token/list"
+      ApiCallV2(config.apiEnv, tokenEndpoint)
+        .execute()
+        .asDF()
+        .withColumn("organization_id", lit(config.organizationId))
+    } catch {
+      case e: Exception =>
+        val warnMsg = s"Got exception while receiving the response."
+        val fullMsg = PipelineFunctions.appendStackStrace(e, warnMsg)
+        logger.log(Level.INFO, fullMsg)
+        throw new BadConfigException(warnMsg, failPipeline = false)
+    }
   }
 
   def getGlobalInitScripts: DataFrame = {
-    val globalInitScEndpoint = "global-init-scripts"
-    ApiCallV2(config.apiEnv, globalInitScEndpoint)
-      .execute()
-      .asDF()
-      .withColumn("organization_id", lit(config.organizationId))
+    try {
+      val globalInitScEndpoint = "global-init-scripts"
+      ApiCallV2(config.apiEnv, globalInitScEndpoint)
+        .execute()
+        .asDF()
+        .withColumn("organization_id", lit(config.organizationId))
+    } catch {
+      case e: Exception => {
+        val warnMsg = s"Got exception while receiving the response."
+        val fullMsg = PipelineFunctions.appendStackStrace(e, warnMsg)
+        logger.log(Level.INFO, fullMsg)
+        throw new BadConfigException(warnMsg, failPipeline = false)
+      }
+    }
   }
 
   /**
