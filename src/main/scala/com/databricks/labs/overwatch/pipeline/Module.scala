@@ -339,12 +339,12 @@ class Module(
     } // requirementsPassed
   }
 
-  def execute(_etlDefinition: () => ETLDefinition): ModuleStatusReport = {
-    execute(_etlDefinition())
-  }
+//  def execute(_etlDefinition: () => ETLDefinition): ModuleStatusReport = {
+//    execute(_etlDefinition())
+//  }
 
   @throws(classOf[IllegalArgumentException])
-  def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
+  def execute(_etlDefinition: () => ETLDefinition): ModuleStatusReport = {
 //    _etlDefinition: ETLDefinition
     if (config.disabledModules.contains(moduleId)) throw new ModuleDisabled(moduleId, s"MODULE DISABLED: $moduleId-$moduleName")
     val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
@@ -369,7 +369,7 @@ class Module(
       validatePipelineState()
       PipelineFunctions.scaleCluster(pipeline, moduleScaleCoefficient)
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
-      val etlDefinition = _etlDefinition.copy()
+      val etlDefinition = _etlDefinition().copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
       val newState = etlDefinition.executeETL(this, verifiedSourceDF)
       finalizeModule(newState)
