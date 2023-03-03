@@ -28,6 +28,8 @@ class Module(
 
   private var _moduleStartMessage: String = ""
 
+  private var _startTime: Long = 0L
+
   private[overwatch] val moduleState: SimplifiedModuleStatusReport = {
     if (pipeline.getModuleState(moduleId).isEmpty) {
       initModuleState
@@ -38,6 +40,9 @@ class Module(
   private var sparkOverrides: Map[String, String] = Map[String, String]()
 
   def isFirstRun: Boolean = _isFirstRun
+
+  private def setStartTime: Unit = _startTime = System.currentTimeMillis()
+  private[overwatch] def startTime: Long = _startTime
 
   private[overwatch] def moduleStartMessage: String = _moduleStartMessage
 
@@ -363,6 +368,7 @@ class Module(
     logger.log(Level.INFO, startMsg)
 
     try {
+      setStartTime
       if (fromTime.asUnixTimeMilli == untilTime.asUnixTimeMilli)
         throw new NoNewDataException("FROM and UNTIL times are identical. Likely due to upstream dependencies " +
           "being at or ahead of current module.", Level.WARN)
