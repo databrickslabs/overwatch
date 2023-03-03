@@ -382,9 +382,12 @@ class Module(
       newState
     } catch {
       case e: ApiCallEmptyResponse =>
+        println(s"EMPTY: $moduleId-$moduleName Module: API Returned No Results")
         noNewDataHandler(PipelineFunctions.appendStackStrace(e, e.apiCallDetail), Level.ERROR, allowModuleProgression = e.allowModuleProgression)
       case e: ApiCallFailure if e.failPipeline =>
-        fail(PipelineFunctions.appendStackStrace(e, e.msg))
+        val failMsg = PipelineFunctions.appendStackStrace(e, e.msg)
+        println(s"FAILED: $moduleId-$moduleName Module: API CALL Failed\n$failMsg")
+        fail(failMsg)
       case e: ModuleDisabled =>
         fail(e.getMessage)
       case e: FailedModuleException =>
@@ -406,7 +409,9 @@ class Module(
         logger.log(Level.ERROR, errMessage, e)
         noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
       case e: Throwable =>
-        val msg = PipelineFunctions.appendStackStrace(e, s"$moduleName FAILED -->\n")
+        val failMsg = PipelineFunctions.appendStackStrace(e)
+        val msg = s"FAILED: $moduleId-$moduleName Module: API CALL Failed\n$failMsg"
+        println(msg)
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     } finally {
