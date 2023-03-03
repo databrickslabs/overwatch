@@ -168,10 +168,10 @@ object DeploymentValidation extends SparkSessionWrapper {
     }
 
   }
-  private def validateMountCount(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
+  private def validateMountCount(conf: MultiWorkspaceConfig,currentOrgID:String): DeploymentValidationReport = {
 
     val isAzure = conf.cloud.toLowerCase == "azure" //Mount-point validation is only done for Azure
-    val isRemoteWorkspace = conf.workspace_id.trim != Initializer.getOrgId // No need to perform mount-point validation for driver workspace.
+    val isRemoteWorkspace = conf.workspace_id.trim != currentOrgID// No need to perform mount-point validation for driver workspace.
     val isMountMappingPathProvided = conf.mount_mapping_path.nonEmpty
 
     if (isAzure && isRemoteWorkspace) { //Performing mount test
@@ -663,6 +663,7 @@ object DeploymentValidation extends SparkSessionWrapper {
   private[overwatch] def performValidation(
                                             multiWorkspaceConfig: Array[MultiWorkspaceConfig],
                                             parallelism: Int,
+                                            currentOrgID:String,
                                           ): Array[DeploymentValidationReport] = {
     //Primary validation //
     val configDF = multiWorkspaceConfig.toSeq.toDS.toDF.repartition(getTotalCores).cache()
@@ -700,7 +701,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         validateRuleAndUpdateStatus(nonGroupedRuleSet,parallelism)++
           configToValidate.map(validateApiUrlConnectivity) ++ //Make request to each API and check the response
           configToValidate.map(cloudSpecificValidation)++ //Connection check for audit logs s3/EH
-          configToValidate.map(validateMountCount)
+          configToValidate.map(validateMountCount(_,currentOrgID))
     //Access validation for etl_storage_prefix
     validationStatus.append(storagePrefixAccessValidation(configToValidate.head)) //Check read/write/create/list access for etl_storage_prefix
 
