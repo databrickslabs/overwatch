@@ -339,9 +339,13 @@ class Module(
     } // requirementsPassed
   }
 
+  def execute(_etlDefinition: () => ETLDefinition): ModuleStatusReport = {
+    execute(_etlDefinition())
+  }
+
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
-
+//    _etlDefinition: ETLDefinition
     if (config.disabledModules.contains(moduleId)) throw new ModuleDisabled(moduleId, s"MODULE DISABLED: $moduleId-$moduleName")
     val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
     val notAQEAutoOptimizeShuffle = spark.conf.getOption("spark.databricks.adaptive.autoOptimizeShuffle.enabled").getOrElse("false").toBoolean

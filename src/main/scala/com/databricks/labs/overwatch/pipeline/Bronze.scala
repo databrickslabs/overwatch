@@ -98,25 +98,31 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
-  lazy private val appendJobsProcess = ETLDefinition(
-    workspace.getJobsDF,
-    Seq(cleanseRawJobsSnapDF(BronzeTargets.jobsSnapshotTarget.keys, config.runID)),
-    append(BronzeTargets.jobsSnapshotTarget)
-  )
+  lazy private val appendJobsProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      workspace.getJobsDF,
+      Seq(cleanseRawJobsSnapDF(BronzeTargets.jobsSnapshotTarget.keys, config.runID)),
+      append(BronzeTargets.jobsSnapshotTarget)
+    )
+  }
 
   lazy private[overwatch] val clustersSnapshotModule = Module(1002, "Bronze_Clusters_Snapshot", this)
-  lazy private val appendClustersAPIProcess = ETLDefinition(
-    workspace.getClustersDF,
-    Seq(cleanseRawClusterSnapDF),
-    append(BronzeTargets.clustersSnapshotTarget)
-  )
+  lazy private val appendClustersAPIProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      workspace.getClustersDF,
+      Seq(cleanseRawClusterSnapDF),
+      append(BronzeTargets.clustersSnapshotTarget)
+    )
+  }
 
   lazy private[overwatch] val poolsSnapshotModule = Module(1003, "Bronze_Pools_Snapshot", this)
-  lazy private val appendPoolsProcess = ETLDefinition(
-    workspace.getPoolsDF,
-    Seq(cleanseRawPoolsDF()),
-    append(BronzeTargets.poolsSnapshotTarget)
-  )
+  lazy private val appendPoolsProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      workspace.getPoolsDF,
+      Seq(cleanseRawPoolsDF()),
+      append(BronzeTargets.poolsSnapshotTarget)
+    )
+  }
 
   lazy private[overwatch] val auditLogsModule = Module(1004, "Bronze_AuditLogs", this)
   lazy private val appendAuditLogsProcess = ETLDefinition(
@@ -133,23 +139,25 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), 0.0, Some(30))
-  lazy private val appendClusterEventLogsProcess = ETLDefinition(
-    BronzeTargets.clustersSnapshotTarget.asDF,
-    Seq(
-      prepClusterEventLogs(
-        BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records
-        clusterEventLogsModule.fromTime,
-        clusterEventLogsModule.untilTime,
-        pipelineSnapTime,
-        config.apiEnv,
-        config.organizationId,
-        database,
-        BronzeTargets.clusterEventsErrorsTarget,
-        config
-      )
-    ),
-    append(BronzeTargets.clusterEventsTarget)
-  )
+  lazy private val appendClusterEventLogsProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      BronzeTargets.clustersSnapshotTarget.asDF,
+      Seq(
+        prepClusterEventLogs(
+          BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records
+          clusterEventLogsModule.fromTime,
+          clusterEventLogsModule.untilTime,
+          pipelineSnapTime,
+          config.apiEnv,
+          config.organizationId,
+          database,
+          BronzeTargets.clusterEventsErrorsTarget,
+          config
+        )
+      ),
+      append(BronzeTargets.clusterEventsTarget)
+    )
+  }
 
   private val sparkEventLogsSparkOverrides = Map(
     "spark.databricks.delta.optimizeWrite.numShuffleBlocks" -> "500000",
@@ -190,41 +198,55 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   )
 
   lazy private[overwatch] val libsSnapshotModule = Module(1007, "Bronze_Libraries_Snapshot", this)
-  lazy private val appendLibsProcess = ETLDefinition(
-    workspace.getClusterLibraries,
-    append(BronzeTargets.libsSnapshotTarget)
-  )
+  lazy private val appendLibsProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      workspace.getClusterLibraries,
+      append(BronzeTargets.libsSnapshotTarget)
+    )
+  }
 
   lazy private[overwatch] val policiesSnapshotModule = Module(1008, "Bronze_Policies_Snapshot", this)
-  lazy private val appendPoliciesProcess = ETLDefinition(
-    workspace.getClusterPolicies,
-    append(BronzeTargets.policiesSnapshotTarget)
-  )
+  lazy private val appendPoliciesProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      workspace.getClusterPolicies,
+      append(BronzeTargets.policiesSnapshotTarget)
+    )
+  }
 
   lazy private[overwatch] val instanceProfileSnapshotModule = Module(1009, "Bronze_Instance_Profile_Snapshot", this)
-  lazy private val appendInstanceProfileProcess = ETLDefinition(
-    workspace.getProfilesDF,
-    append(BronzeTargets.instanceProfilesSnapshotTarget)
-  )
+  lazy private val appendInstanceProfileProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      workspace.getProfilesDF,
+      append(BronzeTargets.instanceProfilesSnapshotTarget)
+    )
+  }
 
   lazy private[overwatch] val tokenSnapshotModule = Module(1010, "Bronze_Token_Snapshot", this)
-  lazy private val appendTokenProcess = ETLDefinition(
-    workspace.getTokens,
-    append(BronzeTargets.tokensSnapshotTarget)
-  )
+  lazy private val appendTokenProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      workspace.getTokens,
+      append(BronzeTargets.tokensSnapshotTarget)
+    )
+  }
 
   lazy private[overwatch] val globalInitScSnapshotModule = Module(1011, "Bronze_Global_Init_Scripts_Snapshot", this)
-  lazy private val appendGlobalInitScProcess = ETLDefinition(
-    workspace.getGlobalInitScripts,
-    append(BronzeTargets.globalInitScSnapshotTarget)
-  )
+  lazy private val appendGlobalInitScProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+      workspace.getGlobalInitScripts,
+      append(BronzeTargets.globalInitScSnapshotTarget)
+    )
+  }
 
   lazy private[overwatch] val jobRunsSnapshotModule = Module(1012, "Bronze_Job_Runs_Snapshot", this) // check module number
-  lazy private val appendJobRunsProcess = ETLDefinition(
-    workspace.getJobRunsDF(jobRunsSnapshotModule.fromTime, jobRunsSnapshotModule.untilTime),
-    Seq(cleanseRawJobRunsSnapDF(BronzeTargets.jobRunsSnapshotTarget.keys, config.runID)),
-    append(BronzeTargets.jobRunsSnapshotTarget)
-  )
+  lazy private val appendJobRunsProcess: () => ETLDefinition = {
+    () => ETLDefinition(
+        workspace.getJobRunsDF(jobRunsSnapshotModule.fromTime, jobRunsSnapshotModule.untilTime),
+        Seq(cleanseRawJobRunsSnapDF(BronzeTargets.jobRunsSnapshotTarget.keys, config.runID)),
+        append(BronzeTargets.jobRunsSnapshotTarget)
+      )
+  }
+
+
 
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
