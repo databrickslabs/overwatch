@@ -17,7 +17,7 @@ object SparkSessionWrapper {
   private[overwatch] val globalTableLock = new ConcurrentHashSet[String]
   private[overwatch] val globalSparkConfOverrides = Map(
     "spark.sql.shuffle.partitions" -> "800", // allow aqe to shrink
-    "spark.databricks.adaptive.autoOptimizeShuffle.enabled" -> "true", // enable AQE
+    "spark.databricks.adaptive.autoOptimizeShuffle.enabled" -> "false", // disabled -- perf issue 794
     "spark.databricks.delta.optimize.maxFileSize" -> "134217728", // 128 MB default
     "spark.sql.files.maxPartitionBytes" -> "134217728", // 128 MB default
     "spark.sql.caseSensitive" -> "false",
