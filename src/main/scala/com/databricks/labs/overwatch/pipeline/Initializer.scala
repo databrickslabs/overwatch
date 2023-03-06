@@ -88,7 +88,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
 
     /** Validate and set the data target details */
     val rawDataTarget = rawParams.dataTarget.getOrElse(
-      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None)
+      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), Some("overwatch"), None)
     )
     Init.validateAndSetDataTarget(rawDataTarget)
 

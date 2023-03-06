@@ -262,6 +262,9 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     def validateAndSetDataTarget(dataTarget: DataTarget): Unit = {
       // Validate data Target
       // todo UC enablement
+      val catalogName = dataTarget.catalogName.get
+      println(catalogName)
+      spark.sessionState.catalogManager.setCurrentCatalog(catalogName)
       if (!disableValidations) dataTargetIsValid(dataTarget)
 
       // If data target is valid get db name and location and set it
@@ -274,6 +277,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
 
       config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
       config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
+      config.setCatalogName(catalogName)
+
     }
 
     private def quickBuildAuditLogConfig(auditLogConfig: AuditLogConfig): AuditLogConfig = {
@@ -438,7 +443,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       if (!spark.catalog.databaseExists(config.databaseName)) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
           s"${config.databaseLocation}.")
-        val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
+        val createDBIfNotExists = s"create database if not exists ${config.databaseName} managed location '" +
             s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
 
         spark.sql(createDBIfNotExists)
@@ -453,7 +458,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
         logger.log(Level.INFO, "Initializing Consumer Database")
         if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
-            s"location '${config.consumerDatabaseLocation}'"
+            s"managed location '${config.consumerDatabaseLocation}'"
 
           spark.sql(createConsumerDBSTMT)
           logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")

@@ -128,6 +128,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
         getOptionString(masterNode, "dataTarget.databaseName"),
         getOptionString(masterNode, "dataTarget.databaseLocation"),
         getOptionString(masterNode, "dataTarget.etlDataPathPrefix"),
+        getOptionString(masterNode, "dataTarget.catalogName"),
         getOptionString(masterNode, "dataTarget.consumerDatabaseName"),
         getOptionString(masterNode, "dataTarget.consumerDatabaseLocation")
       ))
