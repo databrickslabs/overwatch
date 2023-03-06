@@ -3,6 +3,17 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
 import org.apache.log4j.Logger
+import org.apache.spark.sql.functions.{col, from_unixtime}
+import com.databricks.labs.overwatch.pipeline.PipelineFunctions.spark.table
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
+import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes}
+import org.apache.log4j.Level
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{Column, DataFrame}
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import org.apache.log4j.{Level, Logger}
 
 
 class Gold(_workspace: Workspace, _database: Database, _config: Config)
@@ -362,6 +373,53 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case _ =>
     }
   }
+  private def publishVerbose():Unit = {
+    val notebookLookupTSDF = spark.sql(s"SELECT * FROM ${config.consumerDatabaseName}.notebook")
+      .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS")
+      .withColumnRenamed("notebook_id","notebookId")
+      .distinct
+      .toTSDF("unixTimeMS", "organization_id", "notebookId")
+
+    val clsfLookupTSDF = spark.sql(s"SELECT * FROM ${config.consumerDatabaseName}.clusterstatefact")
+      .select(
+        "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
+        "custom_tags", "node_type_id", "current_num_workers")
+      .distinct
+      .withColumnRenamed("state_start_date","date")
+      .withColumnRenamed("unixTimeMS_state_start","unixTimeMS")
+      .withColumnRenamed("cluster_id","clusterId")
+      .withColumnRenamed("current_num_workers","node_count")
+      .withColumn("totalCostPMS",col("uptime_in_state_H")/ col("total_cost")/lit(60)/lit(60)/lit(1000))
+      .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
+
+    val notebookCmdColNames = Array(
+      "organization_id", "workspace_name", "date", "timestamp", "userIdentity.email",
+      "notebookId", "notebook_path", "notebook_name", "commandId", "commandText", "executionTime","sourceIpAddress",
+      "userIdentity","shardName","execution_estimated_cost", "status", "clusterId", "cluster_name", "custom_tags",
+      "node_type_id", "node_count","sourceIPAddress", "response", "userAgent", "unixTimeMS"
+    )
+
+    val notebookCodeAndMetaDF = spark.sql(s"SELECT * FROM ${config.databaseName}.audit_log_bronze")
+      //   .filter('organization_id.isin(orgIDs: _*) && 'serviceName === "notebook" && 'actionName === "runCommand")
+      .filter((col("serviceName") === "databrickssql" && col("actionName") === "commandSubmit")||
+        (col("serviceName") === "databrickssql" && col("actionName") === "commandFinish") ||
+        (col("serviceName") === "notebook" && col("actionName") === "runCommand"))
+      .verifyMinimumSchema(Schema.auditMasterSchema)
+      .selectExpr("*", "requestParams.*").drop("requestParams")
+      .withColumnRenamed("timestamp", "unixTimeMS")
+      .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
+      .toTSDF("unixTimeMS", "organization_id", "notebookId")
+      .lookupWhen(notebookLookupTSDF)
+      .df
+      .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
+      .lookupWhen(clsfLookupTSDF)
+      .df
+      .withColumn("execution_estimated_cost", col("executionTime") * col("totalCostPMS"))
+      .select(notebookCmdColNames map col: _*)
+    println("notebookCodeAndMetaDF is")
+    println(notebookCodeAndMetaDF.show(20,false))
+
+  }
 
   def refreshViews(workspacesAllowed: Array[String] = Array()): Unit = {
     config.overwatchScope.foreach {
@@ -407,6 +465,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     restoreSparkConf()
     executeModules()
     buildFacts()
+    publishVerbose()
 
     initiatePostProcessing()
     this // to be used as fail switch later if necessary
