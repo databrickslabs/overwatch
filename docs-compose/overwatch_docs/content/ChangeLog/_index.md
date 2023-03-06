@@ -4,7 +4,16 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
-## 0.7.1.1
+## 0.7.1.2
+* Fixes bugs from 0711 that may affect workflow
+  * **If already using 0711** -- simply swap the JAR -- no other action necessary
+  * **If < 0711**, be sure to complete the [0711 upgrade script found below](#0711).
+    * **[HTML](/assets/ChangeLog/Upgrade_0711.html) | [DBC](/assets/ChangeLog/Upgrade_0711.dbc)**
+
+[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/17)
+
+## 0.7.1.1 (Deprecated)
+**USE [0712](#0712) Version**
 Bug Fixes Plus a Few New Features
 
 **Upgrade Script** -- Simple but necessary script to be run once per Overawtch Deployment (i.e. storage prefix) the 
@@ -34,7 +43,7 @@ details of script are in the script.
 * Threaded spark session to avoid collisions
 * Table locking for parallel workspace ingestion (avoids delta concurrent write errors)
 
-[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/16)
+[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/16) (0711)
 
 ## 0.7.1.0
 **Multi-Workspace Deployments Are Here!!** 
