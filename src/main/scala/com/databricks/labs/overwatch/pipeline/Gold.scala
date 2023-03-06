@@ -383,7 +383,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     val clsfLookupTSDF = spark.sql(s"SELECT * FROM ${config.consumerDatabaseName}.clusterstatefact")
       .select(
         "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
-        "custom_tags", "node_type_id", "current_num_workers")
+        "custom_tags", "node_type_id", "current_num_workers","uptime_in_state_H","total_cost")
       .distinct
       .withColumnRenamed("state_start_date","date")
       .withColumnRenamed("unixTimeMS_state_start","unixTimeMS")
@@ -392,14 +392,14 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       .withColumn("totalCostPMS",col("uptime_in_state_H")/ col("total_cost")/lit(60)/lit(60)/lit(1000))
       .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
 
-    val notebookCmdColNames = Array(
+    val ColNames = Array(
       "organization_id", "workspace_name", "date", "timestamp", "userIdentity.email",
       "notebookId", "notebook_path", "notebook_name", "commandId", "commandText", "executionTime","sourceIpAddress",
       "userIdentity","shardName","execution_estimated_cost", "status", "clusterId", "cluster_name", "custom_tags",
       "node_type_id", "node_count","sourceIPAddress", "response", "userAgent", "unixTimeMS"
     )
 
-    val notebookCodeAndMetaDF = spark.sql(s"SELECT * FROM ${config.databaseName}.audit_log_bronze")
+    val notebookCodeAndMetaDF = spark.sql(s"SELECT * FROM ${config.etlDataPathPrefix}/audit_log_bronze")
       //   .filter('organization_id.isin(orgIDs: _*) && 'serviceName === "notebook" && 'actionName === "runCommand")
       .filter((col("serviceName") === "databrickssql" && col("actionName") === "commandSubmit")||
         (col("serviceName") === "databrickssql" && col("actionName") === "commandFinish") ||
@@ -415,9 +415,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       .lookupWhen(clsfLookupTSDF)
       .df
       .withColumn("execution_estimated_cost", col("executionTime") * col("totalCostPMS"))
-      .select(notebookCmdColNames map col: _*)
-    println("notebookCodeAndMetaDF is")
-    println(notebookCodeAndMetaDF.show(20,false))
+      .select(ColNames map col: _*)
+
+    notebookCodeAndMetaDF.write.format("delta").mode("overwrite").save(s"${config.etlDataPathPrefix}/verbose_audit_log")
+    spark.sql(s"create or replace view ${config.consumerDatabaseName}.verbose_audit_log as select * from delta.`${config.etlDataPathPrefix}/verbose_audit_log`")
 
   }
 
@@ -462,9 +463,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   def run(): Pipeline = {
 
-    restoreSparkConf()
-    executeModules()
-    buildFacts()
+//    restoreSparkConf()
+//    executeModules()
+//    buildFacts()
     publishVerbose()
 
     initiatePostProcessing()
