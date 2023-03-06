@@ -402,9 +402,13 @@ class Config() {
    * @return
    */
   private def deriveCloudProvider(): String = {
-    if (_workspaceUrl.toLowerCase().contains("azure")) "azure"
-    else if (_workspaceUrl.toLowerCase().contains("aws")) "aws"
-    else "gcp"
+    workspaceURL.toLowerCase match {
+      case cloudType if cloudType.contains("azure") => "azure"
+      case cloudType if cloudType.contains("aws")  => "aws"
+      case cloudType if cloudType.contains("gcp")  => "gcp"
+      case _ => throw new BadConfigException(s"${workspaceURL.toLowerCase} NOT SUPPORTED: Supported clouds at this time " +
+      s"include azure, aws, gcp")
+    }
   }
 
   private[overwatch] def buildApiEnv(tokenSecret: Option[TokenSecret], apiEnvConfig: Option[ApiEnvConfig]): ApiEnv = {
@@ -417,7 +421,7 @@ class Config() {
     } else {
       setWorkspaceURL(dbutils.notebook.getContext().apiUrl.get)
     }
-    setCloudProvider(deriveCloudProvider)
+    setCloudProvider(deriveCloudProvider())
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty) { // not local testing and secret passed

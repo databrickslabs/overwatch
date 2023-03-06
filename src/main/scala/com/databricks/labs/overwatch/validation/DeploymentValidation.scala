@@ -364,7 +364,7 @@ object DeploymentValidation extends SparkSessionWrapper {
   private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
 
     config.cloud.toLowerCase match {
-      case "aws" =>
+      case cloudType if cloudType == "aws" || cloudType == "gcp" =>
         validateAuditLog(
           config.workspace_id,
           config.auditlogprefix_source_aws,
@@ -378,13 +378,6 @@ object DeploymentValidation extends SparkSessionWrapper {
           config.eh_scope_key,
           config.eh_name,
           config.output_path)
-      case "gcp" =>
-        validateAuditLog(
-          config.workspace_id,
-          config.auditlogprefix_source_aws,
-          config.primordial_date,
-          config.max_days
-        )
     }
 
   }
