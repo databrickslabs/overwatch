@@ -396,10 +396,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       "organization_id", "workspace_name", "date", "timestamp", "userIdentity.email",
       "notebookId", "notebook_path", "notebook_name", "commandId", "commandText", "executionTime","sourceIpAddress",
       "userIdentity","shardName","execution_estimated_cost", "status", "clusterId", "cluster_name", "custom_tags",
-      "node_type_id", "node_count","sourceIPAddress", "response", "userAgent", "unixTimeMS"
+      "node_type_id", "node_count", "response", "userAgent", "unixTimeMS"
     )
 
-    val notebookCodeAndMetaDF = spark.sql(s"SELECT * FROM ${config.etlDataPathPrefix}/audit_log_bronze")
+    val notebookCodeAndMetaDF = spark.sql(s"SELECT * FROM delta.`${config.etlDataPathPrefix}/audit_log_bronze`")
       //   .filter('organization_id.isin(orgIDs: _*) && 'serviceName === "notebook" && 'actionName === "runCommand")
       .filter((col("serviceName") === "databrickssql" && col("actionName") === "commandSubmit")||
         (col("serviceName") === "databrickssql" && col("actionName") === "commandFinish") ||
