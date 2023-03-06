@@ -55,10 +55,9 @@ case class PipelineTable(
   // Minimum Schema Enforcement Management
   private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
   private var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
-  private var _existsConfirmed: Boolean = false
-
-  private def setExists(value: Boolean): Unit = _existsConfirmed = value
-  private def existsConfirmed: Boolean = _existsConfirmed
+  private var _existsInCatalogConfirmed: Boolean = false
+  private var _existsInPathConfirmed: Boolean = false
+  private var _existsInDataConfirmed: Boolean = false
 
   def isStreaming: Boolean = if(checkpointPath.nonEmpty) true else false
 
@@ -162,17 +161,71 @@ case class PipelineTable(
   }
 
   /**
+   * Does the target exist in the catalog
+   * If not previously validated, perform test and return result
+   *
+   * @param test Should this test be executed, if not return true
+   * @return
+   */
+  private def existsInCatalog(test: Boolean): Boolean = {
+    if (test && !_existsInCatalogConfirmed) {
+      _existsInCatalogConfirmed = spark.catalog.tableExists(tableFullName)
+      _existsInCatalogConfirmed
+    } else true
+  }
+
+  /**
+   * Does the target exist in the path
+   * Path validation for delta format targets is path/_delta_log others is just path
+   * If not previously validated, perform test and return result
+   *
+   * @param test Should this test be executed, if not return true
+   * @return
+   */
+  private def existsInPath(test: Boolean): Boolean = {
+    if (test && !_existsInPathConfirmed) {
+      if (format == "delta") { // if delta verify the _delta_log is present not just the path
+        _existsInPathConfirmed = Helpers.pathExists(s"$tableLocation/_delta_log")
+      } else { // not delta verify the parent dir exists
+        _existsInPathConfirmed = Helpers.pathExists(tableLocation)
+      }
+      _existsInPathConfirmed
+    } else true
+  }
+
+  /**
+   * Does the target exist in the data
+   * If not previously validated, perform test and return result
+   * @param test Should this test be executed, if not return true
+   * @return
+   */
+  private def existsInData(test: Boolean): Boolean = {
+    if (test && !_existsInDataConfirmed) {
+      try {
+        _existsInDataConfirmed = !spark.read.format("delta")
+          .load(tableLocation)
+          .filter(col("organization_id") === config.organizationId)
+          .isEmpty
+      } catch {
+        case _: Throwable => _existsInDataConfirmed = false
+      }
+      _existsInDataConfirmed
+    } else true
+  }
+
+  /**
    * default catalog only validation
    *
    * @return
    */
   def exists: Boolean = {
-    //    spark.catalog.tableExists(tableFullName)
     exists()
   }
 
   /**
    * Does a table exists as defined by
+   * Once a target has been validated via a certain method it will not be validated again for this target instance
+   * This is done for performance reasons
    *
    * @param pathValidation    does the path exist for the source -- even if the catalog table does not
    * @param dataValidation    is data present for this organizationId (workspaceId) in the source
@@ -180,33 +233,11 @@ case class PipelineTable(
    * @return
    */
   def exists(pathValidation: Boolean = true, dataValidation: Boolean = false, catalogValidation: Boolean = false): Boolean = {
-    // If target already confirmed to exist just return that it exists
-    //  only determine once per state
-    if (!existsConfirmed) { // if not already confirmed to exist -- check existence
-      if (pathValidation || dataValidation) { // when path or data validation is enabled
-        if (format == "delta") { // if delta verify the _delta_log is present not just the path
-          setExists(Helpers.pathExists(s"$tableLocation/_delta_log"))
-        } else { // not delta verify the parent dir exists
-          setExists(Helpers.pathExists(tableLocation))
-        }
-      }
-      if (catalogValidation) setExists(spark.catalog.tableExists(tableFullName))
-
-      // if other validation is enabled it must first pass those for this test to be attempted
-      if (dataValidation && existsConfirmed) { // ++ entity exists to ensure path validation complete
-        // opposite -- when result is empty source data does not exist
-        try {
-          val workspaceDataPresent = !spark.read.format("delta")
-            .load(tableLocation)
-            .filter(col("organization_id") === config.organizationId)
-            .isEmpty
-          setExists(workspaceDataPresent)
-        } catch {
-          case _: Throwable => setExists(false)
-        }
-      }
-    }
-    existsConfirmed
+    // If target already confirmed to exist via a specific method just return that it exists
+    //  only determine once per instance of PipelineTable
+        existsInCatalog(catalogValidation) &&
+          existsInPath(pathValidation) &&
+          existsInData(dataValidation)
   }
 
   /**

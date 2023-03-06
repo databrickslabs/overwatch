@@ -28,6 +28,8 @@ class Module(
 
   private var _moduleStartMessage: String = ""
 
+  private var _startTime: Long = 0L
+
   private[overwatch] val moduleState: SimplifiedModuleStatusReport = {
     if (pipeline.getModuleState(moduleId).isEmpty) {
       initModuleState
@@ -38,6 +40,9 @@ class Module(
   private var sparkOverrides: Map[String, String] = Map[String, String]()
 
   def isFirstRun: Boolean = _isFirstRun
+
+  private def setStartTime: Unit = _startTime = System.currentTimeMillis()
+  private[overwatch] def startTime: Long = _startTime
 
   private[overwatch] def moduleStartMessage: String = _moduleStartMessage
 
@@ -339,15 +344,15 @@ class Module(
     } // requirementsPassed
   }
 
-  @throws(classOf[IllegalArgumentException])
-  def execute(_etlDefinition: ETLDefinition): ModuleStatusReport = {
+//  def execute(_etlDefinition: () => ETLDefinition): ModuleStatusReport = {
+//    execute(_etlDefinition())
+//  }
 
+  @throws(classOf[IllegalArgumentException])
+  def execute(_etlDefinition: () => ETLDefinition): ModuleStatusReport = {
+//    _etlDefinition: ETLDefinition
     if (config.disabledModules.contains(moduleId)) throw new ModuleDisabled(moduleId, s"MODULE DISABLED: $moduleId-$moduleName")
-    val shufflePartitions = spark.conf.get("spark.sql.shuffle.partitions")
-    val notAQEAutoOptimizeShuffle = spark.conf.getOption("spark.databricks.adaptive.autoOptimizeShuffle.enabled").getOrElse("false").toBoolean
-    if (Helpers.isNumeric(shufflePartitions) && notAQEAutoOptimizeShuffle){
-      optimizeShufflePartitions()
-    }
+    optimizeShufflePartitions()
 
     logger.log(Level.INFO, s"Spark Overrides Initialized for target: $moduleName to\n${sparkOverrides.mkString(", ")}")
     PipelineFunctions.setSparkOverrides(spark, sparkOverrides, config.debugFlag)
@@ -359,22 +364,26 @@ class Module(
     logger.log(Level.INFO, startMsg)
 
     try {
+      setStartTime
       if (fromTime.asUnixTimeMilli == untilTime.asUnixTimeMilli)
         throw new NoNewDataException("FROM and UNTIL times are identical. Likely due to upstream dependencies " +
           "being at or ahead of current module.", Level.WARN)
       validatePipelineState()
       PipelineFunctions.scaleCluster(pipeline, moduleScaleCoefficient)
       // validation may alter state, especially time states, reInstantiate etlDefinition to ensure current state
-      val etlDefinition = _etlDefinition.copy()
+      val etlDefinition = _etlDefinition().copy()
       val verifiedSourceDF = validateSourceDF(etlDefinition.sourceDF)
       val newState = etlDefinition.executeETL(this, verifiedSourceDF)
       finalizeModule(newState)
       newState
     } catch {
       case e: ApiCallEmptyResponse =>
+        println(s"EMPTY: $moduleId-$moduleName Module: API Returned No Results")
         noNewDataHandler(PipelineFunctions.appendStackStrace(e, e.apiCallDetail), Level.ERROR, allowModuleProgression = e.allowModuleProgression)
       case e: ApiCallFailure if e.failPipeline =>
-        fail(PipelineFunctions.appendStackStrace(e, e.msg))
+        val failMsg = PipelineFunctions.appendStackStrace(e, e.msg)
+        println(s"FAILED: $moduleId-$moduleName Module: API CALL Failed\n$failMsg")
+        fail(failMsg)
       case e: ModuleDisabled =>
         fail(e.getMessage)
       case e: FailedModuleException =>
@@ -396,7 +405,9 @@ class Module(
         logger.log(Level.ERROR, errMessage, e)
         noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
       case e: Throwable =>
-        val msg = PipelineFunctions.appendStackStrace(e, s"$moduleName FAILED -->\n")
+        val failMsg = PipelineFunctions.appendStackStrace(e)
+        val msg = s"FAILED: $moduleId-$moduleName Module: API CALL Failed\n$failMsg"
+        println(msg)
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     } finally {
