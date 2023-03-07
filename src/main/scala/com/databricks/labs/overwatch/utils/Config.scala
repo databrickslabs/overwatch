@@ -213,7 +213,6 @@ class Config() {
     this
   }
 
-
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
     this
