@@ -7,18 +7,20 @@ import com.databricks.labs.overwatch.utils.{BadConfigException, Config, Overwatc
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
-import org.scalatest.PrivateMethodTester
+import org.scalatest.{Ignore, PrivateMethodTester}
 import org.scalatest.funspec.AnyFunSpec
+
 
 class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper with PrivateMethodTester {
   describe("Tests for Initializer.isPVC") {
     it ("should validate isPVC as false when org id if doesn't have ilb") {
       val conf = new Config
       conf.setOrganizationId("demo")
+      conf.setDeploymentType("default")
       val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
-
-      val isPVC = PrivateMethod[Boolean]('isPVC)
-      val actual = init.Init invokePrivate isPVC()
+//      val isPVC = PrivateMethod[Boolean]('isPVC)
+//      val actual = init.Init invokePrivate isPVC()
+      val actual = init.Init.isPVC
       println("value: " + actual)
       assert(!actual)
     }
@@ -27,6 +29,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setOrganizationId("demoilb")
       conf.setWorkspaceName("demoilbpvc")
+      conf.setDeploymentType("default")
       val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
 
       val isPVC = PrivateMethod[Boolean]('isPVC)
@@ -41,6 +44,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
     it ("initializeDatabase function should create both elt and consumer database") {
       import spark.implicits._
       val conf = new Config
+      conf.setDeploymentType("default")
       conf.setDatabaseNameAndLoc("overwatch_etl", "file:/src/test/resources/overwatch/spark-warehouse/overwatch_etl.db", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")
       conf.setConsumerDatabaseNameandLoc("overwatch", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")
       val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
@@ -58,6 +62,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
 
       val intelligentScaling = IntelligentScaling(enabled = true, 0, 123, 1.0)
       val conf = new Config
+      conf.setDeploymentType("default")
       val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
       val validateIntelligentScaling = PrivateMethod[IntelligentScaling]('validateIntelligentScaling)
 
