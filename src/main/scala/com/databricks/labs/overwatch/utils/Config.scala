@@ -303,7 +303,7 @@ class Config() {
     this
   }
 
-  private def setApiEnv(value: ApiEnv): this.type = {
+   def setApiEnv(value: ApiEnv): this.type = {
     _apiEnv = value
     this
   }
@@ -403,13 +403,18 @@ class Config() {
    * @return
    */
   private def deriveCloudProvider(): String = {
-    workspaceURL.toLowerCase match {
-      case cloudType if cloudType.contains("azure") => "azure"
-      case cloudType if cloudType.contains("aws")  => "aws"
-      case cloudType if cloudType.contains("gcp")  => "gcp"
-      case _ => throw new BadConfigException(s"${workspaceURL.toLowerCase} NOT SUPPORTED: Supported clouds at this time " +
-      s"include azure, aws, gcp")
-    }
+    if(isPVC){
+      "aws"
+    }else(
+      workspaceURL.toLowerCase match {
+        case cloudType if cloudType.contains("azure") => "azure"
+        case cloudType if cloudType.contains("aws") => "aws"
+        case cloudType if cloudType.contains("gcp") => "gcp"
+        case _ => throw new BadConfigException(s"${workspaceURL.toLowerCase} NOT SUPPORTED: Supported clouds at this time " +
+          s"include azure, aws, gcp")
+      }
+    )
+
   }
 
   private[overwatch] def buildApiEnv(tokenSecret: Option[TokenSecret], apiEnvConfig: Option[ApiEnvConfig]): ApiEnv = {
