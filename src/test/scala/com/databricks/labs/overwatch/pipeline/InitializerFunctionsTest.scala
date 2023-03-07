@@ -2,12 +2,13 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.utils.Config
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
-import org.scalatest.Ignore
+import org.scalatest.{Ignore, color}
 import org.scalatest.funspec.AnyFunSpec
-@Ignore
+//@Ignore
 class InitializerFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
   val conf = new Config
   conf.setOrganizationId("demo")
+  conf.setDeploymentType("default")
   val Initializer = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
 
   describe("Tests for InitializerFunctions.loadLocalResource") {
