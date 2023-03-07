@@ -426,7 +426,7 @@ class Pipeline(
   }
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
-    val startTime = System.currentTimeMillis()
+//    val startTime = System.currentTimeMillis()
 
     val finalDF = PipelineFunctions.optimizeDFForWrite(df, target)
 
@@ -458,7 +458,7 @@ class Pipeline(
     val endTime = System.currentTimeMillis()
 
     val rowsWritten = writeOpsMetrics.getOrElse("numOutputRows", "0")
-    val execMins: Double = (endTime - startTime) / 1000.0 / 60.0
+    val execMins: Double = (endTime - module.startTime) / 1000.0 / 60.0
     val simplifiedExecMins: Double = execMins - (execMins % 0.01)
     val successMessage = s"SUCCESS! ${module.moduleName}\nOUTPUT ROWS: $rowsWritten\nRUNTIME MINS: " +
       s"$simplifiedExecMins --> Workspace ID: ${config.organizationId}"
@@ -472,7 +472,7 @@ class Pipeline(
       moduleID = module.moduleId,
       moduleName = module.moduleName,
       primordialDateString = config.primordialDateString,
-      runStartTS = startTime,
+      runStartTS = module.startTime,
       runEndTS = endTime,
       fromTS = module.fromTime.asUnixTimeMilli,
       untilTS = module.untilTime.asUnixTimeMilli,
