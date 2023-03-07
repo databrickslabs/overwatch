@@ -46,6 +46,8 @@ class Config() {
   private var _contractJobsLightDBUPrice: Double = _
   private var _isMultiworkspaceDeployment: Boolean = false
   private var _apiUrl: Option[String] = None
+  private var _deploymentType: String = _
+  private var _catalogName: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -125,6 +127,10 @@ class Config() {
       col("organization_id") === organizationId
     )
   }
+
+  def deploymentType: String = _deploymentType
+
+  def catalogName: String = _catalogName
 
   /**
    * OverwatchScope defines the modules active for the current run
@@ -520,6 +526,16 @@ class Config() {
    */
   private[overwatch] def setBadRecordsPath(value: String): this.type = {
     _badRecordsPath = value
+    this
+  }
+
+  private[overwatch] def setDeploymentType(value: String): this.type = {
+    _deploymentType = value
+    this
+  }
+
+  private[overwatch] def setCatalogName(value: String): this.type = {
+    _catalogName = value
     this
   }
 

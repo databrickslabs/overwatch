@@ -13,8 +13,6 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  object Init {
-
     /**
      * Determine whether or not the workspace is configured on a PVC environment
      *
@@ -166,7 +164,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
      * @return
      */
     @throws(classOf[IllegalArgumentException])
-    private def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
+    private[overwatch] def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
       val dbName = dataTarget.databaseName.getOrElse("overwatch")
       val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
       val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
@@ -262,18 +260,18 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     def validateAndSetDataTarget(dataTarget: DataTarget): Unit = {
       // Validate data Target
       // todo UC enablement
-      if (!disableValidations) dataTargetIsValid(dataTarget)
-
-      // If data target is valid get db name and location and set it
-      val dbName = dataTarget.databaseName.get
-      val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
-      val dataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
-
-      val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
-      val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
-
-      config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
-      config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
+//      if (!disableValidations) dataTargetIsValid(dataTarget)
+//
+//      // If data target is valid get db name and location and set it
+//      val dbName = dataTarget.databaseName.get
+//      val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
+//      val dataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
+//
+//      val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
+//      val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+//
+//      config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
+//      config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
     }
 
     private def quickBuildAuditLogConfig(auditLogConfig: AuditLogConfig): AuditLogConfig = {
@@ -428,37 +426,37 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
     def initializeDatabase(): Database = {
       // TODO -- Add metadata table
       // TODO -- refactor and clean up duplicity
-      val dbMeta = if (isSnap) {
-        logger.log(Level.INFO, "Initializing Snap Database")
-        "OVERWATCHDB='TRUE',SNAPDB='TRUE'"
-      } else {
-        logger.log(Level.INFO, "Initializing ETL Database")
-        "OVERWATCHDB='TRUE'"
-      }
-      if (!spark.catalog.databaseExists(config.databaseName)) {
-        logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
-          s"${config.databaseLocation}.")
-        val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
-            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
-
-        spark.sql(createDBIfNotExists)
-        logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
-      } else {
-        // TODO -- get schema version of each table and perform upgrade if necessary
-        logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
-      }
-
-      // Create consumer database if one is configured
-      if (config.consumerDatabaseName != config.databaseName) {
-        logger.log(Level.INFO, "Initializing Consumer Database")
-        if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
-          val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
-            s"location '${config.consumerDatabaseLocation}'"
-
-          spark.sql(createConsumerDBSTMT)
-          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
-        }
-      }
+//      val dbMeta = if (isSnap) {
+//        logger.log(Level.INFO, "Initializing Snap Database")
+//        "OVERWATCHDB='TRUE',SNAPDB='TRUE'"
+//      } else {
+//        logger.log(Level.INFO, "Initializing ETL Database")
+//        "OVERWATCHDB='TRUE'"
+//      }
+//      if (!spark.catalog.databaseExists(config.databaseName)) {
+//        logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
+//          s"${config.databaseLocation}.")
+//        val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
+//            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
+//
+//        spark.sql(createDBIfNotExists)
+//        logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
+//      } else {
+//        // TODO -- get schema version of each table and perform upgrade if necessary
+//        logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
+//      }
+//
+//      // Create consumer database if one is configured
+//      if (config.consumerDatabaseName != config.databaseName) {
+//        logger.log(Level.INFO, "Initializing Consumer Database")
+//        if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
+//          val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
+//            s"location '${config.consumerDatabaseLocation}'"
+//
+//          spark.sql(createConsumerDBSTMT)
+//          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+//        }
+//      }
 
       Database(config)
     }
@@ -489,6 +487,15 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       spark.read.option("header", "true").option("inferSchema", "true").csv(csvData).coalesce(1)
     }
 
+}
 
+
+object InitializerFunctions {
+  def apply(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean): InitializerFunctions = {
+    config.deploymentType.toLowerCase.trim match {
+      case "uce" => InitializerFunctionsUCE.apply(config, disableValidations, isSnap, initDB)
+      case "default" => InitializerFunctionsDefault.apply(config, disableValidations, isSnap, initDB)
+      case _ => throw new UnsupportedOperationException(s"The Deployment Type for ${config.deploymentType} is not supported.")
+    }
   }
 }
