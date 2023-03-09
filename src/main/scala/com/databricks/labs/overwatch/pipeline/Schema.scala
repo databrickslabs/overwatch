@@ -1042,7 +1042,7 @@ object Schema extends SparkSessionWrapper {
     StructField("consumer_database_name", StringType, nullable = false),
     StructField("secret_scope", StringType, nullable = false),
     StructField("secret_key_dbpat", StringType, nullable = false),
-    StructField("auditlogprefix_source_aws", StringType, nullable = true),
+    StructField("auditlogprefix_source_path", StringType, nullable = true),
     StructField("eh_name", StringType, nullable = true),
     StructField("eh_scope_key", StringType, nullable = true),
     StructField("interactive_dbu_price", DoubleType, nullable = false),

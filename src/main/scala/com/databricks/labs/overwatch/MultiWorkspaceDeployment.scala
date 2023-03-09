@@ -11,9 +11,8 @@ import org.apache.spark.sql.functions._
 
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
-import java.util
+import java.util.Date
 import java.util.concurrent.Executors
-import java.util.{Collections, Date}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
@@ -114,7 +113,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
       val auditLogFormat = spark.conf.getOption("overwatch.aws.auditlogformat").getOrElse("json")
       val auditLogConfig = if (s"${config.cloud}" == "AWS") {
-        AuditLogConfig(rawAuditPath = config.auditlogprefix_source_aws, auditLogFormat = auditLogFormat)
+        AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
       } else {
         val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
         val ehStatePath = s"${config.etl_storage_prefix}/${config.workspace_id}/ehState"

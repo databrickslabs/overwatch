@@ -367,7 +367,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case "aws" =>
         validateAuditLog(
           config.workspace_id,
-          config.auditlogprefix_source_aws,
+          config.auditlogprefix_source_path,
           config.primordial_date,
           config.max_days
         )
@@ -383,6 +383,20 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
   /**
+   *For overwatch version < 0.7.2 We have auditlogprefix_source_AWS as a column in config.csv.
+   * As we have completed GCP integration on overwatch version 0.7.2 we are not supporting column auditlogprefix_source_AWS.
+   * This column name has been changed to auditlogprefix_source_PATH. This function checks whether the config.csv contains auditlogprefix_source_PATH or not.
+   * @param config
+   * @return
+   */
+  private def validateAuditLogColumnName(config: MultiWorkspaceConfig) = {
+    config.auditlogprefix_source_path.getOrElse(
+      throw new BadConfigException("auditlogprefix_source_path cannot be null when cloud is AWS/GCP," +
+        "WE DO NOT support auditlogprefix_source_aws column anymore please change the column name to  auditlogprefix_source_path.")
+    )
+  }
+
+  /**
    * Performs validation on audit log data for AWS.
    *
    * @param workspace_id
@@ -390,11 +404,11 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param primordial_date
    * @param maxDate
    */
-  private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: Option[String], primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
+  private def validateAuditLog(workspace_id: String, auditlogprefix_source_path: Option[String], primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
     try {
-      if (auditlogprefix_source_aws.isEmpty) throw new BadConfigException(
-        "auditlogprefix_source_aws cannot be null when cloud is AWS")
-      val auditLogPrefix = auditlogprefix_source_aws.get
+      if (auditlogprefix_source_path.isEmpty) throw new BadConfigException(
+        "auditlogprefix_source_path cannot be null when cloud is AWS/GCP,WE DO NOT support auditlogprefix_source_aws column anymore please change the column name to  auditlogprefix_source_path")
+      val auditLogPrefix = auditlogprefix_source_path.get
       val fromDT = new java.sql.Date(primordial_date.getTime).toLocalDate
       var untilDT = fromDT.plusDays(maxDate.toLong)
       val dateCompare = untilDT.compareTo(LocalDate.now())
@@ -434,7 +448,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       } else {
         val msg =
           s"""ReValidate the folder existence
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_path.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
 
@@ -452,7 +466,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case exception: Exception =>
         val msg =
           s"""AuditLogPrefixTest workspace_id:${workspace_id}
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_path.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
@@ -652,6 +666,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       throw new BadConfigException(getSimpleMsg("Common_ETLStoragePrefix"))
     }
     storagePrefixAccessValidation(multiWorkspaceConfig.head, fastFail = true) //Check read write access for etl_storage_prefix
+    multiWorkspaceConfig.filter(_.cloud.toLowerCase() != "azure").map(config=>validateAuditLogColumnName(config))
     multiWorkspaceConfig
     }
 
