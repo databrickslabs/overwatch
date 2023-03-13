@@ -112,7 +112,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val tokenSecret = TokenSecret(config.secret_scope, config.secret_key_dbpat)
       val badRecordsPath = s"${config.etl_storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
-      val auditLogFormat = spark.conf.getOption("overwatch.aws.auditlogformat").getOrElse("json")
+      val auditLogFormat = spark.conf.getOption("overwatch.auditlogformat").getOrElse("json")
       val auditLogConfig = if (s"${config.cloud}" == "AWS") {
         AuditLogConfig(rawAuditPath = config.auditlogprefix_source_aws, auditLogFormat = auditLogFormat)
       } else {
