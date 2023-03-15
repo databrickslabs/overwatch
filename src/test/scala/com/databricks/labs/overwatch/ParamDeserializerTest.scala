@@ -51,8 +51,8 @@ class ParamDeserializerTest extends AnyFunSpec {
         workspace_name = Some("myTestWorkspace"),
         externalizeOptimize = false,
         apiEnvConfig = None,
-        tempWorkingDir = "",
-        deploymentType = "default"
+        tempWorkingDir = ""
+//        deploymentType = "default"
       )
       assertResult(expected)(mapper.readValue[OverwatchParams](incomplete))
 

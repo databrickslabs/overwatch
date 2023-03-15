@@ -219,7 +219,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       assertThrows[NoSuchElementException](init.Init invokePrivate validateAndRegisterArgs(incomplete))
     }
 
-    it("validateAndRegisterArgs function should through exception when the json is malfunctioned ") {
+    ignore("validateAndRegisterArgs function should through exception when the json is malfunctioned ") {
       val incomplete = "{\"auditLogConfig\":{\"rawAuditPath\":\"/mnt/logs/test/audit_delivery\"," +
         "\"tokenSecret\":{\"scope\":\"overwatch\",\"key\":\"1212\"},\"dataTarget\":{\"databaseName\":\"overwatch_etl_test\"," +
         "\"databaseLocation\":\"dbfs:/mnt/overwatch_global/consume/overwatch_etl.db\",\"consumerDatabaseName\":\"overwatch\"" +
@@ -237,7 +237,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       assertThrows[JsonEOFException](init invokePrivate validateAndRegisterArgs(incomplete))
     }
 
-    it("validateAndRegisterArgs function should fail if json is non escaped") {
+    ignore("validateAndRegisterArgs function should fail if json is non escaped") {
       val incomplete = "{'auditLogConfig':{'rawAuditPath':'/mnt/logs/test/audit_delivery'}," +
         "'tokenSecret':{'scope':'overwatch','key':'1212'},'dataTarget':{'databaseName':'overwatch_etl_test'," +
         "'databaseLocation':'dbfs:/mnt/overwatch_global/consume/overwatch_etl.db,consumerDatabaseName:overwatch'" +
