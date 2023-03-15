@@ -374,51 +374,59 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
   private def publishVerbose():Unit = {
-    val notebookLookupTSDF = spark.sql(s"SELECT * FROM ${config.consumerDatabaseName}.notebook")
-      .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS")
-      .withColumnRenamed("notebook_id","notebookId")
-      .distinct
-      .toTSDF("unixTimeMS", "organization_id", "notebookId")
+    if((spark.catalog.tableExists(s"${config.consumerDatabaseName}.notebook"))
+      & (spark.catalog.tableExists("overwatch_dev_5481.notebook"))) {
+      val notebookLookupTSDF = spark.sql(s"SELECT * FROM ${config.consumerDatabaseName}.notebook")
+        .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS")
+        .withColumnRenamed("notebook_id", "notebookId")
+        .distinct
+        .toTSDF("unixTimeMS", "organization_id", "notebookId")
 
-    val clsfLookupTSDF = spark.sql(s"SELECT * FROM ${config.consumerDatabaseName}.clusterstatefact")
-      .select(
-        "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
-        "custom_tags", "node_type_id", "current_num_workers","uptime_in_state_H","total_cost")
-      .distinct
-      .withColumnRenamed("state_start_date","date")
-      .withColumnRenamed("unixTimeMS_state_start","unixTimeMS")
-      .withColumnRenamed("cluster_id","clusterId")
-      .withColumnRenamed("current_num_workers","node_count")
-      .withColumn("totalCostPMS",col("uptime_in_state_H")/ col("total_cost")/lit(60)/lit(60)/lit(1000))
-      .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
+      val clsfLookupTSDF = spark.sql(s"SELECT * FROM ${config.consumerDatabaseName}.clusterstatefact")
+        .select(
+          "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
+          "custom_tags", "node_type_id", "current_num_workers", "uptime_in_state_H", "total_cost")
+        .distinct
+        .withColumnRenamed("state_start_date", "date")
+        .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
+        .withColumnRenamed("cluster_id", "clusterId")
+        .withColumnRenamed("current_num_workers", "node_count")
+        .withColumn("totalCostPMS", col("uptime_in_state_H") / col("total_cost") / lit(60) / lit(60) / lit(1000))
+        .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
 
-    val ColNames = Array(
-      "organization_id", "workspace_name", "date", "timestamp", "userIdentity.email",
-      "notebookId", "notebook_path", "notebook_name", "commandId", "commandText", "executionTime","sourceIpAddress",
-      "userIdentity","shardName","execution_estimated_cost", "status", "clusterId", "cluster_name", "custom_tags",
-      "node_type_id", "node_count", "response", "userAgent", "unixTimeMS"
-    )
+      val ColNames = Array(
+        "organization_id", "workspace_name", "date", "timestamp", "userIdentity.email",
+        "notebookId", "notebook_path", "notebook_name", "commandId", "commandText", "executionTime", "sourceIpAddress",
+        "userIdentity", "shardName", "execution_estimated_cost", "status", "clusterId", "cluster_name", "custom_tags",
+        "node_type_id", "node_count", "response", "userAgent", "unixTimeMS"
+      )
 
-    val notebookCodeAndMetaDF = spark.sql(s"SELECT * FROM delta.`${config.etlDataPathPrefix}/audit_log_bronze`")
-      //   .filter('organization_id.isin(orgIDs: _*) && 'serviceName === "notebook" && 'actionName === "runCommand")
-      .filter((col("serviceName") === "databrickssql" && col("actionName") === "commandSubmit")||
-        (col("serviceName") === "databrickssql" && col("actionName") === "commandFinish") ||
-        (col("serviceName") === "notebook" && col("actionName") === "runCommand"))
-      .verifyMinimumSchema(Schema.auditMasterSchema)
-      .selectExpr("*", "requestParams.*").drop("requestParams")
-      .withColumnRenamed("timestamp", "unixTimeMS")
-      .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
-      .toTSDF("unixTimeMS", "organization_id", "notebookId")
-      .lookupWhen(notebookLookupTSDF)
-      .df
-      .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
-      .lookupWhen(clsfLookupTSDF)
-      .df
-      .withColumn("execution_estimated_cost", col("executionTime") * col("totalCostPMS"))
-      .select(ColNames map col: _*)
+      val notebookCodeAndMetaDF = spark.sql(s"SELECT * FROM delta.`${config.etlDataPathPrefix}/audit_log_bronze`")
+        //   .filter('organization_id.isin(orgIDs: _*) && 'serviceName === "notebook" && 'actionName === "runCommand")
+        .filter((col("serviceName") === "databrickssql" && col("actionName") === "commandSubmit") ||
+          (col("serviceName") === "databrickssql" && col("actionName") === "commandFinish") ||
+          (col("serviceName") === "notebook" && col("actionName") === "runCommand"))
+        .verifyMinimumSchema(Schema.auditMasterSchema)
+        .selectExpr("*", "requestParams.*").drop("requestParams")
+        .withColumnRenamed("timestamp", "unixTimeMS")
+        .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
+        .toTSDF("unixTimeMS", "organization_id", "notebookId")
+        .lookupWhen(notebookLookupTSDF)
+        .df
+        .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
+        .lookupWhen(clsfLookupTSDF)
+        .df
+        .withColumn("execution_estimated_cost", col("executionTime") * col("totalCostPMS"))
+        .select(ColNames map col: _*)
 
-    notebookCodeAndMetaDF.write.format("delta").mode("overwrite").save(s"${config.etlDataPathPrefix}/verbose_audit_log")
-    spark.sql(s"create or replace view ${config.consumerDatabaseName}.verbose_audit_log as select * from delta.`${config.etlDataPathPrefix}/verbose_audit_log`")
+      notebookCodeAndMetaDF.write.format("delta").mode("overwrite").save(s"${config.etlDataPathPrefix}/verbose_audit_log")
+      spark.sql(s"create or replace view ${config.consumerDatabaseName}.verbose_audit_log as select * from delta.`${config.etlDataPathPrefix}/verbose_audit_log`")
+    }
+    else {
+      val msgLog = s"GOLD VIEW: CREATE VIEW FAILED: Source table empty or does not exist"
+      logger.log(Level.INFO, msgLog)
+      if (config.debugFlag) println(msgLog)
+    }
 
   }
 
@@ -463,9 +471,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   def run(): Pipeline = {
 
-//    restoreSparkConf()
-//    executeModules()
-//    buildFacts()
+    restoreSparkConf()
+    executeModules()
+    buildFacts()
     publishVerbose()
 
     initiatePostProcessing()
