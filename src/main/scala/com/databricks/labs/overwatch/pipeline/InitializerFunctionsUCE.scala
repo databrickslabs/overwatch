@@ -35,10 +35,9 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       val dbProperties = dbMeta.properties
 
       val existingDBLocation = Option(spark.sql(s"describe database ${dbName}")
-        .filter('database_description_item === "RootLocation")
-        .select("database_description_value")
-        .as[String].collect.head).toString
-//        .map(f=>f.getString(0)).collect.head.toString
+        .where("database_description_item ='RootLocation'")
+        .select("database_description_value").collect.map(_.getString(0)).head).toString
+      //        .map(f=>f.getString(0)).collect.head.toString
 
       if (existingDBLocation != dbLocation) {
         switch = false
@@ -88,9 +87,8 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
         val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
 
         val existingConsumerDBLocation = Option(spark.sql(s"describe database ${consumerDBMeta}")
-          .filter('database_description_item === "RootLocation")
-          .select("database_description_value")
-          .as[String].collect.head).toString
+          .where("database_description_item ='RootLocation'")
+          .select("database_description_value").collect.map(_.getString(0)).head).toString
 
         if (existingConsumerDBLocation != consumerDBLocation) { // separated consumer DB but same location FAIL
           switch = false
