@@ -637,8 +637,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(!'failed && 'withinSpecifiedTimeRange)
         .select('filename)
         .distinct
-
-      if (Helpers.pathExists(badRecordsPath)) {
+      if (Helpers.pathExists(badRecordsPath) && Helpers.pathPatternExists(s"${badRecordsPath}/*/*/")) {
         val badFiles = spark.read.format("json")
           .schema(Schema.badRecordsSchema)
           .load(s"${badRecordsPath}/*/*/")
@@ -748,6 +747,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           // Enable Spark to read case sensitive columns
           spark.conf.set("spark.sql.caseSensitive", "true")
 
+          println(s"baseEventsDF with try badRecordsPath----------${badRecordsPath}")
           // read the df and convert the timestamp column
           val baseDF = spark.read.option("badRecordsPath", badRecordsPath)
             .json(pathsGlob: _*)

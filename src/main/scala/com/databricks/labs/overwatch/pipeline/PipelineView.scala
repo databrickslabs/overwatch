@@ -10,7 +10,10 @@ case class PipelineView(name: String,
                         dbTargetOverride: Option[String] = None
                        ) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
+//  private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
+  private val dbTarget = if(config.deploymentType!="default")
+    s"${config.consumerCatalogName}.${dbTargetOverride.getOrElse(config.consumerDatabaseName)}"
+  else dbTargetOverride.getOrElse(config.consumerDatabaseName)
 
   def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
     if (dataSource.exists) {

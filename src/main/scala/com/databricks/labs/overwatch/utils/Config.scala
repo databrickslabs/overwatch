@@ -47,7 +47,8 @@ class Config() {
   private var _isMultiworkspaceDeployment: Boolean = false
   private var _apiUrl: Option[String] = None
   private var _deploymentType: String = _
-  private var _catalogName: String = _
+  private var _etlCatalogName: String = _
+  private var _consumerCatalogName: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -130,7 +131,11 @@ class Config() {
 
   def deploymentType: String = _deploymentType
 
-  def catalogName: String = _catalogName
+//  def catalogName: String = _catalogName
+  def etlCatalogName: String = _etlCatalogName
+
+  def consumerCatalogName: String = _consumerCatalogName
+
 
   /**
    * OverwatchScope defines the modules active for the current run
@@ -553,8 +558,9 @@ class Config() {
     this
   }
 
-  private[overwatch] def setCatalogName(value: String): this.type = {
-    _catalogName = value
+  private[overwatch] def setCatalogName(etlCatalogName: String, consumerCatalogName: String): this.type = {
+    _etlCatalogName = etlCatalogName
+    _consumerCatalogName = consumerCatalogName
     this
   }
 

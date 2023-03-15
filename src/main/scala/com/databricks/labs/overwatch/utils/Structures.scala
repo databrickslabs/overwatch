@@ -24,8 +24,10 @@ case class GangliaDetail()
 
 case class TokenSecret(scope: String, key: String)
 
-case class DataTarget(databaseName: Option[String], databaseLocation: Option[String], etlDataPathPrefix: Option[String],
-                      catalogName: Option[String], consumerDatabaseName: Option[String] = None,
+case class DataTarget(databaseName: Option[String],
+                      databaseLocation: Option[String],
+                      etlDataPathPrefix: Option[String],
+                      consumerDatabaseName: Option[String] = None,
                       consumerDatabaseLocation: Option[String] = None)
 
 case class DatabricksContractPrices(
@@ -182,8 +184,7 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            workspace_name: Option[String] = None,
                            externalizeOptimize: Boolean = false,
                            apiEnvConfig: Option[ApiEnvConfig] = None,
-                           tempWorkingDir: String = "", // will be set after data target validated if not overridden
-                           deploymentType: String = ""
+                           tempWorkingDir: String = "" // will be set after data target validated if not overridden
                           )
 
 case class ParsedConfig(
