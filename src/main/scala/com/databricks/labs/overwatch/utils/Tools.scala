@@ -181,6 +181,23 @@ object Helpers extends SparkSessionWrapper {
   }
 
   /**
+   * Check whether a path with a regex pattern exists
+   *
+   * @param name file/directory name as a regex
+   * @return
+   */
+  def pathPatternExists(name: String): Boolean = {
+    val path = new Path(name)
+    val fs = path.getFileSystem(spark.sparkContext.hadoopConfiguration)
+    val globPath = fs.globStatus(path)
+    if (globPath.isEmpty)
+      false
+    else
+       true
+  }
+
+
+  /**
    * Serialized / parallelized method for rapidly listing paths under a sub directory
    *
    * @param path path to the file/directory
