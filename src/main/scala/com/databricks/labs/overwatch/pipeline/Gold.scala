@@ -374,8 +374,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
   private def publishVerbose():Unit = {
+    try{
     if((spark.catalog.tableExists(s"${config.consumerDatabaseName}.notebook"))
-      & (spark.catalog.tableExists("overwatch_dev_5481.notebook"))) {
+      & (spark.catalog.tableExists(s"${config.consumerDatabaseName}.clusterstatefact"))) {
       val notebookLookupTSDF = spark.sql(s"SELECT * FROM ${config.consumerDatabaseName}.notebook")
         .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS")
         .withColumnRenamed("notebook_id", "notebookId")
@@ -428,6 +429,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       if (config.debugFlag) println(msgLog)
     }
 
+  }catch{
+      case e : Throwable => println(e)
+    }
   }
 
   def refreshViews(workspacesAllowed: Array[String] = Array()): Unit = {
