@@ -95,38 +95,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     Helpers.parClone(cloneSpecs)
 
   }
-  def incrementalSnap(
-                      targetPrefix: String,
-                      excludes: Array[String] = Array()
-                    ): Unit = {
-    val bronzeTargets = getAllTargets :+ pipelineStateTarget
-
-    // if user provides dot path to table -- remove dot path and lower case the name
-    val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
-      if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
-    })
-
-    // remove excludes
-    // remove non-existing bronze targets
-    val targetsToSnap = bronzeTargets
-      .filter(_.exists()) // source path must exist
-      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
-
-    val finalTargetPathPrefix = s"${targetPrefix}/bckup"
-    // !Overwrite - targetPrefix/currDateString/timestampMillisString
-
-    // build clone details
-    val cloneSpecs = targetsToSnap.map(t => {
-      val targetPath = s"${finalTargetPathPrefix}/${t.name.toLowerCase}"
-      CloneDetail(t.tableLocation, targetPath)
-    })
-
-    // par clone
-    Helpers.snapStream(cloneSpecs)
-
-  }
-
-
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)

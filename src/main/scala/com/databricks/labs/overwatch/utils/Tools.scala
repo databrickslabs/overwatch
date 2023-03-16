@@ -443,7 +443,8 @@ object Helpers extends SparkSessionWrapper {
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
-  private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail]): Seq[CloneReport] = {
+  private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail],snapshotRootPath: String): Seq[Any] = {
+
     val cloneDetailsPar = cloneDetails.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     cloneDetailsPar.tasksupport = taskSupport
@@ -452,26 +453,47 @@ object Helpers extends SparkSessionWrapper {
     cloneDetailsPar.map(cloneSpec => {
       try {
         val rawStreamingDF = spark.readStream.format("delta").load(s"${cloneSpec.source}")
+        val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
+        val checkPointLocation = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}checkpoint/${sourceName}" else s"${snapshotRootPath}/checkpoint/${sourceName}"
+        val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
+        println("Source is ",s"${cloneSpec.source}")
+        println("Target is ",s"${cloneSpec.target}")
+        println("checkPointLocation is ",checkPointLocation)
+        println("cloneReportPath is ",cloneReportPath)
         rawStreamingDF
           .writeStream
           .format("delta")
           .trigger(Trigger.Once())
-          .option("checkpointLocation", s"${cloneSpec.target}_checkpoint")
+          .option("checkpointLocation", checkPointLocation)
           .option("path", s"${cloneSpec.target}")
           .start()
           .awaitTermination()
+
         logger.log(Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-        CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}"+ "checkpoint", "SUCCESS")
+        val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS"))
+        val cloneReportDF = cloneReport.toDF
+        cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
+
       } catch {
         case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
           val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
             s"resulted in a temporally unsafe exception. Cloned the source without the as of timestamp arg. " +
             s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
+          val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
+          val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
           logger.log(Level.WARN, msg)
-          //          spark.sql(baseCloneStatement)
-          CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", msg)
+          val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", msg))
+          val cloneReportDF = cloneReport.toDF
+          cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
+
         }
-        case e: Throwable => CloneReport(cloneSpec, s"`${cloneSpec.target}`", e.getMessage)
+        case e: Throwable => {
+          val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
+          val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
+          val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", e.getMessage))
+          val cloneReportDF = cloneReport.toDF
+          cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
+        }
       }
     }).toArray.toSeq
   }

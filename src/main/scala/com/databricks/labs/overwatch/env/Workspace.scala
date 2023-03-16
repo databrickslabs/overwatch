@@ -355,8 +355,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val finalSnapshotRootPath = s"${snapshotRootPath}/data"
     val cloneSpecs  = buildCloneSpecs(sourcesToSnap,finalSnapshotRootPath)
     // par clone
-    Helpers.snapStream(cloneSpecs)
-
+    Helpers.snapStream(cloneSpecs,snapshotRootPath)
   }
 
   def buildCloneSpecs(
