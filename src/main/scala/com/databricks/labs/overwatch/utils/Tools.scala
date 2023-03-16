@@ -456,10 +456,6 @@ object Helpers extends SparkSessionWrapper {
         val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
         val checkPointLocation = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}checkpoint/${sourceName}" else s"${snapshotRootPath}/checkpoint/${sourceName}"
         val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
-        println("Source is ",s"${cloneSpec.source}")
-        println("Target is ",s"${cloneSpec.target}")
-        println("checkPointLocation is ",checkPointLocation)
-        println("cloneReportPath is ",cloneReportPath)
         rawStreamingDF
           .writeStream
           .format("delta")
@@ -479,7 +475,6 @@ object Helpers extends SparkSessionWrapper {
           val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
             s"resulted in a temporally unsafe exception. Cloned the source without the as of timestamp arg. " +
             s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
-          val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
           val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
           logger.log(Level.WARN, msg)
           val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", msg))
@@ -488,7 +483,6 @@ object Helpers extends SparkSessionWrapper {
 
         }
         case e: Throwable => {
-          val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
           val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
           val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", e.getMessage))
           val cloneReportDF = cloneReport.toDF
