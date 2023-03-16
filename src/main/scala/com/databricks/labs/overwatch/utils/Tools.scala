@@ -443,7 +443,7 @@ object Helpers extends SparkSessionWrapper {
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
-  def tableStream(cloneDetails: Seq[CloneDetail]): Seq[CloneReport] = {
+  private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail]): Seq[CloneReport] = {
     val cloneDetailsPar = cloneDetails.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     cloneDetailsPar.tasksupport = taskSupport

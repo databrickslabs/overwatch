@@ -95,7 +95,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     Helpers.parClone(cloneSpecs)
 
   }
-  def snapshotStream(
+  def incrementalSnap(
                       targetPrefix: String,
                       excludes: Array[String] = Array()
                     ): Unit = {
@@ -122,7 +122,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     })
 
     // par clone
-    Helpers.tableStream(cloneSpecs)
+    Helpers.snapStream(cloneSpecs)
 
   }
 
