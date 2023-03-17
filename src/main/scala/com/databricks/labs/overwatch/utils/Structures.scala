@@ -78,7 +78,7 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 api_url: String,
                                 cloud: String,
                                 primordial_date: java.sql.Date,
-                                etl_storage_prefix: String,
+                                storage_prefix: String,
                                 etl_database_name: String,
                                 consumer_database_name: String,
                                 secret_scope: String,
@@ -113,8 +113,8 @@ case class RulesValidationReport(deployment_id: String, workspace_id: String, re
 
 object MultiWorkspaceConfigColumns extends Enumeration {
   val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,
-  etl_storage_prefix, etl_database_name, consumer_database_name, secret_scope,
-  secret_key_dbpat, auditlogprefix_source_aws, eh_name, eh_scope_key, scopes,
+  storage_prefix, etl_database_name, consumer_database_name, secret_scope,
+  secret_key_dbpat, auditlogprefix_source_path, eh_name, eh_scope_key, scopes,
   interactive_dbu_price, automated_dbu_price, sql_compute_dbu_price, jobs_light_dbu_price,
   max_days, excluded_scopes, active, deploymentId, output_path = Value
 }

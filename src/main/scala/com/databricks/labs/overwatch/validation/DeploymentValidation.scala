@@ -68,12 +68,12 @@ object DeploymentValidation extends SparkSessionWrapper {
    *                 if false it will register the exception in the validation report.
    */
   private def storagePrefixAccessValidation(config: MultiWorkspaceConfig, fastFail: Boolean = false): DeploymentValidationReport  = {
-    val testDetails = s"""StorageAccessTest storage : ${config.etl_storage_prefix}"""
+    val testDetails = s"""StorageAccessTest storage : ${config.storage_prefix}"""
     try {
-      dbutils.fs.mkdirs(s"""${config.etl_storage_prefix}/test_access""")
-      dbutils.fs.put(s"""${config.etl_storage_prefix}/test_access/testwrite""", "This is a file in cloud storage.")
-      dbutils.fs.head(s"""${config.etl_storage_prefix}/test_access/testwrite""")
-      dbutils.fs.rm(s"""${config.etl_storage_prefix}/test_access""", true)
+      dbutils.fs.mkdirs(s"""${config.storage_prefix}/test_access""")
+      dbutils.fs.put(s"""${config.storage_prefix}/test_access/testwrite""", "This is a file in cloud storage.")
+      dbutils.fs.head(s"""${config.storage_prefix}/test_access/testwrite""")
+      dbutils.fs.rm(s"""${config.storage_prefix}/test_access""", true)
       DeploymentValidationReport(true,
         getSimpleMsg("Storage_Access"),
         testDetails,
@@ -633,7 +633,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    */
   private  def getSimpleMsg(ruleName: String): String = {
     ruleName match {
-      case "Common_ETLStoragePrefix" => "ETL Storage Prefix should be common across the workspaces."
+      case "Common_StoragePrefix" => "Storage Prefix should be common across the workspaces."
       case "Common_ETLDatabase" => "Workspaces should have a common ETL Database Name."
       case "Common_ConsumerDatabaseName" => "Workspaces should have a common Consumer Database Name."
       case "Valid_Cloud_providers" => "Cloud provider can be either AWS or Azure."
@@ -660,10 +660,10 @@ object DeploymentValidation extends SparkSessionWrapper {
   private[overwatch] def performMandatoryValidation( multiWorkspaceConfig: Array[MultiWorkspaceConfig],parallelism: Int):Array[MultiWorkspaceConfig]  = {
     logger.log(Level.INFO, "Performing mandatory validation")
     val commonEtlStorageRuleSet = RuleSet(multiWorkspaceConfig.toSeq.toDS.toDF(), by = "deployment_id")//Check common etl_storage_prefix
-    commonEtlStorageRuleSet.add(validateDistinct("Common_ETLStoragePrefix", MultiWorkspaceConfigColumns.etl_storage_prefix.toString))
+    commonEtlStorageRuleSet.add(validateDistinct("Common_StoragePrefix", MultiWorkspaceConfigColumns.storage_prefix.toString))
     val validationStatus = validateRuleAndUpdateStatus(commonEtlStorageRuleSet, parallelism)
     if (!validationStatus.forall(_.validated)) {
-      throw new BadConfigException(getSimpleMsg("Common_ETLStoragePrefix"))
+      throw new BadConfigException(getSimpleMsg("Common_StoragePrefix"))
     }
     storagePrefixAccessValidation(multiWorkspaceConfig.head, fastFail = true) //Check read write access for etl_storage_prefix
     multiWorkspaceConfig.filter(_.cloud.toLowerCase() != "azure").map(config=>validateAuditLogColumnName(config))
@@ -689,7 +689,7 @@ object DeploymentValidation extends SparkSessionWrapper {
 
 
     val gropedRules = Seq[Rule](
-      validateDistinct("Common_ETLStoragePrefix",MultiWorkspaceConfigColumns.etl_storage_prefix.toString),
+      validateDistinct("Common_StoragePrefix",MultiWorkspaceConfigColumns.storage_prefix.toString),
       validateDistinct("Common_ETLDatabase",MultiWorkspaceConfigColumns.etl_database_name.toString),
       validateDistinct("Common_ConsumerDatabaseName",MultiWorkspaceConfigColumns.consumer_database_name.toString)
     )

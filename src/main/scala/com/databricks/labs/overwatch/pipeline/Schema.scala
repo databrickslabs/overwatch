@@ -1037,7 +1037,7 @@ object Schema extends SparkSessionWrapper {
     StructField("api_url", StringType, nullable = false),
     StructField("cloud", StringType, nullable = false),
     StructField("primordial_date", DateType, nullable = false),
-    StructField("etl_storage_prefix", StringType, nullable = false),
+    StructField("storage_prefix", StringType, nullable = false),
     StructField("etl_database_name", StringType, nullable = false),
     StructField("consumer_database_name", StringType, nullable = false),
     StructField("secret_scope", StringType, nullable = false),

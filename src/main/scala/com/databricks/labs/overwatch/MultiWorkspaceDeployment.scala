@@ -103,20 +103,20 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     try {
       val dataTarget = DataTarget(
         Some(config.etl_database_name),
-        Some(s"${config.etl_storage_prefix}/${config.etl_database_name}.db"),
-        Some(s"${config.etl_storage_prefix}/global_share"),
+        Some(s"${config.storage_prefix}/${config.etl_database_name}.db"),
+        Some(s"${config.storage_prefix}/global_share"),
         Some(s"${config.consumer_database_name}"),
-        Some(s"${config.etl_storage_prefix}/${config.consumer_database_name}.db")
+        Some(s"${config.storage_prefix}/${config.consumer_database_name}.db")
       )
       val tokenSecret = TokenSecret(config.secret_scope, config.secret_key_dbpat)
-      val badRecordsPath = s"${config.etl_storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
+      val badRecordsPath = s"${config.storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
       val auditLogFormat = spark.conf.getOption("overwatch.aws.auditlogformat").getOrElse("json")
       val auditLogConfig = if (s"${config.cloud}" == "AWS") {
         AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
       } else {
         val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
-        val ehStatePath = s"${config.etl_storage_prefix}/${config.workspace_id}/ehState"
+        val ehStatePath = s"${config.storage_prefix}/${config.workspace_id}/ehState"
         val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
         AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
       }
@@ -259,7 +259,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    * @param configDF
    */
   private def snapshotConfig(multiworkspaceConfigs: Array[MultiWorkspaceConfig]) = {
-    var configWriteLocation = multiworkspaceConfigs.head.etl_storage_prefix
+    var configWriteLocation = multiworkspaceConfigs.head.storage_prefix
     if (!configWriteLocation.startsWith("dbfs:") && !configWriteLocation.startsWith("s3") && !configWriteLocation.startsWith("abfss")) {
       configWriteLocation = s"""dbfs:${configWriteLocation}"""
     }
@@ -355,11 +355,27 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       when(trim(lower(col(f.name))) === "null", lit(null).cast(f.dataType)).otherwise(col(f.name)).alias(f.name)
     })
 
+    checkStoragePrefixColumnName(rawBaseConfigDF)
     rawBaseConfigDF
       .verifyMinimumSchema(Schema.deployementMinimumSchema)
       .select(deploymentSelectsNoNullStrings: _*)
 
   }
+
+  /**
+   * For overwatch version < 0.7.2 We have etl_storage_prefix as a column in config.csv.
+   * As we have completed Unity Catalogue integration on overwatch version 0.7.2 we are not supporting column etl_storage_prefix.
+   * This column name has been changed to storage_prefix. This function checks whether the config.csv contains storage_prefix or not.
+   *
+   * @param config
+   * @return
+   */
+  private def checkStoragePrefixColumnName(rawBaseConfigDF: DataFrame): Unit ={
+    if (rawBaseConfigDF.hasFieldNamed("etl_storage_prefix")) {
+      throw new BadConfigException("WE DO NOT support etl_storage_prefix column anymore please change the column name to  storage_prefix")
+    }
+  }
+
 
   private def generateMultiWorkspaceConfig(
                                             configLocation: String,
@@ -448,7 +464,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .flatMap(f => Await.result(f, Duration.Inf))
 
       deploymentReport.appendAll(deploymentReports)
-      saveDeploymentReport(deploymentReport.toArray, multiWorkspaceConfig.head.etl_storage_prefix, "deploymentReport")
+      saveDeploymentReport(deploymentReport.toArray, multiWorkspaceConfig.head.storage_prefix, "deploymentReport")
     } catch {
       case e: Exception =>
         val failMsg = s"FAILED DEPLOYMENT WITH EXCEPTION"
@@ -476,7 +492,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     val validations = DeploymentValidation.performValidation(multiWorkspaceConfig, parallelism,currentOrgID)
     val notValidatedCount = validations.filterNot(_.validated).length
 
-    snapShotValidation(validations, multiWorkspaceConfig.head.etl_storage_prefix, "validationReport", deploymentId)
+    snapShotValidation(validations, multiWorkspaceConfig.head.storage_prefix, "validationReport", deploymentId)
     val processingEndTime = System.currentTimeMillis();
     val msg =
       s"""Validation report details
