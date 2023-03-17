@@ -333,13 +333,20 @@ trait GoldTransforms extends SparkSessionWrapper {
       // using noise generators to fill with two passes to reduce skew
       .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores) // scan back then forward to fill all
 
-
-    val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
+    val isSingleNode = when(get_json_object('custom_tags, "$.ResourceClass") === "SingleNode", lit(true)).otherwise(lit(false))
+    val workerPotentialCoreS = when('databricks_billable && isSingleNode, $"driverSpecs.vCPUs" * 'uptime_in_state_S)
+      .when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S)
+      .otherwise(lit(0))
     val isPhotonEnabled = upper('runtime_engine).equalTo("PHOTON")
     val isNotAnSQlWarehouse = !upper('sku).equalTo("SQLCOMPUTE")
     val photonDBUMultiplier = when(isPhotonEnabled && isNotAnSQlWarehouse, lit(2)).otherwise(lit(1))
     val driverDBUs = when('databricks_billable, $"driverSpecs.Hourly_DBUs" * 'uptime_in_state_H * photonDBUMultiplier).otherwise(lit(0)).alias("driver_dbus")
-    val workerDBUs = when('databricks_billable, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H * photonDBUMultiplier).otherwise(lit(0)).alias("worker_dbus")
+    val workerDBUs = when('databricks_billable && !isSingleNode, $"workerSpecs.Hourly_DBUs" * 'current_num_workers * 'uptime_in_state_H * photonDBUMultiplier).otherwise(lit(0)).alias("worker_dbus")
+    val driverCoreHours = round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2)
+    val workerCoreHours = round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
+    val coreHours = when('isRunning && isSingleNode, driverCoreHours)
+      .when('isRunning && !isSingleNode, workerCoreHours)
+      .otherwise(lit(0.0)).alias("core_hours")
     val driverComputeCost = Costs.compute('cloud_billable, $"driverSpecs.Compute_Contract_Price", lit(1), 'uptime_in_state_H).alias("driver_compute_cost")
     val workerComputeCost = Costs.compute('cloud_billable, $"workerSpecs.Compute_Contract_Price", 'target_num_workers, 'uptime_in_state_H).alias("worker_compute_cost")
     val driverDBUCost = Costs.dbu(driverDBUs, 'dbu_rate).alias("driver_dbu_cost")
@@ -375,10 +382,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       driverDBUs,
       workerDBUs,
       (driverDBUs + workerDBUs).alias("total_dbus"),
-      when('isRunning,
-        round(TransformFunctions.getNodeInfo("driver", "vCPUs", true) / lit(3600), 2) +
-          round(TransformFunctions.getNodeInfo("worker", "vCPUs", true) / lit(3600), 2)
-      ).otherwise(lit(0.0)).alias("core_hours"),
+      coreHours,
       'driverSpecs,
       'workerSpecs,
       driverComputeCost,
