@@ -208,8 +208,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     val mergeScope = target.mergeScope
     logger.log(Level.INFO, s"BEGINNING MERGE for target ${target.tableFullName}. \nMERGE SCOPE: " +
       s"$mergeScope")
-    println("inside mertge :"+ spark.conf.get("spark.databricks.delta.commitInfo.userMetadata"))
-    if (mergeScope == MergeScope.insertOnly) {
+   if (mergeScope == MergeScope.insertOnly) {
       deltaTarget
         .merge(updatesDF, mergeCondition)
         .whenNotMatched
