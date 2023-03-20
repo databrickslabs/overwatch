@@ -445,19 +445,19 @@ object Helpers extends SparkSessionWrapper {
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
-  private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail],snapshotRootPath: String): Seq[Unit] = {
+  private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail],snapshotRootPath: String): Unit = {
 
     val cloneDetailsPar = cloneDetails.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     cloneDetailsPar.tasksupport = taskSupport
 
     logger.log(Level.INFO, "Streaming START:")
-    cloneDetailsPar.map(cloneSpec => {
+    val cloneReport = cloneDetailsPar.map(cloneSpec => {
       try {
         val rawStreamingDF = spark.readStream.format("delta").load(s"${cloneSpec.source}")
         val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
         val checkPointLocation = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}checkpoint/${sourceName}" else s"${snapshotRootPath}/checkpoint/${sourceName}"
-        val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
+        val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/clone_report/"
         println("Source Path is",s"${cloneSpec.source}")
         println("Target Path is",s"${cloneSpec.target}")
         println("report path is ",cloneReportPath)
@@ -470,30 +470,22 @@ object Helpers extends SparkSessionWrapper {
           .start()
           .awaitTermination()
         logger.log(Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-        val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS"))
-        val cloneReportDF = cloneReport.toDF
-        cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
-
+        CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
       } catch {
         case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
           val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
             s"resulted in a temporally unsafe exception. Cloned the source without the as of timestamp arg. " +
             s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
-          val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
           logger.log(Level.WARN, msg)
-          val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", msg))
-          val cloneReportDF = cloneReport.toDF
-          cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
-
+          CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", msg)
         }
         case e: Throwable => {
-          val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
-          val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", e.getMessage))
-          val cloneReportDF = cloneReport.toDF
-          cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
+          CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", e.getMessage)
         }
       }
     }).toArray.toSeq
+    val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/clone_report/"
+    cloneReport.toDS.write.format("delta").save(cloneReportPath)
   }
 
   /**
@@ -502,7 +494,7 @@ object Helpers extends SparkSessionWrapper {
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
-  def parClone(cloneDetails: Seq[CloneDetail],snapshotRootPath:String): Seq[Unit]= {
+  def parClone(cloneDetails: Seq[CloneDetail],snapshotRootPath:String): Seq[CloneReport]= {
     val cloneDetailsPar = cloneDetails.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     cloneDetailsPar.tasksupport = taskSupport
@@ -522,9 +514,7 @@ object Helpers extends SparkSessionWrapper {
         val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
         spark.sql(stmt)
         logger.log(Level.INFO, s"CLONE COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-        val cloneReport = Seq(CloneReport(cloneSpec, stmt, "SUCCESS"))
-        val cloneReportDF = cloneReport.toDF
-        cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
+        CloneReport(cloneSpec, stmt, "SUCCESS")
       } catch {
         case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
           val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
@@ -532,16 +522,10 @@ object Helpers extends SparkSessionWrapper {
             s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
           logger.log(Level.WARN, msg)
           spark.sql(baseCloneStatement)
-          val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
-          val cloneReport = Seq(CloneReport(cloneSpec, baseCloneStatement, msg))
-          val cloneReportDF = cloneReport.toDF
-          cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
+          CloneReport(cloneSpec, baseCloneStatement, msg)
         }
         case e: Throwable => {
-          val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
-          val cloneReport = Seq(CloneReport(cloneSpec, stmt, e.getMessage))
-          val cloneReportDF = cloneReport.toDF
-          cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
+          CloneReport(cloneSpec, stmt, e.getMessage)
           }
       }
     }).toArray.toSeq

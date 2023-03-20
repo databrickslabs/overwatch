@@ -3,12 +3,14 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.utils.{CloneDetail, CloneReport, Config, Helpers, OverwatchScope, SparkSessionWrapper, WorkspaceDataset}
 import org.apache.log4j.Logger
 import com.databricks.labs.overwatch.env.{Database, Workspace}
+import org.apache.spark.sql.{Column, DataFrame, Dataset}
 import org.apache.log4j.{Level, Logger}
+
 
 object Snapshot extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-
+  import spark.implicits._
 
   /**
    * Create a backup of the Overwatch datasets
@@ -28,7 +30,7 @@ object Snapshot extends SparkSessionWrapper {
               cloneLevel: String = "DEEP",
               asOfTS: Option[String] = None,
               excludes: Array[String] = Array()
-            ): Seq[CloneReport] = {
+            ): Unit = {
       val acceptableCloneLevels = Array("DEEP", "SHALLOW")
       require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
         s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
@@ -43,7 +45,9 @@ object Snapshot extends SparkSessionWrapper {
       val sourcesToSnap = workspace.getWorkspaceDatasets
         .filterNot(dataset => excludes.map(_.toLowerCase).contains(dataset.name.toLowerCase))
       val cloneSpecs  = buildCloneSpecs(targetsToSnap,snapshotRootPath,cloneLevel,asOfTS)
-      Helpers.parClone(cloneSpecs)
+      val cloneReport = Helpers.parClone(cloneSpecs,snapshotRootPath)
+      val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/clone_report/"
+      cloneReport.toDS.write.format("delta").save(cloneReportPath)
     }
 
   /**
@@ -69,14 +73,8 @@ object Snapshot extends SparkSessionWrapper {
     val targetsToSnap = bronzeTargets
       .filter(_.exists()) // source path must exist
       .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
-
-    val sourcesToSnap = workspace.getWorkspaceDatasets
-      .filterNot(dataset => excludes.map(_.toLowerCase).contains(dataset.name.toLowerCase))
     val finalSnapshotRootPath = s"${snapshotRootPath}/data"
-
     val cloneSpecs = buildCloneSpecs(targetsToSnap, finalSnapshotRootPath)
-//    val cloneSpecs = buildCloneSpecs(sourcesToSnap, finalSnapshotRootPath)
-    // par clone
     Helpers.snapStream(cloneSpecs, snapshotRootPath)
   }
 
