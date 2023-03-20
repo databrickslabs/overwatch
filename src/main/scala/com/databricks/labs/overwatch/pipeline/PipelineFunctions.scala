@@ -176,7 +176,8 @@ object PipelineFunctions extends SparkSessionWrapper {
       s"${newClusterPrefix}.spark_conf" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.spark_conf"),
       s"${newClusterPrefix}.spark_env_vars" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.spark_env_vars"),
       s"${newClusterPrefix}.aws_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.aws_attributes"),
-      s"${newClusterPrefix}.azure_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.azure_attributes")
+      s"${newClusterPrefix}.azure_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.azure_attributes"),
+      s"${newClusterPrefix}.gcp_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.gcp_attributes")
     )
   }
 
