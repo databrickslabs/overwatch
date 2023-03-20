@@ -358,7 +358,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       when(trim(lower(col(f.name))) === "null", lit(null).cast(f.dataType)).otherwise(col(f.name)).alias(f.name)
     })
 
-    checkStoragePrefixColumnName(rawBaseConfigDF)
     rawBaseConfigDF
       .verifyMinimumSchema(Schema.deployementMinimumSchema)
       .select(deploymentSelectsNoNullStrings: _*)
