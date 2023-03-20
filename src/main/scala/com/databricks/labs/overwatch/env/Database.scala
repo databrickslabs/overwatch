@@ -260,7 +260,7 @@ class Database(config: Config) extends SparkSessionWrapper {
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
-      val deltaTarget = DeltaTable.forPath(target.tableLocation).alias("target")
+      val deltaTarget = DeltaTable.forPath(spark,target.tableLocation).alias("target")
       val updatesDF = finalDF.alias("updates")
 
       val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
