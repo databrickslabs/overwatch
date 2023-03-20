@@ -456,6 +456,9 @@ object Helpers extends SparkSessionWrapper {
         val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
         val checkPointLocation = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}checkpoint/${sourceName}" else s"${snapshotRootPath}/checkpoint/${sourceName}"
         val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
+        println("Source Path is",s"${cloneSpec.source}")
+        println("Target Path is",s"${cloneSpec.target}")
+        println("report path is ",cloneReportPath)
         rawStreamingDF
           .writeStream
           .format("delta")
@@ -464,10 +467,10 @@ object Helpers extends SparkSessionWrapper {
           .option("path", s"${cloneSpec.target}")
           .start()
           .awaitTermination()
-
         logger.log(Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
         val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS"))
         val cloneReportDF = cloneReport.toDF
+
         cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
 
       } catch {
@@ -490,6 +493,8 @@ object Helpers extends SparkSessionWrapper {
         }
       }
     }).toArray.toSeq
+
+
   }
 
   /**

@@ -1,9 +1,8 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{CloneDetail, Helpers, SparkSessionWrapper, WorkspaceDataset}
+import com.databricks.labs.overwatch.utils.{CloneDetail, CloneReport, Config, Helpers, OverwatchScope, SparkSessionWrapper, WorkspaceDataset}
 import org.apache.log4j.Logger
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{CloneDetail, Config, Helpers, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
 
 object Snapshot extends SparkSessionWrapper {
@@ -22,21 +21,22 @@ object Snapshot extends SparkSessionWrapper {
    *                         this is the table name only - without the database prefix
    * @return
    */
-  //  def snap(
-  //            snapshotRootPath: String,
-  //            cloneLevel: String = "DEEP",
-  //            asOfTS: Option[String] = None,
-  //            excludes: Array[String] = Array()
-  //          ): Seq[CloneReport] = {
-  //    val acceptableCloneLevels = Array("DEEP", "SHALLOW")
-  //    require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
-  //      s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
-  //
-  //    val sourcesToSnap = getWorkspaceDatasets
-  //      .filterNot(dataset => excludes.map(_.toLowerCase).contains(dataset.name.toLowerCase))
-  //    val cloneSpecs  = buildCloneSpecs(sourcesToSnap,snapshotRootPath,cloneLevel,asOfTS)
-  //    Helpers.parClone(cloneSpecs)
-  //  }
+    def snap(
+              workspace: Workspace,
+              snapshotRootPath: String,
+              cloneLevel: String = "DEEP",
+              asOfTS: Option[String] = None,
+              excludes: Array[String] = Array()
+            ): Seq[CloneReport] = {
+      val acceptableCloneLevels = Array("DEEP", "SHALLOW")
+      require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
+        s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
+
+      val sourcesToSnap = workspace.getWorkspaceDatasets
+        .filterNot(dataset => excludes.map(_.toLowerCase).contains(dataset.name.toLowerCase))
+      val cloneSpecs  = buildCloneSpecs(sourcesToSnap,snapshotRootPath,cloneLevel,asOfTS)
+      Helpers.parClone(cloneSpecs)
+    }
 
   /**
    * Create a backup of the Overwatch datasets
@@ -77,16 +77,19 @@ object Snapshot extends SparkSessionWrapper {
   }
 
   def main(args: Array[String]): Unit = {
-    println(args(0), args(1))
+
+    println(args(0), args(1),args(2))
 
     val workspace = Helpers.getWorkspaceByDatabase(args(0))
-    incrementalSnap(workspace,args(1))
+    if (args(2).toLowerCase() == "incremental"){
+      incrementalSnap(workspace,args(1))
+    }else{
+      snap(workspace,args(1))
+    }
     println("SnapShot Completed")
 //    val bronze = Bronze(workspace)
 //    println(workspace)
 
-
   }
-
 
 }
