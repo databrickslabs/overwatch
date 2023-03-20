@@ -35,6 +35,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.jobRunsSnapshotTarget
     )
   }
+  def targetToSnap: Array[PipelineTable] = {
+    getAllTargets :+ pipelineStateTarget
+  }
+
 
   def getAllModules: Seq[Module] = {
     config.overwatchScope.flatMap {
@@ -92,7 +96,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     })
 
     // par clone
-    Helpers.parClone(cloneSpecs)
+    Helpers.parClone(cloneSpecs,finalTargetPathPrefix)
 
   }
   private val logger: Logger = Logger.getLogger(this.getClass)

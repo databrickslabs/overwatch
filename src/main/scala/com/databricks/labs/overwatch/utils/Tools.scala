@@ -437,13 +437,15 @@ object Helpers extends SparkSessionWrapper {
     spark.conf.set("spark.databricks.delta.vacuum.parallelDelete.enabled", "false")
     s"SHRED COMPLETE: ${target.tableFullName}"
   }
+
+
   /**
    * Execute a parallelized streaming to follow the instructions provided through CloneDetail class
    *
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
-  private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail],snapshotRootPath: String): Seq[Any] = {
+  private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail],snapshotRootPath: String): Seq[Unit] = {
 
     val cloneDetailsPar = cloneDetails.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
@@ -470,7 +472,6 @@ object Helpers extends SparkSessionWrapper {
         logger.log(Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
         val cloneReport = Seq(CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS"))
         val cloneReportDF = cloneReport.toDF
-
         cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
 
       } catch {
@@ -493,8 +494,6 @@ object Helpers extends SparkSessionWrapper {
         }
       }
     }).toArray.toSeq
-
-
   }
 
   /**
@@ -503,7 +502,7 @@ object Helpers extends SparkSessionWrapper {
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
-  def parClone(cloneDetails: Seq[CloneDetail]): Seq[CloneReport] = {
+  def parClone(cloneDetails: Seq[CloneDetail],snapshotRootPath:String): Seq[Unit]= {
     val cloneDetailsPar = cloneDetails.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     cloneDetailsPar.tasksupport = taskSupport
@@ -520,9 +519,12 @@ object Helpers extends SparkSessionWrapper {
       }
       logger.log(Level.INFO, stmt)
       try {
+        val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
         spark.sql(stmt)
         logger.log(Level.INFO, s"CLONE COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-        CloneReport(cloneSpec, stmt, "SUCCESS")
+        val cloneReport = Seq(CloneReport(cloneSpec, stmt, "SUCCESS"))
+        val cloneReportDF = cloneReport.toDF
+        cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
       } catch {
         case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
           val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
@@ -530,9 +532,17 @@ object Helpers extends SparkSessionWrapper {
             s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
           logger.log(Level.WARN, msg)
           spark.sql(baseCloneStatement)
-          CloneReport(cloneSpec, baseCloneStatement, msg)
+          val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
+          val cloneReport = Seq(CloneReport(cloneSpec, baseCloneStatement, msg))
+          val cloneReportDF = cloneReport.toDF
+          cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
         }
-        case e: Throwable => CloneReport(cloneSpec, stmt, e.getMessage)
+        case e: Throwable => {
+          val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
+          val cloneReport = Seq(CloneReport(cloneSpec, stmt, e.getMessage))
+          val cloneReportDF = cloneReport.toDF
+          cloneReportDF.write.mode("append").format("delta").save(cloneReportPath)
+          }
       }
     }).toArray.toSeq
   }

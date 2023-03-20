@@ -22,6 +22,7 @@ object Snapshot extends SparkSessionWrapper {
    * @return
    */
     def snap(
+              bronze: Bronze,
               workspace: Workspace,
               snapshotRootPath: String,
               cloneLevel: String = "DEEP",
@@ -32,9 +33,16 @@ object Snapshot extends SparkSessionWrapper {
       require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
         s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
+      val bronzeTargets = bronze.targetToSnap
+      val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
+        if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
+      })
+      val targetsToSnap = bronzeTargets
+        .filter(_.exists()) // source path must exist
+        .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
       val sourcesToSnap = workspace.getWorkspaceDatasets
         .filterNot(dataset => excludes.map(_.toLowerCase).contains(dataset.name.toLowerCase))
-      val cloneSpecs  = buildCloneSpecs(sourcesToSnap,snapshotRootPath,cloneLevel,asOfTS)
+      val cloneSpecs  = buildCloneSpecs(targetsToSnap,snapshotRootPath,cloneLevel,asOfTS)
       Helpers.parClone(cloneSpecs)
     }
 
@@ -48,28 +56,40 @@ object Snapshot extends SparkSessionWrapper {
    */
 
   def incrementalSnap(
+                       bronze: Bronze,
                        workspace: Workspace,
                        snapshotRootPath: String,
                        excludes: Array[String] = Array()
                      ): Unit = {
 
+    val bronzeTargets = bronze.targetToSnap
+    val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
+      if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
+    })
+    val targetsToSnap = bronzeTargets
+      .filter(_.exists()) // source path must exist
+      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
+
     val sourcesToSnap = workspace.getWorkspaceDatasets
       .filterNot(dataset => excludes.map(_.toLowerCase).contains(dataset.name.toLowerCase))
     val finalSnapshotRootPath = s"${snapshotRootPath}/data"
-    val cloneSpecs = buildCloneSpecs(sourcesToSnap, finalSnapshotRootPath)
+
+    val cloneSpecs = buildCloneSpecs(targetsToSnap, finalSnapshotRootPath)
+//    val cloneSpecs = buildCloneSpecs(sourcesToSnap, finalSnapshotRootPath)
     // par clone
     Helpers.snapStream(cloneSpecs, snapshotRootPath)
   }
 
   def buildCloneSpecs(
-                       sourcesToSnap: Seq[WorkspaceDataset],
+                       targetsToSnap: Array[PipelineTable],
+//                       sourcesToSnap: Seq[WorkspaceDataset],
                        snapshotRootPath: String,
                        cloneLevel: String = "DEEP",
                        asOfTS: Option[String] = None,
                      ): Seq[CloneDetail] = {
-    val cloneSpecs = sourcesToSnap.map(dataset => {
-      val sourceName = dataset.name
-      val sourcePath = dataset.path
+    val cloneSpecs = targetsToSnap.map(dataset => {
+      val sourceName = dataset.name.toLowerCase
+      val sourcePath = dataset.tableLocation
       val targetPath = if (snapshotRootPath.takeRight(1) == "/") s"$snapshotRootPath$sourceName" else s"$snapshotRootPath/$sourceName"
       CloneDetail(sourcePath, targetPath, asOfTS, cloneLevel)
     }).toArray.toSeq
@@ -80,15 +100,24 @@ object Snapshot extends SparkSessionWrapper {
 
     println(args(0), args(1),args(2))
 
-    val workspace = Helpers.getWorkspaceByDatabase(args(0))
+    val workspace = if (args(0).contains("/")){
+      val remote_workspace_id = args(3)
+      val pathToOverwatchGlobalShareData = args(0)
+      Helpers.getRemoteWorkspaceByPath(s"${pathToOverwatchGlobalShareData}/pipeline_report/",true,remote_workspace_id)
+    }else {
+      Helpers.getWorkspaceByDatabase(args(0))
+    }
+    val bronze = Bronze(workspace)
+
+    println(workspace)
+
     if (args(2).toLowerCase() == "incremental"){
-      incrementalSnap(workspace,args(1))
+      incrementalSnap(bronze,workspace,args(1))
     }else{
-      snap(workspace,args(1))
+      snap(bronze,workspace,args(1))
     }
     println("SnapShot Completed")
-//    val bronze = Bronze(workspace)
-//    println(workspace)
+
 
   }
 
