@@ -96,8 +96,6 @@ object Snapshot extends SparkSessionWrapper {
 
   def main(args: Array[String]): Unit = {
 
-    println(args(0), args(1),args(2))
-
     val workspace = if (args(0).contains("/")){
       val remote_workspace_id = args(3)
       val pathToOverwatchGlobalShareData = args(0)
@@ -106,17 +104,12 @@ object Snapshot extends SparkSessionWrapper {
       Helpers.getWorkspaceByDatabase(args(0))
     }
     val bronze = Bronze(workspace)
-
-    println(workspace)
-
-    if (args(2).toLowerCase() == "incremental"){
+    if (args(2).toLowerCase() == "true"){
       incrementalSnap(bronze,workspace,args(1))
     }else{
       snap(bronze,workspace,args(1))
     }
     println("SnapShot Completed")
-
-
   }
 
 }
