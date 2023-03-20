@@ -16,7 +16,7 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 // TODO -- Add rules: Array[Rule] to enable Rules engine calculations in the append
 //  also add ruleStrategy: Enum(Kill, Quarantine, Ignore) to determine when to require them
 //  Perhaps add the strategy into the Rule definition in the Rules Engine
-case class PipelineTable(
+abstract class PipelineTable(
                           name: String,
                           private val _keys: Array[String],
                           config: Config,
@@ -46,15 +46,15 @@ case class PipelineTable(
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   import spark.implicits._
-
+//  val incrementalColumns: String = incrementalColumns  //need a definition check for others variables
   val databaseName: String = if (_databaseName == "default") config.databaseName else _databaseName
   val tableFullName: String = s"${databaseName}.${name}"
 
   // Minimum Schema Enforcement Management
-  private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
-  private var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
+  private[overwatch] var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
+  private[overwatch] var enforceNonNullable: Boolean = if (masterSchema.nonEmpty) true else false
 
-  private def emitMissingMasterSchemaMessage(): Unit = {
+  private[overwatch] def emitMissingMasterSchemaMessage(): Unit = {
     val msg = s"No Master Schema defined for Table $tableFullName"
     logger.log(Level.ERROR, msg)
     if (config.debugFlag) println(msg)
@@ -88,7 +88,7 @@ case class PipelineTable(
 
   def permitDuplicateKeys: Boolean = if (writeMode == WriteMode.merge) false else _permitDuplicateKeys
 
-  private def applyAutoOptimizeConfigs(): Unit = {
+  private[overwatch] def applyAutoOptimizeConfigs(): Unit = {
 
     var overrides = Map[String, String]()
 
@@ -217,7 +217,7 @@ case class PipelineTable(
     asIncrementalDF(module, cronColumns, additionalLagDays)
   }
 
-  private def casedCompare(s1: String, s2: String): Boolean = {
+  private[overwatch] def casedCompare(s1: String, s2: String): Boolean = {
     if ( // make lower case if column names are case insensitive
       spark.conf.getOption("spark.sql.caseSensitive").getOrElse("false").toBoolean
     ) s1 == s2 else s1.equalsIgnoreCase(s2)
@@ -376,4 +376,60 @@ case class PipelineTable(
   }
 
 
+}
+
+object PipelineTable {
+  def apply(name: String,
+            _keys: Array[String],
+            config: Config,
+            incrementalColumns: Array[String] = Array(),
+            format: String = "delta", // TODO -- Convert to Enum
+            persistBeforeWrite: Boolean = false,
+            _mode: WriteMode = WriteMode.append,
+            maxMergeScanDates: Int = 33, // used to create explicit date merge condition -- should be removed after merge dynamic partition pruning is enabled DBR 11.x LTS _permitDuplicateKeys: Boolean = true,
+            _databaseName: String = "default",
+            autoOptimize: Boolean = false,
+            autoCompact: Boolean = false,
+            partitionBy: Seq[String] = Seq(),
+            statsColumns: Array[String] = Array(),
+            optimizeFrequency_H: Int = 24 * 7,
+            zOrderBy: Array[String] = Array(),
+            vacuum_H: Int = 24 * 7, // TODO -- allow config overrides -- no vacuum == 0
+            enableSchemaMerge: Boolean = true,
+            withCreateDate: Boolean = true,
+            withOverwatchRunID: Boolean = true,
+            workspaceName: Boolean = true,
+            isTemp: Boolean = false,
+            checkpointPath: Option[String] = None,
+            masterSchema: Option[StructType] = None): PipelineTable = {
+    config.deploymentType.toLowerCase.trim match {
+      case "ucm"     =>  new PipelineTableUCM(name,
+                                              _keys,
+                                              config,
+                                              incrementalColumns= Array(),
+                                              format= "delta",
+                                              persistBeforeWrite = false,
+                                              _mode = WriteMode.append,
+                                              maxMergeScanDates = 33,
+                                              _permitDuplicateKeys = true,
+                                              _databaseName = "default",
+                                              autoOptimize = false,
+                                              autoCompact = false,
+                                              partitionBy = Seq(),
+                                              statsColumns = Array(),
+                                              optimizeFrequency_H = 24 * 7,
+                                              zOrderBy = Array(),
+                                              vacuum_H = 24 * 7,
+                                              enableSchemaMerge= true,
+                                              withCreateDate = true,
+                                              withOverwatchRunID = true,
+                                              workspaceName = true,
+                                              isTemp = false,
+                                              checkpointPath = None,
+                                              masterSchema = None)
+//      case "uce"     => new PipelineTableUCE()
+//      case "default" => new PipelineTableDefault()
+      case _         => throw new UnsupportedOperationException(s"The Deployment Type for ${config.deploymentType} is not supported.")
+    }
+  }
 }
