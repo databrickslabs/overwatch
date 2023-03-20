@@ -21,3 +21,12 @@ project/target/
 \.terraform
 terraform.tfstate*
 \.terraform.lock.hcl
+*/.bloop
+*/.bsp
+*/.idea
+*/.metals
+*/.vscode
+.bloop
+.bsp
+.metals
+.idea
