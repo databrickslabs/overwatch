@@ -68,12 +68,12 @@ object DeploymentValidation extends SparkSessionWrapper {
    *                 if false it will register the exception in the validation report.
    */
   private def storagePrefixAccessValidation(config: MultiWorkspaceConfig, fastFail: Boolean = false): DeploymentValidationReport  = {
-    val testDetails = s"""StorageAccessTest storage : ${config.etl_storage_prefix}"""
+    val testDetails = s"""StorageAccessTest storage : ${config.storage_prefix}"""
     try {
-      dbutils.fs.mkdirs(s"""${config.etl_storage_prefix}/test_access""")
-      dbutils.fs.put(s"""${config.etl_storage_prefix}/test_access/testwrite""", "This is a file in cloud storage.")
-      dbutils.fs.head(s"""${config.etl_storage_prefix}/test_access/testwrite""")
-      dbutils.fs.rm(s"""${config.etl_storage_prefix}/test_access""", true)
+      dbutils.fs.mkdirs(s"""${config.storage_prefix}/test_access""")
+      dbutils.fs.put(s"""${config.storage_prefix}/test_access/testwrite""", "This is a file in cloud storage.")
+      dbutils.fs.head(s"""${config.storage_prefix}/test_access/testwrite""")
+      dbutils.fs.rm(s"""${config.storage_prefix}/test_access""", true)
       DeploymentValidationReport(true,
         getSimpleMsg("Storage_Access"),
         testDetails,
@@ -367,7 +367,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case cloudType if cloudType == "aws" || cloudType == "gcp" =>
         validateAuditLog(
           config.workspace_id,
-          config.auditlogprefix_source_aws,
+          config.auditlogprefix_source_path,
           config.primordial_date,
           config.max_days
         )
@@ -384,6 +384,20 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
   /**
+   *For overwatch version < 0.7.2 We have auditlogprefix_source_AWS as a column in config.csv.
+   * As we have completed GCP integration on overwatch version 0.7.2 we are not supporting column auditlogprefix_source_AWS.
+   * This column name has been changed to auditlogprefix_source_PATH. This function checks whether the config.csv contains auditlogprefix_source_PATH or not.
+   * @param config
+   * @return
+   */
+  private def validateAuditLogColumnName(config: MultiWorkspaceConfig) = {
+    config.auditlogprefix_source_path.getOrElse(
+      throw new BadConfigException("auditlogprefix_source_path cannot be null when cloud is AWS/GCP," +
+        "WE DO NOT support auditlogprefix_source_aws column anymore please change the column name to  auditlogprefix_source_path.")
+    )
+  }
+
+  /**
    * Performs validation on audit log data for AWS.
    *
    * @param workspace_id
@@ -391,11 +405,11 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param primordial_date
    * @param maxDate
    */
-  private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: Option[String], primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
+  private def validateAuditLog(workspace_id: String, auditlogprefix_source_path: Option[String], primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
     try {
-      if (auditlogprefix_source_aws.isEmpty) throw new BadConfigException(
-        "auditlogprefix_source_aws cannot be null when cloud is AWS")
-      val auditLogPrefix = auditlogprefix_source_aws.get
+      if (auditlogprefix_source_path.isEmpty) throw new BadConfigException(
+        "auditlogprefix_source_path cannot be null when cloud is AWS/GCP,WE DO NOT support auditlogprefix_source_aws column anymore please change the column name to  auditlogprefix_source_path")
+      val auditLogPrefix = auditlogprefix_source_path.get
       val fromDT = new java.sql.Date(primordial_date.getTime).toLocalDate
       var untilDT = fromDT.plusDays(maxDate.toLong)
       val dateCompare = untilDT.compareTo(LocalDate.now())
@@ -435,7 +449,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       } else {
         val msg =
           s"""ReValidate the folder existence
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_path.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
 
@@ -453,7 +467,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case exception: Exception =>
         val msg =
           s"""AuditLogPrefixTest workspace_id:${workspace_id}
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_path.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
@@ -620,7 +634,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    */
   private  def getSimpleMsg(ruleName: String): String = {
     ruleName match {
-      case "Common_ETLStoragePrefix" => "ETL Storage Prefix should be common across the workspaces."
+      case "Common_StoragePrefix" => "Storage Prefix should be common across the workspaces."
       case "Common_ETLDatabase" => "Workspaces should have a common ETL Database Name."
       case "Common_ConsumerDatabaseName" => "Workspaces should have a common Consumer Database Name."
       case "Valid_Cloud_providers" => "Cloud provider can be either AWS or Azure."
@@ -647,12 +661,13 @@ object DeploymentValidation extends SparkSessionWrapper {
   private[overwatch] def performMandatoryValidation( multiWorkspaceConfig: Array[MultiWorkspaceConfig],parallelism: Int):Array[MultiWorkspaceConfig]  = {
     logger.log(Level.INFO, "Performing mandatory validation")
     val commonEtlStorageRuleSet = RuleSet(multiWorkspaceConfig.toSeq.toDS.toDF(), by = "deployment_id")//Check common etl_storage_prefix
-    commonEtlStorageRuleSet.add(validateDistinct("Common_ETLStoragePrefix", MultiWorkspaceConfigColumns.etl_storage_prefix.toString))
+    commonEtlStorageRuleSet.add(validateDistinct("Common_StoragePrefix", MultiWorkspaceConfigColumns.storage_prefix.toString))
     val validationStatus = validateRuleAndUpdateStatus(commonEtlStorageRuleSet, parallelism)
     if (!validationStatus.forall(_.validated)) {
-      throw new BadConfigException(getSimpleMsg("Common_ETLStoragePrefix"))
+      throw new BadConfigException(getSimpleMsg("Common_StoragePrefix"))
     }
     storagePrefixAccessValidation(multiWorkspaceConfig.head, fastFail = true) //Check read write access for etl_storage_prefix
+    multiWorkspaceConfig.filter(_.cloud.toLowerCase() != "azure").map(config=>validateAuditLogColumnName(config))
     multiWorkspaceConfig
     }
 
@@ -675,7 +690,7 @@ object DeploymentValidation extends SparkSessionWrapper {
 
 
     val gropedRules = Seq[Rule](
-      validateDistinct("Common_ETLStoragePrefix",MultiWorkspaceConfigColumns.etl_storage_prefix.toString),
+      validateDistinct("Common_StoragePrefix",MultiWorkspaceConfigColumns.storage_prefix.toString),
       validateDistinct("Common_ETLDatabase",MultiWorkspaceConfigColumns.etl_database_name.toString),
       validateDistinct("Common_ConsumerDatabaseName",MultiWorkspaceConfigColumns.consumer_database_name.toString)
     )
