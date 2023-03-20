@@ -260,7 +260,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   private def snapshotConfig(multiworkspaceConfigs: Array[MultiWorkspaceConfig]) = {
     var configWriteLocation = multiworkspaceConfigs.head.storage_prefix
-    if (!configWriteLocation.startsWith("dbfs:") && !configWriteLocation.startsWith("s3") && !configWriteLocation.startsWith("abfss")) {
+    if (!configWriteLocation.startsWith("dbfs:")
+      && !configWriteLocation.startsWith("s3")
+      && !configWriteLocation.startsWith("abfss")
+      && !configWriteLocation.startsWith("gs")) {
       configWriteLocation = s"""dbfs:${configWriteLocation}"""
     }
     multiworkspaceConfigs.toSeq.toDS().toDF()
@@ -282,7 +285,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   private def snapShotValidation(validationArray: Array[DeploymentValidationReport], path: String, reportName: String, deploymentId: String): Unit = {
     var validationPath = path
-    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
+    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss") && !path.startsWith("gs")) {
       validationPath = s"""dbfs:${path}"""
     }
     validationArray.toSeq.toDS().toDF()
@@ -305,7 +308,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    */
   private def saveDeploymentReport(validationArray: Array[MultiWSDeploymentReport], path: String, reportName: String): Unit = {
     var reportPath = path
-    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss")) {
+    if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss") && !path.startsWith("gs")) {
       reportPath = s"""dbfs:${path}"""
     }
     validationArray.toSeq.toDF()
@@ -460,7 +463,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .map(buildParams)
       println("Workspaces to be Deployed :" + params.length)
       val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
-      val deploymentReports = params.map(executePipelines(_, zones, ec))
+      val deploymentReports = params.filter(param => param != null)
+        .map(executePipelines(_, zones, ec))
         .flatMap(f => Await.result(f, Duration.Inf))
 
       deploymentReport.appendAll(deploymentReports)

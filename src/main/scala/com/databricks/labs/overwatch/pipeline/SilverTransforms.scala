@@ -446,6 +446,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'cluster_source,
       'aws_attributes,
       'azure_attributes,
+      'gcp_attributes,
       'spark_env_vars,
       'spark_conf,
       when('ssh_public_keys.isNotNull, true).otherwise(false).alias("has_ssh_keys"),
@@ -472,11 +473,13 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterWithStructs = clusterRaw
       .withColumn("aws_attributes", SchemaTools.structFromJson(spark, clusterRaw, "aws_attributes"))
       .withColumn("azure_attributes", SchemaTools.structFromJson(spark, clusterRaw, "azure_attributes"))
+      .withColumn("gcp_attributes", SchemaTools.structFromJson(spark, clusterRaw, "gcp_attributes"))
       .scrubSchema
 
     clusterWithStructs
       .withColumn("aws_attributes", SchemaTools.structToMap(clusterWithStructs, "aws_attributes"))
       .withColumn("azure_attributes", SchemaTools.structToMap(clusterWithStructs, "azure_attributes"))
+      .withColumn("gcp_attributes", SchemaTools.structToMap(clusterWithStructs, "gcp_attributes"))
   }
 
   protected def buildPoolsSpec(
@@ -542,6 +545,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       //   fillForward("preloaded_docker_images", lastPoolValue, Seq($"poolSnapDetails.preloaded_docker_images")), // SEC-6198 - DO NOT populate or test until closed
       PipelineFunctions.fillForward(s"aws_attributes", lastPoolValue, Seq(col(s"poolSnapDetails.aws_attributes"))),
       PipelineFunctions.fillForward(s"azure_attributes", lastPoolValue, Seq(col(s"poolSnapDetails.azure_attributes"))),
+      PipelineFunctions.fillForward(s"gcp_attributes", lastPoolValue, Seq(col(s"poolSnapDetails.gcp_attributes"))),
       'custom_tags,
       createCol,
       deleteCol,
@@ -564,6 +568,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'timestamp,
         $"requestParams.aws_attributes".alias("aws_attributes"),
         $"requestParams.azure_attributes".alias("azure_attributes"),
+        $"requestParams.gcp_attributes".alias("gcp_attributes"),
         $"requestParams.instance_pool_id",
         $"requestParams.preloaded_spark_versions",
         $"requestParams.instance_pool_name",
@@ -595,11 +600,13 @@ trait SilverTransforms extends SparkSessionWrapper {
       val poolsRawWithStructs = poolsRawPruned
         .withColumn("aws_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "aws_attributes"))
         .withColumn("azure_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "azure_attributes"))
+        .withColumn("gcp_attributes", SchemaTools.structFromJson(spark, poolsRawPruned, "gcp_attributes"))
         .withColumn("custom_tags", SchemaTools.structFromJson(spark, poolsRawPruned, "custom_tags"))
 
       val changeInventory = Map[String, Column](
         "aws_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "aws_attributes"),
         "azure_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "azure_attributes"),
+        "gcp_attributes" -> SchemaTools.structToMap(poolsRawWithStructs, "gcp_attributes"),
         "custom_tags" -> SchemaTools.structToMap(poolsRawWithStructs, "custom_tags")
       )
 
@@ -652,6 +659,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'preloaded_spark_versions,
           'aws_attributes,
           'azure_attributes,
+          'gcp_attributes,
           'custom_tags,
           lit(null).cast(Schema.poolsCreateSchema).alias("create_details"),
           lit(null).cast(Schema.poolsDeleteSchema).alias("delete_details"),
@@ -763,6 +771,7 @@ trait SilverTransforms extends SparkSessionWrapper {
           'cluster_source,
           'aws_attributes,
           'azure_attributes,
+          'gcp_attributes,
           to_json('spark_env_vars).alias("spark_env_vars"),
           'spark_conf,
           'driver_instance_pool_id,
@@ -854,6 +863,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       'cluster_source,
       'aws_attributes,
       'azure_attributes,
+      'gcp_attributes,
       'spark_env_vars,
       'spark_conf,
       'acl_path_prefix,
