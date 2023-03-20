@@ -833,7 +833,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         coalesce('parentRunId_Started, 'parentRunId_Completed).cast("long").alias("parentRunId"),
         coalesce('taskRunId, 'idInJob).cast("long").alias("idInJob"),
         TransformFunctions.subtractTime(
-          'submissionTime,
+          'startTime,
           array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
         ).alias("TaskRunTime"), // run launch time until terminal event
         TransformFunctions.subtractTime(
