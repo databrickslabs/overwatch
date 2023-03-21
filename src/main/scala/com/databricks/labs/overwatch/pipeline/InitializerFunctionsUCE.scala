@@ -34,10 +34,13 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
       val dbProperties = dbMeta.properties
 
-      val existingDBLocation = Option(spark.sql(s"describe database ${dbName}")
+      val existingDBLocation = spark.sql(s"describe database ${dbName}")
         .where("database_description_item ='RootLocation'")
-        .select("database_description_value").collect.map(_.getString(0)).head).toString
+        .select("database_description_value").collect.map(_.getString(0)).head.toString
       //        .map(f=>f.getString(0)).collect.head.toString
+
+      println(s"existingDBLocation-------${existingDBLocation}")
+      println(s"dbLocation-------${dbLocation}")
 
       if (existingDBLocation != dbLocation) {
         switch = false
@@ -86,9 +89,9 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       if (spark.catalog.databaseExists(consumerDBName)) {
         val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
 
-        val existingConsumerDBLocation = Option(spark.sql(s"describe database ${consumerDBMeta}")
+        val existingConsumerDBLocation = spark.sql(s"describe database ${consumerDBName}")
           .where("database_description_item ='RootLocation'")
-          .select("database_description_value").collect.map(_.getString(0)).head).toString
+          .select("database_description_value").collect.map(_.getString(0)).head.toString
 
         if (existingConsumerDBLocation != consumerDBLocation) { // separated consumer DB but same location FAIL
           switch = false
@@ -120,6 +123,7 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
         throw new BadConfigException("Consumer DB cannot match ETL DB Name while having different locations.")
       }
     }
+    spark.sessionState.catalogManager.setCurrentCatalog(etlCatalogName)
     switch
   }
     /**
