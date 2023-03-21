@@ -272,7 +272,7 @@ object Initializer extends SparkSessionWrapper {
     val overwatchParams = deserializeArgs(overwatchArgs)
 
     val deployment = getDeploymentType(overwatchParams)
-    logger.debug(s"deployment type is - ${deployment}")
+    logger.log(Level.INFO,s"deployment type is - ${deployment}")
 
     config.setDeploymentType(deployment)
 
