@@ -1221,6 +1221,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .withColumn("runtime_in_cluster_state", // all runs have an initial cluster state
         when('state.isin("CREATING", "STARTING") || 'cluster_type === "new", 'uptime_in_state_H * 1000 * 3600) // get true cluster time when state is guaranteed fully initial
           .otherwise(runStateFirstToEnd - $"task_runtime.startEpochMS")) // otherwise use jobStart as beginning time and min of stateEnd or jobEnd for end time )
+      .withColumn("hourly_core_potential", 'cluster_state_worker_potential_core_H / 'uptime_in_state_H) // executor potential per hour
+      .withColumn("worker_potential_core_H", ('runtime_in_cluster_state / 1000.0 / 60.0 / 60.0) * 'hourly_core_potential)
       .withColumn("lifecycleState", lit("init"))
   }
 
@@ -1256,6 +1258,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       )
       .join(jobRunInitialStates.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti") // filter out beginning states
       .withColumn("runtime_in_cluster_state", taskRunEndOrPipelineEnd - runStateLastToStart)
+      .withColumn("hourly_core_potential", 'cluster_state_worker_potential_core_H / 'uptime_in_state_H) // executor potential per hour
+      .withColumn("worker_potential_core_H", ('runtime_in_cluster_state / 1000.0 / 60.0 / 60.0) * 'hourly_core_potential)
       .withColumn("lifecycleState", lit("terminal"))
   }
 
@@ -1295,6 +1299,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .join(jobRunInitialStates.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti") // filter out beginning states
       .join(jobRunTerminalStates.select(stateLifecycleKeys map col: _*), stateLifecycleKeys, "leftanti") // filter out ending states
       .withColumn("runtime_in_cluster_state", 'unixTimeMS_state_end - 'unixTimeMS_state_start)
+      .withColumn("hourly_core_potential", 'cluster_state_worker_potential_core_H / 'uptime_in_state_H) // executor potential per hour
+      .withColumn("worker_potential_core_H", ('runtime_in_cluster_state / 1000.0 / 60.0 / 60.0) * 'hourly_core_potential)
       .withColumn("lifecycleState", lit("intermediate"))
 
   }
@@ -1327,7 +1333,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       $"workerSpecs.vCPUs".alias("worker_cores"),
       'isAutomated,
       'dbu_rate,
-      'worker_potential_core_H,
+      'worker_potential_core_H.alias("cluster_state_worker_potential_core_H"),
       'driver_compute_cost,
       'worker_compute_cost,
       'driver_dbu_cost,
