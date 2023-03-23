@@ -653,7 +653,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'jobId.cast("long").alias("submissionJobId"),
         'runId.alias("jobRunId"),
         'timestamp.alias("submissionTime"),
-        'jobTriggerType,
+        'jobTriggerType.alias("jobTriggerType_Triggered"),
         'requestId.alias("submitRequestID"),
         'response.alias("submitResponse"),
         'userIdentity.alias("submittedBy")
@@ -843,7 +843,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'run_name,
         coalesce('jobClusterType_Started, 'jobClusterType_Completed).alias("clusterType"),
         coalesce('jobTaskType_Started, 'jobTaskType_Completed).alias("taskType"),
-        coalesce('jobTriggerType_Started, 'jobTriggerType_Completed, 'jobTriggerType_runNow).alias("jobTriggerType"),
+        coalesce('jobTriggerType_Triggered,'jobTriggerType_Started, 'jobTriggerType_Completed, 'jobTriggerType_runNow).alias("jobTriggerType"),
         when('cancellationRequestId.isNotNull, "Cancelled")
           .otherwise('jobTerminalState)
           .alias("terminalState"),
