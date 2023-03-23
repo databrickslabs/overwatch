@@ -577,13 +577,19 @@ object Helpers extends SparkSessionWrapper {
    * @return
    */
   def getWorkspaceByDatabase(
-                              etlDB: String,
+//                              etlDB: String,
+                              db: String,
                               organization_id: Option[String] = None,
                               apiUrl: Option[String] = None,
                               successfullOnly: Boolean = true,
                               disableValidations: Boolean = false
                             ): Workspace = {
     // verify database exists
+    val etlDB = if(db.contains("\\.")){
+      spark.sessionState.catalogManager.setCurrentCatalog(db.split("\\.").head)
+      db.split("\\.").last
+    } else db
+
     assert(spark.catalog.databaseExists(etlDB), s"The database provided, $etlDB, does not exist.")
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
     val dbProperties = dbMeta.properties
