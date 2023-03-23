@@ -230,12 +230,14 @@ class Pipeline(
   private def publishInstanceDetails(): Unit = {
     val logMsg = "instanceDetails does not exist and/or does not contain data for this workspace. BUILDING/APPENDING"
     logger.log(Level.INFO, logMsg)
+    val Initializer = new Initializer(config, disableValidations = false, isSnap = false, initDB = true)
+
     if (getConfig.debugFlag) println(logMsg)
     val instanceDetailsDF = config.cloudProvider match {
       case "aws" =>
-        InitializerFunctions.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
+        Initializer.Init.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
       case "azure" =>
-        InitializerFunctions.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
+        Initializer.Init.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
       case _ =>
         throw new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure.")
     }
