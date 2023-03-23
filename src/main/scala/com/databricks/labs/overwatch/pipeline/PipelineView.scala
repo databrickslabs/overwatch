@@ -52,6 +52,7 @@ case class PipelineView(name: String,
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
       try {
+        spark.sessionState.catalogManager.setCurrentCatalog(config.consumerCatalogName)
         spark.sql(pubStatement)
       } catch {
         case e: Throwable =>

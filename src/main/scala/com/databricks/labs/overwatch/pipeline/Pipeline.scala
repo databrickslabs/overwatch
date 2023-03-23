@@ -277,6 +277,7 @@ class Pipeline(
    */
   protected def initPipelineRun(): this.type = {
     logger.log(Level.INFO, "INIT: Pipeline Run")
+    spark.sessionState.catalogManager.setCurrentCatalog(config.etlCatalogName)
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName)
     val dbProperties = dbMeta.properties
     val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")
