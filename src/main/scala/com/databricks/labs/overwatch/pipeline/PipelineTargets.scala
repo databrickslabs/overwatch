@@ -498,6 +498,23 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
+    lazy private[overwatch] val verboseAuditTarget: PipelineTable = PipelineTable(
+      name = "verboseAuditTarget_gold",
+      _keys = Array("organization_id", "timestamp", "unixTimeMS"),
+      config,
+      _mode = WriteMode.merge,
+      partitionBy = Seq("organization_id"),
+//      maxMergeScanDates = 31, // 1 greater than clusterStateDetail
+      incrementalColumns = Array("unixTimeMS"),
+      zOrderBy = Array("notebookId", "unixTimeMS")
+    )
+
+    lazy private[overwatch] val verboseAuditViewTarget: PipelineView = PipelineView(
+      name = "verboseAuditTarget",
+      verboseAuditTarget,
+      config
+    )
+
     lazy private[overwatch] val sparkJobTarget: PipelineTable = PipelineTable(
       name = "sparkJob_gold",
       _keys = Array("spark_context_id", "job_id", "unixTimeMS"),

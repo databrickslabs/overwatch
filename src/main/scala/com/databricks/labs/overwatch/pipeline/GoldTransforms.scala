@@ -237,6 +237,59 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
   }
 
+  protected def buildVerboseAudit(
+                                   notebook: PipelineTable,
+                                   clusterStateFact : PipelineTable,
+                                 )(auditIncrementalDF: DataFrame): DataFrame = {
+
+
+    val notebookLookupTSDF = notebook.asDF
+      .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS")
+      .withColumnRenamed("notebook_id", "notebookId")
+      .distinct
+      .toTSDF("unixTimeMS", "organization_id", "notebookId")
+
+    val clsfLookupTSDF = clusterStateFact.asDF
+      .select(
+        "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
+        "custom_tags", "node_type_id", "current_num_workers", "uptime_in_state_H", "total_cost")
+      .distinct
+      .withColumnRenamed("state_start_date", "date")
+      .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
+      .withColumnRenamed("cluster_id", "clusterId")
+      .withColumnRenamed("current_num_workers", "node_count")
+      .withColumn("totalCostPMS", col("uptime_in_state_H") / col("total_cost") / lit(60) / lit(60) / lit(1000))
+      .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
+
+    val ColNames = Array(
+      "organization_id", "workspace_name", "date", "timestamp", "userIdentity.email",
+      "notebookId", "notebook_path", "notebook_name", "commandId", "commandText", "executionTime", "sourceIpAddress",
+      "userIdentity", "shardName", "execution_estimated_cost", "status", "clusterId", "cluster_name", "custom_tags",
+      "node_type_id", "node_count", "response", "userAgent", "unixTimeMS"
+    )
+
+    val notebookCodeAndMetaDF = auditIncrementalDF
+      .filter((col("serviceName") === "databrickssql" && col("actionName") === "commandSubmit") ||
+        (col("serviceName") === "databrickssql" && col("actionName") === "commandFinish") ||
+        (col("serviceName") === "notebook" && col("actionName") === "runCommand"))
+      .verifyMinimumSchema(Schema.auditMasterSchema)
+      .selectExpr("*", "requestParams.*").drop("requestParams")
+      .withColumnRenamed("timestamp", "unixTimeMS")
+      .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
+      .toTSDF("unixTimeMS", "organization_id", "notebookId")
+      .lookupWhen(notebookLookupTSDF)
+      .df
+      .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
+      .lookupWhen(clsfLookupTSDF)
+      .df
+      .withColumn("execution_estimated_cost", col("executionTime") * col("totalCostPMS"))
+    println("Verbose Audit Log Created")
+
+    notebookCodeAndMetaDF.select(ColNames map col: _*)
+  }
+
+
+
   protected def buildClusterStateFact(
                                        instanceDetailsTarget: PipelineTable,
                                        dbuCostDetailsTarget: PipelineTable,
@@ -800,6 +853,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       |driver_dbu_cost, worker_compute_cost, worker_dbu_cost, total_driver_cost, total_worker_cost,
       |total_compute_cost, total_dbu_cost, total_cost, total_dbus, spark_task_runtimeMS, spark_task_runtime_H,
       |job_run_cluster_util
+      |""".stripMargin
+
+  protected val verboseAuditTargetViewColumnMapping: String =
+    """
+      |organization_id, workspace_name, date, timestamp, userIdentity.email,
+      |notebookId, notebook_path, notebook_name, commandId, commandText, executionTime, sourceIpAddress,
+      |userIdentity, shardName, execution_estimated_cost, status, clusterId, cluster_name, custom_tags,
+      |node_type_id, node_count, response, userAgent, unixTimeMS
       |""".stripMargin
 
   protected val notebookViewColumnMappings: String =

@@ -121,6 +121,21 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
+  lazy private[overwatch] val verboseAuditModule = Module(3018, "Gold_VerboseAuditLog", this, Array(1004,3004,3005))
+  lazy private val appendVerboseAuditProccess: () => ETLDefinition = {
+    () =>
+      ETLDefinition(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(verboseAuditModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+        Seq(buildVerboseAudit(
+          GoldTargets.notebookTarget,
+          GoldTargets.clusterStateFactTarget
+        )),
+        append(GoldTargets.verboseAuditTarget)
+      )
+  }
+
+
+
   lazy private[overwatch] val poolsModule = Module(3009, "Gold_Pools", this, Array(2009))
   lazy private val appendPoolsProcess: () => ETLDefinition = {
     () =>
@@ -373,6 +388,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case _ =>
     }
   }
+
+  private def verboseAudit(): Unit = {
+    verboseAuditModule.execute(appendVerboseAuditProccess)
+    GoldTargets.verboseAuditViewTarget.publish(verboseAuditTargetViewColumnMapping)
+  }
   private def publishVerbose():Unit = {
     try{
     if((spark.catalog.tableExists(s"${config.consumerDatabaseName}.notebook"))
@@ -478,7 +498,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     restoreSparkConf()
     executeModules()
     buildFacts()
-    publishVerbose()
+    verboseAudit()
 
     initiatePostProcessing()
     this // to be used as fail switch later if necessary
