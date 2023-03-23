@@ -881,5 +881,32 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
+  def sanitizeURL(url:String):String={
+    val inputUrl = url.trim
+    removeDuplicateSlashes(removeTrailingSlashes(inputUrl))
+  }
 
+  def removeDuplicateSlashes(url: String): String = {
+    val stringURL = url.replaceAll("//", "/")
+    val makeFirstSlashDoubleSlash =
+      if (stringURL.contains("s3a:/") ||
+        stringURL.contains("s3:/") ||
+        stringURL.contains("gs:/") ||
+        stringURL.contains("abfss:/") ||
+        stringURL.contains("http:/") ||
+        stringURL.contains("https:/")) true else false
+    if (makeFirstSlashDoubleSlash) {
+      stringURL.replaceFirst("/", "//")
+    } else {
+      stringURL
+    }
+  }
+
+  def removeTrailingSlashes(url: String): String = {
+    if(url.lastIndexOf("/") == url.length-1){
+      url.substring(0,url.length-1)
+    }else{
+      url
+    }
+  }
 }
