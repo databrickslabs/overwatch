@@ -466,6 +466,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterRaw = auditRawDF
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .filter($"response.statusCode" === 200) // only publish successful edits into the spec table
       .select(clusterSummaryCols: _*)
       .filter(!isWarehouse)
       .withColumn("cluster_id", cluster_id_gen)
@@ -875,7 +876,6 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     val clustersRemoved = clusterBaseDF
-      .filter($"response.statusCode" === 200) // only successful delete statements get applied
       .filter('actionName.isin("permanentDelete"))
       .select('organization_id, 'cluster_id, 'userEmail.alias("deleted_by"))
 
