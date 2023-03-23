@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions.col
-
+import com.databricks.labs.overwatch.utils.Helpers.spark
 import java.util.UUID
 
 class Config() {
@@ -403,18 +403,17 @@ class Config() {
    * @return
    */
   private def deriveCloudProvider(): String = {
-    if(isPVC){
-      "aws"
-    }else(
-      workspaceURL.toLowerCase match {
-        case cloudType if cloudType.contains("azure") => "azure"
-        case cloudType if cloudType.contains("aws") => "aws"
-        case cloudType if cloudType.contains("gcp") => "gcp"
-        case _ => throw new BadConfigException(s"${workspaceURL.toLowerCase} NOT SUPPORTED: Supported clouds at this time " +
-          s"include azure, aws, gcp")
+    if(isMultiworkspaceDeployment) {
+      if (isPVC) {
+        "aws"
+      } else {
+        workspaceURL.toLowerCase match {
+          case cloudType if cloudType.contains("azure") => "azure"
+          case cloudType if cloudType.contains("gcp") => "gcp"
+          case _ => "aws"
+        }
       }
-    )
-
+    } else spark.conf.get("spark.databricks.cloudProvider").toLowerCase
   }
 
   private[overwatch] def buildApiEnv(tokenSecret: Option[TokenSecret], apiEnvConfig: Option[ApiEnvConfig]): ApiEnv = {
