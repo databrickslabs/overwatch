@@ -419,6 +419,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
 
   private def clusterBase(auditRawDF: DataFrame): DataFrame = {
+    val isWarehouse = get_json_object('custom_tags, "$.SqlEndpointId").isNotNull
     val cluster_id_gen_w = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
     val cluster_name_gen_w = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
     val cluster_id_gen = first('cluster_id, true).over(cluster_id_gen_w)
@@ -466,6 +467,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .select(clusterSummaryCols: _*)
+      .filter(!isWarehouse)
       .withColumn("cluster_id", cluster_id_gen)
       .withColumn("cluster_name", cluster_name_gen)
 
