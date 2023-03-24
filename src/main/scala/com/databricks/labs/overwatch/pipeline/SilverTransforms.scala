@@ -14,6 +14,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
+  private val responseSuccessFilter: Column = $"response.statusCode" === 200
 
   private def appendPowerProperties: Column = {
     struct(
@@ -419,6 +420,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
 
   private def clusterBase(auditRawDF: DataFrame): DataFrame = {
+    val isWarehouse = get_json_object('custom_tags, "$.SqlEndpointId").isNotNull
     val cluster_id_gen_w = Window.partitionBy('organization_id, 'cluster_name).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
     val cluster_name_gen_w = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
     val cluster_id_gen = first('cluster_id, true).over(cluster_id_gen_w)
@@ -465,7 +467,9 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterRaw = auditRawDF
       .filter('serviceName === "clusters" && !'actionName.isin("changeClusterAcl"))
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .filter(responseSuccessFilter) // only publish successful edits into the spec table
       .select(clusterSummaryCols: _*)
+      .filter(!isWarehouse)
       .withColumn("cluster_id", cluster_id_gen)
       .withColumn("cluster_name", cluster_name_gen)
 
@@ -512,14 +516,14 @@ trait SilverTransforms extends SparkSessionWrapper {
         'poolSnapDetails
       )
 
-    val deleteCol = when('actionName === "delete" && $"response.statusCode" === 200,
+    val deleteCol = when('actionName === "delete" && responseSuccessFilter,
       struct(
         $"userIdentity.email".alias("deleted_by"),
         'timestamp.alias("deleted_at_epochMillis"),
         from_unixtime('timestamp / 1000).cast("timestamp").alias("deleted_at")
       )).otherwise(lit(null).cast(Schema.poolsDeleteSchema)).alias("delete_details")
 
-    val createCol = when('actionName === "create" && $"response.statusCode" === 200,
+    val createCol = when('actionName === "create" && responseSuccessFilter,
       struct(
         $"userIdentity.email".alias("created_by"),
         'timestamp.alias("created_at_epochMillis"),
@@ -873,7 +877,6 @@ trait SilverTransforms extends SparkSessionWrapper {
     )
 
     val clustersRemoved = clusterBaseDF
-      .filter($"response.statusCode" === 200) // only successful delete statements get applied
       .filter('actionName.isin("permanentDelete"))
       .select('organization_id, 'cluster_id, 'userEmail.alias("deleted_by"))
 
