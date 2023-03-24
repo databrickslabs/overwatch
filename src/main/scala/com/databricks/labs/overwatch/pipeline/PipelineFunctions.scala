@@ -550,7 +550,7 @@ object PipelineFunctions extends SparkSessionWrapper {
 
   def getDeltaHistory(spark: SparkSession, target: PipelineTable, n: Int = 9999): DataFrame = {
     import spark.implicits._
-    DeltaTable.forPath(target.tableLocation).history(n)
+    DeltaTable.forPath(spark, target.tableLocation).history(n)
       .select(
         'version,
         'timestamp,
