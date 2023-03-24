@@ -496,8 +496,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   def run(): Pipeline = {
 
     restoreSparkConf()
-    executeModules()
-    buildFacts()
+//    executeModules()
+//    buildFacts()
     verboseAudit()
 
     initiatePostProcessing()
