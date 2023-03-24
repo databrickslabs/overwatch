@@ -334,6 +334,12 @@ trait GoldTransforms extends SparkSessionWrapper {
       // filling data is critical here to ensure jrcp dups don't occur
       // using noise generators to fill with two passes to reduce skew
       .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores) // scan back then forward to fill all
+      // Populate Num_workers from cluster_snap_bronze
+      .alias("clusterPotential")
+      .join(clusterSnapshot.asDF.alias("clusterSnapshot"),Seq("cluster_id"),"left").select("clusterPotential.*","clusterSnapshot.num_workers")
+      .withColumn("current_num_workers",when(col("current_num_workers") === "0",col("num_workers")).otherwise(col("current_num_workers")))
+      .withColumn("target_num_workers",when(col("target_num_workers") === "0",col("num_workers")).otherwise(col("target_num_workers")))
+      .drop("num_workers")
 
 
     val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
