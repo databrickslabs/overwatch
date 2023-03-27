@@ -3,10 +3,12 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.utils.Helpers.spark.table
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -16,6 +18,7 @@ import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -881,5 +884,28 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
+  def pipReport(etlDB: String = "overwatch_etl", orgId: String = "", detailed: Boolean = false):Dataset[Row] = {
 
+    val pipReport = if (detailed) {
+      println("Report Extracted from pipeline_report")
+      table(s"${etlDB}.pipeline_report")
+    }else{
+      println("Report Extracted from pipReport")
+      table(s"${etlDB}.pipeline_report")
+    }
+
+    val pipReport1 = if (orgId == "") {
+      pipReport.orderBy('Pipeline_SnapTS.desc,'moduleID)
+      .withColumn("fromTSt", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
+      .withColumn("untilTSt", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
+    }else{
+      pipReport
+        .filter('organization_id === orgId)
+        .orderBy('Pipeline_SnapTS.desc,'moduleID)
+        .withColumn("fromTSt", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
+        .withColumn("untilTSt", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
+    }
+    pipReport1
+
+  }
 }
