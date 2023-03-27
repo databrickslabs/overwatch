@@ -587,7 +587,6 @@ object Helpers extends SparkSessionWrapper {
     // verify database exists
     val initialCatalog = spark.sessionState.catalogManager.currentCatalog.name()
     val etlDB = if(db.contains(".")){
-      println("inside if")
       spark.sessionState.catalogManager.setCurrentCatalog(db.split("\\.").head)
       db.split("\\.").last
     } else db
