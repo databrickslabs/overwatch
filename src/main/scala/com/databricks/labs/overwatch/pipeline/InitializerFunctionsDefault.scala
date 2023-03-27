@@ -30,9 +30,13 @@ class InitializerFunctionsDefault(config: Config, disableValidations: Boolean, i
 
       val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
       val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+      val etlCatalogName = "hive_metastore"
+      val consumerCatalogName = "hive_metastore"
 
       config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
       config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
+      config.setCatalogName(etlCatalogName, consumerCatalogName)
+
     }
 
     /**
