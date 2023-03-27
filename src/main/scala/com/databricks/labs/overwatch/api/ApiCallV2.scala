@@ -1,6 +1,5 @@
-package com.databricks.labs.overwatch
+package com.databricks.labs.overwatch.api
 
-import com.databricks.labs.overwatch.ApiCallV2.sc
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -17,7 +16,6 @@ import java.util.Collections
 import java.util.concurrent.Executors
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.math.Ordered.orderingToOrdered
 import scala.util.{Failure, Success}
 
 /**

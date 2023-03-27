@@ -1,4 +1,4 @@
-package com.databricks.labs.overwatch
+package com.databricks.labs.overwatch.api
 
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.JsonMappingException
