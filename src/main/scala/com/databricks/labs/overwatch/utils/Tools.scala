@@ -585,7 +585,9 @@ object Helpers extends SparkSessionWrapper {
                               disableValidations: Boolean = false
                             ): Workspace = {
     // verify database exists
-    val etlDB = if(db.contains("\\.")){
+    val initialCatalog = spark.sessionState.catalogManager.currentCatalog.name()
+    val etlDB = if(db.contains(".")){
+      println("inside if")
       spark.sessionState.catalogManager.setCurrentCatalog(db.split("\\.").head)
       db.split("\\.").last
     } else db
@@ -629,6 +631,7 @@ object Helpers extends SparkSessionWrapper {
     if (isRemoteWorkspace && workspace.getConfig.auditLogConfig.rawAuditPath.isEmpty) {
       workspace.getConfig.setCloudProvider("azure")
     }
+    spark.sessionState.catalogManager.setCurrentCatalog(initialCatalog)
     workspace
   }
 
