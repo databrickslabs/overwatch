@@ -4,17 +4,9 @@ import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
 import org.apache.log4j.Logger
 import org.apache.spark.sql.functions.{col, from_unixtime}
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions.spark.table
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
-import com.databricks.labs.overwatch.utils.{NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes}
 import org.apache.log4j.Level
-import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame}
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
-import org.apache.log4j.{Level, Logger}
-
 
 class Gold(_workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config)
@@ -496,8 +488,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   def run(): Pipeline = {
 
     restoreSparkConf()
-//    executeModules()
-//    buildFacts()
+    executeModules()
+    buildFacts()
     verboseAudit()
 
     initiatePostProcessing()

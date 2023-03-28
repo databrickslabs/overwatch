@@ -504,7 +504,6 @@ abstract class PipelineTargets(config: Config) {
       config,
       _mode = WriteMode.merge,
       partitionBy = Seq("organization_id"),
-//      maxMergeScanDates = 31, // 1 greater than clusterStateDetail
       incrementalColumns = Array("unixTimeMS"),
       zOrderBy = Array("notebookId", "unixTimeMS")
     )
