@@ -575,7 +575,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         Some(workspace_id)
       )
     } catch {
-      case exception: Exception =>
+      case exception: Throwable =>
         val msg = s"""Unable to retrieve data from ehName:${ehName} scope:${scope} eh_scope_key:${key}"""
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
