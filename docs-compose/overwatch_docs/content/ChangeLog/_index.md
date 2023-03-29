@@ -4,6 +4,29 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.1.3
+* Data Quality Fixes - primarily around cost and utilization
+* **Upgrade Process**
+  * Swap the Jar -- that's it -- all new data will be built with these corrections
+  * (Optional) Run Historical Data Repair script **[HTML](/assets/ChangeLog/0713_Repair_Historical.html) | [DBC](/assets/ChangeLog/0713_Repair_Historical.dbc)**
+    * If you want to rebuild historical data, run the script above and Overwatch's subsequent run will rebuild the 
+    necessary tables
+
+### Bug Fixes
+* **DBU Photon Costs** for Automated workloads
+  * DBU multiplier updated
+* **Single Node DBUs & Cost Calculations**
+  * Overwatch was showing 0 DBUs and $0 costs for workers but since the worker is the driver this is not accurate
+* **Job Task Run - Start Timestamp**
+  * The task_runtime was referencing "submission_time" instead of "start_time" but it turns out that Databricks does 
+  not publish the task start time and all job tasks get submitted at the same time; thus start_time must be used.
+* Job Run Cost Potential Fact - **(JRCP) Cluster Utilization**
+  * Due to the taskRun timestamp issue in the last bullet and a miscalculation for concurrent jobs running on a single 
+  cluster the cluster utilization in JRCP could be off -- this was resolved and should now be accurate.
+* **Cluster name / id imputes** can incorrect in certain scenarios
+
+[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/24?closed=1)
+
 ## 0.7.1.2
 * Fixes bugs from 0711 that may affect workflow
   * **If already using 0711** -- simply swap the JAR -- no other action necessary
@@ -16,7 +39,7 @@ weight: 4
 **USE [0712](#0712) Version**
 Bug Fixes Plus a Few New Features
 
-**Upgrade Script** -- Simple but necessary script to be run once per Overawtch Deployment (i.e. storage prefix) the 
+**Upgrade Script** -- Simple but necessary script to be run once per Overwatch Deployment (i.e. storage prefix) the 
 details of script are in the script.
 * **[HTML](/assets/ChangeLog/Upgrade_0711.html) | [DBC](/assets/ChangeLog/Upgrade_0711.dbc)**
 

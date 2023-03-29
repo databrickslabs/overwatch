@@ -93,6 +93,13 @@ firewall rules. This should be done in the Event Hub Namespace --> Networking Ta
 
 #### Step 2
 Create an Event Hub inside your chosen (or created) EH Namespace.
+{{% notice warning %}}
+**Every Workspace must have its own Event Hub -- They cannot be shared.** Event Hub namespaces (up to 10 for Standard) 
+can be shared but the Event Hub must be different. This is to save you time and money since Event Hubs act like topics 
+and allow us to sub-select data without scanning / streaming it all in just to filter it out. If you try to share an 
+Event Hub, you will be reloading data as there will be several issues.
+{{% /notice %}}
+
 {{% notice info %}}
 [**Partitions**](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-scalability#partitions)
 The maximum number of cores (parallelism) that can simultaneously pull data from your event hub == EH partitions.

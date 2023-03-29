@@ -115,10 +115,11 @@ To externalize the optimize and z-order tasks:
 * Create a job to execute the optimize on the workspace you wish (One Workspace - One Job)
     * Type: JAR
     * Main Class: `com.databricks.labs.overwatch.Optimizer`
-    * Dependent Libraries: `com.databricks.labs:overwatch_2.12:0.6.0.1`
+    * Dependent Libraries: `com.databricks.labs:overwatch_2.12:<LATEST>`
     * Parameters: `["<Overwatch_etl_database_name>"]`
     * Cluster Config: Recommended
-        * DBR Version: 9.1LTS
+        * DBR Version: 11.3LTS
+        * Photon: Optional
         * Enable Autoscaling Compute with enough nodes to go as fast as you want. 4-8 is a good starting point
         * AWS -- Enable autoscaling local storage
         * Worker Nodes: Storage Optimize
