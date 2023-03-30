@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.OverwatchScope._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.SparkSession.setActiveSession
 import org.apache.spark.sql.catalyst.catalog.CatalogDatabase
 import org.apache.spark.sql.catalyst.dsl.expressions.DslSymbol
 import org.apache.spark.sql.functions.lit
@@ -51,7 +52,8 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       }
 
       val isOverwatchDB = dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE"
-      if (!isOverwatchDB) {
+      val tableList = spark.catalog.listTables(dbName)
+      if (!isOverwatchDB && !tableList.isEmpty) {
         switch = false
         throw new BadConfigException(s"The Database: $dbName was not created by overwatch. Specify a " +
           s"database name that does not exist or was created by Overwatch.")
@@ -173,27 +175,35 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
         "OVERWATCHDB='TRUE'"
       }
       if (!spark.catalog.databaseExists(s"${config.etlCatalogName}.${config.databaseName}")) {
-        logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
+        logger.log(Level.INFO, s"Database ${config.databaseName} not found, at " +
           s"${config.databaseLocation}.")
-        val createDBIfNotExists = s"create database if not exists ${config.etlCatalogName}.${config.databaseName} managed location '" +
-            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
-
-        spark.sql(createDBIfNotExists)
-        logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
+//        val createDBIfNotExists = s"create database if not exists ${config.etlCatalogName}.${config.databaseName} managed location '" +
+//            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
+//
+//        spark.sql(createDBIfNotExists)
+//        logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
+        throw new BadConfigException(s"etlDatabase - ${config.databaseName} not found in catalog ${config.etlCatalogName}. " +
+          s"Please create etlDatabase before executing the Overwatch job")
       } else {
         // TODO -- get schema version of each table and perform upgrade if necessary
+        val alterDbPropertiesStatement = s"alter database ${config.databaseName} set DBPROPERTIES ($dbMeta,'SCHEMA'=${config.overwatchSchemaVersion})"
+        spark.sql(alterDbPropertiesStatement)
         logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
       }
 
       // Create consumer database if one is configured
       if (config.consumerDatabaseName != config.databaseName) {
         logger.log(Level.INFO, "Initializing Consumer Database")
-        if (!spark.catalog.databaseExists(s"${config.consumerCatalogName}${config.consumerDatabaseName}")) {
-          val createConsumerDBSTMT = s"create database if not exists ${config.consumerCatalogName}.${config.consumerDatabaseName} " +
-            s"managed location '${config.consumerDatabaseLocation}'"
-
-          spark.sql(createConsumerDBSTMT)
-          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+        if (!spark.catalog.databaseExists(s"${config.consumerCatalogName}.${config.consumerDatabaseName}")) {
+          println("inside consumer if ...")
+          println(s"consumer db name .... ${config.consumerCatalogName}${config.consumerDatabaseName}")
+//          val createConsumerDBSTMT = s"create database if not exists ${config.consumerCatalogName}.${config.consumerDatabaseName} " +
+//            s"managed location '${config.consumerDatabaseLocation}'"
+//
+//          spark.sql(createConsumerDBSTMT)
+//          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+          throw new BadConfigException(s"consumerDatabase - ${config.consumerDatabaseName} not found in catalog - ${config.consumerCatalogName}." +
+            s" Please create consumerDatabase before executing the overwatch job")
         }
       }
 
