@@ -165,7 +165,7 @@ M5ZN Double Extra Large,m5zn.2xlarge,32.0,8,0.66,0.66,2.0,0,None,0,Intel Xeon Pl
 M5ZN 3xlarge,m5zn.3xlarge,48.0,12,0.991,0.991,3.0,0,None,0,Intel Xeon Platinum 8252,4.5,EBS only,25 Gigabit,4750,593.75,TRUE,TRUE,0.624,0
 M5ZN 6xlarge,m5zn.6xlarge,96.0,24,1.982,1.982,6.0,0,None,0,Intel Xeon Platinum 8252,4.5,EBS only,50 Gigabit,9500,1187.5,TRUE,TRUE,1.248,0
 M5ZN 12xlarge,m5zn.12xlarge,192.0,48,3.964,3.964,12.0,0,None,0,Intel Xeon Platinum 8252,4.5,EBS only,100 Gigabit,19000,2375,TRUE,TRUE,2.497,0
-P3DN 24xlarge,p3dn.24xlarge,768.0,96,31.212,31.212,,8,NVIDIA Tesla V100,256,Intel Xeon Platinum 8175 (Skylake),2.5,1800 GiB NVMe SSD,100 Gigabit,19000,2375,TRUE,TRUE,19.215,0
+P3DN 24xlarge,p3dn.24xlarge,768.0,96,31.212,31.212,42.33,8,NVIDIA Tesla V100,256,Intel Xeon Platinum 8175 (Skylake),2.5,1800 GiB NVMe SSD,100 Gigabit,19000,2375,TRUE,TRUE,19.215,0
 R5DN Large,r5dn.large,16.0,2,0.167,0.167,0.52,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,75 GiB NVMe SSD,25 Gigabit,4750,593.75,TRUE,FALSE,0.105,0
 R5DN Extra Large,r5dn.xlarge,32.0,4,0.334,0.334,1.04,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,150 GiB NVMe SSD,25 Gigabit,4750,593.75,TRUE,FALSE,0.21,0
 R5DN Double Extra Large,r5dn.2xlarge,64.0,8,0.668,0.668,2.09,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,300 GiB NVMe SSD,25 Gigabit,4750,593.75,TRUE,FALSE,0.421,0
