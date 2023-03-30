@@ -884,28 +884,38 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
-  def pipReport(etlDB: String = "overwatch_etl", orgId: String = "", detailed: Boolean = false):Dataset[Row] = {
+  def pipReport(etlDB: String = "overwatch_etl", detailed: Boolean = false):Dataset[Row] = {
+    try{
+      spark.catalog.getTable(s"${etlDB}.pipeline_report")
+      logger.log(Level.INFO, s"Overwatch has being deployed with  ${etlDB}")
+    }catch {
+      case e: Exception =>
+        val msg = s"Overwatch has not been deployed with  ${etlDB}"
+        logger.log(Level.ERROR, msg)
+        throw new BadConfigException(msg)
+    }
 
     val pipReport = if (detailed) {
       println("Report Extracted from pipeline_report")
       table(s"${etlDB}.pipeline_report")
     }else{
       println("Report Extracted from pipReport")
-      table(s"${etlDB}.pipeline_report")
+      table(s"${etlDB}.pipReport")
     }
 
-    val pipReport1 = if (orgId == "") {
-      pipReport.orderBy('Pipeline_SnapTS.desc,'moduleID)
+    pipReport
+      .orderBy('Pipeline_SnapTS.desc,'moduleID)
       .withColumn("fromTSt", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
       .withColumn("untilTSt", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
-    }else{
-      pipReport
-        .filter('organization_id === orgId)
-        .orderBy('Pipeline_SnapTS.desc,'moduleID)
-        .withColumn("fromTSt", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
-        .withColumn("untilTSt", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
-    }
-    pipReport1
+
+
+  }
+
+
+  def pipReport(etlDB: String = "overwatch_etl", orgId: String = "", detailed: Boolean = false):Dataset[Row] = {
+
+    val orderedPipReport = pipReport(etlDB,detailed)
+    orderedPipReport.filter('organization_id === orgId)
 
   }
 }
