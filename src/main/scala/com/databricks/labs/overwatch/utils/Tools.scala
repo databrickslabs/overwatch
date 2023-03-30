@@ -881,11 +881,21 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
+  /**
+   * Function removes the trailing slashes and double slashes of the given URL.
+   * @param url
+   * @return
+   */
   def sanitizeURL(url:String):String={
     val inputUrl = url.trim
     removeDuplicateSlashes(removeTrailingSlashes(inputUrl))
   }
 
+  /**
+   * FUnction removes the double slashes of the given URL.
+   * @param url
+   * @return
+   */
   def removeDuplicateSlashes(url: String): String = {
     val stringURL = url.replaceAll("//", "/")
     val makeFirstSlashDoubleSlash =
@@ -902,6 +912,11 @@ object Helpers extends SparkSessionWrapper {
     }
   }
 
+  /**
+   * Removes the slash if the slash is  is present at the end of the URL.
+   * @param url
+   * @return
+   */
   def removeTrailingSlashes(url: String): String = {
     if(url.lastIndexOf("/") == url.length-1){
       url.substring(0,url.length-1)
