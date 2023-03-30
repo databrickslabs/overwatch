@@ -23,7 +23,7 @@ object Snapshot extends SparkSessionWrapper {
    *                         this is the table name only - without the database prefix
    * @return
    */
-    def snap(
+  private[overwatch] def snap(
               bronze: Bronze,
               workspace: Workspace,
               snapshotRootPath: String,
@@ -59,7 +59,7 @@ object Snapshot extends SparkSessionWrapper {
    * @return
    */
 
-  def incrementalSnap(
+  private[overwatch] def incrementalSnap(
                        bronze: Bronze,
                        workspace: Workspace,
                        snapshotRootPath: String,
@@ -78,7 +78,7 @@ object Snapshot extends SparkSessionWrapper {
     Helpers.snapStream(cloneSpecs, snapshotRootPath)
   }
 
-  def buildCloneSpecs(
+  private[overwatch] def buildCloneSpecs(
                        targetsToSnap: Array[PipelineTable],
 //                       sourcesToSnap: Seq[WorkspaceDataset],
                        snapshotRootPath: String,
@@ -93,6 +93,16 @@ object Snapshot extends SparkSessionWrapper {
     }).toArray.toSeq
     cloneSpecs
   }
+  /**
+   * Create a backup of the Overwatch datasets
+   *
+   * @param arg(0)        Source Database Name or Source Remote_OverwatchGlobalPath
+   * @param arg(1)        Target snapshotRootPath
+   * @param arg(2)        Flag to Determine whether the snap is normal batch process or Incremental one.(if "true" then incremental else normal snap)
+   * @param arg(3)        Optional Field for RemoteWorkSpaceID. Needed when arg(0) is Remote_OverwatchGlobalPath
+   * @return
+   */
+
 
   def main(args: Array[String]): Unit = {
 
