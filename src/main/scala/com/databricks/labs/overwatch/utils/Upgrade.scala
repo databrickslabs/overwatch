@@ -465,7 +465,7 @@ object Upgrade extends SparkSessionWrapper {
       val stepMsg = Some("Step 2: Upgrade pipeline_report")
       println(stepMsg.get)
       logger.log(Level.INFO, stepMsg)
-      val pipReportLatestVersion = Helpers.getLatestTableVersionByPath(pipReportPath)
+      val pipReportLatestVersion = Helpers.getLatestTableVersionByPath(spark, pipReportPath)
       initialSourceVersions.put("pipeline_report", pipReportLatestVersion)
 
       try {
@@ -616,7 +616,7 @@ object Upgrade extends SparkSessionWrapper {
       bronzeTargets.tasksupport = taskSupport
 
       // Get start version of all bronze targets
-      bronzeTargets.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestTableVersionByPath(t.tableLocation)))
+      bronzeTargets.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestTableVersionByPath(spark, t.tableLocation)))
 
       bronzeTargets.filter(_.exists).foreach(target => {
         try {
@@ -740,7 +740,7 @@ object Upgrade extends SparkSessionWrapper {
       targetsToRebuild.tasksupport = taskSupport
 
       // Get start version of all targets to be rebuilt
-      targetsToRebuild.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestTableVersionByPath(t.tableLocation)))
+      targetsToRebuild.filter(_.exists).foreach(t => initialSourceVersions.put(t.name, Helpers.getLatestTableVersionByPath(spark, t.tableLocation)))
 
       targetsToRebuild.foreach(target => {
         try {
@@ -994,7 +994,7 @@ object Upgrade extends SparkSessionWrapper {
             etlDatabaseName, targetName, Some("1"), failUpgrade = false
           )
         }
-        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(spark, s"${etlDatabaseName}.${targetName}"))
         val jobSilverDF = spark.table(s"${etlDatabaseName}.${targetName}")
         SchemaTools.cullNestedColumns(jobSilverDF, "new_settings", Array("tasks", "job_clusters"))
           .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
@@ -1030,7 +1030,7 @@ object Upgrade extends SparkSessionWrapper {
             etlDatabaseName, targetName, Some("1"), failUpgrade = false
           )
         }
-        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(spark, s"${etlDatabaseName}.${targetName}"))
         val jobGoldDF = spark.table(s"${etlDatabaseName}.${targetName}")
         SchemaTools.cullNestedColumns(jobGoldDF, "new_settings", Array("tasks", "job_clusters"))
           .repartition(col("organization_id"), col("__overwatch_ctrl_noise"))
@@ -1068,7 +1068,7 @@ object Upgrade extends SparkSessionWrapper {
             etlDatabaseName, targetName, Some("1"), failUpgrade = false
           )
         }
-        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(s"${etlDatabaseName}.${targetName}"))
+        initialSourceVersions.put(targetName, Helpers.getLatestTableVersionByName(spark, s"${etlDatabaseName}.${targetName}"))
         spark.conf.set("spark.databricks.delta.optimizeWrite.numShuffleBlocks", "500000")
         spark.conf.set("spark.databricks.delta.optimizeWrite.binSize", "2048")
         spark.conf.set("spark.sql.files.maxPartitionBytes", (1024 * 1024 * 64).toString)
