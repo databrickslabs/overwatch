@@ -214,10 +214,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     organizationId: String,
                                     runID: String): DataFrame = {
 
-    val connectionString = ConnectionStringBuilder(
-      PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
-      .setEventHubName(ehConfig.eventHubName)
-      .build
+    val connectionString =  try{
+     ConnectionStringBuilder(
+        PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
+        .setEventHubName(ehConfig.eventHubName)
+        .build
+    }catch {
+      case e: NoClassDefFoundError =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception :Please add EH jar to the cluster")
+        throw new BadConfigException(fullMsg, failPipeline = true)
+      case e: Throwable=>
+        throw e
+    }
+
 
     val ehConf = try {
       validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
