@@ -76,7 +76,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  lazy private[overwatch] val clusterModule = Module(3001, "Gold_Cluster", this, Array(2014, 2019))
+  lazy private[overwatch] val clusterModule = Module(3001, "Gold_Cluster", this, Array(2014))
   lazy private val appendClusterProccess: () => ETLDefinition = {
     () =>
       ETLDefinition(
