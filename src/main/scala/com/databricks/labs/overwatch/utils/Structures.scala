@@ -105,7 +105,8 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 api_waiting_time:  Option[Long] = None,
                                 mount_mapping_path: Option[String],
                                 deployment_id: String,
-                                output_path: String
+                                output_path: String,
+                                temp_dir_path: Option[String]
                                )
 case class RulesValidationResult(ruleName: String, passed: String, permitted: String, actual: String)
 

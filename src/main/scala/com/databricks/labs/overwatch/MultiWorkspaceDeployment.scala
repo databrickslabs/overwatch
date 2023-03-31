@@ -134,6 +134,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
       val stringDate = dateFormat.format(primordialDateString)
       val apiEnvConfig = getProxyConfig(config)
+      val temp_dir_path = config.temp_dir_path.getOrElse("")
 
       val params = OverwatchParams(
         auditLogConfig = auditLogConfig,
@@ -146,7 +147,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         primordialDateString = Some(stringDate),
         workspace_name = Some(customWorkspaceName),
         externalizeOptimize = true,
-        apiEnvConfig = Some(apiEnvConfig)
+        apiEnvConfig = Some(apiEnvConfig),
+        tempWorkingDir = temp_dir_path
       )
       MultiWorkspaceParams(JsonUtils.objToJson(params).compactString,
         s"""${config.api_url}""",
