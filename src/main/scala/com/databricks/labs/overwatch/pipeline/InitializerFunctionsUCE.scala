@@ -177,13 +177,13 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       if (!spark.catalog.databaseExists(s"${config.etlCatalogName}.${config.databaseName}")) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, at " +
           s"${config.databaseLocation}.")
-//        val createDBIfNotExists = s"create database if not exists ${config.etlCatalogName}.${config.databaseName} managed location '" +
-//            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
-//
+        val createDBIfNotExists = s"create database if not exists ${config.etlCatalogName}.${config.databaseName} managed location '" +
+            s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
+
 //        spark.sql(createDBIfNotExists)
 //        logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
         throw new BadConfigException(s"etlDatabase - ${config.databaseName} not found in catalog ${config.etlCatalogName}. " +
-          s"Please create etlDatabase before executing the Overwatch job")
+          s"Please create etlDatabase before executing the Overwatch job with this script - ${createDBIfNotExists}")
       } else {
         // TODO -- get schema version of each table and perform upgrade if necessary
         val alterDbPropertiesStatement = s"alter database ${config.databaseName} set DBPROPERTIES ($dbMeta,'SCHEMA'=${config.overwatchSchemaVersion})"
@@ -196,14 +196,13 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
         logger.log(Level.INFO, "Initializing Consumer Database")
         if (!spark.catalog.databaseExists(s"${config.consumerCatalogName}.${config.consumerDatabaseName}")) {
           println("inside consumer if ...")
-          println(s"consumer db name .... ${config.consumerCatalogName}${config.consumerDatabaseName}")
-//          val createConsumerDBSTMT = s"create database if not exists ${config.consumerCatalogName}.${config.consumerDatabaseName} " +
-//            s"managed location '${config.consumerDatabaseLocation}'"
-//
+          println(s"consumer db name .... ${config.consumerCatalogName}.${config.consumerDatabaseName}")
+          val createConsumerDBSTMT = s"create database if not exists ${config.consumerCatalogName}.${config.consumerDatabaseName} " +
+            s"managed location '${config.consumerDatabaseLocation}'"
 //          spark.sql(createConsumerDBSTMT)
 //          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
           throw new BadConfigException(s"consumerDatabase - ${config.consumerDatabaseName} not found in catalog - ${config.consumerCatalogName}." +
-            s" Please create consumerDatabase before executing the overwatch job")
+            s" Please create consumerDatabase before executing the Overwatch job with this script - ${createConsumerDBSTMT}")
         }
       }
 
