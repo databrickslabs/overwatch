@@ -1065,7 +1065,8 @@ object Schema extends SparkSessionWrapper {
     StructField("enable_unsafe_SSL", BooleanType, nullable = true),
     StructField("thread_pool_size", IntegerType, nullable = true),
     StructField("api_waiting_time", LongType, nullable = true),
-    StructField("mount_mapping_path", StringType, nullable = true)
+    StructField("mount_mapping_path", StringType, nullable = true),
+    StructField("temp_dir_path", StringType, nullable = true)
   ))
 
   val mountMinimumSchema: StructType = StructType(Seq(
