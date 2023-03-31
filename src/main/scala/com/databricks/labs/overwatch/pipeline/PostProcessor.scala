@@ -4,6 +4,7 @@ import com.databricks.labs.overwatch.Optimizer
 import com.databricks.labs.overwatch.utils.{Config, Helpers}
 import io.delta.tables.DeltaTable
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
 
 import scala.collection.mutable.ArrayBuffer
@@ -92,7 +93,7 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
    * When the optimize is not executed from within the pipeline run structure it's necessary to go back and
    * update the latest "lastOptimizedTS" state of each module to reflect this optimize as the latest optimization complete
    */
-  private def updateLastOptimizedDate: Unit = {
+  private def updateLastOptimizedDate(spark: SparkSession): Unit = {
     val lastOptimizedUpdateDF = Optimizer.getLatestSuccessState(config.databaseName)
       .withColumn("lastOptimizedTS", lit(System.currentTimeMillis()))
       .alias("updates")
@@ -110,7 +111,7 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
 
     if (config.debugFlag) println(msg)
     logger.log(Level.INFO, msg)
-    DeltaTable.forPath(pipelineStateTarget.tableLocation).alias("target")
+    DeltaTable.forPath(spark, pipelineStateTarget.tableLocation).alias("target")
       .merge(lastOptimizedUpdateDF, mergeCondition)
       .whenMatched
       .updateExpr(updateExpr)
@@ -134,11 +135,11 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
    * Start the optimize process. This should only be called from the Optimizer Main Class.
    * @param targetsToOptimize Array of PipelineTables considered as optimize candidates.
    */
-  private[overwatch] def optimizeOverwatch(targetsToOptimize: Array[PipelineTable]): Unit = {
+  private[overwatch] def optimizeOverwatch(spark: SparkSession, targetsToOptimize: Array[PipelineTable]): Unit = {
     emitStartLog
     targetsToOptimize.foreach(t => tablesToOptimize.append(t))
     executeOptimize
-    updateLastOptimizedDate
+    updateLastOptimizedDate(spark)
     emitCompletionLog
   }
 

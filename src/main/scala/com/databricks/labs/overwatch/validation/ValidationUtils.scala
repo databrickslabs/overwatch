@@ -473,7 +473,7 @@ class ValidationUtils(sourceDBName: String, snapWorkspace: Workspace, _paralelli
       updateStateTable(pipelineStateTable, fromTime.asDTString)
 
       // NOTE: NOT SUPPORTED via DBConnect
-      DeltaTable.forName(pipelineStateTable.tableFullName)
+      DeltaTable.forName(spark, pipelineStateTable.tableFullName)
         .as("target")
         .merge(
           latestMatchedModules.as("src"),
