@@ -317,6 +317,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       .withColumn("snapTS", lit(pipelineSnapTime.asTSString))
       .withColumn("timestamp", lit(pipelineSnapTime.asUnixTimeMilli))
       .write.format("delta").mode("append").save(s"""${reportPath}/report/${reportName}""")
+    println("Deployment report has been saved to " + s"""${reportPath}/report/${reportName}""")
   }
 
   /**
