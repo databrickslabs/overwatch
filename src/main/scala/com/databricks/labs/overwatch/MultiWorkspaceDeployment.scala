@@ -507,4 +507,19 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     println(msg)
   }
 
+  /**
+   * Returns the Overwatch parameters from config.
+   * @param workspaceId
+   * @return
+   */
+  def getParams(workspaceId: String = "") = {
+    val overwatchParams = generateMultiWorkspaceConfig(configLocation, deploymentId, outputPath).map(buildParams)
+    val returnParam = if (workspaceId != "") {
+      overwatchParams.filter(_.workspaceId == workspaceId)
+    } else {
+      overwatchParams
+    }
+    returnParam
+  }
+
 }
