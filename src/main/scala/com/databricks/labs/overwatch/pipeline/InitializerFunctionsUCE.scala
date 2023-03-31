@@ -40,9 +40,6 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
         .select("database_description_value").collect.map(_.getString(0)).head.toString
       //        .map(f=>f.getString(0)).collect.head.toString
 
-      println(s"existingDBLocation-------${existingDBLocation}")
-      println(s"dbLocation-------${dbLocation}")
-
       if (existingDBLocation != dbLocation) {
         switch = false
         throw new BadConfigException(s"The DB: $dbName exists " +
@@ -180,8 +177,6 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
         val createDBIfNotExists = s"create database if not exists ${config.etlCatalogName}.${config.databaseName} managed location '" +
             s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
 
-//        spark.sql(createDBIfNotExists)
-//        logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
         throw new BadConfigException(s"etlDatabase - ${config.databaseName} not found in catalog ${config.etlCatalogName}. " +
           s"Please create etlDatabase before executing the Overwatch job with this script - ${createDBIfNotExists}")
       } else {
@@ -199,8 +194,7 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
           println(s"consumer db name .... ${config.consumerCatalogName}.${config.consumerDatabaseName}")
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerCatalogName}.${config.consumerDatabaseName} " +
             s"managed location '${config.consumerDatabaseLocation}'"
-//          spark.sql(createConsumerDBSTMT)
-//          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+
           throw new BadConfigException(s"consumerDatabase - ${config.consumerDatabaseName} not found in catalog - ${config.consumerCatalogName}." +
             s" Please create consumerDatabase before executing the Overwatch job with this script - ${createConsumerDBSTMT}")
         }
