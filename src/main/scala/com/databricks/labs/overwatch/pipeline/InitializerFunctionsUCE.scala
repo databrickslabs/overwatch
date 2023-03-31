@@ -190,8 +190,6 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       if (config.consumerDatabaseName != config.databaseName) {
         logger.log(Level.INFO, "Initializing Consumer Database")
         if (!spark.catalog.databaseExists(s"${config.consumerCatalogName}.${config.consumerDatabaseName}")) {
-          println("inside consumer if ...")
-          println(s"consumer db name .... ${config.consumerCatalogName}.${config.consumerDatabaseName}")
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerCatalogName}.${config.consumerDatabaseName} " +
             s"managed location '${config.consumerDatabaseLocation}'"
 
