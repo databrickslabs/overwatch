@@ -5,20 +5,20 @@ import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 
 import java.io.FileNotFoundException
-import com.databricks.labs.overwatch.pipeline
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils.Helpers.spark.table
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.delta.tables.DeltaTable
 import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{Dataset, Row}
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -138,10 +138,19 @@ object JsonUtils {
 
 }
 
+trait HelpersMeta{
+  private[overwatch] def getPaginationLogic(jsonObject: JsonNode, requestMap: Map[String, String]): Map[String, String] = {
+    null
+  }
+  private[overwatch] def pipReport(etlDB: String = "" , orgId: String = ""): DataFrame = {
+    null
+  }
+}
+
 /**
  * Helpers object is used throughout like a utility object.
  */
-object Helpers extends SparkSessionWrapper {
+object Helpers extends SparkSessionWrapper with HelpersMeta{
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
@@ -884,7 +893,14 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
-  def pipReport(etlDB: String = "overwatch_etl", detailed: Boolean = false):Dataset[Row] = {
+//  def pipReport(etlDB: String , orgId: String = "", detailed: Boolean = false):DataFrame = {
+//
+//    val orderedPipReport = pipReport(etlDB,detailed)
+//    orderedPipReport.filter('organization_id === orgId)
+//
+//  }
+
+  def basePipReport(etlDB: String): DataFrame = {
     try{
       spark.catalog.getTable(s"${etlDB}.pipeline_report")
       logger.log(Level.INFO, s"Overwatch has being deployed with  ${etlDB}")
@@ -894,28 +910,23 @@ object Helpers extends SparkSessionWrapper {
         logger.log(Level.ERROR, msg)
         throw new BadConfigException(msg)
     }
-
-    val pipReport = if (detailed) {
-      println("Report Extracted from pipeline_report")
-      table(s"${etlDB}.pipeline_report")
-    }else{
-      println("Report Extracted from pipReport")
-      table(s"${etlDB}.pipReport")
-    }
-
+    val pipReport = table(s"${etlDB}.pipeline_report")
+    val pipReportColOrder = "organization_id, workspace_name, moduleID, moduleName, from_time, until_time, primordialDateString, status, parsedConfig.packageVersion, Pipeline_SnapTS, Overwatch_RunID".split(", ")
     pipReport
       .orderBy('Pipeline_SnapTS.desc,'moduleID)
-      .withColumn("fromTSt", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
-      .withColumn("untilTSt", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
-
-
+      .withColumn("from_time", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
+      .withColumn("until_time", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
+      .moveColumnsToFront(pipReportColOrder)
+      .drop("runStartTS","runEndTS","fromTS","untilTS","writeOpsMetrics","lastOptimizedTS","vacuumRetentionHours","inputConfig","parsedConfig","externalizeOptimize")
   }
 
+  override def pipReport(etlDB: String,orgId: String): DataFrame = {
+    val baseReport = basePipReport(etlDB)
+    baseReport.filter('organization_id === orgId)
+  }
 
-  def pipReport(etlDB: String = "overwatch_etl", orgId: String = "", detailed: Boolean = false):Dataset[Row] = {
-
-    val orderedPipReport = pipReport(etlDB,detailed)
-    orderedPipReport.filter('organization_id === orgId)
-
+  def pipReport(etlDB: String): DataFrame = {
+    val baseReport = basePipReport(etlDB)
+    baseReport
   }
 }
