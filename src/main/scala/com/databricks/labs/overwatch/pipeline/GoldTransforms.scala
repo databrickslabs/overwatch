@@ -279,7 +279,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val derivedSKU = PipelineFunctions.deriveSKU(isAutomated('cluster_name), 'spark_version, 'cluster_type)
     val nodeTypeLookup = clusterSpec.asDF
-      .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version, 'cluster_type, 'runtime_engine)
+      .select('organization_id, 'cluster_id, 'cluster_name, 'custom_tags, 'timestamp, 'driver_node_type_id, 'node_type_id, 'spark_version, 'cluster_type, 'runtime_engine,'num_workers)
       .withColumn("sku", derivedSKU)
       .toTSDF("timestamp", "organization_id", "sku")
       .lookupWhen(dbuCostDetailsTSDF)
@@ -330,16 +330,14 @@ trait GoldTransforms extends SparkSessionWrapper {
           $"clusterPotential.unixTimeMS_state_start"
             .between($"workerNodeDetails.activeFromEpochMillis", $"workerNodeDetails.activeUntilEpochMillis"),
         "left")
-      .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup")
+      .withColumn("current_num_workers",when((col("current_num_workers") === "0" && col("num_workers").isNotNull) ,col("num_workers")).otherwise(col("current_num_workers")))
+      .withColumn("target_num_workers",when((col("target_num_workers") === "0" && col("num_workers").isNotNull),col("num_workers")).otherwise(col("target_num_workers")))
+      .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup","num_workers")
       // filling data is critical here to ensure jrcp dups don't occur
       // using noise generators to fill with two passes to reduce skew
       .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores) // scan back then forward to fill all
-      // Populate Num_workers from cluster_snap_bronze
-      .alias("clusterPotential")
-      .join(clusterSnapshot.asDF.alias("clusterSnapshot"),Seq("cluster_id"),"left").select("clusterPotential.*","clusterSnapshot.num_workers")
-      .withColumn("current_num_workers",when(col("current_num_workers") === "0",col("num_workers")).otherwise(col("current_num_workers")))
-      .withColumn("target_num_workers",when(col("target_num_workers") === "0",col("num_workers")).otherwise(col("target_num_workers")))
-      .drop("num_workers")
+
+
 
 
     val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
