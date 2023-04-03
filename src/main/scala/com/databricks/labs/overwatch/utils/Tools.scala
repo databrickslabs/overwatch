@@ -3,7 +3,6 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
@@ -11,14 +10,15 @@ import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.utils.Helpers.spark.table
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.delta.tables.DeltaTable
 import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -902,13 +902,6 @@ object Helpers extends SparkSessionWrapper with HelperTrait{
     rollbackTargetToTimestamp(targetsToRollback, dryRun)
 
   }
-
-//  def pipReport(etlDB: String , orgId: String = "", detailed: Boolean = false):DataFrame = {
-//
-//    val orderedPipReport = pipReport(etlDB,detailed)
-//    orderedPipReport.filter('organization_id === orgId)
-//
-//  }
 
   def basePipReport(etlDB: String,noOfRecords:Int): DataFrame = {
     try{
