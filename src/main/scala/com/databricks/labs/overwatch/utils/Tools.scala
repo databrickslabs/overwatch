@@ -5,9 +5,10 @@ import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 
 import java.io.FileNotFoundException
-import com.databricks.labs.overwatch.pipeline
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.utils.Helpers.spark.table
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -17,7 +18,7 @@ import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -137,10 +138,28 @@ object JsonUtils {
 
 }
 
+trait HelperTrait{
+  /**
+   * Helper Function to get the Customized PipReport
+   *
+   * @param etlDB       ETL Database for which PipReport to be shown.
+   * @param orgId       Organiztion ID. Used for filtering  on Pipline Report.
+   * @param noOfRecords No of Records to grab from PipReport.
+   *                    When default -1 -- returns all data
+   *                    When 1 it uses a window to only grab the latest run for each org/module
+   *                    When 5 it uses a window to only grab the latest 5 runs for each org/module
+   *                    When n it uses a window to only grab the latest n runs for each org/module
+   * @return Dataframe
+   */
+
+  private[overwatch] def pipReport(etlDB: String = "" , orgId: String = "",noOfRecords:Int = -1): DataFrame = {
+    null
+  }
+}
 /**
  * Helpers object is used throughout like a utility object.
  */
-object Helpers extends SparkSessionWrapper {
+object Helpers extends SparkSessionWrapper with HelperTrait {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
@@ -881,6 +900,47 @@ object Helpers extends SparkSessionWrapper {
     )
     rollbackTargetToTimestamp(targetsToRollback, dryRun)
 
+  }
+
+  def basePipReport(etlDB: String,noOfRecords:Int): DataFrame = {
+    try{
+      spark.catalog.getTable(s"${etlDB}.pipeline_report")
+      logger.log(Level.INFO, s"Overwatch has being deployed with  ${etlDB}")
+    }catch {
+      case e: Exception =>
+        val msg = s"Overwatch has not been deployed with  ${etlDB}"
+        logger.log(Level.ERROR, msg)
+        throw new BadConfigException(msg)
+    }
+
+    val pipReport = table(s"${etlDB}.pipeline_report")
+    val pipReportColOrder = "organization_id, workspace_name, moduleID, moduleName, from_time, until_time, primordialDateString, status, parsedConfig.packageVersion, Pipeline_SnapTS, Overwatch_RunID".split(", ")
+    val baseReport = pipReport
+      .orderBy('Pipeline_SnapTS.desc,'moduleID)
+      .withColumn("from_time", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
+      .withColumn("until_time", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
+      .moveColumnsToFront(pipReportColOrder)
+      .drop("runStartTS","runEndTS","fromTS","untilTS","writeOpsMetrics","lastOptimizedTS","vacuumRetentionHours","inputConfig","parsedConfig","externalizeOptimize")
+    if (noOfRecords == -1){
+      baseReport
+    }else{
+      val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
+      baseReport
+        .withColumn("rnk", rank().over(w))
+        .filter('rnk <= noOfRecords)
+        .drop("rnk")
+    }
+
+  }
+
+  override def pipReport(etlDB: String,orgId: String,noOfRecords:Int): DataFrame = {
+    val baseReport = basePipReport(etlDB,noOfRecords)
+    baseReport.filter('organization_id === orgId)
+  }
+
+  def pipReport(etlDB: String,noOfRecords:Int): DataFrame = {
+    val baseReport = basePipReport(etlDB,noOfRecords)
+    baseReport
   }
 
 
