@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
@@ -16,6 +17,7 @@ import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.Column
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -924,4 +926,15 @@ object Helpers extends SparkSessionWrapper {
       url
     }
   }
+
+  /**
+   * Removes the slash if the slash is  is present at the end of the URL.
+   *
+   * @param url
+   * @return
+   */
+  def removeTrailingSlashes(url: Column): Column = {
+    when(url.endsWith("/"), url.substr(lit(0), length(url) - 1)).otherwise(url)
+  }
+
 }
