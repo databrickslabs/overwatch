@@ -383,7 +383,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           WorkspaceMetastoreRegistrationReport(dataset, stmt, msg)
       }
     }).toArray.toSeq
-    if (spark.catalog.databaseExists(config.databaseName)) spark.sql(s"refresh ${config.databaseName}")
+    if (spark.catalog.databaseExists(s"`${config.databaseName}`")) spark.sql(s"refresh ${config.databaseName}")
     addReport
   }
 
