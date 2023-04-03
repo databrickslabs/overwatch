@@ -78,12 +78,7 @@ class ApiCall(env: ApiEnv) extends SparkSessionWrapper {
 
   private def setApiName(value: String): this.type = {
     _apiName = value
-
-    if (!env.isLocal) {
-      _req = s"${env.workspaceURL}/api/2.0/${_apiName}"
-    } else {
-      _req = s"${env.workspaceURL}/api/2.0/${_apiName}"
-    }
+    _req = s"${env.workspaceURL}/api/2.0/${_apiName}"
     this
   }
 
