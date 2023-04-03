@@ -337,9 +337,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       // using noise generators to fill with two passes to reduce skew
       .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores) // scan back then forward to fill all
 
-
-
-
     val workerPotentialCoreS = when('databricks_billable, $"workerSpecs.vCPUs" * 'current_num_workers * 'uptime_in_state_S).otherwise(lit(0))
     val isPhotonEnabled = upper('runtime_engine).equalTo("PHOTON")
     val isNotAnSQlWarehouse = !upper('sku).equalTo("SQLCOMPUTE")
