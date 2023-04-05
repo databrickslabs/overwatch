@@ -932,23 +932,24 @@ object Helpers extends SparkSessionWrapper {
 
 
 
-  def pipReport(etlDB: String, noOfRecords:Int, moduleIds: Array[Int], orgId: String*): DataFrame = {
+  def pipReport(
+                 etlDB: String,
+                 noOfRecords:Int = -1,
+                 moduleIds: Array[Int] = Array[Int](),
+                 verbose: Boolean = false,
+                 orgId: Seq[String] = Seq[String]()
+               ): DataFrame = {
     val orgIDFilter = if (orgId.nonEmpty) col("organization_id").isin(orgId: _*) else lit(true)
     val moduleIdFilter = if (moduleIds.nonEmpty) col("moduleId").isin(moduleIds: _*) else lit(true)
-    buildPipReport(etlDB, noOfRecords, orgIDFilter, moduleIdFilter)
+    buildPipReport(etlDB, noOfRecords, orgIDFilter, moduleIdFilter, verbose)
   }
 
-  def pipReport(etlDB: String): DataFrame = {
-    pipReport(etlDB, -1, Array[Int]())
+  def pipReport(etlDB: String, orgId: String*): DataFrame = {
+    pipReport(etlDB, orgId = orgId)
   }
 
-  def pipReport(etlDB: String, noOfRecords:Int): DataFrame = {
-    pipReport(etlDB, noOfRecords, Array[Int]())
+  def pipReport(etlDB: String, moduleIds: Array[Int], orgId: String*): DataFrame = {
+    pipReport(etlDB, moduleIds = moduleIds, orgId = orgId)
   }
-
-  def pipReport(etlDB: String, noOfRecords: Int, orgId: String*): DataFrame = {
-    pipReport(etlDB, noOfRecords, Array[Int](), orgId: _*)
-  }
-
 
 }
