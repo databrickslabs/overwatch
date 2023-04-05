@@ -175,11 +175,9 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       var switch = true
       val condition = Helpers.checkDatabaseExist(dbName)
       if (condition) {
-        println("If Condition is running")
         val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
         val dbProperties = dbMeta.properties
         val existingDBLocation = dbMeta.locationUri.toString
-        println("existingDBLocation is", existingDBLocation)
         if (existingDBLocation != dbLocation) {
           switch = false
           throw new BadConfigException(s"The DB: $dbName exists " +
@@ -187,7 +185,6 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
             s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
             s"dbfs:/...")
         }
-
         val isOverwatchDB = dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE"
         if (!isOverwatchDB) {
           switch = false
@@ -195,12 +192,10 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
             s"database name that does not exist or was created by Overwatch.")
         }
       } else { // Database does not exist
-        println("Else Condition is running")
         if (!Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
           logger.log(Level.INFO, s"Target location " +
             s"is valid: will create database: $dbName at location: ${dbLocation}")
         } else { // db does not exist AND path already exists
-          println("Else1 Condition is running")
           switch = false
           throw new BadConfigException(
             s"""The target database location: ${dbLocation}
