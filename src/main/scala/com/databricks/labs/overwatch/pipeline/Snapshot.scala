@@ -42,8 +42,7 @@ object Snapshot extends SparkSessionWrapper {
       val targetsToSnap = bronzeTargets
         .filter(_.exists()) // source path must exist
         .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
-      val sourcesToSnap = workspace.getWorkspaceDatasets
-        .filterNot(dataset => excludes.map(_.toLowerCase).contains(dataset.name.toLowerCase))
+
       val cloneSpecs  = buildCloneSpecs(targetsToSnap,snapshotRootPath,cloneLevel,asOfTS)
       val cloneReport = Helpers.parClone(cloneSpecs,snapshotRootPath)
       val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/clone_report/"
