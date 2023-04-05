@@ -18,7 +18,7 @@ import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -138,28 +138,10 @@ object JsonUtils {
 
 }
 
-trait HelperTrait{
-  /**
-   * Helper Function to get the Customized PipReport
-   *
-   * @param etlDB       ETL Database for which PipReport to be shown.
-   * @param orgId       Organiztion ID. Used for filtering  on Pipline Report.
-   * @param noOfRecords No of Records to grab from PipReport.
-   *                    When default -1 -- returns all data
-   *                    When 1 it uses a window to only grab the latest run for each org/module
-   *                    When 5 it uses a window to only grab the latest 5 runs for each org/module
-   *                    When n it uses a window to only grab the latest n runs for each org/module
-   * @return Dataframe
-   */
-
-  private[overwatch] def pipReport(etlDB: String = "" , orgId: String = "",noOfRecords:Int = -1): DataFrame = {
-    null
-  }
-}
 /**
  * Helpers object is used throughout like a utility object.
  */
-object Helpers extends SparkSessionWrapper with HelperTrait {
+object Helpers extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
@@ -902,7 +884,7 @@ object Helpers extends SparkSessionWrapper with HelperTrait {
 
   }
 
-  def basePipReport(etlDB: String,noOfRecords:Int): DataFrame = {
+  private def buildPipReport(etlDB: String, noOfRecords:Int = -1, orgIdFilter: Column = lit(true)): DataFrame = {
     try{
       spark.catalog.getTable(s"${etlDB}.pipeline_report")
       logger.log(Level.INFO, s"Overwatch has being deployed with  ${etlDB}")
@@ -914,6 +896,7 @@ object Helpers extends SparkSessionWrapper with HelperTrait {
     }
 
     val pipReport = table(s"${etlDB}.pipeline_report")
+      .filter(orgIdFilter)
     val pipReportColOrder = "organization_id, workspace_name, moduleID, moduleName, from_time, until_time, primordialDateString, status, parsedConfig.packageVersion, Pipeline_SnapTS, Overwatch_RunID".split(", ")
     val baseReport = pipReport
       .orderBy('Pipeline_SnapTS.desc,'moduleID)
@@ -933,14 +916,13 @@ object Helpers extends SparkSessionWrapper with HelperTrait {
 
   }
 
-  override def pipReport(etlDB: String,orgId: String,noOfRecords:Int): DataFrame = {
-    val baseReport = basePipReport(etlDB,noOfRecords)
-    baseReport.filter('organization_id === orgId)
+  def pipReport(etlDB: String, noOfRecords:Int, orgId: String*): DataFrame = {
+    val orgIDFilter = col("organization_id").isin(orgId: _*)
+    buildPipReport(etlDB, noOfRecords, orgIDFilter)
   }
 
-  def pipReport(etlDB: String,noOfRecords:Int): DataFrame = {
-    val baseReport = basePipReport(etlDB,noOfRecords)
-    baseReport
+  def pipReport(etlDB: String, noOfRecords:Int): DataFrame = {
+    buildPipReport(etlDB, noOfRecords)
   }
 
 
