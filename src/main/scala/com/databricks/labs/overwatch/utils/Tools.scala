@@ -492,6 +492,15 @@ object Helpers extends SparkSessionWrapper {
     new URI(path)
   }
 
+  def checkDatabaseExist(dbName:String): Boolean = {
+    val condition = if (dbName.contains("-")  ){
+      spark.catalog.databaseExists(s"`${dbName}`")
+    }else{
+      spark.catalog.databaseExists(s"${dbName}")
+    }
+    condition
+  }
+
   /**
    * Helper private function for fastrm. Enables serialization
    * This version only supports dbfs but s3 is easy to add it just wasn't necessary at the time this was written

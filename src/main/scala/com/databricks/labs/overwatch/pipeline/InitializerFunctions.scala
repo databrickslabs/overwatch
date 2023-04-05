@@ -173,11 +173,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
       val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
       var switch = true
-      val condition = if (dbName.contains("-")  ){
-        spark.catalog.databaseExists(s"`${dbName}`")
-      }else{
-        spark.catalog.databaseExists(s"${dbName}")
-      }
+      val condition = Helpers.checkDatabaseExist(dbName)
       if (condition) {
         println("If Condition is running")
         val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
@@ -228,11 +224,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
       val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
       if (consumerDBName != dbName) { // separate consumer db
-        val condition = if (consumerDBName.contains("-")  ){
-          spark.catalog.databaseExists(s"`${consumerDBName}`")
-        }else{
-          spark.catalog.databaseExists(s"${consumerDBName}")
-        }
+        val condition = Helpers.checkDatabaseExist(consumerDBName)
         if (condition) {
           val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
           val existingConsumerDBLocation = consumerDBMeta.locationUri.toString
@@ -449,11 +441,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
         logger.log(Level.INFO, "Initializing ETL Database")
         "OVERWATCHDB='TRUE'"
       }
-      val condition = if (config.databaseName.contains("-")  ){
-        spark.catalog.databaseExists(s"`${config.databaseName}`")
-      }else{
-        spark.catalog.databaseExists(s"${config.databaseName}")
-      }
+      val condition = Helpers.checkDatabaseExist(config.databaseName)
       if (!condition) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
           s"${config.databaseLocation}.")
@@ -470,11 +458,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       // Create consumer database if one is configured
       if (config.consumerDatabaseName != config.databaseName) {
         logger.log(Level.INFO, "Initializing Consumer Database")
-        val condition = if (config.databaseName.contains("-")  ){
-          spark.catalog.databaseExists(s"`${config.consumerDatabaseName}`")
-        }else{
-          spark.catalog.databaseExists(s"${config.consumerDatabaseName}")
-        }
+        val condition = Helpers.checkDatabaseExist(config.consumerDatabaseName)
         if (!condition) {
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
             s"location '${config.consumerDatabaseLocation}'"
