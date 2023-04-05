@@ -36,6 +36,10 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
+  def targetToSnap: Array[PipelineTable] = {
+    getAllTargets :+ pipelineStateTarget
+  }
+
   def getAllModules: Seq[Module] = {
     config.overwatchScope.flatMap {
       case OverwatchScope.audit => Array(auditLogsModule)
