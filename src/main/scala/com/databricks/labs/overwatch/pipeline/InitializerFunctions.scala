@@ -173,10 +173,17 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
       val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
       var switch = true
-      if (spark.catalog.databaseExists(s"`${dbName}`")) {
+      val condition = if (dbName.contains("-")  ){
+        spark.catalog.databaseExists(s"`${dbName}`")
+      }else{
+        spark.catalog.databaseExists(s"${dbName}")
+      }
+      if (condition) {
+        println("If Condition is running")
         val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
         val dbProperties = dbMeta.properties
         val existingDBLocation = dbMeta.locationUri.toString
+        println("existingDBLocation is", existingDBLocation)
         if (existingDBLocation != dbLocation) {
           switch = false
           throw new BadConfigException(s"The DB: $dbName exists " +
@@ -192,10 +199,12 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
             s"database name that does not exist or was created by Overwatch.")
         }
       } else { // Database does not exist
+        println("Else Condition is running")
         if (!Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
           logger.log(Level.INFO, s"Target location " +
             s"is valid: will create database: $dbName at location: ${dbLocation}")
         } else { // db does not exist AND path already exists
+          println("Else1 Condition is running")
           switch = false
           throw new BadConfigException(
             s"""The target database location: ${dbLocation}
@@ -219,7 +228,12 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
       val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
       if (consumerDBName != dbName) { // separate consumer db
-        if (spark.catalog.databaseExists(s"`${consumerDBName}`")) {
+        val condition = if (config.databaseName.contains("-")  ){
+          spark.catalog.databaseExists(s"`${consumerDBName}`")
+        }else{
+          spark.catalog.databaseExists(s"${consumerDBName}")
+        }
+        if (condition) {
           val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
           val existingConsumerDBLocation = consumerDBMeta.locationUri.toString
           if (existingConsumerDBLocation != consumerDBLocation) { // separated consumer DB but same location FAIL
@@ -435,7 +449,12 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
         logger.log(Level.INFO, "Initializing ETL Database")
         "OVERWATCHDB='TRUE'"
       }
-      if (!spark.catalog.databaseExists(s"`${config.databaseName}`")) {
+      val condition = if (config.databaseName.contains("-")  ){
+        spark.catalog.databaseExists(s"`${config.databaseName}`")
+      }else{
+        spark.catalog.databaseExists(s"${config.databaseName}")
+      }
+      if (!condition) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
           s"${config.databaseLocation}.")
         val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
@@ -451,7 +470,12 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       // Create consumer database if one is configured
       if (config.consumerDatabaseName != config.databaseName) {
         logger.log(Level.INFO, "Initializing Consumer Database")
-        if (!spark.catalog.databaseExists(s"`${config.consumerDatabaseName}`")) {
+        val condition = if (config.databaseName.contains("-")  ){
+          spark.catalog.databaseExists(s"`${config.consumerDatabaseName}`")
+        }else{
+          spark.catalog.databaseExists(s"${config.consumerDatabaseName}")
+        }
+        if (!condition) {
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
             s"location '${config.consumerDatabaseLocation}'"
 
