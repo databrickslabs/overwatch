@@ -339,7 +339,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       val targetPath = if (targetPrefix.takeRight(1) == "/") s"$targetPrefix$sourceName" else s"$targetPrefix/$sourceName"
       CloneDetail(sourcePath, targetPath, asOfTS, cloneLevel)
     }).toArray.toSeq
-    Helpers.parClone(cloneSpecs,targetPrefix)
+    Helpers.parClone(cloneSpecs)
 
   }
 

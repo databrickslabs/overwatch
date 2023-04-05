@@ -96,7 +96,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     })
 
     // par clone
-    Helpers.parClone(cloneSpecs,finalTargetPathPrefix)
+    Helpers.parClone(cloneSpecs)
 
   }
   private val logger: Logger = Logger.getLogger(this.getClass)
