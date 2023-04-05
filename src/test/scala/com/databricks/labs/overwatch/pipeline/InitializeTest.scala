@@ -7,6 +7,7 @@ import com.databricks.labs.overwatch.utils.{BadConfigException, Config, Overwatc
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
+import org.apache.spark.SparkContext
 import org.scalatest.PrivateMethodTester
 import org.scalatest.funspec.AnyFunSpec
 
@@ -40,6 +41,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
 
     it ("initializeDatabase function should create both elt and consumer database") {
       import spark.implicits._
+      val sc: SparkContext = spark.sparkContext
       val conf = new Config
       conf.setDatabaseNameAndLoc("overwatch_etl", "file:/src/test/resources/overwatch/spark-warehouse/overwatch_etl.db", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")
       conf.setConsumerDatabaseNameandLoc("overwatch", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")

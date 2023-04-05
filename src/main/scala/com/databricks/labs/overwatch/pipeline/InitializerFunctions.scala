@@ -228,7 +228,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
       val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
       if (consumerDBName != dbName) { // separate consumer db
-        val condition = if (config.databaseName.contains("-")  ){
+        val condition = if (consumerDBName.contains("-")  ){
           spark.catalog.databaseExists(s"`${consumerDBName}`")
         }else{
           spark.catalog.databaseExists(s"${consumerDBName}")
