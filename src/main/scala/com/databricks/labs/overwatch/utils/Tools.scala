@@ -884,7 +884,13 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
-  private def buildPipReport(etlDB: String, noOfRecords:Int = -1, orgIdFilter: Column = lit(true)): DataFrame = {
+  private def buildPipReport(
+                              etlDB: String,
+                              noOfRecords: Int,
+                              orgIdFilter: Column,
+                              moduleIDFilter: Column,
+                              verbose: Boolean = false
+                            ): DataFrame = {
     try{
       spark.catalog.getTable(s"${etlDB}.pipeline_report")
       logger.log(Level.INFO, s"Overwatch has being deployed with  ${etlDB}")
@@ -897,18 +903,26 @@ object Helpers extends SparkSessionWrapper {
 
     val pipReport = table(s"${etlDB}.pipeline_report")
       .filter(orgIdFilter)
-    val pipReportColOrder = "organization_id, workspace_name, moduleID, moduleName, from_time, until_time, primordialDateString, status, parsedConfig.packageVersion, Pipeline_SnapTS, Overwatch_RunID".split(", ")
+      .filter(moduleIDFilter)
+    val priorityFields = Array("organization_id", "workspace_name", "moduleID", "moduleName", "from_time",
+      "until_time", "primordialDateString", "status", "parsedConfig.packageVersion",
+      "Pipeline_SnapTS", "Overwatch_RunID")
     val baseReport = pipReport
       .orderBy('Pipeline_SnapTS.desc,'moduleID)
       .withColumn("from_time", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
       .withColumn("until_time", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
-      .moveColumnsToFront(pipReportColOrder)
-      .drop("runStartTS","runEndTS","fromTS","untilTS","writeOpsMetrics","lastOptimizedTS","vacuumRetentionHours","inputConfig","parsedConfig","externalizeOptimize")
-    if (noOfRecords == -1){
+
+    val organizedReport = if (verbose) {
       baseReport
+        .moveColumnsToFront(priorityFields)
+    } else {
+      baseReport.select(priorityFields map col: _*)
+    }
+    if (noOfRecords == -1){
+      organizedReport
     }else{
       val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
-      baseReport
+      organizedReport
         .withColumn("rnk", rank().over(w))
         .filter('rnk <= noOfRecords)
         .drop("rnk")
@@ -916,13 +930,24 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
-  def pipReport(etlDB: String, noOfRecords:Int, orgId: String*): DataFrame = {
-    val orgIDFilter = col("organization_id").isin(orgId: _*)
-    buildPipReport(etlDB, noOfRecords, orgIDFilter)
+
+
+  def pipReport(etlDB: String, noOfRecords:Int, moduleIds: Array[Int], orgId: String*): DataFrame = {
+    val orgIDFilter = if (orgId.nonEmpty) col("organization_id").isin(orgId: _*) else lit(true)
+    val moduleIdFilter = if (moduleIds.nonEmpty) col("moduleId").isin(moduleIds: _*) else lit(true)
+    buildPipReport(etlDB, noOfRecords, orgIDFilter, moduleIdFilter)
+  }
+
+  def pipReport(etlDB: String): DataFrame = {
+    pipReport(etlDB, -1, Array[Int]())
   }
 
   def pipReport(etlDB: String, noOfRecords:Int): DataFrame = {
-    buildPipReport(etlDB, noOfRecords)
+    pipReport(etlDB, noOfRecords, Array[Int]())
+  }
+
+  def pipReport(etlDB: String, noOfRecords: Int, orgId: String*): DataFrame = {
+    pipReport(etlDB, noOfRecords, Array[Int](), orgId: _*)
   }
 
 
