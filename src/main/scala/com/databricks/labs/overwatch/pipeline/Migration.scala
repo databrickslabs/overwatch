@@ -15,12 +15,11 @@ object Migration extends SparkSessionWrapper {
   private[overwatch] def migrate(
                                bronze: Bronze,
                                workspace: Workspace,
-                               scope: String,
                                targetPrefix: String,
+                               scope: String = "All",
                                cloneLevel: String = "DEEP",
-                               asOfTS: Option[String] = None,
-                               SOURCECONFIGPATH:String,
-                               TARGETCONFIGPATH:String
+                               sourceConfigPath:String,
+                               targetConfigPath:String
 
                              ): Unit = {
     val acceptableCloneLevels = Array("DEEP", "SHALLOW")
@@ -45,27 +44,12 @@ object Migration extends SparkSessionWrapper {
       }).toArray.toSeq
     }
 
-//    val cloneSpecs  = buildCloneSpecs(sourcesToSnap,snapshotRootPath,cloneLevel,asOfTS)
-    val cloneReport = Helpers.parClone(cloneSpecs,snapshotRootPath)
-    val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/clone_report/"
+    val finalCloneSpecs = cloneSpecs :+ CloneDetail(sourceConfigPath, targetConfigPath, None, cloneLevel)
+
+    val cloneReport = Helpers.parClone(cloneSpecs)
+    val cloneReportPath = s"${targetPrefix}/clone_report/"
     cloneReport.toDS.write.format("delta").save(cloneReportPath)
   }
-
-//  private[overwatch] def buildCloneSpecs(
-//                                          targetsToSnap: Array[PipelineTable],
-//                                          snapshotRootPath: String,
-//                                          cloneLevel: String = "DEEP",
-//                                          asOfTS: Option[String] = None,
-//                                        ): Seq[CloneDetail] = {
-//    val cloneSpecs = targetsToSnap.map(dataset => {
-//      val sourceName = dataset.name.toLowerCase
-//      val sourcePath = dataset.tableLocation
-//      val targetPath = if (snapshotRootPath.takeRight(1) == "/") s"$snapshotRootPath$sourceName" else s"$snapshotRootPath/$sourceName"
-//      CloneDetail(sourcePath, targetPath, asOfTS, cloneLevel)
-//    }).toArray.toSeq
-//    cloneSpecs
-//  }
-
 
   /**
    * Create a backup of the Overwatch datasets
@@ -80,12 +64,17 @@ object Migration extends SparkSessionWrapper {
   def main(args: Array[String]): Unit = {
 
     val sourceETLDB = args(0)
-    val TARGETETLDB = a
+    val targetPrefix = args(1)
+    val scope = args(2)
+    val sourceConfigPath = args(3)
+    val targetConfigPath = args(4)
+    val targetETLDB = args(4)
 
-    val workspace = Helpers.getWorkspaceByDatabase(args(0))
+
+    val workspace = Helpers.getWorkspaceByDatabase(sourceETLDB)
     val bronze = Bronze(workspace)
 
-    migrate(bronze,workspace,args(1),args(2))
+    migrate(bronze,workspace,targetPrefix,scope,scope,"Deep",sourceConfigPath,targetConfigPath)
     println("SnapShot Completed")
   }
 
