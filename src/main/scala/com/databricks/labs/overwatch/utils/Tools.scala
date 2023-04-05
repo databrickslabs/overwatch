@@ -576,11 +576,7 @@ object Helpers extends SparkSessionWrapper {
                               disableValidations: Boolean = false
                             ): Workspace = {
     // verify database exists
-    val condition = if (etlDB.contains("-")  ){
-      spark.catalog.databaseExists(s"`${etlDB}`")
-    }else{
-      spark.catalog.databaseExists(s"${etlDB}")
-    }
+    val condition = checkDatabaseExist(etlDB)
     assert(condition, s"The database provided, $etlDB, does not exist.")
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
     val dbProperties = dbMeta.properties
@@ -760,11 +756,7 @@ object Helpers extends SparkSessionWrapper {
     b.refreshViews(workspacesAllowed)
     g.refreshViews(workspacesAllowed)
     if (workspacesAllowed.nonEmpty){
-      val condition = if (etlDatabaseNameToCreate.contains("-")  ){
-        spark.catalog.databaseExists(s"`${etlDatabaseNameToCreate}`")
-      }else{
-        spark.catalog.databaseExists(s"${etlDatabaseNameToCreate}")
-      }
+      val condition = checkDatabaseExist(etlDatabaseNameToCreate)
       if (condition) spark.sql(s"Drop Database ${etlDatabaseNameToCreate} cascade")
     }
     registrationReport
