@@ -494,7 +494,7 @@ object Helpers extends SparkSessionWrapper {
    * @param cloneDetails details required to execute the parallelized clone
    * @return
    */
-  def parClone(cloneDetails: Seq[CloneDetail],snapshotRootPath:String): Seq[CloneReport]= {
+  def parClone(cloneDetails: Seq[CloneDetail]): Seq[CloneReport]= {
     val cloneDetailsPar = cloneDetails.par
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     cloneDetailsPar.tasksupport = taskSupport
@@ -511,7 +511,6 @@ object Helpers extends SparkSessionWrapper {
       }
       logger.log(Level.INFO, stmt)
       try {
-        val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/report/"
         spark.sql(stmt)
         logger.log(Level.INFO, s"CLONE COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
         CloneReport(cloneSpec, stmt, "SUCCESS")

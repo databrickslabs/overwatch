@@ -44,7 +44,7 @@ object Snapshot extends SparkSessionWrapper {
         .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
 
       val cloneSpecs  = buildCloneSpecs(targetsToSnap,snapshotRootPath,cloneLevel,asOfTS)
-      val cloneReport = Helpers.parClone(cloneSpecs,snapshotRootPath)
+      val cloneReport = Helpers.parClone(cloneSpecs)
       val cloneReportPath = if (snapshotRootPath.takeRight(1) == "/") s"${snapshotRootPath}report/" else s"${snapshotRootPath}/clone_report/"
       cloneReport.toDS.write.format("delta").save(cloneReportPath)
     }
