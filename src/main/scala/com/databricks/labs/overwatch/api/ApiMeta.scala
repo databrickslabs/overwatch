@@ -1,7 +1,7 @@
-package com.databricks.labs.overwatch
+package com.databricks.labs.overwatch.api
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.utils.{ApiEnv, TimeTypes}
+import com.databricks.labs.overwatch.utils.ApiEnv
 import com.fasterxml.jackson.databind.JsonNode
 import org.apache.log4j.{Level, Logger}
 import scalaj.http.{Http, HttpRequest}

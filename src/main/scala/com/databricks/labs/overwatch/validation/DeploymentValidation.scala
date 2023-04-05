@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.validation
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.ApiCallV2
+import com.databricks.labs.overwatch.api.ApiCallV2
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.{Initializer, Pipeline, PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson

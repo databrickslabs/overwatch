@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch
 
-import com.databricks.labs.overwatch.ApiCallV2.sc
+import com.databricks.labs.overwatch.api.ApiCallV2.sc
+import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import com.databricks.labs.overwatch.utils.{ApiCallFailureV2, ApiEnv, SparkSessionWrapper}
 import org.apache.spark.SparkContext
