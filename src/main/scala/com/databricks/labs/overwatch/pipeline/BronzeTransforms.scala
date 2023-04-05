@@ -7,7 +7,7 @@ import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsClea
 import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
+import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
