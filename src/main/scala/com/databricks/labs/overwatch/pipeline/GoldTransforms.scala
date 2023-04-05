@@ -727,7 +727,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       .filter($"streamDetails.stream_id".isNotNull)
       .select(streamingExecCols: _*)
       .groupBy(streamExecutionsKeys map col: _*)
-      .agg(collect_list('execution_id).alias("execution_ids"))
+      .agg(collect_set('execution_id).alias("execution_ids"))
+      .filter(size('execution_ids) <= 100000) // safety valve for bizarre streams
 
     enhancedStreamsRawDF
       .select(SchemaTools.modifyStruct(enhancedStreamsRawDF.schema, changeInventory): _*)
