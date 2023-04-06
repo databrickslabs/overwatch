@@ -585,7 +585,6 @@ object DeploymentValidation extends SparkSessionWrapper {
         }
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
-        println(fullMsg)
         DeploymentValidationReport(false,
           getSimpleMsg("Validate_EventHub"),
           testDetails,
