@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.log4j.Logger
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.types.{StructField, _}
 
 /**
  * The purpose of this Object is to validate that AT LEAST the columns required for ETL are present. Furthermore,
@@ -1062,7 +1062,11 @@ object Schema extends SparkSessionWrapper {
     StructField("enable_unsafe_SSL", BooleanType, nullable = true),
     StructField("thread_pool_size", IntegerType, nullable = true),
     StructField("api_waiting_time", LongType, nullable = true),
-    StructField("mount_mapping_path", StringType, nullable = true)
+    StructField("mount_mapping_path", StringType, nullable = true),
+    StructField("eh_conn_string", StringType, nullable = true),
+    StructField("aad_tenant_id", StringType, nullable = true),
+    StructField("aad_client_id", StringType, nullable = true),
+    StructField("aad_client_secret_key", StringType, nullable = true)
   ))
 
   val mountMinimumSchema: StructType = StructType(Seq(
