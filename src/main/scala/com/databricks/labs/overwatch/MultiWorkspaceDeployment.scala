@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
@@ -116,9 +117,21 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val auditLogConfig = if (s"${config.cloud}" == "AWS") {
         AuditLogConfig(rawAuditPath = config.auditlogprefix_source_aws, auditLogFormat = auditLogFormat)
       } else {
-        val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
+
         val ehStatePath = s"${config.etl_storage_prefix}/${config.workspace_id}/ehState"
-        val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+        val isAAD = config.aad_client_id.nonEmpty && config.aad_tenant_id.nonEmpty && config.aad_client_secret_key.nonEmpty
+        val azureLogConfig = if(isAAD){
+          println("consuming data by AAD")
+          AzureAuditLogEventhubConfig(connectionString = config.eh_conn_string.get, eventHubName = config.eh_name.get
+            , auditRawEventsPrefix = ehStatePath,
+            azureClientId = Some("ba551aff-7ccf-4889-951e-aa491532d844"), // this could be also specified as {{secrets//}}
+            azureClientSecret = Some(dbutils.secrets.get(scope = "overwatch_global", key = "overwatch-reader-secret")),
+            azureTenantId = Some("9f37a392-f0ae-4280-9796-f1864a10effc"))
+        }else{
+          println("consuming data by key")
+          val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
+         AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+        }
         AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
       }
       val interactiveDBUPrice: Double = config.interactive_dbu_price
@@ -445,7 +458,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .map(buildParams)
       println("Workspaces to be Deployed :" + params.length)
       val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(parallelism))
-      val deploymentReports = params.map(executePipelines(_, zones, ec))
+      val deploymentReports = params.filter(x=>x!=null).map(executePipelines(_, zones, ec))
         .flatMap(f => Await.result(f, Duration.Inf))
 
       deploymentReport.appendAll(deploymentReports)
