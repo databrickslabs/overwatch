@@ -221,6 +221,7 @@ accurately reflect a customer's costs.
 
 {{% notice note %}}
 Cost will not Appear untill State is changed to a state that modify the no of workers i.e. until the Cluster is Restarted or Resized(both Autoscaling or Manual)
+{{% /notice %}}
 
 #### InstanceDetails
 [**AWS Sample**](/assets/TableSamples/instancedetails_aws.tab) | [**AZURE_Sample**](/assets/TableSamples/instancedetails_azure.tab)
