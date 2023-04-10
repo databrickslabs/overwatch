@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
 import org.apache.log4j.{Level, Logger}
@@ -391,7 +392,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     try {
       val baseConfig = generateBaseConfig(configLocation)
       val multiWorkspaceConfig = baseConfig
-        .withColumn("api_url", when('api_url.endsWith("/"), 'api_url.substr(lit(0), length('api_url) - 1)).otherwise('api_url))
+        .withColumn("api_url", removeTrailingSlashes('api_url))
         .withColumn("deployment_id", lit(deploymentId))
         .withColumn("output_path", lit(outputPath))
         .as[MultiWorkspaceConfig]
@@ -508,6 +509,21 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
          |Report run duration in sec : ${(processingEndTime - processingStartTime) / 1000}
          |""".stripMargin
     println(msg)
+  }
+
+  /**
+   * Returns the Overwatch parameters from config.
+   * @param workspaceId
+   * @return
+   */
+  def getParams(workspaceId: String = ""): Array[MultiWorkspaceParams] = {
+    val overwatchParams = generateMultiWorkspaceConfig(configLocation, deploymentId, outputPath).map(buildParams)
+    val returnParam = if (workspaceId != "") {
+      overwatchParams.filter(_.workspaceId == workspaceId)
+    } else {
+      overwatchParams
+    }
+    returnParam
   }
 
 }
