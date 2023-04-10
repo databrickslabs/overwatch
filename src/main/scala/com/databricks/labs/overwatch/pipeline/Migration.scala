@@ -13,7 +13,6 @@ object Migration extends SparkSessionWrapper {
   import spark.implicits._
 
   private[overwatch] def migrate(
-                               bronze: Bronze,
                                workspace: Workspace,
                                targetPrefix: String,
                                scope: String = "All",
@@ -27,6 +26,7 @@ object Migration extends SparkSessionWrapper {
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
     val cloneSpecs = if (scope.toLowerCase() == "bronze"){
+      val bronze = Bronze(workspace)
       val sourcesToSnap =  bronze.targetToSnap
       sourcesToSnap.map(dataset => {
         val sourceName = dataset.name.toLowerCase
@@ -75,9 +75,11 @@ object Migration extends SparkSessionWrapper {
 
 
     val workspace = Helpers.getWorkspaceByDatabase(sourceETLDB)
-    val bronze = Bronze(workspace)
 
-    migrate(bronze,workspace,targetPrefix,scope,"Deep",sourceConfigPath,targetConfigPath)
+    migrate(workspace,targetPrefix,scope,"Deep",sourceConfigPath,targetConfigPath)
+
+
+
     println("SnapShot Completed")
   }
 
