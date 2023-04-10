@@ -51,6 +51,23 @@ object Migration extends SparkSessionWrapper {
     cloneReport.toDS.write.format("delta").save(cloneReportPath)
   }
 
+  private[overwatch] def updateConfig(
+                                       targetConfigPath: String,
+                                       targetPrefix : String,
+                                       targetETLDB: String,
+                                       targetConsumerDB: String
+
+                                     ): Unit = {
+    val configUpdateStatement = s"""
+      update delta.`$targetConfigPath`
+      set
+        etl_storage_prefix = '$targetPrefix',
+        etl_database_name = '$targetETLDB',
+        consumer_database_name = '$targetConsumerDB'
+      """
+    spark.sql(configUpdateStatement)
+  }
+
   /**
    * Create a backup of the Overwatch datasets
    *
@@ -70,13 +87,15 @@ object Migration extends SparkSessionWrapper {
     val scope = args(2)
     val sourceConfigPath = args(3)
     val targetConfigPath = args(4)
-//    val targetETLDB = args(5)
-//    val targetConsumerDB = args(6)
+    val targetETLDB = args(5)
+    val targetConsumerDB = args(6)
 
 
     val workspace = Helpers.getWorkspaceByDatabase(sourceETLDB)
 
     migrate(workspace,targetPrefix,scope,"Deep",sourceConfigPath,targetConfigPath)
+    updateConfig(targetConfigPath,targetPrefix,targetETLDB,targetConsumerDB)
+
 
 
 
