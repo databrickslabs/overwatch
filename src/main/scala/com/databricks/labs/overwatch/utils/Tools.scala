@@ -7,7 +7,6 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
-import com.databricks.labs.overwatch.utils.Helpers.spark.table
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -900,7 +899,7 @@ object Helpers extends SparkSessionWrapper {
         throw new BadConfigException(msg)
     }
 
-    val pipReport = table(s"${etlDB}.pipeline_report")
+    val pipReport = spark.table(s"${etlDB}.pipeline_report")
       .filter(orgIdFilter)
       .filter(moduleIDFilter)
     val priorityFields = Array("organization_id", "workspace_name", "moduleID", "moduleName", "from_time",
