@@ -3,9 +3,9 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+
 import java.io.FileNotFoundException
-import com.databricks.labs.overwatch.pipeline
-import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
@@ -16,7 +16,7 @@ import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{Column, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -882,6 +882,73 @@ object Helpers extends SparkSessionWrapper {
 
   }
 
+  private def buildPipReport(
+                              etlDB: String,
+                              noOfRecords: Int,
+                              orgIdFilter: Column,
+                              moduleIDFilter: Column,
+                              verbose: Boolean = false
+                            ): DataFrame = {
+    try{
+      spark.catalog.getTable(s"${etlDB}.pipeline_report")
+      logger.log(Level.INFO, s"Overwatch has being deployed with  ${etlDB}")
+    }catch {
+      case e: Exception =>
+        val msg = s"Overwatch has not been deployed with  ${etlDB}"
+        logger.log(Level.ERROR, msg)
+        throw new BadConfigException(msg)
+    }
+
+    val pipReport = spark.table(s"${etlDB}.pipeline_report")
+      .filter(orgIdFilter)
+      .filter(moduleIDFilter)
+    val priorityFields = Array("organization_id", "workspace_name", "moduleID", "moduleName", "from_time",
+      "until_time", "primordialDateString", "status", "parsedConfig.packageVersion",
+      "Pipeline_SnapTS", "Overwatch_RunID")
+    val baseReport = pipReport
+      .orderBy('Pipeline_SnapTS.desc,'moduleID)
+      .withColumn("from_time", from_unixtime('fromTS.cast("double") / lit(1000)).cast("timestamp"))
+      .withColumn("until_time", from_unixtime('untilTS.cast("double") / lit(1000)).cast("timestamp"))
+
+    val organizedReport = if (verbose) {
+      baseReport
+        .moveColumnsToFront(priorityFields)
+    } else {
+      baseReport.select(priorityFields map col: _*)
+    }
+    if (noOfRecords == -1){
+      organizedReport
+    }else{
+      val w = Window.partitionBy('organization_id, 'moduleID).orderBy('Pipeline_SnapTS.desc)
+      organizedReport
+        .withColumn("rnk", rank().over(w))
+        .filter('rnk <= noOfRecords)
+        .drop("rnk")
+    }
+
+  }
+
+
+
+  def pipReport(
+                 etlDB: String,
+                 noOfRecords:Int = -1,
+                 moduleIds: Array[Int] = Array[Int](),
+                 verbose: Boolean = false,
+                 orgId: Seq[String] = Seq[String]()
+               ): DataFrame = {
+    val orgIDFilter = if (orgId.nonEmpty) col("organization_id").isin(orgId: _*) else lit(true)
+    val moduleIdFilter = if (moduleIds.nonEmpty) col("moduleId").isin(moduleIds: _*) else lit(true)
+    buildPipReport(etlDB, noOfRecords, orgIDFilter, moduleIdFilter, verbose)
+  }
+
+  def pipReport(etlDB: String, orgId: String*): DataFrame = {
+    pipReport(etlDB, orgId = orgId)
+  }
+
+  def pipReport(etlDB: String, moduleIds: Array[Int], orgId: String*): DataFrame = {
+    pipReport(etlDB, moduleIds = moduleIds, orgId = orgId)
+  }
   /**
    * Function removes the trailing slashes and double slashes of the given URL.
    * @param url
