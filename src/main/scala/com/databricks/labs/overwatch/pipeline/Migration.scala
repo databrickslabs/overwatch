@@ -46,7 +46,7 @@ object Migration extends SparkSessionWrapper {
 
     val finalCloneSpecs = cloneSpecs :+ CloneDetail(sourceConfigPath, targetConfigPath, None, cloneLevel)
 
-    val cloneReport = Helpers.parClone(cloneSpecs)
+    val cloneReport = Helpers.parClone(finalCloneSpecs)
     val cloneReportPath = s"${targetPrefix}/clone_report/"
     cloneReport.toDS.write.format("delta").save(cloneReportPath)
   }
@@ -55,9 +55,11 @@ object Migration extends SparkSessionWrapper {
    * Create a backup of the Overwatch datasets
    *
    * @param arg(0)        Source Database Name
-   * @param arg(1)        Target snapshotRootPath
+   * @param arg(1)        Target ETL Path Prefix
    * @param arg(2)        Scope for the tables to migrate. if 'Bronze' then Migrate Bronze Tables,if 'All' then migrate all the Tables.
-   * @param arg(3)        Optional Field for RemoteWorkSpaceID. Needed when arg(0) is Remote_OverwatchGlobalPath
+   * @param arg(3)        Path for Source Config file.
+   * @param arg(4)        Target ETl Config Path
+   * @param arg(5)        Target Consumer Database Name
    * @return
    */
 
@@ -68,13 +70,14 @@ object Migration extends SparkSessionWrapper {
     val scope = args(2)
     val sourceConfigPath = args(3)
     val targetConfigPath = args(4)
-    val targetETLDB = args(4)
+//    val targetETLDB = args(5)
+//    val targetConsumerDB = args(6)
 
 
     val workspace = Helpers.getWorkspaceByDatabase(sourceETLDB)
     val bronze = Bronze(workspace)
 
-    migrate(bronze,workspace,targetPrefix,scope,scope,"Deep",sourceConfigPath,targetConfigPath)
+    migrate(bronze,workspace,targetPrefix,scope,"Deep",sourceConfigPath,targetConfigPath)
     println("SnapShot Completed")
   }
 
