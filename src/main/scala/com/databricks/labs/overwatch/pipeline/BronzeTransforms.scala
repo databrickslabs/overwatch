@@ -7,7 +7,7 @@ import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsClea
 import com.databricks.labs.overwatch.utils.Helpers.{getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.{ApiCall, ApiCallV2}
+import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -16,6 +16,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
@@ -213,10 +214,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     organizationId: String,
                                     runID: String): DataFrame = {
 
-    val connectionString = ConnectionStringBuilder(
-      PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
-      .setEventHubName(ehConfig.eventHubName)
-      .build
+    val connectionString =  try{
+     ConnectionStringBuilder(
+        PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
+        .setEventHubName(ehConfig.eventHubName)
+        .build
+    }catch {
+      case e: NoClassDefFoundError =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception :Please add EH jar to the cluster")
+        throw new BadConfigException(fullMsg, failPipeline = true)
+      case e: Throwable=>
+        throw e
+    }
+
 
     val ehConf = try {
       validateCleanPaths(azureRawAuditLogTarget, isFirstRun, ehConfig, etlDataPathPrefix, etlDBLocation, consumerDBLocation)
@@ -295,7 +305,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
       .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
       .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
-
+      .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
@@ -305,6 +315,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
       .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
       .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
+      .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
   }
 
   //noinspection ScalaCustomHdfsFormat
@@ -511,11 +522,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
             "details.attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.attributes.spark_conf"),
             "details.attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.azure_attributes"),
             "details.attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.aws_attributes"),
+            "details.attributes.gcp_attributes" -> SchemaTools.structToMap(tdf, "details.attributes.gcp_attributes"),
             "details.attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.attributes.spark_env_vars"),
             "details.previous_attributes.custom_tags" -> SchemaTools.structToMap(tdf, "details.previous_attributes.custom_tags"),
             "details.previous_attributes.spark_conf" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_conf"),
             "details.previous_attributes.azure_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.azure_attributes"),
             "details.previous_attributes.aws_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.aws_attributes"),
+            "details.previous_attributes.gcp_attributes" -> SchemaTools.structToMap(tdf, "details.previous_attributes.gcp_attributes"),
             "details.previous_attributes.spark_env_vars" -> SchemaTools.structToMap(tdf, "details.previous_attributes.spark_env_vars")
           )
 
@@ -796,36 +809,50 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         val bronzeSparkEventsScrubber = getSparkEventsSchemaScrubber(baseEventsDF)
 
-        val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
-          baseEventsDF
-            .withColumn("Executor ID", executorIdOverride)
-            .withColumn("progress", progressCol)
-            .withColumn("filename", input_file_name)
-            .withColumn("pathSize", size(split('filename, "/")))
-            .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-            .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+        // standard dataframe build
+        var rawScrubbed = baseEventsDF
+          .withColumn("Executor ID", executorIdOverride)
+          .withColumn("progress", progressCol)
+          .withColumn("filename", input_file_name)
+          .withColumn("pathSize", size(split('filename, "/")))
+          .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+          .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+          .withColumn("filenameGroup", groupFilename('filename))
+          .drop("pathSize", "executorId")
+
+        // handle multiple stageid fields if present
+        rawScrubbed = if (rawScrubbed.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
+          rawScrubbed
             .withColumn("StageID", stageIDColumnOverride)
             .withColumn("StageAttemptID", stageAttemptIDColumnOverride)
-            .drop("pathSize", "executorId", "Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId")
-            .withColumn("filenameGroup", groupFilename('filename))
-            .scrubSchema(bronzeSparkEventsScrubber)
-        } else {
-          baseEventsDF
-            .withColumn("Executor ID", executorIdOverride)
-            .withColumn("progress", progressCol)
-            .withColumn("filename", input_file_name)
-            .withColumn("pathSize", size(split('filename, "/")))
-            .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-            .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-            .drop("pathSize", "executorId")
-            .withColumn("filenameGroup", groupFilename('filename))
-            .scrubSchema(bronzeSparkEventsScrubber)
-        }
+            .drop("Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId")
+        } else rawScrubbed
+
+        rawScrubbed = rawScrubbed.scrubSchema(bronzeSparkEventsScrubber)
+
+        // Schema Contains TaskEndReason.AccumulatorUpdates
+        rawScrubbed = if (SchemaTools.nestedColExists(rawScrubbed.schema, "TaskEndReason.AccumulatorUpdates")) {
+          // TaskEndReason.AccumulatorUpdates is Array[String]
+          if (rawScrubbed.select($"TaskEndReason.AccumulatorUpdates").schema
+            .fields.filter(_.name == "AccumulatorUpdates").exists(_.dataType == ArrayType(StringType))) {
+            val nullSafeAccumulatorUpdates = StructType(Seq(
+              StructField("ID", LongType, nullable = true)
+            ))
+            val changeInventory = Map[String, Column](
+              "TaskEndReason.AccumulatorUpdates" ->
+                lit(null).cast(ArrayType(nullSafeAccumulatorUpdates))
+            )
+            rawScrubbed
+              .modifyStruct(changeInventory)
+          } else rawScrubbed
+        } else rawScrubbed
 
         // persist to temp to ensure all raw files are not read multiple times
         val sparkEventsTempPath = s"$tempDir/sparkEventsBronze/${pipelineSnapTime.asUnixTimeMilli}"
 
-        rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+        rawScrubbed
+          .scrubSchema(bronzeSparkEventsScrubber)
+          .withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
           .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
           .join(eventLogsDF, Seq("filename"))

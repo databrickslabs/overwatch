@@ -305,7 +305,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       if (disableValidations) {
         quickBuildAuditLogConfig(auditLogConfig)
       } else {
-        if (config.cloudProvider == "aws") {
+        if (config.cloudProvider != "azure") {
 
           val auditLogPath = auditLogConfig.rawAuditPath
           val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim

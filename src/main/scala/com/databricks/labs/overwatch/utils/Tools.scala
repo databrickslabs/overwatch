@@ -3,7 +3,6 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.pipeline.TransformFunctions.datesStream
@@ -17,7 +16,7 @@ import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.Column
+import org.apache.spark.sql.{Column, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
@@ -479,12 +478,12 @@ object Helpers extends SparkSessionWrapper {
     }).toArray.toSeq
   }
 
-  def getLatestTableVersionByPath(tablePath: String): Long = {
-    DeltaTable.forPath(tablePath).history(1).select('version).as[Long].head
+  def getLatestTableVersionByPath(spark: SparkSession, tablePath: String): Long = {
+    DeltaTable.forPath(spark, tablePath).history(1).select('version).as[Long].head
   }
 
-  def getLatestTableVersionByName(tableName: String): Long = {
-    DeltaTable.forName(tableName).history(1).select('version).as[Long].head
+  def getLatestTableVersionByName(spark: SparkSession, tableName: String): Long = {
+    DeltaTable.forName(spark, tableName).history(1).select('version).as[Long].head
   }
 
   def getURI(pathString: String): URI = {

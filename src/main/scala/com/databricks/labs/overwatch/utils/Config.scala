@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions.col
-
+import com.databricks.labs.overwatch.utils.Helpers.spark
 import java.util.UUID
 
 class Config() {
@@ -202,6 +202,7 @@ class Config() {
     this
   }
 
+
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
     this
@@ -302,7 +303,7 @@ class Config() {
     this
   }
 
-  def setApiEnv(value: ApiEnv): this.type = {
+   def setApiEnv(value: ApiEnv): this.type = {
     _apiEnv = value
     this
   }
@@ -397,6 +398,24 @@ class Config() {
     }
   }
 
+  /**
+   * Function derives the cloud from workspaceUrl.
+   * @return
+   */
+  private def deriveCloudProvider(): String = {
+    if(isMultiworkspaceDeployment) {
+      if (isPVC) {
+        "aws"
+      } else {
+        workspaceURL.toLowerCase match {
+          case cloudType if cloudType.contains("azure") => "azure"
+          case cloudType if cloudType.contains("gcp") => "gcp"
+          case _ => "aws"
+        }
+      }
+    } else spark.conf.get("spark.databricks.cloudProvider").toLowerCase
+  }
+
   private[overwatch] def buildApiEnv(tokenSecret: Option[TokenSecret], apiEnvConfig: Option[ApiEnvConfig]): ApiEnv = {
     var rawToken = ""
     var scope = ""
@@ -407,7 +426,7 @@ class Config() {
     } else {
       setWorkspaceURL(dbutils.notebook.getContext().apiUrl.get)
     }
-    setCloudProvider(if (_workspaceUrl.toLowerCase().contains("azure")) "azure" else "aws")
+    setCloudProvider(deriveCloudProvider())
     try {
       // Token secrets not supported in local testing
       if (tokenSecret.nonEmpty) { // not local testing and secret passed

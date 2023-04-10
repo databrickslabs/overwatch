@@ -176,7 +176,8 @@ object PipelineFunctions extends SparkSessionWrapper {
       s"${newClusterPrefix}.spark_conf" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.spark_conf"),
       s"${newClusterPrefix}.spark_env_vars" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.spark_env_vars"),
       s"${newClusterPrefix}.aws_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.aws_attributes"),
-      s"${newClusterPrefix}.azure_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.azure_attributes")
+      s"${newClusterPrefix}.azure_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.azure_attributes"),
+      s"${newClusterPrefix}.gcp_attributes" -> SchemaTools.structToMap(df, s"${newClusterPrefix}.gcp_attributes")
     )
   }
 
@@ -549,7 +550,7 @@ object PipelineFunctions extends SparkSessionWrapper {
 
   def getDeltaHistory(spark: SparkSession, target: PipelineTable, n: Int = 9999): DataFrame = {
     import spark.implicits._
-    DeltaTable.forPath(target.tableLocation).history(n)
+    DeltaTable.forPath(spark, target.tableLocation).history(n)
       .select(
         'version,
         'timestamp,

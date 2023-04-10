@@ -70,7 +70,7 @@ object Optimizer extends SparkSessionWrapper{
 
     val optimizationCandidates = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets
     val postProcessor = new PostProcessor(config)
-    postProcessor.optimizeOverwatch(optimizationCandidates)
+    postProcessor.optimizeOverwatch(spark, optimizationCandidates)
 
   }
 

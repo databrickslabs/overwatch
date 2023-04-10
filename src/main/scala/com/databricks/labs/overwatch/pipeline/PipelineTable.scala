@@ -426,7 +426,7 @@ case class PipelineTable(
         .filter('rnk === 1 && 'rn === 2)
         .drop("rnk", "rn")
 
-      DeltaTable.forName(tableFullName)
+      DeltaTable.forName(spark, tableFullName)
         .as("target")
         .merge(
           dupsToDelete.as("source"), conditionalMatchClause
@@ -435,7 +435,7 @@ case class PipelineTable(
         .delete()
         .execute
 
-      DeltaTable.forName(tableFullName)
+      DeltaTable.forName(spark, tableFullName)
         .as("target")
         .merge(
           dupsToRestore.as("source"), conditionalMatchClause
