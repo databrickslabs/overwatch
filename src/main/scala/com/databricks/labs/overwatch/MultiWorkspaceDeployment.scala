@@ -121,14 +121,12 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         val ehStatePath = s"${config.etl_storage_prefix}/${config.workspace_id}/ehState"
         val isAAD = config.aad_client_id.nonEmpty && config.aad_tenant_id.nonEmpty && config.aad_client_secret_key.nonEmpty
         val azureLogConfig = if(isAAD){
-          println("consuming data by AAD")
           AzureAuditLogEventhubConfig(connectionString = config.eh_conn_string.get, eventHubName = config.eh_name.get
             , auditRawEventsPrefix = ehStatePath,
-            azureClientId = Some("ba551aff-7ccf-4889-951e-aa491532d844"), // this could be also specified as {{secrets//}}
+            azureClientId = Some(config.aad_client_id.get),
             azureClientSecret = Some(dbutils.secrets.get(scope = "overwatch_global", key = "overwatch-reader-secret")),
-            azureTenantId = Some("9f37a392-f0ae-4280-9796-f1864a10effc"))
+            azureTenantId = Some(config.aad_tenant_id.get))
         }else{
-          println("consuming data by key")
           val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
          AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
         }
