@@ -499,7 +499,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       val aadParams = Map("aad_tenant_id" -> config.aad_tenant_id.get,
         "aad_client_id" -> config.aad_client_id.get,
         "aad_client_secret" -> dbutils.secrets.get(scope = config.secret_scope, key = config.aad_client_secret_key.get),
-        "aad_authority_endpoint" -> "https://login.microsoftonline.com/")
+        "aad_authority_endpoint" -> config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/"))
       spark.readStream
         .format("eventhubs")
         .options(AadAuthInstance.addAadAuthParams(ehConf, aadParams).toMap)
@@ -521,6 +521,41 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   }
 
+
+  /**
+   * Decides if the provided configuration is AAD or not.
+   *
+   * @param config
+   * @return
+   */
+  private def checkAAD(config: MultiWorkspaceConfig): Boolean = {
+    if (config.eh_name.isEmpty)
+      throw new BadConfigException("eh_name should be nonempty, please check the configuration.")
+
+    return if (config.aad_client_id.nonEmpty && //Check the mandatory field for AAD connection.
+      config.aad_tenant_id.nonEmpty &&
+      config.aad_client_secret_key.nonEmpty &&
+      config.eh_conn_string.nonEmpty) {
+      if (config.eh_scope_key.isEmpty) { //eh_scope_key should be empty for AAD.
+        true
+      } else {
+        throw new BadConfigException("For AAD eh_scope_key should be empty")
+      }
+    } else if (config.eh_scope_key.nonEmpty) { //Checking for legacy connection.
+      if (config.aad_client_id.isEmpty &&
+        config.aad_tenant_id.isEmpty &&
+        config.aad_client_secret_key.isEmpty &&
+        config.eh_conn_string.isEmpty) {
+        false
+      } else {
+        throw new BadConfigException("For NON AAD aad_client_id,aad_tenant_id,aad_client_secret_key,eh_conn_string should be empty")
+      }
+    } else {
+      throw new BadConfigException("EXCEPTION: Please check Event Hub configuration eh_name,eh_scope_key .For AAD check aad_client_id,aad_tenant_id,aad_client_secret_key,eh_conn_string")
+    }
+
+  }
+
   /**
    * Performs validation of event hub data for Azure
    *
@@ -533,8 +568,7 @@ object DeploymentValidation extends SparkSessionWrapper {
                                config: MultiWorkspaceConfig
                               ): DeploymentValidationReport = {
 
-    val isAAD = config.aad_client_id.nonEmpty && config.aad_tenant_id.nonEmpty && config.aad_client_secret_key.nonEmpty
-
+    val isAAD = checkAAD(config)
     if (config.eh_scope_key.isEmpty && config.eh_name.isEmpty && !isAAD) throw new BadConfigException("When cloud is Azure, the eh_name and " +
       "eh_scope_key are required fields but they were empty in the config. For AAD clinetID,tenentID and clientSecretKey are required fields but they were empty in the config")
     // using gets here because if they were empty from above check, exception would already be thrown
@@ -688,6 +722,7 @@ object DeploymentValidation extends SparkSessionWrapper {
     }
     storagePrefixAccessValidation(multiWorkspaceConfig.head, fastFail = true) //Check read write access for etl_storage_prefix
     multiWorkspaceConfig.filter(_.cloud.toLowerCase() != "azure").map(config=>validateAuditLogColumnName(config))
+    multiWorkspaceConfig.filter(_.cloud.toLowerCase() == "azure").map(checkAAD)
     multiWorkspaceConfig
     }
 
