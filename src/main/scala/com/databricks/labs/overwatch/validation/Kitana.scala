@@ -367,7 +367,6 @@ object Kitana {
       databaseName = Some(snapDBName),
       databaseLocation = snapDBLocation,
       etlDataPathPrefix = snapDBDataLocation,
-//      catalogName =  Some("overwatch"),
       consumerDatabaseName = None,
       consumerDatabaseLocation = None
     )

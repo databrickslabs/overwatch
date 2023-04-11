@@ -52,7 +52,6 @@ class ParamDeserializerTest extends AnyFunSpec {
         externalizeOptimize = false,
         apiEnvConfig = None,
         tempWorkingDir = ""
-//        deploymentType = "default"
       )
       assertResult(expected)(mapper.readValue[OverwatchParams](incomplete))
 

@@ -260,20 +260,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
      * @param dataTarget OW DataTarget
      */
     def validateAndSetDataTarget(dataTarget: DataTarget): Unit = {
-      // Validate data Target
-      // todo UC enablement
-//      if (!disableValidations) dataTargetIsValid(dataTarget)
-//
-//      // If data target is valid get db name and location and set it
-//      val dbName = dataTarget.databaseName.get
-//      val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
-//      val dataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
-//
-//      val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName)
-//      val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
-//
-//      config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
-//      config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
+     // Implementation
     }
 
     private def quickBuildAuditLogConfig(auditLogConfig: AuditLogConfig): AuditLogConfig = {

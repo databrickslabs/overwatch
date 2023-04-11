@@ -27,6 +27,10 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
     val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
     val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
     val etlCatalogName = dataTarget.databaseName.get.split("\\.").head
+    val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName).split("\\.").last
+    val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
+    val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
+    val consumerCatalogName = dataTarget.consumerDatabaseName.getOrElse(dbName).split("\\.").head
     var switch = true
 
 
@@ -79,10 +83,6 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
      * since there's no chance of data corruption given only creating views. This section needs to be refactored
      * to remove duplicity while still enabling control between which checks are done for which DataTarget.
      */
-    val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName).split("\\.").last
-    val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
-    val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
-    val consumerCatalogName = dataTarget.consumerDatabaseName.getOrElse(dbName).split("\\.").head
     spark.sessionState.catalogManager.setCurrentCatalog(consumerCatalogName)
     if (consumerDBName != dbName) { // separate consumer db
       if (spark.catalog.databaseExists(consumerDBName)) {

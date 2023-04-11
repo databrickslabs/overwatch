@@ -25,12 +25,11 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
    * Validate the config and the environment readiness for the run based on the configs and environment state
    *
-   * @param overwatchArgs JSON string of input args from input into main class.
+   * @param rawParams JSON string of input args from input into main class.
    * @return
    */
-  private def validateAndRegisterArgs(overwatchArgs: OverwatchParams): this.type = {
+  private def validateAndRegisterArgs(rawParams: OverwatchParams): this.type = {
 
-    val rawParams = overwatchArgs
     // Now that the input parameters have been parsed -- set them in the config
     config.setInputConfig(rawParams)
 

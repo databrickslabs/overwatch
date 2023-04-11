@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.utils.Config
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import org.scalatest.{Ignore, color}
 import org.scalatest.funspec.AnyFunSpec
-//@Ignore
+
 class InitializerFunctionsTest extends AnyFunSpec with DataFrameComparer with SparkSessionTestWrapper {
   val conf = new Config
   conf.setOrganizationId("demo")
