@@ -1067,7 +1067,6 @@ object Schema extends SparkSessionWrapper {
     StructField("api_waiting_time", LongType, nullable = true),
     StructField("mount_mapping_path", StringType, nullable = true),
     StructField("temp_dir_path", StringType, nullable = true),
-    StructField("mount_mapping_path", StringType, nullable = true),
     StructField("eh_conn_string", StringType, nullable = true),
     StructField("aad_tenant_id", StringType, nullable = true),
     StructField("aad_client_id", StringType, nullable = true),
