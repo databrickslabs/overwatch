@@ -499,7 +499,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       val aadParams = Map("aad_tenant_id" -> config.aad_tenant_id.get,
         "aad_client_id" -> config.aad_client_id.get,
         "aad_client_secret" -> dbutils.secrets.get(scope = config.secret_scope, key = config.aad_client_secret_key.get),
-        "aad_authority_endpoint" -> "https://login.microsoftonline.com/")
+        "aad_authority_endpoint" -> config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/"))
       spark.readStream
         .format("eventhubs")
         .options(AadAuthInstance.addAadAuthParams(ehConf, aadParams).toMap)

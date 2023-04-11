@@ -125,7 +125,9 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
             , auditRawEventsPrefix = ehStatePath,
             azureClientId = Some(config.aad_client_id.get),
             azureClientSecret = Some(dbutils.secrets.get(scope = "overwatch_global", key = "overwatch-reader-secret")),
-            azureTenantId = Some(config.aad_tenant_id.get))
+            azureTenantId = Some(config.aad_tenant_id.get),
+            azureAuthEndpoint = config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/")
+          )
         }else{
           val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
          AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)

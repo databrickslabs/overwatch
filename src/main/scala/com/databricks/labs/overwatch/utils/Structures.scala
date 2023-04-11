@@ -108,6 +108,7 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 aad_tenant_id: Option[String],
                                 aad_client_id: Option[String],
                                 aad_client_secret_key: Option[String],
+                                aad_authority_endpoint: Option[String],
                                 deployment_id: String,
                                 output_path: String,
                                 temp_dir_path: Option[String]
