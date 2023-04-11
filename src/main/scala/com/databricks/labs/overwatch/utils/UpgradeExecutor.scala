@@ -7,7 +7,7 @@ import scala.collection.mutable
 
 class UpgradeExecutor(val etldbname: String, val fromVersion: Int, val toVersion: Int, val executeSingleStep: Int = -1) {
 
-  val versionMap = Map("600-609" -> classOf[UpgradeTo0610], "610-699" -> classOf[UpgradeTo0700])
+  val versionMap = Map("600-610" -> classOf[UpgradeTo0610], "610-700" -> classOf[UpgradeTo0700])
 
   val stepMap = Map(3 -> "600-609", 17 -> "610-699")
 
@@ -62,7 +62,7 @@ class UpgradeExecutor(val etldbname: String, val fromVersion: Int, val toVersion
     upgradeResults
   }
    def is_overlapping(x1:Int,x2:Int,y1:Int,y2:Int):Boolean= {
-    Math.max(x1, y1) <= Math.min(x2, y2)
+    Math.max(x1, y1) < Math.min(x2, y2)
   }
 }
 object Test {

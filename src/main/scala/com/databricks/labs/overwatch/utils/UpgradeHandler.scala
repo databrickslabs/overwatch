@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.pipeline.{Initializer, PipelineFunctions}
 import com.databricks.labs.overwatch.utils.Upgrade.{logger, spark}
 import org.apache.log4j.{Level, Logger}
@@ -10,9 +11,18 @@ import org.apache.spark.sql.functions.{col, lit, rank, row_number, to_json}
 import scala.collection.mutable.ArrayBuffer
 import spark.implicits._
 
+import java.util.concurrent.ConcurrentHashMap
+import scala.collection.JavaConverters.mapAsScalaConcurrentMapConverter
+import scala.collection.concurrent
+
 abstract class UpgradeHandler extends  SparkSessionWrapper{
   val logger: Logger
   val failMsg = s"UPGRADE FAILED"
+  var tempDir:String =""
+  var upgradeStatus: ArrayBuffer[UpgradeReport] =null
+  var dbrVersionNumerical : Double=0.0
+  var initialSourceVersions: concurrent.Map[String, Long] = null
+  var pipReportPath: String = null
 
   def upgrade(): DataFrame
 
@@ -50,44 +60,6 @@ abstract class UpgradeHandler extends  SparkSessionWrapper{
          |""".stripMargin)
  }
 
-  protected def verifyUpgradeStatus(
-                                     upgradeStatus: Array[UpgradeReport],
-                                     initialTableVersions: Map[String, Long],
-                                     snapDir: String): Unit = {
-    if (upgradeStatus.exists(_.failUpgrade)) { // if upgrade report contains fail upgrade
-      val reportTime = System.currentTimeMillis()
-      val upgradeReportPath = s"$snapDir/upgradeReport_$reportTime"
-      val initialTableVersionsPath = s"$snapDir/initialTableVersions_$reportTime"
-
-      val failMsg = s"UPGRADE FAILED:\nUpgrade Report saved as Dataframe to $upgradeReportPath\nTable Versions " +
-        s"prior to upgrade stored as Dataframe at $initialTableVersionsPath"
-
-      logger.log(Level.INFO, failMsg)
-      println(failMsg)
-
-      upgradeStatus.toSeq.toDF().write.format("delta").mode("overwrite")
-        .save(upgradeReportPath)
-
-      initialTableVersions.toSeq.toDF().write.format("delta").mode("overwrite")
-        .save(initialTableVersionsPath)
-
-      throw new Exception(failMsg)
-    }
-  }
-  protected def handleUpgradeException(e:Throwable,upgradeStatus: ArrayBuffer[UpgradeReport],etlDatabaseName:String,stepMsg:Option[String],tbl:String)={
-
-    e match {
-      case e: SimplifiedUpgradeException =>
-        upgradeStatus.append(e.getUpgradeReport.copy(step = stepMsg))
-      case e: Throwable =>
-        logger.log(Level.ERROR, failMsg)
-        upgradeStatus.append(
-          UpgradeReport(etlDatabaseName, tbl, Some(PipelineFunctions.appendStackStrace(e, failMsg)), stepMsg, failUpgrade = true)
-        )
-
-    }
-
-  }
   protected def getWorkspaceByOrgNew(pipelineReportPath: String, statusFilter: Column = lit(true)): Array[OrgWorkspace] = {
     val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
     val compactStringByOrg = spark.read.format("delta").load(pipelineReportPath)
@@ -143,6 +115,31 @@ abstract class UpgradeHandler extends  SparkSessionWrapper{
       .option("overwriteSchema", "true")
       .saveAsTable(s"${db}.${tbl}")
 
+  }
+
+  protected def initializeParamsAndValidations(etlDB:String ,etlPrefix:String,startSchemaVersion:Int, targetSchemaVersion:String)={
+
+    val currentSchemaVersion = SchemaTools.getSchemaVersion(etlDB)
+    val numericalSchemaVersion = getNumericalSchemaVersion(currentSchemaVersion)
+    val numericalTargetVersion = getNumericalSchemaVersion(targetSchemaVersion)
+
+    tempDir = etlPrefix.split("/").dropRight(1).mkString("/") + s"/upgrade0${numericalTargetVersion}_tempDir/${System.currentTimeMillis()}"
+    dbutils.fs.mkdirs(tempDir)
+
+    validateSchemaUpgradeEligibility(currentSchemaVersion, targetSchemaVersion)
+    validateNumericalSchemaVersion(numericalSchemaVersion, startSchemaVersion, numericalTargetVersion)
+
+    upgradeStatus = ArrayBuffer()
+    val dbrVersion = spark.conf.get("spark.databricks.clusterUsageTags.effectiveSparkVersion")
+    val dbrMajorV = dbrVersion.split("\\.").head
+    val dbrMinorV = dbrVersion.split("\\.")(1)
+    dbrVersionNumerical = s"$dbrMajorV.$dbrMinorV".toDouble
+    initialSourceVersions = new ConcurrentHashMap[String, Long]().asScala
+    val packageVersion = new Config().getClass.getPackage.getImplementationVersion.replaceAll("\\.", "").tail.toInt
+    val startingSchemaVersion = SchemaTools.getSchemaVersion(etlDB).split("\\.").takeRight(1).head.toInt
+
+    pipReportPath = s"${etlPrefix}/pipeline_report"
+    validateSchemaAndPackageVersion(startingSchemaVersion, packageVersion, startSchemaVersion, numericalTargetVersion)
   }
 }
 
