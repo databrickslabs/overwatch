@@ -90,15 +90,10 @@ object Migration extends SparkSessionWrapper {
     val targetETLDB = args(5)
     val targetConsumerDB = args(6)
 
-
     val workspace = Helpers.getWorkspaceByDatabase(sourceETLDB)
 
     migrate(workspace,targetPrefix,scope,"Deep",sourceConfigPath,targetConfigPath)
     updateConfig(targetConfigPath,targetPrefix,targetETLDB,targetConsumerDB)
-
-
-
-
     println("SnapShot Completed")
   }
 
