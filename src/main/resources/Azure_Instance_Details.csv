@@ -1,150 +1,200 @@
 instance,API_Name,vCPUs,Memory_GB,Compute_Contract_Price,On_Demand_Cost_Hourly,Linux_Reserved_Cost_Hourly,Hourly_DBUs
 DS4 v2,Standard_DS4_v2,8,28.0,0.46,0.46,0.276,1.5
-DS5 v2,Standard_DS5_v2,16,56.0,0.92,0.92,0.552,3
+DS5 v2,Standard_DS5_v2,16,56.0,0.92,0.92,0.552,3.0
 D3 v2,Standard_D3_v2,4,14.0,0.23,0.23,0.138,0.75
 D8s v3,Standard_D8s_v3,8,32.0,0.38,0.38,0.228,1.5
-D16s v3,Standard_D16s_v3,16,64.0,0.77,0.77,0.462,3
-D32s v3,Standard_D32s_v3,32,128.0,1.54,1.54,0.924,6
-D64s v3,Standard_D64s_v3,64,256.0,3.07,3.07,1.842,12
+D16s v3,Standard_D16s_v3,16,64.0,0.77,0.77,0.462,3.0
+D32s v3,Standard_D32s_v3,32,128.0,1.54,1.54,0.924,6.0
+D64s v3,Standard_D64s_v3,64,256.0,3.07,3.07,1.842,12.0
 D8as v4,Standard_D8as_v4,8,32.0,0.38,0.38,0.228,1.5
-D16as v4,Standard_D16as_v4,16,64.0,0.77,0.77,0.462,3
-D32as v4,Standard_D32as_v4,32,128.0,1.54,1.54,0.924,6
-D48as v4,Standard_D48as_v4,48,192.0,2.3,2.3,1.38,9
-D64as v4,Standard_D64as_v4,64,256.0,3.07,3.07,1.842,12
-D96as v4,Standard_D96as_v4,96,384.0,4.61,4.61,2.766,18
+D16as v4,Standard_D16as_v4,16,64.0,0.77,0.77,0.462,3.0
+D32as v4,Standard_D32as_v4,32,128.0,1.54,1.54,0.924,6.0
+D48as v4,Standard_D48as_v4,48,192.0,2.3,2.3,1.38,9.0
+D64as v4,Standard_D64as_v4,64,256.0,3.07,3.07,1.842,12.0
+D96as v4,Standard_D96as_v4,96,384.0,4.61,4.61,2.766,18.0
 D8 v3,Standard_D8_v3,8,32.0,0.38,0.38,0.228,1.5
-D16 v3,Standard_D16_v3,16,64.0,0.77,0.77,0.462,3
-D32 v3,Standard_D32_v3,32,128.0,1.54,1.54,0.924,6
-D64 v3,Standard_D64_v3,64,256.0,3.07,3.07,1.842,12
+D16 v3,Standard_D16_v3,16,64.0,0.77,0.77,0.462,3.0
+D32 v3,Standard_D32_v3,32,128.0,1.54,1.54,0.924,6.0
+D64 v3,Standard_D64_v3,64,256.0,3.07,3.07,1.842,12.0
 DS3 v2,Standard_DS3_v2,4,14.0,0.23,0.23,0.138,0.75
-DS12 v2,Standard_DS12_v2,4,28.0,0.3,0.3,0.18,1
-DS13 v2,Standard_DS13_v2,8,56.0,0.6,0.6,0.36,2
-DS14 v2,Standard_DS14_v2,16,112.0,1.2,1.2,0.72,4
-DS15 v2,Standard_DS15_v2,20,140.0,1.5,1.5,0.9,5
-D12 v2,Standard_D12_v2,4,28.0,0.3,0.3,0.18,1
-D13 v2,Standard_D13_v2,8,56.0,0.6,0.6,0.36,2
-D14 v2,Standard_D14_v2,16,112.0,1.2,1.2,0.72,4
-D15 v2,Standard_D15_v2,20,140.0,1.5,1.5,0.9,5
-E8s v3,Standard_E8s_v3,8,64.0,0.53,0.53,0.318,2
-E16s v3,Standard_E16s_v3,16,128.0,1.06,1.06,0.636,4
-E32s v3,Standard_E32s_v3,32,256.0,2.13,2.13,1.278,8
-E64s v3,Standard_E64s_v3,64,432.0,3.63,3.63,2.178,16
-E4as v4,Standard_E4as_v4,4,32.0,0.25,0.25,0.15,1
-E8as v4,Standard_E8as_v4,8,64.0,0.5,0.5,0.3,2
-E16as v4,Standard_E16as_v4,16,128.0,1.01,1.01,0.606,4
-E20as v4,Standard_E20as_v4,20,160.0,1.26,1.26,0.756,5
-E32as v4,Standard_E32as_v4,32,256.0,2.02,2.02,1.212,8
-E48as v4,Standard_E48as_v4,48,384.0,3.02,3.02,1.812,12
-E64as v4,Standard_E64as_v4,64,512.0,4.03,4.03,2.418,16
-E96as v4,Standard_E96as_v4,96,672.0,6.05,6.05,3.63,24
-L4s,Standard_L4s,4,32.0,0.34,0.34,0.204,1
-L8s,Standard_L8s,8,64.0,0.69,0.69,0.414,2
-L16s,Standard_L16s,16,128.0,1.37,1.37,0.822,4
-L32s,Standard_L32s,32,256.0,2.75,2.75,1.65,8
-L8s v2,Standard_L8s_v2,8,64.0,0.62,0.62,0.372,2
-L16s v2,Standard_L16s_v2,16,128.0,1.25,1.25,0.75,4
-L32s v2,Standard_L32s_v2,32,256.0,2.5,2.5,1.5,8
-L64s v2,Standard_L64s_v2,64,512.0,4.99,4.99,2.994,16
-L80s v2,Standard_L80s_v2,80,640.0,6.24,6.24,3.744,20
+DS12 v2,Standard_DS12_v2,4,28.0,0.3,0.3,0.18,1.0
+DS13 v2,Standard_DS13_v2,8,56.0,0.6,0.6,0.36,2.0
+DS14 v2,Standard_DS14_v2,16,112.0,1.2,1.2,0.72,4.0
+DS15 v2,Standard_DS15_v2,20,140.0,1.5,1.5,0.9,5.0
+D12 v2,Standard_D12_v2,4,28.0,0.3,0.3,0.18,1.0
+D13 v2,Standard_D13_v2,8,56.0,0.6,0.6,0.36,2.0
+D14 v2,Standard_D14_v2,16,112.0,1.2,1.2,0.72,4.0
+D15 v2,Standard_D15_v2,20,140.0,1.5,1.5,0.9,5.0
+E8s v3,Standard_E8s_v3,8,64.0,0.53,0.53,0.318,2.0
+E16s v3,Standard_E16s_v3,16,128.0,1.06,1.06,0.636,4.0
+E32s v3,Standard_E32s_v3,32,256.0,2.13,2.13,1.278,8.0
+E64s v3,Standard_E64s_v3,64,432.0,3.63,3.63,2.178,16.0
+E4as v4,Standard_E4as_v4,4,32.0,0.25,0.25,0.15,1.0
+E8as v4,Standard_E8as_v4,8,64.0,0.5,0.5,0.3,2.0
+E16as v4,Standard_E16as_v4,16,128.0,1.01,1.01,0.606,4.0
+E20as v4,Standard_E20as_v4,20,160.0,1.26,1.26,0.756,5.0
+E32as v4,Standard_E32as_v4,32,256.0,2.02,2.02,1.212,8.0
+E48as v4,Standard_E48as_v4,48,384.0,3.02,3.02,1.812,12.0
+E64as v4,Standard_E64as_v4,64,512.0,4.03,4.03,2.418,16.0
+E96as v4,Standard_E96as_v4,96,672.0,6.05,6.05,3.63,24.0
+L4s,Standard_L4s,4,32.0,0.34,0.34,0.204,1.0
+L8s,Standard_L8s,8,64.0,0.69,0.69,0.414,2.0
+L16s,Standard_L16s,16,128.0,1.37,1.37,0.822,4.0
+L32s,Standard_L32s,32,256.0,2.75,2.75,1.65,8.0
+L8s v2,Standard_L8s_v2,8,64.0,0.62,0.62,0.372,2.0
+L16s v2,Standard_L16s_v2,16,128.0,1.25,1.25,0.75,4.0
+L32s v2,Standard_L32s_v2,32,256.0,2.5,2.5,1.5,8.0
+L64s v2,Standard_L64s_v2,64,512.0,4.99,4.99,2.994,16.0
+L80s v2,Standard_L80s_v2,80,640.0,6.24,6.24,3.744,20.0
 F4s v2,Standard_F4s_v2,4,8.0,0.17,0.17,0.102,0.75
 F8s v2,Standard_F8s_v2,8,16.0,0.34,0.34,0.204,1.5
-F16s v2,Standard_F16s_v2,16,32.0,0.68,0.68,0.414,3
-F32s v2,Standard_F32s_v2,32,64.0,1.35,1.35,0.81,6
-F64s v2,Standard_F64s_v2,64,128.0,2.71,2.71,1.626,12
+F16s v2,Standard_F16s_v2,16,32.0,0.68,0.68,0.414,3.0
+F32s v2,Standard_F32s_v2,32,64.0,1.35,1.35,0.81,6.0
+F64s v2,Standard_F64s_v2,64,128.0,2.71,2.71,1.626,12.0
 F72s v2,Standard_F72s_v2,72,144.0,3.05,3.05,1.83,13.5
 F4,Standard_F4s,4,8.0,0.2,0.2,0.12,0.5
-F8,Standard_F8s,8,16.0,0.4,0.4,0.24,1
-F16,Standard_F16s,16,32.0,0.8,0.8,0.48,2
-H16,Standard_H16,16,112.0,4.14,4.14,2.484,5
-NC12,Standard_NC12,12,112.0,1.8,1.8,1.08,3
-NC24,Standard_NC24,24,224.0,3.6,3.6,2.16,6
-NC6s v3,Standard_NC6s_v3,6,112.0,3.06,3.06,1.836,5
-NC12s v3,Standard_NC12s_v3,12,224.0,6.12,6.12,3.678,10
-NC24s v3,Standard_NC24s_v3,24,448.0,12.24,12.24,7.344,20
+F8,Standard_F8s,8,16.0,0.4,0.4,0.24,1.0
+F16,Standard_F16s,16,32.0,0.8,0.8,0.48,2.0
+H16,Standard_H16,16,112.0,4.14,4.14,2.484,5.0
+NC12,Standard_NC12,12,112.0,1.8,1.8,1.08,3.0
+NC24,Standard_NC24,24,224.0,3.6,3.6,2.16,6.0
+NC6s v3,Standard_NC6s_v3,6,112.0,3.06,3.06,1.836,5.0
+NC12s v3,Standard_NC12s_v3,12,224.0,6.12,6.12,3.678,10.0
+NC24s v3,Standard_NC24s_v3,24,448.0,12.24,12.24,7.344,20.0
 D4s v3,Standard_D4s_v3,4,16.0,0.19,0.19,0.114,0.75
-E8 v3,Standard_E8_v3,8,64.0,0.53,0.53,0.318,2
-E16 v3,Standard_E16_v3,16,128.0,1.06,1.06,0.636,4
-E32 v3,Standard_E32_v3,32,256.0,2.13,2.13,1.278,8
-E64 v3,Standard_E64_v3,64,432.0,3.63,3.63,2.178,16
-E4d v4,Standard_E4d_v4,4,32.0,0.29,0.29,0.174,1
-E8d v4,Standard_E8d_v4,8,64.0,0.58,0.58,0.348,2
-E16d v4,Standard_E16d_v4,16,128.0,1.15,1.15,0.69,4
-E20d v4,Standard_E20d_v4,20,160.0,1.44,1.44,0.864,5
-E32d v4,Standard_E32d_v4,32,256.0,2.3,2.3,1.38,8
-E48d v4,Standard_E48d_v4,48,384.0,3.46,3.46,2.076,12
-E64d v4,Standard_E64d_v4,64,504.0,4.61,4.61,2.766,16
-E4ds v4,Standard_E4ds_v4,4,32.0,0.29,0.29,0.174,1
-E8ds v4,Standard_E8ds_v4,8,64.0,0.58,0.58,0.348,2
-E16ds v4,Standard_E16ds_v4,16,128.0,1.15,1.15,0.69,4
-E20ds v4,Standard_E20ds_v4,20,160.0,1.44,1.44,0.864,5
-E32ds v4,Standard_E32ds_v4,32,256.0,2.3,2.3,1.38,8
-E48ds v4,Standard_E48ds_v4,48,384.0,3.46,3.46,2.076,12
-E64ds v4,Standard_E64ds_v4,64,504.0,4.61,4.61,2.766,16
-E80ids v4,Standard_E80ids_v4,80,504.0,5.76,5.76,3.456,20
+E8 v3,Standard_E8_v3,8,64.0,0.53,0.53,0.318,2.0
+E16 v3,Standard_E16_v3,16,128.0,1.06,1.06,0.636,4.0
+E32 v3,Standard_E32_v3,32,256.0,2.13,2.13,1.278,8.0
+E64 v3,Standard_E64_v3,64,432.0,3.63,3.63,2.178,16.0
+E4d v4,Standard_E4d_v4,4,32.0,0.29,0.29,0.174,1.0
+E8d v4,Standard_E8d_v4,8,64.0,0.58,0.58,0.348,2.0
+E16d v4,Standard_E16d_v4,16,128.0,1.15,1.15,0.69,4.0
+E20d v4,Standard_E20d_v4,20,160.0,1.44,1.44,0.864,5.0
+E32d v4,Standard_E32d_v4,32,256.0,2.3,2.3,1.38,8.0
+E48d v4,Standard_E48d_v4,48,384.0,3.46,3.46,2.076,12.0
+E64d v4,Standard_E64d_v4,64,504.0,4.61,4.61,2.766,16.0
+E4ds v4,Standard_E4ds_v4,4,32.0,0.29,0.29,0.174,1.0
+E8ds v4,Standard_E8ds_v4,8,64.0,0.58,0.58,0.348,2.0
+E16ds v4,Standard_E16ds_v4,16,128.0,1.15,1.15,0.69,4.0
+E20ds v4,Standard_E20ds_v4,20,160.0,1.44,1.44,0.864,5.0
+E32ds v4,Standard_E32ds_v4,32,256.0,2.3,2.3,1.38,8.0
+E48ds v4,Standard_E48ds_v4,48,384.0,3.46,3.46,2.076,12.0
+E64ds v4,Standard_E64ds_v4,64,504.0,4.61,4.61,2.766,16.0
+E80ids v4,Standard_E80ids_v4,80,504.0,5.76,5.76,3.456,20.0
 H8,Standard_H8,8,56.0,0.796,0.796,0.477,2.5
-NC4as T4 v3,Standard_NC4as_T4_v3 (beta),4,28.0,0.53,0.53,0.318,1
+NC4as T4 v3,Standard_NC4as_T4_v3 (beta),4,28.0,0.53,0.53,0.318,1.0
 NC8as T4 v3,Standard_NC8as_T4_v3 (beta),8,56.0,0.75,0.75,0.45,1.5
 NC16as T4 v3,Standard_NC16as_T4_v3 (beta),16,110.0,1.2,1.2,0.72,2.5
-NC64as T4 v3,Standard_NC64as_T4_v3 (beta),64,440.0,4.35,4.35,2.61,10
+NC64as T4 v3,Standard_NC64as_T4_v3 (beta),64,440.0,4.35,4.35,2.61,10.0
 D4a v4,Standard_D4a_v4,4,16,0.19,0.19,0.114,0.75
 D8a v4,Standard_D8a_v4,8,32,0.38,0.38,0.228,1.5
-D16a v4,Standard_D16a_v4,16,64,0.77,0.77,0.462,3
-D32a v4,Standard_D32a_v4,32,128,1.54,1.54,0.924,6
-D48a v4,Standard_D48a_v4,48,192,2.3,2.3,1.38,9
-D64a v4,Standard_D64a_v4,64,256,3.07,3.07,1.842,12
-D96a v4,Standard_D96a_v4,96,384,4.61,4.61,2.766,18
+D16a v4,Standard_D16a_v4,16,64,0.77,0.77,0.462,3.0
+D32a v4,Standard_D32a_v4,32,128,1.54,1.54,0.924,6.0
+D48a v4,Standard_D48a_v4,48,192,2.3,2.3,1.38,9.0
+D64a v4,Standard_D64a_v4,64,256,3.07,3.07,1.842,12.0
+D96a v4,Standard_D96a_v4,96,384,4.61,4.61,2.766,18.0
 D4ds v4,Standard_D4ds_v4,4,16,0.23,0.23,0.138,0.75
 D8ds v4,Standard_D8ds_v4,8,32,0.45,0.45,0.27,1.5
-D16ds v4,Standard_D16ds_v4,16,64,0.9,0.9,0.54,3
-D32ds v4,Standard_D32ds_v4,32,128,1.81,1.81,1.086,6
-D48ds v4,Standard_D48ds_v4,48,192,2.71,2.71,1.626,9
-D64ds v4,Standard_D64ds_v4,64,256,3.62,3.62,2.172,12
+D16ds v4,Standard_D16ds_v4,16,64,0.9,0.9,0.54,3.0
+D32ds v4,Standard_D32ds_v4,32,128,1.81,1.81,1.086,6.0
+D48ds v4,Standard_D48ds_v4,48,192,2.71,2.71,1.626,9.0
+D64ds v4,Standard_D64ds_v4,64,256,3.62,3.62,2.172,12.0
 D4d v4,Standard_D4d_v4,4,16,0.23,0.23,0.138,0.75
 D8d v4,Standard_D8d_v4,8,32,0.45,0.45,0.27,1.5
-D16d v4,Standard_D16d_v4,16,64,0.9,0.9,0.54,3
-D32d v4,Standard_D32d_v4,32,128,1.81,1.81,1.086,6
-D48d v4,Standard_D48d_v4,48,192,2.71,2.71,1.626,9
-D64d v4,Standard_D64d_v4,64,256,3.62,3.62,2.172,12
+D16d v4,Standard_D16d_v4,16,64,0.9,0.9,0.54,3.0
+D32d v4,Standard_D32d_v4,32,128,1.81,1.81,1.086,6.0
+D48d v4,Standard_D48d_v4,48,192,2.71,2.71,1.626,9.0
+D64d v4,Standard_D64d_v4,64,256,3.62,3.62,2.172,12.0
 D4 v2,Standard_D4_v2,8,28,0.46,0.46,0.276,1.5
-D5 v2,Standard_D5_v2,16,56,0.92,0.92,0.552,3
-E4a v4,Standard_E4a_v4,4,32,0.25,0.25,0.15,1
-E8a v4,Standard_E8a_v4,8,64,0.5,0.5,0.3,2
-E16a v4,Standard_E16a_v4,16,128,1.01,1.01,0.606,4
-E20a v4,Standard_E20a_v4,20,160,1.26,1.26,0.756,5
-E32a v4,Standard_E32a_v4,32,256,2.02,2.02,1.212,8
-E48a v4,Standard_E48a_v4,48,384,3.02,3.02,1.812,12
-E64a v4,Standard_E64a_v4,64,512,4.03,4.03,2.418,16
-E96a v4,Standard_E96a_v4,96,672,6.05,6.05,3.63,24
-E4s v4,Standard_E4s_v4,4,32,0.25,0.25,0.15,1
-E8s v4,Standard_E8s_v4,8,64,0.5,0.5,0.3,2
-E16s v4,Standard_E16s_v4,16,128,1.01,1.01,0.606,4
-E20s v4,Standard_E20s_v4,20,160,1.26,1.26,0.756,5
-E32s v4,Standard_E32s_v4,32,256,2.02,2.02,1.212,8
-E48s v4,Standard_E48s_v4,48,384,3.02,3.02,1.812,12
-E64s v4,Standard_E64s_v4,64,504,4.03,4.03,2.418,16
-E80is v4,Standard_E80is_v4,80,504,5.04,5.04,3.036,20
+D5 v2,Standard_D5_v2,16,56,0.92,0.92,0.552,3.0
+E4a v4,Standard_E4a_v4,4,32,0.25,0.25,0.15,1.0
+E8a v4,Standard_E8a_v4,8,64,0.5,0.5,0.3,2.0
+E16a v4,Standard_E16a_v4,16,128,1.01,1.01,0.606,4.0
+E20a v4,Standard_E20a_v4,20,160,1.26,1.26,0.756,5.0
+E32a v4,Standard_E32a_v4,32,256,2.02,2.02,1.212,8.0
+E48a v4,Standard_E48a_v4,48,384,3.02,3.02,1.812,12.0
+E64a v4,Standard_E64a_v4,64,512,4.03,4.03,2.418,16.0
+E96a v4,Standard_E96a_v4,96,672,6.05,6.05,3.63,24.0
+E4s v4,Standard_E4s_v4,4,32,0.25,0.25,0.15,1.0
+E8s v4,Standard_E8s_v4,8,64,0.5,0.5,0.3,2.0
+E16s v4,Standard_E16s_v4,16,128,1.01,1.01,0.606,4.0
+E20s v4,Standard_E20s_v4,20,160,1.26,1.26,0.756,5.0
+E32s v4,Standard_E32s_v4,32,256,2.02,2.02,1.212,8.0
+E48s v4,Standard_E48s_v4,48,384,3.02,3.02,1.812,12.0
+E64s v4,Standard_E64s_v4,64,504,4.03,4.03,2.418,16.0
+E80is v4,Standard_E80is_v4,80,504,5.04,5.04,3.036,20.0
 F4,Standard_F4,4,8,0.2,0.2,0.12,0.5
-F8,Standard_F8,8,16,0.4,0.4,0.24,1
-F16,Standard_F16,16,32,0.8,0.8,0.48,2
-M5DN Metal,m5dn.metal,384,96,6.528,6.528,19.58,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,3600 GB (4 * 900 GB NVMe SSD),100 Gigabit,19000,2375,TRUE,FALSE,4.113,0
-G4DN Metal,g4dn.metal,384,96,7.824,7.824,17.12,8,NVIDIA T4 Tensor Core,128,Intel Xeon Family,2.5,1800 GB(2 * 900 GB NVMe SSD),100 Gigabit,19000,2375,TRUE,TRUE,4.929,0
-G5 Graphics and Machine Learning GPU Quadruple Extra Large,g5.4xlarge,64,16,1.624,1.624,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,600 GB NVMe SSD,Up to 25 Gigabit,4750,593.75,TRUE,TRUE,0,0
-R5N Metal,r5n.metal,768,96,7.152,7.152,21.6,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),2.5,EBS only,100 Gigabit,19000,2375,TRUE,FALSE,4.506,0
-G5 Graphics and Machine Learning GPU 12xlarge,g5.12xlarge,192,48,5.672,5.672,,4,NVIDIA A10G,96,AMD EPYC 7R32,2.8,3800 GB NVMe SSD,40 Gigabit,16000,2000,TRUE,TRUE,0,0
-G4AD 16xlarge,g4ad.16xlarge,256,64,3.468,3.468,8.21,4,AMD Radeon Pro V520,32,AMD EPYC 7R32,2.8,2400 GB(2 * 1200 GB NVMe SSD),25 Gigabit,6300,787.5,TRUE,TRUE,2.1848,0
-G5 Graphics and Machine Learning GPU Eight Extra Large,g5.8xlarge,128,32,2.448,2.448,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,900 GB NVMe SSD,25 Gigabit,16000,2000,TRUE,TRUE,0,0
-G4AD Quadruple Extra Large,g4ad.4xlarge,64,16,0.867,0.867,2.05,1,AMD Radeon Pro V520,8,AMD EPYC 7R32,2.8,600 GB NVMe SSD,Up to 10 Gigabit,3170,396.25,TRUE,TRUE,0.5462,0
-D3 Eight Extra Large,d3.8xlarge,256,32,3.9955,3.9955,12.8,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,47520 GB(24 * 1980 GB HDD),25 Gigabit,5000,625,TRUE,TRUE,2.5172,0
-G5 Graphics and Machine Learning GPU Double Extra Large,g5.2xlarge,32,8,1.212,1.212,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,450 GB NVMe SSD,Up to 10 Gigabit,3500,437.5,TRUE,TRUE,0,0
-R5DN Metal,r5dn.metal,768,96,8.016,8.016,25.06,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,3600 GB(4 * 900 GB NVMe SSD),100 Gigabit,19000,2375,TRUE,FALSE,5.05,0
-G4AD Eight Extra Large,g4ad.8xlarge,128,32,1.734,1.734,4.1,2,AMD Radeon Pro V520,16,AMD EPYC 7R32,2.8,1200 GB NVMe SSD,15 Gigabit,3170,396.25,TRUE,TRUE,1.0924,0
-G5 Graphics and Machine Learning GPU Extra Large,g5.xlarge,16,4,1.006,1.006,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,250 GB NVMe SSD,Up to 10 Gigabit,3500,437.5,TRUE,TRUE,0,0
-D3EN Eight Extra Large,d3en.8xlarge,128,32,4.206,4.206,13.44,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,223680 GB(16 * 13980 GB HDD),50 Gigabit,5000,625,TRUE,TRUE,0,0
-G5 Graphics and Machine Learning GPU 48xlarge,g5.48xlarge,768,192,16.288,16.288,,8,NVIDIA A10G,192,AMD EPYC 7R32,2.8,7600 GB(2 * 3800 GB NVMe SSD),100 Gigabit,19000,2375,TRUE,TRUE,0,0
-C5N Metal,c5n.metal,192,72,3.888,3.888,13.97,0,None,0,Intel Xeon Platinum 8124M,3,EBS only,100 Gigabit,19000,2375,TRUE,TRUE,2.449,0
-G5 Graphics and Machine Learning GPU 16xlarge,g5.16xlarge,256,64,4.096,4.096,,1,NVIDIA A10G,24,AMD EPYC 7R32,2.8,1900 GB NVMe SSD,25 Gigabit,16000,2000,TRUE,TRUE,0,0
-D3EN 12xlarge,d3en.12xlarge,192,48,6.308,6.308,20.16,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,335520 GB(24 * 13980 GB HDD),75 Gigabit,7000,875,TRUE,TRUE,0,0
-G5 Graphics and Machine Learning GPU 24xlarge,g5.24xlarge,384,96,8.144,8.144,,4,NVIDIA A10G,96,AMD EPYC 7R32,2.8,3800 GB NVMe SSD,50 Gigabit,19000,2375,TRUE,TRUE,0,0
-P4D Highest Performance GPU 24xlarge,p4d.24xlarge,1152,96,32.7726,32.7726,44.45,8,NVIDIA A100,320,Intel Xeon Platinum 8275L,3,8000 GB(8 * 1000 GB NVMe SSD),4x 100 Gigabit,19000,2375,TRUE,FALSE,20.1755,0
-M5N Metal,m5n.metal,384,96,5.712,5.712,17.14,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,EBS only,100 Gigabit,19000,2375,TRUE,FALSE,3.599,0
-M5ZN Metal,m5zn.metal,192,48,3.9641,3.9641,12,0,None,0,Intel Xeon Platinum 8252,4.5,EBS only,100 Gigabit,19000,2375,TRUE,TRUE,2.4974,0
+F8,Standard_F8,8,16,0.4,0.4,0.24,1.0
+F16,Standard_F16,16,32,0.8,0.8,0.48,2.0
+D4ads v5,Standard_D4ads_v5,4,16.0,0.21,0.21,0.126,1.0
+D8ads v5,Standard_D8ads_v5,8,32.0,0.41,0.41,0.246,2.0
+D16ads v5,Standard_D16ads_v5,16,64.0,0.82,0.82,0.492,4.0
+D32ads v5,Standard_D32ads_v5,32,128.0,1.65,1.65,0.99,8.0
+D48ads v5,Standard_D48ads_v5,48,192.0,2.47,2.47,1.482,12.0
+D64ads v5,Standard_D64ads_v5,64,256.0,3.30,3.30,1.98,16.0
+D96ads v5,Standard_D96ads_v5,96,384.0,4.94,4.94,2.964,24.0
+D4as v5,Standard_D4as_v5,4,16.0,0.17,0.17,0.102,1.0
+D8as v5,Standard_D8as_v5,8,32.0,0.34,0.34,0.204,2.0
+D16as v5,Standard_D16as_v5,16,64.0,0.69,0.69,0.414,4.0
+D32as v5,Standard_D32as_v5,32,128.0,1.38,1.38,0.828,8.0
+D48as v5,Standard_D48as_v5,48,192.0,2.06,2.06,1.236,12.0
+D64as v5,Standard_D64as_v5,64,256.0,2.75,2.75,1.65,16.0
+D96as v5,Standard_D96as_v5,96,384.0,4.13,4.13,2.478,24.0
+D4ds v5,Standard_D4ds_v5,4,16.0,0.23,0.23,0.138,1.0
+D8ds v5,Standard_D8ds_v5,8,32.0,0.45,0.45,0.27,2.0
+D16ds v5,Standard_D16ds_v5,16,64.0,0.90,0.90,0.54,4.0
+D32ds v5,Standard_D32ds_v5,32,128.0,1.81,1.81,1.086,8.0
+D48ds v5,Standard_D48ds_v5,48,192.0,2.71,2.71,1.626,12.0
+D64ds v5,Standard_D64ds_v5,64,256.0,3.62,3.62,2.172,16.0
+D96ds v5,Standard_D96ds_v5,96,384.0,5.42,5.42,3.252,24.0
+D4s v5,Standard_D4s_v5,4,16.0,0.19,0.19,0.114,1.0
+D8s v5,Standard_D8s_v5,8,32.0,0.38,0.38,0.228,2.0
+D16s v5,Standard_D16s_v5,16,64.0,0.77,0.77,0.462,4.0
+D32s v5,Standard_D32s_v5,32,128.0,1.54,1.54,0.924,8.0
+D48s v5,Standard_D48s_v5,48,192.0,2.30,2.30,1.38,12.0
+D64s v5,Standard_D64s_v5,64,256.0,3.07,3.07,1.842,16.0
+D96s v5,Standard_D96s_v5,96,384.0,4.61,4.61,2.766,24.0
+E4as v5,Standard_E4as_v5,4,32.0,0.23,0.23,0.138,1.5  
+E8as v5,Standard_E8as_v5,8,64.0,0.45,0.45,0.27,2.75
+E16as v5,Standard_E16as_v5,16,128.0,0.90,0.90,0.54,5.5
+E20as v5,Standard_E20as_v5,20,160.0,1.13,1.13,0.678,7.0
+E32as v5,Standard_E32as_v5,32,256.0,1.81,1.81,1.086,11.0
+E48as v5,Standard_E48as_v5,48,384.0,2.71,2.71,1.626,16.5
+E64as v5,Standard_E64as_v5,64,512.0,3.62,3.62,2.172,22.0
+E96as v5,Standard_E96as_v5,96,672.0,5.42,5.42,3.252,33.0
+E4ads v5,Standard_E4ads_v5,4,32.0,0.26,0.26,0.156,1.5
+E8ads v5,Standard_E8ads_v5,8,64.0,0.52,0.52,0.312,2.75
+E16ads v5,Standard_E16ads_v5,16,128.0,1.05,1.05,0.63,5.5
+E20ads v5,Standard_E20ads_v5,20,160.0,1.31,1.31,0.786,7.0
+E32ads v5,Standard_E32ads_v5,32,256.0,2.10,2.10,1.26,11.0
+E48ads v5,Standard_E48ads_v5,48,384.0,3.14,3.14,1.884,16.5
+E64ads v5,Standard_E64ads_v5,64,512.0,4.19,4.19,2.514,22.0
+E96ads v5,Standard_E96ads_v5,96,672.0,6.29,6.29,3.774,33.0
+E4ds v5,Standard_E4ds_v5,4,32.0,0.29,0.29,0.174,1.5
+E8ds v5,Standard_E8ds_v5,8,64.0,0.58,0.58,0.348,2.75
+E16ds v5,Standard_E16ds_v5,16,128.0,1.15,1.15,0.69,5.5
+E20ds v5,Standard_E20ds_v5,29,160.0,1.44,1.44,0.864,7.0
+E32ds v5,Standard_E32ds_v5,32,256.0,2.30,2.30,1.38,11.0
+E48ds v5,Standard_E48ds_v5,48,384.0,3.46,3.46,2.076,16.5
+E64ds v5,Standard_E64ds_v5,64,512.0,4.61,4.61,2.766,22.0
+E96ds v5,Standard_E96ds_v5,96,672.0,6.91,6.91,4.146,33.0
+E4s v5,Standard_E4s_v5,4,32.0,0.25,0.25,0.15,1.5
+E8s v5,Standard_E8s_v5,8,64.0,0.50,0.50,0.3,2.75
+E16s v5,Standard_E16s_v5,16,128.0,1.01,1.01,0.606
+E20s v5,Standard_E20s_v5,20,160.0,1.26,1.26,0.756
+E32s v5,Standard_E32s_v5,32,256.0,2.02,2.02,1.212,11.0
+E48s v5,Standard_E48s_v5,48,384.0,3.02,3.02,1.812,16.5
+E64s v5,Standard_E64s_v5,64,512.0,4.03,4.03,2.418,22.0
+E96s v5,Standard_E96s_v5,96,672.0,6.05,6.05,3.63,33.0
+L8as v3,Standard_L8as_V3,8,64.0,0.62,0.62,0.372,2.75
+L16as v3,Standard_L16as_V3,16,128.0,1.25,1.25,0.75,5.5
+L32as v3,Standard_L32as_V3,32,256.0,2.5,2.5,1.5,11.0
+L48as v3,Standard_L48as_V3,48,384.0,3.74,3.74,2.244,16.5
+L64as v3,Standard_L64as_V3,64,512.0,4.99,4.99,2.994,22.0
+L80as v3,Standard_L80as_V3,80,640.0,6.24,6.24,3.744,27.5
+L8s v3,Standard_L8s_V3,8,64.0,0.70,0.70,0.42,2.75
+L16s v3,Standard_L16s_V3,16,128.0,1.4,1.4,0.84,5.5
+L32s v3,Standard_L32s_V3,32,256.0,2.79,2.79,1.674,11.0
+L48s v3,Standard_L48s_V3,48,384.0,4.19,4.19,2.514,16.5
+L64s v3,Standard_L64s_V3,64,512.0,5.58,5.58,3.348,22.0
+L80s v3,Standard_L80s_V3,80,640.0,6.98,6.98,4.188,27.5
