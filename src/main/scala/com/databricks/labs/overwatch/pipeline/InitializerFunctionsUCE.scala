@@ -15,7 +15,7 @@ import org.apache.spark.util.SerializableConfiguration
 import scala.reflect.runtime.{universe => ru}
 
 class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
-  extends InitializerFunctions (config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
+  extends Initializer(config, disableValidations)
     with SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -165,7 +165,7 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
      *
      * @return
      */
-    override def initializeDatabase(): Database = {
+    def initializeDatabase(): Database = {
       // TODO -- Add metadata table
       // TODO -- refactor and clean up duplicity
       if (initDB) {
@@ -206,10 +206,4 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       Database(config)
     }
 
-}
-
-object InitializerFunctionsUCE{
-  def apply(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean): InitializerFunctions= {
-    new InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
-  }
 }

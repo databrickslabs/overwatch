@@ -19,7 +19,9 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setOrganizationId("demo")
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      
+      
+      val init = Initializer.buildInitializer(conf)
       val actual = init.isPVC
       println("value: " + actual)
       assert(!actual)
@@ -30,12 +32,13 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setOrganizationId("demoilb")
       conf.setWorkspaceName("demoilbpvc")
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val actual = init.isPVC
       println("value: " + actual)
       assert(actual)
     }
   }
+  
 
   describe("Tests for initialize database") {
 
@@ -45,7 +48,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setDeploymentType("default")
       conf.setDatabaseNameAndLoc("overwatch_etl", "file:/src/test/resources/overwatch/spark-warehouse/overwatch_etl.db", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")
       conf.setConsumerDatabaseNameandLoc("overwatch", "file:/src/test/resources/overwatch/spark-warehouse/overwatch.db")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       init.initializeDatabase()
       println("here")
       val databases = spark.sql("show databases").select("namespace").map(f => f.getString(0)).collect()
@@ -61,7 +64,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val intelligentScaling = IntelligentScaling(enabled = true, 0, 123, 1.0)
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       assertThrows[BadConfigException](init.validateIntelligentScaling(intelligentScaling))
     }
 
@@ -71,7 +74,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val intelligentScaling = IntelligentScaling(enabled = true, 4, 1, 1.0)
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       assertThrows[BadConfigException](init.validateIntelligentScaling(intelligentScaling))
     }
 
@@ -81,7 +84,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val intelligentScaling = IntelligentScaling(enabled = true, 4, 1, 12.0)
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       assertThrows[BadConfigException](init.validateIntelligentScaling(intelligentScaling))
     }
 
@@ -91,7 +94,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val intelligentScaling = IntelligentScaling(enabled = true, 1, 10, 1.0)
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val actualIntelligentScaling = init.validateIntelligentScaling(intelligentScaling)
 
       assert(intelligentScaling == actualIntelligentScaling)
@@ -106,7 +109,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val configInput = AuditLogConfig(Some("path/to/auditLog/"), "Json", None)
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val expectedAuditConf = AuditLogConfig(Some("path/to/auditLog"), "json", None)
       val actualAuditConf = init.validateAuditLogConfigs(configInput)
       assert(expectedAuditConf == actualAuditConf)
@@ -120,7 +123,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
 
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val expectedAuditConf = AuditLogConfig(None, "json", Some(AzureAuditLogEventhubConfig("sample.connection.string",
         "auditLog", "path/to/auditLog/prefix",10000,10, Some("path/to/auditLog/prefix/rawEventsCheckpoint"), Some("path/to/auditLog/prefix/auditLogBronzeCheckpoint"))))
       val actualAuditConf = init.validateAuditLogConfigs(configInput)
@@ -139,7 +142,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setCloudProvider("aws")
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput))
     }
 
@@ -150,7 +153,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setCloudProvider("aws")
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val quickBuildAuditLogConfig = PrivateMethod[AuditLogConfig]('validateAuditLogConfigs)
 
       assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput))
@@ -171,7 +174,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setOrganizationId("dummyorgifid")
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val validateAndRegisterArgs = PrivateMethod[Initializer]('validateAndRegisterArgs)
       init invokePrivate validateAndRegisterArgs(incomplete)
 
@@ -190,7 +193,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setOrganizationId("dummyorgifid")
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val validateAndRegisterArgs = PrivateMethod[Initializer]('validateAndRegisterArgs)
 
       assertThrows[NoSuchElementException](init invokePrivate validateAndRegisterArgs(incomplete))
@@ -208,7 +211,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setOrganizationId("dummyorgifid")
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val validateAndRegisterArgs = PrivateMethod[Initializer]('validateAndRegisterArgs)
 
       assertThrows[JsonEOFException](init invokePrivate validateAndRegisterArgs(incomplete))
@@ -225,7 +228,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setOrganizationId("dummyorgifid")
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val validateAndRegisterArgs = PrivateMethod[Initializer]('validateAndRegisterArgs)
       assertThrows[JsonParseException](init invokePrivate validateAndRegisterArgs(incomplete))
     }
@@ -240,7 +243,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
 
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       assertThrows[BadConfigException](init.dataTargetIsValid(dataTarget))
     }
 
@@ -249,7 +252,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       spark.sql("create database if not exists overwatch_etl location 'file:/src/test/resources/overwatch/spark-warehouse/overwatch_etl.db'")
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       assertThrows[BadConfigException](init.dataTargetIsValid(dataTarget))
     }
   }
@@ -259,21 +262,21 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
 
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       assertThrows[BadConfigException](init.validateScope(Seq("invalidScope")))
     }
     it("validateScope function should check if sparkEvents, clusterEvents, and jobs scopes require clusters scope") {
 
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       assertThrows[IllegalArgumentException](init.validateScope(Seq("jobs", "clusterEvents", "sparkEvents")))
     }
 
     it("validateScope function should return all scopes on validation") {
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val expectedScopeList = init.validateScope(Seq("audit", "notebooks", "accounts", "pools", "clusters", "clusterEvents", "sparkEvents", "jobs"))
       val actualScopeList = Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
       assert(expectedScopeList == actualScopeList)
@@ -281,7 +284,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
     it("validateScope function should not be case sensitive") {
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val expectedScopeList = init.validateScope(Seq("Audit", "notebooks", "accounts", "pools", "CLUSTERS", "clusterEvents", "sparkEvents", "jobs"))
       val actualScopeList = Seq(audit, notebooks, accounts, pools, clusters, clusterEvents, sparkEvents, jobs)
       assert(expectedScopeList == actualScopeList)
@@ -289,7 +292,7 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
     it("validateScope function should work irrespective of order of scope") {
       val conf = new Config
       conf.setDeploymentType("default")
-      val init = new Initializer(conf, disableValidations = false, isSnap = false, initDB = true)
+      val init = Initializer.buildInitializer(conf)
       val expectedScopeList = init.validateScope(Seq("CLUSTERS", "clusterEvents", "sparkEvents", "jobs", "Audit", "notebooks", "accounts", "pools"))
       val actualScopeList = Seq(clusters, clusterEvents, sparkEvents, jobs, audit, notebooks, accounts, pools)
       assert(expectedScopeList == actualScopeList)

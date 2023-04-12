@@ -230,7 +230,6 @@ class Pipeline(
   private def publishInstanceDetails(): Unit = {
     val logMsg = "instanceDetails does not exist and/or does not contain data for this workspace. BUILDING/APPENDING"
     logger.log(Level.INFO, logMsg)
-    val Initializer = new Initializer(config, disableValidations = false, isSnap = false, initDB = true)
 
     if (getConfig.debugFlag) println(logMsg)
     val instanceDetailsDF = config.cloudProvider match {

@@ -9,7 +9,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.util.SerializableConfiguration
 
 class InitializerFunctionsDefault(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
-  extends InitializerFunctions (config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
+  extends Initializer(config, disableValidations)
     with SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -47,7 +47,7 @@ class InitializerFunctionsDefault(config: Config, disableValidations: Boolean, i
      *
      * @return
      */
-    override def initializeDatabase(): Database = {
+    def initializeDatabase(): Database = {
       // TODO -- Add metadata table
       // TODO -- refactor and clean up duplicity
       if (initDB) {
@@ -87,10 +87,4 @@ class InitializerFunctionsDefault(config: Config, disableValidations: Boolean, i
     }
 
 
-}
-
-object InitializerFunctionsDefault{
-  def apply(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean): InitializerFunctions= {
-    new InitializerFunctionsDefault(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
-  }
 }
