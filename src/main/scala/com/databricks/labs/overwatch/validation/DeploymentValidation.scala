@@ -532,7 +532,7 @@ object DeploymentValidation extends SparkSessionWrapper {
     if (config.eh_name.isEmpty)
       throw new BadConfigException("eh_name should be nonempty, please check the configuration.")
 
-    val isAAD = if (config.aad_client_id.nonEmpty && //Check the mandatory field for AAD connection.
+    return if (config.aad_client_id.nonEmpty && //Check the mandatory field for AAD connection.
       config.aad_tenant_id.nonEmpty &&
       config.aad_client_secret_key.nonEmpty &&
       config.eh_conn_string.nonEmpty) {
