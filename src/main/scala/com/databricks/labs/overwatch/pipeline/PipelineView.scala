@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, Helpers}
 import org.apache.log4j.{Level, Logger}
 
 case class PipelineView(name: String,
@@ -52,7 +52,7 @@ case class PipelineView(name: String,
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
       try {
-        spark.sessionState.catalogManager.setCurrentCatalog(config.consumerCatalogName)
+        setCurrentCatalog(spark,config.consumerCatalogName)
         spark.sql(pubStatement)
       } catch {
         case e: Throwable =>

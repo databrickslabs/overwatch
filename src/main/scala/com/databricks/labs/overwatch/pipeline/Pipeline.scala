@@ -235,11 +235,11 @@ class Pipeline(
     if (getConfig.debugFlag) println(logMsg)
     val instanceDetailsDF = config.cloudProvider match {
       case "aws" =>
-        Initializer.Init.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
+        Initializer.loadLocalCSVResource(spark, "/AWS_Instance_Details.csv")
       case "azure" =>
-        Initializer.Init.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
+        Initializer.loadLocalCSVResource(spark, "/Azure_Instance_Details.csv")
       case "gcp" =>
-        Initializer.Init.loadLocalCSVResource(spark, "/Gcp_Instance_Details.csv")
+        Initializer.loadLocalCSVResource(spark, "/Gcp_Instance_Details.csv")
       case _ =>
         throw new IllegalArgumentException("Overwatch only supports cloud providers, AWS and Azure.")
     }
@@ -277,7 +277,7 @@ class Pipeline(
    */
   protected def initPipelineRun(): this.type = {
     logger.log(Level.INFO, "INIT: Pipeline Run")
-    spark.sessionState.catalogManager.setCurrentCatalog(config.etlCatalogName)
+    setCurrentCatalog(spark, config.etlCatalogName)
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(config.databaseName)
     val dbProperties = dbMeta.properties
     val overwatchSchemaVersion = dbProperties.getOrElse("SCHEMA", "BAD_SCHEMA")

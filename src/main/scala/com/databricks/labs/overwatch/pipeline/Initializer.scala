@@ -16,10 +16,8 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  val Init = InitializerFunctions(config, disableValidations, isSnap, initDB)
+//  val Init = InitializerFunctions(config, disableValidations, isSnap, initDB)
 
-
-//    getDeploymentClass(config.deploymentType.toLowerCase.trim)
 
   /**
    * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
@@ -44,7 +42,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
      * name for each workspace (i.e. workspaceName) to provide consistency across deployments.
      */
 
-    if (Init.isPVC && !config.isMultiworkspaceDeployment) Init.pvcOverrideOrganizationId()
+    if (isPVC && !config.isMultiworkspaceDeployment) pvcOverrideOrganizationId()
 
     // Set external optimize if customer specified otherwise use default
     config.setExternalizeOptimize(rawParams.externalizeOptimize)
@@ -55,23 +53,23 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     if (overwatchScope.head == "all") {
       config.setOverwatchScope(config.orderedOverwatchScope)
     } else {
-      config.setOverwatchScope(Init.validateScope(overwatchScope))
+      config.setOverwatchScope(validateScope(overwatchScope))
     }
 
     /** Retrieve raw token secret, validate it and add it to the config if valid */
     val tokenSecret = rawParams.tokenSecret
-    val validatedTokenSecret = Init.validateTokenSecret(tokenSecret)
+    val validatedTokenSecret = validateTokenSecret(tokenSecret)
 
     /** Build and validate workspace meta including API ENV */
     val rawApiEnv = config.buildApiEnv(validatedTokenSecret,rawParams.apiEnvConfig)
-    val validatedApiEnv = Init.validateApiEnv(rawApiEnv)
+    val validatedApiEnv = validateApiEnv(rawApiEnv)
     config.setApiEnv(validatedApiEnv)
 
     /** Validate and set the data target details */
     val rawDataTarget = rawParams.dataTarget.getOrElse(
       DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None)
     )
-    Init.validateAndSetDataTarget(rawDataTarget)
+    validateAndSetDataTarget(rawDataTarget)
 
 
     /** Set Databricks Contract Prices from Config */
@@ -86,7 +84,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     /** Validate and set Audit Log Configs */
     val rawAuditLogConfig = rawParams.auditLogConfig
-    val validatedAuditLogConfig = Init.validateAuditLogConfigs(rawAuditLogConfig)
+    val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig)
     config.setAuditLogConfig(validatedAuditLogConfig)
 
     // must happen AFTER data target validation
@@ -101,7 +99,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     // must happen AFTER data target is set validation since the etlDataPrefix must already be set in the config
     /** Validate and set Temp Working Dir */
     val rawTempWorkingDir = rawParams.tempWorkingDir
-    val validatedTempWorkingDir = Init.prepTempWorkingDir(rawTempWorkingDir)
+    val validatedTempWorkingDir = prepTempWorkingDir(rawTempWorkingDir)
     config.setTempWorkingDir(validatedTempWorkingDir)
 
     /** Set Max Days */
@@ -113,7 +111,7 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
 
     /** Validate and set Intelligent Scaling Params */
     val rawISConfig = rawParams.intelligentScaling
-    val validatedISConfig = Init.validateIntelligentScaling(rawISConfig)
+    val validatedISConfig = validateIntelligentScaling(rawISConfig)
     config.setIntelligentScaling(validatedISConfig)
 
     // as of 0711
@@ -123,14 +121,14 @@ class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, 
     this
   }
 
-//  private def initializeDatabase(): Database = {
-   override def initializeDatabase(): Database = {
-    if (initDB) {
-      Init.initializeDatabase()
-    } else {
-      Database(config)
-    }
-  }
+//   def initializeDatabase(): Database = {
+////   override def initializeDatabase(): Database = {
+//    if (initDB) {
+//      initializeDatabase()
+//    } else {
+//      Database(config)
+//    }
+//  }
 
 }
 

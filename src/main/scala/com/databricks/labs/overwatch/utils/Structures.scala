@@ -28,7 +28,31 @@ case class DataTarget(databaseName: Option[String],
                       databaseLocation: Option[String],
                       etlDataPathPrefix: Option[String],
                       consumerDatabaseName: Option[String] = None,
-                      consumerDatabaseLocation: Option[String] = None)
+                      consumerDatabaseLocation: Option[String] = None){
+  def getDatabaseName: String = {
+    if(databaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    databaseName.get.split("\\.").last
+  }
+
+  def getConsumerDatabaseName: String = {
+    if(consumerDatabaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    consumerDatabaseName.get.split("\\.").last
+  }
+
+  def getEtlCatalogName: String = {
+    if(databaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    databaseName.get.split("\\.").head
+  }
+
+  def getConsumerCatalogName: String = {
+    if(consumerDatabaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    consumerDatabaseName.get.split("\\.").head
+  }
+}
 
 case class DatabricksContractPrices(
                                      interactiveDBUCostUSD: Double = 0.55,

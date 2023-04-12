@@ -351,7 +351,7 @@ class Module(
   @throws(classOf[IllegalArgumentException])
   def execute(_etlDefinition: () => ETLDefinition): ModuleStatusReport = {
 //    _etlDefinition: ETLDefinition
-    spark.sessionState.catalogManager.setCurrentCatalog(config.etlCatalogName)
+    setCurrentCatalog(spark, config.etlCatalogName)
     if (config.disabledModules.contains(moduleId)) throw new ModuleDisabled(moduleId, s"MODULE DISABLED: $moduleId-$moduleName")
     optimizeShufflePartitions()
 

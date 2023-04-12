@@ -412,6 +412,7 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
      *
      * @return
      */
+//    def initializeDatabase(): Database = ???
     def initializeDatabase(): Database = {
       // TODO -- Add metadata table
       // TODO -- refactor and clean up duplicity

@@ -637,6 +637,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .filter(!'failed && 'withinSpecifiedTimeRange)
         .select('filename)
         .distinct
+      // If there are no bad records Helpers.pathExists will allow to read a empty path which cause issue in aws
+      // by creating an empty directory with name '*'. Helpers.pathPatternExists will help in avoid such situations
+      // by check the existence of a path with regex.
       if (Helpers.pathExists(badRecordsPath) && Helpers.pathPatternExists(s"${badRecordsPath}/*/*/")) {
         val badFiles = spark.read.format("json")
           .schema(Schema.badRecordsSchema)

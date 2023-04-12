@@ -21,28 +21,29 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   override private[overwatch] def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
-    val dbName = dataTarget.databaseName.getOrElse("overwatch").split("\\.").last
+    val dbName = dataTarget.getDatabaseName
     val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
     val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
     val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
     val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
-    val etlCatalogName = dataTarget.databaseName.get.split("\\.").head
-    val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName).split("\\.").last
+    val etlCatalogName = dataTarget.getEtlCatalogName
+    val consumerDBName = dataTarget.getConsumerDatabaseName
     val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
     val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
-    val consumerCatalogName = dataTarget.consumerDatabaseName.getOrElse(dbName).split("\\.").head
+    val consumerCatalogName = dataTarget.getConsumerCatalogName
     var switch = true
 
+    import spark.implicits._
 
-    spark.sessionState.catalogManager.setCurrentCatalog(etlCatalogName)
+    setCurrentCatalog(spark,etlCatalogName)
     if (spark.catalog.databaseExists(dbName)) {
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
       val dbProperties = dbMeta.properties
 
       val existingDBLocation = spark.sql(s"describe database ${dbName}")
         .where("database_description_item ='RootLocation'")
-        .select("database_description_value").collect.map(_.getString(0)).head.toString
-      //        .map(f=>f.getString(0)).collect.head.toString
+        .select("database_description_value").as[String].collect.headOption
+        .getOrElse(throw new Exception("ETL DB location does exist"))
 
       if (existingDBLocation != dbLocation) {
         switch = false
@@ -83,14 +84,17 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
      * since there's no chance of data corruption given only creating views. This section needs to be refactored
      * to remove duplicity while still enabling control between which checks are done for which DataTarget.
      */
-    spark.sessionState.catalogManager.setCurrentCatalog(consumerCatalogName)
+    setCurrentCatalog(spark, consumerCatalogName)
     if (consumerDBName != dbName) { // separate consumer db
       if (spark.catalog.databaseExists(consumerDBName)) {
         val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
 
         val existingConsumerDBLocation = spark.sql(s"describe database ${consumerDBName}")
           .where("database_description_item ='RootLocation'")
-          .select("database_description_value").collect.map(_.getString(0)).head.toString
+          .select("database_description_value").as[String].collect
+          .headOption.getOrElse(throw new Exception("Consumer DB Location does not exists"))
+
+//          .collect.map(_.getString(0)).head
 
         if (existingConsumerDBLocation != consumerDBLocation) { // separated consumer DB but same location FAIL
           switch = false
@@ -122,7 +126,7 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
         throw new BadConfigException("Consumer DB cannot match ETL DB Name while having different locations.")
       }
     }
-    spark.sessionState.catalogManager.setCurrentCatalog(etlCatalogName)
+    setCurrentCatalog(spark, etlCatalogName)
     switch
   }
     /**
@@ -133,19 +137,19 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       // Validate data Target
       // todo UC enablement
 
-      val etlCatalogName = dataTarget.databaseName.get.split("\\.").head
-      spark.sessionState.catalogManager.setCurrentCatalog(etlCatalogName)
+      val etlCatalogName = dataTarget.getEtlCatalogName
+      setCurrentCatalog(spark, etlCatalogName)
       if (!disableValidations) dataTargetIsValid(dataTarget)
 
       // If data target is valid get db name and location and set it
-      val dbName = dataTarget.databaseName.get.split("\\.").last
+      val dbName = dataTarget.getDatabaseName
       val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
       val dataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
 
 
-      val consumerDBName = dataTarget.consumerDatabaseName.getOrElse(dbName).split("\\.").last
+      val consumerDBName = dataTarget.getConsumerDatabaseName
       val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
-      val consumerCatalogName = dataTarget.consumerDatabaseName.get.split("\\.").head
+      val consumerCatalogName = dataTarget.getConsumerCatalogName
 
       config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
       config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)
@@ -164,40 +168,41 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
     override def initializeDatabase(): Database = {
       // TODO -- Add metadata table
       // TODO -- refactor and clean up duplicity
-      val dbMeta = if (isSnap) {
-        logger.log(Level.INFO, "Initializing Snap Database")
-        "OVERWATCHDB='TRUE',SNAPDB='TRUE'"
-      } else {
-        logger.log(Level.INFO, "Initializing ETL Database")
-        "OVERWATCHDB='TRUE'"
-      }
-      if (!spark.catalog.databaseExists(s"${config.etlCatalogName}.${config.databaseName}")) {
-        logger.log(Level.INFO, s"Database ${config.databaseName} not found, at " +
-          s"${config.databaseLocation}.")
-        val createDBIfNotExists = s"create database if not exists ${config.etlCatalogName}.${config.databaseName} managed location '" +
+      if (initDB) {
+        val dbMeta = if (isSnap) {
+          logger.log(Level.INFO, "Initializing Snap Database")
+          "OVERWATCHDB='TRUE',SNAPDB='TRUE'"
+        } else {
+          logger.log(Level.INFO, "Initializing ETL Database")
+          "OVERWATCHDB='TRUE'"
+        }
+        if (!spark.catalog.databaseExists(s"${config.etlCatalogName}.${config.databaseName}")) {
+          logger.log(Level.INFO, s"Database ${config.databaseName} not found, at " +
+            s"${config.databaseLocation}.")
+          val createDBIfNotExists = s"create database if not exists ${config.etlCatalogName}.${config.databaseName} managed location '" +
             s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
 
-        throw new BadConfigException(s"etlDatabase - ${config.databaseName} not found in catalog ${config.etlCatalogName}. " +
-          s"Please create etlDatabase before executing the Overwatch job with this script - ${createDBIfNotExists}")
-      } else {
-        // TODO -- get schema version of each table and perform upgrade if necessary
-        val alterDbPropertiesStatement = s"alter database ${config.databaseName} set DBPROPERTIES ($dbMeta,'SCHEMA'=${config.overwatchSchemaVersion})"
-        spark.sql(alterDbPropertiesStatement)
-        logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
-      }
+          throw new BadConfigException(s"etlDatabase - ${config.databaseName} not found in catalog ${config.etlCatalogName}. " +
+            s"Please create etlDatabase before executing the Overwatch job with this script - ${createDBIfNotExists}")
+        } else {
+          // TODO -- get schema version of each table and perform upgrade if necessary
+          val alterDbPropertiesStatement = s"alter database ${config.databaseName} set DBPROPERTIES ($dbMeta,'SCHEMA'=${config.overwatchSchemaVersion})"
+          spark.sql(alterDbPropertiesStatement)
+          logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
+        }
 
-      // Create consumer database if one is configured
-      if (config.consumerDatabaseName != config.databaseName) {
-        logger.log(Level.INFO, "Initializing Consumer Database")
-        if (!spark.catalog.databaseExists(s"${config.consumerCatalogName}.${config.consumerDatabaseName}")) {
-          val createConsumerDBSTMT = s"create database if not exists ${config.consumerCatalogName}.${config.consumerDatabaseName} " +
-            s"managed location '${config.consumerDatabaseLocation}'"
+        // Create consumer database if one is configured
+        if (config.consumerDatabaseName != config.databaseName) {
+          logger.log(Level.INFO, "Initializing Consumer Database")
+          if (!spark.catalog.databaseExists(s"${config.consumerCatalogName}.${config.consumerDatabaseName}")) {
+            val createConsumerDBSTMT = s"create database if not exists ${config.consumerCatalogName}.${config.consumerDatabaseName} " +
+              s"managed location '${config.consumerDatabaseLocation}'"
 
-          throw new BadConfigException(s"consumerDatabase - ${config.consumerDatabaseName} not found in catalog - ${config.consumerCatalogName}." +
-            s" Please create consumerDatabase before executing the Overwatch job with this script - ${createConsumerDBSTMT}")
+            throw new BadConfigException(s"consumerDatabase - ${config.consumerDatabaseName} not found in catalog - ${config.consumerCatalogName}." +
+              s" Please create consumerDatabase before executing the Overwatch job with this script - ${createConsumerDBSTMT}")
+          }
         }
       }
-
       Database(config)
     }
 

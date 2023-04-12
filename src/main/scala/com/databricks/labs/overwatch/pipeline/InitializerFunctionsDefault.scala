@@ -50,40 +50,43 @@ class InitializerFunctionsDefault(config: Config, disableValidations: Boolean, i
     override def initializeDatabase(): Database = {
       // TODO -- Add metadata table
       // TODO -- refactor and clean up duplicity
-      val dbMeta = if (isSnap) {
-        logger.log(Level.INFO, "Initializing Snap Database")
-        "OVERWATCHDB='TRUE',SNAPDB='TRUE'"
-      } else {
-        logger.log(Level.INFO, "Initializing ETL Database")
-        "OVERWATCHDB='TRUE'"
-      }
-      if (!spark.catalog.databaseExists(config.databaseName)) {
-        logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
-          s"${config.databaseLocation}.")
-        val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
+      if (initDB) {
+        val dbMeta = if (isSnap) {
+          logger.log(Level.INFO, "Initializing Snap Database")
+          "OVERWATCHDB='TRUE',SNAPDB='TRUE'"
+        } else {
+          logger.log(Level.INFO, "Initializing ETL Database")
+          "OVERWATCHDB='TRUE'"
+        }
+        if (!spark.catalog.databaseExists(config.databaseName)) {
+          logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
+            s"${config.databaseLocation}.")
+          val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
             s"${config.databaseLocation}' WITH DBPROPERTIES ($dbMeta,SCHEMA=${config.overwatchSchemaVersion})"
 
-        spark.sql(createDBIfNotExists)
-        logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
-      } else {
-        // TODO -- get schema version of each table and perform upgrade if necessary
-        logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
-      }
+          spark.sql(createDBIfNotExists)
+          logger.log(Level.INFO, s"Successfully created database. $createDBIfNotExists")
+        } else {
+          // TODO -- get schema version of each table and perform upgrade if necessary
+          logger.log(Level.INFO, s"Database ${config.databaseName} already exists, using append mode.")
+        }
 
-      // Create consumer database if one is configured
-      if (config.consumerDatabaseName != config.databaseName) {
-        logger.log(Level.INFO, "Initializing Consumer Database")
-        if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
-          val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
-            s"location '${config.consumerDatabaseLocation}'"
+        // Create consumer database if one is configured
+        if (config.consumerDatabaseName != config.databaseName) {
+          logger.log(Level.INFO, "Initializing Consumer Database")
+          if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
+            val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
+              s"location '${config.consumerDatabaseLocation}'"
 
-          spark.sql(createConsumerDBSTMT)
-          logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+            spark.sql(createConsumerDBSTMT)
+            logger.log(Level.INFO, s"Successfully created database. $createConsumerDBSTMT")
+          }
         }
       }
-
       Database(config)
     }
+
+
 }
 
 object InitializerFunctionsDefault{

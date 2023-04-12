@@ -183,7 +183,7 @@ object Helpers extends SparkSessionWrapper {
   }
 
   /**
-   * Check whether a path with a regex pattern exists
+   * Check the existence of a path. This input path can also be a regular expression.
    *
    * @param name file/directory name as a regex
    * @return
@@ -577,33 +577,34 @@ object Helpers extends SparkSessionWrapper {
    * @return
    */
   def getWorkspaceByDatabase(
-//                              etlDB: String,
-                              db: String,
+                              etlDB: String,
                               organization_id: Option[String] = None,
                               apiUrl: Option[String] = None,
                               successfullOnly: Boolean = true,
                               disableValidations: Boolean = false
                             ): Workspace = {
     // verify database exists
-    val initialCatalog = spark.sessionState.catalogManager.currentCatalog.name()
-    val etlDB = if(db.contains(".")){
-      spark.sessionState.catalogManager.setCurrentCatalog(db.split("\\.").head)
-      db.split("\\.").last
-    } else db
+    val initialCatalog = getCurrentCatalogName(spark)
+      val etlDBWithOutCatalog = if(etlDB.contains(".")){
+        setCurrentCatalog(spark, etlDB.split("\\.").head)
+      etlDB.split("\\.").last
+    } else etlDB
 
-    assert(spark.catalog.databaseExists(etlDB), s"The database provided, $etlDB, does not exist.")
-    val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
+    assert(spark.catalog.databaseExists(etlDBWithOutCatalog),
+      s"The database provided, $etlDBWithOutCatalog, does not exist.")
+    val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDBWithOutCatalog)
     val dbProperties = dbMeta.properties
     val isRemoteWorkspace = organization_id.nonEmpty
 
     // verify database is owned and managed by Overwatch
-    assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided, $etlDB, is not an Overwatch managed Database. Please provide an Overwatch managed database")
+    assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided," +
+      s" $etlDBWithOutCatalog, is not an Overwatch managed Database. Please provide an Overwatch managed database")
     val workspaceID = if (isRemoteWorkspace) organization_id.get else Initializer.getOrgId
 
     val statusFilter = if (successfullOnly) 'status === "SUCCESS" else lit(true)
 
     val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
-    val testConfig = spark.table(s"${etlDB}.pipeline_report")
+    val testConfig = spark.table(s"${etlDBWithOutCatalog}.pipeline_report")
       .filter(statusFilter)
       .withColumn("rnk", rank().over(latestConfigByOrg))
       .withColumn("rn", row_number().over(latestConfigByOrg))
@@ -630,7 +631,7 @@ object Helpers extends SparkSessionWrapper {
     if (isRemoteWorkspace && workspace.getConfig.auditLogConfig.rawAuditPath.isEmpty) {
       workspace.getConfig.setCloudProvider("azure")
     }
-    spark.sessionState.catalogManager.setCurrentCatalog(initialCatalog)
+    setCurrentCatalog(spark, initialCatalog)
     workspace
   }
 
@@ -907,6 +908,5 @@ object Helpers extends SparkSessionWrapper {
     rollbackTargetToTimestamp(targetsToRollback, dryRun)
 
   }
-
 
 }
