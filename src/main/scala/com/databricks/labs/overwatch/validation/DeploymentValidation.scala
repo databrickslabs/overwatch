@@ -2,12 +2,14 @@ package com.databricks.labs.overwatch.validation
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.ApiCallV2
+import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.{Initializer, Pipeline, PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.validation.{Rule, RuleSet}
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.Trigger
@@ -373,11 +375,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         )
       case "azure" =>
         validateEventHub(
-          config.workspace_id,
-          config.secret_scope,
-          config.eh_scope_key,
-          config.eh_name,
-          config.output_path)
+          config)
     }
 
   }
@@ -467,59 +465,71 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
   /**
-   * Performs validation of event hub data for Azure
+   * Consumes the data from Event Hub.
    *
-   * @param workspace_id
-   * @param scope
-   * @param key
-   * @param ehName
+   * @param config
+   * @param isAAD             If true it will use aad to authenticate and consume the data.
+   * @param tempPersistDFPath Path in which consumed events will be stored.
+   * @param tempPersistChk    Used for EH checkpoint.
    */
-  private def validateEventHub(
-                                workspace_id: String,
-                                scope: String,
-                                optKey: Option[String],
-                                optEHName: Option[String],
-                                outputPath: String
-                              ): DeploymentValidationReport = {
-    if (optKey.isEmpty || optEHName.isEmpty) throw new BadConfigException("When cloud is Azure, the eh_name and " +
-      "eh_scope_key are required fields but they were empty in the config")
-    // using gets here because if they were empty from above check, exception would already be thrown
-    val key = optKey.get
-    val ehName = optEHName.get
-    val testDetails = s"""Connectivity test with ehName:${ehName} scope:${scope} SecretKey_DBPAT:${key}"""
-    try {
-      import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
-      val ehConn = dbutils.secrets.get(scope = scope, key)
-      //TODO limit 10 check aws
-      //pull 10 milit from aws audit log and grab org id
-      val connectionString = ConnectionStringBuilder(
-        PipelineFunctions.parseAndValidateEHConnectionString(ehConn, false))
-        .setEventHubName(ehName)
-        .build
+  private def consumeEHData(config: MultiWorkspaceConfig, isAAD: Boolean, tempPersistDFPath: String, tempPersistChk: String): Unit = {
 
-      val ehConf = EventHubsConf(connectionString)
-        .setMaxEventsPerTrigger(5000)
-        .setStartingPosition(EventPosition.fromStartOfStream)
-
-      val rawEHDF = spark.readStream
+    val ehConn = if (isAAD) config.eh_conn_string.get else dbutils.secrets.get(scope = config.secret_scope, config.eh_scope_key.get)
+    val connectionString = ConnectionStringBuilder(
+      PipelineFunctions.parseAndValidateEHConnectionString(ehConn, false))
+      .setEventHubName(config.eh_name.get)
+      .build
+    val ehConf = EventHubsConf(connectionString)
+      .setMaxEventsPerTrigger(5000)
+      .setStartingPosition(EventPosition.fromStartOfStream)
+    val rawEHDF = if (isAAD) {
+      val aadParams = Map("aad_tenant_id" -> config.aad_tenant_id.get,
+        "aad_client_id" -> config.aad_client_id.get,
+        "aad_client_secret" -> dbutils.secrets.get(scope = config.secret_scope, key = config.aad_client_secret_key.get),
+        "aad_authority_endpoint" -> config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/"))
+      spark.readStream
+        .format("eventhubs")
+        .options(AadAuthInstance.addAadAuthParams(ehConf, aadParams).toMap)
+        .load()
+    } else {
+      spark.readStream
         .format("eventhubs")
         .options(ehConf.toMap)
         .load()
-        .withColumn("deserializedBody", 'body.cast("string"))
+    }
+    rawEHDF
+      .withColumn("deserializedBody", 'body.cast("string"))
+      .writeStream
+      .trigger(Trigger.Once)
+      .option("checkpointLocation", tempPersistChk)
+      .format("delta")
+      .start(tempPersistDFPath)
+      .awaitTermination()
+
+  }
+
+
+  /**
+   * Performs validation of event hub data for Azure
+   *
+   * @param config
+   */
+  private def validateEventHub(
+                                config: MultiWorkspaceConfig
+                              ): DeploymentValidationReport = {
+
+    val isAAD = config.aad_client_id.nonEmpty && config.aad_tenant_id.nonEmpty && config.aad_client_secret_key.nonEmpty
+    if (config.eh_scope_key.isEmpty && config.eh_name.isEmpty && !isAAD) throw new BadConfigException("When cloud is Azure, the eh_name and " +
+      "eh_scope_key are required fields but they were empty in the config. For AAD clinetID,tenentID and clientSecretKey are required fields but they were empty in the config")
+    // using gets here because if they were empty from above check, exception would already be thrown
+    val ehName = config.eh_name.get
+    val testDetails = s"""Connectivity test for ehName:${ehName} """
+    try {
       val timestamp = LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli
-      val tmpPersistDFPath = s"""$outputPath/${ehName.replaceAll("-", "")}/$timestamp/ehTest/rawDataDF"""
-      val tempPersistChk = s"""$outputPath/${ehName.replaceAll("-", "")}/$timestamp/ehTest/rawChkPoint"""
-
-
-      rawEHDF
-        .writeStream
-        .trigger(Trigger.Once)
-        .option("checkpointLocation", tempPersistChk)
-        .format("delta")
-        .start(tmpPersistDFPath)
-        .awaitTermination()
-
-      val rawBodyLookup = spark.read.format("delta").load(tmpPersistDFPath)
+      val tempPersistDFPath = s"""${config.output_path}/${config.eh_name.get.replaceAll("-", "")}/$timestamp/ehTest/rawDataDF"""
+      val tempPersistChk = s"""${config.output_path}/${config.eh_name.get.replaceAll("-", "")}/$timestamp/ehTest/rawChkPoint"""
+      consumeEHData(config, isAAD, tempPersistDFPath, tempPersistChk)
+      val rawBodyLookup = spark.read.format("delta").load(tempPersistDFPath)
       val schemaBuilders = rawBodyLookup
         .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"))
@@ -528,7 +538,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .withColumn("organization_id", lit("2222170229861029"))
+        .withColumn("organization_id", lit(config.workspace_id))
         .select('resourceId, 'category, 'version, 'timestamp, 'date, 'properties, 'organization_id, 'identity.alias("userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
 
@@ -540,7 +550,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .withColumn("organization_id", lit(workspace_id))
+        .withColumn("organization_id", lit(config.workspace_id))
         .select('resourceId, 'category, 'version, 'timestamp, 'date, 'properties, 'organization_id, 'identity.alias("userIdentity"))
         .withColumn("userIdentity", structFromJson(spark, schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
@@ -550,34 +560,43 @@ object DeploymentValidation extends SparkSessionWrapper {
         .drop("response")
         .verifyMinimumSchema(Schema.auditMasterSchema)
 
-      dbutils.fs.rm(s"""${tmpPersistDFPath}""", true)
+      dbutils.fs.rm(s"""${tempPersistDFPath}""", true)
       dbutils.fs.rm(s"""${tempPersistChk}""", true)
 
       DeploymentValidationReport(true,
         getSimpleMsg("Validate_EventHub"),
         testDetails,
         Some("SUCCESS"),
-        Some(workspace_id)
+        Some(config.workspace_id)
       )
     } catch {
       case exception: Exception =>
-        val msg = s"""Unable to retrieve data from ehName:${ehName} scope:${scope} eh_scope_key:${key}"""
+        val msg = if (isAAD) {
+          s"""Using AAD unable to retrieve data from ehName:${ehName}
+             | eh_conn_string:${config.eh_conn_string}
+             | aad_client_id:${config.aad_client_id}
+             | aad_tenant_id:${config.aad_tenant_id}
+             | aad_client_secret_key:${config.aad_client_secret_key}""".stripMargin
+        }
+        else {
+          s"""Unable to retrieve data from ehName:${ehName} scope:${config.secret_scope} eh_scope_key:${config.eh_scope_key.get}"""
+        }
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
         DeploymentValidationReport(false,
           getSimpleMsg("Validate_EventHub"),
           testDetails,
           Some(fullMsg),
-          Some(workspace_id)
+          Some(config.workspace_id)
         )
     }
 
   }
 
 
-
   /**
    * Transforms output of the rules engine to DeploymentValidationReport
+   *
    * @param ruleSet
    */
   private def validateRuleAndUpdateStatus(ruleSet: RuleSet,parallelism: Int): ArrayBuffer[DeploymentValidationReport] = {
