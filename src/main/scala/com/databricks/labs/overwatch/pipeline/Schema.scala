@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import org.apache.log4j.Logger
-import org.apache.spark.sql.types.{StructField, _}
+import org.apache.spark.sql.types._
 
 /**
  * The purpose of this Object is to validate that AT LEAST the columns required for ETL are present. Furthermore,
