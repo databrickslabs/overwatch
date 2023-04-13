@@ -296,8 +296,6 @@ trait InitializerFunctions
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
       val dbProperties = dbMeta.properties
       val existingDBLocation = dbMeta.locationUri.toString
-      println(s"existingDBLocation-------${existingDBLocation}")
-      println(s"dbLocation-------${dbLocation}")
       if (existingDBLocation != dbLocation) {
         switch = false
         throw new BadConfigException(s"The DB: $dbName exists " +

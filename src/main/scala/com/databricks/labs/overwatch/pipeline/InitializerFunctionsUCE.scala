@@ -21,16 +21,16 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   override private[overwatch] def dataTargetIsValid(dataTarget: DataTarget): Boolean = {
-    val dbName = dataTarget.getDatabaseName
+    val dbName = dataTarget.deriveDatabaseName
     val rawDBLocation = dataTarget.databaseLocation.getOrElse(s"/user/hive/warehouse/${dbName}.db")
     val dbLocation = PipelineFunctions.cleansePathURI(rawDBLocation)
     val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
     val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
-    val etlCatalogName = dataTarget.getEtlCatalogName
-    val consumerDBName = dataTarget.getConsumerDatabaseName
+    val etlCatalogName = dataTarget.deriveEtlCatalogName
+    val consumerDBName = dataTarget.deriveConsumerDatabaseName
     val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
     val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
-    val consumerCatalogName = dataTarget.getConsumerCatalogName
+    val consumerCatalogName = dataTarget.deriveConsumerCatalogName
     var switch = true
 
     import spark.implicits._
@@ -40,19 +40,6 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
       val dbProperties = dbMeta.properties
 
-      val existingDBLocation = spark.sql(s"describe database ${dbName}")
-        .where("database_description_item ='RootLocation'")
-        .select("database_description_value").as[String].collect.headOption
-        .getOrElse(throw new Exception("ETL DB location does exist"))
-
-      if (existingDBLocation != dbLocation) {
-        switch = false
-        throw new BadConfigException(s"The DB: $dbName exists " +
-          s"at location $existingDBLocation which is different than the location entered in the config. Ensure " +
-          s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
-          s"dbfs:/...")
-      }
-
       val isOverwatchDB = dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE"
       val tableList = spark.catalog.listTables(dbName)
       if (!isOverwatchDB && !tableList.isEmpty) {
@@ -60,18 +47,8 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
         throw new BadConfigException(s"The Database: $dbName was not created by overwatch. Specify a " +
           s"database name that does not exist or was created by Overwatch.")
       }
-    } else { // Database does not exist
-      if (!Helpers.pathExists(dbLocation)) { // db path does not already exist -- valid
-        logger.log(Level.INFO, s"Target location " +
-          s"is valid: will create database: $dbName at location: ${dbLocation}")
-      } else { // db does not exist AND path already exists
-        switch = false
-        throw new BadConfigException(
-          s"""The target database location: ${dbLocation}
-          already exists. Please specify a path that doesn't yet exist. If attempting to launch Overwatch on a secondary
-          workspace, please choose a unique location for the database on this workspace and use the "etlDataPathPrefix"
-          to reference the shared physical data location.""".stripMargin)
-      }
+    } else {
+      throw new BadConfigException(s"etlDatabase - ${dbName} not found in catalog ${etlCatalogName}.")
     }
 
     if (Helpers.pathExists(etlDataLocation)) println(s"\n\nWARNING!! The ETL Data Prefix exists. Verify that only " +
@@ -86,44 +63,13 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
      */
     setCurrentCatalog(spark, consumerCatalogName)
     if (consumerDBName != dbName) { // separate consumer db
-      if (spark.catalog.databaseExists(consumerDBName)) {
-        val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
-
-        val existingConsumerDBLocation = spark.sql(s"describe database ${consumerDBName}")
-          .where("database_description_item ='RootLocation'")
-          .select("database_description_value").as[String].collect
-          .headOption.getOrElse(throw new Exception("Consumer DB Location does not exists"))
-
-//          .collect.map(_.getString(0)).head
-
-        if (existingConsumerDBLocation != consumerDBLocation) { // separated consumer DB but same location FAIL
-          switch = false
-          throw new BadConfigException(s"The Consumer DB: $consumerDBName exists" +
-            s"at location $existingConsumerDBLocation which is different than the location entered in the config. Ensure" +
-            s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
-            s"dbfs:/...")
-        }
-      } else { // consumer DB is different from ETL DB AND db does not exist
-        if (!Helpers.pathExists(consumerDBLocation)) { // consumer db path is empty
-          logger.log(Level.INFO, s"Consumer DB location " +
-            s"is valid: will create database: $consumerDBName at location: ${consumerDBLocation}")
-        } else {
-          switch = false
-          throw new BadConfigException(
-            s"""The consumer database location: ${dbLocation}
-          already exists. Please specify a path that doesn't yet exist. If attempting to launch Overwatch on a secondary
-          workspace, please choose a unique location for the database on this workspace.""".stripMargin)
-        }
+      if (!spark.catalog.databaseExists(consumerDBName)) {
+        throw new BadConfigException(s"consumerDatabase - ${consumerDBName} not found in catalog ${consumerCatalogName}.")
       }
-
-      if (consumerDBLocation == dbLocation && consumerDBName != dbName) { // separate db AND same location ERROR
+    } else {
+      if (consumerDBName == dbName ) { // same db AND DIFFERENT location ERROR
         switch = false
-        throw new BadConfigException("Consumer DB Name cannot differ from ETL DB Name while having the same location.")
-      }
-    } else { // same consumer db as etl db
-      if (consumerDBName == dbName && consumerDBLocation != dbLocation) { // same db AND DIFFERENT location ERROR
-        switch = false
-        throw new BadConfigException("Consumer DB cannot match ETL DB Name while having different locations.")
+        throw new BadConfigException("Consumer DB cannot match ETL DB Name ")
       }
     }
     setCurrentCatalog(spark, etlCatalogName)
@@ -137,19 +83,21 @@ class InitializerFunctionsUCE(config: Config, disableValidations: Boolean, isSna
       // Validate data Target
       // todo UC enablement
 
-      val etlCatalogName = dataTarget.getEtlCatalogName
+      val etlCatalogName = dataTarget.deriveEtlCatalogName
       setCurrentCatalog(spark, etlCatalogName)
       if (!disableValidations) dataTargetIsValid(dataTarget)
 
       // If data target is valid get db name and location and set it
-      val dbName = dataTarget.getDatabaseName
-      val dbLocation = dataTarget.databaseLocation.getOrElse(s"dbfs:/user/hive/warehouse/${dbName}.db")
+      val dbName = dataTarget.deriveDatabaseName
+      // Setting dbLocation as empty for UCE
+      val dbLocation = ""
       val dataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
 
 
-      val consumerDBName = dataTarget.getConsumerDatabaseName
-      val consumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
-      val consumerCatalogName = dataTarget.getConsumerCatalogName
+      val consumerDBName = dataTarget.deriveConsumerDatabaseName
+      // Setting consumer DB Location as empty for UCE
+      val consumerDBLocation = ""
+      val consumerCatalogName = dataTarget.deriveConsumerCatalogName
 
       config.setDatabaseNameAndLoc(dbName, dbLocation, dataLocation)
       config.setConsumerDatabaseNameandLoc(consumerDBName, consumerDBLocation)

@@ -29,25 +29,25 @@ case class DataTarget(databaseName: Option[String],
                       etlDataPathPrefix: Option[String],
                       consumerDatabaseName: Option[String] = None,
                       consumerDatabaseLocation: Option[String] = None){
-  def getDatabaseName: String = {
+   private[overwatch] def deriveDatabaseName: String = {
     if(databaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
       "It should be either 0 or 1" )
     databaseName.get.split("\\.").last
   }
 
-  def getConsumerDatabaseName: String = {
+  private[overwatch] def deriveConsumerDatabaseName: String = {
     if(consumerDatabaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
       "It should be either 0 or 1" )
     consumerDatabaseName.get.split("\\.").last
   }
 
-  def getEtlCatalogName: String = {
+  private[overwatch] def deriveEtlCatalogName: String = {
     if(databaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
       "It should be either 0 or 1" )
     databaseName.get.split("\\.").head
   }
 
-  def getConsumerCatalogName: String = {
+  private[overwatch] def deriveConsumerCatalogName: String = {
     if(consumerDatabaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
       "It should be either 0 or 1" )
     consumerDatabaseName.get.split("\\.").head

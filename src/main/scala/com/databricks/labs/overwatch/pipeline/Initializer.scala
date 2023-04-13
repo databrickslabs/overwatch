@@ -123,7 +123,7 @@ object Initializer extends SparkSessionWrapper {
                         disableValidations: Boolean = false,
                         isSnap: Boolean = false,
                         initializeDatabase: Boolean = true): Initializer = {
-    config.deploymentType match {
+    config.deploymentType.toLowerCase.trim match {
       case "uce" => new InitializerFunctionsUCE(config, disableValidations, isSnap, initializeDatabase)
       case "default" => new InitializerFunctionsDefault(config, disableValidations, isSnap, initializeDatabase)
       case _ => throw new UnsupportedOperationException(s"The Deployment Type for ${config.deploymentType} is not supported.")

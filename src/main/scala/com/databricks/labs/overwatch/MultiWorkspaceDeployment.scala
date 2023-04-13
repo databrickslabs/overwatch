@@ -427,6 +427,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     Future {
       val threadDeploymentReport = ArrayBuffer[MultiWSDeploymentReport]()
       val deploymentId = deploymentParams.deploymentId
+      println(s"deploymentParams.args.toString-------${deploymentParams.args}")
       val workspace = Initializer(deploymentParams.args,
         apiURL = Some(deploymentParams.apiUrl),
         organizationID = Some(deploymentParams.workspaceId))
