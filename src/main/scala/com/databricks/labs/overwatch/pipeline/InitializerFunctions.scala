@@ -173,7 +173,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val rawETLDataLocation = dataTarget.etlDataPathPrefix.getOrElse(dbLocation)
       val etlDataLocation = PipelineFunctions.cleansePathURI(rawETLDataLocation)
       var switch = true
-      if (spark.catalog.databaseExists(dbName)) {
+      val condition = Helpers.checkDatabaseExist(dbName)
+      if (condition) {
         val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(dbName)
         val dbProperties = dbMeta.properties
         val existingDBLocation = dbMeta.locationUri.toString
@@ -184,7 +185,6 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
             s"the DBName is unique and the locations match. The location must be a fully qualified URI such as " +
             s"dbfs:/...")
         }
-
         val isOverwatchDB = dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE"
         if (!isOverwatchDB) {
           switch = false
@@ -219,7 +219,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       val rawConsumerDBLocation = dataTarget.consumerDatabaseLocation.getOrElse(s"/user/hive/warehouse/${consumerDBName}.db")
       val consumerDBLocation = PipelineFunctions.cleansePathURI(rawConsumerDBLocation)
       if (consumerDBName != dbName) { // separate consumer db
-        if (spark.catalog.databaseExists(consumerDBName)) {
+        val condition = Helpers.checkDatabaseExist(consumerDBName)
+        if (condition) {
           val consumerDBMeta = spark.sessionState.catalog.getDatabaseMetadata(consumerDBName)
           val existingConsumerDBLocation = consumerDBMeta.locationUri.toString
           if (existingConsumerDBLocation != consumerDBLocation) { // separated consumer DB but same location FAIL
@@ -435,7 +436,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
         logger.log(Level.INFO, "Initializing ETL Database")
         "OVERWATCHDB='TRUE'"
       }
-      if (!spark.catalog.databaseExists(config.databaseName)) {
+      val condition = Helpers.checkDatabaseExist(config.databaseName)
+      if (!condition) {
         logger.log(Level.INFO, s"Database ${config.databaseName} not found, creating it at " +
           s"${config.databaseLocation}.")
         val createDBIfNotExists = s"create database if not exists ${config.databaseName} location '" +
@@ -451,7 +453,8 @@ abstract class InitializerFunctions(config: Config, disableValidations: Boolean,
       // Create consumer database if one is configured
       if (config.consumerDatabaseName != config.databaseName) {
         logger.log(Level.INFO, "Initializing Consumer Database")
-        if (!spark.catalog.databaseExists(config.consumerDatabaseName)) {
+        val condition = Helpers.checkDatabaseExist(config.consumerDatabaseName)
+        if (!condition) {
           val createConsumerDBSTMT = s"create database if not exists ${config.consumerDatabaseName} " +
             s"location '${config.consumerDatabaseLocation}'"
 

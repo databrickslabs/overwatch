@@ -491,6 +491,15 @@ object Helpers extends SparkSessionWrapper {
     new URI(path)
   }
 
+  def checkDatabaseExist(dbName:String): Boolean = {
+    val condition = if (dbName.contains("-")  ){
+      spark.catalog.databaseExists(s"`${dbName}`")
+    }else{
+      spark.catalog.databaseExists(s"${dbName}")
+    }
+    condition
+  }
+
   /**
    * Helper private function for fastrm. Enables serialization
    * This version only supports dbfs but s3 is easy to add it just wasn't necessary at the time this was written
@@ -566,7 +575,8 @@ object Helpers extends SparkSessionWrapper {
                               disableValidations: Boolean = false
                             ): Workspace = {
     // verify database exists
-    assert(spark.catalog.databaseExists(etlDB), s"The database provided, $etlDB, does not exist.")
+    val condition = checkDatabaseExist(etlDB)
+    assert(condition, s"The database provided, $etlDB, does not exist.")
     val dbMeta = spark.sessionState.catalog.getDatabaseMetadata(etlDB)
     val dbProperties = dbMeta.properties
     val isRemoteWorkspace = organization_id.nonEmpty
@@ -745,7 +755,8 @@ object Helpers extends SparkSessionWrapper {
     b.refreshViews(workspacesAllowed)
     g.refreshViews(workspacesAllowed)
     if (workspacesAllowed.nonEmpty){
-      if (spark.catalog.databaseExists(etlDatabaseNameToCreate)) spark.sql(s"Drop Database ${etlDatabaseNameToCreate} cascade")
+      val condition = checkDatabaseExist(etlDatabaseNameToCreate)
+      if (condition) spark.sql(s"Drop Database ${etlDatabaseNameToCreate} cascade")
     }
     registrationReport
   }
