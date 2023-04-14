@@ -46,6 +46,9 @@ class Config() {
   private var _contractJobsLightDBUPrice: Double = _
   private var _isMultiworkspaceDeployment: Boolean = false
   private var _apiUrl: Option[String] = None
+  private var _deploymentType: String = _
+  private var _etlCatalogName: String = _
+  private var _consumerCatalogName: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -126,6 +129,14 @@ class Config() {
     )
   }
 
+  def deploymentType: String = _deploymentType
+
+//  def catalogName: String = _catalogName
+  def etlCatalogName: String = _etlCatalogName
+
+  def consumerCatalogName: String = _consumerCatalogName
+
+
   /**
    * OverwatchScope defines the modules active for the current run
    * Some have been disabled for the moment in a sprint to v1.0 release but this acts as the
@@ -201,7 +212,6 @@ class Config() {
     _initialWorkerCount = value
     this
   }
-
 
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
@@ -539,6 +549,17 @@ class Config() {
    */
   private[overwatch] def setBadRecordsPath(value: String): this.type = {
     _badRecordsPath = value
+    this
+  }
+
+  private[overwatch] def setDeploymentType(value: String): this.type = {
+    _deploymentType = value
+    this
+  }
+
+  private[overwatch] def setCatalogName(etlCatalogName: String, consumerCatalogName: String): this.type = {
+    _etlCatalogName = etlCatalogName
+    _consumerCatalogName = consumerCatalogName
     this
   }
 

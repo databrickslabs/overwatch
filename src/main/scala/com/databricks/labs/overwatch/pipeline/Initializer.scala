@@ -9,146 +9,14 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
-class Initializer(config: Config, disableValidations: Boolean, isSnap: Boolean, initDB: Boolean)
-  extends InitializerFunctions(config, disableValidations, isSnap, initDB)
+abstract class Initializer(config: Config, disableValidations: Boolean)
+  extends InitializerFunctions
     with SparkSessionWrapper {
 
-  private val logger: Logger = Logger.getLogger(this.getClass)
-
-  /**
-   * Convert the args brought in as JSON string into the paramters object "OverwatchParams".
-   * Validate the config and the environment readiness for the run based on the configs and environment state
-   *
-   * @param overwatchArgs JSON string of input args from input into main class.
-   * @return
-   */
-  private def validateAndRegisterArgs(overwatchArgs: String): this.type = {
-
-    /**
-     * Register custom deserializer to create OverwatchParams object
-     */
-    val paramModule: SimpleModule = new SimpleModule()
-      .addDeserializer(classOf[OverwatchParams], new ParamDeserializer)
-    val mapper: ObjectMapper with ScalaObjectMapper = (new ObjectMapper() with ScalaObjectMapper)
-      .registerModule(DefaultScalaModule)
-      .registerModule(paramModule)
-      .asInstanceOf[ObjectMapper with ScalaObjectMapper]
-
-    /**
-     * if isLocalTesting -- Allow for local testing
-     * Either all parameters can be hard coded in the config object or a mach args json string can be returned from
-     * the config object. Returning the config args is a more complete method for integration testing just be sure
-     * to hard code the configuration json string WITHOUT escaped parenthesis even though escaped are necessary
-     * when coming from Datbaricks jobs ui since it has to be escaped to go through the api calls.
-     *
-     * Otherwise -- read from the args passed in and serialize into OverwatchParams
-     */
-    logger.log(Level.INFO, "Validating Input Parameters")
-    val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
-
-
-    // Now that the input parameters have been parsed -- set them in the config
-    config.setInputConfig(rawParams)
-
-    // Add the workspace name (friendly) if provided by the customer
-    val overwatchFriendlyName = rawParams.workspace_name.getOrElse(config.organizationId)
-    config.setWorkspaceName(overwatchFriendlyName)
-
-    /**
-     * PVC: HARD OVERRIDE FOR PVC
-     * Each time PVC deploys a newer version the derived organization_id changes due to the load balancer id
-     * and/or URL to access the workspace changes. There are no identifiable, equal values that can be found
-     * between one deployment and the next. To resolve this, PVC customers will be REQUIRED to provide a canonical
-     * name for each workspace (i.e. workspaceName) to provide consistency across deployments.
-     */
-
-    if (Init.isPVC && !config.isMultiworkspaceDeployment) Init.pvcOverrideOrganizationId()
-
-    // Set external optimize if customer specified otherwise use default
-    config.setExternalizeOptimize(rawParams.externalizeOptimize)
-
-    /** Retrieve scope from user inputs, validate it, and add it to the config */
-    val overwatchScope = rawParams.overwatchScope.getOrElse(Seq("all"))
-
-    if (overwatchScope.head == "all") {
-      config.setOverwatchScope(config.orderedOverwatchScope)
-    } else {
-      config.setOverwatchScope(Init.validateScope(overwatchScope))
-    }
-
-    /** Retrieve raw token secret, validate it and add it to the config if valid */
-    val tokenSecret = rawParams.tokenSecret
-    val validatedTokenSecret = Init.validateTokenSecret(tokenSecret)
-
-    /** Build and validate workspace meta including API ENV */
-    val rawApiEnv = config.buildApiEnv(validatedTokenSecret,rawParams.apiEnvConfig)
-    val validatedApiEnv = Init.validateApiEnv(rawApiEnv)
-    config.setApiEnv(validatedApiEnv)
-
-    /** Validate and set the data target details */
-    val rawDataTarget = rawParams.dataTarget.getOrElse(
-      DataTarget(Some("overwatch"), Some("dbfs:/user/hive/warehouse/overwatch.db"), None)
-    )
-    Init.validateAndSetDataTarget(rawDataTarget)
-
-
-    /** Set Databricks Contract Prices from Config */
-    config.setContractInteractiveDBUPrice(rawParams.databricksContractPrices.interactiveDBUCostUSD)
-    config.setContractAutomatedDBUPrice(rawParams.databricksContractPrices.automatedDBUCostUSD)
-    config.setContractSQLComputeDBUPrice(rawParams.databricksContractPrices.sqlComputeDBUCostUSD)
-    config.setContractJobsLightDBUPrice(rawParams.databricksContractPrices.jobsLightDBUCostUSD)
-
-    // Set Primordial Date
-    config.setPrimordialDateString(rawParams.primordialDateString)
-
-    // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
-    /** Validate and set Audit Log Configs */
-    val rawAuditLogConfig = rawParams.auditLogConfig
-    val validatedAuditLogConfig = Init.validateAuditLogConfigs(rawAuditLogConfig)
-    config.setAuditLogConfig(validatedAuditLogConfig)
-
-    // must happen AFTER data target validation
-    // persistent location for corrupted spark event log files
-    /** Validate and set Bad Records Path */
-    val rawBadRecordsPath = rawParams.badRecordsPath
-    val badRecordsPath = rawBadRecordsPath.getOrElse(
-      s"${config.etlDataPathPrefix}/spark_events_bad_records_files/${config.organizationId}"
-    )
-    config.setBadRecordsPath(badRecordsPath)
-
-    // must happen AFTER data target is set validation since the etlDataPrefix must already be set in the config
-    /** Validate and set Temp Working Dir */
-    val rawTempWorkingDir = rawParams.tempWorkingDir
-    val validatedTempWorkingDir = Init.prepTempWorkingDir(rawTempWorkingDir)
-    config.setTempWorkingDir(validatedTempWorkingDir)
-
-    /** Set Max Days */
-    if (rawParams.maxDaysToLoad <= 0) {
-      throw new BadConfigException(s"maxDaysToLoad should be greater than 0.")
-    }else {
-      config.setMaxDays(rawParams.maxDaysToLoad)
-    }
-
-    /** Validate and set Intelligent Scaling Params */
-    val rawISConfig = rawParams.intelligentScaling
-    val validatedISConfig = Init.validateIntelligentScaling(rawISConfig)
-    config.setIntelligentScaling(validatedISConfig)
-
-    // as of 0711
-    val disabledModulesString = spark(globalSession = true).conf.getOption("overwatch.modules.disabled").getOrElse("0")
-    config.registerDisabledModules(disabledModulesString)
-
-    this
-  }
-
-  private def initializeDatabase(): Database = {
-    if (initDB) {
-      Init.initializeDatabase()
-    } else {
-      Database(config)
-    }
-  }
+  setConfig(config)
+  setDisableValidation(disableValidations)
 
 }
 
@@ -166,7 +34,9 @@ object Initializer extends SparkSessionWrapper {
     } else clusterOwnerOrgID
   }
 
-  private def initConfigState(debugFlag: Boolean,organizationID: Option[String],apiUrl: Option[String]): Config = {
+  private def initConfigState(debugFlag: Boolean,organizationID: Option[String],
+                              apiUrl: Option[String]
+                             ): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
 
@@ -189,6 +59,75 @@ object Initializer extends SparkSessionWrapper {
       config.setDebugFlag(debugFlag)
     }
     config
+  }
+
+  def deserializeArgs(overwatchArgs: String): OverwatchParams = {
+    val paramModule: SimpleModule = new SimpleModule()
+      .addDeserializer(classOf[OverwatchParams], new ParamDeserializer)
+    val mapper: ObjectMapper with ScalaObjectMapper = (new ObjectMapper() with ScalaObjectMapper)
+      .registerModule(DefaultScalaModule)
+      .registerModule(paramModule)
+      .asInstanceOf[ObjectMapper with ScalaObjectMapper]
+
+    /**
+     * if isLocalTesting -- Allow for local testing
+     * Either all parameters can be hard coded in the config object or a mach args json string can be returned from
+     * the config object. Returning the config args is a more complete method for integration testing just be sure
+     * to hard code the configuration json string WITHOUT escaped parenthesis even though escaped are necessary
+     * when coming from Datbaricks jobs ui since it has to be escaped to go through the api calls.
+     *
+     * Otherwise -- read from the args passed in and serialize into OverwatchParams
+     */
+    logger.log(Level.INFO, "Validating Input Parameters")
+    val rawParams = mapper.readValue[OverwatchParams](overwatchArgs)
+    rawParams
+  }
+
+  def getDeploymentType(overwatchParams: OverwatchParams): String ={
+    logger.debug(s"database ------ ${overwatchParams.dataTarget.get.databaseName.get}")
+    if (overwatchParams.dataTarget.get.databaseName.get.contains("."))
+       "uce"
+    else
+       "default"
+  }
+
+  /**
+   * Load text file
+   *
+   * @param path path to the local resource
+   * @return sequence of lines read from the file
+   */
+  def loadLocalResource(path: String): Seq[String] = {
+    val fileLocation = getClass.getResourceAsStream(path)
+    if (fileLocation == null)
+      throw new RuntimeException(s"There is no resource at path: $path")
+    val source = scala.io.Source.fromInputStream(fileLocation).mkString.stripMargin
+    source.split("\\r?\\n").filter(_.trim.nonEmpty).toSeq
+  }
+
+  /**
+   * Load database for cloud provider node details
+   *
+   * @param path path to the local resource
+   * @return
+   */
+  def loadLocalCSVResource(spark: SparkSession, path: String): DataFrame = {
+    import spark.implicits._
+
+    val csvData = loadLocalResource(path).toDS()
+    spark.read.option("header", "true").option("inferSchema", "true").csv(csvData).coalesce(1)
+  }
+
+  def buildInitializer(
+                        config: Config,
+                        disableValidations: Boolean = false,
+                        isSnap: Boolean = false,
+                        initializeDatabase: Boolean = true): Initializer = {
+    config.deploymentType.toLowerCase.trim match {
+      case "uce" => new InitializerFunctionsUCE(config, disableValidations, isSnap, initializeDatabase)
+      case "default" => new InitializerFunctionsDefault(config, disableValidations, isSnap, initializeDatabase)
+      case _ => throw new UnsupportedOperationException(s"The Deployment Type for ${config.deploymentType} is not supported.")
+    }
   }
 
   /**
@@ -253,9 +192,16 @@ object Initializer extends SparkSessionWrapper {
     val config = initConfigState(debugFlag,organizationID,apiURL)
 
     logger.log(Level.INFO, "Initializing Environment")
+    val overwatchParams = deserializeArgs(overwatchArgs)
 
-    val initializer = new Initializer(config, disableValidations, isSnap, initializeDatabase)
-      .validateAndRegisterArgs(overwatchArgs)
+    val deployment = getDeploymentType(overwatchParams)
+    logger.log(Level.INFO,s"deployment type is - ${deployment}")
+
+    config.setDeploymentType(deployment)
+
+    val initializer = buildInitializer(config, disableValidations, isSnap, initializeDatabase)
+
+    initializer.validateAndRegisterArgs(overwatchParams)
 
     val database = if (initializeDatabase) initializer.initializeDatabase() else Database(config)
 

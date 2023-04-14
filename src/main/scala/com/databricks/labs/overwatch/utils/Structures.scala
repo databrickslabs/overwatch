@@ -24,8 +24,35 @@ case class GangliaDetail()
 
 case class TokenSecret(scope: String, key: String)
 
-case class DataTarget(databaseName: Option[String], databaseLocation: Option[String], etlDataPathPrefix: Option[String],
-                      consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
+case class DataTarget(databaseName: Option[String],
+                      databaseLocation: Option[String],
+                      etlDataPathPrefix: Option[String],
+                      consumerDatabaseName: Option[String] = None,
+                      consumerDatabaseLocation: Option[String] = None){
+   private[overwatch] def deriveDatabaseName: String = {
+    if(databaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    databaseName.get.split("\\.").last
+  }
+
+  private[overwatch] def deriveConsumerDatabaseName: String = {
+    if(consumerDatabaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    consumerDatabaseName.get.split("\\.").last
+  }
+
+  private[overwatch] def deriveEtlCatalogName: String = {
+    if(databaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    databaseName.get.split("\\.").head
+  }
+
+  private[overwatch] def deriveConsumerCatalogName: String = {
+    if(consumerDatabaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    consumerDatabaseName.get.split("\\.").head
+  }
+}
 
 case class DatabricksContractPrices(
                                      interactiveDBUCostUSD: Double = 0.55,
