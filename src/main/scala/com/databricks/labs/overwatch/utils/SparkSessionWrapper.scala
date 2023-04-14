@@ -126,4 +126,20 @@ trait SparkSessionWrapper extends Serializable {
     else sc.setLogLevel(logLevel)
     true
   }
+
+  /**
+   * This function set the current catalog Name for the entire spark session
+   * @param catalogName
+   */
+  def setCurrentCatalog(spark: SparkSession, catalogName: String): Unit = {
+    spark.sessionState.catalogManager.setCurrentCatalog(catalogName)
+  }
+
+  /**
+     * This function fetches the current catalog name if the spark session
+   */
+    def getCurrentCatalogName(spark: SparkSession): String = {
+      spark.sessionState.catalogManager.currentCatalog.name()
+    }
+
 }

@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, Helpers}
 import org.apache.log4j.{Level, Logger}
 
 case class PipelineView(name: String,
@@ -10,7 +10,10 @@ case class PipelineView(name: String,
                         dbTargetOverride: Option[String] = None
                        ) extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
-  private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
+//  private val dbTarget = dbTargetOverride.getOrElse(config.consumerDatabaseName)
+  private val dbTarget = if(config.deploymentType!="default")
+    s"${config.consumerCatalogName}.${dbTargetOverride.getOrElse(config.consumerDatabaseName)}"
+  else dbTargetOverride.getOrElse(config.consumerDatabaseName)
 
   def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
     if (dataSource.exists) {
@@ -49,6 +52,7 @@ case class PipelineView(name: String,
       logger.log(Level.INFO, msgLog)
       if (config.debugFlag) println(msgLog)
       try {
+        setCurrentCatalog(spark,config.consumerCatalogName)
         spark.sql(pubStatement)
       } catch {
         case e: Throwable =>
