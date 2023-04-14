@@ -1,8 +1,10 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.validation.DeploymentValidation
 import org.apache.log4j.{Level, Logger}
@@ -115,9 +117,24 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure") {
         AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
       } else {
-        val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
+
         val ehStatePath = s"${config.storage_prefix}/${config.workspace_id}/ehState"
-        val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+        val isAAD = config.aad_client_id.nonEmpty &&
+          config.aad_tenant_id.nonEmpty &&
+          config.aad_client_secret_key.nonEmpty &&
+          config.eh_conn_string.nonEmpty
+        val azureLogConfig = if(isAAD){
+          AzureAuditLogEventhubConfig(connectionString = config.eh_conn_string.get, eventHubName = config.eh_name.get
+            , auditRawEventsPrefix = ehStatePath,
+            azureClientId = Some(config.aad_client_id.get),
+            azureClientSecret = Some(dbutils.secrets.get(config.secret_scope, key = config.aad_client_secret_key.get)),
+            azureTenantId = Some(config.aad_tenant_id.get),
+            azureAuthEndpoint = config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/")
+          )
+        }else{
+          val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
+         AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+        }
         AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
       }
       val interactiveDBUPrice: Double = config.interactive_dbu_price
@@ -391,7 +408,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     try {
       val baseConfig = generateBaseConfig(configLocation)
       val multiWorkspaceConfig = baseConfig
-        .withColumn("api_url", when('api_url.endsWith("/"), 'api_url.substr(lit(0), length('api_url) - 1)).otherwise('api_url))
+        .withColumn("api_url", removeTrailingSlashes('api_url))
         .withColumn("deployment_id", lit(deploymentId))
         .withColumn("output_path", lit(outputPath))
         .as[MultiWorkspaceConfig]

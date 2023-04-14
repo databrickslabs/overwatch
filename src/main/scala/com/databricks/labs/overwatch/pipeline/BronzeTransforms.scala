@@ -4,7 +4,7 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
-import com.databricks.labs.overwatch.utils.Helpers.getDatesGlob
+import com.databricks.labs.overwatch.utils.Helpers.{getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
@@ -889,11 +889,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private[overwatch] def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
     try{
     val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
-      .withColumn("mount_point", when('mount_point.endsWith("/"), 'mount_point.substr(lit(0), length('mount_point) - 1)).otherwise('mount_point))
-      .withColumn("source", when('source.endsWith("/"), 'source.substr(lit(0), length('source) - 1)).otherwise('source))
+      .withColumn("mount_point", removeTrailingSlashes('mount_point))
+      .withColumn("source",  removeTrailingSlashes('source))
       .filter(col("mount_point") =!= "/")
     //Cleaning the data for cluster log path
-    val formattedInputDf = inputDataframe.withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)).otherwise('cluster_log_conf))
+    val formattedInputDf = inputDataframe.withColumn("cluster_log_conf",  removeTrailingSlashes('cluster_log_conf))
       .withColumn("cluster_mount_point_temp", regexp_replace('cluster_log_conf, "dbfs:", ""))
       .withColumn("cluster_mount_point", 'cluster_mount_point_temp)
 //      .withColumn("cluster_mount_point", regexp_replace('cluster_mount_point_temp, "//", "/"))
@@ -1007,7 +1007,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
      } else {
       newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging)
-        .withColumn("cluster_log_conf", when('cluster_log_conf.endsWith("/"), 'cluster_log_conf.substr(lit(0), length('cluster_log_conf) - 1)) .otherwise('cluster_log_conf))
+        .withColumn("cluster_log_conf",removeTrailingSlashes('cluster_log_conf))
         .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
         .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
         .select('wildPrefix)
