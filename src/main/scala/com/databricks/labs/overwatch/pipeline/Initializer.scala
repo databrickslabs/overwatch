@@ -35,7 +35,8 @@ object Initializer extends SparkSessionWrapper {
 
   /**
    * Returns the local workspace orgID
-   * When getOrgId is called from a Future the apiURL MUST be passed to prevent failures on Single Tenant
+   * When getOrgId is called from a Future the apiURL MUST be passed to prevent failure to get orgID
+   * since dbutils.notebook.getContext.apiUrl.get returns None and None.get fails
    * @param apiUrl apiURL of the workspace to get the orgId
    * @return
    */
