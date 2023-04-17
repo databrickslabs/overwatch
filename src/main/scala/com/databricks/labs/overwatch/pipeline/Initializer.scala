@@ -27,10 +27,23 @@ object Initializer extends SparkSessionWrapper {
   // Init the SparkSessionWrapper with envVars
   envInit()
 
-  def getOrgId: String = {
+  /**
+   * Returns the local workspace orgID
+   * @return
+   */
+  def getOrgId: String = getOrgId(None)
+
+  /**
+   * Returns the local workspace orgID
+   * When getOrgId is called from a Future the apiURL MUST be passed to prevent failures on Single Tenant
+   * @param apiUrl apiURL of the workspace to get the orgId
+   * @return
+   */
+  def getOrgId(apiUrl: Option[String]): String = {
     val clusterOwnerOrgID = spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
     if (clusterOwnerOrgID == " " || clusterOwnerOrgID == "0") {
-      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+      val apiUrlFinal = apiUrl.getOrElse(dbutils.notebook.getContext.apiUrl.getOrElse(throw new BadConfigException("API URL cannot be determined")))
+      apiUrlFinal.split("\\.")(0).split("/").lastOption.getOrElse(throw new BadConfigException("ORG ID cannot be determined"))
     } else clusterOwnerOrgID
   }
 
