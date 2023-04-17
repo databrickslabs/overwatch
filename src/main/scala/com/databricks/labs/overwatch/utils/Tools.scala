@@ -598,7 +598,7 @@ object Helpers extends SparkSessionWrapper {
     // verify database is owned and managed by Overwatch
     assert(dbProperties.getOrElse("OVERWATCHDB", "FALSE") == "TRUE", s"The database provided," +
       s" $etlDBWithOutCatalog, is not an Overwatch managed Database. Please provide an Overwatch managed database")
-    val workspaceID = if (isRemoteWorkspace) organization_id.get else Initializer.getOrgId
+    val workspaceID = if (isRemoteWorkspace) organization_id.get else Initializer.getOrgId(apiUrl)
 
     val statusFilter = if (successfullOnly) 'status === "SUCCESS" else lit(true)
 
