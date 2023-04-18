@@ -12,6 +12,6 @@ deployment, please reach out to your account team and one of our specialists wil
 architecture / configuration to meet your needs.
 
 ## Cloud Infrastructure Setup
-* [Azure]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}})
-* [AWS]({{%relref "DeployOverwatch/CloudInfra/AWS.md"%}})
+* [Azure]({{%relref "DeployOverwatch/DefaultDeployment/CloudInfra/Azure.md"%}})
+* [AWS]({{%relref "DeployOverwatch/DefaultDeployment/CloudInfra/AWS.md"%}})
 * GCP (Coming Soon - Target Q2 2023)

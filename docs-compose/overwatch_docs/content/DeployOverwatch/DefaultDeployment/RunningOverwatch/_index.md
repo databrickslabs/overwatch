@@ -8,8 +8,8 @@ An Overwatch deployment is simply a workload and as such can be run within a not
 
 ## As of Version 0.7.1.0
 To deploy Overwatch through the following methods it is required to have version 0710+
-* [Running Overwatch as a Notebook]({{%relref "DeployOverwatch/RunningOverwatch/Notebook.md"%}})
-* [Running Overwatch as a JAR]({{%relref "DeployOverwatch/RunningOverwatch/JAR.md"%}})
+* [Running Overwatch as a Notebook]({{%relref "DeployOverwatch/DefaultDeployment/RunningOverwatch/Notebook.md"%}})
+* [Running Overwatch as a JAR]({{%relref "DeployOverwatch/DefaultDeployment/RunningOverwatch/JAR.md"%}})
 
 ## Legacy Deployments
 
@@ -21,8 +21,8 @@ This method will likely be deprecated in Overwatch version 0.8 and no longer be 
 
 Legacy deployment models can still executed on 0710+ but this deployment model will be deprecated in the future 
 and you should consider switching to the new model as time permits.
-* [Running Overwatch as a Notebook (Legacy)]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy.md"%}})
-* [Running Overwatch as a JAR (Legacy)]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy.md"%}})
+* [Running Overwatch as a Notebook (Legacy)]({{%relref "DeployOverwatch/DefaultDeployment/RunningOverwatch/NotebookLegacy.md"%}})
+* [Running Overwatch as a JAR (Legacy)]({{%relref "DeployOverwatch/DefaultDeployment/RunningOverwatch/JARLegacy.md"%}})
 
 ## Migrating From Legacy Deployments
 If you're ready to migrate from the legacy deployment to the new deployment method, all you need to do is:
