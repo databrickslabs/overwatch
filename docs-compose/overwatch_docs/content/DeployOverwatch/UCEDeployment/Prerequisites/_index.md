@@ -11,3 +11,37 @@ This section will walk you through the steps necessary as a prerequisite to depl
 * Direct access to external location’ storage | [DOCS]({{%relref "/DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/_index.md"%}})
 * Overwatch latest version(0.7.1.0+) should be deployed in the workspace
 * Other overwatch prerequisites can be found [here](https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/)
+
+
+## SQL Command to Grant Permissions to various UC Objects
+
+### SQL Command to grant permissions on Storage Credentials
+```sql
+GRANT READ FILES, WRITE FILES, CREATE EXTERNAL TABLE ON STORAGE CREDENTIAL `<storage-credential-name>` TO `<principal>`;
+```
+
+### SQL Command to grant permissions on External Locations
+```sql
+GRANT ALL PRIVILEGES ON EXTERNAL LOCATION `<external-location-name>` TO `<principal>`;
+```
+
+### SQL Command to grant permissions on Catalog
+```sql
+GRANT USE CATALOG, USE SCHEMA, SELECT
+  ON CATALOG <catalog-name>
+  TO `<principal>`
+```
+
+### SQL Command to grant permissions on ETL Database
+```sql
+GRANT USE SCHEMA, CREATE TABLE, MODIFY
+ON SCHEMA <catalog-name>.<etl-database>
+TO `<principal>`;
+```
+
+### SQL Command to grant permissions on Consumer Database
+```sql
+GRANT USE SCHEMA, CREATE TABLE, MODIFY
+ON SCHEMA <catalog-name>.<consumer-database>
+TO `<principal>`;
+```
