@@ -1,13 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.utils.Helpers.{getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
-import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -21,13 +20,10 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
 import java.time.LocalDateTime
-import java.util
-import java.util.Collections
 import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 
 trait BronzeTransforms extends SparkSessionWrapper {
@@ -1001,7 +997,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes =
-    if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId) {
+    if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId(Some(apiEnv.workspaceURL))) {
       getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
      } else {

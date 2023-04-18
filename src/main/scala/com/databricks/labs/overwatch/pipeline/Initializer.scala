@@ -27,12 +27,41 @@ object Initializer extends SparkSessionWrapper {
   // Init the SparkSessionWrapper with envVars
   envInit()
 
-  def getOrgId: String = {
+  /**
+   * Returns the local workspace orgID
+   * @return
+   */
+  def getOrgId: String = getOrgId(None)
+
+  /**
+   * Returns the local workspace orgID, or the orgID contained in the input apiURL
+   * When getOrgId is called from a Future the apiURL MUST be passed to prevent failure to get orgID
+   * since dbutils.notebook.getContext.apiUrl.get returns None and None.get fails
+   * @param apiUrl apiURL of the workspace to get the orgId
+   * @return
+   */
+  def getOrgId(apiUrlInput: Option[String]): String = {
     val clusterOwnerOrgID = spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
     if (clusterOwnerOrgID == " " || clusterOwnerOrgID == "0") {
-      dbutils.notebook.getContext.apiUrl.get.split("\\.")(0).split("/").last
+      val apiURL = getApiURL(apiUrlInput)
+
+      apiURL.split("\\.")(0).split("/").lastOption match {
+        case Some(orgID) => orgID
+        case None => throw new BadConfigException("ORG ID cannot be determined")
+      }
     } else clusterOwnerOrgID
   }
+
+  private def getApiURL(apiUrlInput: Option[String]): String = {
+    apiUrlInput match {
+      case Some(apiURL) => apiURL
+      case None => dbutils.notebook.getContext.apiUrl match {
+        case Some(apiURL) => apiURL
+        case None => throw new BadConfigException("API URL cannot be determined")
+      }
+    }
+  }
+
 
   private def initConfigState(debugFlag: Boolean,organizationID: Option[String],
                               apiUrl: Option[String]
@@ -42,7 +71,7 @@ object Initializer extends SparkSessionWrapper {
 
     // If MW take orgID from arg
     if(organizationID.isEmpty) {
-      config.setOrganizationId(getOrgId)
+      config.setOrganizationId(getOrgId(apiUrl))
     }else{ // is multiWorkspace deployment since orgID is passed
       logger.log(Level.INFO, "Setting multiworkspace deployment")
       config.setOrganizationId(organizationID.get)
