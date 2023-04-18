@@ -43,3 +43,106 @@ After the migration all the tables in the ETL Database will be populated with th
 2. Resuming the Overwatch Job.
 
 Step 1 can be ignored if you want to do a fresh deployment and do not want to carry forward the old data from hive_metastore to Unity Catalog. Fresh Deployment
+
+### Migration Notebook 
+
+```text
+Migration Utility - hive_metastore to Unity Catalog
+This notebook is used to migrate the existing overwatch data in hive_metastore to the Unity Catalog
+
+Parameters
+sourceEtlDBName = overwatch etlDatabase Name in hive_metastore
+
+storagePrefixForUC = new storagePrefix for Unity Catalog Deployment in this format - <UC External Location>/<newETLDBName>
+
+etlDataPathPrefixForUC = new etlDataPathPrefix for Unity Catalog Deployment in this format - <UC External Location>/<newETLDBName>/global_share
+
+catalogName = catalog name where new etlDB and consumerDB will be stored
+
+etlDB = new etlDatabase Name for Unity Catalog Deployment. <catalogName>.<etlDBName>
+
+consumerDB = new consumerDatabase Name for Unity Catalog Deployment. <catalogName>.<consumerDBName>
+
+Step for Validation
+```
+
+```text
+// Run helper notebook
+%run ../Helpers/_TestingHelpers_0720
+```
+
+```scala
+// provide input to the variables
+val sourceEtlDBName = "<sourceEtlDBName>"
+val storagePrefixForUC = "<storagePrefixForUC>"
+val etlDataPathPrefixForUC = s"${storagePrefixForUC}/global_share"
+val catalogName = "<catalogName>"
+val etlDB = s"${catalogName}.<etlDB>"
+val consumerDB = s"${catalogName}.<consumerDB>"
+
+// create workspace
+val sourceWorkspace = Helpers.getWorkspaceByDatabase(s"${sourceEtlDBName}")
+val b = Bronze(sourceWorkspace)
+val s = Silver(sourceWorkspace)
+val g = Gold(sourceWorkspace)
+
+// get all the  bronze, silver and gold targets 
+val targetsHiveMetastore = (b.getAllTargets ++ s.getAllTargets ++ g.getAllTargets :+ b.pipelineStateTarget).filter(_.exists(dataValidation = true))
+
+// copy the data to the new etlDataPath Prefix
+val targetsForUC = targetsHiveMetastore.map(t => {
+  val newLocation = s"$etlDataPathPrefixForUC/${t.name}".toLowerCase
+  val cloneDetail = CloneDetail(t.tableLocation, newLocation)
+  cloneDetail
+})
+Helpers.parClone(targetsForUC)
+
+// create target tables in the define Catalog 
+val workspaceID = if (dbutils.notebook.getContext.tags("orgId") == "0") {
+  dbutils.notebook.getContext.tags("browserHostName").split("\\.")(0)
+} else dbutils.notebook.getContext.tags("orgId")
+val dataTarget = Some(DataTarget(
+  Some(etlDB), Some(s"${storagePrefixForUC}/${etlDB}.db"), Some(s"${storagePrefixForUC}/global_share"),
+  Some(consumerDB), Some(s"${storagePrefixForUC}/${consumerDB}.db")
+))
+val badRecordsPath = Some(s"${storagePrefixForUC}/${workspaceID}/sparkEventsBadrecords")
+
+// create new workspace config 
+val targetWorkspaceOverrides = sourceWorkspace.getConfig.inputConfig.copy(dataTarget = dataTarget, badRecordsPath = badRecordsPath)
+
+// generate new workspace
+val targetWorkspaceOverrides = sourceWorkspace.getConfig.inputConfig.copy(dataTarget = dataTarget, badRecordsPath = badRecordsPath)
+
+val b = Bronze(targetWorkspace)
+val s = Silver(targetWorkspace)
+val g = Gold(targetWorkspace)
+
+// register target tables
+(b.getAllTargets :+ b.pipelineStateTarget).foreach(table => 
+  b.database.registerTarget(table))
+
+s.getAllTargets.foreach(table=>
+  s.database.registerTarget(table)
+)
+
+g.getAllTargets.foreach(table=>
+  g.database.registerTarget(table)
+)
+
+// run Validation to check if all tables in UC are populated
+def getRecordCountForAllTables(dbName: String): Unit = {
+  val currentCatalog = spark.sessionState.catalogManager.currentCatalog.name
+  val etlDB = if(dbName.contains(".")){
+    spark.sessionState.catalogManager.setCurrentCatalog(dbName.split("\\.").head)
+    dbName.split("\\.").last
+  } else dbName
+  spark.sessionState.catalog.listTables(etlDB).foreach{
+    table=>println(table.table+" - "+spark.table(s"${etlDB}.${table.table}").count)
+  }
+  spark.sessionState.catalogManager.setCurrentCatalog(currentCatalog)
+}
+
+getRecordCountForAllTables("<catalog>.<etlDBName>")
+```
+
+
