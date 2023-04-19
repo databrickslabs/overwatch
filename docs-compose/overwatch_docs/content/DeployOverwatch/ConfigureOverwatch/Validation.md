@@ -10,21 +10,21 @@ given workspace. For more information on executing a full validation, see [below
 
 ### Validation rules
 
-Name | Validation Rule                                                                                                                                                      | Impacted columns
-:------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------------------
-Api Url Validation| API URL should give some response with provided scope and key.                                                                                                       |api_url
-Primordial data validation| Primordial Date must be in **yyyy-MM-dd format** (i.e. 2022-01-30 == Jan 30, 2022) and must be less than current date.                                               |primordial_date
-Excluded scope validation| Excluded scope must be null or in colon-delimited format and include only the following audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts:dbsql |excluded_scopes
-Consuming data from event hub(Azure)| Audit Log data must be recognized as present and readable from the provided Event Hub Configuration fields.                                                          |eh_name,eh_scope_key,secret_scope
-Common consumer database name| All workspaces must have a common consumer database name.                                                                                                            |consumer_database_name
-Common ETL database name| All workspaces must have a common ETL database name.                                                                                                                 |etl_database_name
-Storage prefix validation| All workspaces must share a single storage prefix and the Overwatch cluster must have appropriate access to read/write.                                              |storage_prefix
-Cloud provider validation| Either Azure or AWS.                                                                                                                                                 |cloud
-Max days validation| Must Be a Number                                                                                                                                                     |max_days
-Secrete scope validation| Secret scope must not be empty.                                                                                                                                      |secret_scope
-PAT key validation| DBPAT must not be empty and must be able to authenticate to the workspace.                                                                                           |secret_key_dbpat
-Audit log location validation **(AWS/GCP ONLY)**| Audit logs must present immediately within the provided path and must be read accessible                                                                             |auditlogprefix_source_path
-Mount point validation[ *More Details](#mount-point-limitation)| Workspaces with more than 50 mount points are not supported in remote deployments at this time.                                                                      |
+Name | Validation Rule | Impacted columns
+:------|:----------------|:--------------------------
+Api Url Validation| API URL should give some response with provided scope and key. |api_url
+Primordial data validation|Primordial Date must be in **yyyy-MM-dd format** (i.e. 2022-01-30 == Jan 30, 2022) and must be less than current date.|primordial_date
+Excluded scope validation|Excluded scope must be null or in colon-delimited format and include only the following audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts:dbsql|excluded_scopes
+Consuming data from event hub(Azure)| Audit Log data must be recognized as present and readable from the provided Event Hub Configuration fields.|eh_name,eh_scope_key,secret_scope
+Common consumer database name|All workspaces must have a common consumer database name.|consumer_database_name
+Common ETL database name|All workspaces must have a common ETL database name.|etl_database_name
+ETL storage prefix validation|All workspaces must share a single ETL storage prefix and the Overwatch cluster must have appropriate access to read/write.|etl_storage_prefix
+Cloud provider validation|Either Azure or AWS.|cloud
+Max days validation|Must Be a Number|max_days
+Secrete scope validation|Secret scope must not be empty.|secret_scope
+PAT key validation| DBPAT must not be empty and must be able to authenticate to the workspace.|secret_key_dbpat
+Audit log location validation **(AWS ONLY)**|Audit logs must present immediately within the provided path and must be read accessible|auditlogprefix_source_aws
+Mount point validation[ *More Details](#mount-point-limitation)|Workspaces with more than 50 mount points are not supported in remote deployments at this time.|
 
 ### Run the validation
 

@@ -1,16 +1,16 @@
 ---
-title: "AWS/GCP"
+title: "AWS"
 date: 2022-12-12T11:29:56-05:00
 ---
 
-## Configuring Overwatch on AWS/GCP - Databricks
+## Configuring Overwatch on AWS - Databricks
 Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
 <br>
 To get started, the [Basic Deployment](#basic-deployment) configuration. As more modules are enabled, additional
 environment configuration may be required in addition to the Basic Deployment.
 
 There are two primary sources of data that need to be configured:
-* [Audit Logs-AWS](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)/[Audit Logs-GCP](https://docs.gcp.databricks.com/administration-guide/account-settings/audit-logs.html)
+* [Audit Logs](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)
     * These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis
       and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.
       We don't want multiple workspaces delivering into the same prefix. The audit logs contain data for every interaction
