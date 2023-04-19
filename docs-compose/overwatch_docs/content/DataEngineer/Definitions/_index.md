@@ -219,6 +219,9 @@ accurately reflect a customer's costs.
 * **worker_dbu_cost**: houry_dbu_rate for sku (dbuCostDetails.contract_price) * worker_dbus
 * **driver_dbu_cost**: houry_dbu_rate for sku (dbuCostDetails.contract_price) * driver_dbus
 
+{{% notice note %}}
+Cost will not Appear untill State is changed to a state that modify the no of workers i.e. until the Cluster is Restarted or Resized(both Autoscaling or Manual)
+{{% /notice %}}
 
 #### InstanceDetails
 [**AWS Sample**](/assets/TableSamples/instancedetails_aws.tab) | [**AZURE_Sample**](/assets/TableSamples/instancedetails_azure.tab)
