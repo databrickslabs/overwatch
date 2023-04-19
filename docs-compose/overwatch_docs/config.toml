@@ -12,3 +12,6 @@ canonifyURLs = true
     DisableShortcutsTitle = "true"
     author = "Daniel Tomes -- DatabricksLabs"
     disableLandingPageButton = false
+
+[outputs]
+home = [ "HTML", "RSS", "JSON"]

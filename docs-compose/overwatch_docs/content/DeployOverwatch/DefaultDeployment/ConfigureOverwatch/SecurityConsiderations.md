@@ -33,7 +33,7 @@ is now owned by the etl-admin principle, etl-admin must have access to the relev
 ## Storage Access
 In addition to API authentication / authorization there are some storage access that Overwatch requires.
 
-### Audit Logs (AWS Only)
+### Audit Logs (AWS/GCP)
 Overwatch cluster must be able to read the audit logs
 
 ### Overwatch Target Location
@@ -59,6 +59,9 @@ securing access to these tables would be the same as with any set of tables in y
 ### Recommended Authorizations Approach
 * **For AWS** -- Create an IAM Role and provision it with the following authorizations and then enable an Instance 
   Profile to utilize the IAM Role for the cluster
+  * read/write access to the [Overwatch Output Storage](#overwatch-target-location)
+  * read access to all locations where cluster logs are stored
+* **For GCP** -- Create Google Service Account and provision it with the following authorizations and attach it to the cluster
   * read/write access to the [Overwatch Output Storage](#overwatch-target-location)
   * read access to all locations where cluster logs are stored
 * **For Azure** -- Create an SPN and provision it with and then add the configuration [below](#azure-storage-auth-config) 
