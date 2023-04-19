@@ -1,3 +1,10 @@
+---
+title: "AWS"
+date: 2023-04-18T11:28:39-05:00
+weight: 1
+---
+**Under Construction** -- we will be improving these docs shortly
+
 ### AWS IAM/Policy required to set up for Storage Credentials
 ```
 {
@@ -66,10 +73,7 @@
 }
 ```
 
-### Instance Profile -
-
-IAM Role – ROLE-NAME
-Policy -POLiCY
+### Instance Profile - IAM Role / Policy
 
 ```
 {
@@ -121,14 +125,13 @@ Policy -POLiCY
 ```
 
 
-Reasons for having delete policy -
+**Why Is Delete Required In The Policy**
 
-* TEMP DIRECTORY:
-
-Overwatch scrapes the data from the logs and from the api calls, as mentioned in its documentation. It requires a temporary location to write the intermediary datasets in the temporary location that is provided in the arguments while initializing the notebook/ job.
-Since, overwatch’s goal is to be idempotent in nature, it needs to remove the intermediary locations since it is not required to have the data populated after its use. The cleansed datasets are loaded in the bronze, silver and the gold layers respectively and are ready to be used for dashboards.
-Due to above mentioned scenarios, it needs to delete/ vacuum the datasets from the temporary locations. Hence, overwatch issues a remove command at the defined location which is set by the user/ admin “/tmp/overwatch/templocation”.
-
-* DELTA VACUUM:
-
-The delta tables by concept needs to be vacuumed and optimized which cleans up the file systems relative to the table. However, before these actions, new files are written with the data written in an optimized way thereby reducing the number of files in the directory. None of the data is impacted with this operation. These will be impacting in the Bronze, Silver and Gold data paths relative to overwatch storage locations. Overwatch requires the respective permissions to do so.
+* TEMP DIRECTORY
+  * Overwatch scrapes the data from the logs and from the api calls, as mentioned in its documentation. 
+  It requires a temporary location to write intermediate datasets.
+* DELTA VACUUM
+  * The delta tables need to be vacuumed and optimized to maintain efficiency and optimize the tables for downstream use
+  Please visit the Databricks docs for more details on 
+  [Delta Optimize](https://docs.databricks.com/sql/language-manual/delta-optimize.html) & 
+  [Delta Vacuum](https://docs.databricks.com/sql/language-manual/delta-vacuum.html).

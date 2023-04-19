@@ -1,9 +1,15 @@
-### GCP IAM/Policy required to set up for Storage Credentials
+---
+title: "GCP"
+date: 2023-04-18T11:28:39-05:00
+weight: 3
+---
 
+**Under Construction** -- we will be improving these docs shortly
 
-Add the following to the external location’s bucket permissions -
+## Service Account
 
-Service Account attached to the cluster
+## Storage Credential
 
-Roles - Storage Admin and Storage Legacy Bucket Owner
+## External Location
 
+## Cluster Logging Locations

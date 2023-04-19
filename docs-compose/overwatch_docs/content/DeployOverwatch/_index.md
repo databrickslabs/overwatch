@@ -6,9 +6,9 @@ weight: 2
 
 {{% notice warning%}}
 **EXISTING CUSTOMERS COMING FROM VERSION < 0.7.1.0** As of version 0.7.1.0 Overwatch will begin sunsetting
-the "legacy" deployment ([Notebook]({{%relref "DeployOverwatch/DefaultDeployment/RunningOverwatch/NotebookLegacy.md"%}}) | 
-[JAR]({{%relref "DeployOverwatch/DefaultDeployment/RunningOverwatch/JARLegacy.md"%}})) method and
-[Legacy Configuration]({{%relref "DeployOverwatch/DefaultDeployment/ConfigureOverwatch/ConfigurationLegacy.md"%}}). Please review the
+the "legacy" deployment ([Notebook]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy.md"%}}) | 
+[JAR]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy.md"%}})) method and
+[Legacy Configuration]({{%relref "DeployOverwatch/ConfigureOverwatch/ConfigurationLegacy.md"%}}). Please review the
 benefits of using the new deployment method and plan to switch to this new deployment method by end of Q3 2023.
 **New customers may disregard this notice.**
 {{% /notice %}}
@@ -28,22 +28,22 @@ through the process.
 
 ### Configuring Your Cloud
 Select your cloud to find the details for cloud configuration here. 
-([AWS]({{%relref "DeployOverwatch/DefaultDeployment/CloudInfra/AWS.md"%}}) | [Azure]({{%relref "DeployOverwatch/DefaultDeployment/CloudInfra/Azure.md"%}}))
+([AWS]({{%relref "DeployOverwatch/CloudInfra/AWS.md"%}}) | [Azure]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}))
 
 ### Build / Apply Security
-Reference [Security Considerations]({{%relref "DeployOverwatch/DefaultDeployment/ConfigureOverwatch/SecurityConsiderations.md"%}}) page 
+Reference [Security Considerations]({{%relref "DeployOverwatch/ConfigureOverwatch/SecurityConsiderations.md"%}}) page 
 to help you build and apply a security model commensurate with your needs.
 
 ### Configure Overwatch
-Reference the [configuration page]({{%relref "DeployOverwatch/DefaultDeployment/ConfigureOverwatch/Configuration.md"%}}) to clarify the 
+Reference the [configuration page]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}) to clarify the 
 configuration details and help you get started.
 
 For legacy deployment methods please reference the 
-[Legacy Configuration Page]({{%relref "DeployOverwatch/DefaultDeployment/ConfigureOverwatch/ConfigurationLegacy.md"%}})
+[Legacy Configuration Page]({{%relref "DeployOverwatch/ConfigureOverwatch/ConfigurationLegacy.md"%}})
 
 ### Run and Schedule the Job\[s\]
-Decide whether you'd like to execute Overwatch as a [JAR]({{%relref "DefaultDeployment/RunningOverwatch/JAR.md"%}}) 
-or a [NOTEBOOK]({{%relref "DefaultDeployment/DefaultDeployment/RunningOverwatch/Notebook.md"%}}) and schedule a job to periodically 
+Decide whether you'd like to execute Overwatch as a [JAR]({{%relref "RunningOverwatch/JAR.md"%}}) 
+or a [NOTEBOOK]({{%relref "RunningOverwatch/Notebook.md"%}}) and schedule a job to periodically 
 execute the job.
 
 It's recommended to run Overwatch as a JAR as it unifies the deployment and doesn't depend on another asset 
@@ -61,8 +61,8 @@ Now you're ready to onboard consumers across your workspaces. Details about how 
 ## Multi-Workspace Monitoring - Considerations
 As of 0.7.1.0 Overwatch is able to monitor remote workspaces but having one and only one global deployment often 
 doesn't meet customer needs and there are some requirements for a deployment to monitor remote workspaces. More details 
-are available on the [Security Considerations]({{%relref "DeployOverwatch/DefaultDeployment/ConfigureOverwatch/SecurityConsiderations.md"%}}) and 
-[Validations]({{%relref "DeployOverwatch/DefaultDeployment/ConfigureOverwatch/Validation.md"%}}) pages. The most important things to consider are: 
+are available on the [Security Considerations]({{%relref "DeployOverwatch/ConfigureOverwatch/SecurityConsiderations.md"%}}) and 
+[Validations]({{%relref "DeployOverwatch/ConfigureOverwatch/Validation.md"%}}) pages. The most important things to consider are: 
 * Access to remote workspaces via API Token -- a token (PAT) authorizing access to the remote workspace is required to 
 be provisioned.
 * The Overwatch cluster must have direct read access (not via a mount point) to all cluster logging cloud storage
