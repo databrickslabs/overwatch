@@ -4,6 +4,9 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.2.0
+* RELEASE STAGING
+
 ## 0.7.1.3
 * Data Quality Fixes - primarily around cost and utilization
 * **Upgrade Process**
