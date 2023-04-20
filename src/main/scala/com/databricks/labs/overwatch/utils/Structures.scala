@@ -24,8 +24,35 @@ case class GangliaDetail()
 
 case class TokenSecret(scope: String, key: String)
 
-case class DataTarget(databaseName: Option[String], databaseLocation: Option[String], etlDataPathPrefix: Option[String],
-                      consumerDatabaseName: Option[String] = None, consumerDatabaseLocation: Option[String] = None)
+case class DataTarget(databaseName: Option[String],
+                      databaseLocation: Option[String],
+                      etlDataPathPrefix: Option[String],
+                      consumerDatabaseName: Option[String] = None,
+                      consumerDatabaseLocation: Option[String] = None){
+   private[overwatch] def deriveDatabaseName: String = {
+    if(databaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    databaseName.get.split("\\.").last
+  }
+
+  private[overwatch] def deriveConsumerDatabaseName: String = {
+    if(consumerDatabaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    consumerDatabaseName.get.split("\\.").last
+  }
+
+  private[overwatch] def deriveEtlCatalogName: String = {
+    if(databaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    databaseName.get.split("\\.").head
+  }
+
+  private[overwatch] def deriveConsumerCatalogName: String = {
+    if(consumerDatabaseName.count(_ == '.')>1) throw new Exception("Invalid Database name. Please check the number of '.' in the name" +
+      "It should be either 0 or 1" )
+    consumerDatabaseName.get.split("\\.").head
+  }
+}
 
 case class DatabricksContractPrices(
                                      interactiveDBUCostUSD: Double = 0.55,
@@ -78,12 +105,12 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 api_url: String,
                                 cloud: String,
                                 primordial_date: java.sql.Date,
-                                etl_storage_prefix: String,
+                                storage_prefix: String,
                                 etl_database_name: String,
                                 consumer_database_name: String,
                                 secret_scope: String,
                                 secret_key_dbpat: String,
-                                auditlogprefix_source_aws: Option[String],
+                                auditlogprefix_source_path: Option[String],
                                 eh_name: Option[String],
                                 eh_scope_key: Option[String],
                                 interactive_dbu_price: Double,
@@ -104,8 +131,14 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 thread_pool_size:  Option[Int] = None,
                                 api_waiting_time:  Option[Long] = None,
                                 mount_mapping_path: Option[String],
+                                eh_conn_string: Option[String],
+                                aad_tenant_id: Option[String],
+                                aad_client_id: Option[String],
+                                aad_client_secret_key: Option[String],
+                                aad_authority_endpoint: Option[String],
                                 deployment_id: String,
-                                output_path: String
+                                output_path: String,
+                                temp_dir_path: Option[String]
                                )
 case class RulesValidationResult(ruleName: String, passed: String, permitted: String, actual: String)
 
@@ -113,8 +146,8 @@ case class RulesValidationReport(deployment_id: String, workspace_id: String, re
 
 object MultiWorkspaceConfigColumns extends Enumeration {
   val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,
-  etl_storage_prefix, etl_database_name, consumer_database_name, secret_scope,
-  secret_key_dbpat, auditlogprefix_source_aws, eh_name, eh_scope_key, scopes,
+  storage_prefix, etl_database_name, consumer_database_name, secret_scope,
+  secret_key_dbpat, auditlogprefix_source_path, eh_name, eh_scope_key, scopes,
   interactive_dbu_price, automated_dbu_price, sql_compute_dbu_price, jobs_light_dbu_price,
   max_days, excluded_scopes, active, deploymentId, output_path = Value
 }

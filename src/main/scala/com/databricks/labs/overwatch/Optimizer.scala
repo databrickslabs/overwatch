@@ -68,9 +68,9 @@ object Optimizer extends SparkSessionWrapper{
     val silver = Silver(workspace, suppressReport = true, suppressStaticDatasets = true)
     val gold = Gold(workspace, suppressReport = true, suppressStaticDatasets = true)
 
-    val optimizationCandidates = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets
+    val optimizationCandidates = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget
     val postProcessor = new PostProcessor(config)
-    postProcessor.optimizeOverwatch(optimizationCandidates)
+    postProcessor.optimizeOverwatch(spark, optimizationCandidates)
 
   }
 

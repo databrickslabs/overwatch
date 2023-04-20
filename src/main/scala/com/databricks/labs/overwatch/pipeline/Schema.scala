@@ -158,6 +158,7 @@ object Schema extends SparkSessionWrapper {
         StructField("targetUserId", StringType, nullable = true),
         StructField("aws_attributes", StringType, nullable = true),
         StructField("azure_attributes", StringType, nullable = true),
+        StructField("gcp_attributes", StringType, nullable = true),
         StructField("instanceId", StringType, nullable = true),
         StructField("port", StringType, nullable = true),
         StructField("publicKey", StringType, nullable = true),
@@ -581,7 +582,8 @@ object Schema extends SparkSessionWrapper {
     StructField("max_capacity", LongType, nullable = true),
     StructField("preloaded_spark_versions", ArrayType(StringType, containsNull = true), nullable = true),
     StructField("aws_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
-    StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true)
+    StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("gcp_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true)
   ))
 
   val poolsDeleteSchema: StructType = StructType(Seq(
@@ -921,6 +923,7 @@ object Schema extends SparkSessionWrapper {
       StructField("preloaded_spark_versions", StringType, nullable = true),
       StructField("aws_attributes",MapType(StringType,StringType, valueContainsNull = true), nullable = true),
       StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+      StructField("gcp_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
       StructField("custom_tags",MapType(StringType,StringType, valueContainsNull = true), nullable = true),
       StructField("create_details", poolsCreateSchema, nullable = true),
       StructField("delete_details", poolsDeleteSchema, nullable = true),
@@ -1037,12 +1040,12 @@ object Schema extends SparkSessionWrapper {
     StructField("api_url", StringType, nullable = false),
     StructField("cloud", StringType, nullable = false),
     StructField("primordial_date", DateType, nullable = false),
-    StructField("etl_storage_prefix", StringType, nullable = false),
+    StructField("storage_prefix", StringType, nullable = false),
     StructField("etl_database_name", StringType, nullable = false),
     StructField("consumer_database_name", StringType, nullable = false),
     StructField("secret_scope", StringType, nullable = false),
     StructField("secret_key_dbpat", StringType, nullable = false),
-    StructField("auditlogprefix_source_aws", StringType, nullable = true),
+    StructField("auditlogprefix_source_path", StringType, nullable = true),
     StructField("eh_name", StringType, nullable = true),
     StructField("eh_scope_key", StringType, nullable = true),
     StructField("interactive_dbu_price", DoubleType, nullable = false),
@@ -1062,7 +1065,13 @@ object Schema extends SparkSessionWrapper {
     StructField("enable_unsafe_SSL", BooleanType, nullable = true),
     StructField("thread_pool_size", IntegerType, nullable = true),
     StructField("api_waiting_time", LongType, nullable = true),
-    StructField("mount_mapping_path", StringType, nullable = true)
+    StructField("mount_mapping_path", StringType, nullable = true),
+    StructField("temp_dir_path", StringType, nullable = true),
+    StructField("eh_conn_string", StringType, nullable = true),
+    StructField("aad_tenant_id", StringType, nullable = true),
+    StructField("aad_client_id", StringType, nullable = true),
+    StructField("aad_client_secret_key", StringType, nullable = true),
+    StructField("aad_authority_endpoint", StringType, nullable = true)
   ))
 
   val mountMinimumSchema: StructType = StructType(Seq(

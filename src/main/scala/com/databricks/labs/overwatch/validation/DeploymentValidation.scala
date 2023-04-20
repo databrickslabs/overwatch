@@ -1,14 +1,16 @@
 package com.databricks.labs.overwatch.validation
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-import com.databricks.labs.overwatch.ApiCallV2
+import com.databricks.labs.overwatch.api.ApiCallV2
+import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.{Initializer, Pipeline, PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.databricks.labs.validation.{Rule, RuleSet}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.Dataset
+import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
+import org.apache.spark.sql.{DataFrame, Dataset}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.Trigger
 
@@ -68,12 +70,12 @@ object DeploymentValidation extends SparkSessionWrapper {
    *                 if false it will register the exception in the validation report.
    */
   private def storagePrefixAccessValidation(config: MultiWorkspaceConfig, fastFail: Boolean = false): DeploymentValidationReport  = {
-    val testDetails = s"""StorageAccessTest storage : ${config.etl_storage_prefix}"""
+    val testDetails = s"""StorageAccessTest storage : ${config.storage_prefix}"""
     try {
-      dbutils.fs.mkdirs(s"""${config.etl_storage_prefix}/test_access""")
-      dbutils.fs.put(s"""${config.etl_storage_prefix}/test_access/testwrite""", "This is a file in cloud storage.")
-      dbutils.fs.head(s"""${config.etl_storage_prefix}/test_access/testwrite""")
-      dbutils.fs.rm(s"""${config.etl_storage_prefix}/test_access""", true)
+      dbutils.fs.mkdirs(s"""${config.storage_prefix}/test_access""")
+      dbutils.fs.put(s"""${config.storage_prefix}/test_access/testwrite""", "This is a file in cloud storage.")
+      dbutils.fs.head(s"""${config.storage_prefix}/test_access/testwrite""")
+      dbutils.fs.rm(s"""${config.storage_prefix}/test_access""", true)
       DeploymentValidationReport(true,
         getSimpleMsg("Storage_Access"),
         testDetails,
@@ -316,7 +318,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def validateCloud(): Rule = {
-    Rule("Valid_Cloud_providers", lower(col(MultiWorkspaceConfigColumns.cloud.toString)), Array("aws", "azure"))
+    Rule("Valid_Cloud_providers", lower(col(MultiWorkspaceConfigColumns.cloud.toString)), Array("aws", "azure","gcp"))
   }
 
 
@@ -364,22 +366,32 @@ object DeploymentValidation extends SparkSessionWrapper {
   private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
 
     config.cloud.toLowerCase match {
-      case "aws" =>
+      case cloudType if cloudType == "aws" || cloudType == "gcp" =>
         validateAuditLog(
           config.workspace_id,
-          config.auditlogprefix_source_aws,
+          config.auditlogprefix_source_path,
           config.primordial_date,
           config.max_days
         )
       case "azure" =>
         validateEventHub(
-          config.workspace_id,
-          config.secret_scope,
-          config.eh_scope_key,
-          config.eh_name,
-          config.output_path)
+         config)
     }
 
+  }
+
+  /**
+   *For overwatch version < 0.7.2 We have auditlogprefix_source_AWS as a column in config.csv.
+   * As we have completed GCP integration on overwatch version 0.7.2 we are not supporting column auditlogprefix_source_AWS.
+   * This column name has been changed to auditlogprefix_source_PATH. This function checks whether the config.csv contains auditlogprefix_source_PATH or not.
+   * @param config
+   * @return
+   */
+  private def validateAuditLogColumnName(config: MultiWorkspaceConfig) = {
+    config.auditlogprefix_source_path.getOrElse(
+      throw new BadConfigException("auditlogprefix_source_path cannot be null when cloud is AWS/GCP," +
+        "WE DO NOT support auditlogprefix_source_aws column anymore please change the column name to  auditlogprefix_source_path.")
+    )
   }
 
   /**
@@ -390,11 +402,11 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param primordial_date
    * @param maxDate
    */
-  private def validateAuditLog(workspace_id: String, auditlogprefix_source_aws: Option[String], primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
+  private def validateAuditLog(workspace_id: String, auditlogprefix_source_path: Option[String], primordial_date: Date, maxDate: Int): DeploymentValidationReport = {
     try {
-      if (auditlogprefix_source_aws.isEmpty) throw new BadConfigException(
-        "auditlogprefix_source_aws cannot be null when cloud is AWS")
-      val auditLogPrefix = auditlogprefix_source_aws.get
+      if (auditlogprefix_source_path.isEmpty) throw new BadConfigException(
+        "auditlogprefix_source_path cannot be null when cloud is AWS/GCP,WE DO NOT support auditlogprefix_source_aws column anymore please change the column name to  auditlogprefix_source_path")
+      val auditLogPrefix = auditlogprefix_source_path.get
       val fromDT = new java.sql.Date(primordial_date.getTime).toLocalDate
       var untilDT = fromDT.plusDays(maxDate.toLong)
       val dateCompare = untilDT.compareTo(LocalDate.now())
@@ -434,7 +446,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       } else {
         val msg =
           s"""ReValidate the folder existence
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_path.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
 
@@ -452,7 +464,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case exception: Exception =>
         val msg =
           s"""AuditLogPrefixTest workspace_id:${workspace_id}
-             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_aws.getOrElse("EMPTY")}
+             | Make sure audit log with required date folder exist inside ${auditlogprefix_source_path.getOrElse("EMPTY")}
              |, primordial_date:${primordial_date}
              |, maxDate:${maxDate} """.stripMargin
         logger.log(Level.ERROR, msg)
@@ -467,6 +479,84 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
   /**
+   * Consumes the data from Event Hub.
+   * @param config
+   * @param isAAD If true it will use aad to authenticate and consume the data.
+   * @param tempPersistDFPath Path in which consumed events will be stored.
+   * @param tempPersistChk Used for EH checkpoint.
+   */
+  private def consumeEHData(config: MultiWorkspaceConfig, isAAD: Boolean,tempPersistDFPath: String ,tempPersistChk: String ):Unit = {
+
+    val ehConn = if (isAAD) config.eh_conn_string.get else dbutils.secrets.get(scope = config.secret_scope, config.eh_scope_key.get)
+    val connectionString = ConnectionStringBuilder(
+      PipelineFunctions.parseAndValidateEHConnectionString(ehConn, false))
+      .setEventHubName(config.eh_name.get)
+      .build
+    val ehConf = EventHubsConf(connectionString)
+      .setMaxEventsPerTrigger(5000)
+      .setStartingPosition(EventPosition.fromStartOfStream)
+    val rawEHDF = if (isAAD) {
+      val aadParams = Map("aad_tenant_id" -> config.aad_tenant_id.get,
+        "aad_client_id" -> config.aad_client_id.get,
+        "aad_client_secret" -> dbutils.secrets.get(scope = config.secret_scope, key = config.aad_client_secret_key.get),
+        "aad_authority_endpoint" -> config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/"))
+      spark.readStream
+        .format("eventhubs")
+        .options(AadAuthInstance.addAadAuthParams(ehConf, aadParams).toMap)
+        .load()
+    } else {
+      spark.readStream
+        .format("eventhubs")
+        .options(ehConf.toMap)
+        .load()
+    }
+    rawEHDF
+      .withColumn("deserializedBody", 'body.cast("string"))
+      .writeStream
+      .trigger(Trigger.Once)
+      .option("checkpointLocation", tempPersistChk)
+      .format("delta")
+      .start(tempPersistDFPath)
+      .awaitTermination()
+
+  }
+
+
+  /**
+   * Decides if the provided configuration is AAD or not.
+   *
+   * @param config
+   * @return
+   */
+  private def checkAAD(config: MultiWorkspaceConfig): Boolean = {
+    if (config.eh_name.isEmpty)
+      throw new BadConfigException("eh_name should be nonempty, please check the configuration.")
+
+    return if (config.aad_client_id.nonEmpty && //Check the mandatory field for AAD connection.
+      config.aad_tenant_id.nonEmpty &&
+      config.aad_client_secret_key.nonEmpty &&
+      config.eh_conn_string.nonEmpty) {
+      if (config.eh_scope_key.isEmpty) { //eh_scope_key should be empty for AAD.
+        true
+      } else {
+        throw new BadConfigException("For AAD eh_scope_key should be empty")
+      }
+    } else if (config.eh_scope_key.nonEmpty) { //Checking for legacy connection.
+      if (config.aad_client_id.isEmpty &&
+        config.aad_tenant_id.isEmpty &&
+        config.aad_client_secret_key.isEmpty &&
+        config.eh_conn_string.isEmpty) {
+        false
+      } else {
+        throw new BadConfigException("For NON AAD aad_client_id,aad_tenant_id,aad_client_secret_key,eh_conn_string should be empty")
+      }
+    } else {
+      throw new BadConfigException("EXCEPTION: Please check Event Hub configuration eh_name,eh_scope_key .For AAD check aad_client_id,aad_tenant_id,aad_client_secret_key,eh_conn_string")
+    }
+
+  }
+
+  /**
    * Performs validation of event hub data for Azure
    *
    * @param workspace_id
@@ -475,51 +565,21 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param ehName
    */
   private def validateEventHub(
-                                workspace_id: String,
-                                scope: String,
-                                optKey: Option[String],
-                                optEHName: Option[String],
-                                outputPath: String
+                               config: MultiWorkspaceConfig
                               ): DeploymentValidationReport = {
-    if (optKey.isEmpty || optEHName.isEmpty) throw new BadConfigException("When cloud is Azure, the eh_name and " +
-      "eh_scope_key are required fields but they were empty in the config")
+
+    val isAAD = checkAAD(config)
+    if (config.eh_scope_key.isEmpty && config.eh_name.isEmpty && !isAAD) throw new BadConfigException("When cloud is Azure, the eh_name and " +
+      "eh_scope_key are required fields but they were empty in the config. For AAD clinetID,tenentID and clientSecretKey are required fields but they were empty in the config")
     // using gets here because if they were empty from above check, exception would already be thrown
-    val key = optKey.get
-    val ehName = optEHName.get
-    val testDetails = s"""Connectivity test with ehName:${ehName} scope:${scope} SecretKey_DBPAT:${key}"""
+    val ehName = config.eh_name.get
+    val testDetails = s"""Connectivity test for ehName:${ehName} """
     try {
-      import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
-      val ehConn = dbutils.secrets.get(scope = scope, key)
-      //TODO limit 10 check aws
-      //pull 10 milit from aws audit log and grab org id
-      val connectionString = ConnectionStringBuilder(
-        PipelineFunctions.parseAndValidateEHConnectionString(ehConn, false))
-        .setEventHubName(ehName)
-        .build
-
-      val ehConf = EventHubsConf(connectionString)
-        .setMaxEventsPerTrigger(5000)
-        .setStartingPosition(EventPosition.fromStartOfStream)
-
-      val rawEHDF = spark.readStream
-        .format("eventhubs")
-        .options(ehConf.toMap)
-        .load()
-        .withColumn("deserializedBody", 'body.cast("string"))
       val timestamp = LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli
-      val tmpPersistDFPath = s"""$outputPath/${ehName.replaceAll("-", "")}/$timestamp/ehTest/rawDataDF"""
-      val tempPersistChk = s"""$outputPath/${ehName.replaceAll("-", "")}/$timestamp/ehTest/rawChkPoint"""
-
-
-      rawEHDF
-        .writeStream
-        .trigger(Trigger.Once)
-        .option("checkpointLocation", tempPersistChk)
-        .format("delta")
-        .start(tmpPersistDFPath)
-        .awaitTermination()
-
-      val rawBodyLookup = spark.read.format("delta").load(tmpPersistDFPath)
+      val tempPersistDFPath = s"""${config.output_path}/${config.eh_name.get.replaceAll("-", "")}/$timestamp/ehTest/rawDataDF"""
+      val tempPersistChk = s"""${config.output_path}/${config.eh_name.get.replaceAll("-", "")}/$timestamp/ehTest/rawChkPoint"""
+      consumeEHData(config, isAAD,tempPersistDFPath,tempPersistChk)
+      val rawBodyLookup = spark.read.format("delta").load(tempPersistDFPath)
       val schemaBuilders = rawBodyLookup
         .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
         .select(explode($"parsedBody.records").alias("streamRecord"))
@@ -528,7 +588,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .withColumn("organization_id", lit("2222170229861029"))
+        .withColumn("organization_id", lit(config.workspace_id))
         .select('resourceId, 'category, 'version, 'timestamp, 'date, 'properties, 'organization_id, 'identity.alias("userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
 
@@ -540,7 +600,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .withColumn("organization_id", lit(workspace_id))
+        .withColumn("organization_id", lit(config.workspace_id))
         .select('resourceId, 'category, 'version, 'timestamp, 'date, 'properties, 'organization_id, 'identity.alias("userIdentity"))
         .withColumn("userIdentity", structFromJson(spark, schemaBuilders, "userIdentity"))
         .selectExpr("*", "properties.*").drop("properties")
@@ -550,25 +610,34 @@ object DeploymentValidation extends SparkSessionWrapper {
         .drop("response")
         .verifyMinimumSchema(Schema.auditMasterSchema)
 
-      dbutils.fs.rm(s"""${tmpPersistDFPath}""", true)
+      dbutils.fs.rm(s"""${tempPersistDFPath}""", true)
       dbutils.fs.rm(s"""${tempPersistChk}""", true)
 
       DeploymentValidationReport(true,
         getSimpleMsg("Validate_EventHub"),
         testDetails,
         Some("SUCCESS"),
-        Some(workspace_id)
+        Some(config.workspace_id)
       )
     } catch {
-      case exception: Exception =>
-        val msg = s"""Unable to retrieve data from ehName:${ehName} scope:${scope} eh_scope_key:${key}"""
+      case exception: Throwable =>
+        val msg = if(isAAD){
+          s"""Using AAD unable to retrieve data from ehName:${ehName}
+             | eh_conn_string:${config.eh_conn_string}
+             | aad_client_id:${config.aad_client_id}
+             | aad_tenant_id:${config.aad_tenant_id}
+             | aad_client_secret_key:${config.aad_client_secret_key}""".stripMargin
+        }
+        else {
+          s"""Unable to retrieve data from ehName:${ehName} scope:${config.secret_scope} eh_scope_key:${config.eh_scope_key.get}"""
+        }
         val fullMsg = PipelineFunctions.appendStackStrace(exception, msg)
         logger.log(Level.ERROR, fullMsg)
         DeploymentValidationReport(false,
           getSimpleMsg("Validate_EventHub"),
           testDetails,
           Some(fullMsg),
-          Some(workspace_id)
+          Some(config.workspace_id)
         )
     }
 
@@ -619,7 +688,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    */
   private  def getSimpleMsg(ruleName: String): String = {
     ruleName match {
-      case "Common_ETLStoragePrefix" => "ETL Storage Prefix should be common across the workspaces."
+      case "Common_StoragePrefix" => "Storage Prefix should be common across the workspaces."
       case "Common_ETLDatabase" => "Workspaces should have a common ETL Database Name."
       case "Common_ConsumerDatabaseName" => "Workspaces should have a common Consumer Database Name."
       case "Valid_Cloud_providers" => "Cloud provider can be either AWS or Azure."
@@ -646,12 +715,14 @@ object DeploymentValidation extends SparkSessionWrapper {
   private[overwatch] def performMandatoryValidation( multiWorkspaceConfig: Array[MultiWorkspaceConfig],parallelism: Int):Array[MultiWorkspaceConfig]  = {
     logger.log(Level.INFO, "Performing mandatory validation")
     val commonEtlStorageRuleSet = RuleSet(multiWorkspaceConfig.toSeq.toDS.toDF(), by = "deployment_id")//Check common etl_storage_prefix
-    commonEtlStorageRuleSet.add(validateDistinct("Common_ETLStoragePrefix", MultiWorkspaceConfigColumns.etl_storage_prefix.toString))
+    commonEtlStorageRuleSet.add(validateDistinct("Common_StoragePrefix", MultiWorkspaceConfigColumns.storage_prefix.toString))
     val validationStatus = validateRuleAndUpdateStatus(commonEtlStorageRuleSet, parallelism)
     if (!validationStatus.forall(_.validated)) {
-      throw new BadConfigException(getSimpleMsg("Common_ETLStoragePrefix"))
+      throw new BadConfigException(getSimpleMsg("Common_StoragePrefix"))
     }
     storagePrefixAccessValidation(multiWorkspaceConfig.head, fastFail = true) //Check read write access for etl_storage_prefix
+    multiWorkspaceConfig.filter(_.cloud.toLowerCase() != "azure").map(config=>validateAuditLogColumnName(config))
+    multiWorkspaceConfig.filter(_.cloud.toLowerCase() == "azure").map(checkAAD)
     multiWorkspaceConfig
     }
 
@@ -674,7 +745,7 @@ object DeploymentValidation extends SparkSessionWrapper {
 
 
     val gropedRules = Seq[Rule](
-      validateDistinct("Common_ETLStoragePrefix",MultiWorkspaceConfigColumns.etl_storage_prefix.toString),
+      validateDistinct("Common_StoragePrefix",MultiWorkspaceConfigColumns.storage_prefix.toString),
       validateDistinct("Common_ETLDatabase",MultiWorkspaceConfigColumns.etl_database_name.toString),
       validateDistinct("Common_ConsumerDatabaseName",MultiWorkspaceConfigColumns.consumer_database_name.toString)
     )

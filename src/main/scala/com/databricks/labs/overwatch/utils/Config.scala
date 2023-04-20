@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.pipeline.PipelineFunctions
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions.col
-
+import com.databricks.labs.overwatch.utils.Helpers.spark
 import java.util.UUID
 
 class Config() {
@@ -46,6 +46,9 @@ class Config() {
   private var _contractJobsLightDBUPrice: Double = _
   private var _isMultiworkspaceDeployment: Boolean = false
   private var _apiUrl: Option[String] = None
+  private var _deploymentType: String = _
+  private var _etlCatalogName: String = _
+  private var _consumerCatalogName: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -126,6 +129,14 @@ class Config() {
     )
   }
 
+  def deploymentType: String = _deploymentType
+
+//  def catalogName: String = _catalogName
+  def etlCatalogName: String = _etlCatalogName
+
+  def consumerCatalogName: String = _consumerCatalogName
+
+
   /**
    * OverwatchScope defines the modules active for the current run
    * Some have been disabled for the moment in a sprint to v1.0 release but this acts as the
@@ -201,7 +212,6 @@ class Config() {
     _initialWorkerCount = value
     this
   }
-
 
   private[overwatch] def setCloudProvider(value: String): this.type = {
     _cloudProvider = value
@@ -303,7 +313,7 @@ class Config() {
     this
   }
 
-  private def setApiEnv(value: ApiEnv): this.type = {
+   def setApiEnv(value: ApiEnv): this.type = {
     _apiEnv = value
     this
   }
@@ -317,6 +327,16 @@ class Config() {
 
   def setInputConfig(value: OverwatchParams): this.type = {
     _inputConfig = value
+    this
+  }
+
+  private[overwatch] def setWorkspaceURL(value: String): this.type = {
+    _workspaceUrl = value
+    this
+  }
+
+  private[overwatch] def setTokenType(value: String): this.type = {
+    _tokenType = value
     this
   }
 
@@ -388,8 +408,81 @@ class Config() {
     }
   }
 
+  /**
+   * Function derives the cloud from workspaceUrl.
+   * @return
+   */
+  private def deriveCloudProvider(): String = {
+    if(isMultiworkspaceDeployment) {
+      if (isPVC) {
+        "aws"
+      } else {
+        workspaceURL.toLowerCase match {
+          case cloudType if cloudType.contains("azure") => "azure"
+          case cloudType if cloudType.contains("gcp") => "gcp"
+          case _ => "aws"
+        }
+      }
+    } else spark.conf.get("spark.databricks.cloudProvider").toLowerCase
+  }
 
-
+  private[overwatch] def buildApiEnv(tokenSecret: Option[TokenSecret], apiEnvConfig: Option[ApiEnvConfig]): ApiEnv = {
+    var rawToken = ""
+    var scope = ""
+    var key = ""
+    if (isMultiworkspaceDeployment && apiUrl.nonEmpty) {
+      setWorkspaceURL(apiUrl.get)
+      logger.log(Level.INFO, "Multiworkspace Deployment setting the workspaceURL :" + _workspaceUrl)
+    } else {
+      setWorkspaceURL(dbutils.notebook.getContext().apiUrl.get)
+    }
+    setCloudProvider(deriveCloudProvider())
+    try {
+      // Token secrets not supported in local testing
+      if (tokenSecret.nonEmpty) { // not local testing and secret passed
+        scope = tokenSecret.get.scope
+        key = tokenSecret.get.key
+        rawToken = dbutils.secrets.get(scope, key)
+        val authMessage = s"Valid Secret Identified: Executing with token located in secret, $scope : $key"
+        logger.log(Level.INFO, authMessage)
+        setTokenType("Secret")
+      } else { // Use default token for job owner
+        rawToken = dbutils.notebook.getContext().apiToken.get
+        val authMessage = "No secret parameters provided: attempting to continue with job owner's token."
+        logger.log(Level.WARN, authMessage)
+        println(authMessage)
+        setTokenType("Owner")
+      }
+      if (!rawToken.matches("^(dapi|dkea)[a-zA-Z0-9-]*$")) throw new BadConfigException(s"contents of secret " +
+        s"at scope:key $scope:$key is not in a valid format. Please validate the contents of your secret. It must be " +
+        s"a user access token. It should start with 'dapi' ")
+      val derivedApiEnvConfig = apiEnvConfig.getOrElse(ApiEnvConfig())
+      val derivedApiProxy = derivedApiEnvConfig.apiProxyConfig.getOrElse(ApiProxyConfig())
+      ApiEnv(
+        isLocalTesting,
+        workspaceURL,
+        rawToken,
+        packageVersion,
+        derivedApiEnvConfig.successBatchSize,
+        derivedApiEnvConfig.errorBatchSize,
+        runID,
+        derivedApiEnvConfig.enableUnsafeSSL,
+        derivedApiEnvConfig.threadPoolSize,
+        derivedApiEnvConfig.apiWaitingTime,
+        derivedApiProxy.proxyHost,
+        derivedApiProxy.proxyPort,
+        derivedApiProxy.proxyUserName,
+        derivedApiProxy.proxyPasswordScope,
+        derivedApiProxy.proxyPasswordKey
+      )
+    } catch {
+      case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
+        throw new BadConfigException(e.getMessage, failPipeline = true)
+      case e: Throwable =>
+        logger.log(Level.FATAL, "No valid credentials and/or Databricks URI", e)
+        throw new BadConfigException(e.getMessage, failPipeline = true)
+    }
+  }
 
   /**
    * Set Overwatch DB and location
@@ -456,6 +549,17 @@ class Config() {
    */
   private[overwatch] def setBadRecordsPath(value: String): this.type = {
     _badRecordsPath = value
+    this
+  }
+
+  private[overwatch] def setDeploymentType(value: String): this.type = {
+    _deploymentType = value
+    this
+  }
+
+  private[overwatch] def setCatalogName(etlCatalogName: String, consumerCatalogName: String): this.type = {
+    _etlCatalogName = etlCatalogName
+    _consumerCatalogName = consumerCatalogName
     this
   }
 

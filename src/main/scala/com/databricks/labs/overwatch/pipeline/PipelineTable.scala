@@ -50,7 +50,11 @@ case class PipelineTable(
   import spark.implicits._
 
   val databaseName: String = if (_databaseName == "default") config.databaseName else _databaseName
-  val tableFullName: String = s"${databaseName}.${name}"
+//  val tableFullName: String = s"${databaseName}.${name}"
+
+  val tableFullName: String = if(config.deploymentType!="default")
+    s"${config.etlCatalogName}.${databaseName}.${name}" else s"${databaseName}.${name}"
+
 
   // Minimum Schema Enforcement Management
   private var withMasterMinimumSchema: Boolean = if (masterSchema.nonEmpty) true else false
@@ -426,7 +430,7 @@ case class PipelineTable(
         .filter('rnk === 1 && 'rn === 2)
         .drop("rnk", "rn")
 
-      DeltaTable.forName(tableFullName)
+      DeltaTable.forName(spark, tableFullName)
         .as("target")
         .merge(
           dupsToDelete.as("source"), conditionalMatchClause
@@ -435,7 +439,7 @@ case class PipelineTable(
         .delete()
         .execute
 
-      DeltaTable.forName(tableFullName)
+      DeltaTable.forName(spark, tableFullName)
         .as("target")
         .merge(
           dupsToRestore.as("source"), conditionalMatchClause
