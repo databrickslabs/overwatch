@@ -35,7 +35,7 @@ I3 High I/O Quadruple Extra Large,i3.4xlarge,122.0,16,1.248,1.248,4.0,0,None,0,I
 I3 High I/O Eight Extra Large,i3.8xlarge,244.0,32,2.496,2.496,8.0,0,None,0,Intel Xeon E5-2686 v4 (Broadwell),2.3,7600 GiB (4 * 1900 GiB NVMe SSD),10 Gigabit,7000,875,FALSE,TRUE,1.714,0
 I3 High I/O Large,i3.large,15.3,2,0.156,0.156,0.75,0,None,0,Intel Xeon E5-2686 v4 (Broadwell),2.3,475 GiB NVMe SSD,Up to 10 Gigabit,425,53.13,FALSE,TRUE,0.107,0
 I3 High I/O Extra Large,i3.xlarge,30.5,4,0.312,0.312,1.0,0,None,0,Intel Xeon E5-2686 v4 (Broadwell),2.3,950 GiB NVMe SSD,Up to 10 Gigabit,850,106.25,FALSE,TRUE,0.214,0
-I3EN 12xlarge,i3en.12xlarge,384.0,48,5.424,5.424,17.4.0,0,None,0,Intel Xeon Platinum 8175,3.1,30000 GiB (4 * 7500 GiB NVMe SSD),50 Gigabit,7000,875,TRUE,TRUE,3.694,0
+I3EN 12xlarge,i3en.12xlarge,384.0,48,5.424,5.424,17.4,0,None,0,Intel Xeon Platinum 8175,3.1,30000 GiB (4 * 7500 GiB NVMe SSD),50 Gigabit,7000,875,TRUE,TRUE,3.694,0
 I3EN 24xlarge,i3en.24xlarge,768.0,96,10.848,10.848,34.8,0,None,0,Intel Xeon Platinum 8175,3.1,60000 GiB (8 * 7500 GiB NVMe SSD),100 Gigabit,14000,1750,TRUE,TRUE,7.388,0
 I3EN Double Extra Large,i3en.2xlarge,64.0,8,0.904,0.904,2.9,0,None,0,Intel Xeon Platinum 8175,3.1,5000 GiB (2 * 2500 GiB NVMe SSD),Up to 25 Gigabit,3500,437.5,TRUE,TRUE,0.616,0
 I3EN 3xlarge,i3en.3xlarge,96.0,12,1.356,1.356,4.35,0,None,0,Intel Xeon Platinum 8175,3.1,7500 GiB NVMe SSD,Up to 25 Gigabit,3500,437.5,TRUE,TRUE,0.924,0
