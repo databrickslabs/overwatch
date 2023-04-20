@@ -16,14 +16,14 @@
     </item>
     
     <item>
-      <title>AWS</title>
+      <title>AWS/GCP</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</link>
       <pubDate>Mon, 12 Dec 2022 11:29:56 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</guid>
-      <description>Configuring Overwatch on AWS - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+      <description>Configuring Overwatch on AWS/GCP - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
 There are two primary sources of data that need to be configured:
-Audit Logs These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
+Audit Logs-AWS/Audit Logs-GCP These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
     </item>
     
   </channel>

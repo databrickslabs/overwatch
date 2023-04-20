@@ -5,7 +5,17 @@
     <link>https://databrickslabs.github.io/overwatch/</link>
     <description>Recent content in Welcome To OverWatch on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Thu, 15 Dec 2022 18:31:01 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 18 Apr 2023 11:28:39 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>AWS</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</guid>
+      <description>Under Construction &amp;ndash; we will be improving these docs shortly
+AWS IAM/Policy required to set up for Storage Credentials {&amp;#34;Version&amp;#34;: &amp;#34;2012-10-17&amp;#34;,&amp;#34;Statement&amp;#34;: [{&amp;#34;Action&amp;#34;: [&amp;#34;s3:GetObject&amp;#34;,&amp;#34;s3:GetObjectVersion&amp;#34;,&amp;#34;s3:PutObject&amp;#34;,&amp;#34;s3:PutObjectAcl&amp;#34;,&amp;#34;s3:DeleteObject&amp;#34;,&amp;#34;s3:ListBucket&amp;#34;,&amp;#34;s3:GetBucketLocation&amp;#34;,&amp;#34;s3:GetLifecycleConfiguration&amp;#34;,&amp;#34;s3:PutLifecycleConfiguration&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:s3:::&amp;lt;BUCKET-NAME&amp;gt;/*&amp;#34;,&amp;#34;arn:aws:s3:::&amp;lt; BUCKET-NAME&amp;gt; &amp;#34;],&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;},{&amp;#34;Action&amp;#34;: [&amp;#34;kms:Decrypt&amp;#34;,&amp;#34;kms:Encrypt&amp;#34;,&amp;#34;kms:GenerateDataKey*&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:kms:&amp;lt;KMS_KEY&amp;gt;&amp;#34;],&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;},{&amp;#34;Action&amp;#34;: [&amp;#34;sts:AssumeRole&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:iam::&amp;lt;AWS-ACCOUNT-ID&amp;gt;:role/&amp;lt;THIS-IAM-ROLE&amp;gt;&amp;#34;],&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;}]} Trust Relation {&amp;#34;Version&amp;#34;: &amp;#34;2012-10-17&amp;#34;,&amp;#34;Statement&amp;#34;: [{&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;,&amp;#34;Principal&amp;#34;: {&amp;#34;AWS&amp;#34;: &amp;#34;arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL&amp;#34; //DO NOT CHANGE},&amp;#34;Action&amp;#34;: &amp;#34;sts:AssumeRole&amp;#34;,&amp;#34;Condition&amp;#34;: {&amp;#34;StringEquals&amp;#34;: {&amp;#34;sts:ExternalId&amp;#34;: &amp;#34;e6e8162c-a42f-43a0-af86-312058795a14&amp;#34;}}}]} Instance Profile - IAM Role / Policy {&amp;#34;Version&amp;#34;: &amp;#34;2012-10-17&amp;#34;,&amp;#34;Statement&amp;#34;: [{&amp;#34;Sid&amp;#34;: &amp;#34;PermitSelectedBucketsList&amp;#34;,&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;,&amp;#34;Action&amp;#34;: [&amp;#34;s3:ListBucket&amp;#34;,&amp;#34;s3:GetObject&amp;#34;,&amp;#34;s3:PutObject&amp;#34;,&amp;#34;s3:GetObject&amp;#34;,&amp;#34;s3:DeleteObject&amp;#34;,&amp;#34;s3:PutObjectAcl&amp;#34;,&amp;#34;s3:GetBucketNotification&amp;#34;,&amp;#34;s3:PutBucketNotification&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:s3:::&amp;lt;BUCKET-NAME&amp;gt;/*&amp;#34;,&amp;#34;arn:aws:s3:::&amp;lt; BUCKET-NAME&amp;gt; &amp;#34;]},{&amp;#34;Action&amp;#34;: [&amp;#34;kms:Decrypt&amp;#34;,&amp;#34;kms:Encrypt&amp;#34;,&amp;#34;kms:GenerateDataKey*&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:kms:&amp;lt;KMS_KEY&amp;gt;&amp;#34;],&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;},{&amp;#34;Sid&amp;#34;: &amp;#34;DenyAuditLogsBucketCRUD&amp;#34;,&amp;#34;Effect&amp;#34;: &amp;#34;Deny&amp;#34;,&amp;#34;Action&amp;#34;: [&amp;#34;s3:PutObject&amp;#34;,&amp;#34;s3:PutObjectAcl&amp;#34;,&amp;#34;s3:DeleteObject&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:s3:::&amp;lt;AUDIT-LOG-BUCKET-NAME&amp;gt;/*&amp;#34;]}]} Why Is Delete Required In The Policy</description>
+    </item>
+    
     <item>
       <title>Cluster Configuration</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</link>
@@ -22,6 +32,27 @@
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/</guid>
       <description>Overwatch Deployment Configuration How it works Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as a csv format. This csv file will contain all the necessary details to perform the deployment. Since CSVs are a bit cantankerous we&amp;rsquo;ve offered two different methods for building the configuration file. If you&amp;rsquo;re good at VSCode or similar text editor and want to edit the CSV directly feel free to do so.</description>
+    </item>
+    
+    <item>
+      <title>Azure</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</guid>
+      <description>Under Construction &amp;ndash; we will be improving these docs shortly
+Access Connector External Location Cluster Logging Locations </description>
+    </item>
+    
+    <item>
+      <title>UC Pre-Requisites</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</guid>
+      <description>Unity Catalog Prerequisites The following pre-requisites are in addition to the pre-requisites documented in the UC Storage Requirements. After all UC Pre-requisites are completed, please continue to Deploy Overwatch section.
+This section will walk you through the steps necessary as a prerequisite to deploy Overwatch on Unity Catalog.
+Workspace should be UC enabled. Overwatch Pipeline Cluster must be UC enabled (single user and runtime version &amp;gt; 11.3+). Create Storage Credentials to be used by the external locations provisioned with appropriate read/write access to the UC External Location (AWS | GCP | AZURE) with privileges: READ FILES WRITE FILES CREATE EXTERNAL TABLE Create UC External location where Overwatch data is to be stored (AWS | GCP | AZURE).</description>
     </item>
     
     <item>
@@ -66,6 +97,26 @@ Scopes Scopes are the method by which Overwatch is segmented and a scope will co
     </item>
     
     <item>
+      <title>GCP</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</guid>
+      <description>Under Construction &amp;ndash; we will be improving these docs shortly
+Service Account Storage Credential External Location Cluster Logging Locations </description>
+    </item>
+    
+    <item>
+      <title>UC Configuration Details</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</guid>
+      <description>Configuration changes required for UC Enablement There is no unique configuration process for UC; however, the format for the THREE CONFIGURATIONS below are specific for UC Enablement. For all other configurations, please follow the Configuration
+etl_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;etl_database_name&amp;gt; consumer_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;consumer_database_name&amp;gt; storage_prefix - &amp;lt;UC External Location&amp;gt;/&amp;lt;storage_prefix&amp;gt; </description>
+    </item>
+    
+    <item>
       <title>As A JAR</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</link>
       <pubDate>Tue, 13 Dec 2022 16:09:01 -0500</pubDate>
@@ -95,6 +146,16 @@ Parameters As of 0.7.1.1 the config.csv referenced below can be any one of the f
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</guid>
       <description>Overwatch Data Promotion Process Overwatch data is promoted from bronze - silver - gold - presentation to ensure data consistency and quality as the data is enriched between the stages. The presentation layer is composed of views that reference the latest schema version of the gold layer. This disconnects the consumption layer from the underlying data structure so that developers can transparently add and alter columns without user disruption. All tables in each layer (except consumption) are suffixed in the ETL database with _layer.</description>
+    </item>
+    
+    <item>
+      <title>Migrating To UC</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/migratingtouc/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/migratingtouc/</guid>
+      <description>Migrating Existing Deployment From Hive_Metastore To UC Migrating a deployment from Hive Metastore has been made very simple. The steps are
+Complete the UC Pre-Requisites Ensure storage is set up correctly Update the Overwatch Configuration appropriately for UC Use the Migration Notebook below to migrate the data from Hive to UC Resume the job Migration Notebook Migration Notebook ( HTML | DBC ) Details to Run are in the notebook </description>
     </item>
     
     <item>
@@ -187,14 +248,23 @@ Configuration Basics The Overwatch configuration can be created as a case class 
     </item>
     
     <item>
-      <title>AWS</title>
+      <title>AWS/GCP</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</link>
       <pubDate>Mon, 12 Dec 2022 11:29:56 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</guid>
-      <description>Configuring Overwatch on AWS - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+      <description>Configuring Overwatch on AWS/GCP - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
 There are two primary sources of data that need to be configured:
-Audit Logs These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
+Audit Logs-AWS/Audit Logs-GCP These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
+    </item>
+    
+    <item>
+      <title>Configuration Details By Version</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</guid>
+      <description>Overwatch Deployment Configuration By Version 0.7.2.x Configuration 0.7.1.x Configuration Column description 0.7.2.x Column Type IsRequired Description workspace_name String True Name of the workspace. workspace_id String True Id of the workspace. workspace_url String True URL of the workspace. api_url String True API URL for the Workspace (execute in scala dbutils.notebook.getContext().apiUrl.get ON THE TARGET WORKSPACE NOT DEPLOYMENT WORKSPACE to get the API URL for the workspace. NOTE: Workspace_URL and API_URL can be different for a workspace but may be the same even for multiple workspaces).</description>
     </item>
     
   </channel>

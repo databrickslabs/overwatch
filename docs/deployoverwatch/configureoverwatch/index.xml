@@ -55,5 +55,14 @@ Validation rules Name Validation Rule Impacted columns Api Url Validation API UR
 Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.</description>
     </item>
     
+    <item>
+      <title>Configuration Details By Version</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</guid>
+      <description>Overwatch Deployment Configuration By Version 0.7.2.x Configuration 0.7.1.x Configuration Column description 0.7.2.x Column Type IsRequired Description workspace_name String True Name of the workspace. workspace_id String True Id of the workspace. workspace_url String True URL of the workspace. api_url String True API URL for the Workspace (execute in scala dbutils.notebook.getContext().apiUrl.get ON THE TARGET WORKSPACE NOT DEPLOYMENT WORKSPACE to get the API URL for the workspace. NOTE: Workspace_URL and API_URL can be different for a workspace but may be the same even for multiple workspaces).</description>
+    </item>
+    
   </channel>
 </rss>
