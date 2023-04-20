@@ -12,4 +12,4 @@ are specific for UC Enablement. For all other configurations, please follow the
 
 * **etl_database_name** - <catalog_name>.<etl_database_name>
 * **consumer_database_name** - <catalog_name>.<consumer_database_name>
-* **etl_storage_prefix** -  <UC External Location>/<storage_prefix>
+* **storage_prefix** -  <UC External Location\>/<storage_prefix>

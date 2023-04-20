@@ -15,8 +15,8 @@ Migrating a deployment from Hive Metastore has been made very simple. The steps 
 
 ### Migration Notebook 
 
-* **Migration Notebook** ( [**HTML**](/assets/DeployOverwatch/UC_Migration_Utility-Hive_metastore_To_Unity_Catalog.html) | 
-  [**DBC**](/assets/DeployOverwatch/UC_Migration_Utility-Hive_metastore_To_Unity_Catalog.dbc) )
+* **Migration Notebook** ( [**HTML**](/assets/DeployOverwatch/UC_Migration_Utility-Hive_Metastore_To_Unity_Catalog.html) | 
+  [**DBC**](/assets/DeployOverwatch/UC_Migration_Utility-Hive_Metastore_To_Unity_Catalog.dbc) )
     * Details to Run are in the notebook
 
 

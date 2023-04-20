@@ -209,7 +209,10 @@ accurately reflect a customer's costs.
   however, if some workers cannot be provisioned the worker_compute_cost will be slightly higher than actual while
   target_num_workers > current_num_workers. target_num_workers used here because the compute costs begin accumulating 
   as soon as the node is provisioned, not at the time it is added to the cluster.
-* **photon_kicker**: when runtime_engine == "Photon" and sku != "SqlCompute then 2 otherwise 1
+* **photon_kicker**: 
+  * when runtime_engine == "Photon" and sku != "SqlCompute" and isAutomated then 2.9 
+  * when runtime_engine == "Photon" and sku != "SqlCompute" and !isAutomated then 2 
+  * otherwise 1
 * **worker_dbus**: when databricks_billable --> current_num_workers * driver_hourly_dbus (instancedetails.hourlyDBUs) *
   uptime_in_state_H * photon_kicker --> otherwise 0
   * current_num_workers used here as dbu costs do not begin until the node able to receive workloads (i.e. node is
