@@ -42,8 +42,8 @@ For legacy deployment methods please reference the
 [Legacy Configuration Page]({{%relref "DeployOverwatch/ConfigureOverwatch/ConfigurationLegacy.md"%}})
 
 ### Run and Schedule the Job\[s\]
-Decide whether you'd like to execute Overwatch as a [JAR]({{%relref "DeployOverwatch/RunningOverwatch/JAR.md"%}}) 
-or a [NOTEBOOK]({{%relref "DeployOverwatch/RunningOverwatch/Notebook.md"%}}) and schedule a job to periodically 
+Decide whether you'd like to execute Overwatch as a [JAR]({{%relref "RunningOverwatch/JAR.md"%}}) 
+or a [NOTEBOOK]({{%relref "RunningOverwatch/Notebook.md"%}}) and schedule a job to periodically 
 execute the job.
 
 It's recommended to run Overwatch as a JAR as it unifies the deployment and doesn't depend on another asset 

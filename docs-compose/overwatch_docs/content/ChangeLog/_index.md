@@ -4,6 +4,29 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.2.0
+### Upgrading
+There were a few column name changes to the config file (multi-workspace). Please run this script to update your 
+config file if upgrading from 071x multi-workspace deployment. **[HTML](/assets/ChangeLog/0720_Upgrade.html) | [DBC](/assets/ChangeLog/0720_Upgrade.dbc)**
+
+### Major Features
+* Enablement for **GCP**
+  * Overwatch can now be deployed on Google Compute. The process is identical to AWS 
+* Enablement for **Unity Catalog**
+  * Customers can now deploy to either Hive Metastore or Unity Catalog (UC)
+  * To deploy to UC follow the guide for [Deploying To Unity Catalog]({{%relref "DeployOverwatch/UCEDeployment"%}})
+  * To migrate existing Hive Metastore deployments to a UC, follow the [Migrating To UC]({{%relref "DeployOverwatch/UCEDeployment/MigratingToUC.md"%}}) guide
+* Enablement for **Event Hub Auth via AAD** in multi-workspace deployments
+* **Search enabled** for docs
+* **Updated instanceDetails** node types to include all new supported node types as of April 12, 2023. 
+
+### Key Bug Fixes
+* Single Tenant Multi-Workspace None.get issue for workspaceID
+* Pipeline output showing 0 Output Rows for merged tables | [Issue 692](https://github.com/databrickslabs/overwatch/issues/692)
+* (Azure) When Event Hub Library Dependency is missing / corrupted kill bronze pipeline properly
+
+[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/5?closed=1)
+
 ## 0.7.1.3
 * Data Quality Fixes - primarily around cost and utilization
 * **Upgrade Process**

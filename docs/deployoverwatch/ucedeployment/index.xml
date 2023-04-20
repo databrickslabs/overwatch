@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Deploying To Unity Catalog on Overwatch</title>
+    <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/</link>
+    <description>Recent content in Deploying To Unity Catalog on Overwatch</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Tue, 18 Apr 2023 11:28:39 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>UC Pre-Requisites</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</guid>
+      <description>Unity Catalog Prerequisites The following pre-requisites are in addition to the pre-requisites documented in the UC Storage Requirements. After all UC Pre-requisites are completed, please continue to Deploy Overwatch section.
+This section will walk you through the steps necessary as a prerequisite to deploy Overwatch on Unity Catalog.
+Workspace should be UC enabled. Overwatch Pipeline Cluster must be UC enabled (single user and runtime version &amp;gt; 11.3+). Create Storage Credentials to be used by the external locations provisioned with appropriate read/write access to the UC External Location (AWS | GCP | AZURE) with privileges: READ FILES WRITE FILES CREATE EXTERNAL TABLE Create UC External location where Overwatch data is to be stored (AWS | GCP | AZURE).</description>
+    </item>
+    
+    <item>
+      <title>UC Configuration Details</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</guid>
+      <description>Configuration changes required for UC Enablement There is no unique configuration process for UC; however, the format for the THREE CONFIGURATIONS below are specific for UC Enablement. For all other configurations, please follow the Configuration
+etl_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;etl_database_name&amp;gt; consumer_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;consumer_database_name&amp;gt; storage_prefix - &amp;lt;UC External Location&amp;gt;/&amp;lt;storage_prefix&amp;gt; </description>
+    </item>
+    
+    <item>
+      <title>Migrating To UC</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/migratingtouc/</link>
+      <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/migratingtouc/</guid>
+      <description>Migrating Existing Deployment From Hive_Metastore To UC Migrating a deployment from Hive Metastore has been made very simple. The steps are
+Complete the UC Pre-Requisites Ensure storage is set up correctly Update the Overwatch Configuration appropriately for UC Use the Migration Notebook below to migrate the data from Hive to UC Resume the job Migration Notebook Migration Notebook ( HTML | DBC ) Details to Run are in the notebook </description>
+    </item>
+    
+  </channel>
+</rss>
