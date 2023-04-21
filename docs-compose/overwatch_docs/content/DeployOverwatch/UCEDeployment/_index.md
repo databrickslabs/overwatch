@@ -4,11 +4,17 @@ date: 2023-04-18T11:28:39-05:00
 weight: 5
 ---
 
+{{% notice note %}}
+At this time Overwatch only supports Unity Catalog External Tables. Overwatch was designed to operate with external 
+tables and this strategy has been mirrored to the UC deployments as well. We're investigating options for enabling 
+Overwatch on UC Managed Tables.
+{{% /notice %}}
+
 Deploying Overwatch to a Unity Catalog is nearly exactly the same as deploying to a Hive Metastore with a few 
 additional pre-requisites to configure auth for UC underlying storage, External Locations, Catalogs, and Schemas. 
 
 This guide assumes the reader has an understanding of Unity Catalog, Storage Credentials, and External Locations. 
-For more details on how these components work together to provide fine grained ACLs to data and storage please see 
+For more details on how these components work together to provide fine-grained ACLs to data and storage please see 
 the [Databricks Docs for Unity Catalog](https://docs.databricks.com/data-governance/unity-catalog/index.html)
 
 ## UC Deployment Specific Differences

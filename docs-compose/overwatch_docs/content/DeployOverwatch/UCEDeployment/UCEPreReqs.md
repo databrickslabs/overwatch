@@ -6,13 +6,13 @@ weight: 2
 
 ## Unity Catalog Prerequisites
 
-The following pre-requisites are in addition to the pre-requisites documented in the
-[UC Storage Requirements]({{%relref "DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/"%}}). After 
-all UC Pre-requisites are completed, please continue to [Deploy Overwatch]({{%relref "DeployOverwatch/"%}}) section.
+After all UC Pre-requisites are completed, please continue to [Deploy Overwatch]({{%relref "DeployOverwatch/"%}}) 
+section.
 
 This section will walk you through the steps necessary as a prerequisite to deploy Overwatch on Unity Catalog.
 * **Workspace** should be **UC enabled**.
 * Overwatch Pipeline **Cluster** must be **UC enabled** (single user and runtime version > 11.3+).
+* [UC **Storage Requirements**]({{%relref "DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/"%}})
 * Create **Storage Credentials** to be used by the external locations provisioned with appropriate read/write 
   access to the UC External Location
   ([AWS](https://docs.databricks.com/data-governance/unity-catalog/manage-external-locations-and-credentials.html#create-a-storage-credential) | 
@@ -27,22 +27,28 @@ This section will walk you through the steps necessary as a prerequisite to depl
   [GCP](https://docs.gcp.databricks.com/data/manage-external-locations.html#manage-unity-catalog-external-locations-in-data-explorer) | 
   [AZURE](https://learn.microsoft.com/en-gb/azure/databricks/data/manage-external-locations#create-external-location)). 
   Provide ALL PRIVILEGES permission to the principal (user/SP) that is going to run the Overwatch Pipeline.
+  * Ensure the external location path is pointing to the same storage location to which the storage credential's 
+  identity was authorized
 * Create a **Catalog** or identify an existing catalog where overwatch data will be stored. 
   **Overwatch** code **WILL NOT** create the catalog, it must be pre-existing.
 * Principal (user/SP) executing the Overwatch Pipeline must have access to the **catalog** with **privileges**:
   * USE CATALOG
   * USE SCHEMA
   * SELECT
-* **Create ETL and Consumer Schemas** (i.e. databases). Overwatch **WILL NOT** create the Schemas in a UC Deployment. 
+* **Create ETL and Consumer Schemas** (i.e. databases). **Overwatch WILL NOT** create the Schemas in a UC Deployment. 
   Principal (user/SP) executing the Overwatch Pipeline must have the following privileges on the Schema AND must be 
   an Owner of the Schema.
   * IS OWNER -- required since schema metadata is edited and requires schema ownership
-    * The schema owner can be a user, service principal, or group.
+    * The schema owner can be a user, service principal, or group. It's recommended that you provision an 
+    Overwatch_Maintainers group and place the Overwatch Admin users in this group along with any service principals
+    that will be writing data to the output and assign this group as owner of the Overwatch schemas.
   * USE SCHEMA
   * CREATE TABLE
   * MODIFY
   * SELECT
-* Overwatch latest version(0.7.1.0+) should be deployed in the workspace
+* Overwatch latest version(0.7.2.0+) should be deployed in the workspace
+  * 0.7.1.1+ is ok so long as the [migration process]({{%relref "DeployOverwatch/UCEDeployment/MigratingToUC"%}}) 
+  is completed before executing with Unity Catalog configurations.
 * Other overwatch prerequisites can be found [here](https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/)
 
 ## SQL Command to Grant Permissions to various UC Objects

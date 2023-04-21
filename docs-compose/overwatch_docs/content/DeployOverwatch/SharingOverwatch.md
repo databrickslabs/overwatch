@@ -4,11 +4,27 @@ date: 2022-12-15T18:31:01-05:00
 weight: 4
 ---
 
-## Providing Access to Consumers
+## Granting Access Via DBSQL
+If your storage prefix is referencing a mount point, nothing should be necessary here as the mount point is already 
+accessible to all workspace users. If using a direct path (i.e. s3://, abfss://, or gs://) you will need to configure 
+the appropriate access in Admin Settings --> SQL Warehouse Settings.
+
+If using a **Hive Metastore** you may still need to review your grants to ensure users have access to the Overwatch 
+tables / views. Additionally, you may need to grant select on any file to the appropriate user groups if direct path 
+is used for overwatch instead of a mount point.
+```GRANT SELECT ON ANY FILE TO `<user>@<domain-name>` ```
+
+If using **Unity Catalog** be sure to provision the appropriate access to the user groups on the Overwatch Schemas.
+
+## Providing Access to Consumers On Remote Workspaces
 Now that Overwatch is deployed, it's likely that you want to share some or all of the data with stakeholders.
 We've made that easy to do across workspaces with a single function and it's parameters 
 `Helpers.registerRemoteOverwatchIntoLocalMetastore`. This is a one time command 
 that must be run on the workspace that wants to consumer the Overwatch Data.
+
+{{% notice note %}}
+This is only necessary when using multi-workspace deployment and not using a shared metastore.
+{{% /notice %}}
 
 ### Registering Overwatch On Remote Workspaces
 The command below is the simplest version and will publish the etl and consumer databases with all the data to the 
