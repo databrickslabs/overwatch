@@ -40,8 +40,9 @@ AWS IAM/Policy required to set up for Storage Credentials {&amp;#34;Version&amp
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</guid>
-      <description>Under Construction &amp;ndash; we will be improving these docs shortly
-Access Connector External Location Cluster Logging Locations </description>
+      <description>Creating the Managed Identity Create a Managed Identity to authorize access to the external location. This managed Identity will be configured using a Databricks Storage Credential. Databricks recommends using an Access Connector for Azure Databricks.
+After the managed identity is created, it needs to be provisioned read/write access to the storage target for the Overwatch Output (which will ultimately become your external location).
+Provisioning the Managed Identity to The Storage If you intend to provision the managed identity to the storage account you need to grant the managed identity</description>
     </item>
     
     <item>
@@ -50,9 +51,9 @@ Access Connector External Location Cluster Logging Locations </description>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</guid>
-      <description>Unity Catalog Prerequisites The following pre-requisites are in addition to the pre-requisites documented in the UC Storage Requirements. After all UC Pre-requisites are completed, please continue to Deploy Overwatch section.
+      <description>Unity Catalog Prerequisites After all UC Pre-requisites are completed, please continue to Deploy Overwatch section.
 This section will walk you through the steps necessary as a prerequisite to deploy Overwatch on Unity Catalog.
-Workspace should be UC enabled. Overwatch Pipeline Cluster must be UC enabled (single user and runtime version &amp;gt; 11.3+). Create Storage Credentials to be used by the external locations provisioned with appropriate read/write access to the UC External Location (AWS | GCP | AZURE) with privileges: READ FILES WRITE FILES CREATE EXTERNAL TABLE Create UC External location where Overwatch data is to be stored (AWS | GCP | AZURE).</description>
+Workspace should be UC enabled. Overwatch Pipeline Cluster must be UC enabled (single user and runtime version &amp;gt; 11.3+). UC Storage Requirements Create Storage Credentials to be used by the external locations provisioned with appropriate read/write access to the UC External Location (AWS | GCP | AZURE) with privileges: READ FILES WRITE FILES CREATE EXTERNAL TABLE Create UC External location where Overwatch data is to be stored (AWS | GCP | AZURE).</description>
     </item>
     
     <item>
@@ -164,8 +165,8 @@ Complete the UC Pre-Requisites Ensure storage is set up correctly Update the Ove
       <pubDate>Thu, 15 Dec 2022 18:31:01 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</guid>
-      <description>Providing Access to Consumers Now that Overwatch is deployed, it&amp;rsquo;s likely that you want to share some or all of the data with stakeholders. We&amp;rsquo;ve made that easy to do across workspaces with a single function and it&amp;rsquo;s parameters Helpers.registerRemoteOverwatchIntoLocalMetastore. This is a one time command that must be run on the workspace that wants to consumer the Overwatch Data.
-Registering Overwatch On Remote Workspaces The command below is the simplest version and will publish the etl and consumer databases with all the data to the workspace on which the command is run.</description>
+      <description>Granting Access Via DBSQL If your storage prefix is referencing a mount point, nothing should be necessary here as the mount point is already accessible to all workspace users. If using a direct path (i.e. s3://, abfss://, or gs://) you will need to configure the appropriate access in Admin Settings &amp;ndash;&amp;gt; SQL Warehouse Settings.
+If using a Hive Metastore you may still need to review your grants to ensure users have access to the Overwatch tables / views.</description>
     </item>
     
     <item>

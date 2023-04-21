@@ -12,21 +12,21 @@
     <title>Azure :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1682018393" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1682094763" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1682018393" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1682094763" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1682018393"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1682094763"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1682018393"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1682018393"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1682094763"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1682094763"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1682018393"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1682094763"></script>
 
     
   </div>
@@ -1247,6 +1247,10 @@ situation like this, the minimum autoscaling compute size should approximately e
 minimize waste.</p>
 </div>
 
+<p>Overwatch needs access to the Event Hub. There are two methods for provisioning access, either a
+<a href="#step-21-authorizing-access-via-sas-policy">SAS Policy with keys in the connection string</a>OR
+<a href="#step-22-authorizing-access-via-aad-spn">AAD SPN</a>. Chose your method and follow the docs below.</p>
+<h5 id="step-21-authorizing-access-via-sas-policy">Step 2.1 Authorizing Access Via SAS Policy</h5>
 <p>Once created, get the connection string from the SAS Policy for the Event Hub, find the following path in the Azure portal below.</p>
 <p>eh-namespace &ndash;&gt; eventhub &ndash;&gt; shared access policies &ndash;&gt; Connection String-primary key</p>
 <p>The connection string should begin with <code>Endpoint=sb://</code>. Note that the policy only needs the Listen permission</p>
@@ -1255,9 +1259,26 @@ minimize waste.</p>
 <img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/sas2.png" alt="sas2">
 <img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/sas3.png" alt="sas3">
 Copy the Connection string-primary key and create a secret using Key vault</p>
+<h5 id="step-22-authorizing-access-via-aad-spn">Step 2.2 Authorizing Access Via AAD SPN</h5>
+<p>Navigate either to the EH Namespace or the Event Hub (whichever is appropriate for you), click on
+&ldquo;Access Control (IAM)&rdquo; and then click add &ndash;&gt; Add Role Assignment. Choose the Role
+&ldquo;Azure Event Hubs Data Receiver&rdquo; and add the principal you would like to provision &ndash;&gt; review and assign.</p>
+<p>Now the Principal has access to the EH or EHNS, now you just need to capture the details of the SPN to provide to
+Overwatch configs. These can be found by going to the SPN Overview Active Directory &ndash;&gt; App Registrations &ndash;&gt;
+click the principal. Now capture the details in the screenshot below.</p>
+<p><img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/SPN_Client_tenant_id.png" alt="client_tenant_ids"></p>
+<p>Now a secret needs to be created (if one doesn&rsquo;t already exist), so from the previous screen click
+&ldquo;Certificates &amp; Secrets&rdquo; &ndash;&gt; &ldquo;New Client Secret&rdquo;. Be sure to capture the secret as it won&rsquo;t be visible later.
+Create a Databricks Secret and place the SPN secret in the Databricks secret. This is the value needed to use the
+AAD SPN to complete the rest of the AAD required configs.</p>
+<p>The last thing you need is your <strong>connection string</strong> and that can be found by navigating back to your Event Hub
+** be sure to get to the Event Hub not the Event Hub Namespace (i.e EHNS &ndash;&gt; Event Hubs &ndash;&gt; Event Hub). Then in the
+Overview section you will see &ldquo;Namespace&rdquo;, we will use this to construct the connection string.</p>
+<p>Endpoint=sb://&lt;namespace&gt;.servicebus.windows.net
+<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/eh_namespace.png" alt="EH_Namespace"></p>
 <h4 id="step-3">Step 3</h4>
-<p>With your Event Hub Namespace and Named Event Hub created with data flowing,
-Navigate to your the Azure Databricks workspace[s] (in the portal) for which you&rsquo;d like
+<p>With your Event Hub Namespace and Named Event Hub created,
+Navigate to your Azure Databricks workspace[s] (in the portal) for which you&rsquo;d like
 to enable Overwatch. Under Monitoring section &ndash;&gt; Diagnostics settings &ndash;&gt; Add diagnostic setting. Configure
 your log delivery similar to the example in the image below.</p>
 <p>Additionally, ensure that the Overwatch account has sufficient privileges to read data from the Event Hub[s] created
@@ -1272,10 +1293,10 @@ event hub underneath the event hub namespace and give it a name. Reference the n
 
 <p><img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/EH_BaseConfig.png" alt="EH_Base_Setup"></p>
 <h4 id="step-4-validate-messages-are-flowing">Step 4: Validate Messages Are Flowing</h4>
-<p>Now that you have configured you Overwatch EventHub Namespace, named Event Hub inside of the namespace, and
+<p>Now that you have configured you Overwatch EventHub Namespace, named Event Hub inside the namespace, and
 pointed diagnostic logging to the EventHub it&rsquo;s
 time to validate that messages are flowing. You may have to wait several minutes to begin to see messages flowing
-depending on how busy the workspace is. There are two things that are commonly missed, please double check the
+depending on how busy the workspace is. There are two things that are commonly missed, please double-check the
 two bullet points below, there are images to help clarify as well.</p>
 <ul>
 <li>A named Event Hub has been created within the Namespace.</li>
@@ -1300,7 +1321,7 @@ maximize bandwidth.</p>
 
 <h3 id="overview">OVERVIEW</h3>
 <p>Barring the security and networking sections, once you&rsquo;re setup is complete, your configuration should look similar
-the the image below.
+the image below.
 <img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/storage_acc_7.png" alt="Storage Overview"></p>
 <h3 id="step-1-1">Step 1</h3>
 <p>Select Storage Account from your Azure Portal and hit create</p>
@@ -2009,19 +2030,19 @@ storage account as it has not been fully tested. Container soft deletes are fine
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1682018393"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1682094763"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1682018393"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1682094763"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1682018393" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1682018393"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1682094763" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1682094763"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

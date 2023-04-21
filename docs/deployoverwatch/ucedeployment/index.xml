@@ -12,9 +12,9 @@
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</guid>
-      <description>Unity Catalog Prerequisites The following pre-requisites are in addition to the pre-requisites documented in the UC Storage Requirements. After all UC Pre-requisites are completed, please continue to Deploy Overwatch section.
+      <description>Unity Catalog Prerequisites After all UC Pre-requisites are completed, please continue to Deploy Overwatch section.
 This section will walk you through the steps necessary as a prerequisite to deploy Overwatch on Unity Catalog.
-Workspace should be UC enabled. Overwatch Pipeline Cluster must be UC enabled (single user and runtime version &amp;gt; 11.3+). Create Storage Credentials to be used by the external locations provisioned with appropriate read/write access to the UC External Location (AWS | GCP | AZURE) with privileges: READ FILES WRITE FILES CREATE EXTERNAL TABLE Create UC External location where Overwatch data is to be stored (AWS | GCP | AZURE).</description>
+Workspace should be UC enabled. Overwatch Pipeline Cluster must be UC enabled (single user and runtime version &amp;gt; 11.3+). UC Storage Requirements Create Storage Credentials to be used by the external locations provisioned with appropriate read/write access to the UC External Location (AWS | GCP | AZURE) with privileges: READ FILES WRITE FILES CREATE EXTERNAL TABLE Create UC External location where Overwatch data is to be stored (AWS | GCP | AZURE).</description>
     </item>
     
     <item>
