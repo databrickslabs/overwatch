@@ -12,21 +12,21 @@
     <title>Data Dictionary (Latest) :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1682018393" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1682018393" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1682094763" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1682094763" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1682018393" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1682094763" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1682018393"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1682094763"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1682018393"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1682018393"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1682094763"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1682094763"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1682018393"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1682094763"></script>
 
     
   </div>
@@ -1414,7 +1414,7 @@ updated on the subsequent run.</p>
 <td style="text-align:left">number of workers in use by the cluster at the start of the state</td>
 </tr>
 <tr>
-<td style="text-align:left">target_num_worers</td>
+<td style="text-align:left">target_num_workers</td>
 <td style="text-align:left">long</td>
 <td style="text-align:left">number of workers targeted to be present by the completion of the state. Should be equal to <em>current_num_workers</em> except during RESIZING state</td>
 </tr>
@@ -1461,7 +1461,7 @@ updated on the subsequent run.</p>
 <tr>
 <td style="text-align:left">dbu_rate</td>
 <td style="text-align:left">double</td>
-<td style="text-align:left">Effective dbu rate used for calculations (effective at time of pipeline run)</td>
+<td style="text-align:left">Effective dbu rate used for calculations (effective at time of pipeline run) excluding dbu increases due to photon &ndash; photon uplifts included in dbu_totals</td>
 </tr>
 <tr>
 <td style="text-align:left">runtime_engine</td>
@@ -1572,25 +1572,36 @@ as soon as the node is provisioned, not at the time it is added to the cluster.<
 </li>
 <li><strong>photon_kicker</strong>:
 <ul>
-<li>when runtime_engine == &ldquo;Photon&rdquo; and sku != &ldquo;SqlCompute&rdquo; and isAutomated then 2.9</li>
-<li>when runtime_engine == &ldquo;Photon&rdquo; and sku != &ldquo;SqlCompute&rdquo; and !isAutomated then 2</li>
+<li>WHEN runtime_engine == &ldquo;Photon&rdquo; and sku != &ldquo;SqlCompute&rdquo; and isAutomated THEN 2.9</li>
+<li>WHEN runtime_engine == &ldquo;Photon&rdquo; and sku != &ldquo;SqlCompute&rdquo; and !isAutomated THEN 2</li>
 <li>otherwise 1</li>
 </ul>
 </li>
-<li><strong>worker_dbus</strong>: when databricks_billable &ndash;&gt; current_num_workers * driver_hourly_dbus (instancedetails.hourlyDBUs) *
-uptime_in_state_H * photon_kicker &ndash;&gt; otherwise 0
+<li><strong>worker_dbus</strong>:
 <ul>
-<li>current_num_workers used here as dbu costs do not begin until the node able to receive workloads (i.e. node is
-moved from target_worker to current_worker / &ldquo;upsize_complete&rdquo; state)</li>
+<li>WHEN databricks_billable and !SingleNode THEN current_num_workers * driver_hourly_dbus
+(instancedetails.hourlyDBUs) * uptime_in_state_H * photon_kicker
+<ul>
+<li>NOTE: current_num_workers == current_worker, not target. current_num_workers only includes worker nodes after they
+have become ready and able to receive workloads.</li>
+</ul>
+</li>
+<li>otherwise 0</li>
 </ul>
 </li>
 <li><strong>driver_dbus</strong>: when databricks_billable &ndash;&gt; driver_hourly_dbus (instancedetails.hourlyDBUs) *
-uptime_in_state_H * photon_kicker &ndash;&gt; otherwise 0</li>
+uptime_in_state_H * photon_kicker &ndash;&gt; otherwise 0
+<ul>
+<li>NOTE: In Single Node Clusters &ndash; only the driver will have dbus</li>
+</ul>
+</li>
 <li><strong>worker_dbu_cost</strong>: houry_dbu_rate for sku (dbuCostDetails.contract_price) * worker_dbus</li>
 <li><strong>driver_dbu_cost</strong>: houry_dbu_rate for sku (dbuCostDetails.contract_price) * driver_dbus</li>
 </ul>
 
-<div class="notices note" ><p>Cost will not Appear untill State is changed to a state that modify the no of workers i.e. until the Cluster is Restarted or Resized(both Autoscaling or Manual)</p>
+<div class="notices note" ><p>Cost may not appear for a cluster until a state change is observed (i.e. starting/terminating/expanded_disk/resizing/etc).
+This means that Overwatch may not recognize costs for a cluster until at least one state change has been observed by
+Overwatch since the primordial date (or first run date - 30d whichever is greater).</p>
 </div>
 
 <h4 id="instancedetails">InstanceDetails</h4>
@@ -2350,12 +2361,12 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <tr>
 <td style="text-align:left">task_runtime</td>
 <td style="text-align:left">struct</td>
-<td style="text-align:left">The runtime of the task from launch to termination (including compute spin-up time)</td>
+<td style="text-align:left">The runtime of the task from start to termination. Databricks does not publish task_launch_time</td>
 </tr>
 <tr>
 <td style="text-align:left">task_execution_runtime</td>
 <td style="text-align:left">struct</td>
-<td style="text-align:left">The execution time of the task (excluding compute spin-up time)</td>
+<td style="text-align:left">Until Databricks publishes task_launch_time this will equal task_runtime</td>
 </tr>
 <tr>
 <td style="text-align:left">cluster_type</td>
@@ -2405,7 +2416,7 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <tr>
 <td style="text-align:left">run_cluster_states</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">Count of cluster states during the job run</td>
+<td style="text-align:left">Count of cluster state transitions during the job run</td>
 </tr>
 <tr>
 <td style="text-align:left">driver_node_type_id</td>
@@ -2607,12 +2618,12 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <tr>
 <td style="text-align:left">compilation_time_ms</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">Query compilation time in ms</td>
+<td style="text-align:left">Time spent loading metadata and optimizing the query, in milliseconds.</td>
 </tr>
 <tr>
 <td style="text-align:left">execution_time_ms</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">Query execution time in ms</td>
+<td style="text-align:left">ime spent executing the query, in milliseconds.</td>
 </tr>
 <tr>
 <td style="text-align:left">network_sent_bytes</td>
@@ -2622,7 +2633,7 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <tr>
 <td style="text-align:left">photon_total_time_ms</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">Total time in ms Photon engine executed</td>
+<td style="text-align:left">Total execution time for all individual Photon query engine tasks in the query, in milliseconds.</td>
 </tr>
 <tr>
 <td style="text-align:left">pruned_bytes</td>
@@ -2662,7 +2673,7 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <tr>
 <td style="text-align:left">result_fetch_time_ms</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">Time taken in ms to fetch the results</td>
+<td style="text-align:left">Time spent fetching the query results after the execution finished, in milliseconds.</td>
 </tr>
 <tr>
 <td style="text-align:left">result_from_cache</td>
@@ -2687,12 +2698,12 @@ a cluster state, a run that continues across cluster-state lines will result in 
 <tr>
 <td style="text-align:left">task_total_time_ms</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">Total time taken by task to complete in ms</td>
+<td style="text-align:left">Sum of execution time for all of the query’s tasks, in milliseconds.</td>
 </tr>
 <tr>
 <td style="text-align:left">total_time_ms</td>
 <td style="text-align:left">long</td>
-<td style="text-align:left">Total time taken by query in ms</td>
+<td style="text-align:left">Total execution time of the query from the client’s point of view, in milliseconds. This is equivalent to duration</td>
 </tr>
 <tr>
 <td style="text-align:left">write_remote_bytes</td>
@@ -4422,19 +4433,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1682018393"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1682094763"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1682018393"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1682018393"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1682094763"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1682094763"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1682018393" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1682018393"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1682094763" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1682094763"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

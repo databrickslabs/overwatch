@@ -164,7 +164,7 @@ updated on the subsequent run.
 | \*_state_end            | various     | timestamp reference column at the time the state ended                                                                                                         |
 | state                   | string      | state of the cluster -- full list [HERE](https://docs.databricks.com/dev-tools/api/latest/clusters.html#clustereventtype)                                      |
 | current_num_workers     | long        | number of workers in use by the cluster at the start of the state                                                                                              |
-| target_num_worers       | long        | number of workers targeted to be present by the completion of the state. Should be equal to *current_num_workers* except during RESIZING state                 |
+| target_num_workers      | long        | number of workers targeted to be present by the completion of the state. Should be equal to *current_num_workers* except during RESIZING state                 |
 | uptime_since_restart_S  | double      | Seconds since the cluster was last restarted / terminated                                                                                                      |
 | uptime_in_state_S       | double      | Seconds the cluster spent in current state                                                                                                                     |
 | uptime_in_state_H       | double      | Hours the cluster spent in current state                                                                                                                       |
@@ -173,7 +173,7 @@ updated on the subsequent run.
 | cloud_billable          | boolean     | All current known states are cloud billable. This means that cloud provider charges are present during this state                                              |
 | databricks_billable     | boolean     | State incurs databricks DBU costs. All states incur DBU costs except: INIT_SCRIPTS_FINISHED, INIT_SCRIPTS_STARTED, STARTING, TERMINATING, CREATING, RESTARTING |
 | isAutomated             | boolean     | Whether the cluster was created as an "automated" or "interactive" cluster                                                                                     |
-| dbu_rate                | double      | Effective dbu rate used for calculations (effective at time of pipeline run)                                                                                   |
+| dbu_rate                | double      | Effective dbu rate used for calculations (effective at time of pipeline run) excluding dbu increases due to photon -- photon uplifts included in dbu_totals    |
 | runtime_engine          | string      | One of STANDARD or PHOTON. When PHOTON, pricing is adjusted when deriving the dbu_costs                                                                        |
 | state_dates             | array<date> | Array of all dates across which the state spanned                                                                                                              |
 | days_in_state           | int         | Number of days in state                                                                                                                                        |
@@ -210,20 +210,25 @@ accurately reflect a customer's costs.
   target_num_workers > current_num_workers. target_num_workers used here because the compute costs begin accumulating 
   as soon as the node is provisioned, not at the time it is added to the cluster.
 * **photon_kicker**: 
-  * when runtime_engine == "Photon" and sku != "SqlCompute" and isAutomated then 2.9 
-  * when runtime_engine == "Photon" and sku != "SqlCompute" and !isAutomated then 2 
+  * WHEN runtime_engine == "Photon" and sku != "SqlCompute" and isAutomated THEN 2.9 
+  * WHEN runtime_engine == "Photon" and sku != "SqlCompute" and !isAutomated THEN 2 
   * otherwise 1
-* **worker_dbus**: when databricks_billable --> current_num_workers * driver_hourly_dbus (instancedetails.hourlyDBUs) *
-  uptime_in_state_H * photon_kicker --> otherwise 0
-  * current_num_workers used here as dbu costs do not begin until the node able to receive workloads (i.e. node is
-      moved from target_worker to current_worker / "upsize_complete" state)
+* **worker_dbus**: 
+  * WHEN databricks_billable and !SingleNode THEN current_num_workers * driver_hourly_dbus 
+    (instancedetails.hourlyDBUs) * uptime_in_state_H * photon_kicker
+    * NOTE: current_num_workers == current_worker, not target. current_num_workers only includes worker nodes after they 
+    have become ready and able to receive workloads.
+  * otherwise 0
 * **driver_dbus**: when databricks_billable --> driver_hourly_dbus (instancedetails.hourlyDBUs) *
   uptime_in_state_H * photon_kicker --> otherwise 0
+  * NOTE: In Single Node Clusters -- only the driver will have dbus
 * **worker_dbu_cost**: houry_dbu_rate for sku (dbuCostDetails.contract_price) * worker_dbus
 * **driver_dbu_cost**: houry_dbu_rate for sku (dbuCostDetails.contract_price) * driver_dbus
 
 {{% notice note %}}
-Cost will not Appear untill State is changed to a state that modify the no of workers i.e. until the Cluster is Restarted or Resized(both Autoscaling or Manual)
+Cost may not appear for a cluster until a state change is observed (i.e. starting/terminating/expanded_disk/resizing/etc). 
+This means that Overwatch may not recognize costs for a cluster until at least one state change has been observed by 
+Overwatch since the primordial date (or first run date - 30d whichever is greater).
 {{% /notice %}}
 
 #### InstanceDetails
@@ -514,8 +519,8 @@ across the concurrent runs but not the days running since this fact table is not
 | repair_id               | long        | If the task or job was repaired, the repair id will be present here and the details of the repair will be in repair_details                                                                                                                                                                                                                                                                                                                                                                                              |
 | task_key                | string      | The name of the task is actually a key and must be unique within a job, this field specifies the task that was executed in this task_run_id                                                                                                                                                                                                                                                                                                                                                                              |
 | task_type               | string      | Type of task to be executed -- this should mirror the "type" selected in the "type" drop down in the job definition. May be null for submitRun as this jobType                                                                                                                                                                                                                                                                                                                                                           |
-| task_runtime            | struct      | The runtime of the task from launch to termination (including compute spin-up time)                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| task_execution_runtime  | struct      | The execution time of the task (excluding compute spin-up time)                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| task_runtime            | struct      | The runtime of the task from start to termination. Databricks does not publish task_launch_time                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| task_execution_runtime  | struct      | Until Databricks publishes task_launch_time this will equal task_runtime                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | cluster_type            | string      | Type of type cluster used in the execution, one of "automated", "interactive, null -- will be null for DLT pipelines and/or in situations where the type is not provided from Databricks. In the future you can expect "SQL Warehouse" and other types of compute to show up here.                                                                                                                                                                                                                                       |
 | cluster_id              | string      | The cluster ID of the compute used to execute the task run. If task executed on a SQL Warehouse, the warehouse_id will be populated here.                                                                                                                                                                                                                                                                                                                                                                                |
 | cluster_name            | string      | The name of the compute asset used to execute the task run                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -525,7 +530,7 @@ across the concurrent runs but not the days running since this fact table is not
 | avg_cluster_share       | double      | Average share of the cluster the run had available assuming fair scheduling. This DOES NOT account for activity outside of jobs (i.e. interactive notebooks running alongside job runs), this measure only splits out the share among concurrent job runs. Measure is only calculated for interactive clusters, automated clusters assume 100% run allocation. For more granular utilization detail, enable cluster logging and utilize "job_run_cluster_util" column which derives utilization at the spark task level. |
 | avg_overlapping_runs    | double      | Number of concurrent runs shared by the cluster on average throughout the run                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | max_overlapping_runs    | long        | Highest number of concurrent runs on the cluster during the run                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| run_cluster_states      | long        | Count of cluster states during the job run                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| run_cluster_states      | long        | Count of cluster state transitions during the job run                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | driver_node_type_id     | string      | Driver Node type for the compute asset (not supported for Warehouses yet)                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | node_type_id            | string      | Worker Node type for the compute asset (not supported for Warehouses yet)                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | worker_potential_core_H | double      | cluster core hours capable of executing spark tasks, "potential"                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -556,45 +561,45 @@ across the concurrent runs but not the days running since this fact table is not
 
 **Write Mode** -- Merge
 
-| Column                | Type   | Description                                                                                         |
-|:----------------------|:-------|:----------------------------------------------------------------------------------------------------|
-| organization_id       | string | Canonical workspace id                                                                              |
-| workspace_name        | string | Customizable human-legible name of the workspace, should be globally unique within the organization |
-| warehouse_id          | string | ID of the SQL warehouse.                                                                            |
-| query_id              | string | ID of the query executed in the warehouse                                                           |
-| query_end_time_ms     | long   | Query execution end time                                                                            |
-| user_name             | string | User name who created the query                                                                     |
-| user_id               | long   | Id of the user who created the query                                                                |
-| executed_as_user_id   | long   | Id of the user who executed the query                                                               |
-| executed_as_user_name | string | User name who executed the query                                                                    |
-| duration              | long   | Duration of the query execution                                                                     |
-| error_message         | string | Error message for failed queries                                                                    |
-| execution_end_time_ms | long   | Query execution end time in ms                                                                      |
-| query_start_time_ms   | long   | Query start time in ms                                                                              |
-| query_text            | text   | Query text which is executed in the warehouse                                                       |
-| rows_produced         | long   | Number of rows returned as query output                                                             |
-| spark_ui_url          | string | URL of the Spark UI                                                                                 |
-| statement_type        | string | Statement type of the query being executed, e.g - Select, Update etc                                |
-| status                | string | Current status of the query being executed, e.g - FINISHED, RUNNING etc                             |
-| compilation_time_ms   | long   | Query compilation time in ms                                                                        |
-| execution_time_ms     | long   | Query execution time in ms                                                                          |
-| network_sent_bytes    | long   | Size of data transferred over network in bytes                                                      |
-| photon_total_time_ms  | long   | Total time in ms Photon engine executed                                                             |
-| pruned_bytes          | long   | Size of data pruned in bytes                                                                        |
-| pruned_files_count    | long   | Total number of files pruned                                                                        |
-| read_bytes            | long   | Size of data red in bytes                                                                           |
-| read_cache_bytes      | long   | Size of data cached during reading in bytes                                                         |
-| read_files_count      | long   | Total number of files in read                                                                       |
-| read_partitions_count | long   | Total number of partitions used while reading                                                       |
-| read_remote_bytes     | long   | Shuffle fetches from remote executor                                                                |
-| result_fetch_time_ms  | long   | Time taken in ms to fetch the results                                                               |
-| result_from_cache     | long   | Flag to check whether result is fetched from cache                                                  |
-| rows_produced_count   | long   | Total number of rows produced after fetching the data                                               |
-| rows_read_count       | string | Total number of rows in the output after fetcing the data                                           |
-| spill_to_disk_bytes   | long   | Data spilled to disk in bytes                                                                       |
-| task_total_time_ms    | long   | Total time taken by task to complete in ms                                                          |
-| total_time_ms         | long   | Total time taken by query in ms                                                                     |
-| write_remote_bytes    | long   | Shuffle writes to the remote executor                                                               |
+| Column                | Type   | Description                                                                                                        |
+|:----------------------|:-------|:-------------------------------------------------------------------------------------------------------------------|
+| organization_id       | string | Canonical workspace id                                                                                             |
+| workspace_name        | string | Customizable human-legible name of the workspace, should be globally unique within the organization                |
+| warehouse_id          | string | ID of the SQL warehouse.                                                                                           |
+| query_id              | string | ID of the query executed in the warehouse                                                                          |
+| query_end_time_ms     | long   | Query execution end time                                                                                           |
+| user_name             | string | User name who created the query                                                                                    |
+| user_id               | long   | Id of the user who created the query                                                                               |
+| executed_as_user_id   | long   | Id of the user who executed the query                                                                              |
+| executed_as_user_name | string | User name who executed the query                                                                                   |
+| duration              | long   | Duration of the query execution                                                                                    |
+| error_message         | string | Error message for failed queries                                                                                   |
+| execution_end_time_ms | long   | Query execution end time in ms                                                                                     |
+| query_start_time_ms   | long   | Query start time in ms                                                                                             |
+| query_text            | text   | Query text which is executed in the warehouse                                                                      |
+| rows_produced         | long   | Number of rows returned as query output                                                                            |
+| spark_ui_url          | string | URL of the Spark UI                                                                                                |
+| statement_type        | string | Statement type of the query being executed, e.g - Select, Update etc                                               |
+| status                | string | Current status of the query being executed, e.g - FINISHED, RUNNING etc                                            |
+| compilation_time_ms   | long   | Time spent loading metadata and optimizing the query, in milliseconds.                                             |
+| execution_time_ms     | long   | ime spent executing the query, in milliseconds.                                                                    |
+| network_sent_bytes    | long   | Size of data transferred over network in bytes                                                                     |
+| photon_total_time_ms  | long   | Total execution time for all individual Photon query engine tasks in the query, in milliseconds.                   |
+| pruned_bytes          | long   | Size of data pruned in bytes                                                                                       |
+| pruned_files_count    | long   | Total number of files pruned                                                                                       |
+| read_bytes            | long   | Size of data red in bytes                                                                                          |
+| read_cache_bytes      | long   | Size of data cached during reading in bytes                                                                        |
+| read_files_count      | long   | Total number of files in read                                                                                      |
+| read_partitions_count | long   | Total number of partitions used while reading                                                                      |
+| read_remote_bytes     | long   | Shuffle fetches from remote executor                                                                               |
+| result_fetch_time_ms  | long   | Time spent fetching the query results after the execution finished, in milliseconds.                               |
+| result_from_cache     | long   | Flag to check whether result is fetched from cache                                                                 |
+| rows_produced_count   | long   | Total number of rows produced after fetching the data                                                              |
+| rows_read_count       | string | Total number of rows in the output after fetcing the data                                                          |
+| spill_to_disk_bytes   | long   | Data spilled to disk in bytes                                                                                      |
+| task_total_time_ms    | long   | Sum of execution time for all of the query’s tasks, in milliseconds.                                               |
+| total_time_ms         | long   | Total execution time of the query from the client’s point of view, in milliseconds. This is equivalent to duration |
+| write_remote_bytes    | long   | Shuffle writes to the remote executor                                                                              |
 
 #### Notebook
 [**SAMPLE**](/assets/TableSamples/notebook.tab)

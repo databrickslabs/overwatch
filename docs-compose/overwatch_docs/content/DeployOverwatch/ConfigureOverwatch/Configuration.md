@@ -82,13 +82,17 @@ to authenticate to the EH. Below are the required configurations for each auth m
 deployments must be used as EH is required for Azure.
 
 **Shared Access Key Requirements**
+Review [Authorizing Access Via SAS Policy]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#step-21-authorizing-access-via-sas-policy) 
+for more details.
 
-| Column         | Type   | IsRequired           | Description                                                                                                                                                                                                                |
-|:---------------|:-------|:---------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| eh_name        | String | True (**AZURE**)     | Event hub name (**Azure Only**) The event hub will contain the audit logs of the workspace                                                                                                                                 |
-| eh_scope_key	  | String | True (**AZURE**)     | Name of the key in the <secret_scope> that holds the connection string to the Event Hub WITH THE SHARED ACCESS KEY IN IT -- See [EH Configuration]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#step-2) for details |
+| Column        | Type   | IsRequired       | Description                                                                                                                                                                                                                                                   |
+|:--------------|:-------|:-----------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| eh_name       | String | True (**AZURE**) | Event hub name (**Azure Only**) The event hub will contain the audit logs of the workspace                                                                                                                                                                    |
+| eh_scope_key	 | String | True (**AZURE**) | Name of the key in the <secret_scope> that holds the connection string to the Event Hub WITH THE SHARED ACCESS KEY IN IT -- See [EH Configuration]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#step-21-authorizing-access-via-sas-policy) for details |
 
 **AAD Requirements**
+Review [Authorizing Access Via AAD SPN]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#step-22-authorizing-access-via-aad-spn) 
+for more details.
 
 | Column                 | Type   | IsRequired       | Description                                                                                                |
 |:-----------------------|:-------|:-----------------|:-----------------------------------------------------------------------------------------------------------|
@@ -96,6 +100,6 @@ deployments must be used as EH is required for Azure.
 | eh_conn_string         | String | True (**AZURE**) | Event hub connection string without shared access key. ex: "Endpoint=sb://evhub-ns.servicebus.windows.net" |
 | aad_tenant_id          | String | True (**AZURE**) | Tenant ID for Service principle.                                                                           |
 | aad_client_id          | String | True (**AZURE**) | Client ID for Service principle.                                                                           |
-| aad_client_secret_key  | String | True (**AZURE**) | Client Secret Key for Service principle.                                                                   |
+| aad_client_secret_key  | String | True (**AZURE**) | Name of the key in the <secret_scope> that holds the SPN secret for the Service principle.                 |
 | aad_authority_endpoint | String | True (**AZURE**) | Endpoint of the authority. Default value is "https://login.microsoftonline.com/"                           |
 

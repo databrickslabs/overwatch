@@ -110,6 +110,11 @@ situation like this, the minimum autoscaling compute size should approximately e
 minimize waste.  
 {{% /notice %}}
 
+Overwatch needs access to the Event Hub. There are two methods for provisioning access, either a 
+[SAS Policy with keys in the connection string](#step-21-authorizing-access-via-sas-policy)OR 
+[AAD SPN](#step-22-authorizing-access-via-aad-spn). Chose your method and follow the docs below.
+
+##### Step 2.1 Authorizing Access Via SAS Policy
 Once created, get the connection string from the SAS Policy for the Event Hub, find the following path in the Azure portal below.
 
 eh-namespace --> eventhub --> shared access policies --> Connection String-primary key
@@ -122,9 +127,34 @@ Click Add button and select Listen option for generate policies
 ![sas3](/images/EnvironmentSetup/sas3.png)
 Copy the Connection string-primary key and create a secret using Key vault
 
+##### Step 2.2 Authorizing Access Via AAD SPN
+Navigate either to the EH Namespace or the Event Hub (whichever is appropriate for you), click on 
+"Access Control (IAM)" and then click add --> Add Role Assignment. Choose the Role 
+"Azure Event Hubs Data Receiver" and add the principal you would like to provision --> review and assign.
+
+Now the Principal has access to the EH or EHNS, now you just need to capture the details of the SPN to provide to 
+Overwatch configs. These can be found by going to the SPN Overview Active Directory --> App Registrations --> 
+click the principal. Now capture the details in the screenshot below.
+
+![client_tenant_ids](/images/EnvironmentSetup/SPN_Client_tenant_id.png)
+
+Now a secret needs to be created (if one doesn't already exist), so from the previous screen click 
+"Certificates & Secrets" --> "New Client Secret". Be sure to capture the secret as it won't be visible later. 
+Create a Databricks Secret and place the SPN secret in the Databricks secret. This is the value needed to use the 
+AAD SPN to complete the rest of the AAD required configs.
+
+The last thing you need is your **connection string** and that can be found by navigating back to your Event Hub 
+** be sure to get to the Event Hub not the Event Hub Namespace (i.e EHNS --> Event Hubs --> Event Hub). Then in the 
+Overview section you will see "Namespace", we will use this to construct the connection string.
+
+Endpoint=sb://\<namespace\>.servicebus.windows.net
+![EH_Namespace](/images/EnvironmentSetup/eh_namespace.png)
+
+
+
 #### Step 3
-With your Event Hub Namespace and Named Event Hub created with data flowing,
-Navigate to your the Azure Databricks workspace[s] (in the portal) for which you'd like
+With your Event Hub Namespace and Named Event Hub created,
+Navigate to your Azure Databricks workspace[s] (in the portal) for which you'd like
 to enable Overwatch. Under Monitoring section --> Diagnostics settings --> Add diagnostic setting. Configure
 your log delivery similar to the example in the image below.
 
@@ -142,10 +172,10 @@ event hub underneath the event hub namespace and give it a name. Reference the n
 ![EH_Base_Setup](/images/EnvironmentSetup/EH_BaseConfig.png)
 
 #### Step 4: Validate Messages Are Flowing
-Now that you have configured you Overwatch EventHub Namespace, named Event Hub inside of the namespace, and
+Now that you have configured you Overwatch EventHub Namespace, named Event Hub inside the namespace, and
 pointed diagnostic logging to the EventHub it's
 time to validate that messages are flowing. You may have to wait several minutes to begin to see messages flowing
-depending on how busy the workspace is. There are two things that are commonly missed, please double check the
+depending on how busy the workspace is. There are two things that are commonly missed, please double-check the
 two bullet points below, there are images to help clarify as well.
 * A named Event Hub has been created within the Namespace.
 * Messages are flowing into the named event hub
@@ -171,7 +201,7 @@ maximize bandwidth.
 
 ### OVERVIEW
 Barring the security and networking sections, once you're setup is complete, your configuration should look similar
-the the image below.
+the image below.
 ![Storage Overview](/images/EnvironmentSetup/storage_acc_7.png)
 ### Step 1
 Select Storage Account from your Azure Portal and hit create

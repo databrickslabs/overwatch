@@ -22,8 +22,9 @@ AWS IAM/Policy required to set up for Storage Credentials {&amp;#34;Version&amp
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</guid>
-      <description>Under Construction &amp;ndash; we will be improving these docs shortly
-Access Connector External Location Cluster Logging Locations </description>
+      <description>Creating the Managed Identity Create a Managed Identity to authorize access to the external location. This managed Identity will be configured using a Databricks Storage Credential. Databricks recommends using an Access Connector for Azure Databricks.
+After the managed identity is created, it needs to be provisioned read/write access to the storage target for the Overwatch Output (which will ultimately become your external location).
+Provisioning the Managed Identity to The Storage If you intend to provision the managed identity to the storage account you need to grant the managed identity</description>
     </item>
     
     <item>
