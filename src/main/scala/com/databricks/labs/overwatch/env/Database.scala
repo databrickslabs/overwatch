@@ -27,18 +27,48 @@ class Database(config: Config) extends SparkSessionWrapper {
   }
 
   /**
+   * Checks if the table has optimizeWrite enebled.
+   * @param target
+   * @return
+   */
+  private def checkAutoOptimiseWrite(target: PipelineTable): Boolean = {
+    val deltaProperties = spark.sql(s"""describe detail '${target.tableLocation}'""").select("properties").head().get(0).asInstanceOf[Map[String, Boolean]]
+    val optimiseWrite: Boolean = deltaProperties.get("delta.autoOptimize.optimizeWrite").getOrElse("true").toString.toBoolean
+    optimiseWrite
+  }
+
+
+  /**
    * register an Overwatch target table in the configured Overwatch deployment
    *
    * @param target Pipeline table (i.e. target) as per the Overwatch deployed config
    */
   def registerTarget(target: PipelineTable): Unit = {
     if (!target.exists(catalogValidation = true) && target.exists(pathValidation = true)) {
-      val createStatement = s"create table if not exists ${target.tableFullName} " +
-        s"USING DELTA location '${target.tableLocation}'"
-      val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
-      logger.log(Level.INFO, logMessage)
-      if (config.debugFlag) println(logMessage)
-      spark.sql(createStatement)
+      if (target.autoOptimize) {
+        val isAutoOptimise = checkAutoOptimiseWrite(target)
+        val createStatement = s"create table if not exists ${target.tableFullName} " +
+          s"USING DELTA location '${target.tableLocation}' " +
+          s"TBLPROPERTIES (delta.autoOptimize.optimizeWrite = ${isAutoOptimise},delta.autoOptimize.autoCompact=false)"
+        val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
+        logger.log(Level.INFO, logMessage)
+        if (config.debugFlag) println(logMessage)
+        spark.sql(createStatement) //Creating the table as it was previously created.
+        if (!isAutoOptimise) {
+          val alterStatement = s"""alter table ${target.tableFullName} set TBLPROPERTIES (delta.autoOptimize.optimizeWrite = true)"""
+          logger.log(Level.INFO, alterStatement)
+          if (config.debugFlag) println(alterStatement)
+          spark.sql(alterStatement) //Turning autoOptimize for the table.
+        }
+
+      } else {
+        val createStatement = s"create table if not exists ${target.tableFullName} " +
+          s"USING DELTA location '${target.tableLocation}'"
+        val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
+        logger.log(Level.INFO, logMessage)
+        if (config.debugFlag) println(logMessage)
+        spark.sql(createStatement)
+      }
     }
   }
 
