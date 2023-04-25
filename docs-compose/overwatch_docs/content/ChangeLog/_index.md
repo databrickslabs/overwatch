@@ -34,6 +34,13 @@ config file if upgrading from 071x multi-workspace deployment. **[HTML](/assets/
   * (Optional) Run Historical Data Repair script **[HTML](/assets/ChangeLog/0713_Repair_Historical.html) | [DBC](/assets/ChangeLog/0713_Repair_Historical.dbc)**
     * If you want to rebuild historical data, run the script above and Overwatch's subsequent run will rebuild the 
     necessary tables
+  * (Optional) Since one of the bug fixes is changing the job run start timestamp, subsequent Overwatch runs can result 
+  in **duplicate records for job runs**. If you experience this you can run the following script once to eliminate duplicate 
+  runs. You only need to run this once per deployment (i.e. storage prefix) it will properly dedup all records from all 
+  workspaces in the targets. You only need to run this one time after you experience job run duplicates.
+  Note that you will not experience duplicates until after you execute the 0713+ Overwatch Pipeline. The notebook 
+  has a check in it to determine whether you've experienced this issue.
+    * **[HTML](/assets/ChangeLog/0713_JR_Dedup.html) | [DBC](/assets/ChangeLog/0713_JR_Dedup.dbc)**
 
 ### Bug Fixes
 * **DBU Photon Costs** for Automated workloads
