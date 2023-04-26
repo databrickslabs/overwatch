@@ -142,15 +142,15 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   }
 
   private[overwatch] def incrementalSnap(
-                                          zone : String,
+                                          pipeline : String,
                                           excludes: Array[String] = Array()
                                         ): this.type = {
 
 
     val sourceToSnap = {
-      if (zone.toLowerCase() == "bronze") bronze.getAllTargets
-      else if (zone.toLowerCase() == "silver") silver.getAllTargets
-      else if (zone.toLowerCase() == "gold") gold.getAllTargets
+      if (pipeline.toLowerCase() == "bronze") bronze.getAllTargets
+      else if (pipeline.toLowerCase() == "silver") silver.getAllTargets
+      else if (pipeline.toLowerCase() == "gold") gold.getAllTargets
       else Array(pipelineStateTarget)
     }
 
@@ -169,7 +169,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   }
 
   private[overwatch] def snap(
-                               zone : String,
+                               pipeline : String,
                                cloneLevel: String = "DEEP",
                                excludes: Array[String] = Array()
                              ): Unit = {
@@ -178,9 +178,9 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
     val sourceToSnap = {
-      if (zone.toLowerCase() == "bronze") bronze.getAllTargets
-      else if (zone.toLowerCase() == "silver") silver.getAllTargets
-      else if (zone.toLowerCase() == "gold") gold.getAllTargets
+      if (pipeline.toLowerCase() == "bronze") bronze.getAllTargets
+      else if (pipeline.toLowerCase() == "silver") silver.getAllTargets
+      else if (pipeline.toLowerCase() == "gold") gold.getAllTargets
       else Array(pipelineStateTarget)
     }
 
@@ -206,12 +206,12 @@ object Snapshot extends SparkSessionWrapper {
   def apply(workspace: Workspace,
             sourceETLDB : String,
             targetPrefix : String,
-            zone : String,
+            pipeline : String,
             snapshotType: String,
             excludes: Array[String] = Array()
            ): Any = {
     if (snapshotType.toLowerCase()== "incremental")
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).incrementalSnap(zone, excludes)
+      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).incrementalSnap(pipeline, excludes)
     if (snapshotType.toLowerCase()== "full")
       new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).snap(targetPrefix,"Deep",excludes)
 
@@ -234,16 +234,16 @@ object Snapshot extends SparkSessionWrapper {
 
     val sourceETLDB = args(0)
     val snapshotRootPath = args(1)
-    val zones = args(2)
+    val pipeline = args(2)
     val snapshotType = args(3)
     val tablesToExclude = args(4).split(",")
 
     val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
 
-    val zonesLower = zones.toLowerCase
-    if (zonesLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,tablesToExclude)
-    if (zonesLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType)
-    if (zonesLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType)
+    val pipelineLower = pipeline.toLowerCase
+    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,tablesToExclude)
+    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType)
+    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType)
     Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"pipeline_report",snapshotType)
 
     println("SnapShot Completed")
