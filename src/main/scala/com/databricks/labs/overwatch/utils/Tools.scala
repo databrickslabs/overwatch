@@ -19,6 +19,8 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.streaming.{StreamingQuery, StreamingQueryListener}
+import org.apache.spark.sql.streaming.StreamingQueryListener.{QueryProgressEvent, QueryStartedEvent, QueryTerminatedEvent}
 import org.apache.spark.util.SerializableConfiguration
 
 import java.net.URI
@@ -1027,6 +1029,29 @@ object Helpers extends SparkSessionWrapper {
    */
   def removeTrailingSlashes(url: Column): Column = {
     when(url.endsWith("/"), url.substr(lit(0), length(url) - 1)).otherwise(url)
+  }
+
+  def getQueryListener(query: StreamingQuery, config,minEventsPerTrigger: Long): StreamingQueryListener = {
+    val streamManager = new StreamingQueryListener() {
+      override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
+        println("Query started: " + queryStarted.id)
+      }
+
+      override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
+        println("Query terminated: " + queryTerminated.id)
+      }
+
+      override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
+        println("Query made progress: " + queryProgress.progress)
+        if (config.debugFlag) {
+          println(query.status.prettyJson)
+        }
+        if (queryProgress.progress.numInputRows <= minEventsPerTrigger) {
+          query.stop()
+        }
+      }
+    }
+    streamManager
   }
 
 }
