@@ -1,7 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.utils.{CloneDetail, Config, Helpers, OverwatchScope}
+import com.databricks.labs.overwatch.utils.{CloneDetail, CloneDetail, Config, Helpers, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
 
 
