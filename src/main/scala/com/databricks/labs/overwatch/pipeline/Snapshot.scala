@@ -24,6 +24,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
+  private val config = _config
 
 
   private def parallelism: Int = {
@@ -45,7 +46,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
         val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
         val checkPointLocation = s"${snapshotRootPath}/checkpoint/${sourceName}"
         val targetLocation = s"${cloneSpec.target}"
-        if (cloneSpec.mode == WriteMode.merge){
+        val streamWriter = if (cloneSpec.mode == WriteMode.merge){
           if(Helpers.pathExists(targetLocation)){
             val deltaTable = DeltaTable.forPath(spark,targetLocation)
             val immutableColumns = cloneSpec.immutableColumns
@@ -72,7 +73,6 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
               .option("mergeSchema", "true")
               .option("path", targetLocation)
               .start()
-              .awaitTermination()
 
           }else{
             rawStreamingDF
@@ -83,10 +83,9 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
               .option("mergeSchema", "true")
               .option("path", targetLocation)
               .start()
-              .awaitTermination()
           }
         }else{
-          rawStreamingDF
+         rawStreamingDF
             .writeStream
             .format("delta")
             .trigger(Trigger.Once())
@@ -94,8 +93,16 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
             .option("mergeSchema", "true")
             .option("path", targetLocation)
             .start()
-            .awaitTermination()
         }
+        val streamManager = Helpers.getQueryListener(streamWriter,config, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+        spark.streams.addListener(streamManager)
+        val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
+        if (config.debugFlag) println(listenerAddedMsg)
+        logger.log(Level.INFO, listenerAddedMsg)
+
+        streamWriter.awaitTermination()
+        spark.streams.removeListener(streamManager)
+
         logger.log(Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
         CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
       } catch {
