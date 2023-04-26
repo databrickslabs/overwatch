@@ -110,16 +110,17 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val verboseAuditModule = Module(3018, "Gold_VerboseAuditLog", this, Array(1004,3004,3005))
-  lazy private val appendVerboseAuditProccess: () => ETLDefinition = {
+  lazy private[overwatch] val notebookCommandsModule = Module(3018, "Gold_VerboseAuditLog", this, Array(1004,3004,3005))
+  lazy private val appendNotebookCommandsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        BronzeTargets.auditLogsTarget.asIncrementalDF(verboseAuditModule, BronzeTargets.auditLogsTarget.incrementalColumns),
-        Seq(buildVerboseAudit(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(notebookCommandsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+        Seq(buildNotebookCommands(
           GoldTargets.notebookTarget,
           GoldTargets.clusterStateFactTarget
+            .asIncrementalDF(notebookCommandsModule, GoldTargets.clusterStateFactTarget.incrementalColumns, 90)
         )),
-        append(GoldTargets.verboseAuditTarget)
+        append(GoldTargets.notebookCommandsTarget)
       )
   }
 
@@ -373,8 +374,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
       }
       case OverwatchScope.audit && OverwatchScope.notebooks && OverwatchScope.clusterEvents => {
-        verboseAuditModule.execute(appendVerboseAuditProccess)
-        GoldTargets.verboseAuditViewTarget.publish(verboseAuditTargetViewColumnMapping)
+        notebookCommandsModule.execute(appendNotebookCommandsProcess)
+        GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
       }
       case _ =>
     }
@@ -415,7 +416,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case OverwatchScope.audit && OverwatchScope.notebooks && OverwatchScope.clusterEvents => {
-        GoldTargets.verboseAuditViewTarget.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case _ =>
     }
