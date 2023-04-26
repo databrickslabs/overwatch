@@ -110,6 +110,19 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
+  lazy private[overwatch] val verboseAuditModule = Module(3018, "Gold_VerboseAuditLog", this, Array(1004,3004,3005))
+  lazy private val appendVerboseAuditProccess: () => ETLDefinition = {
+    () =>
+      ETLDefinition(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(verboseAuditModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+        Seq(buildVerboseAudit(
+          GoldTargets.notebookTarget,
+          GoldTargets.clusterStateFactTarget
+        )),
+        append(GoldTargets.verboseAuditTarget)
+      )
+  }
+
   lazy private[overwatch] val poolsModule = Module(3009, "Gold_Pools", this, Array(2009))
   lazy private val appendPoolsProcess: () => ETLDefinition = {
     () =>
@@ -359,6 +372,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         jobRunCostPotentialFactModule.execute(appendJobRunCostPotentialFactProcess)
         GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
       }
+      case OverwatchScope.audit && OverwatchScope.notebooks && OverwatchScope.clusterEvents => {
+        verboseAuditModule.execute(appendVerboseAuditProccess)
+        GoldTargets.verboseAuditViewTarget.publish(verboseAuditTargetViewColumnMapping)
+      }
       case _ =>
     }
   }
@@ -396,6 +413,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case OverwatchScope.dbsql => {
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping,workspacesAllowed = workspacesAllowed)
+      }
+      case OverwatchScope.audit && OverwatchScope.notebooks && OverwatchScope.clusterEvents => {
+        GoldTargets.verboseAuditViewTarget.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case _ =>
     }
