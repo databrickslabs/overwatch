@@ -494,9 +494,9 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
 
 
-  protected def buildVerboseAudit(
+  protected def buildNotebookCommands(
                                    notebook: PipelineTable,
-                                   clusterStateFact : PipelineTable,
+                                   clsfIncrementalDF : DataFrame,
                                  )(auditIncrementalDF: DataFrame): DataFrame = {
 
 
@@ -506,7 +506,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .distinct
       .toTSDF("unixTimeMS", "organization_id", "notebookId")
 
-    val clsfLookupTSDF = clusterStateFact.asDF
+    val clsfLookupTSDF = clsfIncrementalDF
       .select(
         "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
         "custom_tags", "node_type_id", "current_num_workers", "uptime_in_state_H", "total_cost")
@@ -518,17 +518,15 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("totalCostPMS", col("uptime_in_state_H") / col("total_cost") / lit(60) / lit(60) / lit(1000))
       .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
 
-    val ColNames = Array(
+    val colNames = Array(
       "organization_id", "workspace_name", "date", "timestamp", "userIdentity.email",
-      "notebookId", "notebook_path", "notebook_name", "commandId", "commandText", "executionTime", "sourceIpAddress",
-      "userIdentity", "shardName", "execution_estimated_cost", "status", "clusterId", "cluster_name", "custom_tags",
-      "node_type_id", "node_count", "response", "userAgent", "unixTimeMS"
+      "notebook_id", "notebook_path", "notebook_name", "command_id", "command_text", "execution_time_s", "source_ip_address",
+      "userIdentity", "estimated_dbu_cost", "status", "cluster_id", "cluster_name", "custom_tags",
+      "node_type_id", "node_count", "response", "user_agent", "unixTimeMS"
     )
 
     val notebookCodeAndMetaDF = auditIncrementalDF
-      .filter((col("serviceName") === "databrickssql" && col("actionName") === "commandSubmit") ||
-        (col("serviceName") === "databrickssql" && col("actionName") === "commandFinish") ||
-        (col("serviceName") === "notebook" && col("actionName") === "runCommand"))
+      .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
       .verifyMinimumSchema(Schema.auditMasterSchema)
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .withColumnRenamed("timestamp", "unixTimeMS")

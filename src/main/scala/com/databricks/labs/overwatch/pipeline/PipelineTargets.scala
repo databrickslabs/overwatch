@@ -498,19 +498,18 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
-    lazy private[overwatch] val verboseAuditTarget: PipelineTable = PipelineTable(
-      name = "verboseAuditTarget_gold",
-      _keys = Array("organization_id", "timestamp", "unixTimeMS"),
+    lazy private[overwatch] val notebookCommandsTarget: PipelineTable = PipelineTable(
+      name = "notebookCommands_gold",
+      _keys = Array("organization_id", "unixTimeMS"),
       config,
-      _mode = WriteMode.merge,
+      _mode = WriteMode.append,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("unixTimeMS"),
-      zOrderBy = Array("notebookId", "unixTimeMS")
     )
 
-    lazy private[overwatch] val verboseAuditViewTarget: PipelineView = PipelineView(
-      name = "verboseAuditTarget",
-      verboseAuditTarget,
+    lazy private[overwatch] val notebookCommandsTargetView: PipelineView = PipelineView(
+      name = "notebookCommands",
+      notebookCommandsTarget,
       config
     )
 
