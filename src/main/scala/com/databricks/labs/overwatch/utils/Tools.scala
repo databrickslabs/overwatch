@@ -1031,7 +1031,7 @@ object Helpers extends SparkSessionWrapper {
     when(url.endsWith("/"), url.substr(lit(0), length(url) - 1)).otherwise(url)
   }
 
-  def getQueryListener(query: StreamingQuery, config,minEventsPerTrigger: Long): StreamingQueryListener = {
+  def getQueryListener(query: StreamingQuery,config:Config,minEventsPerTrigger: Long): StreamingQueryListener = {
     val streamManager = new StreamingQueryListener() {
       override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
         println("Query started: " + queryStarted.id)
