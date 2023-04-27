@@ -110,20 +110,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val notebookCommandsModule = Module(3018, "Gold_VerboseAuditLog", this, Array(1004,3004,3005))
-  lazy private val appendNotebookCommandsProcess: () => ETLDefinition = {
-    () =>
-      ETLDefinition(
-        BronzeTargets.auditLogsTarget.asIncrementalDF(notebookCommandsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
-        Seq(buildNotebookCommands(
-          GoldTargets.notebookTarget,
-          GoldTargets.clusterStateFactTarget
-            .asIncrementalDF(notebookCommandsModule, GoldTargets.clusterStateFactTarget.incrementalColumns, 90)
-        )),
-        append(GoldTargets.notebookCommandsTarget)
-      )
-  }
-
   lazy private[overwatch] val poolsModule = Module(3009, "Gold_Pools", this, Array(2009))
   lazy private val appendPoolsProcess: () => ETLDefinition = {
     () =>
@@ -300,6 +286,20 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
+  lazy private[overwatch] val notebookCommandsModule = Module(3018, "Gold_VerboseAuditLog", this, Array(1004,3004,3005))
+  lazy private val appendNotebookCommandsProcess: () => ETLDefinition = {
+    () =>
+      ETLDefinition(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(notebookCommandsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+        Seq(buildNotebookCommands(
+          GoldTargets.notebookTarget,
+          GoldTargets.clusterStateFactTarget
+            .asIncrementalDF(notebookCommandsModule, GoldTargets.clusterStateFactTarget.incrementalColumns, 90)
+        )),
+        append(GoldTargets.notebookCommandsTarget)
+      )
+  }
+
   private def processSparkEvents(): Unit = {
 
     sparkExecutorModule.execute(appendSparkExecutorProcess)
@@ -373,13 +373,40 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         jobRunCostPotentialFactModule.execute(appendJobRunCostPotentialFactProcess)
         GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
       }
-      case OverwatchScope.audit && OverwatchScope.notebooks && OverwatchScope.clusterEvents => {
-        notebookCommandsModule.execute(appendNotebookCommandsProcess)
-        GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
-      }
+      case OverwatchScope.audit =>
+        config.overwatchScope.foreach {
+          case OverwatchScope.notebooks =>
+            config.overwatchScope.foreach {
+              case OverwatchScope.clusterEvents => {
+                notebookCommandsModule.execute(appendNotebookCommandsProcess)
+                GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
+              }
+              case _ =>
+            }
+          case _ =>
+        }
       case _ =>
     }
   }
+
+  private def buildVerboseAudit(): Unit = {
+    config.overwatchScope.foreach {
+      case OverwatchScope.audit =>
+        config.overwatchScope.foreach {
+          case OverwatchScope.notebooks =>
+            config.overwatchScope.foreach {
+              case OverwatchScope.clusterEvents => {
+                notebookCommandsModule.execute(appendNotebookCommandsProcess)
+                GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
+              }
+              case _ =>
+            }
+          case _ =>
+        }
+      case _ =>
+    }
+  }
+
 
   def refreshViews(workspacesAllowed: Array[String] = Array()): Unit = {
     config.overwatchScope.foreach {
@@ -415,9 +442,17 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.dbsql => {
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
-      case OverwatchScope.audit && OverwatchScope.notebooks && OverwatchScope.clusterEvents => {
-        GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
-      }
+      case OverwatchScope.audit =>
+        config.overwatchScope.foreach {
+          case OverwatchScope.notebooks =>
+            config.overwatchScope.foreach {
+              case OverwatchScope.clusterEvents => {
+                GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
+              }
+              case _ =>
+            }
+          case _ =>
+        }
       case _ =>
     }
   }
@@ -428,6 +463,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     restoreSparkConf()
     executeModules()
     buildFacts()
+    buildVerboseAudit()
 
     initiatePostProcessing()
     this // to be used as fail switch later if necessary
