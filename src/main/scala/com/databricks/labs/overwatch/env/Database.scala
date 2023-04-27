@@ -109,28 +109,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     registerTarget(target)
   }
 
-  private def getQueryListener(query: StreamingQuery, minEventsPerTrigger: Long): StreamingQueryListener = {
-    val streamManager = new StreamingQueryListener() {
-      override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
-        println("Query started: " + queryStarted.id)
-      }
-
-      override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
-        println("Query terminated: " + queryTerminated.id)
-      }
-
-      override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
-        println("Query made progress: " + queryProgress.progress)
-        if (config.debugFlag) {
-          println(query.status.prettyJson)
-        }
-        if (queryProgress.progress.numInputRows <= minEventsPerTrigger) {
-          query.stop()
-        }
-      }
-    }
-    streamManager
-  }
 
   /**
    * It's often more efficient to write a temporary version of the data to be merged than to compare complex
