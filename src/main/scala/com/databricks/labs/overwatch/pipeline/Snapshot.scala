@@ -24,7 +24,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
-  private val config = _config
+   val Config = _config
 
 
   private def parallelism: Int = {
@@ -199,15 +199,17 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
     })
+    cleanExcludes.foreach(x => println(x))
 
-    val sourceToSnapFiltered = sourceToSnap
-      .filter(_.exists()) // source path must exist
-      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
 
-    val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered)
-    val cloneReport = Helpers.parClone(cloneSpecs)
-    val cloneReportPath = s"${snapshotRootPath}/clone_report/"
-    cloneReport.toDS.write.format("delta").save(cloneReportPath)
+//    val sourceToSnapFiltered = sourceToSnap
+//      .filter(_.exists()) // source path must exist
+//      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
+//
+//    val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered)
+//    val cloneReport = Helpers.parClone(cloneSpecs)
+//    val cloneReportPath = s"${snapshotRootPath}/clone_report/"
+//    cloneReport.toDS.write.format("delta").save(cloneReportPath)
   }
 
 }

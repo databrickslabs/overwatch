@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode, MergeScope}
+import com.databricks.labs.overwatch.utils.{Config, Helpers, MergeScope, SparkSessionWrapper, WriteMode}
 import io.delta.tables.{DeltaMergeBuilder, DeltaTable}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.lit
@@ -304,7 +304,7 @@ class Database(config: Config) extends SparkSessionWrapper {
           .asInstanceOf[DataStreamWriter[Row]]
           .option("path", target.tableLocation)
           .start()
-        val streamManager = getQueryListener(streamWriter, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+        val streamManager = Helpers.getQueryListener(streamWriter,config, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
         spark.streams.addListener(streamManager)
         val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
         if (config.debugFlag) println(listenerAddedMsg)
