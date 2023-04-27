@@ -501,27 +501,26 @@ trait GoldTransforms extends SparkSessionWrapper {
 
 
     val notebookLookupTSDF = notebook.asDF
-      .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS")
+      .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS","date")
       .withColumnRenamed("notebook_id", "notebookId")
       .distinct
-      .toTSDF("unixTimeMS", "organization_id", "notebookId")
+      .toTSDF("unixTimeMS", "organization_id","date","notebookId")
 
     val clsfLookupTSDF = clsfIncrementalDF
       .select(
         "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
         "custom_tags", "node_type_id", "current_num_workers", "uptime_in_state_H", "total_cost")
       .distinct
-      .withColumnRenamed("state_start_date", "date")
       .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
       .withColumnRenamed("cluster_id", "clusterId")
       .withColumnRenamed("current_num_workers", "node_count")
-      .withColumn("totalCostPMS", col("uptime_in_state_H") / col("total_cost") / lit(60) / lit(60) / lit(1000))
-      .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
+      .withColumn("totalCostPMS", col("total_cost") / col("uptime_in_state_H"))
+      .toTSDF("unixTimeMS", "organization_id", "clusterId")
 
     val colNames = Array(
-      "organization_id", "workspace_name", "date", "timestamp",
-      "notebook_id", "notebook_path", "notebook_name", "command_id", "command_text", "execution_time_s", "source_ip_address",
-      "user_identity", "estimated_dbu_cost", "status", "cluster_id", "cluster_name", "custom_tags",
+      "organization_id", "cluster_id","notebook_id", "workspace_name", "date", "timestamp",
+       "notebook_path", "notebook_name", "command_id", "command_text", "execution_time_s", "source_ip_address",
+      "user_identity", "estimated_dbu_cost", "status", "cluster_name", "custom_tags",
       "node_type_id", "node_count", "response", "user_agent", "unixTimeMS"
     )
 
@@ -531,13 +530,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .withColumnRenamed("timestamp", "unixTimeMS")
       .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
-      .toTSDF("unixTimeMS", "organization_id", "notebookId")
+      .withColumn("executionTime",col("executionTime").cast("double"))
+      .toTSDF("unixTimeMS", "organization_id", "date","notebookId")
       .lookupWhen(notebookLookupTSDF)
       .df
-      .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
+      .toTSDF("unixTimeMS", "organization_id", "clusterId")
       .lookupWhen(clsfLookupTSDF)
       .df
-      .withColumn("execution_estimated_cost", col("executionTime") * col("totalCostPMS"))
+      .withColumn("estimated_dbu_cost", col("executionTime") * col("totalCostPMS"))
       .withColumnRenamed("user_identity","userIdentity")
       .withColumnRenamed("notebookId","notebook_id")
       .withColumnRenamed("commandId","command_id")
@@ -545,7 +545,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumnRenamed("executionTime","execution_time_s")
       .withColumnRenamed("sourceIpAddress","source_ip_address")
       .withColumnRenamed("userIdentity","user_identity")
-      .withColumnRenamed("execution_estimated_cost","estimated_dbu_cost")
       .drop("cluster_id")
       .withColumnRenamed("clusterId","cluster_id")
       .withColumnRenamed("userAgent","user_agent")

@@ -286,7 +286,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val notebookCommandsModule = Module(3018, "Gold_VerboseAuditLog", this, Array(1004,3004,3005))
+  lazy private[overwatch] val notebookCommandsModule = Module(3018, "Gold_NotebookCommands", this, Array(1004,3004,3005))
   lazy private val appendNotebookCommandsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
