@@ -519,9 +519,9 @@ trait GoldTransforms extends SparkSessionWrapper {
       .toTSDF("unixTimeMS", "organization_id", "date", "clusterId")
 
     val colNames = Array(
-      "organization_id", "workspace_name", "date", "timestamp", "userIdentity.email",
+      "organization_id", "workspace_name", "date", "timestamp",
       "notebook_id", "notebook_path", "notebook_name", "command_id", "command_text", "execution_time_s", "source_ip_address",
-      "userIdentity", "estimated_dbu_cost", "status", "cluster_id", "cluster_name", "custom_tags",
+      "user_identity", "estimated_dbu_cost", "status", "cluster_id", "cluster_name", "custom_tags",
       "node_type_id", "node_count", "response", "user_agent", "unixTimeMS"
     )
 
@@ -538,9 +538,21 @@ trait GoldTransforms extends SparkSessionWrapper {
       .lookupWhen(clsfLookupTSDF)
       .df
       .withColumn("execution_estimated_cost", col("executionTime") * col("totalCostPMS"))
+      .withColumnRenamed("user_identity","userIdentity")
+      .withColumnRenamed("notebookId","notebook_id")
+      .withColumnRenamed("commandId","command_id")
+      .withColumnRenamed("commandText","command_text")
+      .withColumnRenamed("executionTime","execution_time_s")
+      .withColumnRenamed("sourceIpAddress","source_ip_address")
+      .withColumnRenamed("userIdentity","user_identity")
+      .withColumnRenamed("execution_estimated_cost","estimated_dbu_cost")
+      .drop("cluster_id")
+      .withColumnRenamed("clusterId","cluster_id")
+      .withColumnRenamed("userAgent","user_agent")
+
     println("Verbose Audit Log Created")
 
-    notebookCodeAndMetaDF.select(ColNames map col: _*)
+    notebookCodeAndMetaDF.select(colNames map col: _*)
   }
 
   protected def buildSparkJob(
@@ -863,10 +875,10 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected val verboseAuditTargetViewColumnMapping: String =
     """
-      |organization_id, workspace_name, date, timestamp, userIdentity.email,
-      |notebookId, notebook_path, notebook_name, commandId, commandText, executionTime, sourceIpAddress,
-      |userIdentity, shardName, execution_estimated_cost, status, clusterId, cluster_name, custom_tags,
-      |node_type_id, node_count, response, userAgent, unixTimeMS
+      |organization_id, workspace_name, date, timestamp,
+      |notebook_id, notebook_path, notebook_name, command_id, command_text, execution_time_s, source_ip_address,
+      |user_identity, estimated_dbu_cost, status, cluster_id, cluster_name, custom_tags,
+      |node_type_id, node_count, response, user_agent, unixTimeMS
       |""".stripMargin
 
   protected val notebookViewColumnMappings: String =
