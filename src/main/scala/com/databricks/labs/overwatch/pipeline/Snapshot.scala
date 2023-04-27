@@ -143,7 +143,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
   private[overwatch] def incrementalSnap(
                                           pipeline : String,
-                                          excludes: Array[String] = Array()
+                                          excludes: Option[String] = Some("")
                                         ): this.type = {
 
 
@@ -154,8 +154,14 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       else Array(pipelineStateTarget)
     }
 
+    val exclude = excludes match {
+      case Some(s) if s.nonEmpty => s
+      case _ => ""
+    }
+    val excludeList = exclude.split(":")
 
-    val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
+
+    val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
     })
 
@@ -171,7 +177,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   private[overwatch] def snap(
                                pipeline : String,
                                cloneLevel: String = "DEEP",
-                               excludes: Array[String] = Array()
+                               excludes: Option[String] = Some("")
                              ): Unit = {
     val acceptableCloneLevels = Array("DEEP", "SHALLOW")
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
@@ -184,7 +190,13 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       else Array(pipelineStateTarget)
     }
 
-    val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
+    val exclude = excludes match {
+      case Some(s) if s.nonEmpty => s
+      case _ => ""
+    }
+    val excludeList = exclude.split(":")
+
+    val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
     })
 
@@ -208,7 +220,7 @@ object Snapshot extends SparkSessionWrapper {
             targetPrefix : String,
             pipeline : String,
             snapshotType: String,
-            excludes: Array[String] = Array()
+            excludes: Option[String] = Some("")
            ): Any = {
     if (snapshotType.toLowerCase()== "incremental")
       new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).incrementalSnap(pipeline, excludes)
@@ -236,15 +248,15 @@ object Snapshot extends SparkSessionWrapper {
     val snapshotRootPath = args(1)
     val pipeline = args(2)
     val snapshotType = args(3)
-    val tablesToExclude = args(4).split(",")
+    val tablesToExclude = args.lift(4).getOrElse("")
 
     val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
 
     val pipelineLower = pipeline.toLowerCase
-    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,tablesToExclude)
-    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType)
-    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType)
-    Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"pipeline_report",snapshotType)
+    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,Some(tablesToExclude))
+    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType,Some(tablesToExclude))
+    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType,Some(tablesToExclude))
+    Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"pipeline_report",snapshotType,Some(tablesToExclude))
 
     println("SnapShot Completed")
   }
