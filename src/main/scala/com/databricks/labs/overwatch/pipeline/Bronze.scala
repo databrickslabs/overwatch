@@ -59,8 +59,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
    *                     if choosing to overwrite, only one backup will be maintained
    * @param excludes     which bronze targets to exclude from the snapshot
    */
-
-  @deprecated
+ //TODO: Add link for new Snapshot Class functionality
+  @deprecated("This Method is deprecated, Use new Snapshot Class instead. Please check the link for more details")
   def snapshot(
                 targetPrefix: String,
                 overwrite: Boolean,

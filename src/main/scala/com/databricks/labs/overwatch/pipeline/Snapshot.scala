@@ -160,10 +160,10 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     }
     val excludeList = exclude.split(":")
 
-
     val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
     })
+    cleanExcludes.foreach(x => println(x))
 
     val sourceToSnapFiltered = sourceToSnap
       .filter(_.exists()) // source path must exist
@@ -178,7 +178,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
                                pipeline : String,
                                cloneLevel: String = "DEEP",
                                excludes: Option[String] = Some("")
-                             ): Unit = {
+                             ): this.type= {
     val acceptableCloneLevels = Array("DEEP", "SHALLOW")
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
@@ -202,14 +202,15 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     cleanExcludes.foreach(x => println(x))
 
 
-//    val sourceToSnapFiltered = sourceToSnap
-//      .filter(_.exists()) // source path must exist
-//      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
-//
-//    val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered)
-//    val cloneReport = Helpers.parClone(cloneSpecs)
-//    val cloneReportPath = s"${snapshotRootPath}/clone_report/"
-//    cloneReport.toDS.write.format("delta").save(cloneReportPath)
+    val sourceToSnapFiltered = sourceToSnap
+      .filter(_.exists()) // source path must exist
+      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
+
+    val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered)
+    val cloneReport = Helpers.parClone(cloneSpecs)
+    val cloneReportPath = s"${snapshotRootPath}/clone_report/"
+    cloneReport.toDS.write.format("delta").save(cloneReportPath)
+    this
   }
 
 }
@@ -222,7 +223,7 @@ object Snapshot extends SparkSessionWrapper {
             targetPrefix : String,
             pipeline : String,
             snapshotType: String,
-            excludes: Option[String] = Some("")
+            excludes: Option[String]
            ): Any = {
     if (snapshotType.toLowerCase()== "incremental")
       new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).incrementalSnap(pipeline, excludes)
