@@ -473,7 +473,8 @@ class Config() {
         derivedApiProxy.proxyPort,
         derivedApiProxy.proxyUserName,
         derivedApiProxy.proxyPasswordScope,
-        derivedApiProxy.proxyPasswordKey
+        derivedApiProxy.proxyPasswordKey,
+        derivedApiEnvConfig.mountMappingPath
       )
     } catch {
       case e: IllegalArgumentException if e.getMessage.toLowerCase.contains("secret does not exist with scope") =>
