@@ -45,7 +45,7 @@ To configure multi workspace deployment till the time support for GCS location/m
 * Grant Storage Admin, Read and Write permissions to it
 * Use this Service Account in the cluster running Overwatch Job
 
-_Note - DBFS Google Cloud Storage could reside in any of the projects_
+_Note - DBFS Google Cloud Storage could reside in any of the GCP projects_
 
 
 
