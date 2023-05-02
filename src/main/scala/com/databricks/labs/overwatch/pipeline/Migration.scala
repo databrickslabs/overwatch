@@ -13,7 +13,6 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   import spark.implicits._
   private val migrateRootPath = removeTrailingSlashes(_targetPrefix)
   private val workSpace = _workspace
-  private val targetPrefix = _targetPrefix
   private val sourceETLDB = _sourceETLDB
   private val bronze = Bronze(workSpace)
   private val silver = Silver(workSpace)
@@ -153,13 +152,6 @@ object Migration extends SparkSessionWrapper {
 
     println("Migration Completed")
   }
-
-
-
-
-
-
-
 }
 
 
