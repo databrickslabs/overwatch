@@ -209,7 +209,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered)
     val cloneReport = Helpers.parClone(cloneSpecs)
     val cloneReportPath = s"${snapshotRootPath}/clone_report/"
-    cloneReport.toDS.write.format("delta").save(cloneReportPath)
+    cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
     this
   }
 
