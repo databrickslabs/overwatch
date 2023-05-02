@@ -24,7 +24,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
-   val Config = _config
+  val Config = _config
 
 
   private def parallelism: Int = {
@@ -85,7 +85,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
               .start()
           }
         }else{
-         rawStreamingDF
+          rawStreamingDF
             .writeStream
             .format("delta")
             .trigger(Trigger.Once())
@@ -94,7 +94,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
             .option("path", targetLocation)
             .start()
         }
-        val streamManager = Helpers.getQueryListener(streamWriter,config, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+        val streamManager = Helpers.getQueryListener(streamWriter,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
         spark.streams.addListener(streamManager)
         val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
         if (config.debugFlag) println(listenerAddedMsg)
@@ -223,12 +223,13 @@ object Snapshot extends SparkSessionWrapper {
             targetPrefix : String,
             pipeline : String,
             snapshotType: String,
-            excludes: Option[String]
+            excludes: Option[String],
+            CloneLevel: String
            ): Any = {
     if (snapshotType.toLowerCase()== "incremental")
       new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).incrementalSnap(pipeline, excludes)
     if (snapshotType.toLowerCase()== "full")
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).snap(targetPrefix,"Deep",excludes)
+      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).snap(pipeline,CloneLevel,excludes)
 
   }
 
@@ -252,14 +253,15 @@ object Snapshot extends SparkSessionWrapper {
     val pipeline = args(2)
     val snapshotType = args(3)
     val tablesToExclude = args.lift(4).getOrElse("")
+    val cloneLevel = args.lift(5).getOrElse("Deep")
 
     val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
 
     val pipelineLower = pipeline.toLowerCase
-    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,Some(tablesToExclude))
-    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType,Some(tablesToExclude))
-    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType,Some(tablesToExclude))
-    Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"pipeline_report",snapshotType,Some(tablesToExclude))
+    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,Some(tablesToExclude),cloneLevel)
+    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType,Some(tablesToExclude),cloneLevel)
+    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType,Some(tablesToExclude),cloneLevel)
+    Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"pipeline_report",snapshotType,Some(tablesToExclude),cloneLevel)
 
     println("SnapShot Completed")
   }
