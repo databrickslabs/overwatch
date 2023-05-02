@@ -676,6 +676,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     SchemaScrubber(exceptions = Array(propertiesScrubException))
   }
 
+  private def sparkCaseSensitiveValueDebug(): String = spark.conf.getOption("spark.sql.caseSensitive").getOrElse("unset")
+
   def generateEventLogsDF(database: Database,
                           badRecordsPath: String,
                           processedLogFilesTracker: PipelineTable,
@@ -734,6 +736,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
         //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
         //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
+        // Enable Spark to read case sensitive columns
+        spark.conf.set("spark.sql.caseSensitive", "true")
+
         val baseEventsDF = try {
           /**
            * Event org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent has a duplicate column
@@ -742,9 +747,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
            * the aforementioned event is specifically there to resolve the timestamp issue when this event is present.
            */
           val streamingQueryListenerTS = 'Timestamp.isNull && 'timestamp.isNotNull && 'Event === "org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent"
-
-          // Enable Spark to read case sensitive columns
-          spark.conf.set("spark.sql.caseSensitive", "true")
 
           // read the df and convert the timestamp column
           val baseDF = spark.read.option("badRecordsPath", badRecordsPath)
@@ -778,6 +780,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           }
         }
 
+        logger.log(Level.INFO, s"SPARK CASE SENSITIVITY - POS1: THREAD: ${Thread.currentThread()} --> ${sparkCaseSensitiveValueDebug()}")
         // Handle custom metrics and listeners in streams
         val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
           to_json(col("progress")).alias("progress")
@@ -848,6 +851,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         // persist to temp to ensure all raw files are not read multiple times
         val sparkEventsTempPath = s"$tempDir/sparkEventsBronze/${pipelineSnapTime.asUnixTimeMilli}"
 
+        logger.log(Level.INFO, s"SPARK CASE SENSITIVITY - POS2: THREAD: ${Thread.currentThread()} --> ${sparkCaseSensitiveValueDebug()}")
         rawScrubbed
           .scrubSchema(bronzeSparkEventsScrubber)
           .withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
@@ -864,10 +868,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .verifyMinimumSchema(Schema.sparkEventsRawMasterSchema)
           .cullNestedColumns("TaskMetrics", Array("UpdatedBlocks"))
 
+        logger.log(Level.INFO, s"SPARK CASE SENSITIVITY - POS3: THREAD: ${Thread.currentThread()} --> ${sparkCaseSensitiveValueDebug()}")
         spark.conf.set("spark.sql.caseSensitive", "false")
         // TODO -- PERF test without unpersist, may be unpersisted before re-utilized
         //        cachedEventLogs.unpersist()
 
+        logger.log(Level.INFO, s"SPARK CASE SENSITIVITY - POS4: THREAD: ${Thread.currentThread()} --> ${sparkCaseSensitiveValueDebug()}")
         bronzeEventsFinal
       } else {
         val msg = "Path Globs Empty, exiting"
