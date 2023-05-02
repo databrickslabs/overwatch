@@ -36,6 +36,20 @@ In addition to API authentication / authorization there are some storage access 
 ### Audit Logs (AWS/GCP)
 Overwatch cluster must be able to read the audit logs
 
+### Cluster Logs (GCP)
+As per the latest Databricks GCP release, cluster log location does not support mounted DBFS location, we have to provide DBFS root as a target for log delivery.
+This can cause issues while doing the multi workspace deployment. 
+
+To configure multi workspace deployment till the time support for GCS location/mounted location for log delivery releases we have to perform the following steps -
+* Create or Edit an existing GCP Service Account in the same project as workspace
+* Grant Storage Admin, Read and Write permissions to it
+* Use this Service Account in the cluster running Overwatch Job
+
+_Note - DBFS Google Cloud Storage could reside in any of the projects_
+
+
+
+
 ### Overwatch Target Location
 Overwatch cluster must be able to read/write from/to the output location (i.e. storage prefix) 
 
