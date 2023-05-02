@@ -75,7 +75,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered) :+ CloneDetail(sourceConfigPath, targetConfigPath, None, cloneLevel)
     val cloneReport = Helpers.parClone(cloneSpecs)
     val cloneReportPath = s"${migrateRootPath}/clone_report/"
-    cloneReport.toDS.write.format("delta").save(cloneReportPath)
+    cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
     this
   }
 
@@ -89,7 +89,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val configUpdateStatement = s"""
       update delta.`$targetConfigPath`
       set
-        etl_storage_prefix = '$targetPrefix',
+        storage_prefix = '$targetPrefix',
         etl_database_name = '$targetETLDB',
         consumer_database_name = '$targetConsumerDB'
       """
