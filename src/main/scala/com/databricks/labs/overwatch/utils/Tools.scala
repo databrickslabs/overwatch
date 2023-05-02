@@ -485,14 +485,18 @@ object Helpers extends SparkSessionWrapper {
         CloneReport(cloneSpec, stmt, "SUCCESS")
       } catch {
         case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
+          val failMsg = PipelineFunctions.appendStackStrace(e)
           val msg = s"SUCCESS WITH WARNINGS: The timestamp provided, ${cloneSpec.asOfTS.get} " +
             s"resulted in a temporally unsafe exception. Cloned the source without the as of timestamp arg. " +
-            s"\nDELTA ERROR MESSAGE: ${e.getMessage()}"
+            s"\nDELTA ERROR MESSAGE: ${failMsg}"
           logger.log(Level.WARN, msg)
           spark.sql(baseCloneStatement)
           CloneReport(cloneSpec, baseCloneStatement, msg)
         }
-        case e: Throwable => CloneReport(cloneSpec, stmt, e.getMessage)
+        case e: Throwable => {
+          val failMsg = PipelineFunctions.appendStackStrace(e)
+          CloneReport(cloneSpec, stmt, failMsg)
+        }
       }
     }).toArray.toSeq
   }
