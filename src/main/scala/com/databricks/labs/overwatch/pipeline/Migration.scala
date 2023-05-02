@@ -98,7 +98,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
 }
 
-object Migrate extends SparkSessionWrapper {
+object Migration extends SparkSessionWrapper {
 
 
   def apply(workspace: Workspace,
@@ -134,7 +134,7 @@ object Migrate extends SparkSessionWrapper {
   def main(args: Array[String]): Unit = {
 
     val sourceETLDB = args(0)
-    val MigrateRootPath = args(1)
+    val migrateRootPath = args(1)
     val pipeline = args(2)
     val sourceConfigPath = args(3)
     val targetConfigPath = args(4)
@@ -146,10 +146,10 @@ object Migrate extends SparkSessionWrapper {
     val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
 
     val pipelineLower = pipeline.toLowerCase
-    if (pipelineLower.contains("bronze")) Migrate(snapWorkSpace,sourceETLDB,MigrateRootPath,"Bronze",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    if (pipelineLower.contains("silver")) Migrate(snapWorkSpace,sourceETLDB,MigrateRootPath,"Silver",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    if (pipelineLower.contains("gold")) Migrate(snapWorkSpace,sourceETLDB,MigrateRootPath,"Gold",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    Migrate(snapWorkSpace,sourceETLDB,MigrateRootPath,"pipeline_report",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
+    if (pipelineLower.contains("bronze")) Migration(snapWorkSpace,sourceETLDB,migrateRootPath,"Bronze",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
+    if (pipelineLower.contains("silver")) Migration(snapWorkSpace,sourceETLDB,migrateRootPath,"Silver",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
+    if (pipelineLower.contains("gold")) Migration(snapWorkSpace,sourceETLDB,migrateRootPath,"Gold",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
+    Migration(snapWorkSpace,sourceETLDB,migrateRootPath,"pipeline_report",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
 
     println("Migration Completed")
   }
