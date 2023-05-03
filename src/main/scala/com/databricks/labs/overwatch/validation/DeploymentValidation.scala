@@ -519,8 +519,6 @@ object DeploymentValidation extends SparkSessionWrapper {
                               ): DeploymentValidationReport = {
 
     val isAAD = config.aad_client_id.nonEmpty && config.aad_tenant_id.nonEmpty && config.aad_client_secret_key.nonEmpty
-    println("isAAD:"+isAAD)
-
     if (config.eh_scope_key.isEmpty && config.eh_name.isEmpty && !isAAD) throw new BadConfigException("When cloud is Azure, the eh_name and " +
       "eh_scope_key are required fields but they were empty in the config. For AAD clinetID,tenentID and clientSecretKey are required fields but they were empty in the config")
     // using gets here because if they were empty from above check, exception would already be thrown
