@@ -1125,9 +1125,6 @@ trait SilverTransforms extends SparkSessionWrapper {
           lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
           lit(untilTime.asUnixTimeMilli)
         )))
-
-
-
 //      .withColumn("unixTimeMS_state_start", 'timestamp)
 //      .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
 //        lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
