@@ -1137,12 +1137,12 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
       .withColumn("state_start_date", 'timestamp_state_start.cast("date"))
       .withColumn("uptime_in_state_S", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000))
-      .withColumn("uptime_since_restart_S",
-        coalesce(
+      .withColumn("uptime_since_restart_S",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit(0))
+        .otherwise(coalesce(
           when('counter_reset === 1, lit(0))
             .otherwise(sum('uptime_in_state_S).over(uptimeW)),
           lit(0)
-        )
+        ))
       )
       .withColumn("cloud_billable", 'isRunning)
       .withColumn("databricks_billable",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit('isRunning)).otherwise('isRunning && !'state.isin(nonBillableTypes: _*)))
