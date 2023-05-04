@@ -1098,6 +1098,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("reset_partition", sum('counter_reset).over(stateUnboundW))
       .withColumn("target_num_workers", last('target_num_workers, true).over(stateUnboundW))
       .withColumn("current_num_workers", last('current_num_workers, true).over(stateUnboundW))
+      .withColumn("unixTimeMS_state_start", 'timestamp)
       //Change for Issue-846
 
     val clusterBaseDF = clusterBase(auditLogDF)
