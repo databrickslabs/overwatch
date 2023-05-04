@@ -1119,7 +1119,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     clusterEventsBaselineFinal
       .withColumn("state",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit("PERMANENT_DELETE")).otherwise('state))
       .withColumn("isRunning",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit(false)).otherwise('isRunning))
-      .withColumn("unixTimeMS_state_start",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit(System.currentTimeMillis)).otherwise('timestamp))
+      .withColumn("unixTimeMS_state_start",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit(System.currentTimeMillis)).otherwise('unixTimeMS_state_start))
       .withColumn("unixTimeMS_state_end",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit(System.currentTimeMillis))
         .otherwise(coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
           lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
