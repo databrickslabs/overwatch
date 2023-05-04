@@ -986,7 +986,8 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   def buildClusterStateDetail(
-                               untilTime: TimeTypes
+                               untilTime: TimeTypes,
+                               auditLogDF: DataFrame
                              )(clusterEventsDF: DataFrame): DataFrame = {
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
@@ -1086,7 +1087,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         'organization_id, 'cluster_id, 'isRunning,
         'timestamp, 'state, 'current_num_workers, 'target_num_workers
       )
-
+    val clusterEventsBaselineFinal =
     clusterEventsBaseline
       .withColumn("counter_reset",
         when(
@@ -1097,11 +1098,40 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("reset_partition", sum('counter_reset).over(stateUnboundW))
       .withColumn("target_num_workers", last('target_num_workers, true).over(stateUnboundW))
       .withColumn("current_num_workers", last('current_num_workers, true).over(stateUnboundW))
-      .withColumn("unixTimeMS_state_start", 'timestamp)
-      .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
-        lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
-        lit(untilTime.asUnixTimeMilli)
-      ))
+      //Change for Issue-846
+
+    val clusterBaseDF = clusterBase(auditLogDF)
+    val clustersRemoved = clusterBaseDF
+      .filter('actionName.isin("permanentDelete"))
+      .select('organization_id, 'cluster_id, 'userEmail.alias("deleted_by"))
+
+    val removedClusterID = clustersRemoved.select("cluster_id").distinct().collect().map(f=>f(0))
+    val w = Window.partitionBy('organization_id, 'cluster_id).orderBy('unixTimeMS_state_start)
+    val timeStampForRemovedCluster = clusterEventsBaselineFinal
+      .drop("driverSpecs", "workerSpecs")
+      .filter(col("cluster_id").isin(removedClusterID: _*))
+      .withColumn("positiveTestCase", when(last('state).over(w) === "RUNNING", lit(true)).otherwise(lit(false)))
+      .withColumn("positiveTestCase2", lead('positiveTestCase,1).over(w))
+      .filter('positiveTestCase2.isNull)
+      .filter('state === "RUNNING").select("timestamp").collect().map(t=>t(0))
+
+    clusterEventsBaselineFinal
+      .withColumn("state",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit("PERMANENT_DELETE")).otherwise('state))
+      .withColumn("isRunning",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit(false)).otherwise('isRunning))
+      .withColumn("unixTimeMS_state_start",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit(System.currentTimeMillis)).otherwise('timestamp))
+      .withColumn("unixTimeMS_state_end",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit(System.currentTimeMillis))
+        .otherwise(coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
+          lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
+          lit(untilTime.asUnixTimeMilli)
+        )))
+
+
+
+//      .withColumn("unixTimeMS_state_start", 'timestamp)
+//      .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
+//        lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
+//        lit(untilTime.asUnixTimeMilli)
+//      ))
       .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
       .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
       .withColumn("state_start_date", 'timestamp_state_start.cast("date"))
@@ -1114,7 +1144,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         )
       )
       .withColumn("cloud_billable", 'isRunning)
-      .withColumn("databricks_billable", 'isRunning && !'state.isin(nonBillableTypes: _*))
+      .withColumn("databricks_billable",when(col("timestamp").isin(timeStampForRemovedCluster: _*),lit('isRunning)).otherwise('isRunning && !'state.isin(nonBillableTypes: _*)))
       .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
       .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
       .withColumn("days_in_state", size('state_dates))

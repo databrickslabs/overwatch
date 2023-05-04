@@ -323,7 +323,10 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
           BronzeTargets.clusterEventsTarget.incrementalColumns,
           SilverTargets.clusterStateDetailTarget.maxMergeScanDates // pick up last state up to 30 days ago
         ),
-        Seq(buildClusterStateDetail(clusterStateDetailModule.untilTime)),
+        Seq(buildClusterStateDetail(
+          clusterStateDetailModule.untilTime,
+          BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,30) //Added to get the Removed Cluster
+        )),
         append(SilverTargets.clusterStateDetailTarget)
       )
   }
