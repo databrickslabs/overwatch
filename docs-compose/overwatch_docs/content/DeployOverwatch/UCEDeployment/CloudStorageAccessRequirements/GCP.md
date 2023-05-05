@@ -18,4 +18,4 @@ Following steps needs to be performed to external location’s GCS bucket permis
   * Storage Admin 
   * Storage Legacy Bucket Owner
 
-## Cluster Logging Locations
+## Cluster Logging Locations  
