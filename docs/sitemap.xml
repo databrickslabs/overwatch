@@ -41,9 +41,6 @@
     <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/</loc>
     <lastmod>2022-12-12T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</loc>
-    <lastmod>2022-09-26T08:47:24-04:00</lastmod>
-  </url><url>
     <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
@@ -112,6 +109,9 @@
   </url><url>
     <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</loc>
     <lastmod>2022-12-12T11:29:56-05:00</lastmod>
+  </url><url>
+    <loc>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</loc>
+    <lastmod>2022-09-26T08:47:24-04:00</lastmod>
   </url><url>
     <loc>https://databrickslabs.github.io/overwatch/contributing/</loc>
     <priority>0</priority>

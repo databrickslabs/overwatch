@@ -50,7 +50,7 @@ version please see [Configuration Details By Version]({{%relref "DeployOverwatch
 | api_url                    | String  | True               | API URL for the Workspace (execute in scala `dbutils.notebook.getContext().apiUrl.get` **ON THE TARGET WORKSPACE NOT DEPLOYMENT WORKSPACE** to get the API URL for the workspace. NOTE: Workspace_URL and API_URL can be different for a workspace but may be the same even for multiple workspaces).                     |
 | cloud                      | String  | True               | Cloud provider (Azure or AWS).                                                                                                                                                                                                                                                                                            |
 | primordial_date            | String  | True               | The date from which Overwatch will capture the details. The **format** should be **yyyy-MM-dd** ex: 2022-05-20 == May 20 2022                                                                                                                                                                                             |
-| storage_prefix	            | String  | True               | The location on which Overwatch will store the data. You can think of this as the Overwatch working directory. dbfs:/mnt/path/... or abfss://container@myStorageAccount.dfs.core.windows.net/... or s3://myBucket/...   or gs://myBucket/...                                                                              |
+| storage_prefix	            | String  | True               | **CASE SENSITIVE - Lower Case** The location on which Overwatch will store the data. You can think of this as the Overwatch working directory. dbfs:/mnt/path/... or abfss://container@myStorageAccount.dfs.core.windows.net/... or s3://myBucket/...   or gs://myBucket/...                                              |
 | etl_database_name          | String  | True               | The name of the ETL data base for Overwatch (i.e. overwatch_etl or custom)                                                                                                                                                                                                                                                |
 | consumer_database_name     | String  | True               | The name of the Consumer database for Overwatch. (i.e. overwatch or custom)                                                                                                                                                                                                                                               |
 | secret_scope	              | String  | True               | Name of the secret scope. This must be created on the workspace which the Overwatch job will execute.                                                                                                                                                                                                                     |
@@ -91,8 +91,11 @@ for more details.
 | eh_scope_key	 | String | True (**AZURE**) | Name of the key in the <secret_scope> that holds the connection string to the Event Hub WITH THE SHARED ACCESS KEY IN IT -- See [EH Configuration]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#step-21-authorizing-access-via-sas-policy) for details |
 
 **AAD Requirements**
+
 Review [Authorizing Access Via AAD SPN]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#step-22-authorizing-access-via-aad-spn) 
 for more details.
+
+Ensure the dependent library for AAD Auth is attached `com.microsoft.azure:msal4j:1.10.1` 
 
 | Column                 | Type   | IsRequired       | Description                                                                                                |
 |:-----------------------|:-------|:-----------------|:-----------------------------------------------------------------------------------------------------------|

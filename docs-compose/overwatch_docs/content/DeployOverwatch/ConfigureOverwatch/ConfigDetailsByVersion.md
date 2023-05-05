@@ -59,6 +59,11 @@ deployments must be used as EH is required for Azure.
 
 **AAD Requirements**
 
+Review [Authorizing Access Via AAD SPN]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}/#step-22-authorizing-access-via-aad-spn)
+for more details.
+
+Ensure the dependent library for AAD Auth is attached `com.microsoft.azure:msal4j:1.10.1`
+
 | Column                 | Type   | IsRequired       | Description                                                                                                |
 |:-----------------------|:-------|:-----------------|:-----------------------------------------------------------------------------------------------------------|
 | eh_name                | String | True (**AZURE**) | Event hub name The event hub will contain the audit logs of the workspace                                  |

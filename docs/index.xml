@@ -89,15 +89,6 @@ Scopes Scopes are the method by which Overwatch is segmented and a scope will co
     </item>
     
     <item>
-      <title>Data Dictionary - 0.6.1.x</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</link>
-      <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</guid>
-      <description>Consumption Layer Column Descriptions ETL Tables Bronze Silver Gold Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
-    </item>
-    
-    <item>
       <title>GCP</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
@@ -125,10 +116,11 @@ etl_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;etl_database_name&amp;g
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</guid>
       <description>Deploying Overwatch As A JAR On Databricks Workflows This deployment method requires Overwatch Version 0.7.1.0+
 Main Class The main class for job is com.databricks.labs.overwatch.MultiWorkspaceRunner
-Dependent Library com.databricks.labs:overwatch_2.12:0.7.1.x
+Dependent Library com.databricks.labs:overwatch_2.12:0.7.x.x
 com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only)
+com.microsoft.azure:msal4j:1.10.1 (Azure Only - With AAD Auth For EH)
 Parameters As of 0.7.1.1 the config.csv referenced below can be any one of the following
-&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .csv) &amp;ldquo;dbfs:/path/to/deltaTable&amp;rdquo; &amp;ndash; path to a delta table containing the config &amp;ldquo;myDatabase.myConfigTable&amp;rdquo; &amp;ndash; name of delta table that contains the config Note: any of the paths in examples above may be on any supported storage, dbfs:/ is not required.</description>
+&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .csv) &amp;ldquo;dbfs:/path/to/deltaTable&amp;rdquo; &amp;ndash; path to a delta table containing the config &amp;ldquo;myDatabase.</description>
     </item>
     
     <item>
@@ -257,6 +249,15 @@ Configuration Basics The Overwatch configuration can be created as a case class 
       <description>Configuring Overwatch on AWS/GCP - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
 There are two primary sources of data that need to be configured:
 Audit Logs-AWS/Audit Logs-GCP These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
+    </item>
+    
+    <item>
+      <title>Data Dictionary - 0.6.1.x</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</link>
+      <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</guid>
+      <description>Consumption Layer Column Descriptions ETL Tables Bronze Silver Gold Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
     </item>
     
     <item>
