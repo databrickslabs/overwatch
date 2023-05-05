@@ -473,39 +473,46 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param tempPersistChk    Used for EH checkpoint.
    */
   private def consumeEHData(config: MultiWorkspaceConfig, isAAD: Boolean, tempPersistDFPath: String, tempPersistChk: String): Unit = {
-
-    val ehConn = if (isAAD) config.eh_conn_string.get else dbutils.secrets.get(scope = config.secret_scope, config.eh_scope_key.get)
-    val connectionString = ConnectionStringBuilder(
-      PipelineFunctions.parseAndValidateEHConnectionString(ehConn, false))
-      .setEventHubName(config.eh_name.get)
-      .build
-    val ehConf = EventHubsConf(connectionString)
-      .setMaxEventsPerTrigger(5000)
-      .setStartingPosition(EventPosition.fromStartOfStream)
-    val rawEHDF = if (isAAD) {
-      val aadParams = Map("aad_tenant_id" -> config.aad_tenant_id.get,
-        "aad_client_id" -> config.aad_client_id.get,
-        "aad_client_secret" -> dbutils.secrets.get(scope = config.secret_scope, key = config.aad_client_secret_key.get),
-        "aad_authority_endpoint" -> config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/"))
-      spark.readStream
-        .format("eventhubs")
-        .options(AadAuthInstance.addAadAuthParams(ehConf, aadParams).toMap)
-        .load()
-    } else {
-      spark.readStream
-        .format("eventhubs")
-        .options(ehConf.toMap)
-        .load()
+    try {
+      val ehConn = if (isAAD) config.eh_conn_string.get else dbutils.secrets.get(scope = config.secret_scope, config.eh_scope_key.get)
+      val connectionString = ConnectionStringBuilder(
+        PipelineFunctions.parseAndValidateEHConnectionString(ehConn, false))
+        .setEventHubName(config.eh_name.get)
+        .build
+      val ehConf = EventHubsConf(connectionString)
+        .setMaxEventsPerTrigger(5000)
+        .setStartingPosition(EventPosition.fromStartOfStream)
+      val rawEHDF = if (isAAD) {
+        val aadParams = Map("aad_tenant_id" -> config.aad_tenant_id.get,
+          "aad_client_id" -> config.aad_client_id.get,
+          "aad_client_secret" -> dbutils.secrets.get(scope = config.secret_scope, key = config.aad_client_secret_key.get),
+          "aad_authority_endpoint" -> config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/"))
+        spark.readStream
+          .format("eventhubs")
+          .options(AadAuthInstance.addAadAuthParams(ehConf, aadParams).toMap)
+          .load()
+      } else {
+        spark.readStream
+          .format("eventhubs")
+          .options(ehConf.toMap)
+          .load()
+      }
+      rawEHDF
+        .withColumn("deserializedBody", 'body.cast("string"))
+        .writeStream
+        .trigger(Trigger.Once)
+        .option("checkpointLocation", tempPersistChk)
+        .format("delta")
+        .start(tempPersistDFPath)
+        .awaitTermination()
     }
-    rawEHDF
-      .withColumn("deserializedBody", 'body.cast("string"))
-      .writeStream
-      .trigger(Trigger.Once)
-      .option("checkpointLocation", tempPersistChk)
-      .format("delta")
-      .start(tempPersistDFPath)
-      .awaitTermination()
-
+    catch {
+      case e: NoClassDefFoundError =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception :Please add jar with maven coordinate com.microsoft.azure:msal4j:1.10.1 to the cluster")
+        throw new BadConfigException(fullMsg, failPipeline = true)
+      case e: Throwable =>
+        throw e
+    }
   }
 
 
