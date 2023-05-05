@@ -485,6 +485,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
     val clusterEventsEndpoint = "clusters/events"
 
+    val lagTime = 600000 //10 minutes
+    val lagStartTime = startTime.asUnixTimeMilli - lagTime
     // creating Json input for parallel API calls
     val jsonInput = Map(
       "start_value" -> "0",
@@ -492,7 +494,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "increment_counter" -> "1",
       "final_response_count" -> s"${finalResponseCount}",
       "cluster_ids" -> s"${clusterIDs.mkString(",")}",
-      "start_time" -> s"${startTime.asUnixTimeMilli}",
+      "start_time" -> s"${lagStartTime}",
       "end_time" -> s"${endTime.asUnixTimeMilli}",
       "tmp_success_path" -> tmpClusterEventsSuccessPath,
       "tmp_error_path" -> tmpClusterEventsErrorPath
@@ -578,7 +580,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/clusterEventsBronze/success" + apiEnv.runID
     val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/clusterEventsBronze/error" + apiEnv.runID
-
     landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath,
       tmpClusterEventsErrorPath, config)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
