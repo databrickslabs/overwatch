@@ -31,6 +31,7 @@ There are two primary sources of data that need to be configured:
       be to have each workspace and each team store their logs in a specific prefix, etc to break up the number of log
       files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data
       to the data model.
+#### Note for GCP- ```Latest Overwatch version does not support cluster logs to be collected from multiple workspaces. As per the latest Databricks GCP release, cluster log location does not support mounted DBFS location, we have to provide DBFS root as a target for log delivery. This can cause issues while populating spark job related tables in multi workspace deployment. Overwatch team is wprking on a fix for this issues```
 
 ## Reference Architecture
 As of 0.7.1 Overwatch can be deployed on a single workspace and retrieve data from all workspaces. For more details
