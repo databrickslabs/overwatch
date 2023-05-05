@@ -4,6 +4,14 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.2.0.1 (Patch)
+Bug Fix - **mount_mapping_path** was being ignored
+
+Only customers using multi-workspace deployments with remote workspaces with > 50 mounts and using 
+mount_mapping_path will be affected.
+
+**To Upgrade**, simply swap the JAR
+
 ## 0.7.2.0
 ### Upgrading
 There were a few column name changes to the config file (multi-workspace). Please run this script to update your 
