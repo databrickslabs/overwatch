@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
@@ -116,9 +117,23 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val auditLogConfig = if (s"${config.cloud}" == "AWS") {
         AuditLogConfig(rawAuditPath = config.auditlogprefix_source_aws, auditLogFormat = auditLogFormat)
       } else {
-        val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
         val ehStatePath = s"${config.etl_storage_prefix}/${config.workspace_id}/ehState"
-        val azureLogConfig = AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+        val isAAD = config.aad_client_id.nonEmpty &&
+          config.aad_tenant_id.nonEmpty &&
+          config.aad_client_secret_key.nonEmpty &&
+          config.eh_conn_string.nonEmpty
+        val azureLogConfig = if (isAAD) {
+          AzureAuditLogEventhubConfig(connectionString = config.eh_conn_string.get, eventHubName = config.eh_name.get
+            , auditRawEventsPrefix = ehStatePath,
+            azureClientId = Some(config.aad_client_id.get),
+            azureClientSecret = Some(dbutils.secrets.get(config.secret_scope, key = config.aad_client_secret_key.get)),
+            azureTenantId = Some(config.aad_tenant_id.get),
+            azureAuthEndpoint = config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/")
+          )
+        } else {
+          val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
+          AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+        }
         AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
       }
       val interactiveDBUPrice: Double = config.interactive_dbu_price

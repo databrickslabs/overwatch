@@ -242,22 +242,31 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
-    val eventHubsConf = if (ehConfig.azureClientId.nonEmpty) {
-      val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
-        "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
-        "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
-        "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
-      AadAuthInstance.addAadAuthParams(ehConf, aadParams)
-    } else
-      ehConf
 
-    spark.readStream
-      .format("eventhubs")
-      .options(eventHubsConf.toMap)
-      .load()
-      .withColumn("deserializedBody", 'body.cast("string"))
-      .withColumn("organization_id", lit(organizationId))
-      .withColumn("Overwatch_RunID", lit(runID))
+    try {
+      val eventHubsConf = if (ehConfig.azureClientId.nonEmpty) {
+        val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
+          "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
+          "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
+          "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
+        AadAuthInstance.addAadAuthParams(ehConf, aadParams)
+      } else
+        ehConf
+
+      spark.readStream
+        .format("eventhubs")
+        .options(eventHubsConf.toMap)
+        .load()
+        .withColumn("deserializedBody", 'body.cast("string"))
+        .withColumn("organization_id", lit(organizationId))
+        .withColumn("Overwatch_RunID", lit(runID))
+    }catch{
+      case e: NoClassDefFoundError =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception :Please add jar with maven coordinate com.microsoft.azure:msal4j:1.10.1 to the cluster")
+        throw new BadConfigException(fullMsg, failPipeline = true)
+      case e:Throwable =>
+        throw e
+    }
 
   }
 
