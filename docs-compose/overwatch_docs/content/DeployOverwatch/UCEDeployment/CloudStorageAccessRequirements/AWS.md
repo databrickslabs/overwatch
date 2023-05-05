@@ -3,9 +3,12 @@ title: "AWS"
 date: 2023-04-18T11:28:39-05:00
 weight: 1
 ---
-**Under Construction** -- we will be improving these docs shortly
 
-### AWS IAM/Policy required to set up for Storage Credentials
+### Creating AWS IAM Role/Policy for Storage Credentials
+
+Create a IAM Role to authorize access to the external location. This IAM Role will be configured while creating the Databricks Storage Credential. 
+Please refer this [doc](https://docs.databricks.com/data-governance/unity-catalog/manage-external-locations-and-credentials.html#manage-storage-credentials) for creating IAM role for Storage Credentials 
+
 ```
 {
   "Version": "2012-10-17",
@@ -23,8 +26,8 @@ weight: 1
         "s3:PutLifecycleConfiguration"
       ],
       "Resource": [
-        "arn:aws:s3:::<BUCKET-NAME>/*",
-        "arn:aws:s3:::< BUCKET-NAME> "
+        "arn:aws:s3:::<EXTERNAL-LOCATION-BUCKET-NAME>/*",
+        "arn:aws:s3:::<EXTERNAL-LOCATION-BUCKET-NAME> "
       ],
       "Effect": "Allow"
     },
@@ -52,7 +55,7 @@ weight: 1
 }
 ```
 
-### Trust Relation
+### Add the below policy in Trust Relation of Storage Credentials IAM  
 ```
 {
   "Version": "2012-10-17",
@@ -73,7 +76,9 @@ weight: 1
 }
 ```
 
-### Instance Profile - IAM Role / Policy
+### Change the existing Instance Profile attached to Overwatch Job Cluster 
+
+After the Storage Credentials is created, the existing instance profile attached to the Overwatch Job cluster needs to be provisioned read/write access to the storage target for the Overwatch Output (which will ultimately become your external location).
 
 ```
 {
@@ -93,8 +98,8 @@ weight: 1
         "s3:PutBucketNotification"
       ],
       "Resource": [
-        "arn:aws:s3:::<BUCKET-NAME>/*",
-        "arn:aws:s3:::< BUCKET-NAME> "
+        "arn:aws:s3:::<EXTERNAL-LOCATION-BUCKET-NAME>/*",
+        "arn:aws:s3:::<EXTERNAL-LOCATION-BUCKET-NAME> "
       ]
     },
     {
