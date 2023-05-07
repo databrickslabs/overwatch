@@ -70,6 +70,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
               .foreachBatch(upsertToDelta _)
               .trigger(Trigger.Once())
               .option("checkpointLocation", checkPointLocation)
+              .queryName(s"Streaming_${sourceName}")
               .option("mergeSchema", "true")
               .option("path", targetLocation)
               .start()
@@ -78,6 +79,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
             rawStreamingDF
               .writeStream
               .format("delta")
+              .outputMode(s"${cloneSpec.target}")
               .trigger(Trigger.Once())
               .option("checkpointLocation", checkPointLocation)
               .option("mergeSchema", "true")
@@ -88,6 +90,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
           rawStreamingDF
             .writeStream
             .format("delta")
+            .outputMode(s"${cloneSpec.target}")
             .trigger(Trigger.Once())
             .option("checkpointLocation", checkPointLocation)
             .option("mergeSchema", "true")
