@@ -1,9 +1,12 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
+
+import java.io.FileNotFoundException
 
 
 class Migration(_sourceETLDB: String, _targetPrefix: String, _workspace: Workspace, _database: Database, _config: Config)
@@ -26,7 +29,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
                                           sourceToSnap: Array[PipelineTable]
                                         ): Seq[CloneDetail] = {
 
-    val finalMigrateRootPath= s"${migrateRootPath}/data"
+    val finalMigrateRootPath= s"${migrateRootPath}/global_share"
     val cloneSpecs = sourceToSnap.map(dataset => {
       val sourceName = dataset.name.toLowerCase
       val sourcePath = dataset.tableLocation
@@ -98,6 +101,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 }
 
 object Migration extends SparkSessionWrapper {
+  private val logger: Logger = Logger.getLogger(this.getClass)
 
 
   def apply(workspace: Workspace,
@@ -121,34 +125,57 @@ object Migration extends SparkSessionWrapper {
   /**
    * Create a backup of the Overwatch datasets
    *
-   * @param arg(0)        Source Database Name.
-   * @param arg(1)        Target MigrateRootPath
-   * @param arg(2)        Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)
-   * @param arg(3)        Type of Snapshot to be performed. Full for Full Snapshot , Incremental for Incremental Snapshot
-   * @param arg(4)        Array of table names to exclude from the snapshot
-   *                      this is the table name only - without the database prefix
+   * @param arg(0)        Source Database name or ETlDataPathPrefix name.
+   * @param arg(1)        Remote Source WorkspaceID(Needed when you provide ETlDataPathPrefix as arg(0)
+   * @param arg(2)        Target MigrateRootPath
+   * @param arg(3)        Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)
+   * @param arg(4)        Configuration path for Source
+   * @param arg(5)        Configuration path for Destination
+   * @param arg(6)        Target ETlDB Name
+   * @param arg(7)        Target Consumer DB Name
+   * @param arg(8)        Array of table names to exclude from the snapshot.This is the table name only - without the database prefix
+   * @param arg(9)        Type of Cloning to be performed - "Deep" or "Shallow" .Default is Deep cloning
    * @return
    */
 
   def main(args: Array[String]): Unit = {
 
-    val sourceETLDB = args(0)
-    val migrateRootPath = args(1)
-    val pipeline = args(2)
-    val sourceConfigPath = args(3)
-    val targetConfigPath = args(4)
-    val targetETLDB = args(5)
-    val targetConsumerDB = args(6)
-    val tablesToExclude = args.lift(7).getOrElse("")
-    val cloneLevel = args.lift(8).getOrElse("Deep")
+    val sourceETLDBOrETlDataPathPrefix = args(0)
+    val remoteSourceWorkSpaceID = args.lift(1).getOrElse("")
+    val migrateRootPath = args(2)
+    val pipeline = args(3)
+    val sourceConfigPath = args(4)
+    val targetConfigPath = args(5)
+    val targetETLDB = args(6)
+    val targetConsumerDB = args(7)
+    val tablesToExclude = args.lift(8).getOrElse("")
+    val cloneLevel = args.lift(9).getOrElse("Deep")
 
-    val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
+    //Build Workspace for the Source using the SourceETLDB or SourceRemoteETLDataPathPrefix
+    val snapWorkSpace = if (sourceETLDBOrETlDataPathPrefix.contains("/")){ // Will be using this when want to migrate from Remote Workspace
+      val RemoteETLDataPathPrefix =   removeTrailingSlashes(sourceETLDBOrETlDataPathPrefix) + "/global_share"
+      val pipReportPath = RemoteETLDataPathPrefix+"/pipeline_report"
+      try{
+        dbutils.fs.ls(s"$pipReportPath/_delta_log").nonEmpty
+        logger.log(Level.INFO, s"Overwatch has being deployed with ${pipReportPath} location...proceed")
+      }catch {
+        case e: FileNotFoundException =>
+          val msg = s"Overwatch has not been deployed with ${pipReportPath} location...can not proceed"
+          logger.log(Level.ERROR, msg)
+          throw new BadConfigException(msg)
+      }
+      Helpers.getRemoteWorkspaceByPath(pipReportPath,successfulOnly= true,remoteSourceWorkSpaceID)
+    }else{ // Will be using this when want to migrate from Same Workspace
+      val sourceETLDB = sourceETLDBOrETlDataPathPrefix
+      Helpers.getWorkspaceByDatabase(sourceETLDB)
+    }
+    val sourceDB = snapWorkSpace.getConfig.databaseName
 
     val pipelineLower = pipeline.toLowerCase
-    if (pipelineLower.contains("bronze")) Migration(snapWorkSpace,sourceETLDB,migrateRootPath,"Bronze",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    if (pipelineLower.contains("silver")) Migration(snapWorkSpace,sourceETLDB,migrateRootPath,"Silver",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    if (pipelineLower.contains("gold")) Migration(snapWorkSpace,sourceETLDB,migrateRootPath,"Gold",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    Migration(snapWorkSpace,sourceETLDB,migrateRootPath,"pipeline_report",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
+    if (pipelineLower.contains("bronze")) Migration(snapWorkSpace,sourceDB,migrateRootPath,"Bronze",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
+    if (pipelineLower.contains("silver")) Migration(snapWorkSpace,sourceDB,migrateRootPath,"Silver",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
+    if (pipelineLower.contains("gold")) Migration(snapWorkSpace,sourceDB,migrateRootPath,"Gold",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
+    Migration(snapWorkSpace,sourceDB,migrateRootPath,"pipeline_report",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
 
     println("Migration Completed")
   }
