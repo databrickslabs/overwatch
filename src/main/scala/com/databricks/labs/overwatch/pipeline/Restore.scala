@@ -46,8 +46,8 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
           CloneDetail(sourcePath, targetPath, None, cloneLevel)
         }).toArray.toSeq
         val cloneReport = Helpers.parClone(cloneSpecs)
-        val cloneReportPath = s"${targetPrefix}/clone_report/"
-        cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
+        val restoreReportPath = s"${targetPrefix}/restore_report/"
+        cloneReport.toDS.write.format("delta").mode("overwrite").save(restoreReportPath)
       } else {
         println("Target Path is not Empty...... Could not proceed with OverWrite Mode. Please select Append Mode of Restoration")
       }
@@ -57,7 +57,7 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
         val newTargets = allTargets.map(_.copy(_mode = WriteMode.append, withCreateDate = false, withOverwatchRunID = false))
         newTargets.foreach(t => {
           val tableName = t.name.toLowerCase()
-          println(s"Data is written from ${globalPath} to ${targetPrefix}/global_share/${tableName}")
+          println(s"Data is written from ${globalPath} to ${targetPrefix}/global_share/${tableName} with writeMode ${t.writeMode}")
           val inputDF = spark.read.format("delta").load(s"${globalPath}/${tableName}")
           inputDF.write.format("delta").mode(s"${t.writeMode}").option("mergeSchema", "true").save(s"${targetPrefix}/global_share/${tableName}")
         })
