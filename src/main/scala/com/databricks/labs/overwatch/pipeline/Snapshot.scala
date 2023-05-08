@@ -302,7 +302,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       .filter(_.exists()) // source path must exist
       .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
 
-    val cloneSpecs = buildCloneSpecs("Deep",sourceToSnapFiltered)
+    val cloneSpecs = buildCloneSpecs("Deep",sourceToSnapFiltered,"incremental")
     snapStreamNew(cloneSpecs)
     this
   }
