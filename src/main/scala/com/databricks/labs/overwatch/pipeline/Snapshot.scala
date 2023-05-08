@@ -3,8 +3,9 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.streaming.{DataStreamWriter, Trigger}
 
+import com.databricks.labs.overwatch.pipeline.PipelineTargets
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
@@ -18,14 +19,9 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   import spark.implicits._
   private val snapshotRootPath = removeTrailingSlashes(_targetPrefix)
   private val workSpace = _workspace
-  private val bronze = Bronze(workSpace)
-  private val silver = Silver(workSpace)
-  private val gold = Gold(workSpace)
-
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
-  val Config = _config
-
+  private val Config = _config
 
   private def parallelism: Int = {
     driverCores
@@ -34,7 +30,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail]): Unit = {
 
     val cloneDetailsPar = cloneDetails.par
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(1))
     cloneDetailsPar.tasksupport = taskSupport
     import spark.implicits._
     spark.conf.set("spark.databricks.delta.schema.autoMerge.enabled",true)
@@ -46,65 +42,118 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
         val sourceName = s"${cloneSpec.source}".split("/").takeRight(1).head
         val checkPointLocation = s"${snapshotRootPath}/checkpoint/${sourceName}"
         val targetLocation = s"${cloneSpec.target}"
-        val streamWriter = if (cloneSpec.mode == WriteMode.merge){
-          if(Helpers.pathExists(targetLocation)){
-            val deltaTable = DeltaTable.forPath(spark,targetLocation)
+
+        if(Helpers.pathExists(targetLocation)){
+          println(s"Target path is not Empty and mode for ${sourceName} is ${cloneSpec.mode}")
+          if (cloneSpec.mode == WriteMode.merge){ //If Table mode is Merge then do simple merge
+            val deltaTarget = DeltaTable.forPath(spark,targetLocation).alias("target")
+            val updatesDF = rawStreamingDF
             val immutableColumns = cloneSpec.immutableColumns
 
             def upsertToDelta(microBatchOutputDF: DataFrame, batchId: Long) {
-
               val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")
-              deltaTable.as("target")
-                .merge(
-                  microBatchOutputDF.as("updates"),
-                  mergeCondition)
-                .whenMatched().updateAll()
-                .whenNotMatched().insertAll()
+              val mergeDetailMsg =
+                s"""
+                   |Beginning upsert to ${sourceName}.
+                   |MERGE CONDITION: $mergeCondition
+                   |""".stripMargin
+              logger.log(Level.INFO, mergeDetailMsg)
+              spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", Config.runID)
+
+              deltaTarget
+                .merge(microBatchOutputDF.as("updates"), mergeCondition)
+                .whenMatched
+                .updateAll()
+                .whenNotMatched
+                .insertAll()
                 .execute()
             }
 
-            rawStreamingDF
+            val streamWriter1 = rawStreamingDF
               .writeStream
               .format("delta")
-              .outputMode("append")
               .foreachBatch(upsertToDelta _)
               .trigger(Trigger.Once())
               .option("checkpointLocation", checkPointLocation)
+              .queryName(s"Streaming_${sourceName}")
               .option("mergeSchema", "true")
               .option("path", targetLocation)
               .start()
+
+            val streamManager = Helpers.getQueryListener(streamWriter1,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+            spark.streams.addListener(streamManager)
+            val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter1.name}\nID: ${streamWriter1.id}"
+            logger.log(Level.INFO, listenerAddedMsg)
+
+            streamWriter1.awaitTermination()
+            spark.streams.removeListener(streamManager)
+            logger.log (Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
+            spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
+            CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
 
           }else{
-            rawStreamingDF
-              .writeStream
-              .format("delta")
-              .trigger(Trigger.Once())
-              .option("checkpointLocation", checkPointLocation)
-              .option("mergeSchema", "true")
+            logger.log(Level.INFO, s"Beginning write to ${sourceName}")
+            val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write"
+            logger.log(Level.INFO, msg)
+            val beginMsg = s"Stream to ${sourceName} beginning."
+            logger.log(Level.INFO, beginMsg)
+            var streamWriter = rawStreamingDF.writeStream.outputMode("append").format("delta").option("checkpointLocation", checkPointLocation)
+              .queryName(s"StreamTo_${sourceName}")
+
+            streamWriter = if (cloneSpec.mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
+              streamWriter.option("overwriteSchema", "true")
+            } else { // append AND merge schema
+              streamWriter
+                .option("mergeSchema", "true")
+            }
+            val streamWriter1 = streamWriter
+              .asInstanceOf[DataStreamWriter[Row]]
               .option("path", targetLocation)
               .start()
+
+            val streamManager = Helpers.getQueryListener(streamWriter1,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+            spark.streams.addListener(streamManager)
+            val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter1.name}\nID: ${streamWriter1.id}"
+            logger.log(Level.INFO, listenerAddedMsg)
+
+            streamWriter1.awaitTermination()
+            spark.streams.removeListener(streamManager)
+            logger.log (Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
+            CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
+
           }
         }else{
-          rawStreamingDF
-            .writeStream
-            .format("delta")
-            .trigger(Trigger.Once())
-            .option("checkpointLocation", checkPointLocation)
-            .option("mergeSchema", "true")
+          println(s"First Time Write to  ${sourceName}")
+          logger.log(Level.INFO, s"Beginning write to ${sourceName}")
+          val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write"
+          logger.log(Level.INFO, msg)
+          val beginMsg = s"Stream to ${sourceName} beginning."
+          logger.log(Level.INFO, beginMsg)
+          var streamWriter = rawStreamingDF.writeStream.outputMode("append").format("delta").option("checkpointLocation", checkPointLocation)
+            .queryName(s"StreamTo_${sourceName}")
+
+          streamWriter = if (cloneSpec.mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
+            streamWriter.option("overwriteSchema", "true")
+          } else { // append AND merge schema
+            streamWriter
+              .option("mergeSchema", "true")
+          }
+          val streamWriter1 = streamWriter
+            .asInstanceOf[DataStreamWriter[Row]]
             .option("path", targetLocation)
             .start()
+
+          val streamManager = Helpers.getQueryListener(streamWriter1,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+          spark.streams.addListener(streamManager)
+          val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter1.name}\nID: ${streamWriter1.id}"
+          logger.log(Level.INFO, listenerAddedMsg)
+
+          streamWriter1.awaitTermination()
+          spark.streams.removeListener(streamManager)
+          logger.log (Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
+          CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
         }
-        val streamManager = Helpers.getQueryListener(streamWriter,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
-        spark.streams.addListener(streamManager)
-        val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
-        if (config.debugFlag) println(listenerAddedMsg)
-        logger.log(Level.INFO, listenerAddedMsg)
 
-        streamWriter.awaitTermination()
-        spark.streams.removeListener(streamManager)
-
-        logger.log(Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-        CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
       } catch {
         case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
           val failMsg = PipelineFunctions.appendStackStrace(e)
@@ -120,39 +169,36 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
         }
       }
     }).toArray.toSeq
+
     val cloneReportPath = s"${snapshotRootPath}/clone_report/"
     cloneReport.toDS.write.mode("append").option("mergeSchema", "true").format("delta").save(cloneReportPath)
   }
 
 
   private[overwatch] def buildCloneSpecs(
+                                          cloneLevel: String,
                                           sourceToSnap: Array[PipelineTable]
                                         ): Seq[CloneDetail] = {
 
     val finalSnapshotRootPath = s"${snapshotRootPath}/data"
+
     val cloneSpecs = sourceToSnap.map(dataset => {
       val sourceName = dataset.name.toLowerCase
       val sourcePath = dataset.tableLocation
       val mode = dataset._mode
       val immutableColumns = (dataset.keys ++ dataset.incrementalColumns).distinct
       val targetPath = s"$finalSnapshotRootPath/$sourceName"
-      CloneDetail(sourcePath, targetPath, None, "Deep",immutableColumns,mode)
+      CloneDetail(sourcePath, targetPath, None, cloneLevel,immutableColumns,mode)
     }).toArray.toSeq
     cloneSpecs
   }
 
   private[overwatch] def incrementalSnap(
-                                          pipeline : String,
+                                          pipelineTable : Array[PipelineTable],
                                           excludes: Option[String] = Some("")
                                         ): this.type = {
 
-
-    val sourceToSnap = {
-      if (pipeline.toLowerCase() == "bronze") bronze.getAllTargets
-      else if (pipeline.toLowerCase() == "silver") silver.getAllTargets
-      else if (pipeline.toLowerCase() == "gold") gold.getAllTargets
-      else Array(pipelineStateTarget)
-    }
+    val sourceToSnap = pipelineTable
 
     val exclude = excludes match {
       case Some(s) if s.nonEmpty => s
@@ -169,13 +215,13 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       .filter(_.exists()) // source path must exist
       .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
 
-    val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered)
+    val cloneSpecs = buildCloneSpecs("Deep",sourceToSnapFiltered)
     snapStream(cloneSpecs)
     this
   }
 
   private[overwatch] def snap(
-                               pipeline : String,
+                               pipelineTable : Array[PipelineTable],
                                cloneLevel: String = "DEEP",
                                excludes: Option[String] = Some("")
                              ): this.type= {
@@ -183,13 +229,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
-    val sourceToSnap = {
-      if (pipeline.toLowerCase() == "bronze") bronze.getAllTargets
-      else if (pipeline.toLowerCase() == "silver") silver.getAllTargets
-      else if (pipeline.toLowerCase() == "gold") gold.getAllTargets
-      else Array(pipelineStateTarget)
-    }
-
+    val sourceToSnap = pipelineTable
     val exclude = excludes match {
       case Some(s) if s.nonEmpty => s
       case _ => ""
@@ -206,7 +246,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       .filter(_.exists()) // source path must exist
       .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
 
-    val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered)
+    val cloneSpecs = buildCloneSpecs(cloneLevel,sourceToSnapFiltered)
     val cloneReport = Helpers.parClone(cloneSpecs)
     val cloneReportPath = s"${snapshotRootPath}/clone_report/"
     cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
@@ -224,12 +264,15 @@ object Snapshot extends SparkSessionWrapper {
             pipeline : String,
             snapshotType: String,
             excludes: Option[String],
-            CloneLevel: String
+            CloneLevel: String,
+            pipelineTable : Array[PipelineTable]
            ): Any = {
     if (snapshotType.toLowerCase()== "incremental")
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).incrementalSnap(pipeline, excludes)
-    if (snapshotType.toLowerCase()== "full")
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).snap(pipeline,CloneLevel,excludes)
+      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).incrementalSnap(pipelineTable,excludes)
+    if (snapshotType.toLowerCase()== "full") {
+      println()
+      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).snap(pipelineTable,CloneLevel,excludes)
+    }
 
   }
 
@@ -256,12 +299,23 @@ object Snapshot extends SparkSessionWrapper {
     val cloneLevel = args.lift(5).getOrElse("Deep")
 
     val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
+    val bronze = Bronze(snapWorkSpace)
+    val silver = Silver(snapWorkSpace)
+    val gold = Gold(snapWorkSpace)
+    val pipelineReport = bronze.pipelineStateTarget
+
+    val finalSnapshotRootPath = if (snapshotType == "incremental"){
+      snapshotRootPath
+    }else{
+      val currTime = Pipeline.createTimeDetail(System.currentTimeMillis())
+      s"$snapshotRootPath/${currTime.asDTString}/${currTime.asUnixTimeMilli.toString}"
+    }
 
     val pipelineLower = pipeline.toLowerCase
-    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,Some(tablesToExclude),cloneLevel)
-    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType,Some(tablesToExclude),cloneLevel)
-    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType,Some(tablesToExclude),cloneLevel)
-    Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"pipeline_report",snapshotType,Some(tablesToExclude),cloneLevel)
+    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,finalSnapshotRootPath,"Bronze",snapshotType,Some(tablesToExclude),cloneLevel,bronze.getAllTargets)
+    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,finalSnapshotRootPath,"Silver",snapshotType,Some(tablesToExclude),cloneLevel,silver.getAllTargets)
+    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,finalSnapshotRootPath,"Gold",snapshotType,Some(tablesToExclude),cloneLevel,gold.getAllTargets)
+    Snapshot(snapWorkSpace,sourceETLDB,finalSnapshotRootPath,"pipeline_report",snapshotType,Some(tablesToExclude),cloneLevel,Array(pipelineReport))
 
     println("SnapShot Completed")
   }
