@@ -50,7 +50,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
         if(Helpers.pathExists(targetLocation)){
           println(s"Target path is not Empty and mode for ${sourceName} is ${cloneSpec.mode}")
           if (cloneSpec.mode == WriteMode.merge){ //If Table mode is Merge then do simple merge
-            val deltaTarget = DeltaTable.forPath(spark,targetLocation)
+            val deltaTarget = DeltaTable.forPath(spark,targetLocation).alias("target")
             val updatesDF = rawStreamingDF.alias("updates")
             val immutableColumns = cloneSpec.immutableColumns
             val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")
