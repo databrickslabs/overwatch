@@ -12,7 +12,7 @@ import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
 import io.delta.tables.DeltaTable
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
-class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspace, _database: Database, _config: Config)
+class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspace, _database: Database, _config: Config,_processType: String)
   extends Pipeline(_workspace, _database, _config){
 
 
@@ -22,6 +22,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
   private val Config = _config
+  private val processType = _processType
 
   private def parallelism: Int = {
     driverCores
@@ -180,7 +181,12 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
                                           sourceToSnap: Array[PipelineTable]
                                         ): Seq[CloneDetail] = {
 
-    val finalSnapshotRootPath = s"${snapshotRootPath}/data"
+    val finalSnapshotRootPath  = if (processType.toLowerCase() == "migration"){
+      s"${snapshotRootPath}/global_share"
+    }else{
+      s"${snapshotRootPath}/data"
+    }
+
 
     val cloneSpecs = sourceToSnap.map(dataset => {
       val sourceName = dataset.name.toLowerCase
@@ -265,16 +271,22 @@ object Snapshot extends SparkSessionWrapper {
             snapshotType: String,
             excludes: Option[String],
             CloneLevel: String,
-            pipelineTable : Array[PipelineTable]
+            pipelineTable : Array[PipelineTable],
+            processType : String
            ): Any = {
     if (snapshotType.toLowerCase()== "incremental")
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).incrementalSnap(pipelineTable,excludes)
+      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).incrementalSnap(pipelineTable,excludes)
+
     if (snapshotType.toLowerCase()== "full") {
-      println()
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig).snap(pipelineTable,CloneLevel,excludes)
+      println("pipelineTable", pipelineTable)
+      println("CloneLevel", CloneLevel)
+      println("excludes", excludes)
+      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).snap(pipelineTable,CloneLevel,excludes)
     }
 
   }
+
+
 
 
   /**
@@ -297,6 +309,7 @@ object Snapshot extends SparkSessionWrapper {
     val snapshotType = args(3)
     val tablesToExclude = args.lift(4).getOrElse("")
     val cloneLevel = args.lift(5).getOrElse("Deep")
+    val processType = args.lift(6).getOrElse("Snapshot")
 
     val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
     val bronze = Bronze(snapWorkSpace)
@@ -304,28 +317,14 @@ object Snapshot extends SparkSessionWrapper {
     val gold = Gold(snapWorkSpace)
     val pipelineReport = bronze.pipelineStateTarget
 
-    val finalSnapshotRootPath = if (snapshotType == "incremental"){
-      snapshotRootPath
-    }else{
-      val currTime = Pipeline.createTimeDetail(System.currentTimeMillis())
-      s"$snapshotRootPath/${currTime.asDTString}/${currTime.asUnixTimeMilli.toString}"
-    }
-
     val pipelineLower = pipeline.toLowerCase
-    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,finalSnapshotRootPath,"Bronze",snapshotType,Some(tablesToExclude),cloneLevel,bronze.getAllTargets)
-    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,finalSnapshotRootPath,"Silver",snapshotType,Some(tablesToExclude),cloneLevel,silver.getAllTargets)
-    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,finalSnapshotRootPath,"Gold",snapshotType,Some(tablesToExclude),cloneLevel,gold.getAllTargets)
-    Snapshot(snapWorkSpace,sourceETLDB,finalSnapshotRootPath,"pipeline_report",snapshotType,Some(tablesToExclude),cloneLevel,Array(pipelineReport))
+    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,Some(tablesToExclude),cloneLevel,bronze.getAllTargets,processType)
+    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType,Some(tablesToExclude),cloneLevel,silver.getAllTargets,processType)
+    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType,Some(tablesToExclude),cloneLevel,gold.getAllTargets,processType)
+    Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"pipeline_report",snapshotType,Some(tablesToExclude),cloneLevel,Array(pipelineReport),processType)
 
     println("SnapShot Completed")
   }
-
-
-
-
-
-
-
 }
 
 
