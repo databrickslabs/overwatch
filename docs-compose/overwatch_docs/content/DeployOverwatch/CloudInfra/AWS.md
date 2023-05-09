@@ -26,12 +26,19 @@ There are two primary sources of data that need to be configured:
     * Best Practice - Multi-Workspace -- When multiple workspaces are using Overwatch within a single region it's best to
       ensure that each are going to their own prefix, even if sharing a bucket. This greatly reduces Overwatch scan times
       as the log files build up.
-    * Best Practice - Sharding -- When many clusters send their logs to the same prefix it reduces the AWS read parallelism
-      for these small files. It's best to find a methodology for log prefixes that works for your org. One example would
-      be to have each workspace and each team store their logs in a specific prefix, etc to break up the number of log
-      files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data
-      to the data model.
-#### Note for GCP- ```Latest Overwatch version does not support cluster logs to be collected from multiple workspaces. As per the latest Databricks GCP release, cluster log location does not support mounted DBFS location, we have to provide DBFS root as a target for log delivery. This can cause issues while populating spark job related tables in multi workspace deployment. Overwatch team is wprking on a fix for this issues```
+* Best Practice - Sharding -- When many clusters send their logs to the same prefix it reduces the AWS read parallelism
+  for these small files. It's best to find a methodology for log prefixes that works for your org. One example would
+  be to have each workspace and each team store their logs in a specific prefix, etc to break up the number of log
+  files buried inside a single prefix. Overwatch will do all the work to aggregate these logs and deliver the data
+  to the data model.
+  
+  {{% notice note%}}
+  _Latest Overwatch version does not support clusterlogs to be collected from multiple workspaces.
+  As per the latest Databricks GCP release, cluster log location does not support mounted/GCS bucket location, we have to
+  provide DBFS root as a target for log delivery. This can cause issues while populating spark job related tables in
+  multi workspace deployment. Keep watching this space for more updates as Overwatch team is working on a fix for this issues_
+  {{% /notice %}}
+
 
 ## Reference Architecture
 As of 0.7.1 Overwatch can be deployed on a single workspace and retrieve data from all workspaces. For more details
