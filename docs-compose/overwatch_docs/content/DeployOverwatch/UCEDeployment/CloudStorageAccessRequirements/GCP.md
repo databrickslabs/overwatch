@@ -36,7 +36,7 @@ Following steps needs to be performed to external location’s GCS bucket permis
 ### Cluster Logging Locations Setup
 
 {{% notice note%}}
- _Latest Overwatch version does not support clusterlogs to be collected from multiple workspaces.
+ _Overwatch version 0.7.2.x does not support clusterlogs to be collected from multiple workspaces.
   As per the latest Databricks GCP release, cluster log location does not support mounted/GCS bucket location, we have to
   provide DBFS root as a target for log delivery. This can cause issues while populating spark job related tables in
   multi workspace deployment. Keep watching this space for more updates as Overwatch team is working on a fix for this issues_
