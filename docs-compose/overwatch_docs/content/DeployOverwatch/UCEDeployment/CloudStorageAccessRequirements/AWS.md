@@ -3,9 +3,20 @@ title: "AWS"
 date: 2023-04-18T11:28:39-05:00
 weight: 1
 ---
-**Under Construction** -- we will be improving these docs shortly
+Below are the requirements needed for Storage Access setup in AWS 
 
-### AWS IAM/Policy required to set up for Storage Credentials
+* [AWS IAM Role/Policy required for Storage Credentials](#aws-iam-role-required-for-storage-credentials)
+
+* [Trust Relation required in Storage Credentials IAM Role](#trust-relation-required-in-storage-credentials-iam-role)
+
+* [Instance Profile required for Overwatch Job/Interactive Cluster](#instance-profile-required-for-overwatch-job-cluster)
+
+
+### AWS IAM Role required for Storage Credentials
+
+This IAM Role to authorize access to the external location. It will be configured while creating the Databricks Storage Credential. 
+Below policy will be used for creating the IAM Role. Please refer this [doc](https://docs.databricks.com/data-governance/unity-catalog/manage-external-locations-and-credentials.html#manage-storage-credentials) for a detailed description on creating IAM role for Storage Credentials 
+
 ```
 {
   "Version": "2012-10-17",
@@ -23,8 +34,8 @@ weight: 1
         "s3:PutLifecycleConfiguration"
       ],
       "Resource": [
-        "arn:aws:s3:::<BUCKET-NAME>/*",
-        "arn:aws:s3:::< BUCKET-NAME> "
+        "arn:aws:s3:::<EXTERNAL-LOCATION-BUCKET-NAME>/*",
+        "arn:aws:s3:::<EXTERNAL-LOCATION-BUCKET-NAME> "
       ],
       "Effect": "Allow"
     },
@@ -52,7 +63,11 @@ weight: 1
 }
 ```
 
-### Trust Relation
+### Trust Relation required in Storage Credentials IAM Role
+Add the below policy in Trust Relation of Storage Credentials IAM, 
+to make this role self-assuming. Please refer this 
+[doc](https://docs.databricks.com/data-governance/unity-catalog/manage-external-locations-and-credentials.html#manage-storage-credentials) 
+for a detailed description on setting up Trust relation while creating IAM role for Storage Credentials  
 ```
 {
   "Version": "2012-10-17",
@@ -73,7 +88,11 @@ weight: 1
 }
 ```
 
-### Instance Profile - IAM Role / Policy
+### Instance Profile required for Overwatch Job Cluster
+
+After the Storage Credentials is created, the existing instance profile attached to the Overwatch Job cluster needs 
+to be provisioned read/write access to the storage target for the Overwatch Output (which will ultimately become your external location).
+This Instance profile can be used in the Job CLuster/Interactive Cluster running Overwatch.
 
 ```
 {
@@ -93,8 +112,8 @@ weight: 1
         "s3:PutBucketNotification"
       ],
       "Resource": [
-        "arn:aws:s3:::<BUCKET-NAME>/*",
-        "arn:aws:s3:::< BUCKET-NAME> "
+        "arn:aws:s3:::<EXTERNAL-LOCATION-BUCKET-NAME>/*",
+        "arn:aws:s3:::<EXTERNAL-LOCATION-BUCKET-NAME> "
       ]
     },
     {
