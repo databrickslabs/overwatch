@@ -3,7 +3,7 @@ title: "AWS"
 date: 2023-04-18T11:28:39-05:00
 weight: 1
 ---
-Below are the requirement needed for Storage Access setup in AWS 
+Below are the requirements needed for Storage Access setup in AWS 
 
 * [AWS IAM Role/Policy required for Storage Credentials](#aws-iam-role-required-for-storage-credentials)
 

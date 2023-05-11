@@ -12,21 +12,21 @@
     <title>GCP :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1683818734" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1683818734" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1683818734"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1683816404"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1683816404"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1683818734"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1683818734"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1683816404"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1683818734"></script>
 
     
   </div>
@@ -1069,10 +1069,13 @@
     <div class="wrapper">
 <nav id="TableOfContents">
   <ul>
-    <li><a href="#service-account">Service Account</a></li>
-    <li><a href="#storage-credential">Storage Credential</a></li>
-    <li><a href="#external-location">External Location</a></li>
-    <li><a href="#cluster-logging-locations">Cluster Logging Locations</a></li>
+    <li>
+      <ul>
+        <li><a href="#google-service-account-for-storage-credentials">Google Service Account for Storage Credentials</a></li>
+        <li><a href="#google-service-account-for-overwatch-job-cluster">Google Service Account for Overwatch Job Cluster</a></li>
+        <li><a href="#cluster-logging-locations-setup">Cluster Logging Locations Setup</a></li>
+      </ul>
+    </li>
   </ul>
 </nav>
     </div>
@@ -1097,11 +1100,48 @@
         
 
 
-<p><strong>Under Construction</strong> &ndash; we will be improving these docs shortly</p>
-<h2 id="service-account">Service Account</h2>
-<h2 id="storage-credential">Storage Credential</h2>
-<h2 id="external-location">External Location</h2>
-<h2 id="cluster-logging-locations">Cluster Logging Locations</h2>
+<p>Below are the requirement needed for Storage Access setup in GCP</p>
+<ul>
+<li>
+<p><a href="#google-service-account-for-storage-credentials">Google Service Account for Storage Credentials</a></p>
+</li>
+<li>
+<p><a href="#google-service-account-for-overwatch-job-cluster">Google Service Account for Overwatch Job Cluster</a></p>
+</li>
+<li>
+<p><a href="#cluster-logging-locations-setup">Cluster Logging Locations Setup</a></p>
+</li>
+</ul>
+<h3 id="google-service-account-for-storage-credentials">Google Service Account for Storage Credentials</h3>
+<p>Unity Catalog Storage credentials  should have the ability to read and write to a External Location(GCS bucket) by
+assigning appropriate IAM roles on that bucket to a Databricks-generated Google Cloud service account. Please refer the
+<a href="https://docs.gcp.databricks.com/data-governance/unity-catalog/manage-external-locations-and-credentials.html#manage-storage-credentials">docs</a>
+for detailed steps.</p>
+<h3 id="google-service-account-for-overwatch-job-cluster">Google Service Account for Overwatch Job Cluster</h3>
+<p>After the Storage Credentials are created, the existing Service Account attached to the Overwatch Job cluster needs to
+be provisioned read/write access to the storage target for the Overwatch Output
+(which will ultimately become your external location). This Service Account can be added to Overwatch Job/Interactive
+Clusters.</p>
+<p>The following steps needs to be performed to external location’s GCS bucket permissions -</p>
+<ul>
+<li>Add Service Account which is attached to the Overwatch Job cluster</li>
+<li>Add Roles -
+<ul>
+<li>Storage Admin</li>
+<li>Storage Legacy Bucket Owner</li>
+</ul>
+</li>
+</ul>
+<h3 id="cluster-logging-locations-setup">Cluster Logging Locations Setup</h3>
+
+<div class="notices note" ><p><strong>GCP &ndash; Remote Cluster Logs</strong> - Overwatch version 0.7.2.0.x  does not support cluster logs to be collected from remote
+workspaces. Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
+provide DBFS root path as a target for log delivery. This disables Overwatch&rsquo;s ability to collect cluster logs from
+remote workspaces at this time. A fix is in progress and expected to be available in the next release but for now,
+Overwatch customers must make a deployment on each workspace to the same target. After the fix is published you will
+be able to unify the configs and execute Overwatch from a single workspace and monitor remote workspaces.</p>
+</div>
+
 
 
 <footer class="footline">
@@ -1761,19 +1801,19 @@
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1683818734"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1683818734"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1683816404" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1683816404"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1683818734" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1683818734"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

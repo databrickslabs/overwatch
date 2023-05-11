@@ -12,8 +12,11 @@
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</guid>
-      <description>Under Construction &amp;ndash; we will be improving these docs shortly
-AWS IAM/Policy required to set up for Storage Credentials {&amp;#34;Version&amp;#34;: &amp;#34;2012-10-17&amp;#34;,&amp;#34;Statement&amp;#34;: [{&amp;#34;Action&amp;#34;: [&amp;#34;s3:GetObject&amp;#34;,&amp;#34;s3:GetObjectVersion&amp;#34;,&amp;#34;s3:PutObject&amp;#34;,&amp;#34;s3:PutObjectAcl&amp;#34;,&amp;#34;s3:DeleteObject&amp;#34;,&amp;#34;s3:ListBucket&amp;#34;,&amp;#34;s3:GetBucketLocation&amp;#34;,&amp;#34;s3:GetLifecycleConfiguration&amp;#34;,&amp;#34;s3:PutLifecycleConfiguration&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:s3:::&amp;lt;BUCKET-NAME&amp;gt;/*&amp;#34;,&amp;#34;arn:aws:s3:::&amp;lt; BUCKET-NAME&amp;gt; &amp;#34;],&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;},{&amp;#34;Action&amp;#34;: [&amp;#34;kms:Decrypt&amp;#34;,&amp;#34;kms:Encrypt&amp;#34;,&amp;#34;kms:GenerateDataKey*&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:kms:&amp;lt;KMS_KEY&amp;gt;&amp;#34;],&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;},{&amp;#34;Action&amp;#34;: [&amp;#34;sts:AssumeRole&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:iam::&amp;lt;AWS-ACCOUNT-ID&amp;gt;:role/&amp;lt;THIS-IAM-ROLE&amp;gt;&amp;#34;],&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;}]} Trust Relation {&amp;#34;Version&amp;#34;: &amp;#34;2012-10-17&amp;#34;,&amp;#34;Statement&amp;#34;: [{&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;,&amp;#34;Principal&amp;#34;: {&amp;#34;AWS&amp;#34;: &amp;#34;arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL&amp;#34; //DO NOT CHANGE},&amp;#34;Action&amp;#34;: &amp;#34;sts:AssumeRole&amp;#34;,&amp;#34;Condition&amp;#34;: {&amp;#34;StringEquals&amp;#34;: {&amp;#34;sts:ExternalId&amp;#34;: &amp;#34;e6e8162c-a42f-43a0-af86-312058795a14&amp;#34;}}}]} Instance Profile - IAM Role / Policy {&amp;#34;Version&amp;#34;: &amp;#34;2012-10-17&amp;#34;,&amp;#34;Statement&amp;#34;: [{&amp;#34;Sid&amp;#34;: &amp;#34;PermitSelectedBucketsList&amp;#34;,&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;,&amp;#34;Action&amp;#34;: [&amp;#34;s3:ListBucket&amp;#34;,&amp;#34;s3:GetObject&amp;#34;,&amp;#34;s3:PutObject&amp;#34;,&amp;#34;s3:GetObject&amp;#34;,&amp;#34;s3:DeleteObject&amp;#34;,&amp;#34;s3:PutObjectAcl&amp;#34;,&amp;#34;s3:GetBucketNotification&amp;#34;,&amp;#34;s3:PutBucketNotification&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:s3:::&amp;lt;BUCKET-NAME&amp;gt;/*&amp;#34;,&amp;#34;arn:aws:s3:::&amp;lt; BUCKET-NAME&amp;gt; &amp;#34;]},{&amp;#34;Action&amp;#34;: [&amp;#34;kms:Decrypt&amp;#34;,&amp;#34;kms:Encrypt&amp;#34;,&amp;#34;kms:GenerateDataKey*&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:kms:&amp;lt;KMS_KEY&amp;gt;&amp;#34;],&amp;#34;Effect&amp;#34;: &amp;#34;Allow&amp;#34;},{&amp;#34;Sid&amp;#34;: &amp;#34;DenyAuditLogsBucketCRUD&amp;#34;,&amp;#34;Effect&amp;#34;: &amp;#34;Deny&amp;#34;,&amp;#34;Action&amp;#34;: [&amp;#34;s3:PutObject&amp;#34;,&amp;#34;s3:PutObjectAcl&amp;#34;,&amp;#34;s3:DeleteObject&amp;#34;],&amp;#34;Resource&amp;#34;: [&amp;#34;arn:aws:s3:::&amp;lt;AUDIT-LOG-BUCKET-NAME&amp;gt;/*&amp;#34;]}]} Why Is Delete Required In The Policy</description>
+      <description>Below are the requirements needed for Storage Access setup in AWS
+AWS IAM Role/Policy required for Storage Credentials
+Trust Relation required in Storage Credentials IAM Role
+Instance Profile required for Overwatch Job/Interactive Cluster
+AWS IAM Role required for Storage Credentials This IAM Role to authorize access to the external location. It will be configured while creating the Databricks Storage Credential. Below policy will be used for creating the IAM Role. Please refer this doc for a detailed description on creating IAM role for Storage Credentials</description>
     </item>
     
     <item>
@@ -33,8 +36,11 @@ Provisioning the Managed Identity to The Storage If you intend to provision the 
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</guid>
-      <description>Under Construction &amp;ndash; we will be improving these docs shortly
-Service Account Storage Credential External Location Cluster Logging Locations </description>
+      <description>Below are the requirement needed for Storage Access setup in GCP
+Google Service Account for Storage Credentials
+Google Service Account for Overwatch Job Cluster
+Cluster Logging Locations Setup
+Google Service Account for Storage Credentials Unity Catalog Storage credentials should have the ability to read and write to a External Location(GCS bucket) by assigning appropriate IAM roles on that bucket to a Databricks-generated Google Cloud service account. Please refer the docs for detailed steps.</description>
     </item>
     
   </channel>

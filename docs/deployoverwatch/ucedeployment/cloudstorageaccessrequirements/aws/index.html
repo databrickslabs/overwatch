@@ -12,21 +12,21 @@
     <title>AWS :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1683816404" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1683818734" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1683818734" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1683818734" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1683818734"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1683816404"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1683816404"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1683818734"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1683818734"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1683816404"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1683818734"></script>
 
     
   </div>
@@ -1071,9 +1071,9 @@
   <ul>
     <li>
       <ul>
-        <li><a href="#aws-iampolicy-required-to-set-up-for-storage-credentials">AWS IAM/Policy required to set up for Storage Credentials</a></li>
-        <li><a href="#trust-relation">Trust Relation</a></li>
-        <li><a href="#instance-profile---iam-role--policy">Instance Profile - IAM Role / Policy</a></li>
+        <li><a href="#aws-iam-role-required-for-storage-credentials">AWS IAM Role required for Storage Credentials</a></li>
+        <li><a href="#trust-relation-required-in-storage-credentials-iam-role">Trust Relation required in Storage Credentials IAM Role</a></li>
+        <li><a href="#instance-profile-required-for-overwatch-job-cluster">Instance Profile required for Overwatch Job Cluster</a></li>
       </ul>
     </li>
   </ul>
@@ -1100,8 +1100,21 @@
         
 
 
-<p><strong>Under Construction</strong> &ndash; we will be improving these docs shortly</p>
-<h3 id="aws-iampolicy-required-to-set-up-for-storage-credentials">AWS IAM/Policy required to set up for Storage Credentials</h3>
+<p>Below are the requirements needed for Storage Access setup in AWS</p>
+<ul>
+<li>
+<p><a href="#aws-iam-role-required-for-storage-credentials">AWS IAM Role/Policy required for Storage Credentials</a></p>
+</li>
+<li>
+<p><a href="#trust-relation-required-in-storage-credentials-iam-role">Trust Relation required in Storage Credentials IAM Role</a></p>
+</li>
+<li>
+<p><a href="#instance-profile-required-for-overwatch-job-cluster">Instance Profile required for Overwatch Job/Interactive Cluster</a></p>
+</li>
+</ul>
+<h3 id="aws-iam-role-required-for-storage-credentials">AWS IAM Role required for Storage Credentials</h3>
+<p>This IAM Role to authorize access to the external location. It will be configured while creating the Databricks Storage Credential.
+Below policy will be used for creating the IAM Role. Please refer this <a href="https://docs.databricks.com/data-governance/unity-catalog/manage-external-locations-and-credentials.html#manage-storage-credentials">doc</a> for a detailed description on creating IAM role for Storage Credentials</p>
 <pre tabindex="0"><code>{
   &#34;Version&#34;: &#34;2012-10-17&#34;,
   &#34;Statement&#34;: [
@@ -1118,8 +1131,8 @@
         &#34;s3:PutLifecycleConfiguration&#34;
       ],
       &#34;Resource&#34;: [
-        &#34;arn:aws:s3:::&lt;BUCKET-NAME&gt;/*&#34;,
-        &#34;arn:aws:s3:::&lt; BUCKET-NAME&gt; &#34;
+        &#34;arn:aws:s3:::&lt;EXTERNAL-LOCATION-BUCKET-NAME&gt;/*&#34;,
+        &#34;arn:aws:s3:::&lt;EXTERNAL-LOCATION-BUCKET-NAME&gt; &#34;
       ],
       &#34;Effect&#34;: &#34;Allow&#34;
     },
@@ -1145,7 +1158,11 @@
     }
   ]
 }
-</code></pre><h3 id="trust-relation">Trust Relation</h3>
+</code></pre><h3 id="trust-relation-required-in-storage-credentials-iam-role">Trust Relation required in Storage Credentials IAM Role</h3>
+<p>Add the below policy in Trust Relation of Storage Credentials IAM,
+to make this role self-assuming. Please refer this
+<a href="https://docs.databricks.com/data-governance/unity-catalog/manage-external-locations-and-credentials.html#manage-storage-credentials">doc</a>
+for a detailed description on setting up Trust relation while creating IAM role for Storage Credentials</p>
 <pre tabindex="0"><code>{
   &#34;Version&#34;: &#34;2012-10-17&#34;,
   &#34;Statement&#34;: [
@@ -1163,7 +1180,10 @@
     }
   ]
 }
-</code></pre><h3 id="instance-profile---iam-role--policy">Instance Profile - IAM Role / Policy</h3>
+</code></pre><h3 id="instance-profile-required-for-overwatch-job-cluster">Instance Profile required for Overwatch Job Cluster</h3>
+<p>After the Storage Credentials is created, the existing instance profile attached to the Overwatch Job cluster needs
+to be provisioned read/write access to the storage target for the Overwatch Output (which will ultimately become your external location).
+This Instance profile can be used in the Job CLuster/Interactive Cluster running Overwatch.</p>
 <pre tabindex="0"><code>{
   &#34;Version&#34;: &#34;2012-10-17&#34;,
   &#34;Statement&#34;: [
@@ -1181,8 +1201,8 @@
         &#34;s3:PutBucketNotification&#34;
       ],
       &#34;Resource&#34;: [
-        &#34;arn:aws:s3:::&lt;BUCKET-NAME&gt;/*&#34;,
-        &#34;arn:aws:s3:::&lt; BUCKET-NAME&gt; &#34;
+        &#34;arn:aws:s3:::&lt;EXTERNAL-LOCATION-BUCKET-NAME&gt;/*&#34;,
+        &#34;arn:aws:s3:::&lt;EXTERNAL-LOCATION-BUCKET-NAME&gt; &#34;
       ]
     },
     {
@@ -1883,19 +1903,19 @@ Please visit the Databricks docs for more details on
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1683818734"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1683816404"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1683818734"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1683818734"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1683816404" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1683816404"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1683818734" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1683818734"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
