@@ -12,21 +12,21 @@
     <title>Validation :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1683300842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1683300842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1683300842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1683300842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1683300842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1683300842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1683300842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1683300842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1683300842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1683816404" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1683816404" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1683300842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1683816404" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1683300842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1683816404"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1683300842"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1683300842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1683816404"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1683816404"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1683300842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1683816404"></script>
 
     
   </div>
@@ -1068,7 +1068,6 @@
         <li><a href="#validation-rules">Validation rules</a></li>
         <li><a href="#run-the-validation">Run the validation</a></li>
         <li><a href="#review-the-report">Review The Report</a></li>
-        <li><a href="#mount-point-limitation">Mount Point Limitation</a></li>
       </ul>
     </li>
   </ul>
@@ -1125,9 +1124,14 @@ given workspace. For more information on executing a full validation, see <a hre
 <td style="text-align:left">excluded_scopes</td>
 </tr>
 <tr>
-<td style="text-align:left">Consuming data from event hub(Azure)</td>
+<td style="text-align:left">Event Hub <strong>Shared Access Key</strong> (Azure Only)</td>
 <td style="text-align:left">Audit Log data must be recognized as present and readable from the provided Event Hub Configuration fields.</td>
-<td style="text-align:left">eh_name,eh_scope_key,secret_scope</td>
+<td style="text-align:left">eh_name, eh_scope_key, secret_scope</td>
+</tr>
+<tr>
+<td style="text-align:left">Event Hub <strong>AAD Auth</strong> (Azure Only)</td>
+<td style="text-align:left">Audit Log data must be recognized as present and readable from the provided Event Hub Configuration fields.</td>
+<td style="text-align:left">eh_name, eh_conn_string, aad_tenant_id, aad_client_id, aad_client_secret_key, aad_authority_endpoint</td>
 </tr>
 <tr>
 <td style="text-align:left">Common consumer database name</td>
@@ -1170,9 +1174,9 @@ given workspace. For more information on executing a full validation, see <a hre
 <td style="text-align:left">auditlogprefix_source_path</td>
 </tr>
 <tr>
-<td style="text-align:left">Mount point validation<a href="#mount-point-limitation"> *More Details</a></td>
-<td style="text-align:left">Workspaces with more than 50 mount points are not supported in remote deployments at this time.</td>
-<td></td>
+<td style="text-align:left">Mount point validation</td>
+<td style="text-align:left">Workspaces with more than 50 mount points need to provide a csv file which will contain the mount point to source mapping. <strong><a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics//#exception---remote-workspaces-with-50-mounts">click here for more details</a></strong></td>
+<td style="text-align:left">mount_mapping_path</td>
 </tr>
 </tbody>
 </table>
@@ -1206,17 +1210,7 @@ to look at the snapTS and only review the validations relevant for the latest va
 </span></span><span style="display:flex;"><span>  spark<span style="color:#f92672">.</span>read<span style="color:#f92672">.</span>format<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;delta&#34;</span><span style="color:#f92672">).</span>load<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;&lt;etl_storage_prefix&gt;/report/validationReport&#34;</span><span style="color:#f92672">)</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#f92672">.</span>orderBy<span style="color:#f92672">(</span>&#39;snapTS<span style="color:#f92672">.</span>desc<span style="color:#f92672">)</span>
 </span></span><span style="display:flex;"><span><span style="color:#f92672">)</span>
-</span></span></code></pre></div><h3 id="mount-point-limitation">Mount Point Limitation</h3>
-<p>As you can see from the validation, monitoring remote workspaces is not supported for workspaces with &gt; 50 mount points.
-This is because the Databricks API that provides a map of mount points to fully-qualified URIs returns only 50 results
-and does not support pagination. Databricks is aware of this limitation and is working to prioritize pagination. In
-the meantime the dev team is looking for work-arounds and will publish updates as soon as a viable alternative can be
-found.</p>
-<p><strong>If Using AWS And All Cluster Logs are going to s3:// direct paths</strong></p>
-<p>Currently, workspaces with more than 50 mount points must have a local Overwatch deployment due to this limitation.
-Deactivate / Remove the workspace in question from the config and add the workspace to a new config where it is the
-only configured workspace. Create a local Overwatch deployment for that one deployment local to that workspace.</p>
-
+</span></span></code></pre></div>
 
 <footer class="footline">
 	
@@ -1874,19 +1868,19 @@ only configured workspace. Create a local Overwatch deployment for that one depl
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1683300842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1683300842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1683300842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1683300842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1683300842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1683300842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1683816404"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1683300842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1683300842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1683300842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1683816404"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1683816404"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1683300842" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1683300842"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1683816404" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1683816404"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
