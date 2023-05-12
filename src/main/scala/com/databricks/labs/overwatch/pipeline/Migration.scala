@@ -1,126 +1,59 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.MultiWorkspaceDeployment
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
+import com.databricks.labs.overwatch.MultiWorkspaceDeployment._
+import org.apache.spark.sql.functions._
 
 import java.io.FileNotFoundException
 
 
-class Migration(_sourceETLDB: String, _targetPrefix: String, _workspace: Workspace, _database: Database, _config: Config)
-  extends Pipeline(_workspace, _database, _config){
+class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String) {
 
-
-  import spark.implicits._
-  private val migrateRootPath = removeTrailingSlashes(_targetPrefix)
-  private val workSpace = _workspace
+  private val storage_prefix = removeTrailingSlashes(_targetPrefix)
   private val sourceETLDB = _sourceETLDB
-  private val bronze = Bronze(workSpace)
-  private val silver = Silver(workSpace)
-  private val gold = Gold(workSpace)
-
-  private val logger: Logger = Logger.getLogger(this.getClass)
-  private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
-  val Config = _config
-
-  private[overwatch] def buildCloneSpecs(
-                                          sourceToSnap: Array[PipelineTable]
-                                        ): Seq[CloneDetail] = {
-
-    val finalMigrateRootPath= s"${migrateRootPath}/global_share"
-    val cloneSpecs = sourceToSnap.map(dataset => {
-      val sourceName = dataset.name.toLowerCase
-      val sourcePath = dataset.tableLocation
-      val mode = dataset._mode
-      val immutableColumns = (dataset.keys ++ dataset.incrementalColumns).distinct
-      val targetPath = s"$finalMigrateRootPath/$sourceName"
-      CloneDetail(sourcePath, targetPath, None, "Deep",immutableColumns,mode)
-    }).toArray.toSeq
-    cloneSpecs
-  }
-  private[overwatch] def migrate(
-                               pipeline : String,
-                               cloneLevel: String = "DEEP",
-                               excludes: Option[String] = Some(""),
-                               sourceConfigPath : String,
-                               targetConfigPath : String
-                             ): this.type= {
-    val acceptableCloneLevels = Array("DEEP", "SHALLOW")
-    require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
-      s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
-
-    val sourceToSnap = {
-      if (pipeline.toLowerCase() == "bronze") bronze.getAllTargets
-      else if (pipeline.toLowerCase() == "silver") silver.getAllTargets
-      else if (pipeline.toLowerCase() == "gold") gold.getAllTargets
-      else Array(pipelineStateTarget)
-    }
-
-    val exclude = excludes match {
-      case Some(s) if s.nonEmpty => s
-      case _ => ""
-    }
-    val excludeList = exclude.split(":")
-
-    val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
-      if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
-    })
-    cleanExcludes.foreach(x => println(x))
+  private val configPath = _configPath
 
 
-    val sourceToSnapFiltered = sourceToSnap
-      .filter(_.exists()) // source path must exist
-      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
-
-    val cloneSpecs = buildCloneSpecs(sourceToSnapFiltered) :+ CloneDetail(sourceConfigPath, targetConfigPath, None, cloneLevel)
-    val cloneReport = Helpers.parClone(cloneSpecs)
-    val cloneReportPath = s"${migrateRootPath}/clone_report/"
-    cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
-    this
-  }
-
-  private[overwatch] def updateConfig(
-                                       targetConfigPath: String,
-                                       targetPrefix : String,
-                                       targetETLDB: String,
-                                       targetConsumerDB: String
-
-                                     ): Unit = {
-    val configUpdateStatement = s"""
-      update delta.`$targetConfigPath`
+  private[overwatch] def updateConfig(): Unit = {
+    if (configPath.toLowerCase().endsWith(".csv")) {
+      println(s"Config source: csv path ${configPath}")
+      val tempConfigPath = (configPath.split("/").dropRight(1) :+ "tempConfig.csv").mkString("/")
+      spark.read.format("csv")
+        .option("header", "true")
+        .option("ignoreLeadingWhiteSpace", true)
+        .option("ignoreTrailingWhiteSpace", true)
+        .load(configPath)
+        .withColumn("storage_prefix", when(col("etl_database_name") === lit(sourceETLDB), lit(storage_prefix)).otherwise(col("storage_prefix")))
+        .coalesce(1)
+        .write
+        .format("csv")
+        .option("header", "true")
+        .mode("overwrite")
+        .option("overwriteSchema", "true")
+        .save(tempConfigPath)
+      val filePath = dbutils.fs.ls(tempConfigPath).last.path
+      dbutils.fs.cp(filePath, configPath, true)
+      dbutils.fs.rm(tempConfigPath, true)
+    } else {
+      val configUpdateStatement =
+        s"""
+      update delta.`$configPath`
       set
-        storage_prefix = '$targetPrefix',
-        etl_database_name = '$targetETLDB',
-        consumer_database_name = '$targetConsumerDB'
+        storage_prefix = '$storage_prefix'
+      Where etl_database_name = '$sourceETLDB'
       """
-    spark.sql(configUpdateStatement)
+      spark.sql(configUpdateStatement)
+    }
   }
-
 }
 
 object Migration extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
-
-
-  def apply(workspace: Workspace,
-            sourceETLDB : String,
-            targetPrefix : String,
-            pipeline : String,
-            excludes: Option[String],
-            CloneLevel: String,
-            sourceConfigPath : String,
-            targetConfigPath : String,
-            targetETLDB : String,
-            targetConsumerDB: String
-           ): Any = {
-      val migration = new Migration(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig)
-      migration.migrate(pipeline,CloneLevel,excludes,sourceConfigPath,targetConfigPath)
-      migration.updateConfig(targetConfigPath,targetPrefix,targetETLDB,targetConsumerDB)
-
-  }
-
 
   /**
    * Create a backup of the Overwatch datasets
@@ -140,43 +73,30 @@ object Migration extends SparkSessionWrapper {
 
   def main(args: Array[String]): Unit = {
 
-    val sourceETLDBOrETlDataPathPrefix = args(0)
-    val remoteSourceWorkSpaceID = args.lift(1).getOrElse("")
-    val migrateRootPath = args(2)
-    val pipeline = args(3)
-    val sourceConfigPath = args(4)
-    val targetConfigPath = args(5)
-    val targetETLDB = args(6)
-    val targetConsumerDB = args(7)
-    val tablesToExclude = args.lift(8).getOrElse("")
-    val cloneLevel = args.lift(9).getOrElse("Deep")
+    val sourceETLDB = args(0)
+    val migrateRootPath = args(1)
+    val configPath = args(2)
+    val tablesToExclude = args.lift(3).getOrElse("")
+    val cloneLevel = "Deep"
 
-    //Build Workspace for the Source using the SourceETLDB or SourceRemoteETLDataPathPrefix
-    val snapWorkSpace = if (sourceETLDBOrETlDataPathPrefix.contains("/")){ // Will be using this when want to migrate from Remote Workspace
-      val RemoteETLDataPathPrefix =   removeTrailingSlashes(sourceETLDBOrETlDataPathPrefix) + "/global_share"
-      val pipReportPath = RemoteETLDataPathPrefix+"/pipeline_report"
-      try{
-        dbutils.fs.ls(s"$pipReportPath/_delta_log").nonEmpty
-        logger.log(Level.INFO, s"Overwatch has being deployed with ${pipReportPath} location...proceed")
-      }catch {
-        case e: FileNotFoundException =>
-          val msg = s"Overwatch has not been deployed with ${pipReportPath} location...can not proceed"
-          logger.log(Level.ERROR, msg)
-          throw new BadConfigException(msg)
-      }
-      Helpers.getRemoteWorkspaceByPath(pipReportPath,successfulOnly= true,remoteSourceWorkSpaceID)
-    }else{ // Will be using this when want to migrate from Same Workspace
-      val sourceETLDB = sourceETLDBOrETlDataPathPrefix
-      Helpers.getWorkspaceByDatabase(sourceETLDB)
+    val configDF = new MultiWorkspaceDeployment().generateBaseConfig(configPath).filter(col("etl_database_name") === sourceETLDB)
+    if (configDF.select("storage_prefix").distinct().count() != 1){
+      throw new BadConfigException("Migration is not possible where multiple different storage_prefix present for etl_database_name")
     }
-    val sourceDB = snapWorkSpace.getConfig.databaseName
+    val pipeline = "Bronze,Silver,Gold"
+    val etlDatabase = configDF.select("etl_database_name").distinct().collect()(0)(0)
+    val consumerDatabase = configDF.select("consumer_database_name").distinct().collect()(0)(0)
 
-    val pipelineLower = pipeline.toLowerCase
-    if (pipelineLower.contains("bronze")) Migration(snapWorkSpace,sourceDB,migrateRootPath,"Bronze",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    if (pipelineLower.contains("silver")) Migration(snapWorkSpace,sourceDB,migrateRootPath,"Silver",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    if (pipelineLower.contains("gold")) Migration(snapWorkSpace,sourceDB,migrateRootPath,"Gold",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
-    Migration(snapWorkSpace,sourceDB,migrateRootPath,"pipeline_report",Some(tablesToExclude),cloneLevel,sourceConfigPath,targetConfigPath,targetETLDB,targetConsumerDB)
 
+    // Step 01 - Start Migration Process
+    Snapshot.main(Array(sourceETLDB,migrateRootPath,pipeline,"full",tablesToExclude,cloneLevel,"Migration"))
+
+    //Step 02 - Drop Source ETLDatabase and Consumer Database after Migration
+    spark.sql(s"DROP DATABASE ${etlDatabase} CASCADE")
+    spark.sql(s"DROP DATABASE ${consumerDatabase} CASCADE")
+
+    //Step 03 - Update Config with the latest Storage Prefix
+    new Migration(sourceETLDB,migrateRootPath,configPath).updateConfig()
     println("Migration Completed")
   }
 }

@@ -183,6 +183,8 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
     val finalSnapshotRootPath  = if (processType.toLowerCase() == "migration"){
       s"${snapshotRootPath}/global_share"
+    }else if (processType.toLowerCase() == "restore") {
+      s"${snapshotRootPath}/global_share"
     }else{
       s"${snapshotRootPath}/data"
     }
@@ -272,15 +274,12 @@ object Snapshot extends SparkSessionWrapper {
             excludes: Option[String],
             CloneLevel: String,
             pipelineTable : Array[PipelineTable],
-            processType : String
+            processType : String,
            ): Any = {
     if (snapshotType.toLowerCase()== "incremental")
       new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).incrementalSnap(pipelineTable,excludes)
 
     if (snapshotType.toLowerCase()== "full") {
-      println("pipelineTable", pipelineTable)
-      println("CloneLevel", CloneLevel)
-      println("excludes", excludes)
       new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).snap(pipelineTable,CloneLevel,excludes)
     }
 
