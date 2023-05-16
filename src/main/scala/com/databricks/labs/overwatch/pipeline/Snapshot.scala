@@ -212,7 +212,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       case Some(s) if s.nonEmpty => s
       case _ => ""
     }
-    val excludeList = exclude.split(":")
+    val excludeList = exclude.split(",")
 
     val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
@@ -242,7 +242,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       case Some(s) if s.nonEmpty => s
       case _ => ""
     }
-    val excludeList = exclude.split(":")
+    val excludeList = exclude.split(",")
 
     val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
