@@ -688,6 +688,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                          )(eventLogsDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Searching for Event logs")
+    println("searching Event logs")
     val tempDir = processedLogFilesTracker.config.tempWorkingDir
     // Caching is done to ensure a single scan of the event log file paths
     // From here forward there should be no more direct scans for new records, just loading data direct from paths
@@ -739,7 +740,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         // Enable Spark to read case sensitive columns
         spark.conf.set("spark.sql.caseSensitive", "true")
 
-        val baseEventsDF = try {
+        val baseEventsDFRaw = try {
           /**
            * Event org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent has a duplicate column
            * "timestamp" where the type is a string and the column name is "timestamp". This conflicts with the rest
@@ -763,8 +764,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
           } else col("Timestamp")
 
           baseDF
-            .withColumn("Timestamp", fixDupTimestamps)
+            .withColumn("DerivedTimestamp", fixDupTimestamps)
             .drop("timestamp")
+            .drop("Timestamp")
 
 
         } catch {
@@ -780,7 +782,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
           }
         }
 
-        logger.log(Level.INFO, s"SPARK CASE SENSITIVITY - POS1: THREAD: ${Thread.currentThread()} --> ${sparkCaseSensitiveValueDebug()}")
+       val baseEventsDF = baseEventsDFRaw.withColumnRenamed("DerivedTimestamp","Timestamp")
+         logger.log(Level.INFO, s"SPARK CASE SENSITIVITY - POS1: THREAD: ${Thread.currentThread()} --> ${sparkCaseSensitiveValueDebug()}")
         // Handle custom metrics and listeners in streams
         val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
           to_json(col("progress")).alias("progress")
