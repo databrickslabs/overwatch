@@ -13,6 +13,15 @@ import io.delta.tables.DeltaTable
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
 
+/**
+ ** Class for Snapshot Process (Both Incremental or Full Snapshot)
+ * @param _sourceETLDB          ETL Database for Souce from where Snapshot need to be done.
+ * @param _targetPrefix         Target Path for where snapshot would be done
+ * @param _workspace            Workspace from where snapshot would be performed
+ * @param _database             Workspace Database Name.
+ * @param _config               Source Workspace Config.
+ * @param _processType          Process Type for Snapshot. Default is Snapshot, Otherwise it is "Restore" or "Migration"
+ */
 class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspace, _database: Database, _config: Config,_processType: String)
   extends Pipeline(_workspace, _database, _config){
 
@@ -295,9 +304,13 @@ object Snapshot extends SparkSessionWrapper {
    * @param arg(0)        Source Database Name.
    * @param arg(1)        Target snapshotRootPath
    * @param arg(2)        Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)
-   * @param arg(3)        Type of Snapshot to be performed. Full for Full Snapshot , Incremental for Incremental Snapshot
+   * @param arg(3)        Type of Snapshot to be performed. "Full" for Full Snapshot , "Incremental" for Incremental Snapshot
    * @param arg(4)        Array of table names to exclude from the snapshot
-   *                      this is the table name only - without the database prefix
+   *                      this is the table name only - without the database prefix. By Default it is empty.
+   * @param arg(5)        Clone Level for Snapshot. By Default it is "Deep". You can also specify "Shallow" Clone.
+   *
+   * @param arg(6)        This argument specify the process type. Whether it is Restore, Migration or Snapshot. By Default it is Snapshot. This argument is
+   *                      used internally by restore or Migration process by changing this argument.
    * @return
    */
 

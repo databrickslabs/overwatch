@@ -11,6 +11,12 @@ import org.apache.spark.sql.functions._
 
 import java.io.FileNotFoundException
 
+/**
+ *
+ * @param _sourceETLDB        ETL Database for Souce from where Migration need to be done.
+ * @param _targetPrefix       Target Path for where Migration would be done
+ * @param _configPath         path for Configuration file for which migration need to be performed.
+ */
 
 class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String) {
 
@@ -59,15 +65,8 @@ object Migration extends SparkSessionWrapper {
    * Create a backup of the Overwatch datasets
    *
    * @param arg(0)        Source Database name or ETlDataPathPrefix name.
-   * @param arg(1)        Remote Source WorkspaceID(Needed when you provide ETlDataPathPrefix as arg(0)
-   * @param arg(2)        Target MigrateRootPath
-   * @param arg(3)        Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)
-   * @param arg(4)        Configuration path for Source
-   * @param arg(5)        Configuration path for Destination
-   * @param arg(6)        Target ETlDB Name
-   * @param arg(7)        Target Consumer DB Name
-   * @param arg(8)        Array of table names to exclude from the snapshot.This is the table name only - without the database prefix
-   * @param arg(9)        Type of Cloning to be performed - "Deep" or "Shallow" .Default is Deep cloning
+   * @param arg(2)        Target path to where migration need to be performed.
+   * @param arg(2)        Configuration Path where the config file for the source is present.
    * @return
    */
 
