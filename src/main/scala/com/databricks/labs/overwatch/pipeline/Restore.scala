@@ -9,6 +9,16 @@ import com.databricks.labs.overwatch.pipeline.Snapshot
 
 import java.io.FileNotFoundException
 
+
+/**
+ *
+ * @param _sourceETLDB        ETL Database for Souce from where Restore need to be done.
+ * @param _targetPrefix       Target Path for where Restore would be done
+ * @param _workspace          Workspace from where Restore would be performed
+ * @param _database           Workspace Database Name.
+ * @param _config             Source Workspace Config.
+ */
+
 class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspace, _database: Database, _config: Config)
   extends Pipeline(_workspace, _database, _config) {
 
@@ -75,8 +85,8 @@ object Restore extends SparkSessionWrapper {
     /**
      * Create a backup of the Overwatch datasets
      *
-     * @param arg(0)        Source ETL Path Prefix
-     * @param arg(2)        Target ETL Path Prefix
+     * @param arg(0)        Source ETL Path Prefix from where restore need to be performed
+     * @param arg(1)        Target ETL Path Prefix to where restore data would be loaded.
      * @return
      */
 
@@ -100,20 +110,7 @@ object Restore extends SparkSessionWrapper {
           logger.log(Level.ERROR, msg)
           throw new BadConfigException(msg)
       }
-
-
       val workSpace = Helpers.getRemoteWorkspaceByPath(pipReportPath,true,orgID)
-//
-//      val sourceETlDB = workSpace.getConfig.databaseName
-//      val snapshotRootPath = targetPrefix
-//      val pipeline = "Bronze,Silver,Gold"
-//      val cloneLevel = "Deep"
-//      val snapshotType = "full"
-//      val tablesToExclude = ""
-//      val processType = "Restore"
-//
-//      // Step 01 - Start Restore Process
-//      Snapshot.main(Array(sourceETlDB,snapshotRootPath,pipeline,snapshotType,tablesToExclude,cloneLevel,processType))
 
       val bronze = Bronze(workSpace)
       val silver = Silver(workSpace)
@@ -123,7 +120,6 @@ object Restore extends SparkSessionWrapper {
 
       // Step 1 : Restore Process Started
       Restore(workSpace,allTarget,targetPrefix,backupPath,cloneLevel)
-
 
       println("Restore Completed")
     }

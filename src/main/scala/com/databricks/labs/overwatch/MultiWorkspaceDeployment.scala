@@ -348,7 +348,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   }
 
 
-  private def generateBaseConfig(configLocation: String): DataFrame = {
+  def generateBaseConfig(configLocation: String): DataFrame = {
     val rawBaseConfigDF = try {
       if (configLocation.toLowerCase().endsWith(".csv")) { // CSV file
         println(s"Config source: csv path ${configLocation}")
