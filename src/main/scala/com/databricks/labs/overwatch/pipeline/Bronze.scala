@@ -69,6 +69,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     val bronzeTargets = getAllTargets :+ pipelineStateTarget
     val currTime = Pipeline.createTimeDetail(System.currentTimeMillis())
     val timestampedTargetPrefix = s"$targetPrefix/${currTime.asDTString}/${currTime.asUnixTimeMilli.toString}"
+   import spark.implicits._
 
     // if user provides dot path to table -- remove dot path and lower case the name
     val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
@@ -87,14 +88,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       targetPrefix
     } else timestampedTargetPrefix // !Overwrite - targetPrefix/currDateString/timestampMillisString
 
-    // build clone details
-    val cloneSpecs = targetsToSnap.map(t => {
-      val targetPath = s"${finalTargetPathPrefix}/${t.name.toLowerCase}"
-      CloneDetail(t.tableLocation, targetPath)
-    })
+   val cloneSpecs = new Snapshot(workspace.getConfig.databaseName, finalTargetPathPrefix, workspace, workspace.database, workspace.getConfig, "snapShot").buildCloneSpecs("Deep", targetsToSnap)
+
 
     // par clone
-    Helpers.parClone(cloneSpecs)
+   val cloneReport = Helpers.parClone(cloneSpecs)
+   val cloneReportPath = s"${finalTargetPathPrefix}/clone_report/"
+   cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
 
   }
 

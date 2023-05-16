@@ -12,6 +12,7 @@ import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
 import io.delta.tables.DeltaTable
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
 
+
 class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspace, _database: Database, _config: Config,_processType: String)
   extends Pipeline(_workspace, _database, _config){
 
