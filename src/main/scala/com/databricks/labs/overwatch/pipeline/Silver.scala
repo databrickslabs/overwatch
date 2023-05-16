@@ -325,7 +325,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         ),
         Seq(buildClusterStateDetail(
           clusterStateDetailModule.untilTime,
-          BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,30) //Added to get the Removed Cluster
+          BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,1) //Added to get the Removed Cluster
         )),
         append(SilverTargets.clusterStateDetailTarget)
       )
