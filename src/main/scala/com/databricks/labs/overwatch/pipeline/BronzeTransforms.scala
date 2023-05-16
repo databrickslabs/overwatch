@@ -688,7 +688,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
                          )(eventLogsDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Searching for Event logs")
-    println("searching Event logs")
     val tempDir = processedLogFilesTracker.config.tempWorkingDir
     // Caching is done to ensure a single scan of the event log file paths
     // From here forward there should be no more direct scans for new records, just loading data direct from paths
