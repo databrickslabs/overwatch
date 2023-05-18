@@ -545,19 +545,24 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val notebookCodeAndMetaDF = auditIncrementalDF
       .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
-      .verifyMinimumSchema(Schema.auditMasterSchema)
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .withColumnRenamed("timestamp", "unixTimeMS")
       .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
       .withColumn("executionTime",col("executionTime").cast("double"))
+      .filter('notebookId.isNotNull)
       .toTSDF("unixTimeMS", "organization_id", "date","notebookId")
-      .lookupWhen(notebookLookupTSDF)
+      .lookupWhen(
+        notebookLookupTSDF,
+        maxLookAhead = 100
+      )
       .df
       .toTSDF("unixTimeMS", "organization_id", "clusterId")
-      .lookupWhen(clsfLookupTSDF)
+      .lookupWhen(
+        clsfLookupTSDF,
+        tsPartitionVal = 8
+      )
       .df
       .withColumn("estimated_dbu_cost", col("executionTime") * col("totalCostPMS"))
-      .filter('notebookId.isNotNull)
       .drop("cluster_id")
 //      .withColumnRenamed("user_identity","userIdentity")
 //      .withColumnRenamed("notebookId","notebook_id")
