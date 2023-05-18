@@ -518,11 +518,29 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("totalCostPMS", col("total_cost") / col("uptime_in_state_H"))
       .toTSDF("unixTimeMS", "organization_id", "clusterId")
 
-    val colNames = Array(
-      "organization_id", "cluster_id","notebook_id", "workspace_name", "date", "timestamp",
-       "notebook_path", "notebook_name", "command_id", "command_text", "execution_time_s", "source_ip_address",
-      "user_identity", "estimated_dbu_cost", "status", "cluster_name", "custom_tags",
-      "node_type_id", "node_count", "response", "user_agent", "unixTimeMS"
+    val colNames: Array[Column] = Array(
+      'organization_id,
+      'clusterId.alias("cluster_id"),
+      'notebookId.alias("notebook_id"),
+      'workspace_name,
+      'date,
+      'timestamp,
+      'notebook_path,
+      'notebook_name,
+      'commandId.alias("command_id"),
+      'commandText.alias("command_text"),
+      'executionTime.alias("execution_time_s"),
+      'sourceIpAddress.alias("source_ip_address"),
+      'user_identity,
+      'estimated_dbu_cost,
+      'status,
+      'cluster_name,
+      'custom_tags,
+      'node_type_id,
+      'node_count,
+      'response,
+      'userAgent.alias("user_agent"),
+      'unixTimeMS
     )
 
     val notebookCodeAndMetaDF = auditIncrementalDF
@@ -540,20 +558,19 @@ trait GoldTransforms extends SparkSessionWrapper {
       .df
       .withColumn("estimated_dbu_cost", col("executionTime") * col("totalCostPMS"))
       .filter('notebookId.isNotNull)
-      .withColumnRenamed("user_identity","userIdentity")
-      .withColumnRenamed("notebookId","notebook_id")
-      .withColumnRenamed("commandId","command_id")
-      .withColumnRenamed("commandText","command_text")
-      .withColumnRenamed("executionTime","execution_time_s")
-      .withColumnRenamed("sourceIpAddress","source_ip_address")
-      .withColumnRenamed("userIdentity","user_identity")
       .drop("cluster_id")
-      .withColumnRenamed("clusterId","cluster_id")
-      .withColumnRenamed("userAgent","user_agent")
+//      .withColumnRenamed("user_identity","userIdentity")
+//      .withColumnRenamed("notebookId","notebook_id")
+//      .withColumnRenamed("commandId","command_id")
+//      .withColumnRenamed("commandText","command_text")
+//      .withColumnRenamed("executionTime","execution_time_s")
+//      .withColumnRenamed("sourceIpAddress","source_ip_address")
+//      .withColumnRenamed("userIdentity","user_identity")
+//      .withColumnRenamed("clusterId","cluster_id")
+//      .withColumnRenamed("userAgent","user_agent")
 
     println("Verbose Audit Log Created")
-
-    notebookCodeAndMetaDF.select(colNames map col: _*)
+    notebookCodeAndMetaDF.select(colNames: _*)
   }
 
   protected def buildSparkJob(
