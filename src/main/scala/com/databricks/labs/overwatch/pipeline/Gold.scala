@@ -373,19 +373,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         jobRunCostPotentialFactModule.execute(appendJobRunCostPotentialFactProcess)
         GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
       }
-      case OverwatchScope.audit =>
-        config.overwatchScope.foreach {
-          case OverwatchScope.notebooks =>
-            config.overwatchScope.foreach {
-              case OverwatchScope.clusterEvents => {
-                notebookCommandsModule.execute(appendNotebookCommandsProcess)
-                GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
-              }
-              case _ =>
-            }
-          case _ =>
-        }
-      case _ =>
     }
   }
 
