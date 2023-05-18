@@ -503,6 +503,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     val notebookLookupTSDF = notebook.asDF
       .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS","date")
       .withColumnRenamed("notebook_id", "notebookId")
+      .filter('notebookId.isNotNull)
       .distinct
       .toTSDF("unixTimeMS", "organization_id","date","notebookId")
 
@@ -538,6 +539,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .lookupWhen(clsfLookupTSDF)
       .df
       .withColumn("estimated_dbu_cost", col("executionTime") * col("totalCostPMS"))
+      .filter('notebookId.isNotNull)
       .withColumnRenamed("user_identity","userIdentity")
       .withColumnRenamed("notebookId","notebook_id")
       .withColumnRenamed("commandId","command_id")
