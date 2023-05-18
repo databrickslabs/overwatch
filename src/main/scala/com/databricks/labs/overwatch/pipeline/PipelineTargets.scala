@@ -500,9 +500,10 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val notebookCommandsTarget: PipelineTable = PipelineTable(
       name = "notebookCommands_gold",
-      _keys = Array("organization_id", "unixTimeMS"),
+      _keys = Array("notebook_id","organization_id", "unixTimeMS"),
       config,
-      _mode = WriteMode.append,
+      _mode = WriteMode.merge,
+      mergeScope = MergeScope.insertOnly,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("unixTimeMS"),
     )

@@ -290,7 +290,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendNotebookCommandsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        BronzeTargets.auditLogsTarget.asIncrementalDF(notebookCommandsModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+        BronzeTargets.auditLogsTarget.asIncrementalDF(notebookCommandsModule, BronzeTargets.auditLogsTarget.incrementalColumns,1),
         Seq(buildNotebookCommands(
           GoldTargets.notebookTarget,
           GoldTargets.clusterStateFactTarget
