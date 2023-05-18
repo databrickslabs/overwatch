@@ -89,6 +89,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   private val clsfSparkOverrides = Map(
     "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
   )
+
+  private val scopeToCheck : Array [OverwatchScope.Value]= Array(OverwatchScope.audit,OverwatchScope.notebooks,OverwatchScope.clusterEvents)
+  private val containsElements: Boolean = config.overwatchScope.containsSlice(scopeToCheck)
+
+
   lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(2019, 2014), 3.0)
     .withSparkOverrides(clsfSparkOverrides)
   lazy private val appendClusterStateFactProccess: () => ETLDefinition = {
@@ -326,6 +331,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private def executeModules(): Unit = {
     validateCostSources()
+
     config.overwatchScope.foreach {
       case OverwatchScope.accounts => {
         accountModModule.execute(appendAccountModProcess)
@@ -373,24 +379,14 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         jobRunCostPotentialFactModule.execute(appendJobRunCostPotentialFactProcess)
         GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
       }
+      case _ =>
     }
   }
 
   private def buildVerboseAudit(): Unit = {
-    config.overwatchScope.foreach {
-      case OverwatchScope.audit =>
-        config.overwatchScope.foreach {
-          case OverwatchScope.notebooks =>
-            config.overwatchScope.foreach {
-              case OverwatchScope.clusterEvents => {
-                notebookCommandsModule.execute(appendNotebookCommandsProcess)
-                GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
-              }
-              case _ =>
-            }
-          case _ =>
-        }
-      case _ =>
+    if (containsElements) {
+      notebookCommandsModule.execute(appendNotebookCommandsProcess)
+      GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
     }
   }
 
@@ -429,18 +425,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.dbsql => {
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
-      case OverwatchScope.audit =>
-        config.overwatchScope.foreach {
-          case OverwatchScope.notebooks =>
-            config.overwatchScope.foreach {
-              case OverwatchScope.clusterEvents => {
-                GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
-              }
-              case _ =>
-            }
-          case _ =>
-        }
       case _ =>
+    }
+    if (containsElements) {
+      GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
     }
   }
 
