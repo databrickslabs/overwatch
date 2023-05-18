@@ -531,7 +531,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'commandText.alias("command_text"),
       'executionTime.alias("execution_time_s"),
       'sourceIpAddress.alias("source_ip_address"),
-      'user_identity,
+      'userIdentity.alias("user_identity"),
       'estimated_dbu_cost,
       'status,
       'cluster_name,
