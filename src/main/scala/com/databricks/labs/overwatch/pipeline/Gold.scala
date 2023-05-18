@@ -90,8 +90,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
   )
 
-  private val scopeToCheck : Array [OverwatchScope.Value]= Array(OverwatchScope.audit,OverwatchScope.notebooks,OverwatchScope.clusterEvents)
-  private val containsElements: Boolean = config.overwatchScope.containsSlice(scopeToCheck)
+  private val containsElements: Boolean = config.overwatchScope.contains(OverwatchScope.audit) && config.overwatchScope.contains(OverwatchScope.notebooks) && config.overwatchScope.contains(OverwatchScope.clusterEvents)
+
 
 
   lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(2019, 2014), 3.0)
@@ -385,8 +385,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private def buildVerboseAudit(): Unit = {
     if (containsElements) {
+      println("VerboseAudit Log will be created")
       notebookCommandsModule.execute(appendNotebookCommandsProcess)
       GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
+    }
+    else{
+      println("VerboseAudit Log will not be created")
     }
   }
 

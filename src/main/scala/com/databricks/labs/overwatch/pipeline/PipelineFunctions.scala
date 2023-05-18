@@ -656,6 +656,7 @@ object PipelineFunctions extends SparkSessionWrapper {
       case 3015 => "jobRunCostPotentialFact_gold"
       case 3016 => "sparkStream_gold"
       case 3017 => "sql_query_history_gold"
+      case 3018 => "notebookCommands_gold"
     }
   }
 
