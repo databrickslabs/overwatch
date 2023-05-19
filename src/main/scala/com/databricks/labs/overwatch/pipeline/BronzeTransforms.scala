@@ -949,6 +949,24 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  /**
+   *
+   * @param cloudProvider
+   * @param inputCol
+   * @param isMultiWorkSpaceDeployment
+   * @param organisationId
+   * @return
+   */
+  private def fetchClusterLogConfiguration(cloudProvider: String, inputCol: Column,
+                                   isMultiWorkSpaceDeployment: Boolean, organisationId: String): Column = {
+    if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment)
+    //        concat(lit(s"gs://databricks-${organisationId}/${organisationId}/"),
+      regexp_replace(inputCol,"dbfs:/",s"gs://databricks-${organisationId}/${organisationId}/")
+    //        )
+    else {
+      inputCol
+    }
+  }
 
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
@@ -959,7 +977,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       sparkLogClusterScaleCoefficient: Double,
                                       apiEnv: ApiEnv,
                                       isMultiWorkSpaceDeployment: Boolean,
-                                      organisationId: String
+                                      organisationId: String,
+                                      cloudProvider: String
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -985,8 +1004,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
       // Change for #357
       .join(incrementalClusterIDs.hint("SHUFFLE_HASH"), Seq("cluster_id"))
-      .withColumn("cluster_log_conf", coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
-      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
+      .withColumn("cluster_log_conf",
+        coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
+//      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
+      .withColumn("cluster_log_conf",
+        fetchClusterLogConfiguration(cloudProvider, get_json_object('cluster_log_conf, "$.destination"),
+          isMultiWorkSpaceDeployment, organisationId))
       .filter('cluster_log_conf.isNotNull)
 
     // Get latest incremental snapshot of clusters with logging dirs but not existing in audit updates
@@ -997,7 +1020,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .join(incrementalClusterIDs, Seq("cluster_id"))
       .withColumn("snapRnk", rank.over(latestSnapW))
       .filter('snapRnk === 1)
-      .withColumn("cluster_log_conf", coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"))
+      .withColumn("cluster_log_conf",
+        fetchClusterLogConfiguration(cloudProvider,coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"),
+          isMultiWorkSpaceDeployment, organisationId))
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('cluster_id, 'cluster_log_conf)
 
