@@ -733,7 +733,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
         //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
-        val baseEventsDF = try {
+        val baseEventsDFRaw = try {
           /**
            * Event org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent has a duplicate column
            * "timestamp" where the type is a string and the column name is "timestamp". This conflicts with the rest
@@ -760,8 +760,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
           } else col("Timestamp")
 
           baseDF
-            .withColumn("Timestamp", fixDupTimestamps)
+            .withColumn("DerivedTimestamp", fixDupTimestamps)
             .drop("timestamp")
+            .drop("Timestamp")
 
 
         } catch {
@@ -776,7 +777,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             throw e
           }
         }
-
+        val baseEventsDF = baseEventsDFRaw.withColumnRenamed("DerivedTimestamp","Timestamp")
         // Handle custom metrics and listeners in streams
         val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
           to_json(col("progress")).alias("progress")
@@ -808,28 +809,37 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
           baseEventsDF
-            .withColumn("Executor ID", executorIdOverride)
-            .withColumn("progress", progressCol)
+            .withColumn("DerivedExecutorID", executorIdOverride)
+            .withColumn("DerivedProgress", progressCol)
             .withColumn("filename", input_file_name)
             .withColumn("pathSize", size(split('filename, "/")))
             .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-            .withColumn("StageID", stageIDColumnOverride)
-            .withColumn("StageAttemptID", stageAttemptIDColumnOverride)
-            .drop("pathSize", "executorId", "Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId")
+            .withColumn("DerivedStageID", stageIDColumnOverride)
+            .withColumn("DerivedStageAttemptID", stageAttemptIDColumnOverride)
+            .drop("pathSize", "executorId", "Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId",
+              "Executor ID","progress","StageID","StageAttemptID")
             .withColumn("filenameGroup", groupFilename('filename))
+            .withColumnRenamed("DerivedExecutorID", "Executor ID")
+            .withColumnRenamed("DerivedProgress", "progress")
+            .withColumnRenamed("DerivedStageID", "StageID")
+            .withColumnRenamed("DerivedStageAttemptID", "StageAttemptID")
             .scrubSchema(bronzeSparkEventsScrubber)
+
         } else {
           baseEventsDF
-            .withColumn("Executor ID", executorIdOverride)
-            .withColumn("progress", progressCol)
+            .withColumn("DerivedExecutorID", executorIdOverride)
+            .withColumn("DerivedProgress", progressCol)
             .withColumn("filename", input_file_name)
             .withColumn("pathSize", size(split('filename, "/")))
             .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
             .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-            .drop("pathSize", "executorId")
+            .drop("pathSize", "executorId","Executor ID","progress")
             .withColumn("filenameGroup", groupFilename('filename))
+            .withColumnRenamed("DerivedExecutorID", "Executor ID")
+            .withColumnRenamed("DerivedProgress", "progress")
             .scrubSchema(bronzeSparkEventsScrubber)
+
         }
 
         // persist to temp to ensure all raw files are not read multiple times
