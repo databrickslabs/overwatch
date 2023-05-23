@@ -515,7 +515,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
       .withColumnRenamed("cluster_id", "clusterId")
       .withColumnRenamed("current_num_workers", "node_count")
-      .withColumn("totalCostPMS", col("total_cost") / col("uptime_in_state_H"))
+      .withColumn("totalCostPMS", col("total_cost") / col("uptime_in_state_H")/lit(3600))
       .toTSDF("unixTimeMS", "organization_id", "clusterId")
 
     val colNames: Array[Column] = Array(
@@ -564,15 +564,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       .df
       .withColumn("estimated_dbu_cost", col("executionTime") * col("totalCostPMS"))
       .drop("cluster_id")
-//      .withColumnRenamed("user_identity","userIdentity")
-//      .withColumnRenamed("notebookId","notebook_id")
-//      .withColumnRenamed("commandId","command_id")
-//      .withColumnRenamed("commandText","command_text")
-//      .withColumnRenamed("executionTime","execution_time_s")
-//      .withColumnRenamed("sourceIpAddress","source_ip_address")
-//      .withColumnRenamed("userIdentity","user_identity")
-//      .withColumnRenamed("clusterId","cluster_id")
-//      .withColumnRenamed("userAgent","user_agent")
 
     println("Verbose Audit Log Created")
     notebookCodeAndMetaDF.select(colNames: _*)
