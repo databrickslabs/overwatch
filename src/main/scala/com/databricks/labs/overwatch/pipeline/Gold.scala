@@ -90,7 +90,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
   )
 
-  private val containsElements: Boolean = config.overwatchScope.contains(OverwatchScope.audit) && config.overwatchScope.contains(OverwatchScope.notebooks) && config.overwatchScope.contains(OverwatchScope.clusterEvents)
+  private val  verboseAuditLoggingDerivedScope: Boolean = config.overwatchScope.contains(OverwatchScope.audit) && config.overwatchScope.contains(OverwatchScope.notebooks) && config.overwatchScope.contains(OverwatchScope.clusterEvents)
 
 
 
@@ -381,16 +381,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case _ =>
     }
-  }
-
-  private def buildVerboseAudit(): Unit = {
-    if (containsElements) {
-      println("VerboseAudit Log will be created")
+    if (verboseAuditLoggingDerivedScope) {
       notebookCommandsModule.execute(appendNotebookCommandsProcess)
       GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
-    }
-    else{
-      println("VerboseAudit Log will not be created")
     }
   }
 
@@ -431,7 +424,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case _ =>
     }
-    if (containsElements) {
+    if (verboseAuditLoggingDerivedScope) {
       GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
     }
   }
@@ -442,7 +435,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     restoreSparkConf()
     executeModules()
     buildFacts()
-    buildVerboseAudit()
 
     initiatePostProcessing()
     this // to be used as fail switch later if necessary
