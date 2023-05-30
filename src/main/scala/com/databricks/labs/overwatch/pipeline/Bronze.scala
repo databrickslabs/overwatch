@@ -48,6 +48,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     }
   }
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
   /**
    * Simplified method for the common task of deep cloning bronze targets.
    * This function will perform a deep clone on all existing bronze targets
@@ -94,11 +95,13 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     // par clone
    val cloneReport = Helpers.parClone(cloneSpecs)
    val cloneReportPath = s"${finalTargetPathPrefix}/clone_report/"
+   val ProcessCompleteMsg = s"Cloning is one and clone report is being written to ${cloneReportPath}"
+   logger.log(Level.INFO, ProcessCompleteMsg)
    cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
 
   }
 
-  private val logger: Logger = Logger.getLogger(this.getClass)
+
 
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess: () => ETLDefinition = {
