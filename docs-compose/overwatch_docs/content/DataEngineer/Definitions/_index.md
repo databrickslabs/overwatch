@@ -66,6 +66,7 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [sparkStage](#sparkstage)
 * [sparkTask](#sparktask)
 * [sparkStream](#sparkstream)
+* [pipReport](#pipreport)
 * [Common Meta Fields](#common-meta-fields)
   * There are several fields that are present in all tables. Instead of cluttering each table with them, this section
   was created as a reference to each of these.
@@ -885,6 +886,27 @@ to improve performance.
 | streamSegment     | string         | Type of event from the event listener such as 'Progressed'                                                     |
 | streaming_metrics | dynamic struct | All metrics available for the stream batch run                                                                 |
 | execution_ids     | array<long>    | Array of execution_ids in the spark_context. Can explode and tie back to sparkExecution and other spark tables |
+
+#### PipReport
+[**SAMPLE**](/assets/TableSamples/pipreport.tab)
+
+**KEY** -- organization_id + moduleID + Overwatch_RunID
+
+**Write Mode** -- Append
+
+| Column          | Type      | Description                                                                                                                                                                                                             |
+|:----------------|:----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| organization_id | string    | Canonical workspace id                                                                                                                                                                                                  |
+| workspace_name  | string    | Customizable human-legible name of the workspace, should be globally unique within the organization                                                                                                                     | 
+| moduleId        | int       | Module ID -- Unique identifier for the module                                                                                                                                                                           |
+| moduleName      | string    | Name of the module                                                                                                                                                                                                      |
+| primodialDate   | date      | The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022                                                                                                   | 
+| fromTS          | long      | The snapshot start time from which data will be loaded for the module                                                                                                                                                   |
+| untilTS         | long      | The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS                                                                                                 |
+| status          | string    | Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues |
+| write_metrics   | string    | Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written.                                                           |  
+| Pipeline_SnapTS | timestamp | Timestamp type of the pipeline snapshot time (server time)                                                                                                                                                              |
+| Overwatch_RunID | string    | GUID for the overwatch run                                                                                                                                                                                              |
 
 #### Common Meta Fields
 | Column          | Type   | Description                                                       |
