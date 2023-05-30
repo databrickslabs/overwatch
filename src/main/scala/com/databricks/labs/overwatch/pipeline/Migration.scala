@@ -2,17 +2,14 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.MultiWorkspaceDeployment
-import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
 import com.databricks.labs.overwatch.MultiWorkspaceDeployment._
 import org.apache.spark.sql.functions._
 
-import java.io.FileNotFoundException
-
 /**
- *
+ * Class for Migrating the ETL Database to Source to Target and update the config as per the target databases(both consumer and Etl Database)
  * @param _sourceETLDB        ETL Database for Souce from where Migration need to be done.
  * @param _targetPrefix       Target Path for where Migration would be done
  * @param _configPath         path for Configuration file for which migration need to be performed.
@@ -27,8 +24,9 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
 
   private[overwatch] def updateConfig(): Unit = {
     if (configPath.toLowerCase().endsWith(".csv")) {
-      println(s"Config source: csv path ${configPath}")
+
       val tempConfigPath = (configPath.split("/").dropRight(1) :+ "tempConfig.csv").mkString("/")
+
       spark.read.format("csv")
         .option("header", "true")
         .option("ignoreLeadingWhiteSpace", true)
@@ -42,6 +40,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
         .mode("overwrite")
         .option("overwriteSchema", "true")
         .save(tempConfigPath)
+
       val filePath = dbutils.fs.ls(tempConfigPath).last.path
       dbutils.fs.cp(filePath, configPath, true)
       dbutils.fs.rm(tempConfigPath, true)
@@ -65,8 +64,10 @@ object Migration extends SparkSessionWrapper {
    * Create a backup of the Overwatch datasets
    *
    * @param arg(0)        Source Database name or ETlDataPathPrefix name.
-   * @param arg(2)        Target path to where migration need to be performed.
-   * @param arg(2)        Configuration Path where the config file for the source is present.
+   * @param arg(1)        Target path to where migration need to be performed.
+   * @param arg(2)        Configuration Path where the config file for the source is present. Path can be CSV file or delta path ot delta table.
+   * @param arg(3)        Array of table names to exclude from the snapshot
+   *                      this is the table name only - without the database prefix. By Default it is empty.
    * @return
    */
 
@@ -88,15 +89,23 @@ object Migration extends SparkSessionWrapper {
 
 
     // Step 01 - Start Migration Process
-    Snapshot.main(Array(sourceETLDB,migrateRootPath,pipeline,"full",tablesToExclude,cloneLevel,"Migration"))
-
+    try {
+      Snapshot.main(Array(sourceETLDB, migrateRootPath, pipeline, "full", tablesToExclude, cloneLevel, "Migration"))
+    }
+    catch{
+      case e: Throwable =>
+        val failMsg = PipelineFunctions.appendStackStrace(e,"Unable to proceed with Migration  Process")
+        logger.log(Level.ERROR, failMsg)
+        throw e
+    }
     //Step 02 - Drop Source ETLDatabase and Consumer Database after Migration
     spark.sql(s"DROP DATABASE ${etlDatabase} CASCADE")
     spark.sql(s"DROP DATABASE ${consumerDatabase} CASCADE")
 
     //Step 03 - Update Config with the latest Storage Prefix
     new Migration(sourceETLDB,migrateRootPath,configPath).updateConfig()
-    println("Migration Completed")
+
+    logger.log(Level.INFO, "Migration Completed. Please delete the external data from storage for all source etl database tables")
   }
 }
 

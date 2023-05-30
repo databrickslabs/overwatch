@@ -5,12 +5,11 @@ import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.streaming.{DataStreamWriter, Trigger}
 
-import com.databricks.labs.overwatch.pipeline.PipelineTargets
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
 import io.delta.tables.DeltaTable
-import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row}
+import org.apache.spark.sql.{DataFrame, Row}
 
 
 /**
@@ -28,15 +27,11 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
   import spark.implicits._
   private val snapshotRootPath = removeTrailingSlashes(_targetPrefix)
-  private val workSpace = _workspace
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val driverCores = java.lang.Runtime.getRuntime.availableProcessors()
   private val Config = _config
   private val processType = _processType
 
-  private def parallelism: Int = {
-    driverCores
-  }
 
   private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail]): Unit = {
 
@@ -55,7 +50,6 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
         val targetLocation = s"${cloneSpec.target}"
 
         if(Helpers.pathExists(targetLocation)){
-          println(s"Target path is not Empty and mode for ${sourceName} is ${cloneSpec.mode}")
           if (cloneSpec.mode == WriteMode.merge){ //If Table mode is Merge then do simple merge
             val deltaTarget = DeltaTable.forPath(spark,targetLocation).alias("target")
             val updatesDF = rawStreamingDF
@@ -134,7 +128,6 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
           }
         }else{
-          println(s"First Time Write to  ${sourceName}")
           logger.log(Level.INFO, s"Beginning write to ${sourceName}")
           val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write"
           logger.log(Level.INFO, msg)
@@ -188,7 +181,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
   private[overwatch] def buildCloneSpecs(
                                           cloneLevel: String,
-                                          sourceToSnap: Array[PipelineTable]
+                                          sourcesToSnap: Array[PipelineTable]
                                         ): Seq[CloneDetail] = {
 
     val finalSnapshotRootPath  = if (processType.toLowerCase() == "migration"){
@@ -200,7 +193,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     }
 
 
-    val cloneSpecs = sourceToSnap.map(dataset => {
+    val cloneSpecs = sourcesToSnap.map(dataset => {
       val sourceName = dataset.name.toLowerCase
       val sourcePath = dataset.tableLocation
       val mode = dataset._mode
@@ -212,11 +205,11 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   }
 
   private[overwatch] def incrementalSnap(
-                                          pipelineTable : Array[PipelineTable],
+                                          pipelineTables : Array[PipelineTable],
                                           excludes: Option[String] = Some("")
                                         ): this.type = {
 
-    val sourceToSnap = pipelineTable
+    val sourceToSnap = pipelineTables
 
     val exclude = excludes match {
       case Some(s) if s.nonEmpty => s
@@ -227,7 +220,6 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
     })
-    cleanExcludes.foreach(x => println(x))
 
     val sourceToSnapFiltered = sourceToSnap
       .filter(_.exists()) // source path must exist
@@ -239,7 +231,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   }
 
   private[overwatch] def snap(
-                               pipelineTable : Array[PipelineTable],
+                               pipelineTables : Array[PipelineTable],
                                cloneLevel: String = "DEEP",
                                excludes: Option[String] = Some("")
                              ): this.type= {
@@ -247,7 +239,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
-    val sourceToSnap = pipelineTable
+    val sourceToSnap = pipelineTables
     val exclude = excludes match {
       case Some(s) if s.nonEmpty => s
       case _ => ""
@@ -257,7 +249,6 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
     })
-    cleanExcludes.foreach(x => println(x))
 
 
     val sourceToSnapFiltered = sourceToSnap
@@ -275,22 +266,21 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
 object Snapshot extends SparkSessionWrapper {
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
 
   def apply(workspace: Workspace,
             sourceETLDB : String,
             targetPrefix : String,
-            pipeline : String,
             snapshotType: String,
             excludes: Option[String],
-            CloneLevel: String,
-            pipelineTable : Array[PipelineTable],
+            cloneLevel: String,
+            pipelineTables : Array[PipelineTable],
             processType : String,
-           ): Any = {
+           ): Snapshot = {
     if (snapshotType.toLowerCase()== "incremental")
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).incrementalSnap(pipelineTable,excludes)
-
-    if (snapshotType.toLowerCase()== "full") {
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).snap(pipelineTable,CloneLevel,excludes)
+      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).incrementalSnap(pipelineTables,excludes)
+    else{
+      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).snap(pipelineTables,cloneLevel,excludes)
     }
 
   }
@@ -314,7 +304,7 @@ object Snapshot extends SparkSessionWrapper {
    * @return
    */
 
-  def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Any = {
 
     val sourceETLDB = args(0)
     val snapshotRootPath = args(1)
@@ -330,13 +320,19 @@ object Snapshot extends SparkSessionWrapper {
     val gold = Gold(snapWorkSpace)
     val pipelineReport = bronze.pipelineStateTarget
 
-    val pipelineLower = pipeline.toLowerCase
-    if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Bronze",snapshotType,Some(tablesToExclude),cloneLevel,bronze.getAllTargets,processType)
-    if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Silver",snapshotType,Some(tablesToExclude),cloneLevel,silver.getAllTargets,processType)
-    if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"Gold",snapshotType,Some(tablesToExclude),cloneLevel,gold.getAllTargets,processType)
-    Snapshot(snapWorkSpace,sourceETLDB,snapshotRootPath,"pipeline_report",snapshotType,Some(tablesToExclude),cloneLevel,Array(pipelineReport),processType)
+    try {
+      val pipelineLower = pipeline.toLowerCase
+      if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace, sourceETLDB, snapshotRootPath, snapshotType, Some(tablesToExclude), cloneLevel, bronze.getAllTargets, processType)
+      if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace, sourceETLDB, snapshotRootPath, snapshotType, Some(tablesToExclude), cloneLevel, silver.getAllTargets, processType)
+      if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace, sourceETLDB, snapshotRootPath, snapshotType, Some(tablesToExclude), cloneLevel, gold.getAllTargets, processType)
+      Snapshot(snapWorkSpace, sourceETLDB, snapshotRootPath, snapshotType, Some(tablesToExclude), cloneLevel, Array(pipelineReport), processType)
 
-    println("SnapShot Completed")
+    }catch{
+      case e: Throwable =>
+        val failMsg = PipelineFunctions.appendStackStrace(e,"Unable to proceed with Snapshot Process")
+        logger.log(Level.ERROR, failMsg)
+        throw e
+    }
   }
 }
 

@@ -2,16 +2,16 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.{Database, Workspace}
+import com.databricks.labs.overwatch.pipeline.Restore.logger
 import com.databricks.labs.overwatch.utils.Helpers.{logger, removeTrailingSlashes}
-import com.databricks.labs.overwatch.utils.{BadConfigException, CloneDetail, Config, Helpers, SparkSessionWrapper, WriteMode}
+import com.databricks.labs.overwatch.utils.{BadConfigException, Config, Helpers, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import com.databricks.labs.overwatch.pipeline.Snapshot
 
 import java.io.FileNotFoundException
 
 
 /**
- *
+ * Class for restoring from Migrated location to Source Location incase of some failure happens in Source Side.
  * @param _sourceETLDB        ETL Database for Souce from where Restore need to be done.
  * @param _targetPrefix       Target Path for where Restore would be done
  * @param _workspace          Workspace from where Restore would be performed
@@ -26,16 +26,11 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
 
   private val targetPrefix = removeTrailingSlashes(_targetPrefix)
   private val workSpace = _workspace
-  private val sourceETLDB = _sourceETLDB
-  private val bronze = Bronze(workSpace)
-  private val silver = Silver(workSpace)
-  private val gold = Gold(workSpace)
 
   private val logger: Logger = Logger.getLogger(this.getClass)
-  val Config = _config
 
   private[overwatch] def restore(
-                                  allTarget: Array[PipelineTable],
+                                  allTargets: Array[PipelineTable],
                                   cloneLevel: String = "DEEP",
                                 ): Unit = {
     val acceptableCloneLevels = Array("DEEP", "SHALLOW")
@@ -49,13 +44,15 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
     }
 
     try {
-      if (!dbutils.fs.ls(targetPrefix).nonEmpty) {
-        val cloneSpecs = new Snapshot(workSpace.getConfig.databaseName, targetPrefix, workspace, workspace.database, workspace.getConfig, "restore").buildCloneSpecs(cloneLevel, allTarget)
+      if (dbutils.fs.ls(targetPrefix).isEmpty) {
+        val cloneSpecs = new Snapshot(workSpace.getConfig.databaseName, targetPrefix, workspace, workspace.database,
+          workspace.getConfig, "restore").buildCloneSpecs(cloneLevel, allTargets)
         val cloneReport = Helpers.parClone(cloneSpecs)
         val restoreReportPath = s"${targetPrefix}/restore_report/"
+        logger.log(Level.INFO,s"Restoration is successful. Please check restoreReportPath ${restoreReportPath} for more details")
         cloneReport.toDS.write.format("delta").mode("append").save(restoreReportPath)
       } else {
-        println("Target Path is not Empty...... Could not proceed with Restoration")
+        logger.log(Level.INFO, "Target Path is not Empty...... Could not proceed with Restoration")
       }
 
     } catch {
@@ -74,11 +71,11 @@ object Restore extends SparkSessionWrapper {
                allTarget: Array[PipelineTable],
                targetPrefix : String,
                backupPath: String,
-               CloneLevel: String
-             ): Any = {
+               cloneLevel: String
+             ): Unit = {
 
       val restoration = new Restore(workSpace.getConfig.databaseName, targetPrefix, workSpace, workSpace.database, workSpace.getConfig)
-      restoration.restore(allTarget,CloneLevel)
+      restoration.restore(allTarget,cloneLevel)
 
     }
 
@@ -99,18 +96,18 @@ object Restore extends SparkSessionWrapper {
       //
 
 
-      val backupPath = s"${sourcePrefix}/data"
-      val pipReportPath = s"${backupPath}/pipeline_report"
-      try{
+      val sourcePath = s"${sourcePrefix}/data"
+      val pipReportPath = s"${sourcePath}/pipeline_report"
+      try {
         dbutils.fs.ls(s"$pipReportPath/_delta_log").nonEmpty
-        logger.log(Level.INFO, s"Overwatch has being deployed with ${pipReportPath} location...proceed")
-      }catch {
+        logger.log(Level.INFO, s"This ${pipReportPath} location corresponds to previous Overwatch Deployment... proceed Restoration")
+      } catch {
         case e: FileNotFoundException =>
-          val msg = s"Overwatch has not been deployed with ${pipReportPath} location...can not proceed"
+          val msg = s"This ${pipReportPath} location does not corresponds to previous Overwatch Deployment...can not proceed with Restoration"
           logger.log(Level.ERROR, msg)
           throw new BadConfigException(msg)
       }
-      val workSpace = Helpers.getRemoteWorkspaceByPath(pipReportPath,true,orgID)
+      val workSpace = Helpers.getRemoteWorkspaceByPath(pipReportPath, true, orgID)
 
       val bronze = Bronze(workSpace)
       val silver = Silver(workSpace)
@@ -118,9 +115,15 @@ object Restore extends SparkSessionWrapper {
       val pipelineReport = bronze.pipelineStateTarget
       val allTarget = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets ++ Array(pipelineReport).filter(_.exists(dataValidation = true))
 
-      // Step 1 : Restore Process Started
-      Restore(workSpace,allTarget,targetPrefix,backupPath,cloneLevel)
+      try {
+      Restore(workSpace, allTarget, targetPrefix, sourcePath, cloneLevel)
+      logger.log(Level.INFO, "Restoration Completed")
 
-      println("Restore Completed")
+      }catch {
+        case e: Throwable =>
+          val failMsg = PipelineFunctions.appendStackStrace(e,"Unable to proceed with Restoration")
+          logger.log(Level.ERROR, failMsg)
+          throw e
+      }
     }
 }

@@ -347,7 +347,9 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     true
   }
 
-
+  /**
+   * Generate Config Dataframe from Config Location(csv, delta path or Delta Table)
+   */
   def generateBaseConfig(configLocation: String): DataFrame = {
     val rawBaseConfigDF = try {
       if (configLocation.toLowerCase().endsWith(".csv")) { // CSV file

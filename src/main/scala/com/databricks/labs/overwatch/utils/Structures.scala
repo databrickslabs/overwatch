@@ -321,7 +321,12 @@ case class MultiWSDeploymentReport(
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
 
 
-case class CloneDetail(source: String, target: String, asOfTS: Option[String] = None, cloneLevel: String = "DEEP",immutableColumns:Array[String] = Array(),mode: WriteMode.WriteMode = WriteMode.append)
+case class CloneDetail(source: String,
+                       target: String,
+                       asOfTS: Option[String] = None,
+                       cloneLevel: String = "DEEP",
+                       immutableColumns:Array[String] = Array(),
+                       mode: WriteMode.WriteMode = WriteMode.append)
 
 case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
 
