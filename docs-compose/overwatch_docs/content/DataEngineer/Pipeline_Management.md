@@ -77,22 +77,6 @@ so be sure to read the rest of this page before altering this table.
 The Pipeline Report is very useful for identifying issues in the pipeline. Each module, each run is detailed here. 
 The structure of the table is outlined [below](#pipeline_report-structure).
 
-A *pipReport* view has been created atop the pipeline_report table to simplify reviewing the historical runs. The 
-query most commonly used is below. If you are asked for the pipReport, please provide the output from the following
-
-**SCALA**
-```scala
-table("overwatch_etl.pipReport")
-  .filter('organization_id === "<workspace_id>") // if you want to see the pipReport for only a specific workspace
-  .orderBy('Pipeline_SnapTS.desc)
-```
-**SQL**
-```sql
-select * from overwatch_etl.pipReport
-    where organization_id = '<workspace_id>' -- if you want to see the pipReport for only a specific workspace
-    order by Pipeline_SnapTS desc
-```
-
 ### Pipeline_Report Structure
 [**SAMPLE**](/assets/TableSamples/pipeline_report.tab)
 
@@ -119,6 +103,47 @@ For the developers -- This output is created as a DataSet via the Case Class
 | parsedConfig         | struct    | The config that was parsed into OverwatchParams through the json deserializer                                                                                                                                                       |
 | Pipeline_SnapTS      | timestamp | Timestamp type of the pipeline snapshot time (server time)                                                                                                                                                                          |
 | Overwatch_RunID      | string    | GUID for the overwatch run                                                                                                                                                                                                          |
+
+## The PipReport View
+A *pipReport* view has been created atop the pipeline_report table to simplify reviewing the historical runs. The
+query most commonly used is below. If you are asked for the pipReport, please provide the output from the following
+
+**SCALA**
+```scala
+table("overwatch_etl.pipReport")
+  .filter('organization_id === "<workspace_id>") // if you want to see the pipReport for only a specific workspace
+  .orderBy('Pipeline_SnapTS.desc)
+```
+**SQL**
+```sql
+select * from overwatch_etl.pipReport
+    where organization_id = '<workspace_id>' -- if you want to see the pipReport for only a specific workspace
+    order by Pipeline_SnapTS desc
+```
+
+The structure of the table is outlined [below](#pipreport-structure).
+
+### PipReport Structure
+[**SAMPLE**](/assets/TableSamples/pipreport.tab)
+
+**KEY** -- organization_id + moduleID + Overwatch_RunID
+
+**Write Mode** -- Append
+
+| Column          | Type      | Description                                                                                                                                                                                                             |
+|:----------------|:----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| organization_id | string    | Canonical workspace id                                                                                                                                                                                                  |
+| workspace_name  | string    | Customizable human-legible name of the workspace, should be globally unique within the organization                                                                                                                     | 
+| moduleId        | int       | Module ID -- Unique identifier for the module                                                                                                                                                                           |
+| moduleName      | string    | Name of the module                                                                                                                                                                                                      |
+| primodialDate   | date      | The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022                                                                                                   | 
+| fromTS          | long      | The snapshot start time from which data will be loaded for the module                                                                                                                                                   |
+| untilTS         | long      | The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS                                                                                                 |
+| status          | string    | Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues |
+| write_metrics   | string    | Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written.                                                           |  
+| Pipeline_SnapTS | timestamp | Timestamp type of the pipeline snapshot time (server time)                                                                                                                                                              |
+| Overwatch_RunID | string    | GUID for the overwatch run                                                                                                                                                                                              |
+
 
 ## Overwatch Time
 Overwatch will default timezone to that of the server / cluster on which it runs. This is a critical point to 
