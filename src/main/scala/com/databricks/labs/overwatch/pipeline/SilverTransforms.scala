@@ -1096,15 +1096,17 @@ trait SilverTransforms extends SparkSessionWrapper {
     // Change for PR -934
     // Get the ClusterID that has been Permenantly_Deleted
     val clusterBaseDF = clusterBase(auditLogDF)
-    val clustersRemoved = clusterBaseDF
+    val removedClusterID = clusterBaseDF
       .filter('actionName.isin("permanentDelete"))
-      .select('timestamp.alias("deletion_timestamp"),'organization_id, 'cluster_id, 'userEmail.alias("deleted_by"))
+      .select('cluster_id,'timestamp.alias("deletion_timestamp")).distinct()
 
-    val removedClusterID = clustersRemoved.select("cluster_id","deletion_timestamp").distinct()
     val clusterEventsBaselineForRemovedCluster = clusterEventsBaseline.join(removedClusterID,Seq("cluster_id"))
 
     val window = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
-    val stateBeforeRemoval = clusterEventsBaselineForRemovedCluster.withColumn("rnk",rank().over(window)).filter('rnk === 1).drop("rnk")
+    val stateBeforeRemoval = clusterEventsBaselineForRemovedCluster
+      .withColumn("rnk",rank().over(window))
+      .withColumn("rn", row_number().over(window))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
     val stateDuringRemoval = stateBeforeRemoval
       .withColumn("timestamp",col("deletion_timestamp"))
@@ -1112,14 +1114,14 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("state",lit("PERMENANT_DELETE"))
       .withColumn("current_num_workers",lit(0))
       .withColumn("target_num_workers",lit(0))
-      .withColumn("unixTimeMS_state_start",'timestamp)
-      .withColumn("unixTimeMS_state_end",'timeStamp)
+      .withColumn("unixTimeMS_state_start",('timestamp+1))
+      .withColumn("unixTimeMS_state_end",('timestamp+1))
       .drop("deletion_timestamp")
     val columns: Array[String] = clusterEventsBaseline.columns
 
-    val stateDuringRemovalFinal = stateBeforeRemoval.withColumn("unixTimeMS_state_end",'deletion_timestamp).drop("deletion_timestamp").union(stateDuringRemoval).select(columns.map(col): _*)
+    val stateDuringRemovalFinal = stateBeforeRemoval.withColumn("unixTimeMS_state_end",'deletion_timestamp).drop("deletion_timestamp").unionByName(stateDuringRemoval, allowMissingColumns = true).select(columns.map(col): _*)
 
-    val clusterEventsBaselineFinal = clusterEventsBaseline.join(stateDuringRemovalFinal,Seq("cluster_id","timestamp"),"anti").select(columns.map(col): _*).union(stateDuringRemovalFinal)
+    val clusterEventsBaselineFinal = clusterEventsBaseline.join(stateDuringRemovalFinal,Seq("cluster_id","timestamp"),"anti").select(columns.map(col): _*).unionByName(stateDuringRemovalFinal, allowMissingColumns = true)
 
 
     clusterEventsBaselineFinal
@@ -1147,7 +1149,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("databricks_billable", 'isRunning && !'state.isin(nonBillableTypes: _*))
       .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
       .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
-      .withColumn("days_in_state", size('state_dates))
+      .withColumn("days_in_state", size('state_dates)).dropDuplicates()
 
   }
 
