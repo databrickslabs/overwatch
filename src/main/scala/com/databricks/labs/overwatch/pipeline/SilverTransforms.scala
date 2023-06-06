@@ -996,7 +996,8 @@ trait SilverTransforms extends SparkSessionWrapper {
   }
 
   def buildClusterStateDetail(
-                               untilTime: TimeTypes
+                               untilTime: TimeTypes,
+                               auditLogDF: DataFrame
                              )(clusterEventsDF: DataFrame): DataFrame = {
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
@@ -1096,8 +1097,42 @@ trait SilverTransforms extends SparkSessionWrapper {
         'organization_id, 'cluster_id, 'isRunning,
         'timestamp, 'state, 'current_num_workers, 'target_num_workers
       )
+      .withColumn("unixTimeMS_state_start", 'timestamp)
+      .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
+        lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
+        lit(untilTime.asUnixTimeMilli)
+      ))
 
-    clusterEventsBaseline
+    // Change for PR -934
+    // Get the ClusterID that has been Permenantly_Deleted
+    val clusterBaseDF = clusterBase(auditLogDF)
+    val clustersRemoved = clusterBaseDF
+      .filter('actionName.isin("permanentDelete"))
+      .select('timestamp.alias("deletion_timestamp"),'organization_id, 'cluster_id, 'userEmail.alias("deleted_by"))
+
+    val removedClusterID = clustersRemoved.select("cluster_id","deletion_timestamp").distinct()
+    val clusterEventsBaselineForRemovedCluster = clusterEventsBaseline.join(removedClusterID,Seq("cluster_id"))
+
+    val window = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp.desc)
+    val stateBeforeRemoval = clusterEventsBaselineForRemovedCluster.withColumn("rnk",rank().over(window)).filter('rnk === 1).drop("rnk")
+
+    val stateDuringRemoval = stateBeforeRemoval
+      .withColumn("timestamp",col("deletion_timestamp"))
+      .withColumn("isRunning",lit(false))
+      .withColumn("state",lit("PERMENANT_DELETE"))
+      .withColumn("current_num_workers",lit(0))
+      .withColumn("target_num_workers",lit(0))
+      .withColumn("unixTimeMS_state_start",'timestamp)
+      .withColumn("unixTimeMS_state_end",'timeStamp)
+      .drop("deletion_timestamp")
+    val columns: Array[String] = clusterEventsBaseline.columns
+
+    val stateDuringRemovalFinal = stateBeforeRemoval.withColumn("unixTimeMS_state_end",'deletion_timestamp).drop("deletion_timestamp").union(stateDuringRemoval).select(columns.map(col): _*)
+
+    val clusterEventsBaselineFinal = clusterEventsBaseline.join(stateDuringRemovalFinal,Seq("cluster_id","timestamp"),"anti").select(columns.map(col): _*).union(stateDuringRemovalFinal)
+
+
+    clusterEventsBaselineFinal
       .withColumn("counter_reset",
         when(
           lag('state, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING", "EDITED") ||
@@ -1107,11 +1142,6 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("reset_partition", sum('counter_reset).over(stateUnboundW))
       .withColumn("target_num_workers", last('target_num_workers, true).over(stateUnboundW))
       .withColumn("current_num_workers", last('current_num_workers, true).over(stateUnboundW))
-      .withColumn("unixTimeMS_state_start", 'timestamp)
-      .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
-        lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
-        lit(untilTime.asUnixTimeMilli)
-      ))
       .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
       .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
       .withColumn("state_start_date", 'timestamp_state_start.cast("date"))
