@@ -1106,23 +1106,28 @@ trait SilverTransforms extends SparkSessionWrapper {
     val stateBeforeRemoval = clusterEventsBaselineForRemovedCluster
       .withColumn("rnk",rank().over(window))
       .withColumn("rn", row_number().over(window))
+      .withColumn("unixTimeMS_state_end",when('state === "TERMINATING",'unixTimeMS_state_end).otherwise('deletion_timestamp))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
     val stateDuringRemoval = stateBeforeRemoval
-      .withColumn("timestamp",col("deletion_timestamp"))
+      .withColumn("timestamp",when('state === "TERMINATING",'unixTimeMS_state_end+1).otherwise(col("deletion_timestamp")+1))
       .withColumn("isRunning",lit(false))
+      .withColumn("unixTimeMS_state_start",('timestamp))
+      .withColumn("unixTimeMS_state_end",('timestamp))
       .withColumn("state",lit("PERMENANT_DELETE"))
       .withColumn("current_num_workers",lit(0))
       .withColumn("target_num_workers",lit(0))
-      .withColumn("unixTimeMS_state_start",('timestamp+1))
-      .withColumn("unixTimeMS_state_end",('timestamp+1))
       .drop("deletion_timestamp")
+
     val columns: Array[String] = clusterEventsBaseline.columns
 
-    val stateDuringRemovalFinal = stateBeforeRemoval.withColumn("unixTimeMS_state_end",'deletion_timestamp).drop("deletion_timestamp").unionByName(stateDuringRemoval, allowMissingColumns = true).select(columns.map(col): _*)
+    val stateDuringRemovalFinal = stateBeforeRemoval.drop("deletion_timestamp")
+      .unionByName(stateDuringRemoval, allowMissingColumns = true)
+      .select(columns.map(col): _*)
 
-    val clusterEventsBaselineFinal = clusterEventsBaseline.join(stateDuringRemovalFinal,Seq("cluster_id","timestamp"),"anti").select(columns.map(col): _*).unionByName(stateDuringRemovalFinal, allowMissingColumns = true)
-
+    val clusterEventsBaselineFinal = clusterEventsBaseline.join(stateDuringRemovalFinal,Seq("cluster_id","timestamp"),"anti")
+      .select(columns.map(col): _*)
+      .unionByName(stateDuringRemovalFinal, allowMissingColumns = true)
 
     clusterEventsBaselineFinal
       .withColumn("counter_reset",
