@@ -324,6 +324,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   //  Tested in AWS, azure account logic may be slightly different
   protected def accountLogins()(df: DataFrame): DataFrame = {
     val prunedDF = df
+      .filter(responseSuccessFilter)
       .select(
         'timestamp,
         'organization_id,
@@ -395,6 +396,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .rowsBetween(Window.currentRow, Window.unboundedFollowing)
     val modifiedAccountsDF = df.filter('serviceName === "accounts" &&
       'actionName.isin("add", "addPrincipalToGroup", "removePrincipalFromGroup", "setAdmin", "updateUser", "delete"))
+      .filter(responseSuccessFilter)
     if (!modifiedAccountsDF.isEmpty) {
       modifiedAccountsDF
         .select(
@@ -1292,6 +1294,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     df.filter('serviceName === "notebook")
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .filter(responseSuccessFilter)
       .withColumn("pathLength", when('notebookName.isNull, size(split('path, "/"))))
       .withColumn("notebookName", when('notebookName.isNull, split('path, "/")('pathLength - 1)).otherwise('notebookName))
       .select(notebookCols: _*)

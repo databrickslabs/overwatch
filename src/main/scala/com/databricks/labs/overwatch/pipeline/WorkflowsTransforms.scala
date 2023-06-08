@@ -13,6 +13,7 @@ import org.apache.spark.sql.{Column, DataFrame}
 object WorkflowsTransforms extends SparkSessionWrapper {
 
   import spark.implicits._
+  private val responseSuccessFilter: Column = $"response.statusCode" === 200
 
   /**
    * BEGIN Workflow generic functions
@@ -42,6 +43,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     val onlyOnceJobRecW = Window.partitionBy('organization_id, 'timestamp, 'actionName, 'requestId, $"response.statusCode", 'runId).orderBy('timestamp)
     df.filter(col("serviceName") === "jobs")
       .selectExpr("*", "requestParams.*").drop("requestParams")
+      .filter(responseSuccessFilter)
       .withColumn("rnk", rank().over(onlyOnceJobRecW))
       .withColumn("rn", row_number.over(onlyOnceJobRecW))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
