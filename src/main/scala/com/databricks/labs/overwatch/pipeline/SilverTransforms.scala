@@ -1154,7 +1154,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("databricks_billable", 'isRunning && !'state.isin(nonBillableTypes: _*))
       .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
       .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
-      .withColumn("days_in_state", size('state_dates)).dropDuplicates()
+      .withColumn("days_in_state", size('state_dates))
 
   }
 
