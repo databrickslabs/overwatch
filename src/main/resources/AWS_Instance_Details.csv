@@ -251,3 +251,119 @@ G5 Graphics and Machine Learning GPU 24xlarge,g5.24xlarge,384,96,8.144,8.144,11.
 P4D Highest Performance GPU 24xlarge,p4d.24xlarge,1152,96,32.7726,32.7726,44.45,8,NVIDIA A100,320,Intel Xeon Platinum 8275L,3,8000 GB(8 * 1000 GB NVMe SSD),4x 100 Gigabit,19000,2375,TRUE,FALSE,20.1755,0
 M5N Metal,m5n.metal,384,96,5.712,5.712,17.14,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,EBS only,100 Gigabit,19000,2375,TRUE,FALSE,3.599,0
 M5ZN Metal,m5zn.metal,192,48,3.9641,3.9641,12,0,None,0,Intel Xeon Platinum 8252,4.5,EBS only,100 Gigabit,19000,2375,TRUE,TRUE,2.4974,0
+C6I 12xlarge,c6i.12xlarge,96.0,48,4.587,4.587,8.34,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,18.75 Gigabit,15000,1875,TRUE,TRUE,1.3495,0
+C6I 16xlarge,c6i.16xlarge,128.0,64,6.122,6.122,11.13,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,25 Gigabit,20000,2500,TRUE,TRUE,1.7993,0
+C6I 24xlarge,c6i.24xlarge,192.0,96,9.1795,9.1795,16.69,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,37.5 Gigabit,30000,3750,TRUE,TRUE,2.6989,0
+C6I Double Extra Large,c6i.2xlarge,16.0,8,0.7645,0.7645,1.39,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,2500,312.5,TRUE,TRUE,0.2249,0
+C6I 32xlarge,c6i.32xlarge,256.0,128,12.2375,12.2375,22.25,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,40000,5000,TRUE,TRUE,3.5986,0
+C6I Quadruple Extra Large,c6i.4xlarge,32.0,16,1.529,1.529,2.78,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,5000,625,TRUE,TRUE,0.4498,0
+C6I Eight Extra Large,c6i.8xlarge,64.0,32,3.058,3.058,5.56,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,10000,1250,TRUE,TRUE,0.8996,0
+C6I Extra Large,c6i.xlarge,8.0,4,0.385,0.385,0.7,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.1125,0
+C6ID 12xlarge,c6id.12xlarge,96.0,48,4.587,4.587,8.34,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,2850 GB (2 * 1425 GB NVMe SSD),18.75 Gigabit,15000,1875,TRUE,TRUE,1.5246,0
+C6ID 16xlarge,c6id.16xlarge,128.0,64,6.1215,6.1215,11.13,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,3800 GB (2 * 1900 GB NVMe SSD),25 Gigabit,20000,2500,TRUE,TRUE,2.0328,0
+C6ID 24xlarge,c6id.24xlarge,192.0,96,9.1795,9.1795,16.69,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,5700 GB (4 * 1425 GB NVMe SSD),37.5 Gigabit,30000,3750,TRUE,TRUE,3.0492,0
+C6ID Double Extra Large,c6id.2xlarge,16.0,8,0.7645,0.7645,1.39,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,474 GB NVMe SSD,12.5 Gigabit,2500,312.5,TRUE,TRUE,0.2541,0
+C6ID 32xlarge,c6id.32xlarge,256.0,128,12.2375,12.2375,22.25,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,7600 GB (4 * 1900 GB NVMe SSD),50 Gigabit,40000,5000,TRUE,TRUE,4.0656,0
+C6ID Quadruple Extra Large,c6id.4xlarge,32.0,16,1.529,1.529,2.78,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,950 GB NVMe SSD,12.5 Gigabit,5000,625,TRUE,TRUE,0.5082,0
+C6ID Eight Extra Large,c6id.8xlarge,64.0,32,3.058,3.058,5.56,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,1900 GB NVMe SSD,12.5 Gigabit,10000,1250,TRUE,TRUE,1.0164,0
+C6ID Extra Large,c6id.xlarge,8.0,4,0.385,0.385,0.7,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,237 GB NVMe SSD,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.127,0
+C6IN 12xlarge,c6in.12xlarge,96.0,48,4.587,4.587,8.34,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,75 Gigabit,30000,3750,TRUE,TRUE,1.7146,0
+C6IN 16xlarge,c6in.16xlarge,128.0,64,6.1215,6.1215,11.13,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,100 Gigabit,40000,5000,TRUE,TRUE,2.2861,0
+C6IN 24xlarge,c6in.24xlarge,192.0,96,9.1795,9.1795,16.69,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,150 Gigabit,60000,7500,TRUE,TRUE,3.4292,0
+C6IN Double Extra Large,c6in.2xlarge,16.0,8,0.7645,0.7645,1.39,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,40 Gigabit,5000,625,TRUE,TRUE,0.2858,0
+C6IN 32xlarge,c6in.32xlarge,256.0,128,12.2375,12.2375,22.25,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,200 Gigabit,80000,10000,TRUE,TRUE,4.5723,0
+C6IN Quadruple Extra Large,c6in.4xlarge,32.0,16,1.529,1.529,2.78,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,10000,1250,TRUE,TRUE,0.5715,0
+C6IN Eight Extra Large,c6in.8xlarge,64.0,32,3.058,3.058,5.56,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,20000,2500,TRUE,TRUE,1.1431,0
+C6IN Extra Large,c6in.xlarge,8.0,4,0.385,0.385,0.7,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,30 Gigabit,2500,312.5,TRUE,TRUE,0.1429,0
+C7G 12xlarge,c7g.12xlarge,96.0,48,5.973,5.973,10.86,0,None,0,AWS Graviton3 Processor,2.5,EBS only,22.5 Gigabit,15000,1875,TRUE,TRUE,1.1466,0
+C7G 16xlarge,c7g.16xlarge,128.0,64,7.964,7.964,14.48,0,None,0,AWS Graviton3 Processor,2.5,EBS only,30 Gigabit,20000,2500,TRUE,TRUE,1.5288,0
+C7G Double Extra Large,c7g.2xlarge,16.0,8,0.9955,0.9955,1.81,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,2500,312.5,TRUE,TRUE,0.1911,0
+C7G Quadruple Extra Large,c7g.4xlarge,32.0,16,1.991,1.991,3.62,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,5000,625,TRUE,TRUE,0.3822,0
+C7G Eight Extra Large,c7g.8xlarge,64.0,32,3.982,3.982,7.24,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,10000,1250,TRUE,TRUE,0.7644,0
+C7G Extra Large,c7g.xlarge,8.0,4,0.495,0.495,0.9,0,None,0,AWS Graviton3 Processor,2.5,EBS only,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.0955,0
+M6I 12xlarge,m6i.12xlarge,192.0,48,5.016,5.016,9.12,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,18.75 Gigabit,15000,1875,TRUE,TRUE,1.5241,0
+M6I 16xlarge,m6i.16xlarge,256.0,64,6.688,6.688,12.16,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,25 Gigabit,20000,2500,TRUE,TRUE,2.0321,0
+M6I 24xlarge,m6i.24xlarge,384.0,96,10.032,10.032,18.24,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,37.5 Gigabit,30000,3750,TRUE,TRUE,3.0482,0
+M6I Double Extra Large,m6i.2xlarge,32.0,8,0.836,0.836,1.52,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,2500,312.5,TRUE,TRUE,0.254,0
+M6I 32xlarge,m6i.32xlarge,512.0,128,13.376,13.376,24.32,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,40000,5000,TRUE,TRUE,4.0643,0
+M6I Quadruple Extra Large,m6i.4xlarge,64.0,16,1.672,1.672,3.04,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,5000,625,TRUE,TRUE,0.508,0
+M6I Eight Extra Large,m6i.8xlarge,128.0,32,3.34,3.34,6.08,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,10000,1250,TRUE,TRUE,1.0161,0
+M6I Large,m6i.large,8.0,2,0.209,0.209,0.38,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,650,81.25,TRUE,TRUE,0.0635,0
+M6I Extra Large,m6i.xlarge,16.0,4,0.418,0.418,0.76,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.127,0
+M6ID 12xlarge,m6id.12xlarge,192.0,48,5.016,5.016,9.12,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,2850 GB (2 * 1425 GB NVMe SSD),18.75 Gigabit,15000,1875,TRUE,TRUE,1.794,0
+M6ID 16xlarge,m6id.16xlarge,256.0,64,6.688,6.688,12.16,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,3800 GB (2 * 1900 GB NVMe SSD),25 Gigabit,20000,2500,TRUE,TRUE,2.392,0
+M6ID 24xlarge,m6id.24xlarge,384.0,96,10.032,10.032,18.24,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,5700 GB (4 * 1425 GB NVMe SSD),37.5 Gigabit,30000,3750,TRUE,TRUE,3.588,0
+M6ID Double Extra Large,m6id.2xlarge,32.0,8,0.836,0.836,1.52,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,474 GB NVMe SSD,12.5 Gigabit,2500,312.5,TRUE,TRUE,0.299,0
+M6ID 32xlarge,m6id.32xlarge,512.0,128,13.376,13.376,24.32,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,7600 GB (4 * 1900 GB NVMe SSD),50 Gigabit,40000,5000,TRUE,TRUE,4.784,0
+M6ID Quadruple Extra Large,m6id.4xlarge,64.0,16,1.672,1.672,3.04,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,950 GB NVMe SSD,12.5 Gigabit,5000,625,TRUE,TRUE,0.598,0
+M6ID Eight Extra Large,m6id.8xlarge,128.0,32,3.34,3.34,6.08,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,1900 GB NVMe SSD,12.5 Gigabit,10000,1250,TRUE,TRUE,1.196,0
+M6ID Large,m6id.large,8.0,2,0.209,0.209,0.38,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,118 GB NVMe SSD,12.5 Gigabit,650,81.25,TRUE,TRUE,0.0747,0
+M6ID Extra Large,m6id.xlarge,16.0,4,0.418,0.418,0.76,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,237 GB NVMe SSD,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.1495,0
+M6IDN 12xlarge,m6idn.12xlarge,192.0,48,5.016,5.016,9.12,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,2850 GB (2 * 1425 GB NVMe SSD),75 Gigabit,30000,3750,TRUE,TRUE,2.4059,0
+M6IDN 16xlarge,m6idn.16xlarge,256.0,64,6.688,6.688,12.16,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,3800 GB (2 * 1900 GB NVMe SSD),100 Gigabit,40000,5000,TRUE,TRUE,3.2079,0
+M6IDN 24xlarge,m6idn.24xlarge,384.0,96,10.032,10.032,18.24,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,5700 GB (4 * 1425 GB NVMe SSD),150 Gigabit,60000,7500,TRUE,TRUE,4.8118,0
+M6IDN Double Extra Large,m6idn.2xlarge,32.0,8,0.836,0.836,1.52,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,474 GB NVMe SSD,40 Gigabit,5000,625,TRUE,TRUE,0.401,0
+M6IDN 32xlarge,m6idn.32xlarge,512.0,128,13.376,13.376,24.32,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,7600 GB (4 * 1900 GB NVMe SSD),200 Gigabit,80000,10000,TRUE,TRUE,6.4157,0
+M6IDN Quadruple Extra Large,m6idn.4xlarge,64.0,16,1.672,1.672,3.04,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,950 GB NVMe SSD,50 Gigabit,10000,1250,TRUE,TRUE,0.802,0
+M6IDN Eight Extra Large,m6idn.8xlarge,128.0,32,3.34,3.34,6.08,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,1900 GB NVMe SSD,50 Gigabit,20000,2500,TRUE,TRUE,1.6039,0
+M6IDN Large,m6idn.large,8.0,2,0.209,0.209,0.38,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,118 GB NVMe SSD,25 Gigabit,1250,156.25,TRUE,TRUE,0.1003,0
+M6IDN Extra Large,m6idn.xlarge,16.0,4,0.418,0.418,0.76,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,237 GB NVMe SSD,30 Gigabit,2500,312.5,TRUE,TRUE,0.2005,0
+M6IN 12xlarge,m6in.12xlarge,192.0,48,5.016,5.016,9.12,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,75 Gigabit,30000,3750,TRUE,TRUE,2.1052,0
+M6IN 16xlarge,m6in.16xlarge,256.0,64,6.688,6.688,12.16,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,100 Gigabit,40000,5000,TRUE,TRUE,2.8069,0
+M6IN 24xlarge,m6in.24xlarge,384.0,96,10.032,10.032,18.24,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,150 Gigabit,60000,7500,TRUE,TRUE,4.2103,0
+M6IN Double Extra Large,m6in.2xlarge,32.0,8,0.836,0.836,1.52,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,40 Gigabit,5000,625,TRUE,TRUE,0.3509,0
+M6IN 32xlarge,m6in.32xlarge,512.0,128,13.376,13.376,24.32,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,200 Gigabit,80000,10000,TRUE,TRUE,5.6137,0
+M6IN Quadruple Extra Large,m6in.4xlarge,64.0,16,1.672,1.672,3.04,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,10000,1250,TRUE,TRUE,0.7017,0
+M6IN Eight Extra Large,m6in.8xlarge,128.0,32,3.34,3.34,6.08,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,20000,2500,TRUE,TRUE,1.4034,0
+M6IN Large,m6in.large,8.0,2,0.209,0.209,0.38,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,25 Gigabit,1250,156.25,TRUE,TRUE,0.0877,0
+M6IN Extra Large,m6in.xlarge,16.0,4,0.418,0.418,0.76,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,30 Gigabit,2500,312.5,TRUE,TRUE,0.1754,0
+M7G 12xlarge,m7g.12xlarge,192.0,48,6.336,6.336,11.52,0,None,0,AWS Graviton3 Processor,2.5,EBS only,22.5 Gigabit,15000,1875,TRUE,TRUE,1.2955,0
+M7G 16xlarge,m7g.16xlarge,256.0,64,8.448,8.448,15.36,0,None,0,AWS Graviton3 Processor,2.5,EBS only,30 Gigabit,20000,2500,TRUE,TRUE,1.7273,0
+M7G Double Extra Large,m7g.2xlarge,32.0,8,1.056,1.056,1.92,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,2500,312.5,TRUE,TRUE,0.2159,0
+M7G Quadruple Extra Large,m7g.4xlarge,64.0,16,2.112,2.112,3.84,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,5000,625,TRUE,TRUE,0.4318,0
+M7G Eight Extra Large,m7g.8xlarge,128.0,32,4.224,4.224,7.68,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,10000,1250,TRUE,TRUE,0.8637,0
+M7G Large,m7g.large,8.0,2,0.264,0.264,0.48,0,None,0,AWS Graviton3 Processor,2.5,EBS only,12.5 Gigabit,630,78.75,TRUE,TRUE,0.054,0
+M7G Extra Large,m7g.xlarge,16.0,4,0.528,0.528,0.96,0,None,0,AWS Graviton3 Processor,2.5,EBS only,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.108,0
+R6I 12xlarge,r6i.12xlarge,384.0,48,6.732,6.732,12.24,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,18.75 Gigabit,15000,1875,TRUE,TRUE,2.0004,0
+R6I 16xlarge,r6i.16xlarge,512.0,64,8.976,8.976,16.32,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,25 Gigabit,20000,2500,TRUE,TRUE,2.6672,0
+R6I 24xlarge,r6i.24xlarge,768.0,96,13.464,13.464,24.48,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,37.5 Gigabit,30000,3750,TRUE,TRUE,4.0008,0
+R6I Double Extra Large,r6i.2xlarge,64.0,8,1.122,1.122,2.04,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,2500,312.5,TRUE,TRUE,0.3334,0
+R6I 32xlarge,r6i.32xlarge,1024.0,128,17.952,17.952,32.64,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,40000,5000,TRUE,TRUE,5.3343,0
+R6I Quadruple Extra Large,r6i.4xlarge,128.0,16,2.244,2.244,4.08,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,5000,625,TRUE,TRUE,0.6668,0
+R6I Eight Extra Large,r6i.8xlarge,256.0,32,4.488,4.488,8.16,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,10000,1250,TRUE,TRUE,1.3336,0
+R6I Large,r6i.large,16.0,2,0.2805,0.2805,0.51,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,650,81.25,TRUE,TRUE,0.0833,0
+R6I Extra Large,r6i.xlarge,32.0,4,0.561,0.561,1.02,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.1667,0
+R6ID 12xlarge,r6id.12xlarge,384.0,48,6.732,6.732,12.24,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,2850 GB (2 * 1425 GB NVMe SSD),18.75 Gigabit,15000,1875,TRUE,TRUE,2.2806,0
+R6ID 16xlarge,r6id.16xlarge,512.0,64,8.976,8.976,16.32,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,3800 GB (2 * 1900 GB NVMe SSD),25 Gigabit,20000,2500,TRUE,TRUE,3.0408,0
+R6ID 24xlarge,r6id.24xlarge,768.0,96,13.464,13.464,24.48,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,5700 GB (4 * 1425 GB NVMe SSD),37.5 Gigabit,30000,3750,TRUE,TRUE,4.5612,0
+R6ID Double Extra Large,r6id.2xlarge,64.0,8,1.122,1.122,2.04,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,474 GB NVMe SSD,12.5 Gigabit,2500,312.5,TRUE,TRUE,0.3801,0
+R6ID 32xlarge,r6id.32xlarge,1024.0,128,17.952,17.952,32.64,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,7600 GB (4 * 1900 GB NVMe SSD),50 Gigabit,40000,5000,TRUE,TRUE,6.0816,0
+R6ID Quadruple Extra Large,r6id.4xlarge,128.0,16,2.244,2.244,4.08,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,950 GB NVMe SSD,12.5 Gigabit,5000,625,TRUE,TRUE,0.7602,0
+R6ID Eight Extra Large,r6id.8xlarge,256.0,32,4.488,4.488,8.16,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,1900 GB NVMe SSD,12.5 Gigabit,10000,1250,TRUE,TRUE,1.5204,0
+R6ID Large,r6id.large,16.0,2,0.2805,0.2805,0.51,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,118 GB NVMe SSD,12.5 Gigabit,650,81.25,TRUE,TRUE,0.095,0
+R6ID Extra Large,r6id.xlarge,32.0,4,0.561,0.561,1.02,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,237 GB NVMe SSD,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.19,0
+R6IDN 12xlarge,r6idn.12xlarge,384.0,48,6.732,6.732,12.24,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,2850 GB (2 * 1425 GB NVMe SSD),75 Gigabit,30000,3750,TRUE,TRUE,2.9543,0
+R6IDN 16xlarge,r6idn.16xlarge,512.0,64,8.976,8.976,16.32,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,3800 GB (2 * 1900 GB NVMe SSD),100 Gigabit,40000,5000,TRUE,TRUE,3.9391,0
+R6IDN 24xlarge,r6idn.24xlarge,768.0,96,13.464,13.464,24.48,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,5700 GB (4 * 1425 GB NVMe SSD),150 Gigabit,60000,7500,TRUE,TRUE,5.9086,0
+R6IDN Double Extra Large,r6idn.2xlarge,64.0,8,1.122,1.122,2.04,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,474 GB NVMe SSD,40 Gigabit,5000,625,TRUE,TRUE,0.4924,0
+R6IDN 32xlarge,r6idn.32xlarge,1024.0,128,17.952,17.952,32.64,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,7600 GB (4 * 1900 GB NVMe SSD),200 Gigabit,80000,10000,TRUE,TRUE,7.8781,0
+R6IDN Quadruple Extra Large,r6idn.4xlarge,128.0,16,2.244,2.244,4.08,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,950 GB NVMe SSD,50 Gigabit,10000,1250,TRUE,TRUE,0.9848,0
+R6IDN Eight Extra Large,r6idn.8xlarge,256.0,32,4.488,4.488,8.16,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,1900 GB NVMe SSD,50 Gigabit,20000,2500,TRUE,TRUE,1.9695,0
+R6IDN Large,r6idn.large,16.0,2,0.2805,0.2805,0.51,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,118 GB NVMe SSD,25 Gigabit,1250,156.25,TRUE,TRUE,0.1231,0
+R6IDN Extra Large,r6idn.xlarge,32.0,4,0.561,0.561,1.02,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,237 GB NVMe SSD,30 Gigabit,2500,312.5,TRUE,TRUE,0.2462,0
+R6IN 12xlarge,r6in.12xlarge,384.0,48,6.732,6.732,12.24,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,75 Gigabit,30000,3750,TRUE,TRUE,2.6359,0
+R6IN 16xlarge,r6in.16xlarge,512.0,64,8.976,8.976,16.32,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,100 Gigabit,40000,5000,TRUE,TRUE,3.5145,0
+R6IN 24xlarge,r6in.24xlarge,768.0,96,13.464,13.464,24.48,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,150 Gigabit,60000,7500,TRUE,TRUE,5.2717,0
+R6IN Double Extra Large,r6in.2xlarge,64.0,8,1.122,1.122,2.04,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,40 Gigabit,5000,625,TRUE,TRUE,0.4393,0
+R6IN 32xlarge,r6in.32xlarge,1024.0,128,17.952,17.952,32.64,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,200 Gigabit,80000,10000,TRUE,TRUE,7.029,0
+R6IN Quadruple Extra Large,r6in.4xlarge,128.0,16,2.244,2.244,4.08,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,10000,1250,TRUE,TRUE,0.8786,0
+R6IN Eight Extra Large,r6in.8xlarge,256.0,32,4.488,4.488,8.16,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,50 Gigabit,20000,2500,TRUE,TRUE,1.7572,0
+R6IN Large,r6in.large,16.0,2,0.2805,0.2805,0.51,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,25 Gigabit,1250,156.25,TRUE,TRUE,0.1098,0
+R6IN Extra Large,r6in.xlarge,32.0,4,0.561,0.561,1.02,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,30 Gigabit,2500,312.5,TRUE,TRUE,0.2197,0
+R7G 12xlarge,r7g.12xlarge,384.0,48,8.616,8.616,15.12,0,None,0,AWS Graviton3 Processor,2.5,EBS only,22.5 Gigabit,15000,1875,TRUE,TRUE,1.7003,0
+R7G 16xlarge,r7g.16xlarge,512.0,64,11.088,11.088,20.16,0,None,0,AWS Graviton3 Processor,2.5,EBS only,30 Gigabit,20000,2500,TRUE,TRUE,2.2671,0
+R7G Double Extra Large,r7g.2xlarge,64.0,8,1.386,1.386,2.52,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,2500,312.5,TRUE,TRUE,0.2834,0
+R7G Quadruple Extra Large,r7g.4xlarge,128.0,16,2.772,2.772,5.04,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,5000,625,TRUE,TRUE,0.5668,0
+R7G Eight Extra Large,r7g.8xlarge,256.0,32,5.544,5.544,10.08,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,10000,1250,TRUE,TRUE,1.1335,0
+R7G Large,r7g.large,16.0,2,0.3465,0.3465,0.63,0,None,0,AWS Graviton3 Processor,2.5,EBS only,12.5 Gigabit,630,78.75,TRUE,TRUE,0.0708,0
+R7G Extra Large,r7g.xlarge,32.0,4,0.693,0.693,1.26,0,None,0,AWS Graviton3 Processor,2.5,EBS only,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.1417,0

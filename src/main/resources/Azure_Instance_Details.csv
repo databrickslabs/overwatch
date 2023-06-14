@@ -148,3 +148,5 @@ G5 Graphics and Machine Learning GPU 24xlarge,g5.24xlarge,384,96,8.144,8.144,,4,
 P4D Highest Performance GPU 24xlarge,p4d.24xlarge,1152,96,32.7726,32.7726,44.45,8,NVIDIA A100,320,Intel Xeon Platinum 8275L,3,8000 GB(8 * 1000 GB NVMe SSD),4x 100 Gigabit,19000,2375,TRUE,FALSE,20.1755,0
 M5N Metal,m5n.metal,384,96,5.712,5.712,17.14,0,None,0,Intel Xeon Platinum 8259 (Cascade Lake),3.1,EBS only,100 Gigabit,19000,2375,TRUE,FALSE,3.599,0
 M5ZN Metal,m5zn.metal,192,48,3.9641,3.9641,12,0,None,0,Intel Xeon Platinum 8252,4.5,EBS only,100 Gigabit,19000,2375,TRUE,TRUE,2.4974,0
+E16s v5,Standard_E16s_v5,16,128.0,1.01,1.01,0.606,5.5
+E20s v5,Standard_E20s_v5,20,160.0,1.26,1.26,0.756,7.0
