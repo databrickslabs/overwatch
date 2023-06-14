@@ -1329,6 +1329,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     df.filter('serviceName === "notebook")
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .filter(responseSuccessFilter)
       .withColumn("pathLength", when('notebookName.isNull, size(split('path, "/"))))
       .withColumn("notebookName", when('notebookName.isNull, split('path, "/")('pathLength - 1)).otherwise('notebookName))
       .select(notebookCols: _*)
