@@ -184,24 +184,20 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
                                           sourcesToSnap: Array[PipelineTable]
                                         ): Seq[CloneDetail] = {
 
-    val finalSnapshotRootPath  = if (processType.toLowerCase() == "migration"){
-      s"${snapshotRootPath}/global_share"
-    }else if (processType.toLowerCase() == "restore") {
+    val finalSnapshotRootPath  = if (Array("migration","restore").contains(processType.toLowerCase())){
       s"${snapshotRootPath}/global_share"
     }else{
       s"${snapshotRootPath}/data"
     }
 
-
-    val cloneSpecs = sourcesToSnap.map(dataset => {
+    sourcesToSnap.map(dataset => {
       val sourceName = dataset.name.toLowerCase
       val sourcePath = dataset.tableLocation
       val mode = dataset._mode
       val immutableColumns = (dataset.keys ++ dataset.incrementalColumns).distinct
       val targetPath = s"$finalSnapshotRootPath/$sourceName"
       CloneDetail(sourcePath, targetPath, None, cloneLevel,immutableColumns,mode)
-    }).toArray.toSeq
-    cloneSpecs
+    }).toSeq
   }
 
   private[overwatch] def incrementalSnap(
