@@ -1169,6 +1169,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val jobsBase = getJobsBase(df)
       .filter('actionName.isin("create", "delete", "reset", "update", "resetJobAcl", "changeJobAcl"))
+      .filter(responseSuccessFilter) // only promote successful events
 
     val jobsBaseHasRecords = !jobsBase.isEmpty
     jobStatusValidateNewJobsStatusHasNewData(isFirstRun, jobsSnapshotTargetComplete, jobsBaseHasRecords)
