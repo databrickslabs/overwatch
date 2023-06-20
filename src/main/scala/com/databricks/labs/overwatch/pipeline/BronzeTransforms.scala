@@ -992,7 +992,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes =
-    if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId) {
+    if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId(Some(apiEnv.workspaceURL))) {
       getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
      } else {
