@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.streaming.{DataStreamWriter, Trigger}
+import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, Trigger}
 
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
@@ -32,6 +32,55 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   private val Config = _config
   private val processType = _processType
 
+  def writeStream(sourceName:String,
+                  checkPointLocation:String,
+                  targetLocation:String,
+                  rawStreamingDF:DataFrame,
+                  cloneSpec:CloneDetail):StreamingQuery = {
+    logger.log(Level.INFO, s"Beginning write to ${sourceName}")
+    val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write"
+    logger.log(Level.INFO, msg)
+
+    val beginMsg = s"Stream to ${sourceName} beginning."
+    logger.log(Level.INFO, beginMsg)
+    var streamWriter = rawStreamingDF.writeStream.outputMode("append").format("delta").option("checkpointLocation", checkPointLocation)
+      .queryName(s"StreamTo_${sourceName}")
+
+    streamWriter = if (cloneSpec.mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
+      streamWriter.option("overwriteSchema", "true")
+    } else { // append AND merge schema
+      streamWriter
+        .option("mergeSchema", "true")
+    }
+    streamWriter
+      .asInstanceOf[DataStreamWriter[Row]]
+      .option("path", targetLocation)
+      .start()
+  }
+
+  def upsertToDelta(microBatchOutputDF: DataFrame,
+                    batchId: Long,
+                    immutableColumns: Array[String],
+                    sourceName:String,
+                    deltaTarget:DeltaTable) : Unit = {
+    val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")
+    val mergeDetailMsg =
+      s"""
+         |Beginning upsert to ${sourceName}.
+         |MERGE CONDITION: $mergeCondition
+         |""".stripMargin
+    logger.log(Level.INFO, mergeDetailMsg)
+    spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", Config.runID)
+
+    deltaTarget
+      .merge(microBatchOutputDF.as("updates"), mergeCondition)
+      .whenMatched
+      .updateAll()
+      .whenNotMatched
+      .insertAll()
+      .execute()
+  }
+
 
   private[overwatch] def snapStream(cloneDetails: Seq[CloneDetail]): Unit = {
 
@@ -49,114 +98,45 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
         val checkPointLocation = s"${snapshotRootPath}/checkpoint/${sourceName}"
         val targetLocation = s"${cloneSpec.target}"
 
-        if(Helpers.pathExists(targetLocation)){
-          if (cloneSpec.mode == WriteMode.merge){ //If Table mode is Merge then do simple merge
+        val streamWriter = if(Helpers.pathExists(targetLocation)){
+          if (cloneSpec.mode == WriteMode.merge)
+          { //If Table mode is Merge then do simple merge
             val deltaTarget = DeltaTable.forPath(spark,targetLocation).alias("target")
             val updatesDF = rawStreamingDF
             val immutableColumns = cloneSpec.immutableColumns
 
-            def upsertToDelta(microBatchOutputDF: DataFrame, batchId: Long) {
-              val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ")
-              val mergeDetailMsg =
-                s"""
-                   |Beginning upsert to ${sourceName}.
-                   |MERGE CONDITION: $mergeCondition
-                   |""".stripMargin
-              logger.log(Level.INFO, mergeDetailMsg)
-              spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", Config.runID)
-
-              deltaTarget
-                .merge(microBatchOutputDF.as("updates"), mergeCondition)
-                .whenMatched
-                .updateAll()
-                .whenNotMatched
-                .insertAll()
-                .execute()
-            }
-
-            val streamWriter1 = rawStreamingDF
+            updatesDF
               .writeStream
               .format("delta")
-              .foreachBatch(upsertToDelta _)
+              .foreachBatch { (df: DataFrame, batchId: Long) =>
+                upsertToDelta(df, batchId, immutableColumns, sourceName,deltaTarget)
+              }
               .trigger(Trigger.Once())
               .option("checkpointLocation", checkPointLocation)
               .queryName(s"Streaming_${sourceName}")
               .option("mergeSchema", "true")
               .option("path", targetLocation)
               .start()
-
-            val streamManager = Helpers.getQueryListener(streamWriter1,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
-            spark.streams.addListener(streamManager)
-            val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter1.name}\nID: ${streamWriter1.id}"
-            logger.log(Level.INFO, listenerAddedMsg)
-
-            streamWriter1.awaitTermination()
-            spark.streams.removeListener(streamManager)
-            logger.log (Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-            spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
-            CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
-
-          }else{
-            logger.log(Level.INFO, s"Beginning write to ${sourceName}")
-            val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write"
-            logger.log(Level.INFO, msg)
-            val beginMsg = s"Stream to ${sourceName} beginning."
-            logger.log(Level.INFO, beginMsg)
-            var streamWriter = rawStreamingDF.writeStream.outputMode("append").format("delta").option("checkpointLocation", checkPointLocation)
-              .queryName(s"StreamTo_${sourceName}")
-
-            streamWriter = if (cloneSpec.mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
-              streamWriter.option("overwriteSchema", "true")
-            } else { // append AND merge schema
-              streamWriter
-                .option("mergeSchema", "true")
-            }
-            val streamWriter1 = streamWriter
-              .asInstanceOf[DataStreamWriter[Row]]
-              .option("path", targetLocation)
-              .start()
-
-            val streamManager = Helpers.getQueryListener(streamWriter1,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
-            spark.streams.addListener(streamManager)
-            val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter1.name}\nID: ${streamWriter1.id}"
-            logger.log(Level.INFO, listenerAddedMsg)
-
-            streamWriter1.awaitTermination()
-            spark.streams.removeListener(streamManager)
-            logger.log (Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-            CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
-
           }
-        }else{
-          logger.log(Level.INFO, s"Beginning write to ${sourceName}")
-          val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write"
-          logger.log(Level.INFO, msg)
-          val beginMsg = s"Stream to ${sourceName} beginning."
-          logger.log(Level.INFO, beginMsg)
-          var streamWriter = rawStreamingDF.writeStream.outputMode("append").format("delta").option("checkpointLocation", checkPointLocation)
-            .queryName(s"StreamTo_${sourceName}")
-
-          streamWriter = if (cloneSpec.mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
-            streamWriter.option("overwriteSchema", "true")
-          } else { // append AND merge schema
-            streamWriter
-              .option("mergeSchema", "true")
+          else //Not Streaming Merge
+          {
+            writeStream(sourceName:String,checkPointLocation:String,targetLocation:String,rawStreamingDF:DataFrame,cloneSpec:CloneDetail)
           }
-          val streamWriter1 = streamWriter
-            .asInstanceOf[DataStreamWriter[Row]]
-            .option("path", targetLocation)
-            .start()
-
-          val streamManager = Helpers.getQueryListener(streamWriter1,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
-          spark.streams.addListener(streamManager)
-          val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter1.name}\nID: ${streamWriter1.id}"
-          logger.log(Level.INFO, listenerAddedMsg)
-
-          streamWriter1.awaitTermination()
-          spark.streams.removeListener(streamManager)
-          logger.log (Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-          CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
+        }else //First time Streaming
+        {
+         writeStream(sourceName:String,checkPointLocation:String,targetLocation:String,rawStreamingDF:DataFrame,cloneSpec:CloneDetail)
         }
+
+        val streamManager = Helpers.getQueryListener(streamWriter,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+        spark.streams.addListener(streamManager)
+        val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
+        logger.log(Level.INFO, listenerAddedMsg)
+
+        streamWriter.awaitTermination()
+        spark.streams.removeListener(streamManager)
+        logger.log (Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
+        spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
+        CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
 
       } catch {
         case e: Throwable if (e.getMessage.contains("is after the latest commit timestamp of")) => {
@@ -177,7 +157,6 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val cloneReportPath = s"${snapshotRootPath}/clone_report/"
     cloneReport.toDS.write.mode("append").option("mergeSchema", "true").format("delta").save(cloneReportPath)
   }
-
 
   private[overwatch] def buildCloneSpecs(
                                           cloneLevel: String,
