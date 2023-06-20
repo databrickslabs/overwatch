@@ -600,7 +600,7 @@ object Initializer extends SparkSessionWrapper {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
     if(organizationID.isEmpty) {
-      config.setOrganizationId(getOrgId)
+      config.setOrganizationId(getOrgId(apiUrl))
     }else{ // is multiWorkspace deployment since orgID is passed
       logger.log(Level.INFO, "Setting multiworkspace deployment")
       config.setOrganizationId(organizationID.get)
