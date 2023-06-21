@@ -248,22 +248,31 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .setStartingPosition(EventPosition.fromEnqueuedTime(lastEnqTime))
     }
 
-    val eventHubsConf = if (ehConfig.azureClientId.nonEmpty) {
-      val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
-        "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
-        "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
-        "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
-      AadAuthInstance.addAadAuthParams(ehConf, aadParams)
-    } else
-      ehConf
 
-    spark.readStream
-      .format("eventhubs")
-      .options(eventHubsConf.toMap)
-      .load()
-      .withColumn("deserializedBody", 'body.cast("string"))
-      .withColumn("organization_id", lit(organizationId))
-      .withColumn("Overwatch_RunID", lit(runID))
+    try {
+      val eventHubsConf = if (ehConfig.azureClientId.nonEmpty) {
+        val aadParams = Map("aad_tenant_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureTenantId.get),
+          "aad_client_id" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientId.get),
+          "aad_client_secret" -> PipelineFunctions.maybeGetSecret(ehConfig.azureClientSecret.get),
+          "aad_authority_endpoint" -> ehConfig.azureAuthEndpoint)
+        AadAuthInstance.addAadAuthParams(ehConf, aadParams)
+      } else
+        ehConf
+
+      spark.readStream
+        .format("eventhubs")
+        .options(eventHubsConf.toMap)
+        .load()
+        .withColumn("deserializedBody", 'body.cast("string"))
+        .withColumn("organization_id", lit(organizationId))
+        .withColumn("Overwatch_RunID", lit(runID))
+    }catch{
+      case e: NoClassDefFoundError =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception :Please add jar with maven coordinate com.microsoft.azure:msal4j:1.10.1 to the cluster")
+        throw new BadConfigException(fullMsg, failPipeline = true)
+      case e:Throwable =>
+        throw e
+    }
 
   }
 
@@ -483,6 +492,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
     val clusterEventsEndpoint = "clusters/events"
 
+    val lagTime = 600000 //10 minutes
+    val lagStartTime = startTime.asUnixTimeMilli - lagTime
     // creating Json input for parallel API calls
     val jsonInput = Map(
       "start_value" -> "0",
@@ -490,7 +501,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "increment_counter" -> "1",
       "final_response_count" -> s"${finalResponseCount}",
       "cluster_ids" -> s"${clusterIDs.mkString(",")}",
-      "start_time" -> s"${startTime.asUnixTimeMilli}",
+      "start_time" -> s"${lagStartTime}",
       "end_time" -> s"${endTime.asUnixTimeMilli}",
       "tmp_success_path" -> tmpClusterEventsSuccessPath,
       "tmp_error_path" -> tmpClusterEventsErrorPath
@@ -734,7 +745,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         //        logger.log(Level.INFO, s"Temporarily setting spark.sql.files.maxPartitionBytes --> ${tempMaxPartBytes}")
         //        spark.conf.set("spark.sql.files.maxPartitionBytes", tempMaxPartBytes)
 
-        val baseEventsDF = try {
+        val baseEventsDFRaw = try {
           /**
            * Event org.apache.spark.sql.streaming.StreamingQueryListener$QueryStartedEvent has a duplicate column
            * "timestamp" where the type is a string and the column name is "timestamp". This conflicts with the rest
@@ -761,8 +772,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
           } else col("Timestamp")
 
           baseDF
-            .withColumn("Timestamp", fixDupTimestamps)
+            .withColumn("DerivedTimestamp", fixDupTimestamps)
             .drop("timestamp")
+            .drop("Timestamp")
 
 
         } catch {
@@ -777,7 +789,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             throw e
           }
         }
-
+        val baseEventsDF = baseEventsDFRaw.withColumnRenamed("DerivedTimestamp","Timestamp")
         // Handle custom metrics and listeners in streams
         val progressCol = if (baseEventsDF.schema.fields.map(_.name.toLowerCase).contains("progress")) {
           to_json(col("progress")).alias("progress")
@@ -807,50 +819,45 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         val bronzeSparkEventsScrubber = getSparkEventsSchemaScrubber(baseEventsDF)
 
-        // standard dataframe build
-        var rawScrubbed = baseEventsDF
-          .withColumn("Executor ID", executorIdOverride)
-          .withColumn("progress", progressCol)
-          .withColumn("filename", input_file_name)
-          .withColumn("pathSize", size(split('filename, "/")))
-          .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
-          .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
-          .withColumn("filenameGroup", groupFilename('filename))
-          .drop("pathSize", "executorId")
+        val rawScrubbed = if (baseEventsDF.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
+          baseEventsDF
+            .withColumn("DerivedExecutorID", executorIdOverride)
+            .withColumn("DerivedProgress", progressCol)
+            .withColumn("filename", input_file_name)
+            .withColumn("pathSize", size(split('filename, "/")))
+            .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+            .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+            .withColumn("DerivedStageID", stageIDColumnOverride)
+            .withColumn("DerivedStageAttemptID", stageAttemptIDColumnOverride)
+            .drop("pathSize", "executorId", "Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId",
+              "Executor ID","progress","StageID","StageAttemptID")
+            .withColumn("filenameGroup", groupFilename('filename))
+            .withColumnRenamed("DerivedExecutorID", "Executor ID")
+            .withColumnRenamed("DerivedProgress", "progress")
+            .withColumnRenamed("DerivedStageID", "StageID")
+            .withColumnRenamed("DerivedStageAttemptID", "StageAttemptID")
+            .scrubSchema(bronzeSparkEventsScrubber)
 
-        // handle multiple stageid fields if present
-        rawScrubbed = if (rawScrubbed.columns.count(_.toLowerCase().replace(" ", "") == "stageid") > 1) {
-          rawScrubbed
-            .withColumn("StageID", stageIDColumnOverride)
-            .withColumn("StageAttemptID", stageAttemptIDColumnOverride)
-            .drop("Stage ID", "stageId", "Stage Attempt ID", "stageAttemptId")
-        } else rawScrubbed
+        } else {
+          baseEventsDF
+            .withColumn("DerivedExecutorID", executorIdOverride)
+            .withColumn("DerivedProgress", progressCol)
+            .withColumn("filename", input_file_name)
+            .withColumn("pathSize", size(split('filename, "/")))
+            .withColumn("SparkContextId", split('filename, "/")('pathSize - lit(2)))
+            .withColumn("clusterId", split('filename, "/")('pathSize - lit(5)))
+            .drop("pathSize", "executorId","Executor ID","progress")
+            .withColumn("filenameGroup", groupFilename('filename))
+            .withColumnRenamed("DerivedExecutorID", "Executor ID")
+            .withColumnRenamed("DerivedProgress", "progress")
+            .scrubSchema(bronzeSparkEventsScrubber)
 
-        rawScrubbed = rawScrubbed.scrubSchema(bronzeSparkEventsScrubber)
-
-        // Schema Contains TaskEndReason.AccumulatorUpdates
-        rawScrubbed = if (SchemaTools.nestedColExists(rawScrubbed.schema, "TaskEndReason.AccumulatorUpdates")) {
-          // TaskEndReason.AccumulatorUpdates is Array[String]
-          if (rawScrubbed.select($"TaskEndReason.AccumulatorUpdates").schema
-            .fields.filter(_.name == "AccumulatorUpdates").exists(_.dataType == ArrayType(StringType))) {
-            val nullSafeAccumulatorUpdates = StructType(Seq(
-              StructField("ID", LongType, nullable = true)
-            ))
-            val changeInventory = Map[String, Column](
-              "TaskEndReason.AccumulatorUpdates" ->
-                lit(null).cast(ArrayType(nullSafeAccumulatorUpdates))
-            )
-            rawScrubbed
-              .modifyStruct(changeInventory)
-          } else rawScrubbed
-        } else rawScrubbed
+        }
 
         // persist to temp to ensure all raw files are not read multiple times
         val sparkEventsTempPath = s"$tempDir/sparkEventsBronze/${pipelineSnapTime.asUnixTimeMilli}"
 
-        rawScrubbed
-          .scrubSchema(bronzeSparkEventsScrubber)
-          .withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
+        rawScrubbed.withColumn("Properties", SchemaTools.structToMap(rawScrubbed, "Properties"))
           .withColumn("modifiedConfigs", SchemaTools.structToMap(rawScrubbed, "modifiedConfigs"))
           .withColumn("extraTags", SchemaTools.structToMap(rawScrubbed, "extraTags"))
           .join(eventLogsDF, Seq("filename"))
@@ -885,9 +892,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private[overwatch] def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
     try{
     val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
+      .filter(col("mount_point") =!= "/")
       .withColumn("mount_point", removeTrailingSlashes('mount_point))
       .withColumn("source",  removeTrailingSlashes('source))
-      .filter(col("mount_point") =!= "/")
     //Cleaning the data for cluster log path
     val formattedInputDf = inputDataframe.withColumn("cluster_log_conf",  removeTrailingSlashes('cluster_log_conf))
       .withColumn("cluster_mount_point_temp", regexp_replace('cluster_log_conf, "dbfs:", ""))

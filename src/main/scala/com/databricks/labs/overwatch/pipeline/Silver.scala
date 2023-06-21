@@ -249,7 +249,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobStatusProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, BronzeTargets.auditLogsTarget.incrementalColumns),
+        BronzeTargets.auditLogsTarget.asIncrementalDF(jobStatusModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1),
         Seq(
           dbJobsStatusSummary(
             BronzeTargets.jobsSnapshotTarget,
@@ -323,7 +323,10 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
           BronzeTargets.clusterEventsTarget.incrementalColumns,
           SilverTargets.clusterStateDetailTarget.maxMergeScanDates // pick up last state up to 30 days ago
         ),
-        Seq(buildClusterStateDetail(clusterStateDetailModule.untilTime)),
+        Seq(buildClusterStateDetail(
+          clusterStateDetailModule.untilTime,
+          BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,1) //Added to get the Removed Cluster
+        )),
         append(SilverTargets.clusterStateDetailTarget)
       )
   }
