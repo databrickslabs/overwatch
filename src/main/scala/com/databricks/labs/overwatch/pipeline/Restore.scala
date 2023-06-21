@@ -37,10 +37,8 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
-    try {
-      dbutils.fs.ls(targetPrefix)
-    } catch {
-      case e: Exception => dbutils.fs.mkdirs(targetPrefix)
+    if (!Helpers.pathExists(targetPrefix)){
+      dbutils.fs.mkdirs(targetPrefix)
     }
 
     try {
@@ -89,9 +87,9 @@ object Restore extends SparkSessionWrapper {
 
     def main(args: Array[String]): Unit = {
 
-      val sourcePrefix = args(0)
+      val sourcePrefix = args.lift(0).getOrElse("")
       val orgID = Initializer.getOrgId
-      val targetPrefix = args(1)
+      val targetPrefix = args.lift(1).getOrElse("")
       val cloneLevel = "Deep"
       //
 
@@ -102,10 +100,16 @@ object Restore extends SparkSessionWrapper {
         dbutils.fs.ls(s"$pipReportPath/_delta_log").nonEmpty
         logger.log(Level.INFO, s"This ${pipReportPath} location corresponds to previous Overwatch Deployment... proceed Restoration")
       } catch {
-        case e: FileNotFoundException =>
+        case e: FileNotFoundException => {
           val msg = s"This ${pipReportPath} location does not corresponds to previous Overwatch Deployment...can not proceed with Restoration"
           logger.log(Level.ERROR, msg)
           throw new BadConfigException(msg)
+        }
+        case e: Throwable => {
+          val failMsg = PipelineFunctions.appendStackStrace(e, "Unable to proceed with Restoration")
+          logger.log(Level.ERROR, failMsg)
+          throw e
+        }
       }
       val workSpace = Helpers.getRemoteWorkspaceByPath(pipReportPath, true, orgID)
 

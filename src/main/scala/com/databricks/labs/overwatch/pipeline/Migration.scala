@@ -23,38 +23,51 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
 
 
   private[overwatch] def updateConfig(): Unit = {
-    if (configPath.toLowerCase().endsWith(".csv")) {
+    try {
+      if (configPath.toLowerCase().endsWith(".csv")) {
 
-      val tempConfigPath = (configPath.split("/").dropRight(1) :+ "tempConfig.csv").mkString("/")
+        val tempConfigPath = (configPath.split("/").dropRight(1) :+ "tempConfig.csv").mkString("/")
 
-      spark.read.format("csv")
-        .option("header", "true")
-        .option("ignoreLeadingWhiteSpace", true)
-        .option("ignoreTrailingWhiteSpace", true)
-        .load(configPath)
-        .withColumn("storage_prefix", when(col("etl_database_name") === lit(sourceETLDB), lit(storage_prefix)).otherwise(col("storage_prefix")))
-        .coalesce(1)
-        .write
-        .format("csv")
-        .option("header", "true")
-        .mode("overwrite")
-        .option("overwriteSchema", "true")
-        .save(tempConfigPath)
+        val df = spark.read.format("csv")
+          .option("header", "true")
+          .option("ignoreLeadingWhiteSpace", true)
+          .option("ignoreTrailingWhiteSpace", true)
+          .load(configPath)
+          .withColumn("storage_prefix", when(col("etl_database_name") === lit(sourceETLDB), lit(storage_prefix)).otherwise(col("storage_prefix")))
+          .coalesce(1)
 
-      val filePath = dbutils.fs.ls(tempConfigPath).last.path
-      dbutils.fs.cp(filePath, configPath, true)
-      dbutils.fs.rm(tempConfigPath, true)
-    } else {
-      val configUpdateStatement =
-        s"""
+          try{
+            df.write
+              .format("csv")
+              .option("header", "true")
+              .mode("overwrite")
+              .option("overwriteSchema", "true")
+              .save(tempConfigPath)
+          }catch {
+            case e: Exception =>
+              println(s"Exception while writing to tempConfigPath,Please ensure we have proper write access to ${tempConfigPath}")
+              throw e
+          }
+        val filePath = dbutils.fs.ls(tempConfigPath).last.path
+        dbutils.fs.cp(filePath, configPath, true)
+        dbutils.fs.rm(tempConfigPath, true)
+      } else {
+        val configUpdateStatement =
+          s"""
       update delta.`$configPath`
       set
         storage_prefix = '$storage_prefix'
       Where etl_database_name = '$sourceETLDB'
       """
-      spark.sql(configUpdateStatement)
+        spark.sql(configUpdateStatement)
+      }
+    }catch {
+      case e: Exception =>
+        println("Exception while reading config , please provide config csv path/config delta path/config delta table")
+        throw e
     }
   }
+
 }
 
 object Migration extends SparkSessionWrapper {
@@ -73,9 +86,9 @@ object Migration extends SparkSessionWrapper {
 
   def main(args: Array[String]): Unit = {
 
-    val sourceETLDB = args(0)
-    val migrateRootPath = args(1)
-    val configPath = args(2)
+    val sourceETLDB = args.lift(0).getOrElse("")
+    val migrateRootPath = args.lift(1).getOrElse("")
+    val configPath = args.lift(2).getOrElse("")
     val tablesToExclude = args.lift(3).getOrElse("")
     val cloneLevel = "Deep"
 
