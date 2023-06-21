@@ -4,6 +4,13 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.2.0.2 (Patch)
+Pulled forward all bug fixes from [0714](#0714)
+
+**To Upgrade**, simply swap the JAR
+
+[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/26?closed=1)
+
 ## 0.7.2.0.1 (Patch)
 Bug Fix - **mount_mapping_path** was being ignored
 
@@ -34,6 +41,25 @@ config file if upgrading from 071x multi-workspace deployment. **[HTML](/assets/
 * (Azure) When Event Hub Library Dependency is missing / corrupted kill bronze pipeline properly
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/5?closed=1)
+
+## 0.7.1.4
+**To Upgrade**, simply swap the JAR
+
+### Features
+* Backported AAD Authentication for Event Hubs
+* Added support for permanently deleted clusters
+  * Costs will now stop accumulating for permanently deleted clusters
+
+### Bug Fixes
+* api calls / job_status_silver - Added lag overlap to handle late arriving events
+* getOrgID fix for single-tenant and PVC backported from 072x
+* PVC - shardName duplicate column in audit_log_bronze handled
+* Only promote crud events for successful events (clusters / jobs / notebooks)
+* Spark Events Bronze - AWS Remote workspaces with s3:// direct logging paths empty
+* Spark Executor Table - empty
+* Spark Tasks -- end timestamp nulls
+
+[Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/26?closed=1)
 
 ## 0.7.1.3
 * Data Quality Fixes - primarily around cost and utilization
