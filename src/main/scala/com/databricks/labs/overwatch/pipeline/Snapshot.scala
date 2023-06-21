@@ -98,9 +98,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
         val checkPointLocation = s"${snapshotRootPath}/checkpoint/${sourceName}"
         val targetLocation = s"${cloneSpec.target}"
 
-        val streamWriter = if(Helpers.pathExists(targetLocation)){
-          if (cloneSpec.mode == WriteMode.merge)
-          { //If Table mode is Merge then do simple merge
+        val streamWriter = if(Helpers.pathExists(targetLocation) && cloneSpec.mode == WriteMode.merge){
             val deltaTarget = DeltaTable.forPath(spark,targetLocation).alias("target")
             val updatesDF = rawStreamingDF
             val immutableColumns = cloneSpec.immutableColumns
@@ -117,11 +115,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
               .option("mergeSchema", "true")
               .option("path", targetLocation)
               .start()
-          }
-          else //Not Streaming Merge
-          {
-            writeStream(sourceName:String,checkPointLocation:String,targetLocation:String,rawStreamingDF:DataFrame,cloneSpec:CloneDetail)
-          }
+
         }else //First time Streaming
         {
          writeStream(sourceName:String,checkPointLocation:String,targetLocation:String,rawStreamingDF:DataFrame,cloneSpec:CloneDetail)
