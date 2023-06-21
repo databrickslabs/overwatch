@@ -27,6 +27,16 @@ object Initializer extends SparkSessionWrapper {
   // Init the SparkSessionWrapper with envVars
   envInit()
 
+  private def getApiURL(apiUrlInput: Option[String]): String = {
+    apiUrlInput match {
+      case Some(apiURL) => apiURL
+      case None => dbutils.notebook.getContext.apiUrl match {
+        case Some(apiURL) => apiURL
+        case None => throw new BadConfigException("API URL cannot be determined")
+      }
+    }
+  }
+
   /**
    * Returns the local workspace orgID
    * @return
@@ -52,23 +62,12 @@ object Initializer extends SparkSessionWrapper {
     } else clusterOwnerOrgID
   }
 
-  private def getApiURL(apiUrlInput: Option[String]): String = {
-    apiUrlInput match {
-      case Some(apiURL) => apiURL
-      case None => dbutils.notebook.getContext.apiUrl match {
-        case Some(apiURL) => apiURL
-        case None => throw new BadConfigException("API URL cannot be determined")
-      }
-    }
-  }
-
 
   private def initConfigState(debugFlag: Boolean,organizationID: Option[String],
                               apiUrl: Option[String]
                              ): Config = {
     logger.log(Level.INFO, "Initializing Config")
     val config = new Config()
-
     // If MW take orgID from arg
     if(organizationID.isEmpty) {
       config.setOrganizationId(getOrgId(apiUrl))
