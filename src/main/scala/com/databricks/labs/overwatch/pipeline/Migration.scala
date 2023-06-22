@@ -127,12 +127,13 @@ object Migration extends SparkSessionWrapper {
         logger.log(Level.ERROR, failMsg)
         throw e
     }
-    //Step 02 - Drop Source ETLDatabase and Consumer Database after Migration
+
+    //Step 02 - Update Config with the latest Storage Prefix
+    new Migration(sourceETLDB,migrateRootPath,configPath).updateConfig()
+
+    //Step 03 - Drop Source ETLDatabase and Consumer Database after Migration
     spark.sql(s"DROP DATABASE ${etlDatabase} CASCADE")
     spark.sql(s"DROP DATABASE ${consumerDatabase} CASCADE")
-
-    //Step 03 - Update Config with the latest Storage Prefix
-    new Migration(sourceETLDB,migrateRootPath,configPath).updateConfig()
 
     logger.log(Level.INFO, "Migration Completed. Please delete the external data from storage for all source etl database tables")
   }
