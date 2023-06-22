@@ -77,6 +77,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
         storage_prefix = '$storage_prefix'
       Where etl_database_name = '$sourceETLDB'
       """
+        spark.sql(configUpdateStatement)
       }
     }catch {
       case e: Exception =>
