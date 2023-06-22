@@ -24,10 +24,12 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
 
   private[overwatch] def updateConfig(): Unit = {
     try {
-      if (configPath.toLowerCase().endsWith(".csv")) {
-
+      if (configPath.toLowerCase().endsWith(".csv")) { // CSV file
+        println(s"Config source: csv path ${configPath}")
+        if (!Helpers.pathExists(configPath)) {
+          throw new BadConfigException("Unable to find config file in the given location:" + configPath)
+        }
         val tempConfigPath = (configPath.split("/").dropRight(1) :+ "tempConfig.csv").mkString("/")
-
         val df = spark.read.format("csv")
           .option("header", "true")
           .option("ignoreLeadingWhiteSpace", true)
@@ -35,7 +37,6 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
           .load(configPath)
           .withColumn("storage_prefix", when(col("etl_database_name") === lit(sourceETLDB), lit(storage_prefix)).otherwise(col("storage_prefix")))
           .coalesce(1)
-
           try{
             df.write
               .format("csv")
@@ -51,7 +52,11 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
         val filePath = dbutils.fs.ls(tempConfigPath).last.path
         dbutils.fs.cp(filePath, configPath, true)
         dbutils.fs.rm(tempConfigPath, true)
-      } else {
+      } else if (configPath.contains("/")) { // delta path
+        println(s"Config source: delta path ${configPath}")
+        if (!Helpers.pathExists(configPath)) {
+          throw new BadConfigException("Unable to find config file in the given location:" + configPath)
+        }
         val configUpdateStatement =
           s"""
       update delta.`$configPath`
@@ -60,11 +65,22 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
       Where etl_database_name = '$sourceETLDB'
       """
         spark.sql(configUpdateStatement)
+      }else{ // delta table
+        println(s"Config source: delta table ${configPath}")
+        if (!spark.catalog.tableExists(configPath)) {
+          throw new BadConfigException("Unable to find Delta table" + configPath)
+        }
+        val configUpdateStatement =
+          s"""
+      update `$configPath`
+      set
+        storage_prefix = '$storage_prefix'
+      Where etl_database_name = '$sourceETLDB'
+      """
       }
     }catch {
       case e: Exception =>
-        println("Exception while reading config , please provide config csv path/config delta path/config delta table")
-        throw e
+        throw new BadConfigException("Exception while reading config , please provide config csv path/config delta path/config delta table")
     }
   }
 
