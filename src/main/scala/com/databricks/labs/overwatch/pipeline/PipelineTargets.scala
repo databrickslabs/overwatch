@@ -19,6 +19,17 @@ abstract class PipelineTargets(config: Config) {
       "writeOpsMetrics, lastOptimizedTS, Pipeline_SnapTS, primordialDateString").split(", ")
   )
 
+  val apiEventsTarget: PipelineTable = PipelineTable(
+    name = "pipeline_report",
+    _keys = Array("organization_id", "moduleId", "Overwatch_RunID"),
+    config = config,
+    partitionBy = Array("organization_id"),
+    incrementalColumns = Array("Pipeline_SnapTS"),
+    statsColumns = ("organization_id, workspace_name, moduleID, moduleName, runStartTS, runEndTS, " +
+      "fromTS, untilTS, status, " +
+      "writeOpsMetrics, lastOptimizedTS, Pipeline_SnapTS, primordialDateString").split(", ")
+  )
+
   lazy private[overwatch] val pipelineStateViewTarget: PipelineView = PipelineView(
     name = "pipReport",
     pipelineStateTarget,

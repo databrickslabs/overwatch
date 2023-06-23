@@ -162,6 +162,8 @@ trait ApiMeta {
    *
    * @param response
    */
+    //TOMES -- change name to enrichAPIResponse (or something)
+    //TOMES -- workspaceName and runID and snapTS will get added when we database.write api_events_bronze
   private[overwatch] def addTraceability(response: HttpResponse[String],jsonQuery: String): String = {
     /*The output json will look like below
           { rawResponse: {.......},

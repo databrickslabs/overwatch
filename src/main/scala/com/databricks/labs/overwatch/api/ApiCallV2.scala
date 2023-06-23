@@ -579,6 +579,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
+      // TOMES -- does jsonQuery hold all the meta we want? Don't forget ow run id
       _apiResponseArray.add(apiMeta.addTraceability(response,jsonQuery))//for GET request we have to convert queryMap to Json
     //  _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
@@ -632,6 +633,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeHelper(): this.type = {
       val response = getResponse
       responseCodeHandler(response)
+      // TOMES - why diff func here? Why not sending in jsonQuery?
       _apiResponseArray.add(addTraceabilityMeta(response))
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
@@ -788,6 +790,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       PipelineFunctions.writeMicroBatchToTempLocation(tmpErrorPath, apiErrorArray.toString)
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
+    //TOMES -- database.write
     tmpSuccessPath
   }
 

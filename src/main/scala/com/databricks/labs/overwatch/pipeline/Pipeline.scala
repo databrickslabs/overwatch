@@ -446,6 +446,13 @@ class Pipeline(
       logger.log(Level.WARN, readOnlyMsg)
     }
 
+    // if (isAPIDependent) createAPIDF(...)
+    // def createAPIDF {
+//    target.apiSuffix + "/" + pipelineSnapTime
+    apiEventsTarget
+    // database.writeWithRetry(enrichedAPIEvents, apiEventsTarget...)
+    // }
+
     val writeOpsMetrics = PipelineFunctions.getTargetWriteMetrics(spark, target, pipelineSnapTime, config.runID)
 
     val lastOptimizedTS: Long = PipelineFunctions.getLastOptimized(spark, target)

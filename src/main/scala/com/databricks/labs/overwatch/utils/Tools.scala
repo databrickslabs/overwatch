@@ -1066,6 +1066,7 @@ object Helpers extends SparkSessionWrapper {
    * Function to create the required final dataframe for traceability and persist it.
    * @param dataFrame
    */
+    // TOMES -- include error column in case catch
   def createTraceabilityDF(dataFrame: DataFrame)={
 
   }
