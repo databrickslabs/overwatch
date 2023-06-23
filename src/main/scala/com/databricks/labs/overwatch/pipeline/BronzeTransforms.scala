@@ -508,8 +508,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       //Code changes to get the raw response
       if (spark.read.json(tmpClusterEventsSuccessPath).columns.contains("events")) {
         try {
-          //Code changes to store the traceability DF
-          createTraceabilityDF(spark.read.json(tmpClusterEventsSuccessPath))
           val tdf = SchemaScrubber.scrubSchema(
             spark.read.json(tmpClusterEventsSuccessPath)
               .select(explode('events).alias("events"))
