@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.api
 
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.utils.JsonUtils.{createJsonFromString, mergeJson}
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -568,7 +569,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       false
     }
   }
-
+  
 
   /**
    * Performs api calls in parallel.
@@ -578,7 +579,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
-      _apiResponseArray.add(response.body)
+      _apiResponseArray.add(apiMeta.addTraceability(response,jsonQuery))//for GET request we have to convert queryMap to Json
+    //  _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
         accumulator.add(1)
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
@@ -630,7 +632,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeHelper(): this.type = {
       val response = getResponse
       responseCodeHandler(response)
-      _apiResponseArray.add(response.body)
+      _apiResponseArray.add(addTraceabilityMeta(response))
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)

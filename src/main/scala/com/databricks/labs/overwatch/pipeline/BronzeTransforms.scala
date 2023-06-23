@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
-import com.databricks.labs.overwatch.utils.Helpers.{getDatesGlob, removeTrailingSlashes}
+import com.databricks.labs.overwatch.utils.Helpers.{createTraceabilityDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -505,8 +505,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
+      //Code changes to get the raw response
       if (spark.read.json(tmpClusterEventsSuccessPath).columns.contains("events")) {
         try {
+          //Code changes to store the traceability DF
+          createTraceabilityDF(spark.read.json(tmpClusterEventsSuccessPath))
           val tdf = SchemaScrubber.scrubSchema(
             spark.read.json(tmpClusterEventsSuccessPath)
               .select(explode('events).alias("events"))

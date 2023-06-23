@@ -2,9 +2,10 @@ package com.databricks.labs.overwatch.api
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.ApiEnv
+import com.databricks.labs.overwatch.utils.JsonUtils.{createJsonFromString, mergeJson}
 import com.fasterxml.jackson.databind.JsonNode
 import org.apache.log4j.{Level, Logger}
-import scalaj.http.{Http, HttpRequest}
+import scalaj.http.{Http, HttpRequest, HttpResponse}
 
 /**
  * Configuration for each API.
@@ -154,6 +155,32 @@ trait ApiMeta {
     logger.log(Level.INFO, s"""Needs to be override for specific API for intializing Parallel API call function""")
     Map[String, String]()
   }
+
+
+  /**
+   * Method will add the meta to the json response
+   *
+   * @param response
+   */
+  private[overwatch] def addTraceability(response: HttpResponse[String],jsonQuery: String): String = {
+    /*The output json will look like below
+          { rawResponse: {.......},
+            apiTraceabilityMeta : {
+              batch_key_filter:{.....},
+              api_name:{.....},
+              response_code:{.....},
+            }
+          }
+         */
+    val rawJson = createJsonFromString("rawResponse", response.body)
+    val filterjson = createJsonFromString("batch_key_filter", jsonQuery)
+    val responseCodeJson = createJsonFromString("response_code", response.code.toString)
+    val endpointJson = createJsonFromString("end_point", apiName)
+    val metaJson = mergeJson(new Array[String](4)(rawJson, filterjson, responseCodeJson, endpointJson))
+    //More utilities to achieve the desired json
+    metaJson
+  }
+
 
 }
 
