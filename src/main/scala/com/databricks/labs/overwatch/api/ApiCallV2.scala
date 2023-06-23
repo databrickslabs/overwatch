@@ -571,6 +571,16 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
+  /**
+   * Function to create the required final dataframe for traceability and persist it.
+   *
+   * @param dataFrame
+   */
+  def createTraceabilityDF(dataFrame: DataFrame) = {
+    //Read from temp location if required and create a DF(cluster/events , sql/history)
+    //For other api calls spark.read.json(Seq(_apiResponseArray.toString).toDS())
+  }
+
 
   /**
    * Performs api calls in parallel.

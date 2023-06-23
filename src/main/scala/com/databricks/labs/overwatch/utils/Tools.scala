@@ -1062,13 +1062,6 @@ object Helpers extends SparkSessionWrapper {
     when(url.endsWith("/"), url.substr(lit(0), length(url) - 1)).otherwise(url)
   }
 
-  /**
-   * Function to create the required final dataframe for traceability and persist it.
-   * @param dataFrame
-   */
-  def createTraceabilityDF(dataFrame: DataFrame)={
-
-  }
 
 
 }
