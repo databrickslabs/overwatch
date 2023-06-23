@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.api
 
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.utils.Helpers.createTraceabilityDF
 import com.databricks.labs.overwatch.utils.JsonUtils.{createJsonFromString, mergeJson}
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -569,7 +570,17 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       false
     }
   }
-  
+
+  /**
+   * Function to create the required final dataframe for traceability and persist it.
+   *
+   * @param dataFrame
+   */
+  def createTraceabilityDF(dataFrame: DataFrame) = {
+    //Read from temp location if required and create a DF(cluster/events , sql/history)
+    //For other api calls spark.read.json(Seq(_apiResponseArray.toString).toDS())
+  }
+
 
   /**
    * Performs api calls in parallel.
@@ -595,7 +606,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      if (paginate(response.body)) executeThreadedHelper() else _apiResponseArray
+      if (paginate(response.body)) executeThreadedHelper() else {
+        createTraceabilityDF(spark.read.json(successTempPath.get))
+        _apiResponseArray
+      }
     }
     try {
       executeThreadedHelper()
@@ -634,7 +648,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       // TOMES - why diff func here? Why not sending in jsonQuery?
-      _apiResponseArray.add(addTraceabilityMeta(response))
+      _apiResponseArray.add(apiMeta.addTraceability(response,jsonQuery))
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
@@ -647,7 +661,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      if (paginate(response.body)) executeHelper() else this
+      if (paginate(response.body)) executeHelper() else {
+        createTraceabilityDF(spark.read.json(successTempPath.get))
+        this
+      }
     }
     try {
       executeHelper()
