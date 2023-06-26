@@ -117,8 +117,7 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("cluster_id", "from_epoch", "until_epoch", "Overwatch_RunID"),
       config,
       partitionBy = Seq("organization_id"),
-      incrementalColumns = Array("Pipeline_SnapTS")
-    )
+      incrementalColumns = Array("Pipeline_SnapTS"))
 
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
