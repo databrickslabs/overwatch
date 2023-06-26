@@ -579,15 +579,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
-  /**
-   * Function to create the required final dataframe for traceability and persist it.
-   *
-   * @param dataFrame
-   */
-  def createTraceabilityDF(dataFrame: DataFrame) = {
-    //Read from temp location if required and create a DF(cluster/events , sql/history)
-    //For other api calls spark.read.json(Seq(_apiResponseArray.toString).toDS())
-  }
 
 
   /**
@@ -614,10 +605,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      if (paginate(response.body)) executeThreadedHelper() else {
-        createTraceabilityDF(spark.read.json(successTempPath.get))
-        _apiResponseArray
-      }
+      if (paginate(response.body)) executeThreadedHelper() else _apiResponseArray
     }
     try {
       executeThreadedHelper()
@@ -669,10 +657,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      if (paginate(response.body)) executeHelper() else {
-        createTraceabilityDF(spark.read.json(successTempPath.get))
-        this
-      }
+      if (paginate(response.body)) executeHelper() else this
     }
     try {
       executeHelper()
