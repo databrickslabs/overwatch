@@ -428,8 +428,10 @@ class Pipeline(
   }
 
   //Get the dataframe from either tempDirectory or from the ResponseArray
-  private def getApiData(tempSuccessPath: Option[String], tempErrorPath: Option[String], apiResponseArray: Array[String]): DataFrame ={
+  private def getApiData(apiTempPath: Option[String]): DataFrame ={
      //Get the data from either tempDirectory or from the ResponseArray
+     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiTempPath.get}/success" + config.runID
+    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiTempPath.get}/error" + config.runID
     null
   }
 
@@ -447,7 +449,7 @@ class Pipeline(
   }
   //Persist the Api Data
   private def persistApiData(target: PipelineTable, module: Module): Unit = {
-      val apiDF  = getApiData(target.tempApiSuccessPath ,target.tempApiErrorPath , target.traceableApiData)
+      val apiDF  = getApiData(target.apiEndpoint)
       val finalDF = transformApiData(apiDF)
       database.writeWithRetry(finalDF, target, pipelineSnapTime.asColumnTS, Array[String](),Some(module.daysToProcess))
   }

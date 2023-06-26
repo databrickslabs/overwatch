@@ -27,9 +27,7 @@ abstract class PipelineTargets(config: Config) {
     incrementalColumns = Array("Pipeline_SnapTS"),
     statsColumns = ("organization_id, workspace_name, moduleID, moduleName, runStartTS, runEndTS, " +
       "fromTS, untilTS, status, " +
-      "writeOpsMetrics, lastOptimizedTS, Pipeline_SnapTS, primordialDateString").split(", "),
-    tempApiSuccessPath =  s"${config.tempWorkingDir}/clusterEventsBronze/success" + config.runID,
-    tempApiErrorPath =  s"${config.tempWorkingDir}/clusterEventsBronze/error" + config.runID
+      "writeOpsMetrics, lastOptimizedTS, Pipeline_SnapTS, primordialDateString").split(", ")
   )
 
   lazy private[overwatch] val pipelineStateViewTarget: PipelineView = PipelineView(
@@ -114,7 +112,8 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       incrementalColumns = Array("timestamp"),
       statsColumns = "cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID".split(", "),
-      masterSchema = Some(Schema.clusterEventsMinimumSchema)
+      masterSchema = Some(Schema.clusterEventsMinimumSchema),
+      apiEndpoint = Some("cluster_events")
     )
 
     lazy private[overwatch] val clusterEventsErrorsTarget: PipelineTable = PipelineTable(
@@ -122,7 +121,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("cluster_id", "from_epoch", "until_epoch", "Overwatch_RunID"),
       config,
       partitionBy = Seq("organization_id"),
-      incrementalColumns = Array("Pipeline_SnapTS"))
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      apiEndpoint = Some("cluster_events_error"))
 
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",

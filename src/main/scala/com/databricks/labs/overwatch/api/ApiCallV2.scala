@@ -530,7 +530,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
     }
 
-   val baseDF = if (emptyDFCheck(apiResultDF)) {
+  if (emptyDFCheck(apiResultDF)) {
       val errMsg =
         s"""API CALL Resulting DF is empty BUT no errors detected, progressing module.
            |Details Below:\n$buildGenericErrorMessage""".stripMargin
@@ -539,15 +539,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }else {
       extrapolateSupportedStructure(apiResultDF)
     }
-    removeEnrichMent(baseDF)
   }
 
-  //asDF method should remove the enrichment fields which got added previously.
-  //It should return only the raw response
-  private def removeEnrichMent(dataFrame: DataFrame): DataFrame = {
-    //Remove the traceability info from the DataFrame
-    null
-  }
 
   private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
     val mapper = new ObjectMapper()
@@ -661,7 +654,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
     try {
       executeHelper()
-      if (!apiMeta.storeInTempLocation) // persistEnriched
+      if (!apiMeta.storeInTempLocation) {
+        //write to temp success location for success
+        //write to temp error location for error
+      }
+      this// persistEnriched
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"

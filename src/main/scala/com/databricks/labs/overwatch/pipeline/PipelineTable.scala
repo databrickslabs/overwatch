@@ -43,10 +43,7 @@ case class PipelineTable(
                           isTemp: Boolean = false,
                           checkpointPath: Option[String] = None,
                           masterSchema: Option[StructType] = None,
-                          apiEndpoint: Option[String] = None, // clusterlist CASE SENSITIVE
-//                          tempApiSuccessPath: Option[String] = None,
-//                          tempApiErrorPath: Option[String] = None,
-//                          traceableApiData: Array[String] = Array()
+                          apiEndpoint: Option[String] = None // clusterlist CASE SENSITIVE
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
