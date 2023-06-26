@@ -5,6 +5,7 @@ import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
+import com.databricks.labs.overwatch.utils.Helpers.{ deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.Helpers.{getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
@@ -487,6 +488,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 startTime: TimeTypes,
                                 endTime: TimeTypes,
                                 apiEnv: ApiEnv,
+                                pipelineSnapTime: Long,
                                 tmpClusterEventsSuccessPath: String,
                                 tmpClusterEventsErrorPath: String,
                                 config: Config) = {
@@ -511,17 +513,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // calling function to make parallel API calls
     val apiCallV2Obj = new ApiCallV2(config.apiEnv)
-    apiCallV2Obj.makeParallelApiCalls(clusterEventsEndpoint, jsonInput, config)
+    apiCallV2Obj.makeParallelApiCalls(clusterEventsEndpoint, jsonInput, pipelineSnapTime, config)
     logger.log(Level.INFO, " Cluster event landing completed")
   }
 
   private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
-      if (spark.read.json(tmpClusterEventsSuccessPath).columns.contains("events")) {
+        val baseDF = spark.read.json(tmpClusterEventsSuccessPath)
+        val rawDf = deriveRawApiResponseDF(baseDF)
+      println("count for rawDF"+rawDf.count())
+      if (rawDf.columns.contains("events")) {
         try {
           val tdf = SchemaScrubber.scrubSchema(
-            spark.read.json(tmpClusterEventsSuccessPath)
+            rawDf
               .select(explode('events).alias("events"))
               .select(col("events.*"))
           ).scrubSchema
@@ -576,7 +581,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       organizationId: String,
                                       database: Database,
                                       erroredBronzeEventsTarget: PipelineTable,
-                                      config: Config
+                                      config: Config,
+                                      apiEndpointTempDir: String
                                     )(clusterSnapshotDF: DataFrame): DataFrame = {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
@@ -589,14 +595,18 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val processingStartTime = System.currentTimeMillis();
     logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
-    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/clusterEventsBronze/success" + apiEnv.runID
-    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/clusterEventsBronze/error" + apiEnv.runID
 
-    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath,
+
+    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
+    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
+
+    println("landing data in"+tmpClusterEventsSuccessPath)
+
+    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
       tmpClusterEventsErrorPath, config)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
-        spark.read.json(tmpClusterEventsErrorPath)
+        deriveRawApiResponseDF(spark.read.json(tmpClusterEventsErrorPath))
           .withColumn("from_ts", toTS(col("from_epoch")))
           .withColumn("until_ts", toTS(col("until_epoch"))),
         database,
@@ -611,6 +621,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     spark.conf.set("spark.sql.caseSensitive", "false")
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
+    println("total cluster events df:"+clusterEventDf.count())
     clusterEventDf
   }
 

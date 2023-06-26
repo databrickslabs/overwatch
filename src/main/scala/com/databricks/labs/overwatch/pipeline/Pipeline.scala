@@ -3,11 +3,14 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
+import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveApiTempErrDir}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+
+import java.util
 
 //import io.delta.tables._
 
@@ -384,6 +387,7 @@ class Pipeline(
     // cleanse the temp dir
     // if failure doesn't allow pipeline to get here, temp dir will be cleansed on workspace init
     if (!config.externalizeOptimize) postProcessor.optimize(this, Pipeline.OPTIMIZESCALINGCOEF)
+    println(config.tempWorkingDir+" config.tempWorkingDir")
     Helpers.fastrm(Array(config.tempWorkingDir))
     dbutils.fs.rm(config.tempWorkingDir)
 
@@ -425,8 +429,19 @@ class Pipeline(
     Helpers.getDatesGlob(startDate.toLocalDate, untilTime.asLocalDateTime.plusDays(1).toLocalDate)
   }
 
+  //Get the dataframe from either tempDirectory or from the ResponseArray
+  private def getTempApiData(apiTempPath: String): DataFrame ={
+     //Get the data from either tempDirectory or from the ResponseArray
+     val apiTempDir =  s"${config.tempWorkingDir}/${apiTempPath}/success_" + pipelineSnapTime.asUnixTimeMilli
+    ???
+  }
+
+
+
+
+
+
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
-//    val startTime = System.currentTimeMillis()
 
     val finalDF = PipelineFunctions.optimizeDFForWrite(df, target)
 

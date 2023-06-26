@@ -1,9 +1,11 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveApiTempErrDir, pathExists}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions.{col, lit}
 
 import java.time.Duration
 import scala.util.parsing.json.JSON.number
@@ -423,9 +425,59 @@ class Module(
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     } finally {
+      println("traceapi: "+spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean)
+      if(spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean)
+        {
+          persistApiEvents
+        }
       spark.catalog.clearCache()
     }
 
+  }
+
+  private def persistApiEvents(): Unit = {
+    //call getTempApiData and get the data then persist it
+    try {
+      val successPath = deriveApiTempDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
+      if (pathExists(successPath)) {
+        println("successPath" + successPath)
+        val rawTraceDF = spark.read.json(successPath)
+        rawTraceDF.columns.foreach(println)
+
+        val rawStructDF = rawTraceDF
+          .select("apiTraceabilityMeta.*", "rawResponse")
+        val batchKeyFilterOverride = if (rawStructDF.columns.contains("batchKeyFilter")) {
+          col("batchKeyFilter")
+        } else {
+          lit("")
+        }
+
+        val finalDF = rawStructDF
+          .withColumn("batchKeyFilter", batchKeyFilterOverride)
+          .withColumn("data", col("rawResponse").cast("binary"))
+          .select("end_point","type", "batchKeyFilter", "responseCode", "data")
+          .withColumn("moduleId", lit(moduleId))
+          .withColumn("moduleName", lit(moduleName))
+          .withColumn("organization_id", lit(config.organizationId))
+          .withColumn("Pipeline_SnapTS", lit(pipeline.pipelineSnapTime.asUnixTimeMilli))
+          .withColumn("Overwatch_RunID", lit(config.runID))
+
+        val optimizeDF = PipelineFunctions.optimizeDFForWrite(finalDF,  pipeline.apiEventsTarget)
+        pipeline.database.writeWithRetry(optimizeDF, pipeline.apiEventsTarget, pipeline.pipelineSnapTime.asColumnTS)
+
+        println("trace writing completed for " + moduleName)
+      /*  if (target.apiEndpointTempDir.get.toLowerCase().equals("cluster_events")) { // for cluster/events api we store the failed events in another directory
+          val tmpClusterEventsErrorPath = deriveApiTempErrDir(config.tempWorkingDir, BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get, pipelineSnapTime)
+          println("in tmpClusterEventsErrorPath method" + tmpClusterEventsErrorPath)
+        }
+*/
+
+      }
+    } catch {
+      case e: Throwable =>
+        println("got exception while writing" + e.getMessage)
+        e.getMessage
+    }
   }
 
 

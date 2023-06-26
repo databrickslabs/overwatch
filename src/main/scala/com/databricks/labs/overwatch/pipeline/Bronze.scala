@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
+import com.databricks.labs.overwatch.utils.Helpers.deriveApiTempDir
 import com.databricks.labs.overwatch.utils.{CloneDetail, Config, Helpers, OverwatchScope}
 import org.apache.log4j.{Level, Logger}
 
@@ -109,7 +110,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getJobsDF,
+        workspace.getJobsDF(deriveApiTempDir(config.tempWorkingDir,jobsSnapshotModule.moduleName,pipelineSnapTime)),
         Seq(cleanseRawJobsSnapDF(BronzeTargets.jobsSnapshotTarget.keys, config.runID)),
         append(BronzeTargets.jobsSnapshotTarget)
       )
@@ -119,7 +120,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClustersAPIProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getClustersDF,
+        workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir,clustersSnapshotModule.moduleName,pipelineSnapTime)),
         Seq(cleanseRawClusterSnapDF),
         append(BronzeTargets.clustersSnapshotTarget)
       )
@@ -129,7 +130,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendPoolsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getPoolsDF,
+        workspace.getPoolsDF(deriveApiTempDir(config.tempWorkingDir,poolsSnapshotModule.moduleName,pipelineSnapTime)),
         Seq(cleanseRawPoolsDF()),
         append(BronzeTargets.poolsSnapshotTarget)
       )
@@ -167,7 +168,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
             config.organizationId,
             database,
             BronzeTargets.clusterEventsErrorsTarget,
-            config
+            config,
+            clusterEventLogsModule.moduleName
           )
         ),
         append(BronzeTargets.clusterEventsTarget)
@@ -220,7 +222,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendLibsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getClusterLibraries,
+        workspace.getClusterLibraries(deriveApiTempDir(config.tempWorkingDir,libsSnapshotModule.moduleName,pipelineSnapTime)),
         append(BronzeTargets.libsSnapshotTarget)
       )
   }
@@ -229,7 +231,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendPoliciesProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getClusterPolicies,
+        workspace.getClusterPolicies(deriveApiTempDir(config.tempWorkingDir,policiesSnapshotModule.moduleName,pipelineSnapTime)),
         append(BronzeTargets.policiesSnapshotTarget)
       )
   }
@@ -238,7 +240,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendInstanceProfileProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getProfilesDF,
+        workspace.getProfilesDF(deriveApiTempDir(config.tempWorkingDir,instanceProfileSnapshotModule.moduleName,pipelineSnapTime)),
         append(BronzeTargets.instanceProfilesSnapshotTarget)
       )
   }
@@ -247,7 +249,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendTokenProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getTokens,
+        workspace.getTokens(deriveApiTempDir(config.tempWorkingDir,tokenSnapshotModule.moduleName,pipelineSnapTime)),
         append(BronzeTargets.tokensSnapshotTarget)
       )
   }
@@ -256,7 +258,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendGlobalInitScProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getGlobalInitScripts,
+        workspace.getGlobalInitScripts(deriveApiTempDir(config.tempWorkingDir,globalInitScSnapshotModule.moduleName,pipelineSnapTime)),
         append(BronzeTargets.globalInitScSnapshotTarget)
       )
   }
@@ -265,7 +267,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobRunsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getJobRunsDF(jobRunsSnapshotModule.fromTime, jobRunsSnapshotModule.untilTime),
+        workspace.getJobRunsDF(jobRunsSnapshotModule.fromTime, jobRunsSnapshotModule.untilTime,deriveApiTempDir(config.tempWorkingDir,jobRunsSnapshotModule.moduleName,pipelineSnapTime)),
         Seq(cleanseRawJobRunsSnapDF(BronzeTargets.jobRunsSnapshotTarget.keys, config.runID)),
         append(BronzeTargets.jobRunsSnapshotTarget)
       )
