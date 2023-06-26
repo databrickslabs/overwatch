@@ -530,7 +530,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
     }
 
-    if (emptyDFCheck(apiResultDF)) {
+   val baseDF = if (emptyDFCheck(apiResultDF)) {
       val errMsg =
         s"""API CALL Resulting DF is empty BUT no errors detected, progressing module.
            |Details Below:\n$buildGenericErrorMessage""".stripMargin
@@ -539,6 +539,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }else {
       extrapolateSupportedStructure(apiResultDF)
     }
+    removeEnrichMent(baseDF)
+  }
+
+  //asDF method should remove the enrichment fields which got added previously.
+  //It should return only the raw response
+  private def removeEnrichMent(dataFrame: DataFrame): DataFrame = {
+    //Remove the traceability info from the DataFrame
+    null
   }
 
   private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
@@ -591,7 +599,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       // TOMES -- does jsonQuery hold all the meta we want? Don't forget ow run id
-      _apiResponseArray.add(apiMeta.addTraceability(response,jsonQuery))//for GET request we have to convert queryMap to Json
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery))//for GET request we have to convert queryMap to Json
     //  _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
         accumulator.add(1)
@@ -648,7 +656,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       // TOMES - why diff func here? Why not sending in jsonQuery?
-      _apiResponseArray.add(apiMeta.addTraceability(response,jsonQuery))
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery))
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)

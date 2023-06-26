@@ -160,7 +160,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
             config.organizationId,
             database,
             BronzeTargets.clusterEventsErrorsTarget,
-            config
+            config,
+            apiEventsTarget
           )
         ),
         append(BronzeTargets.clusterEventsTarget)

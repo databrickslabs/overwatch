@@ -27,7 +27,9 @@ abstract class PipelineTargets(config: Config) {
     incrementalColumns = Array("Pipeline_SnapTS"),
     statsColumns = ("organization_id, workspace_name, moduleID, moduleName, runStartTS, runEndTS, " +
       "fromTS, untilTS, status, " +
-      "writeOpsMetrics, lastOptimizedTS, Pipeline_SnapTS, primordialDateString").split(", ")
+      "writeOpsMetrics, lastOptimizedTS, Pipeline_SnapTS, primordialDateString").split(", "),
+    tempApiSuccessPath =  s"${config.tempWorkingDir}/clusterEventsBronze/success" + config.runID,
+    tempApiErrorPath =  s"${config.tempWorkingDir}/clusterEventsBronze/error" + config.runID
   )
 
   lazy private[overwatch] val pipelineStateViewTarget: PipelineView = PipelineView(

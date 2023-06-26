@@ -9,6 +9,8 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
+import java.util
+
 //import io.delta.tables._
 
 import java.text.SimpleDateFormat
@@ -425,6 +427,31 @@ class Pipeline(
     Helpers.getDatesGlob(startDate.toLocalDate, untilTime.asLocalDateTime.plusDays(1).toLocalDate)
   }
 
+  //Get the dataframe from either tempDirectory or from the ResponseArray
+  private def getApiData(tempSuccessPath: Option[String], tempErrorPath: Option[String], apiResponseArray: Array[String]): DataFrame ={
+     //Get the data from either tempDirectory or from the ResponseArray
+    null
+  }
+
+  //Add moduleID to the dataframe
+  private def addModuleID(apiDF: DataFrame):DataFrame = {
+    null
+  }
+
+  //Transform the api data
+  // convert responses to binary
+  // add moduleID to the DF
+  private def transformApiData(apiDF: DataFrame):DataFrame = {
+    addModuleID(apiDF)
+    //convert responses to binary
+  }
+  //Persist the Api Data
+  private def persistApiData(target: PipelineTable, module: Module): Unit = {
+      val apiDF  = getApiData(target.tempApiSuccessPath ,target.tempApiErrorPath , target.traceableApiData)
+      val finalDF = transformApiData(apiDF)
+      database.writeWithRetry(finalDF, target, pipelineSnapTime.asColumnTS, Array[String](),Some(module.daysToProcess))
+  }
+
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
 //    val startTime = System.currentTimeMillis()
 
@@ -446,6 +473,8 @@ class Pipeline(
       logger.log(Level.WARN, readOnlyMsg)
     }
 
+    //Persisting API data
+    persistApiData(apiEventsTarget,module)
     // if (isAPIDependent) createAPIDF(...)
     // def createAPIDF {
 //    target.apiSuffix + "/" + pipelineSnapTime

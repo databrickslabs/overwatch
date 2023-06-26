@@ -568,7 +568,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       organizationId: String,
                                       database: Database,
                                       erroredBronzeEventsTarget: PipelineTable,
-                                      config: Config
+                                      config: Config,
+                                      apiEventsTarget: PipelineTable
                                     )(clusterSnapshotDF: DataFrame): DataFrame = {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
@@ -581,8 +582,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val processingStartTime = System.currentTimeMillis();
     logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
-    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/clusterEventsBronze/success" + apiEnv.runID
-    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/clusterEventsBronze/error" + apiEnv.runID
+
+
+    //get the temp working directory from apiEventsTarget
+    val tmpClusterEventsSuccessPath = apiEventsTarget.tempApiSuccessPath.get //s"${config.tempWorkingDir}/clusterEventsBronze/success" + apiEnv.runID
+    val tmpClusterEventsErrorPath = apiEventsTarget.tempApiErrorPath.get //s"${config.tempWorkingDir}/clusterEventsBronze/error" + apiEnv.runID
 
     landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath,
       tmpClusterEventsErrorPath, config)
