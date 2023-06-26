@@ -661,6 +661,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
     try {
       executeHelper()
+      if (!apiMeta.storeInTempLocation) // persistEnriched
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
@@ -691,12 +692,18 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @param config
    * @return
    */
-  def makeParallelApiCalls(endpoint: String, jsonInput: Map[String, String], config: Config): String = {
-    val tempEndpointLocation = endpoint.replaceAll("/","")
+  def makeParallelApiCalls(
+                            endpoint: String,
+                            jsonInput: Map[String, String],
+                            pipelineSnapTime: Long,
+                            config: Config
+                          ): String = {
+    val tempEndpointLocation = endpoint.replaceAll("/","_")
     val acc = sc.longAccumulator(tempEndpointLocation)
 
     val tmpSuccessPath = if(jsonInput.contains("tmp_success_path")) jsonInput.get("tmp_success_path").get
-    else s"${config.tempWorkingDir}/${tempEndpointLocation}/${System.currentTimeMillis()}"
+//    else s"${config.tempWorkingDir}/${tempEndpointLocation}/${System.currentTimeMillis()}" NO DOESNT WORK
+      else s"${config.tempWorkingDir}/${tempEndpointLocation}/${pipelineSnapTime}"
 
     val tmpErrorPath = if(jsonInput.contains("tmp_error_path")) jsonInput.get("tmp_error_path").get
     else s"${config.tempWorkingDir}/errors/${tempEndpointLocation}/${System.currentTimeMillis()}"

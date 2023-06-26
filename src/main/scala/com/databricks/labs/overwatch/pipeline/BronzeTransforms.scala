@@ -476,6 +476,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 startTime: TimeTypes,
                                 endTime: TimeTypes,
                                 apiEnv: ApiEnv,
+                                pipelineSnapTime: Long,
                                 tmpClusterEventsSuccessPath: String,
                                 tmpClusterEventsErrorPath: String,
                                 config: Config) = {
@@ -498,7 +499,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     // calling function to make parallel API calls
     val apiCallV2Obj = new ApiCallV2(config.apiEnv)
-    apiCallV2Obj.makeParallelApiCalls(clusterEventsEndpoint, jsonInput, config)
+    apiCallV2Obj.makeParallelApiCalls(clusterEventsEndpoint, jsonInput, pipelineSnapTime, config)
     logger.log(Level.INFO, " Cluster event landing completed")
   }
 
@@ -588,7 +589,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val tmpClusterEventsSuccessPath = apiEventsTarget.tempApiSuccessPath.get //s"${config.tempWorkingDir}/clusterEventsBronze/success" + apiEnv.runID
     val tmpClusterEventsErrorPath = apiEventsTarget.tempApiErrorPath.get //s"${config.tempWorkingDir}/clusterEventsBronze/error" + apiEnv.runID
 
-    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, tmpClusterEventsSuccessPath,
+    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
       tmpClusterEventsErrorPath, config)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(

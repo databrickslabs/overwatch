@@ -20,7 +20,7 @@ abstract class PipelineTargets(config: Config) {
   )
 
   val apiEventsTarget: PipelineTable = PipelineTable(
-    name = "pipeline_report",
+    name = "api_events_meta",
     _keys = Array("organization_id", "moduleId", "Overwatch_RunID"),
     config = config,
     partitionBy = Array("organization_id"),
@@ -62,7 +62,8 @@ abstract class PipelineTargets(config: Config) {
       statsColumns = ("organization_id, cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
         "start_time, terminated_time, Overwatch_RunID").split(", "),
       partitionBy = Seq("organization_id"),
-      masterSchema = Some(Schema.clusterSnapMinimumSchema)
+      masterSchema = Some(Schema.clusterSnapMinimumSchema),
+      apiEndpoint = Some("clusters_list")
     )
 
     lazy private[overwatch] val poolsSnapshotTarget: PipelineTable = PipelineTable(
