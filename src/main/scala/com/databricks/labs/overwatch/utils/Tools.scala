@@ -1030,11 +1030,11 @@ object Helpers extends SparkSessionWrapper {
   }
 
   /**
-   * Creates the missing tables for Bronze,Silver and Gold.
+   * Registers the missing tables for Bronze,Silver and Gold into the metastore.
    * @param workspace
    */
   def registerMissingTargets(workspace: Workspace): Unit = {
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(4))
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(12))
     val bronze = Bronze(workspace)
     val silver = Silver(workspace)
     val gold = Gold(workspace)
