@@ -27,18 +27,66 @@ class Database(config: Config) extends SparkSessionWrapper {
   }
 
   /**
-   * register an Overwatch target table in the configured Overwatch deployment
+   * Checks if the table has optimizeWrite enabled.
+   *
+   * @param target
+   * @return
+   */
+  private def checkAutoOptimizeWrite(target: PipelineTable): Boolean = {
+    import spark.implicits._
+    spark.sql(s"""describe detail '${target.tableLocation}'""")
+      .select("properties").as[Map[String, String]].collect()
+      .headOption.getOrElse(throw new Exception(s"Unable to find properties for ${target.tableLocation}"))
+      .getOrElse("delta.autoOptimize.optimizeWrite", "false")
+      .toBoolean
+  }
+
+  /**
+   * It will create the table as it was previously created
+   * then check whether it has autoOptimize enabled or not.
+   * If AutoOptimize is enabled for the target table but it is not set to true in TBLPROPERTIES
+   * then alter the table and set the correct property of autoOptimizeWrite.
+   *
+   * @param target
+   */
+  private def createTableWithAutoOptimizeWrite(target: PipelineTable): Unit = {
+    val targetPropertiesAccurate = checkAutoOptimizeWrite(target)
+    val createStatement = s"create table if not exists ${target.tableFullName} " +
+      s"USING DELTA location '${target.tableLocation}' " +
+      s"TBLPROPERTIES (delta.autoOptimize.optimizeWrite = ${targetPropertiesAccurate.toString},delta.autoOptimize.autoCompact=false)"
+    val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
+    logger.log(Level.INFO, logMessage)
+    if (config.debugFlag) println(logMessage)
+    spark.sql(createStatement) //Creating the table as it was previously created.
+    if (!targetPropertiesAccurate) {
+      val alterStatement = s"""alter table ${target.tableFullName} set TBLPROPERTIES (delta.autoOptimize.optimizeWrite = true)"""
+      logger.log(Level.INFO, alterStatement)
+      if (config.debugFlag) println(alterStatement)
+      spark.sql(alterStatement) //Turning autoOptimize for the table.
+    }
+  }
+
+  /**
+   * register an Overwatch target table in the configured Overwatch deployment.
+   * As of release 0.7.2.1 : When the tables are dropped ,it will create the table as it was previously created
+   * then check whether it has autoOptimize enabled or not.
+   * If AutoOptimize is enabled for the target table but it is not set to true in TBLPROPERTIES
+   * then alter the table and set the correct property of autoOptimizeWrite.
    *
    * @param target Pipeline table (i.e. target) as per the Overwatch deployed config
    */
   def registerTarget(target: PipelineTable): Unit = {
     if (!target.exists(catalogValidation = true) && target.exists(pathValidation = true)) {
-      val createStatement = s"create table if not exists ${target.tableFullName} " +
-        s"USING DELTA location '${target.tableLocation}'"
-      val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
-      logger.log(Level.INFO, logMessage)
-      if (config.debugFlag) println(logMessage)
-      spark.sql(createStatement)
+      if (target.autoOptimize) {//Checks if the target table should be autoOptimize or not.
+        createTableWithAutoOptimizeWrite(target)
+      } else { // target is not auto optimize
+        val createStatement = s"create table if not exists ${target.tableFullName} " +
+          s"USING DELTA location '${target.tableLocation}'"
+        val logMessage = s"CREATING TABLE: ${target.tableFullName} at ${target.tableLocation}\n$createStatement\n\n"
+        logger.log(Level.INFO, logMessage)
+        if (config.debugFlag) println(logMessage)
+        spark.sql(createStatement)
+      }
     }
   }
 

@@ -1029,4 +1029,24 @@ object Helpers extends SparkSessionWrapper {
     when(url.endsWith("/"), url.substr(lit(0), length(url) - 1)).otherwise(url)
   }
 
+  /**
+   * Registers the missing tables for Bronze,Silver and Gold into the metastore.
+   * @param workspace
+   */
+  def registerMissingTargets(workspace: Workspace): Unit = {
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(12))
+    val bronze = Bronze(workspace)
+    val silver = Silver(workspace)
+    val gold = Gold(workspace)
+    val db = bronze.database
+    val targets = (bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget).filter(_.exists(dataValidation = true, catalogValidation = false)).par
+    targets.tasksupport = taskSupport
+    targets.foreach(t => {
+      try {
+        db.registerTarget(t)
+      } catch {
+        case e: Throwable => println(s"FAILED: ${t.tableFullName}", e)
+      }
+    })
+  }
 }
