@@ -27,6 +27,21 @@ class Database(config: Config) extends SparkSessionWrapper {
   }
 
   /**
+   * Checks if the table has optimizeWrite enabled.
+   *
+   * @param target
+   * @return
+   */
+  private def checkAutoOptimizeWrite(target: PipelineTable): Boolean = {
+    import spark.implicits._
+    spark.sql(s"""describe detail '${target.tableLocation}'""")
+      .select("properties").as[Map[String, String]].collect()
+      .headOption.getOrElse(throw new Exception(s"Unable to find properties for ${target.tableLocation}"))
+      .getOrElse("delta.autoOptimize.optimizeWrite", "false")
+      .toBoolean
+  }
+
+  /**
    * It will create the table as it was previously created
    * then check whether it has autoOptimize enabled or not.
    * If AutoOptimize is enabled for the target table but it is not set to true in TBLPROPERTIES
@@ -49,20 +64,6 @@ class Database(config: Config) extends SparkSessionWrapper {
       if (config.debugFlag) println(alterStatement)
       spark.sql(alterStatement) //Turning autoOptimize for the table.
     }
-  }
-
-  /**
-   * Checks if the table has optimizeWrite enabled.
-   * @param target
-   * @return
-   */
-  private def checkAutoOptimizeWrite(target: PipelineTable): Boolean = {
-    import spark.implicits._
-    spark.sql(s"""describe detail '${target.tableLocation}'""")
-      .select("properties").as[Map[String, String]].collect()
-      .headOption.getOrElse(throw new Exception(s"Unable to find properties for ${target.tableLocation}"))
-      .getOrElse("delta.autoOptimize.optimizeWrite", "false")
-      .toBoolean
   }
 
   /**
