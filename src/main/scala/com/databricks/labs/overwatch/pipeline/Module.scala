@@ -407,7 +407,7 @@ class Module(
         noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
       case e: Throwable =>
         val failMsg = PipelineFunctions.appendStackStrace(e)
-        val msg = s"FAILED: $moduleId-$moduleName Module: API CALL Failed\n$failMsg"
+        val msg = s"FAILED: $moduleId-$moduleName Module: Failed\n$failMsg"
         println(msg)
         logger.log(Level.ERROR, msg, e)
         fail(msg)
