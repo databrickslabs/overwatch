@@ -1067,7 +1067,7 @@ object Helpers extends SparkSessionWrapper {
    * @param dataFrame
    */
     // TOMES -- include error column in case catch
-  def createTraceabilityDF(dataFrame: DataFrame)={
+  def deriveRawApiResponseDF(dataFrame: DataFrame)={
 
   }
 

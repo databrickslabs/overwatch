@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
-import com.databricks.labs.overwatch.utils.Helpers.{createTraceabilityDF, getDatesGlob, removeTrailingSlashes}
+import com.databricks.labs.overwatch.utils.Helpers.{createTraceabilityDF, deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -506,13 +506,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
-      //Code changes to get the raw response
+        deriveRawApiResponseDF(spark.read.json(tmpClusterEventsSuccessPath))
       if (spark.read.json(tmpClusterEventsSuccessPath).columns.contains("events")) {
         try {
-          //Code changes to store the traceability DF
-          // TOMES - need to see how this makes it's way to target
-          // TOMES -- add pipeline_target
-          createTraceabilityDF(spark.read.json(tmpClusterEventsSuccessPath))
+
           val tdf = SchemaScrubber.scrubSchema(
             spark.read.json(tmpClusterEventsSuccessPath)
               .select(explode('events).alias("events"))
@@ -569,8 +566,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       organizationId: String,
                                       database: Database,
                                       erroredBronzeEventsTarget: PipelineTable,
-                                      config: Config,
-                                      apiEndPoint: String
+                                      config: Config
                                     )(clusterSnapshotDF: DataFrame): DataFrame = {
 
     val clusterIDs = getClusterIdsWithNewEvents(filteredAuditLogDF, clusterSnapshotDF)
@@ -585,8 +581,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
 
 
-    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndPoint}/success" + apiEnv.runID
-    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndPoint}/error" + apiEnv.runID
+    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/cluster_events/success_" + apiEnv.runID
+    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/cluster_events/error_" + apiEnv.runID
 
     landClusterEvents(clusterIDs, startTime, endTime, apiEnv, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
       tmpClusterEventsErrorPath, config)

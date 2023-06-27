@@ -658,7 +658,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         //write to temp success location for success
         //write to temp error location for error
       }
-      this// persistEnriched
+      this
     } catch {
       case e: java.lang.NoClassDefFoundError => {
         val excMsg = "DEPENDENCY MISSING: scalaj. Ensure that the proper scalaj library is attached to your cluster"
@@ -804,7 +804,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       PipelineFunctions.writeMicroBatchToTempLocation(tmpErrorPath, apiErrorArray.toString)
       apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     }
-    //TOMES -- database.write
     tmpSuccessPath
   }
 

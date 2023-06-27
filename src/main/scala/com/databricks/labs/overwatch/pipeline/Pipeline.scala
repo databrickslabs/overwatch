@@ -428,30 +428,19 @@ class Pipeline(
   }
 
   //Get the dataframe from either tempDirectory or from the ResponseArray
-  private def getApiData(apiTempPath: Option[String]): DataFrame ={
+  private def getApiData(apiTempPath: String): DataFrame ={
      //Get the data from either tempDirectory or from the ResponseArray
-     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiTempPath.get}/success" + config.runID
-    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiTempPath.get}/error" + config.runID
+     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiTempPath}/success_" + config.runID
+    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiTempPath}/error_" + config.runID
     null
   }
 
-  //Add moduleID to the dataframe
-  private def addModuleID(apiDF: DataFrame):DataFrame = {
-    null
-  }
 
-  //Transform the api data
-  // convert responses to binary
-  // add moduleID to the DF
-  private def transformApiData(apiDF: DataFrame):DataFrame = {
-    addModuleID(apiDF)
-    //convert responses to binary
-  }
+
   //Persist the Api Data
   private def persistApiData(target: PipelineTable, module: Module): Unit = {
-      val apiDF  = getApiData(target.apiEndpoint)
-      val finalDF = transformApiData(apiDF)
-      database.writeWithRetry(finalDF, target, pipelineSnapTime.asColumnTS, Array[String](),Some(module.daysToProcess))
+      //create the DF from temp dir and persist it
+     // database.writeWithRetry(finalDF, target, pipelineSnapTime.asColumnTS, Array[String](),Some(module.daysToProcess))
   }
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
