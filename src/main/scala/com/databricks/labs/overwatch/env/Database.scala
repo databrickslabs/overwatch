@@ -341,8 +341,13 @@ class Database(config: Config) extends SparkSessionWrapper {
    *                           concurrency locking.
    * @return
    */
-  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array(),
-            preWritesPerformed: Boolean = false): Unit = {
+  def write(
+             df: DataFrame,
+             target: PipelineTable,
+             pipelineSnapTime: Column,
+             maxMergeScanDates: Array[String] = Array(),
+             preWritesPerformed: Boolean = false
+           ): Unit = {
 
     // append metadata to source DF and cleanse as necessary
     val finalDF = if (!preWritesPerformed) {
@@ -460,7 +465,7 @@ class Database(config: Config) extends SparkSessionWrapper {
    * @param daysToProcess
    * @return
    */
-  def ifCachedNeeded(target: PipelineTable, daysToProcess: Option[Int] = None): Boolean = {
+  def preWriteCacheRequired(target: PipelineTable, daysToProcess: Option[Int] = None): Boolean = {
     daysToProcess.getOrElse(1000) < 5 &&   // this can be inside a function
       !target.autoOptimize &&
       !SparkSessionWrapper.parSessionsOn &&
@@ -489,7 +494,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     //  when in parallel disable cache because it will always use persistAndLoad to reduce table lock times.
     //  persist and load will all be able to happen in parallel to temp location and use a simple read/write to
     //  merge into target rather than locking the target for the entire time all the transforms are being executed.
-    val needsCache = ifCachedNeeded(target, daysToProcess)
+    val needsCache = preWriteCacheRequired(target, daysToProcess)
     logger.log(Level.INFO, s"PRE-CACHING TARGET ${target.tableFullName} ENABLED: $needsCache")
 
     val inputDf = if (needsCache) {
