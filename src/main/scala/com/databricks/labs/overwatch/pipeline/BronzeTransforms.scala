@@ -950,19 +950,22 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   /**
-   *
-   * @param cloudProvider
-   * @param inputCol
-   * @param isMultiWorkSpaceDeployment
+   * Create cluster_log path based on the cloud provider passed. For GCP, it will create the cluster log path based on the
+   * default GCS bucket created during workspace deployment (databricks-organisation-id). This GCS bucket will contains
+   * clusters logs for that workspace. For AWS and Azure cloud, input column will pe passed as it is.
+   * @param cloudProvider  Its value can be AWS, Azure or GCP
+   * @param inputCol Input column contains the default dbfs/mounted cluster log path.
+   * @param isMultiWorkSpaceDeployment Flag specifying if it is a multi workspace deployment.
    * @param organisationId
    * @return
    */
   private def fetchClusterLogConfiguration(cloudProvider: String, inputCol: Column,
                                    isMultiWorkSpaceDeployment: Boolean, organisationId: String): Column = {
-    if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment)
-    //        concat(lit(s"gs://databricks-${organisationId}/${organisationId}/"),
-      regexp_replace(inputCol,"dbfs:/",s"gs://databricks-${organisationId}/${organisationId}/")
-    //        )
+    // If cloud provider is GCP and if it is a multi workspace deployment, then we need to create the cluster logs path
+    // using default GCS bucket and organisation-id else input-column containing the cluster-log path will be returned
+    if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment) {
+      regexp_replace(inputCol, "dbfs:/", s"gs://databricks-${organisationId}/${organisationId}/")
+    }
     else {
       inputCol
     }
