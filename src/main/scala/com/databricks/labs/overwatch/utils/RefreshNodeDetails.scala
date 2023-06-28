@@ -325,7 +325,7 @@ object RefreshNodeDetails {
                      tempDirPrefix: String = "/tmp/overwatch/instanceDetailsRefresh/"
                    ): Unit = {
 
-    // TODO -- delete all instanceDetails originals with HourlyDBUs == null
+    // TODO -- 904 - add minScheam for instanceDetails and dbuCostDetails
     // TODO -- lowercase / trim api_name for merge condition?
     verifyETLDB(spark, etlDB)
     verifyCloudInputs(cloud, workspaceCloudMap)
