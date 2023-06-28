@@ -1461,7 +1461,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   def jrcpAppendUtilAndCosts(df: DataFrame): DataFrame = {
     df
       .withColumn("cluster_type",
-        when('cluster_type === "new", lit("automated"))
+        when('cluster_type.isin("new", "job_cluster"), lit("automated"))
           .otherwise(lit("interactive"))
       )
       .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time
