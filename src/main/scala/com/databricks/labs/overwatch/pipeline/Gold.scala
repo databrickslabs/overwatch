@@ -31,45 +31,55 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkExecutionTarget,
       GoldTargets.sparkStreamTarget,
       GoldTargets.sparkExecutorTarget,
-      GoldTargets.sqlQueryHistoryTarget
+      GoldTargets.sqlQueryHistoryTarget,
+      GoldTargets.notebookCommandsTarget
     )
   }
 
+  private val  verboseAuditLoggingDerivedScope: Boolean = config.overwatchScope.contains(OverwatchScope.audit) &&
+    config.overwatchScope.contains(OverwatchScope.notebooks) &&
+    config.overwatchScope.contains(OverwatchScope.clusterEvents)
+
   def getAllModules: Seq[Module] = {
-    config.overwatchScope.flatMap {
-      case OverwatchScope.accounts => {
-        Array(accountModModule, accountLoginModule)
-      }
-      case OverwatchScope.notebooks => {
-        Array(notebookModule)
-      }
-      case OverwatchScope.pools => {
-        Array(poolsModule)
-      }
-      case OverwatchScope.clusters => {
-        Array(clusterModule)
-      }
-      case OverwatchScope.clusterEvents => {
-        Array(clusterStateFactModule)
-      }
-      case OverwatchScope.jobs => {
-        Array(jobsModule, jobRunsModule, jobRunCostPotentialFactModule)
-      }
-      case OverwatchScope.sparkEvents => {
-        Array(
-          sparkJobModule,
-          sparkStageModule,
-          sparkTaskModule,
-          sparkExecutorModule,
-          sparkExecutionModule,
-          sparkStreamModule
-        )
-      }
-      case OverwatchScope.dbsql => {
-        Array(sqlQueryHistoryModule)
-      }
-      case _ => Array[Module]()
-    }
+
+   if(verboseAuditLoggingDerivedScope) {
+     Array(notebookCommandsModule)
+   }else{
+     config.overwatchScope.flatMap {
+       case OverwatchScope.accounts => {
+         Array(accountModModule, accountLoginModule)
+       }
+       case OverwatchScope.notebooks => {
+         Array(notebookModule)
+       }
+       case OverwatchScope.pools => {
+         Array(poolsModule)
+       }
+       case OverwatchScope.clusters => {
+         Array(clusterModule)
+       }
+       case OverwatchScope.clusterEvents => {
+         Array(clusterStateFactModule)
+       }
+       case OverwatchScope.jobs => {
+         Array(jobsModule, jobRunsModule, jobRunCostPotentialFactModule)
+       }
+       case OverwatchScope.sparkEvents => {
+         Array(
+           sparkJobModule,
+           sparkStageModule,
+           sparkTaskModule,
+           sparkExecutorModule,
+           sparkExecutionModule,
+           sparkStreamModule
+         )
+       }
+       case OverwatchScope.dbsql => {
+         Array(sqlQueryHistoryModule)
+       }
+       case _ => Array[Module]()
+     }
+   }
   }
 
   envInit()
@@ -89,8 +99,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   private val clsfSparkOverrides = Map(
     "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
   )
-
-  private val  verboseAuditLoggingDerivedScope: Boolean = config.overwatchScope.contains(OverwatchScope.audit) && config.overwatchScope.contains(OverwatchScope.notebooks) && config.overwatchScope.contains(OverwatchScope.clusterEvents)
 
 
 

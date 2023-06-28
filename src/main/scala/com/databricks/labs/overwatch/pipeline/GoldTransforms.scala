@@ -510,12 +510,12 @@ trait GoldTransforms extends SparkSessionWrapper {
     val clsfLookupTSDF = clsfIncrementalDF
       .select(
         "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
-        "custom_tags", "node_type_id", "current_num_workers", "uptime_in_state_H", "total_cost")
+        "custom_tags", "node_type_id", "current_num_workers", "uptime_in_state_H", "total_DBU_cost")
       .distinct
       .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
       .withColumnRenamed("cluster_id", "clusterId")
       .withColumnRenamed("current_num_workers", "node_count")
-      .withColumn("totalCostPMS", col("total_cost") / col("uptime_in_state_H")/lit(3600))
+      .withColumn("total_dbu_cost_ps", col("total_DBU_cost") / col("uptime_in_state_H")/lit(3600))
       .toTSDF("unixTimeMS", "organization_id", "clusterId")
 
     val colNames: Array[Column] = Array(
@@ -562,7 +562,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         tsPartitionVal = 8
       )
       .df
-      .withColumn("estimated_dbu_cost", col("executionTime") * col("totalCostPMS"))
+      .withColumn("estimated_dbu_cost", col("executionTime") * col("total_dbu_cost_ps"))
       .drop("cluster_id")
 
     println("Verbose Audit Log Created")
