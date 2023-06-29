@@ -892,7 +892,10 @@ object Helpers extends SparkSessionWrapper {
     val targetsToRollback = rollbackTSByModule.map(rollback => {
       val targetTableName = PipelineFunctions.getTargetTableNameByModule(rollback.moduleId)
       val targetToRollback = allTargets.find(_.name.toLowerCase == targetTableName.toLowerCase)
-      assert(targetToRollback.nonEmpty, s"Target with name: $targetTableName not found")
+      if (targetToRollback.isEmpty) { // table doesn't exist
+        println(s"WARNING: Target with name: $targetTableName not found. If it doesn't exist, you may ignore this " +
+          s"warning.")
+      }
       TargetRollbackTS(
         rollback.organization_id,
         targetToRollback.get,
