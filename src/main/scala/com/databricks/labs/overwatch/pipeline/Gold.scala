@@ -67,8 +67,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         )
       }
       case OverwatchScope.dbsql => {
-        Array(sqlQueryHistoryModule,
-          warehouseModule)
+        Array(
+          sqlQueryHistoryModule,
+          warehouseModule
+        )
       }
       case _ => Array[Module]()
     }

@@ -20,9 +20,9 @@ object DbsqlTransforms extends SparkSessionWrapper {
    * BEGIN DBSQL generic functions
    */
 
-  private val auditBaseCols: Array[Column] = Array(
-    'timestamp, 'date, 'organization_id, 'serviceName, 'actionName,
-    $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
+//  private val auditBaseCols: Array[Column] = Array(
+//    'timestamp, 'date, 'organization_id, 'serviceName, 'actionName,
+//    $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
 
   def deriveWarehouseId(): Column = {
     when(('actionName === "createEndpoint" || 'actionName === "createWarehouse")
@@ -31,7 +31,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
       .otherwise('id)
   }
 
-  def deriveWarehouseBase(auditRawDF: DataFrame): DataFrame = {
+  def deriveWarehouseBase(auditRawDF: DataFrame, auditBaseCols: Array[Column]): DataFrame = {
     val warehouse_id_gen_w = Window.partitionBy('organization_id, 'warehouse_name)
       .orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
     val warehouse_name_gen_w = Window.partitionBy('organization_id, 'warehouse_id)
@@ -41,14 +41,14 @@ object DbsqlTransforms extends SparkSessionWrapper {
       deriveWarehouseId.alias("warehouse_id"),
       'name.alias("warehouse_name"),
       'cluster_size,
-      'min_num_clusters.cast("long"),
-      'max_num_clusters.cast("long"),
-      'auto_stop_mins.cast("long"),
+      'min_num_clusters,
+      'max_num_clusters,
+      'auto_stop_mins,
       'spot_instance_policy,
-      'enable_photon.cast("boolean"),
+      'enable_photon,
       'channel,
       'tags,
-      'enable_serverless_compute.cast("boolean"),
+      'enable_serverless_compute,
       'warehouse_type
     )
 
@@ -121,7 +121,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
           (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
           'Pipeline_SnapTS.cast("date").alias("date"),
           'creator_name.alias("createdBy")
-        )
+        ).unionByName(warehouseBaseWMetaDF, allowMissingColumns = true)
       unionWithMissingAsNull(warehouseBaseWMetaDF, missingWareHouseBaseFromSnap)
     } else warehouseBaseWMetaDF
   }
