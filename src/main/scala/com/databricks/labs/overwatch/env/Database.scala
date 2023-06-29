@@ -359,7 +359,9 @@ class Database(config: Config) extends SparkSessionWrapper {
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     target.writeMode match {
       case WriteMode.merge => batchWriter(finalDF, target, maxMergeScanDates)
-      case _ => streamWriter(finalDF, target)
+      case WriteMode.append | WriteMode.overwrite => streamWriter(finalDF, target)
+      case _ => throw new UnsupportedOperationException(s"${target.writeMode} is not supported. Support write modes " +
+        s"are - Merge, Append and Overwrite")
     }
     registerTarget(target)
   }
