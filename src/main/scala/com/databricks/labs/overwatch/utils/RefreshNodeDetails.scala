@@ -18,6 +18,7 @@ private class RefreshNodeDetails(
                                 ) {
 
   private val refreshSnapTime: TimeTypes = Pipeline.createTimeDetail(System.currentTimeMillis())
+  private val activeAsOfDate = if (asOfDate == "") current_date() else lit(asOfDate).cast("date")
 
   import spark.implicits._
 
@@ -156,8 +157,6 @@ private class RefreshNodeDetails(
   // build the updates dataframe to be merged into instanceDetails
   private def deriveMergeDF: DataFrame = {
 
-    val activeAsOfDate = if (asOfDate == "") current_date() else lit(asOfDate).cast("date")
-
     val fieldsToUpdate = getLatestInstanceDetailsDF.columns
       .filterNot(fieldName => keyFields.map(_.toLowerCase).contains(fieldName.toLowerCase))
 
@@ -238,7 +237,7 @@ private class RefreshNodeDetails(
       .whenMatched()
       .updateExpr(Map(
         "target.isActive" -> "false",
-        "target.activeUntil" -> s"cast('$asOfDate' as date)"
+        "target.activeUntil" -> activeAsOfDate.expr.sql
       ))
       .whenNotMatched()
       .insertExpr(insertFieldMappings)
