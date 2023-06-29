@@ -438,6 +438,7 @@ class Pipeline(
 
   //Persist the Api Data
   private def persistApiEvents(target: PipelineTable, module: Module): Unit = ???
+    //call getTempApiData and get the data then persist it
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
 //    val startTime = System.currentTimeMillis()
