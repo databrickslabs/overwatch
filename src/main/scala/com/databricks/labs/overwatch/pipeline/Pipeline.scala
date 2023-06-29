@@ -464,8 +464,8 @@ class Pipeline(
       logger.log(Level.WARN, readOnlyMsg)
     }
 
-    //Persisting API data
-    persistApiData(apiEventsTarget,module)
+    //Persisting API data if target has temp dir is present
+    persistApiEvents(apiEventsTarget,module)
     // if (isAPIDependent) createAPIDF(...)
     // def createAPIDF {
 //    target.apiSuffix + "/" + pipelineSnapTime

@@ -582,7 +582,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
-      // TOMES -- does jsonQuery hold all the meta we want? Don't forget ow run id
+      // TOMES -- does jsonQuery hold all the meta we want? Don't forget ow run id Sriram: Run it we will add it in pipeline.append() function
       _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery))//for GET request we have to convert queryMap to Json
     //  _apiResponseArray.add(response.body)
       if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
@@ -655,8 +655,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     try {
       executeHelper()
       if (!apiMeta.storeInTempLocation) {
-        //write to temp success location for success
-        //write to temp error location for error
+        //write the responses into the temp location
+        PipelineFunctions.writeMicroBatchToTempLocation(???, _apiResponseArray.toString) //"How to get the temp path as we are not having tempsuccess path for single thread api calls"
       }
       this
     } catch {

@@ -21,8 +21,9 @@ abstract class PipelineTargets(config: Config) {
 
   val apiEventsTarget: PipelineTable = PipelineTable(
     name = "api_events_meta",
-    _keys = Array("organization_id", "Overwatch_RunID"),
+    _keys = Array("organization_id", "Overwatch_RunID","end_point"),
     config = config,
+    incrementalColumns = Array("Pipeline_SnapTS"),
     partitionBy = Array("organization_id","end_point"),
     statsColumns = ("organization_id,end_point").split(", ")
   )
@@ -46,7 +47,8 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("Pipeline_SnapTS"),
       statsColumns = "created_time, creator_user_name, job_id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
       partitionBy = Seq("organization_id"),
-      masterSchema = Some(Schema.jobSnapMinimumSchema)
+      masterSchema = Some(Schema.jobSnapMinimumSchema),
+      apiEndpointTempDir = Some("jobs_list")
     )
 
     lazy private[overwatch] val clustersSnapshotTarget: PipelineTable = PipelineTable(
@@ -58,7 +60,7 @@ abstract class PipelineTargets(config: Config) {
         "start_time, terminated_time, Overwatch_RunID").split(", "),
       partitionBy = Seq("organization_id"),
       masterSchema = Some(Schema.clusterSnapMinimumSchema),
-      apiEndpoint = Some("clusters_list")
+      apiEndpointTempDir = Some("clusters_list") //Change the name to
     )
 
     lazy private[overwatch] val poolsSnapshotTarget: PipelineTable = PipelineTable(
@@ -69,7 +71,8 @@ abstract class PipelineTargets(config: Config) {
       statsColumns = ("instance_pool_id, node_type_id, " +
         "Pipeline_SnapTS, Overwatch_RunID").split(", "),
       partitionBy = Seq("organization_id"),
-      masterSchema = Some(Schema.poolsSnapMinimumSchema)
+      masterSchema = Some(Schema.poolsSnapMinimumSchema),
+      apiEndpointTempDir = Some("instance_pools_list")
     )
 
     lazy private[overwatch] val auditLogsTarget: PipelineTable = PipelineTable(
@@ -110,7 +113,7 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("timestamp"),
       statsColumns = "cluster_id, timestamp, type, Pipeline_SnapTS, Overwatch_RunID".split(", "),
       masterSchema = Some(Schema.clusterEventsMinimumSchema),
-      apiEndpoint = Some("cluster_events")
+      apiEndpointTempDir = Some("cluster_events")
     )
 
     lazy private[overwatch] val clusterEventsErrorsTarget: PipelineTable = PipelineTable(
@@ -119,7 +122,7 @@ abstract class PipelineTargets(config: Config) {
       config,
       partitionBy = Seq("organization_id"),
       incrementalColumns = Array("Pipeline_SnapTS"),
-      apiEndpoint = Some("cluster_events_error"))
+      apiEndpointTempDir = Some("cluster_events_error"))
 
     lazy private[overwatch] val sparkEventLogsTarget: PipelineTable = PipelineTable(
       name = "spark_events_bronze",
@@ -175,7 +178,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("cluster_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      apiEndpointTempDir = Some("libraries_all_cluster_statuses")
     )
 
     lazy private[overwatch] val policiesSnapshotTarget: PipelineTable = PipelineTable(
@@ -183,7 +187,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("policy_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      apiEndpointTempDir = Some("policies_clusters_list")
     )
 
     lazy private[overwatch] val instanceProfilesSnapshotTarget: PipelineTable = PipelineTable(
@@ -191,7 +196,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("cluster_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      apiEndpointTempDir = Some("instance_profiles_list")
     )
 
     lazy private[overwatch] val tokensSnapshotTarget: PipelineTable = PipelineTable(
@@ -199,7 +205,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("token_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      apiEndpointTempDir = Some("token_list")
     )
 
     lazy private[overwatch] val globalInitScSnapshotTarget: PipelineTable = PipelineTable(
@@ -207,7 +214,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("script_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      apiEndpointTempDir = Some("global_init_scripts")
     )
 
     lazy private[overwatch] val jobRunsSnapshotTarget: PipelineTable = PipelineTable(
@@ -215,7 +223,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("job_id", "run_id", "Overwatch_RunID"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      apiEndpointTempDir = Some("jobs_runs_list")
     )
   }
 
@@ -364,7 +373,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       _permitDuplicateKeys = false,
       incrementalColumns = Array("query_start_time_ms"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      apiEndpointTempDir = Some("sql_history_queries")
     )
 
   }

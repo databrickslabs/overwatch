@@ -65,7 +65,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "expand_tasks" -> "true",
       "offset" -> "0"
     )
-    ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1)
+    ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1,"tempDir")//Option if non we should not break it if temp dir is not present then we will not record it
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))

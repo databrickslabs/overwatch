@@ -141,10 +141,7 @@ object JsonUtils {
    * @param value
    * @return
    */
-  def createJsonFromString(key: String, value: String): String = {
-    //function creates json string from provided key and value
-    return null
-  }
+  def createJsonFromString(key: String, value: String): String = ???
 
   /**
    * Function combines two json values and returns a single json
