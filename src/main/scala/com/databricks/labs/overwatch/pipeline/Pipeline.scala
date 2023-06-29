@@ -428,20 +428,16 @@ class Pipeline(
   }
 
   //Get the dataframe from either tempDirectory or from the ResponseArray
-  private def getApiData(apiTempPath: String): DataFrame ={
+  private def getTempApiData(apiTempPath: String): DataFrame ={
      //Get the data from either tempDirectory or from the ResponseArray
-     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiTempPath}/success_" + config.runID
-    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiTempPath}/error_" + config.runID
-    null
+     val apiTempDir =  s"${config.tempWorkingDir}/${apiTempPath}/success_" + pipelineSnapTime.asUnixTimeMilli
+    ???
   }
 
 
 
   //Persist the Api Data
-  private def persistApiData(target: PipelineTable, module: Module): Unit = {
-      //create the DF from temp dir and persist it
-     // database.writeWithRetry(finalDF, target, pipelineSnapTime.asColumnTS, Array[String](),Some(module.daysToProcess))
-  }
+  private def persistApiEvents(target: PipelineTable, module: Module): Unit = ???
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
 //    val startTime = System.currentTimeMillis()

@@ -582,8 +582,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
 
 
-    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + apiEnv.runID
-    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + apiEnv.runID
+    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
+    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
 
     landClusterEvents(clusterIDs, startTime, endTime, apiEnv, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
       tmpClusterEventsErrorPath, config)

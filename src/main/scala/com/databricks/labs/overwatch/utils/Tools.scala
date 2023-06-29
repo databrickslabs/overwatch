@@ -134,36 +134,6 @@ object JsonUtils {
     )
   }
 
-
-  /**
-   *  Function creates json string from provided key and value
-   * @param key
-   * @param value
-   * @return
-   */
-  def createJsonFromString(key: String, value: String): String = ???
-
-  /**
-   * Function combines two json values and returns a single json
-   * @param value1
-   * @param value2
-   * @return
-   */
-  def mergeJson(value:Array[String]):String = {
-    // Function combines two json values and returns a single json
-    return null
-  }
-
-  /**
-   * Function gets the value of the provided key from the json
-   * @param key
-   * @return
-   */
-  def getJsonValueByKey(key: String,json: String): String = {
-    //function gets the value of the provided key from the json
-    return null
-  }
-
 }
 
 /**
@@ -1064,9 +1034,7 @@ object Helpers extends SparkSessionWrapper {
    * @param dataFrame
    */
     // TOMES -- include error column in case catch
-  def deriveRawApiResponseDF(dataFrame: DataFrame)={
-
-  }
+  def deriveRawApiResponseDF(dataFrame: DataFrame)= ???
 
 
 }

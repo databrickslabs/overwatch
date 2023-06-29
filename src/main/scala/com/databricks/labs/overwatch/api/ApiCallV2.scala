@@ -656,7 +656,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       executeHelper()
       if (!apiMeta.storeInTempLocation) {
         //write the responses into the temp location
-        PipelineFunctions.writeMicroBatchToTempLocation(???, _apiResponseArray.toString) //"How to get the temp path as we are not having tempsuccess path for single thread api calls"
+        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath, _apiResponseArray.toString) //Changes in apply() to get the temp directory
       }
       this
     } catch {
