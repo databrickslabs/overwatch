@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
@@ -963,7 +964,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                    isMultiWorkSpaceDeployment: Boolean, organisationId: String): Column = {
     // If cloud provider is GCP and if it is a multi workspace deployment, then we need to create the cluster logs path
     // using default GCS bucket and organisation-id else input-column containing the cluster-log path will be returned
-    if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment) {
+    if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment &&
+      organisationId != dbutils.notebook.getContext.tags("orgId")) {
       regexp_replace(inputCol, "dbfs:/", s"gs://databricks-${organisationId}/${organisationId}/")
     }
     else {
