@@ -1359,14 +1359,19 @@ trait SilverTransforms extends SparkSessionWrapper {
                                   isFirstRun: Boolean,
                                   untilTime: TimeTypes
                                 )(df: DataFrame): DataFrame = {
-    val bronzeWarehouseSnapUntilCurrent = bronze_warehouse_snap.asDF
-      .filter('Pipeline_SnapTS <= untilTime.asColumnTS)
+    val lastWarehouseSnapW = Window.partitionBy('organization_id, 'warehouse_id)
+      .orderBy('Pipeline_SnapTS.desc)
+
+    val bronzeWarehouseSnapLatest = bronze_warehouse_snap.asDF
+      .withColumn("rnk", rank().over(lastWarehouseSnapW))
+      .withColumn("rn", row_number().over(lastWarehouseSnapW))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
     val filteredDf = df
           .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
-            "editWarehouse", "deleteEndpoint", "deleteWarehouse"))
+            "editWarehouse", "deleteEndpoint", "deleteWarehouse") && responseSuccessFilter)
 
     deriveWarehouseBase(filteredDf, auditBaseCols)
-      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapUntilCurrent))
+      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest))
   }
 }

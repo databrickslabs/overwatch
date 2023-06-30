@@ -25,8 +25,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
 //    $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
 
   def deriveWarehouseId(): Column = {
-    when(('actionName === "createEndpoint" || 'actionName === "createWarehouse")
-      && responseSuccessFilter,
+    when(('actionName === "createEndpoint" || 'actionName === "createWarehouse"),
       get_json_object($"response.result", "$.id"))
       .otherwise('id)
   }
@@ -46,7 +45,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
       'auto_stop_mins,
       'spot_instance_policy,
       'enable_photon,
-      'channel,
+      get_json_object('channel, "$.name").alias("channel"),
       'tags,
       'enable_serverless_compute,
       'warehouse_type
@@ -60,7 +59,6 @@ object DbsqlTransforms extends SparkSessionWrapper {
       .withColumn("warehouse_name", PipelineFunctions.fillForward("warehouse_name", warehouse_name_gen_w))
 
     val warehouseWithStructs = warehouseRaw
-      .withColumn("channel", SchemaTools.structFromJson(spark, warehouseRaw, "channel"))
       .withColumn("tags", SchemaTools.structFromJson(spark, warehouseRaw, "tags"))
       .scrubSchema
 

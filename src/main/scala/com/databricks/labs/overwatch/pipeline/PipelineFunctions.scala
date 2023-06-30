@@ -626,6 +626,7 @@ object PipelineFunctions extends SparkSessionWrapper {
       case 1010 => "tokens_snapshot_bronze"
       case 1011 => "global_inits_snapshot_bronze"
       case 1012 => "job_runs_snapshot_bronze"
+      case 1013 => "warehouses_snapshot_bronze"
       case 2003 => "spark_executors_silver"
       case 2005 => "spark_Executions_silver"
       case 2006 => "spark_jobs_silver"
@@ -640,6 +641,7 @@ object PipelineFunctions extends SparkSessionWrapper {
       case 2018 => "notebook_silver"
       case 2019 => "cluster_state_detail_silver"
       case 2020 => "sql_query_history_silver"
+      case 2021 => "warehouse_spec_silver"
       case 3001 => "cluster_gold"
       case 3002 => "job_gold"
       case 3003 => "jobRun_gold"
@@ -656,6 +658,7 @@ object PipelineFunctions extends SparkSessionWrapper {
       case 3015 => "jobRunCostPotentialFact_gold"
       case 3016 => "sparkStream_gold"
       case 3017 => "sql_query_history_gold"
+      case 3018 => "warehouse_gold"
     }
   }
 

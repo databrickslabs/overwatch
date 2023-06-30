@@ -737,7 +737,7 @@ object Schema extends SparkSessionWrapper {
   ))
 
   val warehouseSnapMinimumSchema: StructType = StructType(Seq(
-    StructField("id", StringType, nullable = true),
+    StructField("warehouse_id", StringType, nullable = false),
     StructField("name", StringType, nullable = true),
     StructField("size", StringType, nullable = true),
     StructField("cluster_size", StringType, nullable = true),
