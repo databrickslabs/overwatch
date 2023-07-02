@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.MultiWorkspaceDeployment
+import com.databricks.labs.overwatch.pipeline.Snapshot
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes
@@ -17,10 +18,9 @@ import org.apache.spark.sql.functions._
 
 class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String) {
 
-  private val storage_prefix = removeTrailingSlashes(_targetPrefix)
+  private val target_storage_prefix = removeTrailingSlashes(_targetPrefix)
   private val sourceETLDB = _sourceETLDB
   private val configPath = _configPath
-
 
   private[overwatch] def updateConfig(): Unit = {
     try {
@@ -35,7 +35,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
           .option("ignoreLeadingWhiteSpace", true)
           .option("ignoreTrailingWhiteSpace", true)
           .load(configPath)
-          .withColumn("storage_prefix", when(col("etl_database_name") === lit(sourceETLDB), lit(storage_prefix)).otherwise(col("storage_prefix")))
+          .withColumn("storage_prefix", when(col("etl_database_name") === lit(sourceETLDB), lit(target_storage_prefix)).otherwise(col("storage_prefix")))
           .coalesce(1)
           try{
             df.write
@@ -61,7 +61,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
           s"""
       update delta.`$configPath`
       set
-        storage_prefix = '$storage_prefix'
+        storage_prefix = '$target_storage_prefix'
       Where etl_database_name = '$sourceETLDB'
       """
         spark.sql(configUpdateStatement)
@@ -74,7 +74,7 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
           s"""
       update `$configPath`
       set
-        storage_prefix = '$storage_prefix'
+        storage_prefix = '$target_storage_prefix'
       Where etl_database_name = '$sourceETLDB'
       """
         spark.sql(configUpdateStatement)
@@ -93,20 +93,21 @@ object Migration extends SparkSessionWrapper {
   /**
    * Create a backup of the Overwatch datasets
    *
-   * @param arg(0)        Source Database name or ETlDataPathPrefix name.
-   * @param arg(1)        Target path to where migration need to be performed.
-   * @param arg(2)        Configuration Path where the config file for the source is present. Path can be CSV file or delta path ot delta table.
-   * @param arg(3)        Array of table names to exclude from the snapshot
-   *                      this is the table name only - without the database prefix. By Default it is empty.
+   * @param sourceETLDB         Source Database name or ETlDataPathPrefix name.
+   * @param migrateRootPath     Target path to where migration need to be performed.
+   * @param configPath          Configuration Path where the config file for the source is present. Path can be CSV file or delta path or delta table.
+   * @param tablesToExclude     Array of table names to exclude from the snapshot
+   *                            this is the table name only - without the database prefix. By Default it is empty.
    * @return
    */
 
-  def main(args: Array[String]): Unit = {
+  def apply(
+             sourceETLDB: String,
+             migrateRootPath:String,
+             configPath: String,
+             tablesToExclude :String = " "
+           ): Unit = {
 
-    val sourceETLDB = args.lift(0).getOrElse("")
-    val migrateRootPath = args.lift(1).getOrElse("")
-    val configPath = args.lift(2).getOrElse("")
-    val tablesToExclude = args.lift(3).getOrElse("")
     val cloneLevel = "Deep"
 
     val configDF = new MultiWorkspaceDeployment().generateBaseConfig(configPath).filter(col("etl_database_name") === sourceETLDB)
@@ -114,13 +115,13 @@ object Migration extends SparkSessionWrapper {
       throw new BadConfigException("Migration is not possible where multiple different storage_prefix present for etl_database_name")
     }
     val pipeline = "Bronze,Silver,Gold"
-    val etlDatabase = configDF.select("etl_database_name").distinct().collect()(0)(0)
+    val etlDatabase = sourceETLDB
     val consumerDatabase = configDF.select("consumer_database_name").distinct().collect()(0)(0)
 
 
     // Step 01 - Start Migration Process
     try {
-      Snapshot.main(Array(sourceETLDB, migrateRootPath, pipeline, "full", tablesToExclude, cloneLevel, "Migration"))
+      Snapshot(sourceETLDB, migrateRootPath, "full",pipeline, tablesToExclude, cloneLevel, "Migration")
     }
     catch{
       case e: Throwable =>

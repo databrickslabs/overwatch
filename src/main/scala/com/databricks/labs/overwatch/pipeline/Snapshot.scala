@@ -32,17 +32,15 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   private val Config = _config
   private val processType = _processType
 
-  def writeStream(sourceName:String,
+  private[overwatch] def writeStream(sourceName:String,
                   checkPointLocation:String,
                   targetLocation:String,
                   rawStreamingDF:DataFrame,
                   cloneSpec:CloneDetail):StreamingQuery = {
     logger.log(Level.INFO, s"Beginning write to ${sourceName}")
-    val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write"
+    val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write with source as ${sourceName}"
     logger.log(Level.INFO, msg)
 
-    val beginMsg = s"Stream to ${sourceName} beginning."
-    logger.log(Level.INFO, beginMsg)
     var streamWriter = rawStreamingDF.writeStream.outputMode("append").format("delta").option("checkpointLocation", checkPointLocation)
       .queryName(s"StreamTo_${sourceName}")
 
@@ -58,7 +56,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       .start()
   }
 
-  def upsertToDelta(microBatchOutputDF: DataFrame,
+  private[overwatch] def upsertToDelta(microBatchOutputDF: DataFrame,
                     batchId: Long,
                     immutableColumns: Array[String],
                     sourceName:String,
@@ -150,6 +148,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
     val cloneReportPath = s"${snapshotRootPath}/clone_report/"
     cloneReport.toDS.write.mode("append").option("mergeSchema", "true").format("delta").save(cloneReportPath)
+    logger.log(Level.INFO, s"Clone report has been generated to this path: ${cloneReportPath}")
   }
 
   private[overwatch] def buildCloneSpecs(
@@ -176,7 +175,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   private[overwatch] def incrementalSnap(
                                           pipelineTables : Array[PipelineTable],
                                           excludes: Option[String] = Some("")
-                                        ): this.type = {
+                                        ): Unit = {
 
     val sourceToSnap = pipelineTables
 
@@ -196,14 +195,13 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
     val cloneSpecs = buildCloneSpecs("Deep",sourceToSnapFiltered)
     snapStream(cloneSpecs)
-    this
   }
 
   private[overwatch] def snap(
                                pipelineTables : Array[PipelineTable],
                                cloneLevel: String = "DEEP",
                                excludes: Option[String] = Some("")
-                             ): this.type= {
+                             ): Unit= {
     val acceptableCloneLevels = Array("DEEP", "SHALLOW")
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
@@ -228,7 +226,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val cloneReport = Helpers.parClone(cloneSpecs)
     val cloneReportPath = s"${snapshotRootPath}/clone_report/"
     cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
-    this
+    logger.log(Level.INFO, s"Clone report has been generated to this path: ${cloneReportPath}")
   }
 
 }
@@ -237,64 +235,95 @@ object Snapshot extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def apply(workspace: Workspace,
-            sourceETLDB : String,
-            targetPrefix : String,
-            snapshotType: String,
-            excludes: Option[String],
-            cloneLevel: String,
-            pipelineTables : Array[PipelineTable],
-            processType : String,
-           ): Snapshot = {
-    if (snapshotType.toLowerCase()== "incremental")
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).incrementalSnap(pipelineTables,excludes)
-    else{
-      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).snap(pipelineTables,cloneLevel,excludes)
-    }
+//  def apply(workspace: Workspace,
+//            sourceETLDB : String,
+//            targetPrefix : String,
+//            snapshotType: String,
+//            excludes: Option[String],
+//            cloneLevel: String,
+//            pipelineTables : Array[PipelineTable],
+//            processType : String,
+//           ): Unit = {
+//
+//
+//    if (snapshotType.toLowerCase()== "incremental")
+//      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).incrementalSnap(pipelineTables,excludes)
+//    else{
+//      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).snap(pipelineTables,cloneLevel,excludes)
+//    }
+//
+//  }
 
+  def apply(
+             sourceETLDB: String,
+             targetPrefix : String,
+             snapshotType : String): Unit = {
+    apply(
+      sourceETLDB,
+      targetPrefix,
+      snapshotType,
+      pipeline = "Bronze,Silver,Gold",
+      tablesToExclude = " ",
+      cloneLevel = "Deep",
+      processType = "Snapshot"
+    )
   }
-
-
-
 
   /**
    * Create a backup of the Overwatch datasets
    *
-   * @param arg(0)        Source Database Name.
-   * @param arg(1)        Target snapshotRootPath
-   * @param arg(2)        Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)
-   * @param arg(3)        Type of Snapshot to be performed. "Full" for Full Snapshot , "Incremental" for Incremental Snapshot
-   * @param arg(4)        Array of table names to exclude from the snapshot
-   *                      this is the table name only - without the database prefix. By Default it is empty.
-   * @param arg(5)        Clone Level for Snapshot. By Default it is "Deep". You can also specify "Shallow" Clone.
+   * @param sourceETLDB        Source Database Name.
+   * @param targetPrefix       Target snapshotRootPath
+   * @param pipeline           Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)
+   * @param snapshotType       Type of Snapshot to be performed. "Full" for Full Snapshot , "Incremental" for Incremental Snapshot
+   * @param tablesToExclude    Array of table names to exclude from the snapshot
+   *                           this is the table name only - without the database prefix. By Default it is empty.
+   * @param cloneLevel         Clone Level for Snapshot. By Default it is "Deep". You can also specify "Shallow" Clone.
    *
-   * @param arg(6)        This argument specify the process type. Whether it is Restore, Migration or Snapshot. By Default it is Snapshot. This argument is
-   *                      used internally by restore or Migration process by changing this argument.
+   * @param processType        This argument specify the process type. Whether it is Restore, Migration or Snapshot. By Default it is Snapshot. This argument is
+   *                           used internally by restore or Migration process by changing this argument.
    * @return
    */
 
-  def main(args: Array[String]): Any = {
-
-    val sourceETLDB = args(0)
-    val snapshotRootPath = args(1)
-    val pipeline = args(2)
-    val snapshotType = args(3)
-    val tablesToExclude = args.lift(4).getOrElse("")
-    val cloneLevel = args.lift(5).getOrElse("Deep")
-    val processType = args.lift(6).getOrElse("Snapshot")
-
+  def apply(sourceETLDB : String,
+            targetPrefix : String,
+            snapshotType : String,
+            pipeline : String = "Bronze,Silver,Gold",
+            tablesToExclude : String = " ",
+            cloneLevel: String = "Deep",
+            processType : String = "Snapshot"
+           ): Unit = {
     val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
     val bronze = Bronze(snapWorkSpace)
     val silver = Silver(snapWorkSpace)
     val gold = Gold(snapWorkSpace)
     val pipelineReport = bronze.pipelineStateTarget
 
+    val snapshotObj = new Snapshot(sourceETLDB, targetPrefix, snapWorkSpace, snapWorkSpace.database, snapWorkSpace.getConfig,processType)
+
     try {
-      val pipelineLower = pipeline.toLowerCase
-      if (pipelineLower.contains("bronze")) Snapshot(snapWorkSpace, sourceETLDB, snapshotRootPath, snapshotType, Some(tablesToExclude), cloneLevel, bronze.getAllTargets, processType)
-      if (pipelineLower.contains("silver")) Snapshot(snapWorkSpace, sourceETLDB, snapshotRootPath, snapshotType, Some(tablesToExclude), cloneLevel, silver.getAllTargets, processType)
-      if (pipelineLower.contains("gold")) Snapshot(snapWorkSpace, sourceETLDB, snapshotRootPath, snapshotType, Some(tablesToExclude), cloneLevel, gold.getAllTargets, processType)
-      Snapshot(snapWorkSpace, sourceETLDB, snapshotRootPath, snapshotType, Some(tablesToExclude), cloneLevel, Array(pipelineReport), processType)
+      val pipelineList = pipeline.split(",").map(_.toLowerCase)
+
+      for (layer <- pipelineList) {
+        val pipelineTables = if (layer == "bronze") {
+          bronze.getAllTargets
+        } else if (layer == "silver") {
+          silver.getAllTargets
+        } else {
+          gold.getAllTargets
+        }
+
+        if (snapshotType.toLowerCase() == "incremental") {
+          snapshotObj.incrementalSnap(pipelineTables, Some(tablesToExclude))
+        } else {
+          snapshotObj.snap(pipelineTables, cloneLevel, Some(tablesToExclude))
+        }
+      }
+      if (snapshotType.toLowerCase() == "incremental") {
+        snapshotObj.incrementalSnap(Array(pipelineReport), Some(tablesToExclude))
+      } else {
+        snapshotObj.snap(Array(pipelineReport), cloneLevel, Some(tablesToExclude))
+      }
 
     }catch{
       case e: Throwable =>
@@ -303,6 +332,7 @@ object Snapshot extends SparkSessionWrapper {
         throw e
     }
   }
+
 }
 
 

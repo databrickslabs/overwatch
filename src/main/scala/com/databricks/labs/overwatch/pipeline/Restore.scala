@@ -64,35 +64,21 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
 object Restore extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  /**
+   * Create a backup of the Overwatch datasets
+   *
+   * @param sourcePrefix        Source ETL Path Prefix from where restore need to be performed
+   * @param targetPrefix        Target ETL Path Prefix to where restore data would be loaded.
+   * @return
+   */
+
     def apply(
-               workSpace: Workspace,
-               allTarget: Array[PipelineTable],
+               sourcePrefix : String,
                targetPrefix : String,
-               backupPath: String,
-               cloneLevel: String
              ): Unit = {
 
-      val restoration = new Restore(workSpace.getConfig.databaseName, targetPrefix, workSpace, workSpace.database, workSpace.getConfig)
-      restoration.restore(allTarget,cloneLevel)
-
-    }
-
-    /**
-     * Create a backup of the Overwatch datasets
-     *
-     * @param arg(0)        Source ETL Path Prefix from where restore need to be performed
-     * @param arg(1)        Target ETL Path Prefix to where restore data would be loaded.
-     * @return
-     */
-
-    def main(args: Array[String]): Unit = {
-
-      val sourcePrefix = args.lift(0).getOrElse("")
       val orgID = Initializer.getOrgId
-      val targetPrefix = args.lift(1).getOrElse("")
       val cloneLevel = "Deep"
-      //
-
 
       val sourcePath = s"${sourcePrefix}/data"
       val pipReportPath = s"${sourcePath}/pipeline_report"
@@ -111,6 +97,7 @@ object Restore extends SparkSessionWrapper {
           throw e
         }
       }
+
       val workSpace = Helpers.getRemoteWorkspaceByPath(pipReportPath, true, orgID)
 
       val bronze = Bronze(workSpace)
@@ -120,9 +107,9 @@ object Restore extends SparkSessionWrapper {
       val allTarget = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets ++ Array(pipelineReport).filter(_.exists(dataValidation = true))
 
       try {
-      Restore(workSpace, allTarget, targetPrefix, sourcePath, cloneLevel)
-      logger.log(Level.INFO, "Restoration Completed")
-
+        val restoreObj = new Restore(workSpace.getConfig.databaseName, targetPrefix, workSpace, workSpace.database, workSpace.getConfig)
+        restoreObj.restore(allTarget,cloneLevel)
+        logger.log(Level.INFO, "Restoration Completed")
       }catch {
         case e: Throwable =>
           val failMsg = PipelineFunctions.appendStackStrace(e,"Unable to proceed with Restoration")
@@ -130,4 +117,8 @@ object Restore extends SparkSessionWrapper {
           throw e
       }
     }
+
+
+
+
 }
