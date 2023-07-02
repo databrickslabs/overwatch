@@ -2,7 +2,6 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.MultiWorkspaceDeployment
-import com.databricks.labs.overwatch.pipeline.Snapshot
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import com.databricks.labs.overwatch.utils.Helpers.removeTrailingSlashes

@@ -235,24 +235,6 @@ object Snapshot extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-//  def apply(workspace: Workspace,
-//            sourceETLDB : String,
-//            targetPrefix : String,
-//            snapshotType: String,
-//            excludes: Option[String],
-//            cloneLevel: String,
-//            pipelineTables : Array[PipelineTable],
-//            processType : String,
-//           ): Unit = {
-//
-//
-//    if (snapshotType.toLowerCase()== "incremental")
-//      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).incrementalSnap(pipelineTables,excludes)
-//    else{
-//      new Snapshot(sourceETLDB, targetPrefix, workspace, workspace.database, workspace.getConfig,processType).snap(pipelineTables,cloneLevel,excludes)
-//    }
-//
-//  }
 
   def apply(
              sourceETLDB: String,

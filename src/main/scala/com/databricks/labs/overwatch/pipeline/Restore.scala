@@ -2,7 +2,6 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.{Database, Workspace}
-import com.databricks.labs.overwatch.pipeline.Restore.logger
 import com.databricks.labs.overwatch.utils.Helpers.{logger, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.{BadConfigException, Config, Helpers, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
