@@ -301,9 +301,17 @@ object Snapshot extends SparkSessionWrapper {
 
     val snapshotObj = new Snapshot(sourceETLDB, targetPrefix, snapWorkSpace, snapWorkSpace.database, snapWorkSpace.getConfig,processType)
 
-    try {
-      val pipelineList = pipeline.split(",").map(_.toLowerCase)
+    val pipelineList = pipeline.split(",").map(_.toLowerCase)
 
+    pipelineList.foreach(layer => {
+      if (layer == "bronze" || layer == "silver" || layer == "gold") {
+        //validated
+      }else{
+        val errMsg = s"Unknown Zone found ${pipeline}, Zone should be either Bronze,Silver or Gold"
+        throw new BadConfigException(errMsg)
+      }
+    })
+    try {
       for (layer <- pipelineList) {
         val pipelineTables = if (layer == "bronze") {
           bronze.getAllTargets
