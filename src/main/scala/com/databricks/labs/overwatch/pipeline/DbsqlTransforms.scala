@@ -20,43 +20,39 @@ object DbsqlTransforms extends SparkSessionWrapper {
    * BEGIN DBSQL generic functions
    */
 
-//  private val auditBaseCols: Array[Column] = Array(
-//    'timestamp, 'date, 'organization_id, 'serviceName, 'actionName,
-//    $"userIdentity.email".alias("userEmail"), 'requestId, 'response)
-
   def deriveWarehouseId(): Column = {
     when(('actionName === "createEndpoint" || 'actionName === "createWarehouse"),
       get_json_object($"response.result", "$.id"))
       .otherwise('id)
   }
 
-  def deriveWarehouseBase(auditRawDF: DataFrame, auditBaseCols: Array[Column]): DataFrame = {
-    val warehouse_id_gen_w = Window.partitionBy('organization_id, 'warehouse_name)
-      .orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
+  def deriveWarehouseBase()(auditRawDF: DataFrame): DataFrame = {
     val warehouse_name_gen_w = Window.partitionBy('organization_id, 'warehouse_id)
-      .orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
-
-    val warehouseSummaryCols = auditBaseCols ++ Array[Column](
-      deriveWarehouseId.alias("warehouse_id"),
-      'name.alias("warehouse_name"),
-      'cluster_size,
-      'min_num_clusters,
-      'max_num_clusters,
-      'auto_stop_mins,
-      'spot_instance_policy,
-      'enable_photon,
-      get_json_object('channel, "$.name").alias("channel"),
-      'tags,
-      'enable_serverless_compute,
-      'warehouse_type
-    )
+      .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, 1000)
 
     val warehouseRaw = auditRawDF
-      .filter('serviceName === "databrickssql")
-      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
-      .select(warehouseSummaryCols: _*)
-      .withColumn("warehouse_id", PipelineFunctions.fillForward("warehouse_id", warehouse_id_gen_w))
-      .withColumn("warehouse_name", PipelineFunctions.fillForward("warehouse_name", warehouse_name_gen_w))
+      .select(
+        'timestamp,
+        'date,
+        'serviceName,
+        'actionName,
+        'userEmail,
+        'requestId,
+        'response,
+        'warehouse_id,
+        PipelineFunctions.fillForward("warehouse_name",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("cluster_size",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("min_num_clusters",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("max_num_clusters",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("auto_stop_mins",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("spot_instance_policy",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("enable_photon",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("channel",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("tags",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("enable_serverless_compute",warehouse_name_gen_w),
+        PipelineFunctions.fillForward("warehouse_type",warehouse_name_gen_w)
+      )
+
 
     val warehouseWithStructs = warehouseRaw
       .withColumn("tags", SchemaTools.structFromJson(spark, warehouseRaw, "tags"))
@@ -124,5 +120,42 @@ object DbsqlTransforms extends SparkSessionWrapper {
     } else warehouseBaseWMetaDF
   }
 
+  def deriveInputForWarehouseBase(auditLogDf: DataFrame, warehouseSpecSilver: PipelineTable
+                                  , auditBaseCols: Array[Column]) : DataFrame = {
+
+    val warehouseSummaryCols = auditBaseCols ++ Array[Column](
+      deriveWarehouseId.alias("warehouse_id"),
+      'name.alias("warehouse_name"),
+      'cluster_size,
+      'min_num_clusters,
+      'max_num_clusters,
+      'auto_stop_mins,
+      'spot_instance_policy,
+      'enable_photon,
+      get_json_object('channel, "$.name").alias("channel"),
+      'tags,
+      'enable_serverless_compute,
+      'warehouse_type
+    )
+
+    val filteredAuditLogDf = auditLogDf
+      .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
+        "editWarehouse", "deleteEndpoint", "deleteWarehouse")
+        && responseSuccessFilter
+        && 'serviceName === "databrickssql")
+      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .select(warehouseSummaryCols: _*)
+
+
+    val filteredDf = if(warehouseSpecSilver.exists(dataValidation = true)) {
+      filteredAuditLogDf
+        .unionByName(warehouseSpecSilver.asDF
+          .select(warehouseSummaryCols: _*))
+    }
+    else
+      filteredAuditLogDf
+
+    filteredDf
+  }
 
 }

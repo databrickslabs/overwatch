@@ -1357,7 +1357,7 @@ trait SilverTransforms extends SparkSessionWrapper {
   protected def buildWarehouseSpec(
                                   bronze_warehouse_snap: PipelineTable,
                                   isFirstRun: Boolean,
-                                  untilTime: TimeTypes
+                                  silver_warehouse_spec: PipelineTable
                                 )(df: DataFrame): DataFrame = {
     val lastWarehouseSnapW = Window.partitionBy('organization_id, 'warehouse_id)
       .orderBy('Pipeline_SnapTS.desc)
@@ -1367,11 +1367,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("rn", row_number().over(lastWarehouseSnapW))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
-    val filteredDf = df
-          .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
-            "editWarehouse", "deleteEndpoint", "deleteWarehouse") && responseSuccessFilter)
-
-    deriveWarehouseBase(filteredDf, auditBaseCols)
+    deriveInputForWarehouseBase(df,silver_warehouse_spec,auditBaseCols)
+    .transform(deriveWarehouseBase())
       .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest))
   }
 }

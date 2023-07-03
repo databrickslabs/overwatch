@@ -384,7 +384,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         buildWarehouseSpec(
           BronzeTargets.warehousesSnapshotTarget,
           warehouseSpecModule.isFirstRun,
-          warehouseSpecModule.untilTime
+          SilverTargets.warehousesSpecTarget
         )),
       append(SilverTargets.warehousesSpecTarget)
     )
