@@ -41,7 +41,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     val msg = s"Checkpoint Path Set: ${checkPointLocation} - proceeding with streaming write with source as ${sourceName}"
     logger.log(Level.INFO, msg)
 
-    var streamWriter = rawStreamingDF.writeStream.outputMode("append").format("delta").option("checkpointLocation", checkPointLocation)
+    var streamWriter = rawStreamingDF.writeStream.outputMode("append").trigger(Trigger.Once()).format("delta").option("checkpointLocation", checkPointLocation)
       .queryName(s"StreamTo_${sourceName}")
 
     streamWriter = if (cloneSpec.mode == WriteMode.overwrite) { // set overwrite && set overwriteSchema == true
