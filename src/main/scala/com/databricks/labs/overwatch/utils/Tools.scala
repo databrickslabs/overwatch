@@ -1034,15 +1034,15 @@ object Helpers extends SparkSessionWrapper {
   def getQueryListener(query: StreamingQuery, config: Config, minEventsPerTrigger: Long): StreamingQueryListener = {
     val streamManager = new StreamingQueryListener() {
       override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
-        println("Query started: " + queryStarted.id)
+        logger.log(Level.INFO,s"Query started: ${queryStarted.id}")
       }
 
       override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
-        println("Query terminated: " + queryTerminated.id)
+        logger.log(Level.INFO,s"Query terminated: ${queryTerminated.id}")
       }
 
       override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
-        println("Query made progress: " + queryProgress.progress)
+        logger.log(Level.INFO,s"Query made progress: ${queryProgress.id}")
         if (config.debugFlag) {
           println(query.status.prettyJson)
         }
