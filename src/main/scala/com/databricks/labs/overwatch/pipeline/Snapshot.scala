@@ -32,7 +32,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
   private val Config = _config
   private val processType = _processType
 
-  private[overwatch] def writeStream(sourceName:String,
+  private[overwatch] def streamWrite(sourceName:String,
                   checkPointLocation:String,
                   targetLocation:String,
                   rawStreamingDF:DataFrame,
@@ -116,7 +116,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
 
         }else //First time Streaming
         {
-         writeStream(sourceName:String,checkPointLocation:String,targetLocation:String,rawStreamingDF:DataFrame,cloneSpec:CloneDetail)
+          streamWrite(sourceName:String,checkPointLocation:String,targetLocation:String,rawStreamingDF:DataFrame,cloneSpec:CloneDetail)
         }
 
         val streamManager = Helpers.getQueryListener(streamWriter,workspace.getConfig, workspace.getConfig.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
