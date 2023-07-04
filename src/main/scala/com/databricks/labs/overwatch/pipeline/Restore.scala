@@ -23,7 +23,7 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
 
   import spark.implicits._
 
-  private val targetPrefix = removeTrailingSlashes(_targetPrefix)
+  private val target_storage_prefix = removeTrailingSlashes(_targetPrefix)
   private val workSpace = _workspace
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -36,16 +36,16 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
-    if (!Helpers.pathExists(targetPrefix)){
-      dbutils.fs.mkdirs(targetPrefix)
+    if (!Helpers.pathExists(target_storage_prefix)){
+      dbutils.fs.mkdirs(target_storage_prefix)
     }
 
     try {
-      if (dbutils.fs.ls(targetPrefix).isEmpty) {
-        val cloneSpecs = new Snapshot(workSpace.getConfig.databaseName, targetPrefix, workspace, workspace.database,
+      if (dbutils.fs.ls(target_storage_prefix).isEmpty) {
+        val cloneSpecs = new Snapshot(workSpace.getConfig.databaseName, target_storage_prefix, workspace, workspace.database,
           workspace.getConfig, "restore").buildCloneSpecs(cloneLevel, allTargets)
         val cloneReport = Helpers.parClone(cloneSpecs)
-        val restoreReportPath = s"${targetPrefix}/restore_report/"
+        val restoreReportPath = s"${target_storage_prefix}/restore_report/"
         logger.log(Level.INFO,s"Restoration is successful. Please check restoreReportPath ${restoreReportPath} for more details")
         cloneReport.toDS.write.format("delta").mode("append").save(restoreReportPath)
       } else {
