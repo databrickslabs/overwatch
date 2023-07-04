@@ -172,12 +172,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     }).toSeq
   }
 
-  private[overwatch] def incrementalSnap(
-                                          pipelineTables : Array[PipelineTable],
-                                          excludes: Option[String] = Some("")
-                                        ): Unit = {
-
-    val sourceToSnap = pipelineTables
+  private[overwatch] def tableToExclude (sourceToSnap : Array[PipelineTable], excludes: Option[String] = Some("")) : Array[PipelineTable] = {
 
     val exclude = excludes match {
       case Some(s) if s.nonEmpty => s
@@ -189,9 +184,19 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
     })
 
-    val sourceToSnapFiltered = sourceToSnap
+    sourceToSnap
       .filter(_.exists()) // source path must exist
       .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
+  }
+
+
+  private[overwatch] def incrementalSnap(
+                                          pipelineTables : Array[PipelineTable],
+                                          excludes: Option[String] = Some("")
+                                        ): Unit = {
+
+
+    val sourceToSnapFiltered = tableToExclude(pipelineTables,excludes)
 
     val cloneSpecs = buildCloneSpecs("Deep",sourceToSnapFiltered)
     snapStream(cloneSpecs)
@@ -256,12 +261,11 @@ object Snapshot extends SparkSessionWrapper {
    *
    * @param sourceETLDB        Source Database Name.
    * @param targetPrefix       Target snapshotRootPath
-   * @param pipeline           Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)
    * @param snapshotType       Type of Snapshot to be performed. "Full" for Full Snapshot , "Incremental" for Incremental Snapshot
+   * @param pipeline           Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)
    * @param tablesToExclude    Array of table names to exclude from the snapshot
    *                           this is the table name only - without the database prefix. By Default it is empty.
    * @param cloneLevel         Clone Level for Snapshot. By Default it is "Deep". You can also specify "Shallow" Clone.
-   *
    * @param processType        This argument specify the process type. Whether it is Restore, Migration or Snapshot. By Default it is Snapshot. This argument is
    *                           used internally by restore or Migration process by changing this argument.
    * @return

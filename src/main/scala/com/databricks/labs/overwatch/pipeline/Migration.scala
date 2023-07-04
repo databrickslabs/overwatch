@@ -89,6 +89,19 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
 object Migration extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  def apply(
+             sourceETLDB: String,
+             migrateRootPath:String,
+             configPath: String
+           ): Unit = {
+    apply(
+      sourceETLDB,
+      migrateRootPath,
+      configPath,
+      tablesToExclude = " "
+    )
+  }
+
   /**
    * Create a backup of the Overwatch datasets
    *
@@ -104,7 +117,7 @@ object Migration extends SparkSessionWrapper {
              sourceETLDB: String,
              migrateRootPath:String,
              configPath: String,
-             tablesToExclude :String = " "
+             tablesToExclude :String
            ): Unit = {
 
     val cloneLevel = "Deep"
