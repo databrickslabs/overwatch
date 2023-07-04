@@ -9,7 +9,6 @@ object MigrationRunner extends SparkSessionWrapper{
 
   def main(args: Array[String]): Unit = {
     envInit()
-
     if (args.length == 3) {
       val sourceETLDB = args(0)
       val migrateRootPath = args(1)
