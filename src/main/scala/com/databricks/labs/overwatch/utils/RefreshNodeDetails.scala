@@ -168,13 +168,20 @@ private class RefreshNodeDetails(
 
     // full join to get original df with all values from git where git fields (less keys) are renamed to be
     // suffixed with _update
-    val mergeUpdatesDF = instanceDetailsDF
-      .join(latestInstanceDetailsFromGitDF, keyFields, "full")
+    val mergeUpdatesDF = latestInstanceDetailsFromGitDF
+      .join(
+        instanceDetailsDF
+          .withColumnRenamed("organization_id", "target_organization_id")
+          .withColumnRenamed("API_Name", "target_API_Name"),
+        'target_organization_id === 'organization_id &&
+          'target_API_Name === 'API_Name
+        , "left")
 
     // identify record status as determined by whether it's a new key, changed value, or no change
     val isUpdateLogic = 'Hourly_DBUs =!= 'Hourly_DBUs_update && coalesce('Hourly_DBUs, 'Hourly_DBUs_update).isNotNull
+    val isInsertLogic = 'target_organization_id.isNull && 'target_API_Name.isNull // not matched - insert
     val recordStatus = when(isUpdateLogic, array(lit("update"), lit("newActive")))
-      .when('Hourly_DBUs.isNull, array(lit("insert")))
+      .when(isInsertLogic, array(lit("insert")))
       .otherwise(array(lit("noUpdate")))
 
     // define merge key logic for first key
