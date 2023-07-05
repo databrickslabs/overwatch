@@ -1042,7 +1042,7 @@ object Helpers extends SparkSessionWrapper {
       }
 
       override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
-        logger.log(Level.INFO,s"Query made progress: ${queryProgress.id}")
+        logger.log(Level.INFO,s"Query made progress: ${queryProgress.progress}")
         if (config.debugFlag) {
           println(query.status.prettyJson)
         }
