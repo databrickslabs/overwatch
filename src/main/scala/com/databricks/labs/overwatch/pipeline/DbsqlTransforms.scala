@@ -34,6 +34,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
       .select(
         'timestamp,
         'date,
+        'organization_id,
         'serviceName,
         'actionName,
         'userEmail,
@@ -53,13 +54,13 @@ object DbsqlTransforms extends SparkSessionWrapper {
         PipelineFunctions.fillForward("warehouse_type",warehouse_name_gen_w)
       )
 
-
-    val warehouseWithStructs = warehouseRaw
-      .withColumn("tags", SchemaTools.structFromJson(spark, warehouseRaw, "tags"))
-      .scrubSchema
-
-    warehouseWithStructs
-      .withColumn("tags", SchemaTools.structToMap(warehouseWithStructs, "tags"))
+    warehouseRaw
+//    val warehouseWithStructs = warehouseRaw
+//      .withColumn("tags", SchemaTools.structFromJson(spark, warehouseRaw, "tags"))
+//      .scrubSchema
+//
+//    warehouseWithStructs
+//      .withColumn("tags", SchemaTools.structToMap(warehouseWithStructs, "tags"))
   }
 
   /**
@@ -104,7 +105,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
           'creator_id,
           'spot_instance_policy,
           'enable_photon,
-          'channel,
+          get_json_object(to_json($"channel"), "$.name").alias("channel"),
           'tags,
           'enable_serverless_compute,
           'warehouse_type,
@@ -138,7 +139,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
       'warehouse_type
     )
 
-    val filteredAuditLogDf = auditLogDf
+    val auditLogDfWithStructs = auditLogDf
       .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
         "editWarehouse", "deleteEndpoint", "deleteWarehouse")
         && responseSuccessFilter
@@ -146,11 +147,40 @@ object DbsqlTransforms extends SparkSessionWrapper {
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .select(warehouseSummaryCols: _*)
 
+    val auditLogDfWithStructsToMap = auditLogDfWithStructs
+      .withColumn("tags", SchemaTools.structFromJson(spark, auditLogDfWithStructs, "tags"))
+      .scrubSchema
+
+
+    val filteredAuditLogDf = auditLogDfWithStructsToMap
+      .withColumn("tags", SchemaTools.structToMap(auditLogDfWithStructsToMap, "tags"))
 
     val filteredDf = if(warehouseSpecSilver.exists(dataValidation = true)) {
       filteredAuditLogDf
         .unionByName(warehouseSpecSilver.asDF
-          .select(warehouseSummaryCols: _*))
+          .select(
+            'timestamp,
+            'date,
+            'organization_id,
+            'serviceName,
+            'actionName,
+            'userEmail,
+            'requestId,
+            'response,
+            'warehouse_id,
+            'warehouse_name,
+            'cluster_size,
+            'min_num_clusters,
+            'max_num_clusters,
+            'auto_stop_mins,
+            'spot_instance_policy,
+            'enable_photon,
+            'channel,
+            'tags,
+            'enable_serverless_compute,
+            'warehouse_type
+          )
+        )
     }
     else
       filteredAuditLogDf
