@@ -1,8 +1,6 @@
 package com.databricks.labs.overwatch.api
 
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
-import com.databricks.labs.overwatch.utils.Helpers.createTraceabilityDF
-import com.databricks.labs.overwatch.utils.JsonUtils.{createJsonFromString, mergeJson}
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -515,13 +513,13 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   def asDF(): DataFrame = {
     var apiResultDF: DataFrame = null;
-    if (_apiResponseArray.size == 0 && !apiMeta.storeInTempLocation) { //If response contains no Data.
+    if (_apiResponseArray.size == 0 && !apiMeta.batchPersist) { //If response contains no Data.
       val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
         s"Details Below:\n$buildGenericErrorMessage"
       throw new ApiCallEmptyResponse(errMsg, true)
     } else if (_apiResponseArray.size != 0 && successTempPath.isEmpty) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
       apiResultDF = spark.read.json(Seq(_apiResponseArray.toString).toDS())
-    } else if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) { //Read the response from the Temp location/Disk and convert it to Dataframe.
+    } else if (apiMeta.batchPersist && successTempPath.nonEmpty) { //Read the response from the Temp location/Disk and convert it to Dataframe.
       apiResultDF = try {
         spark.read.json(successTempPath.get)
       } catch {
@@ -538,6 +536,38 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       spark.emptyDataFrame
     }else {
       extrapolateSupportedStructure(apiResultDF)
+    }
+  }
+
+  def asRawDF() : DataFrame = {
+    val apiResultDF: DataFrame =
+    if (_apiResponseArray.size == 0 && !apiMeta.batchPersist) { //If response contains no Data.
+      val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
+        s"Details Below:\n$buildGenericErrorMessage"
+      throw new ApiCallEmptyResponse(errMsg, true)
+    } else if (_apiResponseArray.size != 0 && successTempPath.isEmpty) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
+        spark.read.json(Seq(_apiResponseArray.toString).toDS())
+    } else if (apiMeta.batchPersist && successTempPath.nonEmpty) { //Read the response from the Temp location/Disk and convert it to Dataframe.
+       try {
+        spark.read.json(successTempPath.get)
+      } catch {
+        case e: AnalysisException if e.getMessage().contains("Path does not exist") => spark.emptyDataFrame
+      }
+    }else{
+      spark.emptyDataFrame
+    }
+
+
+
+    if (emptyDFCheck(apiResultDF)) {
+      val errMsg =
+        s"""API CALL Resulting DF is empty BUT no errors detected, progressing module.
+           |Details Below:\n$buildGenericErrorMessage""".stripMargin
+      logger.error(errMsg)
+      spark.emptyDataFrame
+    } else {
+     val rawDf = spark.read.json(apiResultDF.rdd.map(row => row.getAs[String]("rawResponse")))
+      extrapolateSupportedStructure(rawDf)
     }
   }
 
@@ -583,9 +613,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       // TOMES -- does jsonQuery hold all the meta we want? Don't forget ow run id Sriram: Run it we will add it in pipeline.append() function
-      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery))//for GET request we have to convert queryMap to Json
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,apiSuccessCount))//for GET request we have to convert queryMap to Json
     //  _apiResponseArray.add(response.body)
-      if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
+      if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         accumulator.add(1)
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
@@ -637,8 +667,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       // TOMES - why diff func here? Why not sending in jsonQuery?
-      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery))
-      if (apiMeta.storeInTempLocation && successTempPath.nonEmpty) {
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,apiSuccessCount))
+     // _apiResponseArray.add(response.body)
+      if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
           if (responseFlag) { //Clearing the resultArray in-case of successful write
@@ -654,10 +685,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
     try {
       executeHelper()
-      if (!apiMeta.storeInTempLocation) {
-        //write the responses into the temp location
-        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath, _apiResponseArray.toString) //Changes in apply() to get the temp directory
-      }
+      println(successTempPath.nonEmpty+"successTempPath.nonEmpty")
+      if (!apiMeta.batchPersist && successTempPath.nonEmpty) {
+        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
+         }
       this
     } catch {
       case e: java.lang.NoClassDefFoundError => {

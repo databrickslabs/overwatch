@@ -4,7 +4,7 @@ import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
-import com.databricks.labs.overwatch.utils.Helpers.{createTraceabilityDF, deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
+import com.databricks.labs.overwatch.utils.Helpers.{ deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -506,12 +506,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private def processClusterEvents(tmpClusterEventsSuccessPath: String, organizationId: String, erroredBronzeEventsTarget: PipelineTable): DataFrame = {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
-        deriveRawApiResponseDF(spark.read.json(tmpClusterEventsSuccessPath))
-      if (spark.read.json(tmpClusterEventsSuccessPath).columns.contains("events")) {
+        val baseDF = spark.read.json(tmpClusterEventsSuccessPath)
+        val rawDf = spark.read.json(baseDF.rdd.map(row => row.getAs[String]("rawResponse")))
+      println("count for rawDF"+rawDf.count())
+      if (rawDf.columns.contains("events")) {
         try {
-
           val tdf = SchemaScrubber.scrubSchema(
-            spark.read.json(tmpClusterEventsSuccessPath)
+            rawDf
               .select(explode('events).alias("events"))
               .select(col("events.*"))
           ).scrubSchema

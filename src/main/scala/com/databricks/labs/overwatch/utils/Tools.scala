@@ -1036,5 +1036,9 @@ object Helpers extends SparkSessionWrapper {
     // TOMES -- include error column in case catch
   def deriveRawApiResponseDF(dataFrame: DataFrame)= ???
 
+  def deriveApiTempDir(tempWOrkingDir: String, endpointDir: String , pipelineSnapTs: TimeTypes):String = {
+    s"${tempWOrkingDir}/${endpointDir}/success_" + pipelineSnapTs.asUnixTimeMilli
+  }
+
 
 }

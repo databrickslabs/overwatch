@@ -57,7 +57,9 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    *
    * @return
    */
-  def getJobsDF: DataFrame = {
+  def getJobsDF(apiTempPath: String): DataFrame = {
+
+    println("apiTempPath :"+apiTempPath)
 
     val jobsEndpoint = "jobs/list"
     val query = Map(
@@ -65,9 +67,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "expand_tasks" -> "true",
       "offset" -> "0"
     )
-    ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1,"tempDir")//Option if non we should not break it if temp dir is not present then we will not record it
+    ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1)//Option if non we should not break it if temp dir is not present then we will not record it
+      .setSuccessTempPath(apiTempPath)
       .execute()
-      .asDF()
+      .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -79,11 +82,12 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getConfig: Config = config
 
-  def getClustersDF: DataFrame = {
+  def getClustersDF(tempApiDir: String): DataFrame = {
     val clustersEndpoint = "clusters/list"
     ApiCallV2(config.apiEnv, clustersEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
-      .asDF()
+      .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -98,7 +102,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val jsonQuery = s"""{"path":"${dbfsPath}"}"""
     ApiCallV2(config.apiEnv, dbfsEndpoint, jsonQuery)
       .execute()
-      .asDF()
+      .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -111,7 +115,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val poolsEndpoint = "instance-pools/list"
     ApiCallV2(config.apiEnv, poolsEndpoint)
       .execute()
-      .asDF()
+      .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -122,7 +126,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getProfilesDF: DataFrame = {
     val profilesEndpoint = "instance-profiles/list"
-    ApiCallV2(config.apiEnv, profilesEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv, profilesEndpoint).execute().asRawDF().withColumn("organization_id", lit(config.organizationId))
 
   }
 
@@ -133,7 +137,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getWorkspaceUsersDF: DataFrame = {
     val workspaceEndpoint = "workspace/list"
-    ApiCallV2(config.apiEnv, workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv, workspaceEndpoint).execute().asRawDF().withColumn("organization_id", lit(config.organizationId))
   }
 
   def getSqlQueryHistoryDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
@@ -157,7 +161,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes, untilTime: TimeTypes, pipelineSnapTime: TimeTypes): DataFrame = {
     val sqlQueryHistoryEndpoint = "sql/history/queries"
     val untilTimeMs = untilTime.asUnixTimeMilli
     val fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
@@ -174,7 +178,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
     // calling function to make parallel API calls
     val apiCallV2Obj = new ApiCallV2(config.apiEnv)
-    val tmpSqlQueryHistorySuccessPath= apiCallV2Obj.makeParallelApiCalls(sqlQueryHistoryEndpoint, jsonInput, config)
+    val tmpSqlQueryHistorySuccessPath= apiCallV2Obj.makeParallelApiCalls(sqlQueryHistoryEndpoint, jsonInput, pipelineSnapTime.asUnixTimeMilli,config)
     logger.log(Level.INFO, " sql query history landing completed")
 
     if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
@@ -229,31 +233,34 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val libsEndpoint = "libraries/all-cluster-statuses"
     ApiCallV2(config.apiEnv, libsEndpoint)
       .execute()
-      .asDF()
+      .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getClusterPolicies: DataFrame = {
+  def getClusterPolicies(tempApiDir: String): DataFrame = {
     val policiesEndpoint = "policies/clusters/list"
     ApiCallV2(config.apiEnv, policiesEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
-      .asDF()
+      .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getTokens: DataFrame = {
+  def getTokens(tempApiDir: String): DataFrame = {
     val tokenEndpoint = "token/list"
     ApiCallV2(config.apiEnv, tokenEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
-      .asDF()
+      .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getGlobalInitScripts: DataFrame = {
+  def getGlobalInitScripts(tempApiDir: String): DataFrame = {
     val globalInitScEndpoint = "global-init-scripts"
     ApiCallV2(config.apiEnv, globalInitScEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
-      .asDF()
+      .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 

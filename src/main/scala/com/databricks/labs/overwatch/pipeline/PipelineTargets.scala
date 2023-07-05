@@ -48,7 +48,8 @@ abstract class PipelineTargets(config: Config) {
       statsColumns = "created_time, creator_user_name, job_id, Pipeline_SnapTS, Overwatch_RunID".split(", "),
       partitionBy = Seq("organization_id"),
       masterSchema = Some(Schema.jobSnapMinimumSchema),
-      apiEndpointTempDir = Some("jobs_list")
+      apiEndpointTempDir = Some("jobs_list"),
+
     )
 
     lazy private[overwatch] val clustersSnapshotTarget: PipelineTable = PipelineTable(

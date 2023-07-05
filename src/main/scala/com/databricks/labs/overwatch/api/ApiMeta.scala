@@ -2,9 +2,10 @@ package com.databricks.labs.overwatch.api
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.ApiEnv
-import com.databricks.labs.overwatch.utils.JsonUtils.{createJsonFromString, mergeJson}
-import com.fasterxml.jackson.databind.JsonNode
+import com.databricks.labs.validation.LocalTest.sc
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import org.apache.log4j.{Level, Logger}
+import org.json.JSONObject
 import scalaj.http.{Http, HttpRequest, HttpResponse}
 
 /**
@@ -17,7 +18,7 @@ trait ApiMeta {
   protected var _paginationToken: String = _
   protected var _dataframeColumn: String = "*"
   protected var _apiCallType: String = _
-  protected var _storeInTempLocation = false
+  protected var _batchPersist = false
   protected var _apiV = "api/2.0"
   protected var _isDerivePaginationLogic = false
   protected var _apiEnv: ApiEnv = _
@@ -33,7 +34,7 @@ trait ApiMeta {
 
   protected[overwatch] def apiCallType: String = _apiCallType
 
-  protected[overwatch] def storeInTempLocation: Boolean = _storeInTempLocation
+  protected[overwatch] def batchPersist: Boolean = _batchPersist
 
   protected[overwatch] def apiV: String = _apiV
 
@@ -53,8 +54,8 @@ trait ApiMeta {
     this
   }
 
-  private[overwatch] def setStoreInTempLocation(value: Boolean): this.type = {
-    _storeInTempLocation = value
+  private[overwatch] def setBatchPersist(value: Boolean): this.type = {
+    _batchPersist = value
     this
   }
 
@@ -140,7 +141,7 @@ trait ApiMeta {
        |paginationToken: ${paginationToken}
        |dataframeColumns: ${dataframeColumn}
        |apiCallType: ${apiCallType}
-       |storeInTempLocation: ${storeInTempLocation}
+       |storeInTempLocation: ${batchPersist}
        |apiV: ${apiV}
        |isDerivePaginationLogic: ${isDerivePaginationLogic}
        |""".stripMargin
@@ -164,7 +165,23 @@ trait ApiMeta {
    */
     //TOMES -- change name to enrichAPIResponse (or something)
     //TOMES -- workspaceName and runID and snapTS will get added when we database.write api_events_bronze
-  private[overwatch] def enrichAPIResponse(response: HttpResponse[String],jsonQuery: String): String = ???
+  private[overwatch] def enrichAPIResponse(response: HttpResponse[String],jsonQuery: String,apiSuccessCount: Int): String = {
+
+      val jsonObject = new JSONObject();
+      jsonObject.put("rawResponse", response.body)
+      jsonObject.put("apiMeta",
+        s"""{"apiTraceabilityMeta" :{"api_name": ${apiName} ,"response_code": ${response.code},"jsonQuery": ${jsonQuery} ,"apiSuccessCount": ${apiSuccessCount} }}"""
+          )//.stripMargin.replace("\"", "")
+      println(jsonObject.toString)
+      //String to json for testing
+    /*  val mapper = new ObjectMapper()
+      val om = mapper.readTree(jsonObject.toString);*/
+      jsonObject.toString
+
+
+
+    }
+
     /*The output json will look like below
           { rawResponse: {.......},
             apiTraceabilityMeta : {
@@ -237,7 +254,7 @@ class SqlQueryHistoryApi extends ApiMeta {
   setPaginationToken("next_page_token")
   setDataframeColumn("res")
   setApiCallType("GET")
-  setStoreInTempLocation(true)
+  setBatchPersist(true)
   setIsDerivePaginationLogic(true)
 
   private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
@@ -334,7 +351,7 @@ class ClusterEventsApi extends ApiMeta {
   setPaginationToken("next_page")
   setDataframeColumn("events")
   setApiCallType("POST")
-  setStoreInTempLocation(true)
+  setBatchPersist(true)
 
   private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long,jsonInput: Map[String, String]): Map[String, String] = {
     val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
@@ -364,7 +381,7 @@ class JobRunsApi extends ApiMeta {
   setApiCallType("GET")
   setPaginationKey("has_more")
   setIsDerivePaginationLogic(true)
-  setStoreInTempLocation(true)
+  setBatchPersist(true)
 
   private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
     jsonObject.get(paginationKey).asBoolean()
