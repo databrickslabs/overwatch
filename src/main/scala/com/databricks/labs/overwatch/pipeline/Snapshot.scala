@@ -240,6 +240,54 @@ object Snapshot extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  def validate(sourceETLDB : String,
+               targetPrefix : String,
+               snapshotType : String,
+               pipeline : String = "Bronze,Silver,Gold",
+               tablesToExclude : String = " ",
+               cloneLevel: String = "Deep",
+               processType : String = "Snapshot"): Unit = {
+
+    val processingStartTime = System.currentTimeMillis()
+    // Check whether sourceETLDB is Overwatch Database
+    val isOverwatchDB = spark.sessionState.catalog.getDatabaseMetadata(sourceETLDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
+    if (isOverwatchDB){
+      logger.log(Level.INFO, s"${sourceETLDB} is Overwatch Database and suitable for Snapshot")
+    }else{
+      val errMsg = s"${sourceETLDB} is Not Overwatch Database and not suitable for Snapshot"
+      throw new BadConfigException(errMsg)
+    }
+
+    // Snapshot Type should be Incremental or Full
+    if (snapshotType == "Incremental" || snapshotType == "Full"){
+      println(s"Snapshot Type is Suitable for Snapshot Process. Provided SnapshotType value is ${snapshotType}")
+    }else{
+      val errMsg = s"Provided SnapshotType value is ${snapshotType}. SnapshotType value should be either Full or Incremental. Can Not Proceed with Snapshot"
+      throw new BadConfigException(errMsg)
+    }
+
+    // Pipeline Should be Bronze, Sliver Or Gold
+
+    val pipelineList = pipeline.split(",").map(_.toLowerCase)
+
+    for (layer <- pipelineList){
+      if (layer == "bronze" || layer == "silver" || layer == "gold") {
+        println(s"Zone should be either Bronze,Silver or Gold. Provied Zone value is ${layer}")
+      }else
+      {
+        val errMsg = s"Unknown Zone found ${layer}, Zone should be either Bronze,Silver or Gold"
+        throw new BadConfigException(errMsg)
+      }}
+
+    // Clone Level should be "Deep" or "Shallow"
+    if (cloneLevel == "Deep" || cloneLevel == "SHALLOW"){
+      println(s"cloneLevel Type is Suitable for Snapshot Process. Provided cloneLevel value is ${cloneLevel}")
+    }else{
+      val errMsg = s"Provided cloneLevel value is ${cloneLevel}. cloneLevel value should be Deep Full or SHALLOW. Can Not Proceed with Snapshot"
+      throw new BadConfigException(errMsg)
+    }
+
+  }
 
   def apply(
              sourceETLDB: String,
@@ -293,7 +341,7 @@ object Snapshot extends SparkSessionWrapper {
       if (layer == "bronze" || layer == "silver" || layer == "gold") {
         //validated
       }else{
-        val errMsg = s"Unknown Zone found ${pipeline}, Zone should be either Bronze,Silver or Gold"
+        val errMsg = s"Unknown Zone found ${layer}, Zone should be either Bronze,Silver or Gold"
         throw new BadConfigException(errMsg)
       }
     })
