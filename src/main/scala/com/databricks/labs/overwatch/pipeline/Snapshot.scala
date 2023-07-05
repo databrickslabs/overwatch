@@ -248,7 +248,6 @@ object Snapshot extends SparkSessionWrapper {
                cloneLevel: String = "Deep",
                processType : String = "Snapshot"): Unit = {
 
-    val processingStartTime = System.currentTimeMillis()
     // Check whether sourceETLDB is Overwatch Database
     val isOverwatchDB = spark.sessionState.catalog.getDatabaseMetadata(sourceETLDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
     if (isOverwatchDB){

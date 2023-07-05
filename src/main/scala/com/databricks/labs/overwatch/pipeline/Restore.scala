@@ -49,7 +49,7 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
         logger.log(Level.INFO,s"Restoration is successful. Please check restoreReportPath ${restoreReportPath} for more details")
         cloneReport.toDS.write.format("delta").mode("append").save(restoreReportPath)
       } else {
-        logger.log(Level.INFO, "Target Path is not Empty...... Could not proceed with Restoration")
+        logger.log(Level.ERROR, "Target Path is not Empty...... Could not proceed with Restoration")
       }
 
     } catch {
@@ -62,6 +62,47 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
 
 object Restore extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
+
+  def Validate(sourcePrefix : String,
+               targetPrefix : String,
+              ): Unit = {
+
+    // Check whether the SourcePrefix Exists
+    if(Helpers.pathExists(sourcePrefix)){
+      println("SourcePrefix Path Exists.")
+    }else{
+      val errMsg = s"${sourcePrefix} does not Exists. Can not Proceed with Restore Process"
+      throw new BadConfigException(errMsg)
+    }
+
+    // Check whether the Source Prefix does contain Overwatch Data
+    val sourcePath = s"${sourcePrefix}/data"
+    val pipReportPath = s"${sourcePath}/pipeline_report"
+    try {
+      dbutils.fs.ls(s"$pipReportPath/_delta_log").nonEmpty
+      logger.log(Level.INFO, s"This ${pipReportPath} location corresponds to previous Overwatch Deployment... proceed Restoration")
+    } catch {
+      case e: FileNotFoundException => {
+        val msg = s"This ${pipReportPath} location does not corresponds to previous Overwatch Deployment...can not proceed with Restoration"
+        logger.log(Level.ERROR, msg)
+        throw new BadConfigException(msg)
+      }
+      case e: Throwable => {
+        val failMsg = PipelineFunctions.appendStackStrace(e, "Unable to proceed with Restoration")
+        logger.log(Level.ERROR, failMsg)
+        throw e
+      }
+    }
+
+    if (dbutils.fs.ls(removeTrailingSlashes(targetPrefix)).isEmpty){
+      println(s"Target Path ${targetPrefix} is Empty and is Suitable for Restore Process")
+
+    }else{
+      val failMsg = s"Target Path ${targetPrefix} is not Empty...... can not proceed with Restoration"
+      throw new BadConfigException(failMsg)
+    }
+  }
+
 
   /**
    * Create a backup of the Overwatch datasets
@@ -81,21 +122,6 @@ object Restore extends SparkSessionWrapper {
 
       val sourcePath = s"${sourcePrefix}/data"
       val pipReportPath = s"${sourcePath}/pipeline_report"
-      try {
-        dbutils.fs.ls(s"$pipReportPath/_delta_log").nonEmpty
-        logger.log(Level.INFO, s"This ${pipReportPath} location corresponds to previous Overwatch Deployment... proceed Restoration")
-      } catch {
-        case e: FileNotFoundException => {
-          val msg = s"This ${pipReportPath} location does not corresponds to previous Overwatch Deployment...can not proceed with Restoration"
-          logger.log(Level.ERROR, msg)
-          throw new BadConfigException(msg)
-        }
-        case e: Throwable => {
-          val failMsg = PipelineFunctions.appendStackStrace(e, "Unable to proceed with Restoration")
-          logger.log(Level.ERROR, failMsg)
-          throw e
-        }
-      }
 
       val workSpace = Helpers.getRemoteWorkspaceByPath(pipReportPath, true, orgID)
 
