@@ -252,7 +252,7 @@ object Snapshot extends SparkSessionWrapper {
     // Check whether sourceETLDB is Overwatch Database
     val isOverwatchDB = spark.sessionState.catalog.getDatabaseMetadata(sourceETLDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
     if (isOverwatchDB){
-      logger.log(Level.INFO, s"${sourceETLDB} is Overwatch Database and suitable for Snapshot")
+      println(s"${sourceETLDB} is Overwatch Database and suitable for Snapshot")
     }else{
       val errMsg = s"${sourceETLDB} is Not Overwatch Database and not suitable for Snapshot"
       throw new BadConfigException(errMsg)
