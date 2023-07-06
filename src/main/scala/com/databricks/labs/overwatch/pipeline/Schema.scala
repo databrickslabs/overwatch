@@ -725,6 +725,29 @@ object Schema extends SparkSessionWrapper {
     StructField("workspace_name", StringType, nullable = true)
   ))
 
+  val instanceDetailsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id", StringType, nullable = false),
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("Hourly_DBUs", DoubleType, nullable = false),
+    StructField("isActive", BooleanType, nullable = false),
+    StructField("activeFrom", DateType, nullable = false),
+    StructField("activeUntil", DateType, nullable = true),
+    StructField("Compute_Contract_Price", DoubleType, nullable = false),
+    StructField("Memory_GB", DoubleType, nullable = false),
+    StructField("vCPUs", IntegerType, nullable = false),
+    StructField("API_Name", StringType, nullable = false)
+  ))
+
+  val dbuCostDetailsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id", StringType, nullable = false),
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("isActive", BooleanType, nullable = false),
+    StructField("activeFrom", DateType, nullable = false),
+    StructField("activeUntil", DateType, nullable = true),
+    StructField("sku", StringType, nullable = false),
+    StructField("contract_price", DoubleType, nullable = false)
+  ))
+
   /**
    * Minimum required schema by module. "Minimum Requierd Schema" means that at least these columns of these types
    * must exist for the downstream ETLs to function.
