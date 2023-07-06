@@ -63,7 +63,7 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
 object Restore extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def Validate(sourcePrefix : String,
+  def validate(sourcePrefix : String,
                targetPrefix : String,
               ): Unit = {
 
