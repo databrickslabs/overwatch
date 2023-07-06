@@ -721,7 +721,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterBaseDF = clusterBase(df)
     val clusterBaseWMetaDF = clusterBaseDF
       // remove start, startResults, and permanentDelete as they do not contain sufficient metadata
-      .filter('actionName.isin("create", "edit"))
+      .filter('actionName.isin("create", "edit", "resize"))
 
     val lastClusterSnapW = Window.partitionBy('organization_id, 'cluster_id)
       .orderBy('Pipeline_SnapTS.desc)
