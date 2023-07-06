@@ -618,7 +618,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .select(SchemaTools.modifyStruct(poolsRawWithStructs.schema, changeInventory): _*)
 
       poolsBase
-        .filter('actionName.isin("create", "edit", "delete", "resize"))
+        .filter('actionName.isin("create", "edit", "delete"))
         .withColumn("instance_pool_id", when('actionName === "create", get_json_object($"response.result", "$.instance_pool_id")).otherwise('instance_pool_id))
         .withColumn("preloaded_spark_versions", get_json_object('preloaded_spark_versions, "$."))
         .withColumn("rnk", rank().over(exactlyOnceFilterW))
@@ -808,7 +808,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     } else (None, None)
 
     val basePoolsDF = auditRawTable.asDF
-      .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit", "resize"))
+      .filter('serviceName === "instancePools" && 'actionName.isin("create", "edit"))
       .cache()
 
     basePoolsDF.count
@@ -900,7 +900,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     // lookup pools node types from audit logs if records present
     val clusterBaseWithPools = if (driverPoolLookup.nonEmpty) {
       clusterBaseFilled
-        .filter('actionName.isin("create", "edit", "snapImpute", "resize"))
+        .filter('actionName.isin("create", "edit", "snapImpute"))
         .toTSDF("timestamp", "organization_id", "instance_pool_id")
         .lookupWhen(
           workerPoolLookup.get
@@ -912,7 +912,7 @@ trait SilverTransforms extends SparkSessionWrapper {
             .toTSDF("timestamp", "organization_id", "driver_instance_pool_id")
         ).df
     } else { // driver pool does not exist -- filter and add null lookup cols
-      clusterBaseFilled.filter('actionName.isin("create", "edit", "snapImpute", "resize"))
+      clusterBaseFilled.filter('actionName.isin("create", "edit", "snapImpute"))
         .withColumn("driver_instance_pool_name", lit(null).cast("string"))
         .withColumn("instance_pool_name", lit(null).cast("string"))
         .withColumn("pool_driver_node_type", lit(null).cast("string"))
