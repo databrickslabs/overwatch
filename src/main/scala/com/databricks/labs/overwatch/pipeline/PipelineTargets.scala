@@ -136,7 +136,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("API_Name"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.instanceDetailsMinimumSchema)
     )
 
     lazy private[overwatch] val cloudMachineDetailViewTarget: PipelineView = PipelineView(
@@ -150,7 +151,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("sku"),
       config,
       incrementalColumns = Array("activeFrom"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.dbuCostDetailsMinimumSchema)
     )
 
     lazy private[overwatch] val dbuCostDetailViewTarget: PipelineView = PipelineView(
