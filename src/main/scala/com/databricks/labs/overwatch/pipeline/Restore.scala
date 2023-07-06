@@ -95,7 +95,7 @@ object Restore extends SparkSessionWrapper {
     }
 
     if (!Helpers.pathExists(targetPrefix)){
-      dbutils.fs.mkdirs(targetPrefix)
+        dbutils.fs.mkdirs(targetPrefix)
     }
     if (dbutils.fs.ls(removeTrailingSlashes(targetPrefix)).isEmpty){
       println(s"Target Path ${targetPrefix} is Empty and is Suitable for Restore Process")
