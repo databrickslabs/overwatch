@@ -178,7 +178,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       case Some(s) if s.nonEmpty => s
       case _ => ""
     }
-    val excludeList = exclude.split(",")
+    val excludeList = exclude.split(",").map(_.trim)
 
     val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
       if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
@@ -211,21 +211,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
-    val sourceToSnap = pipelineTables
-    val exclude = excludes match {
-      case Some(s) if s.nonEmpty => s
-      case _ => ""
-    }
-    val excludeList = exclude.split(",")
-
-    val cleanExcludes = excludeList.map(_.toLowerCase).map(exclude => {
-      if (exclude.contains(".")) exclude.split("\\.").takeRight(1).head else exclude
-    })
-
-
-    val sourceToSnapFiltered = sourceToSnap
-      .filter(_.exists()) // source path must exist
-      .filterNot(t => cleanExcludes.contains(t.name.toLowerCase))
+    val sourceToSnapFiltered = tableToExclude(pipelineTables,excludes)
 
     val cloneSpecs = buildCloneSpecs(cloneLevel,sourceToSnapFiltered)
     val cloneReport = Helpers.parClone(cloneSpecs)
