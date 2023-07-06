@@ -841,7 +841,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
         ).alias("TaskExecutionRunTime"), // from cluster up and run begin until terminal event
         'run_name,
-        coalesce('jobClusterType_Started, 'jobClusterType_Completed).alias("clusterType"),
+        when(coalesce('jobClusterType_Started, 'jobClusterType_Completed).isNull and ('job_clusters.isNotNull or 'new_cluster.isNotNull), "new")
+      .otherwise(coalesce('jobClusterType_Started, 'jobClusterType_Completed)).alias("clusterType"),
         coalesce('jobTaskType_Started, 'jobTaskType_Completed).alias("taskType"),
         coalesce('jobTriggerType_Triggered,'jobTriggerType_Started, 'jobTriggerType_Completed, 'jobTriggerType_runNow).alias("jobTriggerType"),
         when('cancellationRequestId.isNotNull, "Cancelled")
