@@ -512,7 +512,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
         "custom_tags", "node_type_id", "current_num_workers", "uptime_in_state_H", "total_DBU_cost")
       .distinct
-      .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
+//      .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
       .withColumnRenamed("cluster_id", "clusterId")
       .withColumnRenamed("current_num_workers", "node_count")
       .withColumn("total_dbu_cost_ps", col("total_DBU_cost") / col("uptime_in_state_H")/lit(3600))
@@ -543,19 +543,61 @@ trait GoldTransforms extends SparkSessionWrapper {
       'unixTimeMS
     )
 
-    val notebookCodeAndMetaDF = auditIncrementalDF
+    val auditDF = auditIncrementalDF
       .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .withColumnRenamed("timestamp", "unixTimeMS")
-      .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
+      .withColumn("timestamp", from_unixtime(col("unixTimeMSStart") / 1000.0).cast("timestamp"))
       .withColumn("executionTime",col("executionTime").cast("double"))
+      .withColumn("unixTimeMSEnd",(col("unixTimeMSStart")+(col("executionTime")*1000)).cast("double"))
       .filter('notebookId.isNotNull)
-      .toTSDF("unixTimeMS", "organization_id", "date","notebookId")
-      .lookupWhen(
-        notebookLookupTSDF,
-        maxLookAhead = 100
-      )
-      .df
+
+    val clsfDF = clsfLookupTSDF.df
+    val joinedDF = auditDF.join(clsfDF,Seq("clusterId"),"left")
+
+    // Cluster_state started before cmd start time and ended before command end time
+    val state_before_before = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end < 'unixTimeMSEnd
+
+    // Cluster_state started on or after command start time and ended on or before command end time
+    val state_after_before = 'unixTimeMS_state_start >= 'unixTimeMSStart && 'unixTimeMS_state_end <= 'unixTimeMSEnd
+
+    // cluster_state started after command start time and ended after command end time
+    val state_after = 'unixTimeMS_state_start > 'unixTimeMSStart && 'unixTimeMS_state_end > 'unixTimeMSEnd
+
+    // Cluster State Started before cmd start time and ended after command run time
+    val state_before_after = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end > 'unixTimeMSEnd
+
+    val windowSpec  = Window.partitionBy("commandId","clusterId","unixTimeMSStart","unixTimeMSEnd").orderBy("executionTime")
+
+    val joinedDF_before_before = joinedDF.filter(state_before_before)
+      .withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec))
+      .withColumn("rnk",rank.over(windowSpec))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+
+    val joinedDF_after_before = joinedDF.filter(state_after_before).withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec))
+      .withColumn("rnk",rank.over(windowSpec))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+    val joinedDF_after = joinedDF.filter(state_after).withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec))
+      .withColumn("rnk",rank.over(windowSpec))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+    val joinedDF_before_after = joinedDF.filter(state_before_after).withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec))
+      .withColumn("rnk",rank.over(windowSpec))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+
+    val unionDF = joinedDF_before_before.union(joinedDF_after_before).union(joinedDF_after).union(joinedDF_before_after)
+      .withColumn("total_dbu_cost_ps", avg(col("avg_total_dbu_cost_ps")).over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec))
+      .withColumn("rnk",rank.over(windowSpec))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn").drop("avg_total_dbu_cost_ps")
+
+    val df = joinedDF.join(unionDF,Seq("unixTimeMSStart","unixTimeMSEnd","commandId"),"leftAnti")
+
+    val notebookClsfDF = unionDF.union(df)
+    val notebookCodeAndMetaDF = notebookClsfDF
       .toTSDF("unixTimeMS", "organization_id", "clusterId")
       .lookupWhen(
         clsfLookupTSDF,
@@ -567,6 +609,30 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     println("Verbose Audit Log Created")
     notebookCodeAndMetaDF.select(colNames: _*)
+//    val notebookCodeAndMetaDF = auditIncrementalDF
+//      .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
+//      .selectExpr("*", "requestParams.*").drop("requestParams")
+//      .withColumnRenamed("timestamp", "unixTimeMS")
+//      .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
+//      .withColumn("executionTime",col("executionTime").cast("double"))
+//      .filter('notebookId.isNotNull)
+//      .toTSDF("unixTimeMS", "organization_id", "date","notebookId")
+//      .lookupWhen(
+//        notebookLookupTSDF,
+//        maxLookAhead = 100
+//      )
+//      .df
+//      .toTSDF("unixTimeMS", "organization_id", "clusterId")
+//      .lookupWhen(
+//        clsfLookupTSDF,
+//        tsPartitionVal = 8
+//      )
+//      .df
+//      .withColumn("estimated_dbu_cost", col("executionTime") * col("total_dbu_cost_ps"))
+//      .drop("cluster_id")
+//
+//    println("Verbose Audit Log Created")
+//    notebookCodeAndMetaDF.select(colNames: _*)
   }
 
   protected def buildSparkJob(
