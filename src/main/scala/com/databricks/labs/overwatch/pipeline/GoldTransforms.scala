@@ -500,6 +500,7 @@ trait GoldTransforms extends SparkSessionWrapper {
                                  )(auditIncrementalDF: DataFrame): DataFrame = {
 
 
+
     val notebookLookupTSDF = notebook.asDF
       .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS","date")
       .withColumnRenamed("notebook_id", "notebookId")
@@ -507,16 +508,16 @@ trait GoldTransforms extends SparkSessionWrapper {
       .distinct
       .toTSDF("unixTimeMS", "organization_id","date","notebookId")
 
-    val clsfLookupTSDF = clsfIncrementalDF
+    val clsfDF = clsfIncrementalDF
       .select(
-        "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id", "cluster_name",
-        "custom_tags", "node_type_id", "current_num_workers", "uptime_in_state_H", "total_DBU_cost")
+        "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id",
+        "current_num_workers", "uptime_in_state_H", "total_DBU_cost","unixTimeMS_state_end")
       .distinct
-//      .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
+      //      .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
       .withColumnRenamed("cluster_id", "clusterId")
       .withColumnRenamed("current_num_workers", "node_count")
       .withColumn("total_dbu_cost_ps", col("total_DBU_cost") / col("uptime_in_state_H")/lit(3600))
-      .toTSDF("unixTimeMS", "organization_id", "clusterId")
+
 
     val colNames: Array[Column] = Array(
       'organization_id,
@@ -542,18 +543,15 @@ trait GoldTransforms extends SparkSessionWrapper {
       'userAgent.alias("user_agent"),
       'unixTimeMS
     )
-
     val auditDF = auditIncrementalDF
       .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
       .selectExpr("*", "requestParams.*").drop("requestParams")
-      .withColumnRenamed("timestamp", "unixTimeMS")
+      .withColumnRenamed("timestamp", "unixTimeMSStart")
       .withColumn("timestamp", from_unixtime(col("unixTimeMSStart") / 1000.0).cast("timestamp"))
       .withColumn("executionTime",col("executionTime").cast("double"))
       .withColumn("unixTimeMSEnd",(col("unixTimeMSStart")+(col("executionTime")*1000)).cast("double"))
       .filter('notebookId.isNotNull)
-
-    val clsfDF = clsfLookupTSDF.df
-    val joinedDF = auditDF.join(clsfDF,Seq("clusterId"),"left")
+    val joinedDF = auditDF.join(clsfDF,Seq("clusterId","organization_id"),"left")
 
     // Cluster_state started before cmd start time and ended before command end time
     val state_before_before = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end < 'unixTimeMSEnd
@@ -588,6 +586,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("rnk",rank.over(windowSpec))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
+
     val unionDF = joinedDF_before_before.union(joinedDF_after_before).union(joinedDF_after).union(joinedDF_before_after)
       .withColumn("total_dbu_cost_ps", avg(col("avg_total_dbu_cost_ps")).over(windowSpec))
       .withColumn("rn",row_number.over(windowSpec))
@@ -596,13 +595,15 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val df = joinedDF.join(unionDF,Seq("unixTimeMSStart","unixTimeMSEnd","commandId"),"leftAnti")
 
-    val notebookClsfDF = unionDF.union(df)
+    //
+
+    val notebookClsfDF = unionDF.union(df.select(unionDF.schema.fieldNames.map(col): _*))
     val notebookCodeAndMetaDF = notebookClsfDF
-      .toTSDF("unixTimeMS", "organization_id", "clusterId")
-      .lookupWhen(
-        clsfLookupTSDF,
-        tsPartitionVal = 8
-      )
+      .toTSDF("unixTimeMS", "organization_id", "date","notebookId")
+            .lookupWhen(
+              notebookLookupTSDF,
+              maxLookAhead = 100
+            )
       .df
       .withColumn("estimated_dbu_cost", col("executionTime") * col("total_dbu_cost_ps"))
       .drop("cluster_id")
