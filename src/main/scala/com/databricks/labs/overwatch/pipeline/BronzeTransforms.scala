@@ -965,7 +965,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // If cloud provider is GCP and if it is a multi workspace deployment, then we need to create the cluster logs path
     // using default GCS bucket and organisation-id else input-column containing the cluster-log path will be returned
     if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment &&
-      organisationId != dbutils.notebook.getContext.tags("orgId")) {
+      organisationId != Initializer.getOrgId) {
       regexp_replace(inputCol, "dbfs:/", s"gs://databricks-${organisationId}/${organisationId}/")
     }
     else {
