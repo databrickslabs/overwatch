@@ -415,6 +415,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("date",
             split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
           .drop("filenameAR")
+          .verifyMinimumSchema(Schema.auditMasterSchema)
       } else {
         throw new Exception(auditLogsFailureMsg)
       }
