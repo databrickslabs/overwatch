@@ -960,8 +960,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
    * @param organisationId
    * @return
    */
-  private def fetchClusterLogConfiguration(cloudProvider: String, inputCol: Column,
-                                   isMultiWorkSpaceDeployment: Boolean, organisationId: String): Column = {
+  private def fetchClusterLogConfiguration(cloudProvider: String,
+                                           inputCol: Column,
+                                           isMultiWorkSpaceDeployment: Boolean,
+                                           organisationId: String): Column = {
     // If cloud provider is GCP and if it is a multi workspace deployment, then we need to create the cluster logs path
     // using default GCS bucket and organisation-id else input-column containing the cluster-log path will be returned
     if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment &&
