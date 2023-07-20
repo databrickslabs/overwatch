@@ -7,6 +7,7 @@ This section is meant for analysts and Data Engineers looking for more detail on
 Data Ingestion Process and also contains the data dictionary for all columns delivered to the presentation layer.
 
 * [Data Dictionary (Latest)]({{%relref "dataengineer/definitions/_index.md"%}})
+    * [0.7.1.x]({{%relref "dataengineer/definitions/071x.md"%}})
     * [0.6.1.x]({{%relref "dataengineer/definitions/061x.md"%}})
     * [0.5.x](/images/_index/Overwatch_Gold_05x.png)
 * [Overwatch Pipeline Details & Management]({{%relref "dataengineer/Pipeline_Management.md"%}})
@@ -26,5 +27,5 @@ Data Ingestion Process and also contains the data dictionary for all columns del
 
 
 ## Overwatch ERD
-![OverwatchERD](/images/_index/Overwatch_Gold_070.png)
+![OverwatchERD](/images/_index/Overwatch_Gold_072x.png)
 For full fidelity image, right click and save the image.
