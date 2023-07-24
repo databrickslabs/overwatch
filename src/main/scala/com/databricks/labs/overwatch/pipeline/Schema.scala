@@ -159,10 +159,8 @@ object Schema extends SparkSessionWrapper {
         StructField("aws_attributes", StringType, nullable = true),
         StructField("azure_attributes", StringType, nullable = true),
         StructField("gcp_attributes", StringType, nullable = true),
-        StructField("instanceId", StringType, nullable = true),
         StructField("port", StringType, nullable = true),
         StructField("publicKey", StringType, nullable = true),
-        StructField("containerId", StringType, nullable = true),
         StructField("userName", StringType, nullable = true),
         StructField("user", StringType, nullable = true),
         StructField("email", StringType, nullable = true),
@@ -211,6 +209,8 @@ object Schema extends SparkSessionWrapper {
         // EXPLICIT EXCLUSIONS -- fields will not be in targetDF
         StructField("organization_id", NullType, nullable = true),
         StructField("shardName", NullType, nullable = true),
+        StructField("containerId", NullType, nullable = true),
+        StructField("instanceId", NullType, nullable = true),
         StructField("orgId", NullType, nullable = true),
         StructField("version", NullType, nullable = true),
         //adding schema used for photon evolution
