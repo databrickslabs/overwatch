@@ -77,6 +77,8 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
       .whenNotMatched
       .insertAll()
       .execute()
+
+    spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
   }
 
 
@@ -127,7 +129,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
         streamWriter.awaitTermination()
         spark.streams.removeListener(streamManager)
         logger.log (Level.INFO, s"Streaming COMPLETE: ${cloneSpec.source} --> ${cloneSpec.target}")
-        spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
+
         CloneReport(cloneSpec, s"Streaming For: ${cloneSpec.source} --> ${cloneSpec.target}", "SUCCESS")
 
       } catch {
@@ -172,7 +174,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     }).toSeq
   }
 
-  private[overwatch] def tableToExclude (sourceToSnap : Array[PipelineTable], excludes: Option[String] = Some("")) : Array[PipelineTable] = {
+  private[overwatch] def filteredTables(sourceToSnap : Array[PipelineTable], excludes: Option[String] = Some("")) : Array[PipelineTable] = {
 
     val exclude = excludes match {
       case Some(s) if s.nonEmpty => s
@@ -196,9 +198,9 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
                                         ): Unit = {
 
 
-    val sourceToSnapFiltered = tableToExclude(pipelineTables,excludes)
+    val sourceToSnapFiltered = filteredTables(pipelineTables,excludes)
 
-    val cloneSpecs = buildCloneSpecs("Deep",sourceToSnapFiltered)
+    val cloneSpecs = buildCloneSpecs("DEEP",sourceToSnapFiltered)
     snapStream(cloneSpecs)
   }
 
@@ -211,7 +213,7 @@ class Snapshot (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspa
     require(acceptableCloneLevels.contains(cloneLevel.toUpperCase), s"SNAP CLONE ERROR: cloneLevel provided is " +
       s"$cloneLevel. CloneLevels supported are ${acceptableCloneLevels.mkString(",")}.")
 
-    val sourceToSnapFiltered = tableToExclude(pipelineTables,excludes)
+    val sourceToSnapFiltered = filteredTables(pipelineTables,excludes)
 
     val cloneSpecs = buildCloneSpecs(cloneLevel,sourceToSnapFiltered)
     val cloneReport = Helpers.parClone(cloneSpecs)
@@ -226,13 +228,11 @@ object Snapshot extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def validate(sourceETLDB : String,
-               targetPrefix : String,
+  def isValid(sourceETLDB : String,
                snapshotType : String,
                pipeline : String = "Bronze,Silver,Gold",
-               tablesToExclude : String = " ",
-               cloneLevel: String = "Deep",
-               processType : String = "Snapshot"): Unit = {
+               cloneLevel: String = "DEEP",
+               ): Boolean = {
 
     // Check whether sourceETLDB is Overwatch Database
     val isOverwatchDB = spark.sessionState.catalog.getDatabaseMetadata(sourceETLDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
@@ -253,7 +253,7 @@ object Snapshot extends SparkSessionWrapper {
 
     // Pipeline Should be Bronze, Sliver Or Gold
 
-    val pipelineList = pipeline.split(",").map(_.toLowerCase)
+    val pipelineList = pipeline.split(",").map(_.toLowerCase).map(_.trim)
 
     for (layer <- pipelineList){
       if (layer == "bronze" || layer == "silver" || layer == "gold") {
@@ -271,6 +271,8 @@ object Snapshot extends SparkSessionWrapper {
       val errMsg = s"Provided cloneLevel value is ${cloneLevel}. cloneLevel value should be Deep Full or SHALLOW. Can Not Proceed with Snapshot"
       throw new BadConfigException(errMsg)
     }
+    println("Validation successful.You Can proceed with Snapshot process")
+    true
 
   }
 
@@ -283,7 +285,7 @@ object Snapshot extends SparkSessionWrapper {
       targetPrefix,
       snapshotType,
       pipeline = "Bronze,Silver,Gold",
-      tablesToExclude = " ",
+      tablesToExclude = "",
       cloneLevel = "Deep",
       processType = "Snapshot"
     )
@@ -308,58 +310,63 @@ object Snapshot extends SparkSessionWrapper {
             targetPrefix : String,
             snapshotType : String,
             pipeline : String = "Bronze,Silver,Gold",
-            tablesToExclude : String = " ",
-            cloneLevel: String = "Deep",
+            tablesToExclude : String = "",
+            cloneLevel: String = "DEEP",
             processType : String = "Snapshot"
            ): Unit = {
-    val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
-    val bronze = Bronze(snapWorkSpace)
-    val silver = Silver(snapWorkSpace)
-    val gold = Gold(snapWorkSpace)
-    val pipelineReport = bronze.pipelineStateTarget
 
-    val snapshotObj = new Snapshot(sourceETLDB, targetPrefix, snapWorkSpace, snapWorkSpace.database, snapWorkSpace.getConfig,processType)
 
-    val pipelineList = pipeline.split(",").map(_.toLowerCase)
+    if (isValid(sourceETLDB, snapshotType, pipeline, cloneLevel)) {
+      val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
+      val bronze = Bronze(snapWorkSpace)
+      val silver = Silver(snapWorkSpace)
+      val gold = Gold(snapWorkSpace)
+      val pipelineReport = bronze.pipelineStateTarget
 
-    pipelineList.foreach(layer => {
-      if (layer == "bronze" || layer == "silver" || layer == "gold") {
-        //validated
-      }else{
-        val errMsg = s"Unknown Zone found ${layer}, Zone should be either Bronze,Silver or Gold"
-        throw new BadConfigException(errMsg)
-      }
-    })
-    try {
-      for (layer <- pipelineList) {
-        val pipelineTables = if (layer == "bronze") {
-          bronze.getAllTargets
-        } else if (layer == "silver") {
-          silver.getAllTargets
+      val snapshotObj = new Snapshot(sourceETLDB, targetPrefix, snapWorkSpace, snapWorkSpace.database, snapWorkSpace.getConfig, processType)
+
+      val pipelineList = pipeline.split(",").map(_.toLowerCase)
+
+      pipelineList.foreach(layer => {
+        if (layer == "bronze" || layer == "silver" || layer == "gold") {
+          //validated
         } else {
-          gold.getAllTargets
+          val errMsg = s"Unknown Zone found ${layer}, Zone should be either Bronze,Silver or Gold"
+          throw new BadConfigException(errMsg)
         }
+      })
+      try {
+        for (layer <- pipelineList) {
+          val pipelineTables = if (layer == "bronze") {
+            bronze.getAllTargets
+          } else if (layer == "silver") {
+            silver.getAllTargets
+          } else {
+            gold.getAllTargets
+          }
 
+          if (snapshotType.toLowerCase() == "incremental") {
+            snapshotObj.incrementalSnap(pipelineTables, Some(tablesToExclude))
+          } else {
+            snapshotObj.snap(pipelineTables, cloneLevel, Some(tablesToExclude))
+          }
+        }
         if (snapshotType.toLowerCase() == "incremental") {
-          snapshotObj.incrementalSnap(pipelineTables, Some(tablesToExclude))
+          snapshotObj.incrementalSnap(Array(pipelineReport), Some(tablesToExclude))
         } else {
-          snapshotObj.snap(pipelineTables, cloneLevel, Some(tablesToExclude))
+          snapshotObj.snap(Array(pipelineReport), cloneLevel, Some(tablesToExclude))
         }
-      }
-      if (snapshotType.toLowerCase() == "incremental") {
-        snapshotObj.incrementalSnap(Array(pipelineReport), Some(tablesToExclude))
-      } else {
-        snapshotObj.snap(Array(pipelineReport), cloneLevel, Some(tablesToExclude))
-      }
 
-    }catch{
-      case e: Throwable =>
-        val failMsg = PipelineFunctions.appendStackStrace(e,"Unable to proceed with Snapshot Process")
-        logger.log(Level.ERROR, failMsg)
-        throw e
+      } catch {
+        case e: Throwable =>
+          val failMsg = PipelineFunctions.appendStackStrace(e, "Unable to proceed with Snapshot Process")
+          logger.log(Level.ERROR, failMsg)
+          throw e
+      }
+    } else {
+      throw new BadConfigException("Validation Failed for Snapshot. Can not Proceed with Snapshot Process")
     }
   }
-
 }
 
 

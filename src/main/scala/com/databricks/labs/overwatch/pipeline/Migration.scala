@@ -104,16 +104,15 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
 object Migration extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def validate (sourceETLDB: String,
-                migrateRootPath:String,
-                configPath: String): Unit = {
+  def isValid (sourceETLDB: String,
+                configPath: String): Boolean = {
 
     // Validate ETlDB
     val isOverwatchDB = spark.sessionState.catalog.getDatabaseMetadata(sourceETLDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
     if (isOverwatchDB){
-      println(s"${sourceETLDB} is Overwatch Database and suitable for Snapshot")
+      println(s"${sourceETLDB} is Overwatch Database and suitable for Migration")
     }else{
-      val errMsg = s"${sourceETLDB} is Not Overwatch Database and not suitable for Snapshot"
+      val errMsg = s"${sourceETLDB} is Not Overwatch Database and not suitable for Migration"
       throw new BadConfigException(errMsg)
     }
 
@@ -131,21 +130,13 @@ object Migration extends SparkSessionWrapper {
         throw new BadConfigException("Unable to find Delta table" + configPath)
       }
     }
+    val configDF = new MultiWorkspaceDeployment().generateBaseConfig(configPath).filter(col("etl_database_name") === sourceETLDB)
+    if (configDF.select("storage_prefix").distinct().count() != 1){
+      throw new BadConfigException("Migration is not possible where multiple different storage_prefix present for etl_database_name")
+    }
+    println("Validation successful.You Can proceed with Migration process")
+    true
 
-
-  }
-
-  def apply(
-             sourceETLDB: String,
-             migrateRootPath:String,
-             configPath: String
-           ): Unit = {
-    apply(
-      sourceETLDB,
-      migrateRootPath,
-      configPath,
-      tablesToExclude = " "
-    )
   }
 
   /**
@@ -154,7 +145,7 @@ object Migration extends SparkSessionWrapper {
    * @param sourceETLDB         Source Database name or ETlDataPathPrefix name.
    * @param migrateRootPath     Target path to where migration need to be performed.
    * @param configPath          Configuration Path where the config file for the source is present. Path can be CSV file or delta path or delta table.
-   * @param tablesToExclude     Array of table names to exclude from the snapshot
+   * @param tablesToExclude     Array of table names to exclude from the Migration.
    *                            this is the table name only - without the database prefix. By Default it is empty.
    * @return
    */
@@ -163,39 +154,43 @@ object Migration extends SparkSessionWrapper {
              sourceETLDB: String,
              migrateRootPath:String,
              configPath: String,
-             tablesToExclude :String
+             tablesToExclude :String = ""
            ): Unit = {
 
     val cloneLevel = "Deep"
 
-    val configDF = new MultiWorkspaceDeployment().generateBaseConfig(configPath).filter(col("etl_database_name") === sourceETLDB)
-    if (configDF.select("storage_prefix").distinct().count() != 1){
-      throw new BadConfigException("Migration is not possible where multiple different storage_prefix present for etl_database_name")
+
+    if (isValid(sourceETLDB,configPath))
+    {
+      val configDF = new MultiWorkspaceDeployment().generateBaseConfig(configPath).filter(col("etl_database_name") === sourceETLDB)
+      val pipeline = "Bronze,Silver,Gold"
+      val etlDatabase = sourceETLDB
+      val consumerDatabase = configDF.select("consumer_database_name").distinct().collect()(0)(0)
+
+
+      // Step 01 - Start Migration Process
+      try {
+        Snapshot(sourceETLDB, migrateRootPath, "full",pipeline, tablesToExclude, cloneLevel, "Migration")
+      }
+      catch{
+        case e: Throwable =>
+          val failMsg = PipelineFunctions.appendStackStrace(e,"Unable to proceed with Migration  Process")
+          logger.log(Level.ERROR, failMsg)
+          throw e
+      }
+
+      //Step 02 - Update Config with the latest Storage Prefix
+      new Migration(sourceETLDB,migrateRootPath,configPath).updateConfig()
+
+      //Step 03 - Drop Source ETLDatabase and Consumer Database after Migration
+      spark.sql(s"DROP DATABASE ${etlDatabase} CASCADE")
+      spark.sql(s"DROP DATABASE ${consumerDatabase} CASCADE")
+
+      logger.log(Level.INFO, "Migration Completed. Please delete the external data from storage for all source etl database tables")
+
+  }else{
+      throw new BadConfigException("Validation Failed for Migration. Can not Proceed with Migration")
     }
-    val pipeline = "Bronze,Silver,Gold"
-    val etlDatabase = sourceETLDB
-    val consumerDatabase = configDF.select("consumer_database_name").distinct().collect()(0)(0)
-
-
-    // Step 01 - Start Migration Process
-    try {
-      Snapshot(sourceETLDB, migrateRootPath, "full",pipeline, tablesToExclude, cloneLevel, "Migration")
-    }
-    catch{
-      case e: Throwable =>
-        val failMsg = PipelineFunctions.appendStackStrace(e,"Unable to proceed with Migration  Process")
-        logger.log(Level.ERROR, failMsg)
-        throw e
-    }
-
-    //Step 02 - Update Config with the latest Storage Prefix
-    new Migration(sourceETLDB,migrateRootPath,configPath).updateConfig()
-
-    //Step 03 - Drop Source ETLDatabase and Consumer Database after Migration
-    spark.sql(s"DROP DATABASE ${etlDatabase} CASCADE")
-    spark.sql(s"DROP DATABASE ${consumerDatabase} CASCADE")
-
-    logger.log(Level.INFO, "Migration Completed. Please delete the external data from storage for all source etl database tables")
   }
 }
 

@@ -41,16 +41,12 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
     }
 
     try {
-      if (dbutils.fs.ls(target_storage_prefix).isEmpty) {
-        val cloneSpecs = new Snapshot(workSpace.getConfig.databaseName, target_storage_prefix, workspace, workspace.database,
-          workspace.getConfig, "restore").buildCloneSpecs(cloneLevel, allTargets)
-        val cloneReport = Helpers.parClone(cloneSpecs)
-        val restoreReportPath = s"${target_storage_prefix}/restore_report/"
-        logger.log(Level.INFO,s"Restoration is successful. Please check restoreReportPath ${restoreReportPath} for more details")
-        cloneReport.toDS.write.format("delta").mode("append").save(restoreReportPath)
-      } else {
-        logger.log(Level.ERROR, "Target Path is not Empty...... Could not proceed with Restoration")
-      }
+      val cloneSpecs = new Snapshot(workSpace.getConfig.databaseName, target_storage_prefix, workspace, workspace.database,
+        workspace.getConfig, "restore").buildCloneSpecs(cloneLevel, allTargets)
+      val cloneReport = Helpers.parClone(cloneSpecs)
+      val restoreReportPath = s"${target_storage_prefix}/restore_report/"
+      logger.log(Level.INFO,s"Restoration is successful. Please check restoreReportPath ${restoreReportPath} for more details")
+      cloneReport.toDS.write.format("delta").mode("append").save(restoreReportPath)
 
     } catch {
       case e: Throwable =>
@@ -63,9 +59,9 @@ class Restore (_sourceETLDB: String, _targetPrefix: String, _workspace: Workspac
 object Restore extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def validate(sourcePrefix : String,
+  def isValid(sourcePrefix : String,
                targetPrefix : String,
-              ): Unit = {
+              ): Boolean = {
 
     // Check whether the SourcePrefix Exists
     if(Helpers.pathExists(sourcePrefix)){
@@ -92,8 +88,8 @@ object Restore extends SparkSessionWrapper {
         logger.log(Level.ERROR, failMsg)
         throw e
       }
-    }
 
+    }
     if (!Helpers.pathExists(targetPrefix)){
         dbutils.fs.mkdirs(targetPrefix)
     }
@@ -101,9 +97,12 @@ object Restore extends SparkSessionWrapper {
       println(s"Target Path ${targetPrefix} is Empty and is Suitable for Restore Process")
 
     }else{
-      val failMsg = s"Target Path ${targetPrefix} is not Empty...... can not proceed with Restoration"
+      val failMsg = s"Target path: ${targetPrefix} is not empty, please provide a different path"
       throw new BadConfigException(failMsg)
     }
+
+    println("Validation successful.You Can proceed with Restoration process")
+    true
   }
 
 
@@ -120,33 +119,33 @@ object Restore extends SparkSessionWrapper {
                targetPrefix : String,
              ): Unit = {
 
-      val orgID = Initializer.getOrgId
-      val cloneLevel = "Deep"
+      if (isValid(sourcePrefix, targetPrefix)) {
+        val orgID = Initializer.getOrgId
+        val cloneLevel = "Deep"
 
-      val sourcePath = s"${sourcePrefix}/data"
-      val pipReportPath = s"${sourcePath}/pipeline_report"
+        val sourcePath = s"${sourcePrefix}/data"
+        val pipReportPath = s"${sourcePath}/pipeline_report"
 
-      val workSpace = Helpers.getRemoteWorkspaceByPath(pipReportPath, true, orgID)
+        val workSpace = Helpers.getRemoteWorkspaceByPath(pipReportPath, true, orgID)
 
-      val bronze = Bronze(workSpace)
-      val silver = Silver(workSpace)
-      val gold = Gold(workSpace)
-      val pipelineReport = bronze.pipelineStateTarget
-      val allTarget = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets ++ Array(pipelineReport).filter(_.exists(dataValidation = true))
+        val bronze = Bronze(workSpace)
+        val silver = Silver(workSpace)
+        val gold = Gold(workSpace)
+        val pipelineReport = bronze.pipelineStateTarget
+        val allTarget = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets ++ Array(pipelineReport).filter(_.exists(dataValidation = true))
 
-      try {
-        val restoreObj = new Restore(workSpace.getConfig.databaseName, targetPrefix, workSpace, workSpace.database, workSpace.getConfig)
-        restoreObj.restore(allTarget,cloneLevel)
-        logger.log(Level.INFO, "Restoration Completed")
-      }catch {
-        case e: Throwable =>
-          val failMsg = PipelineFunctions.appendStackStrace(e,"Unable to proceed with Restoration")
-          logger.log(Level.ERROR, failMsg)
-          throw e
+        try {
+          val restoreObj = new Restore(workSpace.getConfig.databaseName, targetPrefix, workSpace, workSpace.database, workSpace.getConfig)
+          restoreObj.restore(allTarget, cloneLevel)
+          logger.log(Level.INFO, "Restoration Completed")
+        } catch {
+          case e: Throwable =>
+            val failMsg = PipelineFunctions.appendStackStrace(e, "Unable to proceed with Restoration")
+            logger.log(Level.ERROR, failMsg)
+            throw e
+        }
+      } else {
+        throw new BadConfigException("Validation Failed for Restoration. Can not Proceed with Restore")
       }
     }
-
-
-
-
 }
