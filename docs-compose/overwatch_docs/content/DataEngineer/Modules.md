@@ -27,6 +27,7 @@ Scopes are:
 * [notebooks](#notebooks)
 * [DBSQL](#dbsql)
 * [sparkEvents](#sparkevents)
+* [verboseAuditLogging](#verboseauditlogging)
 
 The default is to use all scopes so if none are specified in the configuration, all scopes will be enabled. Currently,
 under normal, daily operations, there no significant cost to any of these modules. It's likely best to leave them
@@ -251,3 +252,10 @@ Additional clarification of the Spark Hierachy can be found on this [Spark+AI Su
   due to node failure, the task + attempt is marked as failed and a new attempt is executed on another node. The
   ExecutorID is the node on which the work was executed.
   ![TaskViz](/images/GettingStarted/Modules/Task_Detail.png)
+
+### VerboseAuditLogging
+*Requires:* Audit|Notebook|ClusterEvents
+
+*Gold Entities:* NotebookCommands
+
+To enable this module user need to enable verbose logging in their workspace. This module that enables the materialization of notebooks commands with cost dimension related to the notebook commands.
