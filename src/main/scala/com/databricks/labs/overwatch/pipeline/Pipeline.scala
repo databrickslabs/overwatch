@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.pipeline
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.pipeline.Pipeline.{deriveLocalDate, systemZoneId, systemZoneOffset}
+import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveApiTempErrDir}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -438,11 +439,28 @@ class Pipeline(
 
 
   //Persist the Api Data
-  private def persistApiEvents(target: PipelineTable, module: Module): Unit = ???
+  private def persistApiEvents(target: PipelineTable, module: Module): Unit = {
     //call getTempApiData and get the data then persist it
+    println("inside persistApiEvents"+target.apiEndpointTempDir.nonEmpty)
+    println("inside apiEndpointTempDir"+target.apiEndpointTempDir)
+    if(target.apiEndpointTempDir.nonEmpty) {
+      println("inside apiEndpointTempDir nonempty")
+     val successPath = deriveApiTempDir(config.tempWorkingDir,BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)
+      println("successPath"+successPath)
+      if(target.apiEndpointTempDir.get.toLowerCase().equals("cluster_events")){// for cluster/events api we store the failed events in another directory
+        val tmpClusterEventsErrorPath = deriveApiTempErrDir(config.tempWorkingDir, BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get, pipelineSnapTime)
+        println("in tmpClusterEventsErrorPath method" + tmpClusterEventsErrorPath)
+      }
+
+
+    }
+  }
+
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
 //    val startTime = System.currentTimeMillis()
+
+    println(" DATA IN DF"+ df.count())
 
     val finalDF = PipelineFunctions.optimizeDFForWrite(df, target)
 
@@ -463,7 +481,8 @@ class Pipeline(
     }
 
     //Persisting API data if target has temp dir is present
-    //persistApiEvents(apiEventsTarget,module)
+    println("calling persistApiEvents")
+    persistApiEvents(target,module)
     // if (isAPIDependent) createAPIDF(...)
     // def createAPIDF {
 //    target.apiSuffix + "/" + pipelineSnapTime

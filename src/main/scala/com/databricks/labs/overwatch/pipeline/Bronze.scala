@@ -103,7 +103,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendJobsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getJobsDF(deriveApiTempDir("/tmp/Sriram/",BronzeTargets.jobsSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
+        workspace.getJobsDF(deriveApiTempDir(config.tempWorkingDir,BronzeTargets.jobsSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
         Seq(cleanseRawJobsSnapDF(BronzeTargets.jobsSnapshotTarget.keys, config.runID)),
         append(BronzeTargets.jobsSnapshotTarget)
       )
@@ -113,7 +113,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClustersAPIProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getClustersDF(deriveApiTempDir("/tmp/Sriram/",BronzeTargets.clustersSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
+        workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir,BronzeTargets.clustersSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
         Seq(cleanseRawClusterSnapDF),
         append(BronzeTargets.clustersSnapshotTarget)
       )
@@ -123,7 +123,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendPoolsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getPoolsDF,
+        workspace.getPoolsDF(deriveApiTempDir(config.tempWorkingDir,BronzeTargets.poolsSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
         Seq(cleanseRawPoolsDF()),
         append(BronzeTargets.poolsSnapshotTarget)
       )
@@ -214,7 +214,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendLibsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getClusterLibraries,
+        workspace.getClusterLibraries(deriveApiTempDir(config.tempWorkingDir,BronzeTargets.libsSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
         append(BronzeTargets.libsSnapshotTarget)
       )
   }
@@ -223,7 +223,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendPoliciesProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getClusterPolicies(deriveApiTempDir("/tmp/Sriram/",BronzeTargets.policiesSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
+        workspace.getClusterPolicies(deriveApiTempDir(config.tempWorkingDir,BronzeTargets.policiesSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
         append(BronzeTargets.policiesSnapshotTarget)
       )
   }
@@ -232,7 +232,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendInstanceProfileProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getProfilesDF,
+        workspace.getProfilesDF(deriveApiTempDir(config.tempWorkingDir,BronzeTargets.instanceProfilesSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
         append(BronzeTargets.instanceProfilesSnapshotTarget)
       )
   }
@@ -241,7 +241,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendTokenProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getTokens(deriveApiTempDir("/tmp/Sriram/",BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
+        workspace.getTokens(deriveApiTempDir(config.tempWorkingDir,BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
         append(BronzeTargets.tokensSnapshotTarget)
       )
   }
@@ -250,7 +250,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendGlobalInitScProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getGlobalInitScripts(deriveApiTempDir("/tmp/Sriram/",BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
+        workspace.getGlobalInitScripts(deriveApiTempDir(config.tempWorkingDir,BronzeTargets.globalInitScSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)),
         append(BronzeTargets.globalInitScSnapshotTarget)
       )
   }

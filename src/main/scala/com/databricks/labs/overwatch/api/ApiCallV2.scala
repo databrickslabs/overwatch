@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.api
 
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.utils.Helpers.deriveRawApiResponseDF
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -341,6 +342,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       hibernate(response)
       execute()
     } else {
+      PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,apiSuccessCount))
       throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = false)
     }
 
@@ -545,7 +547,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
         s"Details Below:\n$buildGenericErrorMessage"
       throw new ApiCallEmptyResponse(errMsg, true)
-    } else if (_apiResponseArray.size != 0 && successTempPath.isEmpty) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
+    } else if (_apiResponseArray.size != 0 ) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
         spark.read.json(Seq(_apiResponseArray.toString).toDS())
     } else if (apiMeta.batchPersist && successTempPath.nonEmpty) { //Read the response from the Temp location/Disk and convert it to Dataframe.
        try {
@@ -557,8 +559,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       spark.emptyDataFrame
     }
 
-
-
     if (emptyDFCheck(apiResultDF)) {
       val errMsg =
         s"""API CALL Resulting DF is empty BUT no errors detected, progressing module.
@@ -566,11 +566,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       logger.error(errMsg)
       spark.emptyDataFrame
     } else {
-     val rawDf = spark.read.json(apiResultDF.rdd.map(row => row.getAs[String]("rawResponse")))
+     //val rawDf = spark.read.json(apiResultDF.rdd.map(row => row.getAs[String]("rawResponse")))
+     val rawDf = deriveRawApiResponseDF(apiResultDF)
+     // rawDf.as[TraceApi]
       extrapolateSupportedStructure(rawDf)
     }
   }
+ case class ApiCallMeta(apiName: String, response_code: Int, jsonQuery: String, apiSuccessCount: Int)
 
+  case class TraceApi(apiCallMeta: ApiCallMeta, rawResponse: String)
 
   private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
     val mapper = new ObjectMapper()
@@ -593,12 +597,30 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   private def emptyDFCheck(apiResultDF: DataFrame): Boolean = {
-    if (apiResultDF.columns.length == 0) { //Check number of columns in result Dataframe
+/*    if (apiResultDF.columns.length == 0) { //Check number of columns in result Dataframe
       true
     } else if (apiResultDF.columns.size == 1 && apiResultDF.columns.contains(apiMeta.paginationKey)) { //Check if only pagination key in present in the response
       true
     } else {
       false
+    }*/
+
+  val filteredDf =  apiResultDF.select('rawResponse)
+      .filter('rawResponse =!= "{}")
+    if (filteredDf.isEmpty) {
+      true
+    } else {
+    val rawDF= filteredDf
+        .withColumn("rawResponse", SchemaTools.structFromJson(spark, apiResultDF, "rawResponse"))
+        .select("rawResponse.*")
+      rawDF.show(false)
+      if (rawDF.columns.length == 0) { //Check number of columns in result Dataframe
+        true
+      } else if (rawDF.columns.size == 1 && rawDF.columns.contains(apiMeta.paginationKey)) { //Check if only pagination key in present in the response
+        true
+      } else {
+        false
+      }
     }
   }
 
@@ -666,7 +688,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeHelper(): this.type = {
       val response = getResponse
       responseCodeHandler(response)
-      // TOMES - why diff func here? Why not sending in jsonQuery?
       _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,apiSuccessCount))
      // _apiResponseArray.add(response.body)
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
@@ -686,9 +707,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     try {
       executeHelper()
       println(successTempPath.nonEmpty+"successTempPath.nonEmpty")
-      if (!apiMeta.batchPersist && successTempPath.nonEmpty) {
-        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
-         }
       this
     } catch {
       case e: java.lang.NoClassDefFoundError => {
@@ -709,6 +727,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         e.printStackTrace()
         logger.log(Level.WARN, excMsg, e)
         throw e
+      }
+    }finally {
+      if (!apiMeta.batchPersist && successTempPath.nonEmpty) {
+        println("finally persisting the data "+successTempPath.get)
+        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
       }
     }
   }

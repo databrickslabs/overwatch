@@ -111,9 +111,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    *
    * @return
    */
-  def getPoolsDF: DataFrame = {
+  def getPoolsDF(tempApiDir: String): DataFrame = {
     val poolsEndpoint = "instance-pools/list"
     ApiCallV2(config.apiEnv, poolsEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
@@ -124,9 +125,13 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    *
    * @return
    */
-  def getProfilesDF: DataFrame = {
+  def getProfilesDF(tempApiDir: String): DataFrame = {
     val profilesEndpoint = "instance-profiles/list"
-    ApiCallV2(config.apiEnv, profilesEndpoint).execute().asRawDF().withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv, profilesEndpoint)
+      .setSuccessTempPath(tempApiDir)
+      .execute()
+      .asRawDF()
+      .withColumn("organization_id", lit(config.organizationId))
 
   }
 
@@ -229,9 +234,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       })
   }
 
-  def getClusterLibraries: DataFrame = {
+  def getClusterLibraries(tempApiDir: String): DataFrame = {
     val libsEndpoint = "libraries/all-cluster-statuses"
     ApiCallV2(config.apiEnv, libsEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
@@ -248,11 +254,14 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   def getTokens(tempApiDir: String): DataFrame = {
     val tokenEndpoint = "token/list"
-    ApiCallV2(config.apiEnv, tokenEndpoint)
+   val df = ApiCallV2(config.apiEnv, tokenEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
       .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
+
+    println("token df size"+df.count())
+    df
   }
 
   def getGlobalInitScripts(tempApiDir: String): DataFrame = {

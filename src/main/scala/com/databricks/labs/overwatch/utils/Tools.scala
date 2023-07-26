@@ -1034,10 +1034,24 @@ object Helpers extends SparkSessionWrapper {
    * @param dataFrame
    */
     // TOMES -- include error column in case catch
-  def deriveRawApiResponseDF(dataFrame: DataFrame)= ???
+  def deriveRawApiResponseDF(dataFrame: DataFrame) : DataFrame ={
+    val filteredDf =  dataFrame.select('rawResponse)
+        .filter('rawResponse =!= "{}")
+      if(filteredDf.isEmpty){
+         filteredDf
+      }else {
+         filteredDf
+          .withColumn("rawResponse", SchemaTools.structFromJson(spark, dataFrame, "rawResponse"))
+          .select("rawResponse.*")
+      }
+    }
 
   def deriveApiTempDir(tempWOrkingDir: String, endpointDir: String , pipelineSnapTs: TimeTypes):String = {
     s"${tempWOrkingDir}/${endpointDir}/success_" + pipelineSnapTs.asUnixTimeMilli
+  }
+
+  def deriveApiTempErrDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
+    s"${tempWOrkingDir}/${endpointDir}/error_" + pipelineSnapTs.asUnixTimeMilli
   }
 
 

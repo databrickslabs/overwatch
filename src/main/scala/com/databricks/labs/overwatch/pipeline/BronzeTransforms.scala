@@ -507,7 +507,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
         val baseDF = spark.read.json(tmpClusterEventsSuccessPath)
-        val rawDf = spark.read.json(baseDF.rdd.map(row => row.getAs[String]("rawResponse")))
+        val rawDf = deriveRawApiResponseDF(baseDF)
       println("count for rawDF"+rawDf.count())
       if (rawDf.columns.contains("events")) {
         try {
@@ -586,11 +586,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
 
+    println("landing data in"+tmpClusterEventsSuccessPath)
+
     landClusterEvents(clusterIDs, startTime, endTime, apiEnv, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
       tmpClusterEventsErrorPath, config)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
-        spark.read.json(tmpClusterEventsErrorPath)
+        deriveRawApiResponseDF(spark.read.json(tmpClusterEventsErrorPath))
           .withColumn("from_ts", toTS(col("from_epoch")))
           .withColumn("until_ts", toTS(col("until_epoch"))),
         database,

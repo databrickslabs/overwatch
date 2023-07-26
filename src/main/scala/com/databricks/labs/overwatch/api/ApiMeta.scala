@@ -168,7 +168,7 @@ trait ApiMeta {
   private[overwatch] def enrichAPIResponse(response: HttpResponse[String],jsonQuery: String,apiSuccessCount: Int): String = {
 
       val jsonObject = new JSONObject();
-      jsonObject.put("rawResponse", response.body)
+      jsonObject.put("rawResponse", response.body.trim)
       jsonObject.put("apiMeta",
         s"""{"apiTraceabilityMeta" :{"api_name": ${apiName} ,"response_code": ${response.code},"jsonQuery": ${jsonQuery} ,"apiSuccessCount": ${apiSuccessCount} }}"""
           )//.stripMargin.replace("\"", "")
@@ -177,7 +177,6 @@ trait ApiMeta {
     /*  val mapper = new ObjectMapper()
       val om = mapper.readTree(jsonObject.toString);*/
       jsonObject.toString
-
 
 
     }
