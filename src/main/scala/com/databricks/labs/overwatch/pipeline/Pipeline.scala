@@ -446,12 +446,15 @@ class Pipeline(
         val successPath = deriveApiTempDir(config.tempWorkingDir, target.apiEndpointTempDir.get, pipelineSnapTime)
         println("successPath" + successPath)
         val rawTraceDF = spark.read.json(successPath)
-        val batchKeyFilterOverride  = if(rawTraceDF.columns.contains("batchKeyFilter")) {col("batchKeyFilter")} else { lit("")}
+        rawTraceDF.columns.foreach(println)
+
         val rawStructDF = rawTraceDF
           .select("apiTraceabilityMeta.*", "rawResponse")
-          .withColumn("batchKeyFilter",batchKeyFilterOverride)
-          .withColumn("data", col("rawResponse").cast("binary"))
+        val batchKeyFilterOverride  = if(rawStructDF.columns.contains("batchKeyFilter")) {col("batchKeyFilter")} else { lit("")}
+
         val finalDF = rawStructDF
+          .withColumn("batchKeyFilter", batchKeyFilterOverride)
+          .withColumn("data", col("rawResponse").cast("binary"))
           .select("end_point", "batchKeyFilter", "responseCode", "apiSuccessCount", "rawResponse")
           .withColumn("moduleId", lit(module.moduleId))
           .withColumn("organization_id", lit(config.organizationId))
