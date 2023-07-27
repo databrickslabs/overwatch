@@ -20,7 +20,7 @@ abstract class PipelineTargets(config: Config) {
   )
 
   val apiEventsTarget: PipelineTable = PipelineTable(
-    name = "api_events_meta",
+    name = "apiEventDetails",
     _keys = Array("organization_id", "Overwatch_RunID","end_point"),
     config = config,
     incrementalColumns = Array("Pipeline_SnapTS"),

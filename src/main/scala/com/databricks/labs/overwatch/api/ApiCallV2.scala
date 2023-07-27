@@ -613,7 +613,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     val rawDF= filteredDf
         .withColumn("rawResponse", SchemaTools.structFromJson(spark, apiResultDF, "rawResponse"))
         .select("rawResponse.*")
-      rawDF.show(false)
       if (rawDF.columns.length == 0) { //Check number of columns in result Dataframe
         true
       } else if (rawDF.columns.size == 1 && rawDF.columns.contains(apiMeta.paginationKey)) { //Check if only pagination key in present in the response
@@ -730,7 +729,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       }
     }finally {
       if (!apiMeta.batchPersist && successTempPath.nonEmpty) {
-        println("finally persisting the data "+successTempPath.get)
         PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
       }
     }

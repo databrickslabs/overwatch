@@ -441,24 +441,45 @@ class Pipeline(
   //Persist the Api Data
   private def persistApiEvents(target: PipelineTable, module: Module): Unit = {
     //call getTempApiData and get the data then persist it
-    println("inside persistApiEvents"+target.apiEndpointTempDir.nonEmpty)
-    println("inside apiEndpointTempDir"+target.apiEndpointTempDir)
-    if(target.apiEndpointTempDir.nonEmpty) {
-      println("inside apiEndpointTempDir nonempty")
-     val successPath = deriveApiTempDir(config.tempWorkingDir,BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get,pipelineSnapTime)
-      println("successPath"+successPath)
-      if(target.apiEndpointTempDir.get.toLowerCase().equals("cluster_events")){// for cluster/events api we store the failed events in another directory
-        val tmpClusterEventsErrorPath = deriveApiTempErrDir(config.tempWorkingDir, BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get, pipelineSnapTime)
-        println("in tmpClusterEventsErrorPath method" + tmpClusterEventsErrorPath)
+    try {
+      if (target.apiEndpointTempDir.nonEmpty) {
+        val successPath = deriveApiTempDir(config.tempWorkingDir, target.apiEndpointTempDir.get, pipelineSnapTime)
+        println("successPath" + successPath)
+        val rawTraceDF = spark.read.json(successPath)
+        val batchKeyFilterOverride  = if(rawTraceDF.columns.contains("batchKeyFilter")) {col("batchKeyFilter")} else { lit("")}
+        val rawStructDF = rawTraceDF
+          .select("apiTraceabilityMeta.*", "rawResponse")
+          .withColumn("batchKeyFilter",batchKeyFilterOverride)
+          .withColumn("data", col("rawResponse").cast("binary"))
+        val finalDF = rawStructDF
+          .select("end_point", "batchKeyFilter", "responseCode", "apiSuccessCount", "rawResponse")
+          .withColumn("moduleId", lit(module.moduleId))
+          .withColumn("organization_id", lit(config.organizationId))
+          .withColumn("Pipeline_SnapTS", lit(pipelineSnapTime.asUnixTimeMilli))
+          .withColumn("Overwatch_RunID", lit(config.runID))
+
+        val optimizeDF = PipelineFunctions.optimizeDFForWrite(finalDF, apiEventsTarget)
+        database.writeWithRetry(optimizeDF, apiEventsTarget, pipelineSnapTime.asColumnTS)
+        println("trace writing completed for " + target.apiEndpointTempDir)
+        if (target.apiEndpointTempDir.get.toLowerCase().equals("cluster_events")) { // for cluster/events api we store the failed events in another directory
+          val tmpClusterEventsErrorPath = deriveApiTempErrDir(config.tempWorkingDir, BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get, pipelineSnapTime)
+          println("in tmpClusterEventsErrorPath method" + tmpClusterEventsErrorPath)
+        }
+
+
       }
-
-
+    }catch {
+      case e: Throwable =>
+        println("got exception while writing"+e.getMessage)
+        e.getMessage
     }
   }
 
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
 //    val startTime = System.currentTimeMillis()
+    println("calling append ------------")
+    persistApiEvents(target, module)
 
     println(" DATA IN DF"+ df.count())
 
@@ -481,8 +502,7 @@ class Pipeline(
     }
 
     //Persisting API data if target has temp dir is present
-    println("calling persistApiEvents")
-    persistApiEvents(target,module)
+
     // if (isAPIDependent) createAPIDF(...)
     // def createAPIDF {
 //    target.apiSuffix + "/" + pipelineSnapTime
