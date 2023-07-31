@@ -482,7 +482,7 @@ class Pipeline(
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
 //    val startTime = System.currentTimeMillis()
     println("calling append ------------")
-    persistApiEvents(target, module)
+   // persistApiEvents(target, module)
 
     println(" DATA IN DF"+ df.count())
 

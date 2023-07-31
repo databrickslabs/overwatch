@@ -607,6 +607,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     spark.conf.set("spark.sql.caseSensitive", "false")
     val processingEndTime = System.currentTimeMillis();
     logger.log(Level.INFO, " Duration in millis :" + (processingEndTime - processingStartTime))
+    println("total cluster events df:"+clusterEventDf.count())
     clusterEventDf
   }
 

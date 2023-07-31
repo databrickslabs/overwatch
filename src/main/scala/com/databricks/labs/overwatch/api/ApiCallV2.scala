@@ -342,7 +342,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       hibernate(response)
       execute()
     } else {
-      PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,apiSuccessCount))
+      PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))
       throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = false)
     }
 
@@ -597,13 +597,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   private def emptyDFCheck(apiResultDF: DataFrame): Boolean = {
-/*    if (apiResultDF.columns.length == 0) { //Check number of columns in result Dataframe
-      true
-    } else if (apiResultDF.columns.size == 1 && apiResultDF.columns.contains(apiMeta.paginationKey)) { //Check if only pagination key in present in the response
-      true
-    } else {
-      false
-    }*/
 
   val filteredDf =  apiResultDF.select('rawResponse)
       .filter('rawResponse =!= "{}")
@@ -634,7 +627,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       // TOMES -- does jsonQuery hold all the meta we want? Don't forget ow run id Sriram: Run it we will add it in pipeline.append() function
-      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,apiSuccessCount))//for GET request we have to convert queryMap to Json
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))//for GET request we have to convert queryMap to Json
     //  _apiResponseArray.add(response.body)
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         accumulator.add(1)
@@ -687,7 +680,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeHelper(): this.type = {
       val response = getResponse
       responseCodeHandler(response)
-      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,apiSuccessCount))
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))
      // _apiResponseArray.add(response.body)
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
@@ -705,7 +698,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
     try {
       executeHelper()
-      println(successTempPath.nonEmpty+"successTempPath.nonEmpty")
+      println(successTempPath.get+"successTempPath.nonEmpty")
       this
     } catch {
       case e: java.lang.NoClassDefFoundError => {

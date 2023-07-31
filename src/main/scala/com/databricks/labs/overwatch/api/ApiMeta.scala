@@ -4,6 +4,7 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.ApiEnv
 import com.databricks.labs.validation.LocalTest.sc
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.log4j.{Level, Logger}
 import org.json.JSONObject
 import scalaj.http.{Http, HttpRequest, HttpResponse}
@@ -165,20 +166,22 @@ trait ApiMeta {
    */
     //TOMES -- change name to enrichAPIResponse (or something)
     //TOMES -- workspaceName and runID and snapTS will get added when we database.write api_events_bronze
-  private[overwatch] def enrichAPIResponse(response: HttpResponse[String],jsonQuery: String,apiSuccessCount: Int): String = {
+  private[overwatch] def enrichAPIResponse(response: HttpResponse[String],jsonQuery: String,queryMap: Map[String, String], apiSuccessCount: Int): String = {
 
+        val filter: String = if(apiCallType.equals("POST")) jsonQuery else {
+          val mapper = new ObjectMapper()
+          mapper.registerModule(DefaultScalaModule)
+          mapper.writeValueAsString(queryMap)
+        }
       val jsonObject = new JSONObject();
       val apiTraceabilityMeta = new JSONObject();
       apiTraceabilityMeta.put("end_point",apiName)
+      apiTraceabilityMeta.put("type",apiCallType)
       apiTraceabilityMeta.put("responseCode",response.code)
-      apiTraceabilityMeta.put("batchKeyFilter",jsonQuery)
+      apiTraceabilityMeta.put("batchKeyFilter",filter)
       apiTraceabilityMeta.put("apiSuccessCount",apiSuccessCount)
       jsonObject.put("rawResponse", response.body.trim)
       jsonObject.put("apiTraceabilityMeta", apiTraceabilityMeta)
-    //  jsonObject.put("apiMeta", s"""{"apiTraceabilityMeta" :{"end_point": "${apiName}" ,"responseCode": "${response.code}","batchKeyFilter": ${jsonQuery} ,"apiSuccessCount": "${apiSuccessCount}" }}""")//.stripMargin.replace("\"", "")
-      //String to json for testing
-    /*  val mapper = new ObjectMapper()
-      val om = mapper.readTree(jsonObject.toString);*/
       println( jsonObject.toString)
       jsonObject.toString
 

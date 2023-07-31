@@ -277,7 +277,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * Function to get the the list of Job Runs
    * @return
    */
-  def getJobRunsDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+  def getJobRunsDF(fromTime: TimeTypes, untilTime: TimeTypes,tempWorkingDir: String): DataFrame = {
     val jobsRunsEndpoint = "jobs/runs/list"
     val jsonQuery = Map(
       "limit" -> "25",
@@ -288,7 +288,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     )
     val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
-    val tempWorkingDir = s"${config.tempWorkingDir}/jobrunslist_bronze/${System.currentTimeMillis()}"
+    //val tempWorkingDir = s"${config.tempWorkingDir}/jobrunslist_bronze/${System.currentTimeMillis()}"
 
     val apiObj = ApiCallV2(config.apiEnv,
       jobsRunsEndpoint,
