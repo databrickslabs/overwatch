@@ -334,9 +334,6 @@ abstract class PipelineTargets(config: Config) {
       name = "job_status_silver",
       _keys = Array("timestamp", "jobId", "actionName", "requestId"),
       config,
-      _permitDuplicateKeys = false,
-      _mode = WriteMode.merge,
-      mergeScope = MergeScope.insertOnly,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
