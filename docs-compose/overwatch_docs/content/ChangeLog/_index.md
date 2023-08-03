@@ -3,8 +3,18 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+## 0.7.2.0.3 (Patch)
+Pulled forward all bug fixes from [0715](#0715-patch)
 
-## 0.7.2.0.2 (Patch)
+**To Upgrade**, simply swap the JAR
+
+### Bug Fixes
+* Fixed schema issue while merging in job_status_silver
+* PVC - instanceId and containerId duplicate columns in audit_log_bronze handled
+
+Released Aug 3rd, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/28)
+
+## 0.7.2.0.2 (Deprecated)
 Pulled forward all bug fixes from [0714](#0714)
 
 **To Upgrade**, simply swap the JAR
@@ -42,7 +52,16 @@ config file if upgrading from 071x multi-workspace deployment. **[HTML](/assets/
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/5?closed=1)
 
-## 0.7.1.4
+## 0.7.1.5 (Patch)
+**To Upgrade**, simply swap the JAR
+
+### Bug Fixes
+* Fixed schema issue while merging in job_status_silver
+* PVC - instanceId and containerId duplicate columns in audit_log_bronze handled
+
+Released Aug 3rd, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/28)
+
+## 0.7.1.4 (Deprecated)
 **To Upgrade**, simply swap the JAR
 
 ### Features
