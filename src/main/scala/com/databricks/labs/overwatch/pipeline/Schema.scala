@@ -218,6 +218,8 @@ object Schema extends SparkSessionWrapper {
         StructField("runtime_engine", StringType, nullable = true),
         StructField("fields_to_remove", StringType, nullable = true)
       )), nullable = true),
+    StructField("instanceId", NullType, nullable = true),
+    StructField("containerId", NullType, nullable = true),
     common("response"),
     common("useridentity")
   ))

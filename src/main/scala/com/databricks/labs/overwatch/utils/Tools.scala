@@ -194,7 +194,7 @@ object Helpers extends SparkSessionWrapper {
     if (globPath.isEmpty)
       false
     else
-       true
+      true
   }
 
 
@@ -584,8 +584,8 @@ object Helpers extends SparkSessionWrapper {
                             ): Workspace = {
     // verify database exists
     val initialCatalog = getCurrentCatalogName(spark)
-      val etlDBWithOutCatalog = if(etlDB.contains(".")){
-        setCurrentCatalog(spark, etlDB.split("\\.").head)
+    val etlDBWithOutCatalog = if(etlDB.contains(".")){
+      setCurrentCatalog(spark, etlDB.split("\\.").head)
       etlDB.split("\\.").last
     } else etlDB
 
@@ -653,7 +653,7 @@ object Helpers extends SparkSessionWrapper {
 
     //val workspaceID = Initializer.getOrgId
 
-  val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
+    val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
     val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
     val testConfig = spark.read.format("delta").load(pipelineReportPath)
       .filter(statusFilter)
@@ -887,7 +887,7 @@ object Helpers extends SparkSessionWrapper {
     val allTargets = (Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets)
-        .filter(_.exists(pathValidation = false, catalogValidation = true))
+      .filter(_.exists(pathValidation = false, catalogValidation = true))
 
     val targetsToRollback = rollbackTSByModule.map(rollback => {
       val targetTableName = PipelineFunctions.getTargetTableNameByModule(rollback.moduleId)

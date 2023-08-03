@@ -133,7 +133,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           )
         }else{
           val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
-         AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+          AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
         }
         AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
       }

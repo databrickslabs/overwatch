@@ -211,7 +211,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                     runID: String): DataFrame = {
 
     val connectionString =  try{
-     ConnectionStringBuilder(
+      ConnectionStringBuilder(
         PipelineFunctions.parseAndValidateEHConnectionString(ehConfig.connectionString, ehConfig.azureClientId.isEmpty))
         .setEventHubName(ehConfig.eventHubName)
         .build
@@ -891,37 +891,37 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   private[overwatch] def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
     try{
-    val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
-      .filter(col("mount_point") =!= "/")
-      .withColumn("mount_point", removeTrailingSlashes('mount_point))
-      .withColumn("source",  removeTrailingSlashes('source))
-    //Cleaning the data for cluster log path
-    val formattedInputDf = inputDataframe.withColumn("cluster_log_conf",  removeTrailingSlashes('cluster_log_conf))
-      .withColumn("cluster_mount_point_temp", regexp_replace('cluster_log_conf, "dbfs:", ""))
-      .withColumn("cluster_mount_point", 'cluster_mount_point_temp)
-//      .withColumn("cluster_mount_point", regexp_replace('cluster_mount_point_temp, "//", "/"))
+      val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
+        .filter(col("mount_point") =!= "/")
+        .withColumn("mount_point", removeTrailingSlashes('mount_point))
+        .withColumn("source",  removeTrailingSlashes('source))
+      //Cleaning the data for cluster log path
+      val formattedInputDf = inputDataframe.withColumn("cluster_log_conf",  removeTrailingSlashes('cluster_log_conf))
+        .withColumn("cluster_mount_point_temp", regexp_replace('cluster_log_conf, "dbfs:", ""))
+        .withColumn("cluster_mount_point", 'cluster_mount_point_temp)
+      //      .withColumn("cluster_mount_point", regexp_replace('cluster_mount_point_temp, "//", "/"))
 
-    //Joining the cluster log data with mount point data
-    val joinDF = formattedInputDf
-      .join(mountMap, formattedInputDf.col("cluster_mount_point").startsWith(mountMap.col("mount_point")), "left") //starts with then when
+      //Joining the cluster log data with mount point data
+      val joinDF = formattedInputDf
+        .join(mountMap, formattedInputDf.col("cluster_mount_point").startsWith(mountMap.col("mount_point")), "left") //starts with then when
 
-    val clusterMountPointAr = split('cluster_mount_point, "/")
-    val mountPointAr = split('mount_point, "/")
-    val hasSubFolders = size(clusterMountPointAr) > size(mountPointAr)
-    val buildSubfolderSources = concat_ws("/", 'source, array_join(array_except(split('cluster_mount_point, "/"), split('mount_point, "/")), "/"))
+      val clusterMountPointAr = split('cluster_mount_point, "/")
+      val mountPointAr = split('mount_point, "/")
+      val hasSubFolders = size(clusterMountPointAr) > size(mountPointAr)
+      val buildSubfolderSources = concat_ws("/", 'source, array_join(array_except(split('cluster_mount_point, "/"), split('mount_point, "/")), "/"))
 
-    //Generating the final source path for mount points
-    val pathsDF = joinDF.withColumn("source_temp", when(hasSubFolders, buildSubfolderSources) otherwise ('source))
-      .withColumn("derivedSource", when('source.isNull, 'cluster_mount_point) otherwise ('source_temp))
-      .withColumn("topLevelTargets", array(col("derivedSource"), col("cluster_id"), lit("eventlog")))
-      .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
+      //Generating the final source path for mount points
+      val pathsDF = joinDF.withColumn("source_temp", when(hasSubFolders, buildSubfolderSources) otherwise ('source))
+        .withColumn("derivedSource", when('source.isNull, 'cluster_mount_point) otherwise ('source_temp))
+        .withColumn("topLevelTargets", array(col("derivedSource"), col("cluster_id"), lit("eventlog")))
+        .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
 
-    val result = pathsDF.select('wildPrefix, 'cluster_id)
-    result
+      val result = pathsDF.select('wildPrefix, 'cluster_id)
+      result
     }catch {
       case e:Exception=>
-          logger.log(Level.ERROR,"Unable to get all the event log prefix",e)
-          throw e
+        logger.log(Level.ERROR,"Unable to get all the event log prefix",e)
+        throw e
     }
 
   }
@@ -930,7 +930,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     try{
       if (apiEnv.mountMappingPath.nonEmpty) {
         logger.log(Level.INFO, "Reading cluster logs from " + apiEnv.mountMappingPath)
-         spark.read.option("header", "true")
+        spark.read.option("header", "true")
           .option("ignoreLeadingWhiteSpace", true)
           .option("ignoreTrailingWhiteSpace", true)
           .csv(apiEnv.mountMappingPath.get)
@@ -1007,7 +1007,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId(Some(apiEnv.workspaceURL))) {
       getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
-     } else {
+    } else {
       newLogDirsNotIdentifiedInAudit
         .unionByName(incrementalClusterWLogging)
         .withColumn("cluster_log_conf",removeTrailingSlashes('cluster_log_conf))
@@ -1047,7 +1047,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("Overwatch_RunID", lit(runId))
       .modifyStruct(PipelineFunctions.newClusterCleaner(outputDF, "cluster_spec.new_cluster"))
 
-//    val keys = Array("organization_id", "job_id", "run_id", "Overwatch_RunID")
+    //    val keys = Array("organization_id", "job_id", "run_id", "Overwatch_RunID")
     val emptyKeysDF = Seq.empty[(String, Long, Long, String)].toDF("organization_id", "job_id", "run_id", "Overwatch_RunID")
     val cleansedTasksDF = workflowsCleanseTasks(rawDf, keys, emptyKeysDF, "tasks")
     val cleansedJobClustersDF = workflowsCleanseJobClusters(rawDf, keys, emptyKeysDF, "job_clusters")

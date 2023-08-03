@@ -49,7 +49,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         .filter(MultiWorkspaceConfigColumns.active.toString)
         .withColumn("deployment_id", lit(deploymentId))
         .withColumn("output_path", lit(outputPath))
-     val multiWorkspaceConfig = df.as[MultiWorkspaceConfig]
+      val multiWorkspaceConfig = df.as[MultiWorkspaceConfig]
       multiWorkspaceConfig
     } catch {
       case e: Exception =>
@@ -375,7 +375,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         )
       case "azure" =>
         validateEventHub(
-         config)
+          config)
     }
 
   }
@@ -428,7 +428,7 @@ object DeploymentValidation extends SparkSessionWrapper {
           validationFlag = true
         }
         else if(presentPaths.length >0){
-         val presentPathSet = presentPaths.toSet
+          val presentPathSet = presentPaths.toSet
           msgBuffer.append("Warning: unable to find below paths: ")
           pathsToCheck.filterNot(presentPathSet).foreach(path=>msgBuffer.append(path+","))
         }else{
@@ -565,7 +565,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param ehName
    */
   private def validateEventHub(
-                               config: MultiWorkspaceConfig
+                                config: MultiWorkspaceConfig
                               ): DeploymentValidationReport = {
 
     val isAAD = checkAAD(config)
@@ -658,7 +658,7 @@ object DeploymentValidation extends SparkSessionWrapper {
     } else {
       validation.completeReport
     }
-     val resultDF = completeReportDF.withColumn("concat_rule_columns", array(columns map col: _*))
+    val resultDF = completeReportDF.withColumn("concat_rule_columns", array(columns map col: _*))
       .withColumn("result", explode(col("concat_rule_columns")))
       .select("deployment_id", "workspace_id", "result")
 
@@ -675,7 +675,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       synchronized {
         validationStatus.append(DeploymentValidationReport(resultFlag, getSimpleMsg(validation.result.ruleName), validationDetails, Some(validationMsg), Some(validation.workspace_id)))
       }
-     })
+    })
     validationStatus
 
   }
@@ -724,7 +724,7 @@ object DeploymentValidation extends SparkSessionWrapper {
     multiWorkspaceConfig.filter(_.cloud.toLowerCase() != "azure").map(config=>validateAuditLogColumnName(config))
     multiWorkspaceConfig.filter(_.cloud.toLowerCase() == "azure").map(checkAAD)
     multiWorkspaceConfig
-    }
+  }
 
   /**
    * Entry point of the validation.
@@ -768,11 +768,11 @@ object DeploymentValidation extends SparkSessionWrapper {
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
     configToValidate.tasksupport = taskSupport
     validationStatus =
-        validateRuleAndUpdateStatus(groupedRuleSet,parallelism) ++
+      validateRuleAndUpdateStatus(groupedRuleSet,parallelism) ++
         validateRuleAndUpdateStatus(nonGroupedRuleSet,parallelism)++
-          configToValidate.map(validateApiUrlConnectivity) ++ //Make request to each API and check the response
-          configToValidate.map(cloudSpecificValidation)++ //Connection check for audit logs s3/EH
-          configToValidate.map(validateMountCount(_,currentOrgID))
+        configToValidate.map(validateApiUrlConnectivity) ++ //Make request to each API and check the response
+        configToValidate.map(cloudSpecificValidation)++ //Connection check for audit logs s3/EH
+        configToValidate.map(validateMountCount(_,currentOrgID))
     //Access validation for etl_storage_prefix
     validationStatus.append(storagePrefixAccessValidation(configToValidate.head)) //Check read/write/create/list access for etl_storage_prefix
 
@@ -781,4 +781,3 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
 }
-
