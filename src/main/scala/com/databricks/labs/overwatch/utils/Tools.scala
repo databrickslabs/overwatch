@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.api.ApiMetaFactory
 
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
@@ -1052,6 +1053,28 @@ object Helpers extends SparkSessionWrapper {
 
   def deriveApiTempErrDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
     s"${tempWOrkingDir}/${endpointDir}/error_" + pipelineSnapTs.asUnixTimeMilli
+  }
+
+  def transformBinaryDf(df: DataFrame) : DataFrame = {
+      df.withColumnRenamed("data","rawResponse").withColumn("rawResponse",col("rawResponse").cast("String"))
+  }
+  def deriveTraceDFByApiName(df: DataFrame, apiName: String): DataFrame ={
+    val rawDF = deriveRawApiResponseDF(transformBinaryDf(df))
+    val apiMetaFactory = new ApiMetaFactory().getApiClass(apiName)
+    rawDF.select(explode(col(apiMetaFactory.dataframeColumn)).alias(apiMetaFactory.dataframeColumn)).select(col(apiMetaFactory.dataframeColumn + ".*"))
+  }
+
+  def getTraceDFByModule(apiEventPath: String ,moduleId : Long): DataFrame ={
+    val rawDF = spark.read.load(apiEventPath).filter('moduleId === moduleId)
+    val endPoint = rawDF.head().getAs("end_point")
+    deriveTraceDFByApiName(rawDF,endPoint)
+  }
+
+  def getTraceDFByTable(apiEventTable: String, endPoint: String): DataFrame = {
+    deriveTraceDFByApiName(spark.read.table(apiEventTable).filter('end_point === endPoint),endPoint)
+  }
+  def getTraceDFByPath(apiEventPath: String ,endPoint : String): DataFrame ={
+    deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('end_point === endPoint),endPoint)
   }
 
 

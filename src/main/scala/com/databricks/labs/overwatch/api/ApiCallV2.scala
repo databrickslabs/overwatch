@@ -342,7 +342,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       hibernate(response)
       execute()
     } else {
-      PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))
+      if(writeTraceApiFlag){
+        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))
+      }
       throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = false)
     }
 
@@ -721,10 +723,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         throw e
       }
     }finally {
-      if (!apiMeta.batchPersist && successTempPath.nonEmpty) {
-        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
+      if (writeTraceApiFlag) {
+          PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
       }
     }
+  }
+
+  private def writeTraceApiFlag(): Boolean ={
+    spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean && !apiMeta.batchPersist && successTempPath.nonEmpty
   }
 
   /**

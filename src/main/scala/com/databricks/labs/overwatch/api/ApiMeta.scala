@@ -179,10 +179,8 @@ trait ApiMeta {
       apiTraceabilityMeta.put("type",apiCallType)
       apiTraceabilityMeta.put("responseCode",response.code)
       apiTraceabilityMeta.put("batchKeyFilter",filter)
-      apiTraceabilityMeta.put("apiSuccessCount",apiSuccessCount)
       jsonObject.put("rawResponse", response.body.trim)
       jsonObject.put("apiTraceabilityMeta", apiTraceabilityMeta)
-      println( jsonObject.toString)
       jsonObject.toString
 
     }

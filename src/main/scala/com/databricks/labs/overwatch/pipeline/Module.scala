@@ -414,7 +414,11 @@ class Module(
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     } finally {
-      persistApiEvents
+      println("traceapi: "+spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean)
+      if(spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean)
+        {
+          persistApiEvents
+        }
       spark.catalog.clearCache()
     }
 
@@ -440,8 +444,9 @@ class Module(
         val finalDF = rawStructDF
           .withColumn("batchKeyFilter", batchKeyFilterOverride)
           .withColumn("data", col("rawResponse").cast("binary"))
-          .select("end_point", "batchKeyFilter", "responseCode", "apiSuccessCount", "rawResponse")
+          .select("end_point","type", "batchKeyFilter", "responseCode", "data")
           .withColumn("moduleId", lit(moduleId))
+          .withColumn("moduleName", lit(moduleName))
           .withColumn("organization_id", lit(config.organizationId))
           .withColumn("Pipeline_SnapTS", lit(pipeline.pipelineSnapTime.asUnixTimeMilli))
           .withColumn("Overwatch_RunID", lit(config.runID))
