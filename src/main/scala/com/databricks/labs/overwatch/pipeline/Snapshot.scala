@@ -244,7 +244,7 @@ object Snapshot extends SparkSessionWrapper {
     }
 
     // Snapshot Type should be Incremental or Full
-    if (snapshotType == "Incremental" || snapshotType == "Full"){
+    if (snapshotType.toLowerCase() == "incremental" || snapshotType.toLowerCase()  == "full"){
       println(s"Snapshot Type is Suitable for Snapshot Process. Provided SnapshotType value is ${snapshotType}")
     }else{
       val errMsg = s"Provided SnapshotType value is ${snapshotType}. SnapshotType value should be either Full or Incremental. Can Not Proceed with Snapshot"

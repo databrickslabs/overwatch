@@ -170,7 +170,7 @@ object Migration extends SparkSessionWrapper {
 
       // Step 01 - Start Migration Process
       try {
-        Snapshot(sourceETLDB, migrateRootPath, "full",pipeline, tablesToExclude, cloneLevel, "Migration")
+        Snapshot(sourceETLDB, migrateRootPath, "Full",pipeline, tablesToExclude, cloneLevel, "Migration")
       }
       catch{
         case e: Throwable =>
