@@ -265,7 +265,7 @@ object Snapshot extends SparkSessionWrapper {
       }}
 
     // Clone Level should be "Deep" or "Shallow"
-    if (cloneLevel == "Deep" || cloneLevel == "SHALLOW"){
+    if (cloneLevel == "DEEP" || cloneLevel.toLowerCase() == "SHALLOW"){
       println(s"cloneLevel Type is Suitable for Snapshot Process. Provided cloneLevel value is ${cloneLevel}")
     }else{
       val errMsg = s"Provided cloneLevel value is ${cloneLevel}. cloneLevel value should be Deep Full or SHALLOW. Can Not Proceed with Snapshot"
@@ -276,17 +276,17 @@ object Snapshot extends SparkSessionWrapper {
 
   }
 
-  def apply(
+  def process(
              sourceETLDB: String,
              targetPrefix : String,
              snapshotType : String): Unit = {
-    apply(
+    process(
       sourceETLDB,
       targetPrefix,
       snapshotType,
       pipeline = "Bronze,Silver,Gold",
       tablesToExclude = "",
-      cloneLevel = "Deep",
+      cloneLevel = "DEEP",
       processType = "Snapshot"
     )
   }
@@ -306,7 +306,7 @@ object Snapshot extends SparkSessionWrapper {
    * @return
    */
 
-  def apply(sourceETLDB : String,
+  def process(sourceETLDB : String,
             targetPrefix : String,
             snapshotType : String,
             pipeline : String = "Bronze,Silver,Gold",

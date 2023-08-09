@@ -150,7 +150,7 @@ object Migration extends SparkSessionWrapper {
    * @return
    */
 
-  def apply(
+  def process(
              sourceETLDB: String,
              migrateRootPath:String,
              configPath: String,
@@ -170,7 +170,7 @@ object Migration extends SparkSessionWrapper {
 
       // Step 01 - Start Migration Process
       try {
-        Snapshot(sourceETLDB, migrateRootPath, "Full",pipeline, tablesToExclude, cloneLevel, "Migration")
+        Snapshot.process(sourceETLDB, migrateRootPath, "Full",pipeline, tablesToExclude, cloneLevel, "Migration")
       }
       catch{
         case e: Throwable =>

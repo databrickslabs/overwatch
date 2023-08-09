@@ -114,7 +114,7 @@ object Restore extends SparkSessionWrapper {
    * @return
    */
 
-    def apply(
+    def process(
                sourcePrefix : String,
                targetPrefix : String,
              ): Unit = {
