@@ -16,7 +16,7 @@ object MigrationRunner extends SparkSessionWrapper{
       val tablesToExclude = args.lift(3).getOrElse("")
       logger.log(Level.INFO,s"Migration Process started from ${sourceETLDB} to ${migrateRootPath} With Config Path set as ${configPath} " +
         s"and tables excluded from migration are ${tablesToExclude}")
-      Migration(sourceETLDB,migrateRootPath,configPath,tablesToExclude)
+      Migration.process(sourceETLDB,migrateRootPath,configPath,tablesToExclude)
 
     }else{
       val errMsg = s"MigrationRunner Main class requires 3/4 argument, received ${args.length} arguments. Please review the " +

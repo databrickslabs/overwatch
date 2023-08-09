@@ -15,7 +15,7 @@ object RestoreRunner extends SparkSessionWrapper{
       val targetPrefix = args(1)
 
       logger.log(Level.INFO,s"Restoration process started from ${sourcePrefix} to ${targetPrefix}")
-      Restore(sourcePrefix,targetPrefix)
+      Restore.process(sourcePrefix,targetPrefix)
     }else{
       val errMsg = s"Main class requires 2 argument, received ${args.length} arguments. Please review the " +
         s"docs to compose the input arguments appropriately."
