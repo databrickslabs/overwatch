@@ -157,7 +157,7 @@ object Migration extends SparkSessionWrapper {
              tablesToExclude :String = ""
            ): Unit = {
 
-    val cloneLevel = "Deep"
+    val cloneLevel = "DEEP"
 
 
     if (isValid(sourceETLDB,configPath))
