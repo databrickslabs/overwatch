@@ -259,7 +259,7 @@ class Database(config: Config) extends SparkSessionWrapper {
    * @param target
    * @param maxMergeScanDates
    */
-  def batchWriter(df: DataFrame, target: PipelineTable, maxMergeScanDates: Array[String] = Array()): Unit = { // DELTA MERGE / UPSERT
+  def deltaMergeWriter(df: DataFrame, target: PipelineTable, maxMergeScanDates: Array[String] = Array()): Unit = { // DELTA MERGE / UPSERT
     val deltaTarget = DeltaTable.forPath(spark,target.tableLocation).alias("target")
     val updatesDF = df.alias("updates")
     val mergeCondition = getMergeCondition(df, target, maxMergeScanDates)
@@ -283,7 +283,7 @@ class Database(config: Config) extends SparkSessionWrapper {
    * @param df
    * @param target
    */
-  def streamWriter(df: DataFrame, target: PipelineTable): Unit = {
+  def streamAndBatchWriter(df: DataFrame, target: PipelineTable): Unit = {
     logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
     if (target.checkpointPath.nonEmpty) { // STREAMING WRITER
 
@@ -358,8 +358,8 @@ class Database(config: Config) extends SparkSessionWrapper {
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
     target.writeMode match {
-      case WriteMode.merge => batchWriter(finalDF, target, maxMergeScanDates)
-      case WriteMode.append | WriteMode.overwrite => streamWriter(finalDF, target)
+      case WriteMode.merge => deltaMergeWriter(finalDF, target, maxMergeScanDates)
+      case WriteMode.append | WriteMode.overwrite => streamAndBatchWriter(finalDF, target)
       case _ => throw new UnsupportedOperationException(s"${target.writeMode} is not supported. Support write modes " +
         s"are - Merge, Append and Overwrite")
     }
