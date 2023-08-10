@@ -53,14 +53,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
         PipelineFunctions.fillForward("enable_serverless_compute",warehouse_name_gen_w),
         PipelineFunctions.fillForward("warehouse_type",warehouse_name_gen_w)
       )
-
     warehouseRaw
-//    val warehouseWithStructs = warehouseRaw
-//      .withColumn("tags", SchemaTools.structFromJson(spark, warehouseRaw, "tags"))
-//      .scrubSchema
-//
-//    warehouseWithStructs
-//      .withColumn("tags", SchemaTools.structToMap(warehouseWithStructs, "tags"))
   }
 
   /**
@@ -68,6 +61,10 @@ object DbsqlTransforms extends SparkSessionWrapper {
    * commencement of audit logs. Allows for joins directly to gold warehouse work even if they haven't yet been edited.
    * Several of the fields are unavailable through this method but many are and they are very valuable when
    * present in gold
+   * @param isFirstRun
+   * @param bronzeWarehouseSnapUntilCurrent
+   * @param warehouseBaseWMetaDF
+   * @return
    */
   def deriveWarehouseBaseFilled(isFirstRun: Boolean, bronzeWarehouseSnapUntilCurrent: DataFrame)
                                 (warehouseBaseWMetaDF: DataFrame): DataFrame = {

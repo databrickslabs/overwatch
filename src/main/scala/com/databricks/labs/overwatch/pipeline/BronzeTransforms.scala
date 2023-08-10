@@ -1080,6 +1080,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("tags", SchemaTools.structToMap(outputDF, "tags"))
       .withColumn("odbc_params", SchemaTools.structToMap(outputDF, "odbc_params"))
       .withColumnRenamed("id","warehouse_id")
+      .verifyMinimumSchema(Schema.warehouseSnapMinimumSchema)
   }
 
   protected def cleanseRawJobRunsSnapDF(keys: Array[String], runId: String)(df: DataFrame): DataFrame = {
