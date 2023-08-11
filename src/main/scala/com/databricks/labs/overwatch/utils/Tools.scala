@@ -20,8 +20,6 @@ import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
-import org.apache.spark.sql.streaming.{StreamingQuery, StreamingQueryListener}
-import org.apache.spark.sql.streaming.StreamingQueryListener.{QueryProgressEvent, QueryStartedEvent, QueryTerminatedEvent}
 
 import java.net.URI
 import java.time.LocalDate
@@ -1050,27 +1048,5 @@ object Helpers extends SparkSessionWrapper {
         case e: Throwable => println(s"FAILED: ${t.tableFullName}", e)
       }
     })
-  }
-  def getQueryListener(query: StreamingQuery, config: Config, minEventsPerTrigger: Long): StreamingQueryListener = {
-    val streamManager = new StreamingQueryListener() {
-      override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
-        logger.log(Level.INFO,s"Query started: ${queryStarted.id}")
-      }
-
-      override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
-        logger.log(Level.INFO,s"Query terminated: ${queryTerminated.id}")
-      }
-
-      override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
-        logger.log(Level.INFO,s"Query made progress: ${queryProgress.progress}")
-        if (config.debugFlag) {
-          println(query.status.prettyJson)
-        }
-        if (queryProgress.progress.numInputRows <= minEventsPerTrigger) {
-          query.stop()
-        }
-      }
-    }
-    streamManager
   }
 }
