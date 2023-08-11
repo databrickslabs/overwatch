@@ -229,50 +229,55 @@ object Snapshot extends SparkSessionWrapper {
   private val logger: Logger = Logger.getLogger(this.getClass)
 
   def isValid(sourceETLDB : String,
-               snapshotType : String,
-               pipeline : String = "Bronze,Silver,Gold",
-               cloneLevel: String = "DEEP",
-               ): Boolean = {
+              snapshotType : String,
+              pipeline : String = "Bronze,Silver,Gold",
+              cloneLevel: String = "DEEP",
+              processType : String = "Snapshot"
+             ): Boolean = {
 
     // Check whether sourceETLDB is Overwatch Database
-    val isOverwatchDB = spark.sessionState.catalog.getDatabaseMetadata(sourceETLDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
-    if (isOverwatchDB){
-      println(s"${sourceETLDB} is Overwatch Database and suitable for Snapshot")
-    }else{
-      val errMsg = s"${sourceETLDB} is Not Overwatch Database and not suitable for Snapshot"
-      throw new BadConfigException(errMsg)
-    }
-
-    // Snapshot Type should be Incremental or Full
-    if (snapshotType.toLowerCase() == "incremental" || snapshotType.toLowerCase()  == "full"){
-      println(s"Snapshot Type is Suitable for Snapshot Process. Provided SnapshotType value is ${snapshotType}")
-    }else{
-      val errMsg = s"Provided SnapshotType value is ${snapshotType}. SnapshotType value should be either Full or Incremental. Can Not Proceed with Snapshot"
-      throw new BadConfigException(errMsg)
-    }
-
-    // Pipeline Should be Bronze, Sliver Or Gold
-
-    val pipelineList = pipeline.split(",").map(_.toLowerCase).map(_.trim)
-
-    for (layer <- pipelineList){
-      if (layer == "bronze" || layer == "silver" || layer == "gold") {
-        println(s"Zone should be either Bronze,Silver or Gold. Provied Zone value is ${layer}")
-      }else
-      {
-        val errMsg = s"Unknown Zone found ${layer}, Zone should be either Bronze,Silver or Gold"
+    if (processType == "Migration") {
+      val isOverwatchDB = spark.sessionState.catalog.getDatabaseMetadata(sourceETLDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
+      if (isOverwatchDB) {
+        println(s"${sourceETLDB} is Overwatch Database and suitable for Snapshot")
+      } else {
+        val errMsg = s"${sourceETLDB} is Not Overwatch Database and not suitable for Snapshot"
         throw new BadConfigException(errMsg)
-      }}
+      }
 
-    // Clone Level should be "Deep" or "Shallow"
-    if (cloneLevel == "DEEP" || cloneLevel.toLowerCase() == "SHALLOW"){
-      println(s"cloneLevel Type is Suitable for Snapshot Process. Provided cloneLevel value is ${cloneLevel}")
+      // Snapshot Type should be Incremental or Full
+      if (snapshotType.toLowerCase() == "incremental" || snapshotType.toLowerCase() == "full") {
+        println(s"Snapshot Type is Suitable for Snapshot Process. Provided SnapshotType value is ${snapshotType}")
+      } else {
+        val errMsg = s"Provided SnapshotType value is ${snapshotType}. SnapshotType value should be either Full or Incremental. Can Not Proceed with Snapshot"
+        throw new BadConfigException(errMsg)
+      }
+
+      // Pipeline Should be Bronze, Sliver Or Gold
+
+      val pipelineList = pipeline.split(",").map(_.trim)
+
+      for (layer <- pipelineList) {
+        if (layer.toLowerCase() == "bronze" || layer.toLowerCase()  == "silver" || layer.toLowerCase()  == "gold") {
+          println(s"Zone should be either Bronze,Silver or Gold. Provided Zone value is ${layer}")
+        } else {
+          val errMsg = s"Unknown Zone found ${layer}, Zone should be either Bronze,Silver or Gold"
+          throw new BadConfigException(errMsg)
+        }
+      }
+
+      // Clone Level should be "Deep" or "Shallow"
+      if (cloneLevel == "DEEP" || cloneLevel.toLowerCase() == "SHALLOW") {
+        println(s"cloneLevel Type is Suitable for Snapshot Process. Provided cloneLevel value is ${cloneLevel}")
+      } else {
+        val errMsg = s"Provided cloneLevel value is ${cloneLevel}. cloneLevel value should be Deep Full or SHALLOW. Can Not Proceed with Snapshot"
+        throw new BadConfigException(errMsg)
+      }
+      println("Validation successful.You Can proceed with Snapshot process")
+      true
     }else{
-      val errMsg = s"Provided cloneLevel value is ${cloneLevel}. cloneLevel value should be Deep Full or SHALLOW. Can Not Proceed with Snapshot"
-      throw new BadConfigException(errMsg)
+      true
     }
-    println("Validation successful.You Can proceed with Snapshot process")
-    true
 
   }
 

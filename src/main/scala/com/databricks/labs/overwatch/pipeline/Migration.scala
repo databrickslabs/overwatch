@@ -22,7 +22,6 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
   private val configPath = _configPath
 
   private[overwatch] def updateCSVConfig():Unit = {
-    println(s"Config source: csv path ${configPath}")
 
     val tempConfigPath = (configPath.split("/").dropRight(1) :+ "tempConfig.csv").mkString("/")
     val df = spark.read.format("csv")
@@ -50,7 +49,6 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
   }
 
   private[overwatch] def updateDeltaPathConfig():Unit = {
-    println(s"Config source: delta path ${configPath}")
 
     val configUpdateStatement =
       s"""
@@ -63,7 +61,6 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
   }
 
   private[overwatch] def updateDeltaTableConfig():Unit = {
-    println(s"Config source: delta table ${configPath}")
 
     val configUpdateStatement =
       s"""
@@ -78,19 +75,10 @@ class Migration(_sourceETLDB: String, _targetPrefix: String, _configPath: String
   private[overwatch] def updateConfig(): Unit = {
     try {
       if (configPath.toLowerCase().endsWith(".csv")) { // CSV file
-        if (!Helpers.pathExists(configPath)) {
-          throw new BadConfigException("Unable to find config file in the given location:" + configPath)
-        }
         updateCSVConfig()
       } else if (configPath.contains("/")) { // delta path
-        if (!Helpers.pathExists(configPath)) {
-          throw new BadConfigException("Unable to find config file in the given location:" + configPath)
-        }
         updateDeltaPathConfig()
       }else{ // delta table
-        if (!spark.catalog.tableExists(configPath)) {
-          throw new BadConfigException("Unable to find Delta table" + configPath)
-        }
         updateDeltaTableConfig()
       }
     }catch {
@@ -120,19 +108,25 @@ object Migration extends SparkSessionWrapper {
     if (configPath.toLowerCase().endsWith(".csv")) { // CSV file
       if (!Helpers.pathExists(configPath)) {
         throw new BadConfigException("Unable to find config file in the given location:" + configPath)
+      }else{
+        println("Config file is properly configured and suitable for Migration")
       }
     } else if (configPath.contains("/")) { // delta path
       if (!Helpers.pathExists(configPath)) {
         throw new BadConfigException("Unable to find config file in the given location:" + configPath)
+      }else{
+        println("Config file is properly configured and suitable for Migration")
       }
-    }else{ // delta table
+    } else{ // delta table
       if (!spark.catalog.tableExists(configPath)) {
         throw new BadConfigException("Unable to find Delta table" + configPath)
+      }else{
+        println("Config file is properly configured and suitable for Migration")
       }
     }
     val configDF = new MultiWorkspaceDeployment().generateBaseConfig(configPath).filter(col("etl_database_name") === sourceETLDB)
     if (configDF.select("storage_prefix").distinct().count() != 1){
-      throw new BadConfigException("Migration is not possible where multiple different storage_prefix present for etl_database_name")
+      throw new BadConfigException("Migration is not possible where multiple different storage_prefix present for same etl_database_name")
     }
     println("Validation successful.You Can proceed with Migration process")
     true
