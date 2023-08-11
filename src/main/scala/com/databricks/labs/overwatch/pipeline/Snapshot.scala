@@ -236,7 +236,7 @@ object Snapshot extends SparkSessionWrapper {
              ): Boolean = {
 
     // Check whether sourceETLDB is Overwatch Database
-    if (processType == "Migration") {
+    if (processType == "Snapshot") {
       val isOverwatchDB = spark.sessionState.catalog.getDatabaseMetadata(sourceETLDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
       if (isOverwatchDB) {
         println(s"${sourceETLDB} is Overwatch Database and suitable for Snapshot")
@@ -321,7 +321,7 @@ object Snapshot extends SparkSessionWrapper {
            ): Unit = {
 
 
-    if (isValid(sourceETLDB, snapshotType, pipeline, cloneLevel)) {
+    if (isValid(sourceETLDB, snapshotType, pipeline, cloneLevel,processType)) {
       val snapWorkSpace = Helpers.getWorkspaceByDatabase(sourceETLDB)
       val bronze = Bronze(snapWorkSpace)
       val silver = Silver(snapWorkSpace)
