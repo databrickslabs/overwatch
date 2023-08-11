@@ -756,8 +756,8 @@ object Schema extends SparkSessionWrapper {
     StructField("num_active_sessions", LongType, nullable = true),
     StructField("state", StringType, nullable = true),
     StructField("organization_id", StringType, nullable = false),
-    StructField("Pipeline_SnapTS", TimestampType, nullable = false),
-    StructField("Overwatch_RunID", StringType, nullable = false),
+    StructField("Pipeline_SnapTS", TimestampType, nullable = true),
+    StructField("Overwatch_RunID", StringType, nullable = true),
     StructField("workspace_name", StringType, nullable = true)
   ))
 

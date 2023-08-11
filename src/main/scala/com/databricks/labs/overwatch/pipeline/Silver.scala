@@ -375,7 +375,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val warehouseSpecModule = Module(2021, "Silver_WarehouseSpec", this, Array(1004))
+  lazy private[overwatch] val warehouseSpecModule = Module(2021, "Silver_WarehouseSpec", this, Array(1004, 1013))
   lazy private val appendWarehouseSpecProcess: () => ETLDefinition = {
     () =>
     ETLDefinition(
