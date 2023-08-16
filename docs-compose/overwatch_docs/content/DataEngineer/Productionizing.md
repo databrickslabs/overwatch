@@ -19,7 +19,7 @@ over the place. These will be very challenging to clean up and can eat up a sign
 pile up indefinitely. Suggested time to live time is 30 days.
 
 ### Backups
-#### (This will be Deprecated in Future Release.Please refer Snapshot in Future)
+#### (This will be Deprecated in Future Release.Please refer Snapshot for backup process in Future)
 **Perform Bronze Backups**
 I know we don't hear a lot about backups in big data world but often times the cluster logs and / or 
 the audit logs are transient (especially Azure deployments as Event Hub only maintains 7 days). This means that if
@@ -68,69 +68,138 @@ Currently, There are two types of Snapshot process available in Overwatch:
 
 **Batch Snapshot**
 
-**Incremental Snapshot(Support Streaming Operation)**
+**Incremental Snapshot** 
+
+#### Batch Snaphot
+This is normal Snapshot process where we take the backup of Bronze in Batch method. Here we can do Deep Cloning of existing Bronze table to target Snapshot RootPath
+
+#### Incremental Snap
+Through Incremental_Snap we take the snapshot of the bronze table incrementally i.e. through streaming operation.
+As described before as this is a streaming process we have to maintain a checkpoint directory. Below is the screenshot of the snap location after snapshot process is done:
+
+1. "snapshotRootPath/data" - Contains the backup data of Bronze Tables
+2. "snapshotRootPath/clone_report" - Contains the data containing run metrics
+3. "snapshotRootPath/checkpoint" - Checkpoint Location for Streaming Operation
 
 #### How to run the Snapshot Process
 Currently, Users need to run the snapshot process through 
 1. Databricks Job.
 2. Through Notebook.
 
+##### Snapshot through Databricks Notebook
+
+The code snippet to run the Snapshot process is as below:
+
+```scala
+import com.databricks.labs.overwatch.pipeline.Snapshot
+val sourceETLDB = "ow_bronze_snapshot_etl"
+val targetPrefix = "/mnt/overwatch_playground/721-snap/incremental"
+val pipeline = "Bronze,Silver,Gold"
+val snapshotType = "Incremental"
+val tablesToExclude = "notebook_silver,notebook_gold"
+Snapshot.process(sourceETLDB,targetPrefix,snapshotType)
+```
+
+We need below parameters to run the snapshot process through Databricks Notebook:
+
+| Param           | Type   | Optional | Default Value        | Description                                                                                                         |
+|-----------------|--------|----------|----------------------|---------------------------------------------------------------------------------------------------------------------|
+| sourceETLDB     | String | No       | NA                   | Source Database Name for which Snapshot need to be done.                                                            |
+| targetPrefix    | String | No       | NA                   | Target path where Snapshot need to be done.                                                                         |
+| snapshotType    | String | No       | NA                   | Type of Snapshot to be performed. "Full" for Full Snapshot, "Incremental" for Incremental Snapshot                  |
+| pipeline        | String | Yes      | "Bronze,Silver,Gold" | Define the Medallion Layers. Argument should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them) |
+| cloneLevel      | String | Yes      | "DEEP"               | Clone Level for Snapshot. By Default it is "DEEP". You can also specify "SHALLOW" Clone                             |
+| tablesToExclude | String | Yes      | ""                   | Array of table names to exclude from the snapshot. This is the table name only - without the database prefix.       |
+
+After snapshot process is done the tables from Source ETL Database will be cloned in the target prefix location. The structure for target prefix location would be like below:
+
+![Snapshot_Target](/images/DataEngineer/snapshotTarget.png)
+
+All the tables data would be there in "targetPrefix/data" folder as shown below:
+
+![Snapshot_Target_Data](/images/DataEngineer/snapshotTarget_Data.png)
+
+If you look into the targetPrefix folder there would one another subdirectory called "clone_report". This folder contains the data regarding the report to show the status of your snapshot process for each table:
+
+![clone_report](/images/DataEngineer/clone_report.png)
+
 ##### Snapshot through Databricks Job
-Below is the Configuration for the Databricks Job
+
+Snapshot process can also be configured using Databricks Job. For this we need to run SnapshotRunner Class.
 
 Below is the screenshot of the Job through which we run the snapshot process.
 
 1. **Type** - Jar
-2. **Main class** - com.databricks.labs.overwatch.pipeline.Snapshot
-3. **Parameters for the Job** 
+2. **Main class** - com.databricks.labs.overwatch.pipeline.SnapshotRunner
+3. **Parameters for the Job** - Same as mentioned above for `Snapshot through Databricks Notebook`
 
-| Param  | Type   | Optional | Description                                                                                |
-|--------|--------|----------|--------------------------------------------------------------------------------------------|
-|SourceETLDB | String | No       | Source Database Name for which Snapshot need to be done.                                |
-| snapshotRootPath | String | No       | Target path where Snapshot need to be done.                                        |
-| pipeline | String | No       | Define the Medallion Layers. Argumnent should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)                                                        |
-| snapshotType | String | No       | Type of Snapshot to be performed. "Full" for Full Snapshot , "Incremental" for Incremental Snapshot |
-| tablesToExclude | String | Yes      | Array of table names to exclude from the snapshot. This is the table name only - without the database prefix. By Default it is empty. |
+![Snapshot_Job](/images/DataEngineer/snapshot_job.png)
 
-![Snapshot_Job](/images/DataEngineer/Snapshot_Job.png)
 
-##### Snapshot through Databricks Notebook
+#### Validation Functionality
+This is a special module in Snapshot Process. By default, it is part of Snapshot.process() but if user want to run it separately they can run it separately 
+to check whether the configuration they would provide for Snapshot process, are correct or not.
+
+Below is the code snippet for the validation function
+
 ```scala
 import com.databricks.labs.overwatch.pipeline.Snapshot
 val sourceETLDB = "ow_bronze_snapshot_etl"
-val snapshotRootPath = "/mnt/overwatch_playground/721-snap/incremental"
-val pipeline = "Bronze:Silver:Gold"
-val snapshotType = "Incremental"  // "Full" For Batch Snapshot
-val tablesToExclude = "notebook_silver:notebook_gold"
-Snapshot.main(Array(sourceETLDB,snapshotRootPath,pipeline,snapshotType,tablesToExclude))
-
+val pipeline = "Bronze,Silver,Gold"
+val snapshotType = "Incremental"
+Snapshot.isValid(sourceETLDB,snapshotType,pipeline)
 ```
+
 
 ### Restore Process
 Restore is the reverse process of Snapshot.In data world the term Restore is very common. It simply means if our current working space is corrupted then we can restore the current workspace from the snapshot location we have used earlier.
 
 Same like Snapshot Restore can be run by both Databricks Job and Databricks Notebook.
 
-##### Restore through Databricks Job
-Below is the Configuration for the Databricks Job
-1. **Type** - Jar
-2. **Main class** - com.databricks.labs.overwatch.pipeline.Restore
-3. **Parameters for the Job**
-
-| Param  | Type   | Optional | Description                                                                                  |
-|--------|--------|----------|----------------------------------------------------------------------------------------------|
-|sourcePrefix | String | No       | Source ETL Path Prefix from where restore need to be performed.                         |
-|targetPrefix | String | No       | Target ETL Path Prefix to where restore data would be loaded.                           |
-
-![Restore_Job](/images/DataEngineer/Restore.png)
-
 ##### Restore through Databricks Notebook
+
+The code snippet to run the Restore process is as below:
 ```scala
 import com.databricks.labs.overwatch.pipeline.Restore
 val sourcePrefix = "/mnt/overwatch_playground/721-snap/full"
 val targetPrefix = "/mnt/overwatch_playground/721-snap/restore"
-Restore.main(Array(sourcePrefix,targetPrefix))
+Restore.process(sourcePrefix,targetPrefix)
 ```
+We need below parameters to run the Restore process through Databricks Notebook:
+
+| Param          | Type   | Optional  | Description                                                                              |
+|----------------|--------|-----------|------------------------------------------------------------------------------------------|
+| sourcePrefix   | String | No        | Source ETL Path Prefix from where restore need to be performed.                          |
+| targetPrefix   | String | No        | Target ETL Path Prefix to where restore data would be loaded.                            |
+
+After Restore process is done the tables from sourcePrefix will be restored in the `target prefix/globalshare` location
+
+![Restore](/images/DataEngineer/restore_path.png)
+
+##### Restore through Databricks Job
+Restore process can also be configured using Databricks Job. For this we need to run RestoreRunner Class.
+
+Below is the screenshot of the Job through which we run the snapshot process.
+
+1. **Type** - Jar
+2. **Main class** - com.databricks.labs.overwatch.pipeline.RestoreRunner
+3. **Parameters for the Job** - Same as mentioned above for `Restore through Databricks Notebook`
+
+![Restore_Job](/images/DataEngineer/restore_job.png)
+
+#### Validation Functionality
+This is a special module in Restore  Process. By default, it is part of Restore.process() but if user want to run it separately they can run it separately
+to check whether the configuration they would provide for Restore process, are correct or not.
+
+Below is the code snippet for the validation function
+
+```scala
+import com.databricks.labs.overwatch.pipeline.Restore
+val sourcePrefix = "/mnt/overwatch_playground/721-snap/full"
+val targetPrefix = "/mnt/overwatch_playground/721-snap/restore"
+Restore.isValid(sourcePrefix,targetPrefix)
+```
+
 
 ### Migration Process
 Migration Process is same as Snapshot process with some added Functionality. Below are the steps involved in Migration Process:
@@ -141,45 +210,50 @@ Migration Process is same as Snapshot process with some added Functionality. Bel
 4. Delete Old Database  (Done by OW Migration Job)
 5. Restart jobs (Need to be done by User)
 
-##### Migration through Databricks Job
-Below is the Configuration for the Databricks Job
-1. **Type** - Jar
-2. **Main class** - com.databricks.labs.overwatch.pipeline.Migration
-3. **Parameters for the Job**
-
-| Param  | Type   | Optional | Description                                                                                  |
-|--------|--------|----------|----------------------------------------------------------------------------------------------|
-|sourceETLDB | String | No       | Source Database name or ETlDataPathPrefix name.                         |
-|migrateRootPath | String | No       | Target path to where migration need to be performed.                           |
-|configPath | String | No       | Configuration Path where the config file for the source is present. Path can be CSV file or delta path ot delta table.                           |
-|tablesToExclude | String | Yes      | Array of table names to exclude from the snapshot. This is the table name only - without the database prefix. By Default it is empty.                           |
-
-![Migration_Job](/images/DataEngineer/Migration.png)
-
-
+##### Migration through Databricks Notebook
+The code snippet to run the Migration process is as below:
 ```scala
 import com.databricks.labs.overwatch.pipeline.Migration
 val sourceETLDB = "ow_bronze_migration_etl"
 val migrateRootPath = "/mnt/overwatch_playground/721-snap/migration"
 val configPath = "abfss://overwatch-field-playground@overwatchglobalinternal.dfs.core.windows.net/sourav/configs/721-migration"
 val tablesToExclude = "notebook_silver:notebook_gold"
-Migration.main(Array(sourceETLDB,migrateRootPath,configPath,tablesToExclude))
+Migration.process(sourceETLDB,migrateRootPath,configPath)
 ```
+We need below parameters to run the Migration process through Databricks Notebook:
+
+| Param           | Type     | Optional   | Description                                                                                                                           |
+|-----------------|----------|------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| sourceETLDB     | String   | No         | Source Database Name for which Migration need to be done.                                                                             |
+| migrateRootPath | String   | No         | Target path to where migration need to be performed.                                                                                  |
+| configPath      | String   | No         | Configuration Path where the config file for the source is present. Path can be CSV file or delta path ot delta table.                |
+| tablesToExclude | String   | Yes        | Array of table names to exclude from the snapshot. This is the table name only - without the database prefix. By Default it is empty. |
+
+After Migration process is done the tables from sourcePrefix will be restored in the `migrateRootPath/globalshare` location
+![Migration](/images/DataEngineer/Migration_path.png)
 
 
+##### Migration through Databricks Job
+Below is the Configuration for the Databricks Job
+1. **Type** - Jar
+2. **Main class** - com.databricks.labs.overwatch.pipeline.MigrationRunner
+3. **Parameters for the Job** Same as mentioned above for `Migration through Databricks Notebook`
 
-##### Migration through Databricks Notebook
 
-#### Batch Snaphot
-This is normal Snapshot process where we take the backup of Bronze in Batch method. Here we can do Deep Cloning of existing Bronze table to target Snapshot RootPath
+![Migration_Job](/images/DataEngineer/Migration_Job.png)
 
-#### Incremental Snap
-Through Incremental_Snap we take the snapshot of the bronze table incrementally i.e. through streaming operation.
-As described before as this is a streaming process we have to maintain a checkpoint directory. Below is the screenshot of the snap location after snapshot process is done:
+#### Validation Functionality
+This is a special module in Migration Process. By default, it is part of Migration.process() but if user want to run it separately they can run it separately
+to check whether the configuration they would provide for Migration process, are correct or not.
 
-1. "snapshotRootPath/data" - Contains the backup data of Bronze Tables
-2. "snapshotRootPath/clone_Report" - Contains the data containing run metrics
-3. "snapshotRootPath/checkpoint" - Checkpoint Location for Streaming Operation
+Below is the code snippet for the validation function
+
+```scala
+import com.databricks.labs.overwatch.pipeline.Migration
+val sourceETLDB = "ow_bronze_migration_etl"
+val configPath = "abfss://overwatch-field-playground@overwatchglobalinternal.dfs.core.windows.net/sourav/configs/721-migration"
+Migration.isValid(sourceETLDB,configPath)
+```
 
 ### Alerting On Failures
 Overwatch modules are designed to fail softly. This means that if your silver jobs module fails the job will still 
