@@ -19,7 +19,7 @@ over the place. These will be very challenging to clean up and can eat up a sign
 pile up indefinitely. Suggested time to live time is 30 days.
 
 ### Backups
-#### (This will be Deprecated in Future Release.Please refer Snapshot for backup process in Future)
+#### (This will be Deprecated from version 7.2.1.Please refer Snapshot for backup process)
 **Perform Bronze Backups**
 I know we don't hear a lot about backups in big data world but often times the cluster logs and / or 
 the audit logs are transient (especially Azure deployments as Event Hub only maintains 7 days). This means that if
@@ -62,7 +62,7 @@ the audit logs are transient (especially Azure deployments as Event Hub only mai
 something happened to the bronze data your Overwatch history could be lost forever. To guard against this it's
 strongly recommended that you periodically snapshot the Overwatch data.
 
-With 0.7.x.x release this snapshot would be done by Snapshot Class.
+With 0.7.2.1 release this snapshot would be done by Snapshot Class.
 
 Currently, There are two types of Snapshot process available in Overwatch:
 
@@ -71,20 +71,20 @@ Currently, There are two types of Snapshot process available in Overwatch:
 **Incremental Snapshot** 
 
 #### Batch Snaphot
-This is normal Snapshot process where we take the backup of Bronze in Batch method. Here we can do Deep Cloning of existing Bronze table to target Snapshot RootPath
+This is normal Snapshot process where we take the backup of Bronze in Batch method. Here we can do Deep Cloning of existing Bronze table to target Snapshot RootPath.
 
 #### Incremental Snap
 Through Incremental_Snap we take the snapshot of the bronze table incrementally i.e. through streaming operation.
 As described before as this is a streaming process we have to maintain a checkpoint directory. Below is the screenshot of the snap location after snapshot process is done:
 
-1. "snapshotRootPath/data" - Contains the backup data of Bronze Tables
-2. "snapshotRootPath/clone_report" - Contains the data containing run metrics
-3. "snapshotRootPath/checkpoint" - Checkpoint Location for Streaming Operation
+1. "snapshotRootPath/data" - Contains the backup data of Bronze Tables.
+2. "snapshotRootPath/clone_report" - Contains the data containing run metrics.
+3. "snapshotRootPath/checkpoint" - Checkpoint Location for Streaming Operation.
 
 #### How to run the Snapshot Process
 Currently, Users need to run the snapshot process through 
 1. Databricks Job.
-2. Through Notebook.
+2. Notebook.
 
 ##### Snapshot through Databricks Notebook
 
@@ -102,14 +102,14 @@ Snapshot.process(sourceETLDB,targetPrefix,snapshotType)
 
 We need below parameters to run the snapshot process through Databricks Notebook:
 
-| Param           | Type   | Optional | Default Value        | Description                                                                                                         |
-|-----------------|--------|----------|----------------------|---------------------------------------------------------------------------------------------------------------------|
-| sourceETLDB     | String | No       | NA                   | Source Database Name for which Snapshot need to be done.                                                            |
-| targetPrefix    | String | No       | NA                   | Target path where Snapshot need to be done.                                                                         |
-| snapshotType    | String | No       | NA                   | Type of Snapshot to be performed. "Full" for Full Snapshot, "Incremental" for Incremental Snapshot                  |
-| pipeline        | String | Yes      | "Bronze,Silver,Gold" | Define the Medallion Layers. Argument should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them) |
-| cloneLevel      | String | Yes      | "DEEP"               | Clone Level for Snapshot. By Default it is "DEEP". You can also specify "SHALLOW" Clone                             |
-| tablesToExclude | String | Yes      | ""                   | Array of table names to exclude from the snapshot. This is the table name only - without the database prefix.       |
+| Param           | Type   | Optional | Default Value        | Description                                                                                                                                        |
+|-----------------|--------|----------|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| sourceETLDB     | String | No       | NA                   | Source Database Name for which Snapshot need to be done.                                                                                           |
+| targetPrefix    | String | No       | NA                   | Target path where Snapshot need to be done.                                                                                                        |
+| snapshotType    | String | No       | NA                   | Type of Snapshot to be performed. "Full" for Full Snapshot, "Incremental" for Incremental Snapshot                                                 |
+| pipeline        | String | Yes      | "Bronze,Silver,Gold" | Define the Medallion Layers. Argument should be in form of "Bronze, Silver, Gold"(All 3 or any combination of them)                                |
+| cloneLevel      | String | Yes      | "DEEP"               | Clone Level for Snapshot. By Default it is "DEEP". You can also specify "SHALLOW" Clone                                                            |
+| tablesToExclude | String | Yes      | ""                   | Array of table names to exclude from the snapshot. Tables should be separated with ",". This is the table name only - without the database prefix. |
 
 After snapshot process is done the tables from Source ETL Database will be cloned in the target prefix location. The structure for target prefix location would be like below:
 
@@ -150,6 +150,19 @@ val snapshotType = "Incremental"
 Snapshot.isValid(sourceETLDB,snapshotType,pipeline)
 ```
 
+Upon running the above function you will get proper output whether the input parameters you would be using for Snapshot process,passed the validation check or not. One example of the same is as below:
+
+```
+ow_bronze_snapshot_etl is Overwatch Database and suitable for Snapshot
+Snapshot Type is Suitable for Snapshot Process. Provided SnapshotType value is Incremental
+Zone should be either Bronze,Silver or Gold. Provided Zone value is Bronze
+Zone should be either Bronze,Silver or Gold. Provided Zone value is Silver
+Zone should be either Bronze,Silver or Gold. Provided Zone value is Gold
+cloneLevel Type is Suitable for Snapshot Process. Provided cloneLevel value is DEEP
+Validation successful.You Can proceed with Snapshot process
+import com.databricks.labs.overwatch.pipeline.Snapshot
+res14: Boolean = true
+```
 
 ### Restore Process
 Restore is the reverse process of Snapshot.In data world the term Restore is very common. It simply means if our current working space is corrupted then we can restore the current workspace from the snapshot location we have used earlier.
@@ -200,15 +213,25 @@ val targetPrefix = "/mnt/overwatch_playground/721-snap/restore"
 Restore.isValid(sourcePrefix,targetPrefix)
 ```
 
+Upon running the above function you will get proper output whether the input parameters you would be using for Restore process,passed the validation check or not. One example of the same is as below:
+
+```
+SourcePrefix Path Exists.
+Target Path /mnt/overwatch_playground/721-snap/restore is Empty and is Suitable for Restore Process
+Validation successful.You Can proceed with Restoration process
+import com.databricks.labs.overwatch.pipeline.Restore
+res43: Boolean = true
+```
+
 
 ### Migration Process
 Migration Process is same as Snapshot process with some added Functionality. Below are the steps involved in Migration Process:
 
 1. Stop Overwatch jobs  (Need to be done by User)
-2. Migrate all old data to new location. (Done by OW Migration Job) 
-3. Update Config with new storage location (Done by OW Migration Job)
-4. Delete Old Database  (Done by OW Migration Job)
-5. Restart jobs (Need to be done by User)
+2. Migrate all old data to new location. (Would be done by OW Migration Process) 
+3. Update Config with new storage location (Would be done by OW Migration Process)
+4. Delete Old Database  (Would be done by OW Migration Process)
+5. Resume Overwatch jobs (Need to be done by User)
 
 ##### Migration through Databricks Notebook
 The code snippet to run the Migration process is as below:
@@ -254,6 +277,18 @@ val sourceETLDB = "ow_bronze_migration_etl"
 val configPath = "abfss://overwatch-field-playground@overwatchglobalinternal.dfs.core.windows.net/sourav/configs/721-migration"
 Migration.isValid(sourceETLDB,configPath)
 ```
+Upon running the above function you will get proper output whether the input parameters you would be using for Migration process,passed the validation check or not. One example of the same is as below:
+
+```
+ow_bronze_migration_etl is Overwatch Database and suitable for Migration
+Config file is properly configured and suitable for Migration
+Config source: delta path abfss://overwatch-field-playground@overwatchglobalinternal.dfs.core.windows.net/sourav/configs/721-migration
+Validation successful.You Can proceed with Migration process
+import com.databricks.labs.overwatch.pipeline.Migration
+res13: Boolean = true
+```
+
+
 
 ### Alerting On Failures
 Overwatch modules are designed to fail softly. This means that if your silver jobs module fails the job will still 
