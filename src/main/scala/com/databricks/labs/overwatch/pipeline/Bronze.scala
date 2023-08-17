@@ -192,7 +192,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
             sparkLogClusterScaleCoefficient,
             config.apiEnv,
             config.isMultiworkspaceDeployment,
-            config.organizationId
+            config.organizationId,
+            config.cloudProvider
           ),
           generateEventLogsDF(
             database,

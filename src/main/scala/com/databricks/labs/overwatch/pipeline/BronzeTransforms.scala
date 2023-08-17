@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
@@ -950,6 +951,30 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  /**
+   * Create cluster_log path based on the cloud provider passed. For GCP, it will create the cluster log path based on the
+   * default GCS bucket created during workspace deployment (databricks-organisation-id). This GCS bucket will contains
+   * clusters logs for that workspace. For AWS and Azure cloud, input column will pe passed as it is.
+   * @param cloudProvider  Its value can be AWS, Azure or GCP
+   * @param inputCol Input column contains the default dbfs/mounted cluster log path.
+   * @param isMultiWorkSpaceDeployment Flag specifying if it is a multi workspace deployment.
+   * @param organisationId
+   * @return
+   */
+  private def fetchClusterLogConfiguration(cloudProvider: String,
+                                           inputCol: Column,
+                                           isMultiWorkSpaceDeployment: Boolean,
+                                           organisationId: String): Column = {
+    // If cloud provider is GCP and if it is a multi workspace deployment, then we need to create the cluster logs path
+    // using default GCS bucket and organisation-id else input-column containing the cluster-log path will be returned
+    if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment &&
+      organisationId != Initializer.getOrgId) {
+      regexp_replace(inputCol, "dbfs:/", s"gs://databricks-${organisationId}/${organisationId}/")
+    }
+    else {
+      inputCol
+    }
+  }
 
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
@@ -960,7 +985,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       sparkLogClusterScaleCoefficient: Double,
                                       apiEnv: ApiEnv,
                                       isMultiWorkSpaceDeployment: Boolean,
-                                      organisationId: String
+                                      organisationId: String,
+                                      cloudProvider: String
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -986,8 +1012,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
       // Change for #357
       .join(incrementalClusterIDs.hint("SHUFFLE_HASH"), Seq("cluster_id"))
-      .withColumn("cluster_log_conf", coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
-      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
+      .withColumn("cluster_log_conf",
+        coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
+//      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
+      .withColumn("cluster_log_conf",
+        fetchClusterLogConfiguration(cloudProvider, get_json_object('cluster_log_conf, "$.destination"),
+          isMultiWorkSpaceDeployment, organisationId))
       .filter('cluster_log_conf.isNotNull)
 
     // Get latest incremental snapshot of clusters with logging dirs but not existing in audit updates
@@ -998,7 +1028,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .join(incrementalClusterIDs, Seq("cluster_id"))
       .withColumn("snapRnk", rank.over(latestSnapW))
       .filter('snapRnk === 1)
-      .withColumn("cluster_log_conf", coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"))
+      .withColumn("cluster_log_conf",
+        fetchClusterLogConfiguration(cloudProvider,coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"),
+          isMultiWorkSpaceDeployment, organisationId))
       .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
       .select('cluster_id, 'cluster_log_conf)
 
