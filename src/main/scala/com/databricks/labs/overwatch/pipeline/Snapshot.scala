@@ -258,8 +258,7 @@ object Snapshot extends SparkSessionWrapper {
       val pipelineList = pipeline.split(",").map(_.trim)
 
       for (layer <- pipelineList) {
-        if (layer.toLowerCase() == "bronze" || layer.toLowerCase()  == "silver" || layer.toLowerCase()  == "gold") {
-        } else {
+        if (!(layer.toLowerCase() == "bronze" || layer.toLowerCase() == "silver" || layer.toLowerCase() == "gold")) {
           val errMsg = s"Unknown Zone found ${layer}, Zone should be either Bronze,Silver or Gold"
           throw new BadConfigException(errMsg)
         }
