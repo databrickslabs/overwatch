@@ -19,9 +19,9 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.sql.streaming.{StreamingQuery, StreamingQueryListener}
 import org.apache.spark.sql.streaming.StreamingQueryListener.{QueryProgressEvent, QueryStartedEvent, QueryTerminatedEvent}
-import org.apache.spark.util.SerializableConfiguration
 
 import java.net.URI
 import java.time.LocalDate
@@ -196,7 +196,7 @@ object Helpers extends SparkSessionWrapper {
     if (globPath.isEmpty)
       false
     else
-       true
+      true
   }
 
 
@@ -586,8 +586,8 @@ object Helpers extends SparkSessionWrapper {
                             ): Workspace = {
     // verify database exists
     val initialCatalog = getCurrentCatalogName(spark)
-      val etlDBWithOutCatalog = if(etlDB.contains(".")){
-        setCurrentCatalog(spark, etlDB.split("\\.").head)
+    val etlDBWithOutCatalog = if(etlDB.contains(".")){
+      setCurrentCatalog(spark, etlDB.split("\\.").head)
       etlDB.split("\\.").last
     } else etlDB
 
@@ -655,7 +655,7 @@ object Helpers extends SparkSessionWrapper {
 
     //val workspaceID = Initializer.getOrgId
 
-  val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
+    val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
     val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
     val testConfig = spark.read.format("delta").load(pipelineReportPath)
       .filter(statusFilter)
@@ -889,7 +889,7 @@ object Helpers extends SparkSessionWrapper {
     val allTargets = (Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets)
-        .filter(_.exists(pathValidation = false, catalogValidation = true))
+      .filter(_.exists(pathValidation = false, catalogValidation = true))
 
     val targetsToRollback = rollbackTSByModule.map(rollback => {
       val targetTableName = PipelineFunctions.getTargetTableNameByModule(rollback.moduleId)
@@ -1031,6 +1031,26 @@ object Helpers extends SparkSessionWrapper {
     when(url.endsWith("/"), url.substr(lit(0), length(url) - 1)).otherwise(url)
   }
 
+  /**
+   * Registers the missing tables for Bronze,Silver and Gold into the metastore.
+   * @param workspace
+   */
+  def registerMissingTargets(workspace: Workspace): Unit = {
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(12))
+    val bronze = Bronze(workspace)
+    val silver = Silver(workspace)
+    val gold = Gold(workspace)
+    val db = bronze.database
+    val targets = (bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget).filter(_.exists(dataValidation = true, catalogValidation = false)).par
+    targets.tasksupport = taskSupport
+    targets.foreach(t => {
+      try {
+        db.registerTarget(t)
+      } catch {
+        case e: Throwable => println(s"FAILED: ${t.tableFullName}", e)
+      }
+    })
+  }
   def getQueryListener(query: StreamingQuery, config: Config, minEventsPerTrigger: Long): StreamingQueryListener = {
     val streamManager = new StreamingQueryListener() {
       override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
@@ -1052,26 +1072,5 @@ object Helpers extends SparkSessionWrapper {
       }
     }
     streamManager
-  }
-
-  /**
-   * Registers the missing tables for Bronze,Silver and Gold into the metastore.
-   * @param workspace
-   */
-  def registerMissingTargets(workspace: Workspace): Unit = {
-    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(12))
-    val bronze = Bronze(workspace)
-    val silver = Silver(workspace)
-    val gold = Gold(workspace)
-    val db = bronze.database
-    val targets = (bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget).filter(_.exists(dataValidation = true, catalogValidation = false)).par
-    targets.tasksupport = taskSupport
-    targets.foreach(t => {
-      try {
-        db.registerTarget(t)
-      } catch {
-        case e: Throwable => println(s"FAILED: ${t.tableFullName}", e)
-      }
-    })
   }
 }

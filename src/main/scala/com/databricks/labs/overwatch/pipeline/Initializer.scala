@@ -114,9 +114,9 @@ object Initializer extends SparkSessionWrapper {
   def getDeploymentType(overwatchParams: OverwatchParams): String ={
     logger.debug(s"database ------ ${overwatchParams.dataTarget.get.databaseName.get}")
     if (overwatchParams.dataTarget.get.databaseName.get.contains("."))
-       "uce"
+      "uce"
     else
-       "default"
+      "default"
   }
 
   /**
