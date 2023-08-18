@@ -327,7 +327,9 @@ class Database(config: Config) extends SparkSessionWrapper {
         .asInstanceOf[DataStreamWriter[Row]]
         .option("path", target.tableLocation)
         .start()
+      
       val streamManager = Helpers.getQueryListener(streamWriter, config,config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+
       spark.streams.addListener(streamManager)
       val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
       if (config.debugFlag) println(listenerAddedMsg)
@@ -349,8 +351,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     }
     logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
   }
-
-
 
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
