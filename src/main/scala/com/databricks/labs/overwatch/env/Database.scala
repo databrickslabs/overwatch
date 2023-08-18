@@ -258,6 +258,100 @@ class Database(config: Config) extends SparkSessionWrapper {
     }
   }
 
+  /**
+   * Get the merge condition based on the maxMergeScanDates on target's immutable columns
+   * @param df
+   * @param target
+   * @param maxMergeScanDates
+   * @return
+   */
+  def getMergeCondition(df: DataFrame, target: PipelineTable, maxMergeScanDates: Array[String] = Array()): String = {
+    val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
+
+    val datePartitionFields = getPartitionedDateField(df, target.partitionBy)
+    val explicitDatePartitionCondition = if (datePartitionFields.nonEmpty & maxMergeScanDates.nonEmpty) {
+      s" AND target.${datePartitionFields.get} in (${maxMergeScanDates.mkString("'", "', '", "'")})"
+    } else ""
+    val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ") + " " +
+      s"AND target.organization_id = '${config.organizationId}'" + // force partition filter for concurrent merge
+      explicitDatePartitionCondition // force right side scan to only scan relevant dates
+
+    mergeCondition
+  }
+
+  /**
+   * Function to write the batch data in delta format
+   * @param df
+   * @param target
+   * @param maxMergeScanDates
+   */
+  def deltaMergeWriter(df: DataFrame, target: PipelineTable, maxMergeScanDates: Array[String] = Array()): Unit = { // DELTA MERGE / UPSERT
+    val deltaTarget = DeltaTable.forPath(spark,target.tableLocation).alias("target")
+    val updatesDF = df.alias("updates")
+    val mergeCondition = getMergeCondition(df, target, maxMergeScanDates)
+
+    val mergeDetailMsg =
+      s"""
+         |Beginning upsert to ${target.tableFullName}.
+         |MERGE CONDITION: $mergeCondition
+         |""".stripMargin
+    logger.log(Level.INFO, mergeDetailMsg)
+    spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", config.runID)
+    // TODO -- when DBR 9.1 LTS GA, use LSM (low-shuffle-merge) to improve pipeline
+    deriveDeltaMergeBuilder(deltaTarget, updatesDF, mergeCondition, target)
+      .execute()
+
+    spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
+  }
+
+  /**
+   * Function to write the streaming data
+   * @param df
+   * @param target
+   */
+  def streamAndBatchWriter(df: DataFrame, target: PipelineTable): Unit = {
+    logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
+    if (target.checkpointPath.nonEmpty) { // STREAMING WRITER
+
+      val msg = s"Checkpoint Path Set: ${target.checkpointPath.get} - proceeding with streaming write"
+      logger.log(Level.INFO, msg)
+      if (config.debugFlag) println(msg)
+
+      val beginMsg = s"Stream to ${target.tableFullName} beginning."
+      if (config.debugFlag) println(beginMsg)
+      logger.log(Level.INFO, beginMsg)
+      if (!spark.catalog.tableExists(config.databaseName, target.name)) {
+        initializeStreamTarget(df, target)
+      }
+      val streamWriter = target.writer(df)
+        .asInstanceOf[DataStreamWriter[Row]]
+        .option("path", target.tableLocation)
+        .start()
+      val streamManager = Helpers.getQueryListener(streamWriter, config,config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+      spark.streams.addListener(streamManager)
+      val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
+      if (config.debugFlag) println(listenerAddedMsg)
+      logger.log(Level.INFO, listenerAddedMsg)
+
+      streamWriter.awaitTermination()
+      spark.streams.removeListener(streamManager)
+
+    } else { // DF Standard Writer append/overwrite
+      try {
+        target.writer(df).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
+      } catch {
+        case e: Throwable =>
+          val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception in writeMethod:")
+          logger.log(Level.ERROR, s"""Exception while writing to ${target.tableFullName}"""" +
+            Thread.currentThread().getName + " Error msg:" + fullMsg)
+          throw e
+      }
+    }
+    logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
+  }
+
+
+
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
   /**
@@ -274,82 +368,27 @@ class Database(config: Config) extends SparkSessionWrapper {
    *                           concurrency locking.
    * @return
    */
-  def write(df: DataFrame, target: PipelineTable, pipelineSnapTime: Column, maxMergeScanDates: Array[String] = Array(), preWritesPerformed: Boolean = false): Unit = {
-    val finalSourceDF: DataFrame = df
+  def write(
+             df: DataFrame,
+             target: PipelineTable,
+             pipelineSnapTime: Column,
+             maxMergeScanDates: Array[String] = Array(),
+             preWritesPerformed: Boolean = false
+           ): Unit = {
 
     // append metadata to source DF and cleanse as necessary
     val finalDF = if (!preWritesPerformed) {
-      preWriteActions(finalSourceDF, target, pipelineSnapTime)
+      preWriteActions(df, target, pipelineSnapTime)
     } else {
-      finalSourceDF
+      df
     }
 
     // ON FIRST RUN - WriteMode is automatically overwritten to APPEND
-    if (target.writeMode == WriteMode.merge) { // DELTA MERGE / UPSERT
-      val deltaTarget = DeltaTable.forPath(spark,target.tableLocation).alias("target")
-      val updatesDF = finalDF.alias("updates")
-
-      val immutableColumns = (target.keys ++ target.incrementalColumns).distinct
-
-      val datePartitionFields = getPartitionedDateField(finalDF, target.partitionBy)
-      val explicitDatePartitionCondition = if (datePartitionFields.nonEmpty & maxMergeScanDates.nonEmpty) {
-        s" AND target.${datePartitionFields.get} in (${maxMergeScanDates.mkString("'", "', '", "'")})"
-      } else ""
-      val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ") + " " +
-        s"AND target.organization_id = '${config.organizationId}'" + // force partition filter for concurrent merge
-        explicitDatePartitionCondition // force right side scan to only scan relevant dates
-
-      val mergeDetailMsg =
-        s"""
-           |Beginning upsert to ${target.tableFullName}.
-           |MERGE CONDITION: $mergeCondition
-           |""".stripMargin
-      logger.log(Level.INFO, mergeDetailMsg)
-      spark.conf.set("spark.databricks.delta.commitInfo.userMetadata", config.runID)
-      // TODO -- when DBR 9.1 LTS GA, use LSM (low-shuffle-merge) to improve pipeline
-      deriveDeltaMergeBuilder(deltaTarget, updatesDF, mergeCondition, target)
-        .execute()
-
-      spark.conf.unset("spark.databricks.delta.commitInfo.userMetadata")
-
-    } else {
-      logger.log(Level.INFO, s"Beginning write to ${target.tableFullName}")
-      if (target.checkpointPath.nonEmpty) { // STREAMING WRITER
-
-        val msg = s"Checkpoint Path Set: ${target.checkpointPath.get} - proceeding with streaming write"
-        logger.log(Level.INFO, msg)
-        if (config.debugFlag) println(msg)
-
-        val beginMsg = s"Stream to ${target.tableFullName} beginning."
-        if (config.debugFlag) println(beginMsg)
-        logger.log(Level.INFO, beginMsg)
-        if (!spark.catalog.tableExists(config.databaseName, target.name)) {
-          initializeStreamTarget(finalDF, target)
-        }
-        val streamWriter = target.writer(finalDF)
-          .asInstanceOf[DataStreamWriter[Row]]
-          .option("path", target.tableLocation)
-          .start()
-        val streamManager = Helpers.getQueryListener(streamWriter,config, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
-        spark.streams.addListener(streamManager)
-        val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
-        if (config.debugFlag) println(listenerAddedMsg)
-        logger.log(Level.INFO, listenerAddedMsg)
-
-        streamWriter.awaitTermination()
-        spark.streams.removeListener(streamManager)
-
-      } else { // DF Standard Writer append/overwrite
-        try {
-          target.writer(finalDF).asInstanceOf[DataFrameWriter[Row]].save(target.tableLocation)
-        } catch {
-          case e: Throwable =>
-            val fullMsg = PipelineFunctions.appendStackStrace(e, "Exception in writeMethod:")
-            logger.log(Level.ERROR, s"""Exception while writing to ${target.tableFullName}"""" + Thread.currentThread().getName + " Error msg:" + fullMsg)
-            throw e
-        }
-      }
-      logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
+    target.writeMode match {
+      case WriteMode.merge => deltaMergeWriter(finalDF, target, maxMergeScanDates)
+      case WriteMode.append | WriteMode.overwrite => streamAndBatchWriter(finalDF, target)
+      case _ => throw new UnsupportedOperationException(s"${target.writeMode} is not supported. Support write modes " +
+        s"are - Merge, Append and Overwrite")
     }
     registerTarget(target)
   }
@@ -450,6 +489,19 @@ class Database(config: Config) extends SparkSessionWrapper {
   }
 
   /**
+   * Checks whether targets needs to be cached
+   * @param target
+   * @param daysToProcess
+   * @return
+   */
+  def preWriteCacheRequired(target: PipelineTable, daysToProcess: Option[Int] = None): Boolean = {
+    daysToProcess.getOrElse(1000) < 5 &&   // this can be inside a function
+      !target.autoOptimize &&
+      !SparkSessionWrapper.parSessionsOn &&
+      target.isEvolvingSchema // don't cache small meta tables
+  }
+
+  /**
    * Wrapper for the write function
    * If legacy deployment retry delta write in event of race condition
    * If multiworkspace -- implement table locking to alleviate race conditions on parallelize workspace loads
@@ -471,12 +523,9 @@ class Database(config: Config) extends SparkSessionWrapper {
     //  when in parallel disable cache because it will always use persistAndLoad to reduce table lock times.
     //  persist and load will all be able to happen in parallel to temp location and use a simple read/write to
     //  merge into target rather than locking the target for the entire time all the transforms are being executed.
-    val needsCache = daysToProcess.getOrElse(1000) < 5 &&
-      !target.autoOptimize &&
-      !SparkSessionWrapper.parSessionsOn &&
-      target.isEvolvingSchema // don't cache small meta tables
-
+    val needsCache = preWriteCacheRequired(target, daysToProcess)
     logger.log(Level.INFO, s"PRE-CACHING TARGET ${target.tableFullName} ENABLED: $needsCache")
+
     val inputDf = if (needsCache) {
       logger.log(Level.INFO, "Persisting data :" + target.tableFullName)
       df.persist()
