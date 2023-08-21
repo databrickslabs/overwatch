@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, PipelineTable}
-import com.databricks.labs.overwatch.utils.{Config, SparkSessionWrapper, WriteMode, MergeScope}
+import com.databricks.labs.overwatch.utils.{Config, Helpers, MergeScope, SparkSessionWrapper, WriteMode}
 import io.delta.tables.{DeltaMergeBuilder, DeltaTable}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions.lit
@@ -157,28 +157,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     registerTarget(target)
   }
 
-  private def getQueryListener(query: StreamingQuery, minEventsPerTrigger: Long): StreamingQueryListener = {
-    val streamManager = new StreamingQueryListener() {
-      override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
-        println("Query started: " + queryStarted.id)
-      }
-
-      override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
-        println("Query terminated: " + queryTerminated.id)
-      }
-
-      override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
-        println("Query made progress: " + queryProgress.progress)
-        if (config.debugFlag) {
-          println(query.status.prettyJson)
-        }
-        if (queryProgress.progress.numInputRows <= minEventsPerTrigger) {
-          query.stop()
-        }
-      }
-    }
-    streamManager
-  }
 
   /**
    * It's often more efficient to write a temporary version of the data to be merged than to compare complex
@@ -349,7 +327,9 @@ class Database(config: Config) extends SparkSessionWrapper {
         .asInstanceOf[DataStreamWriter[Row]]
         .option("path", target.tableLocation)
         .start()
-      val streamManager = getQueryListener(streamWriter, config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+      
+      val streamManager = Helpers.getQueryListener(streamWriter, config,config.auditLogConfig.azureAuditLogEventhubConfig.get.minEventsPerTrigger)
+
       spark.streams.addListener(streamManager)
       val listenerAddedMsg = s"Event Listener Added.\nStream: ${streamWriter.name}\nID: ${streamWriter.id}"
       if (config.debugFlag) println(listenerAddedMsg)
@@ -371,7 +351,6 @@ class Database(config: Config) extends SparkSessionWrapper {
     }
     logger.log(Level.INFO, s"Completed write to ${target.tableFullName}")
   }
-
 
   // TODO - refactor this write function and the writer from the target
   //  write function has gotten overly complex
