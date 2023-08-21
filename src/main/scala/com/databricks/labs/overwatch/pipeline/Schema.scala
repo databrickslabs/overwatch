@@ -216,7 +216,9 @@ object Schema extends SparkSessionWrapper {
         //adding schema used for photon evolution
         StructField("effective_spark_version", StringType, nullable = true),
         StructField("runtime_engine", StringType, nullable = true),
-        StructField("fields_to_remove", StringType, nullable = true)
+        StructField("fields_to_remove", StringType, nullable = true),
+        StructField("commandText", StringType, nullable = true),
+        StructField("commandId", StringType, nullable = true),
       )), nullable = true),
     common("response"),
     common("useridentity")

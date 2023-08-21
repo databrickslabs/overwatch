@@ -511,7 +511,7 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("unixTimeMS"),
     )
 
-    lazy private[overwatch] val notebookCommandsTargetView: PipelineView = PipelineView(
+    lazy private[overwatch] val notebookCommandsFactViewTarget: PipelineView = PipelineView(
       name = "notebookCommands",
       notebookCommandsTarget,
       config

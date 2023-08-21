@@ -494,7 +494,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   }
 
 
-  protected def buildNotebookCommands(
+  protected def buildNotebookCommandsFact(
                                    notebook: PipelineTable,
                                    clsfIncrementalDF : DataFrame,
                                  )(auditIncrementalDF: DataFrame): DataFrame = {
@@ -513,7 +513,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id",
         "current_num_workers", "uptime_in_state_H", "total_DBU_cost","unixTimeMS_state_end")
       .distinct
-      //      .withColumnRenamed("unixTimeMS_state_start", "unixTimeMS")
       .withColumnRenamed("cluster_id", "clusterId")
       .withColumnRenamed("current_num_workers", "node_count")
       .withColumn("total_dbu_cost_ps", col("total_DBU_cost") / col("uptime_in_state_H")/lit(3600))
@@ -595,7 +594,6 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val df = joinedDF.join(unionDF,Seq("unixTimeMSStart","unixTimeMSEnd","commandId"),"leftAnti")
 
-    //
 
     val notebookClsfDF = unionDF.union(df.select(unionDF.schema.fieldNames.map(col): _*))
     val notebookCodeAndMetaDF = notebookClsfDF
@@ -608,32 +606,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("estimated_dbu_cost", col("executionTime") * col("total_dbu_cost_ps"))
       .drop("cluster_id")
 
-    println("Verbose Audit Log Created")
     notebookCodeAndMetaDF.select(colNames: _*)
-//    val notebookCodeAndMetaDF = auditIncrementalDF
-//      .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
-//      .selectExpr("*", "requestParams.*").drop("requestParams")
-//      .withColumnRenamed("timestamp", "unixTimeMS")
-//      .withColumn("timestamp", from_unixtime(col("unixTimeMS") / 1000.0).cast("timestamp"))
-//      .withColumn("executionTime",col("executionTime").cast("double"))
-//      .filter('notebookId.isNotNull)
-//      .toTSDF("unixTimeMS", "organization_id", "date","notebookId")
-//      .lookupWhen(
-//        notebookLookupTSDF,
-//        maxLookAhead = 100
-//      )
-//      .df
-//      .toTSDF("unixTimeMS", "organization_id", "clusterId")
-//      .lookupWhen(
-//        clsfLookupTSDF,
-//        tsPartitionVal = 8
-//      )
-//      .df
-//      .withColumn("estimated_dbu_cost", col("executionTime") * col("total_dbu_cost_ps"))
-//      .drop("cluster_id")
-//
-//    println("Verbose Audit Log Created")
-//    notebookCodeAndMetaDF.select(colNames: _*)
   }
 
   protected def buildSparkJob(
@@ -954,7 +927,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       |job_run_cluster_util
       |""".stripMargin
 
-  protected val verboseAuditTargetViewColumnMapping: String =
+  protected val notebookCommandsFactViewColumnMapping: String =
     """
       |organization_id, workspace_name, date, timestamp,
       |notebook_id, notebook_path, notebook_name, command_id, command_text, execution_time_s, source_ip_address,

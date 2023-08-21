@@ -36,50 +36,51 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
-  private val  verboseAuditLoggingDerivedScope: Boolean = config.overwatchScope.contains(OverwatchScope.audit) &&
+  private val notebookCommandsDerivedScope: Boolean = config.overwatchScope.contains(OverwatchScope.audit) &&
     config.overwatchScope.contains(OverwatchScope.notebooks) &&
     config.overwatchScope.contains(OverwatchScope.clusterEvents)
 
   def getAllModules: Seq[Module] = {
 
-   if(verboseAuditLoggingDerivedScope) {
-     Array(notebookCommandsModule)
-   }else{
-     config.overwatchScope.flatMap {
-       case OverwatchScope.accounts => {
-         Array(accountModModule, accountLoginModule)
-       }
-       case OverwatchScope.notebooks => {
-         Array(notebookModule)
-       }
-       case OverwatchScope.pools => {
-         Array(poolsModule)
-       }
-       case OverwatchScope.clusters => {
-         Array(clusterModule)
-       }
-       case OverwatchScope.clusterEvents => {
-         Array(clusterStateFactModule)
-       }
-       case OverwatchScope.jobs => {
-         Array(jobsModule, jobRunsModule, jobRunCostPotentialFactModule)
-       }
-       case OverwatchScope.sparkEvents => {
-         Array(
-           sparkJobModule,
-           sparkStageModule,
-           sparkTaskModule,
-           sparkExecutorModule,
-           sparkExecutionModule,
-           sparkStreamModule
-         )
-       }
-       case OverwatchScope.dbsql => {
-         Array(sqlQueryHistoryModule)
-       }
-       case _ => Array[Module]()
+   config.overwatchScope.flatMap {
+     case OverwatchScope.accounts => {
+       Array(accountModModule, accountLoginModule)
      }
+     case OverwatchScope.notebooks => {
+       Array(notebookModule)
+     }
+     case OverwatchScope.pools => {
+       Array(poolsModule)
+     }
+     case OverwatchScope.clusters => {
+       Array(clusterModule)
+     }
+     case OverwatchScope.clusterEvents => {
+       Array(clusterStateFactModule)
+     }
+     case OverwatchScope.jobs => {
+       Array(jobsModule, jobRunsModule, jobRunCostPotentialFactModule)
+     }
+     case OverwatchScope.sparkEvents => {
+       Array(
+         sparkJobModule,
+         sparkStageModule,
+         sparkTaskModule,
+         sparkExecutorModule,
+         sparkExecutionModule,
+         sparkStreamModule
+       )
+     }
+     case OverwatchScope.dbsql => {
+       Array(sqlQueryHistoryModule)
+     }
+     case _ => Array[Module]()
    }
+    if(notebookCommandsDerivedScope) {
+      Array(notebookCommandsFactModule)
+    }else{
+      Array[Module]()
+    }
   }
 
   envInit()
@@ -299,15 +300,15 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val notebookCommandsModule = Module(3018, "Gold_NotebookCommands", this, Array(1004,3004,3005))
-  lazy private val appendNotebookCommandsProcess: () => ETLDefinition = {
+  lazy private[overwatch] val notebookCommandsFactModule = Module(3018, "Gold_NotebookCommands", this, Array(1004,3004,3005))
+  lazy private val appendNotebookCommandsFactProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        BronzeTargets.auditLogsTarget.asIncrementalDF(notebookCommandsModule, BronzeTargets.auditLogsTarget.incrementalColumns,1),
-        Seq(buildNotebookCommands(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(notebookCommandsFactModule, BronzeTargets.auditLogsTarget.incrementalColumns,1),
+        Seq(buildNotebookCommandsFact(
           GoldTargets.notebookTarget,
           GoldTargets.clusterStateFactTarget
-            .asIncrementalDF(notebookCommandsModule, GoldTargets.clusterStateFactTarget.incrementalColumns, 90)
+            .asIncrementalDF(notebookCommandsFactModule, GoldTargets.clusterStateFactTarget.incrementalColumns, 90)
         )),
         append(GoldTargets.notebookCommandsTarget)
       )
@@ -389,9 +390,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case _ =>
     }
-    if (verboseAuditLoggingDerivedScope) {
-      notebookCommandsModule.execute(appendNotebookCommandsProcess)
-      GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping)
+    if (notebookCommandsDerivedScope) {
+      notebookCommandsFactModule.execute(appendNotebookCommandsFactProcess)
+      GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping)
     }
   }
 
@@ -432,8 +433,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case _ =>
     }
-    if (verboseAuditLoggingDerivedScope) {
-      GoldTargets.notebookCommandsTargetView.publish(verboseAuditTargetViewColumnMapping,workspacesAllowed = workspacesAllowed)
+    if (notebookCommandsDerivedScope) {
+      GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping,workspacesAllowed = workspacesAllowed)
     }
   }
 
