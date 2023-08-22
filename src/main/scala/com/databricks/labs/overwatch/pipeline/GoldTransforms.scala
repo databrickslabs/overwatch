@@ -572,15 +572,20 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("rnk",rank.over(windowSpec))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
-    val joinedDF_after_before = joinedDF.filter(state_after_before).withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
+    val joinedDF_after_before = joinedDF.filter(state_after_before)
+      .withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
       .withColumn("rn",row_number.over(windowSpec))
       .withColumn("rnk",rank.over(windowSpec))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-    val joinedDF_after = joinedDF.filter(state_after).withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
+
+    val joinedDF_after = joinedDF.filter(state_after)
+      .withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
       .withColumn("rn",row_number.over(windowSpec))
       .withColumn("rnk",rank.over(windowSpec))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-    val joinedDF_before_after = joinedDF.filter(state_before_after).withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
+
+    val joinedDF_before_after = joinedDF.filter(state_before_after)
+      .withColumn("avg_total_dbu_cost_ps", avg(col("total_dbu_cost_ps")).over(windowSpec))
       .withColumn("rn",row_number.over(windowSpec))
       .withColumn("rnk",rank.over(windowSpec))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
