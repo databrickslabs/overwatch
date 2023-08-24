@@ -337,7 +337,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       val sourceName = dataset.name
       val sourcePath = dataset.path
       val targetPath = if (targetPrefix.takeRight(1) == "/") s"$targetPrefix$sourceName" else s"$targetPrefix/$sourceName"
-      CloneDetail(sourcePath, targetPath, asOfTS, cloneLevel)
+      CloneDetail(sourcePath, targetPath, asOfTS, cloneLevel,Array(),WriteMode.append)
     }).toArray.toSeq
     Helpers.parClone(cloneSpecs)
   }

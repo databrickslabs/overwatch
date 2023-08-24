@@ -218,6 +218,8 @@ object Schema extends SparkSessionWrapper {
         StructField("runtime_engine", StringType, nullable = true),
         StructField("fields_to_remove", StringType, nullable = true)
       )), nullable = true),
+    StructField("instanceId", NullType, nullable = true),
+    StructField("containerId", NullType, nullable = true),
     common("response"),
     common("useridentity")
   ))
@@ -723,6 +725,29 @@ object Schema extends SparkSessionWrapper {
     StructField("Overwatch_RunID", StringType, nullable = true),
     StructField("job_type", StringType, nullable = true),
     StructField("workspace_name", StringType, nullable = true)
+  ))
+
+  val instanceDetailsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id", StringType, nullable = false),
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("Hourly_DBUs", DoubleType, nullable = false),
+    StructField("isActive", BooleanType, nullable = false),
+    StructField("activeFrom", DateType, nullable = false),
+    StructField("activeUntil", DateType, nullable = true),
+    StructField("Compute_Contract_Price", DoubleType, nullable = false),
+    StructField("Memory_GB", DoubleType, nullable = false),
+    StructField("vCPUs", IntegerType, nullable = false),
+    StructField("API_Name", StringType, nullable = false)
+  ))
+
+  val dbuCostDetailsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id", StringType, nullable = false),
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("isActive", BooleanType, nullable = false),
+    StructField("activeFrom", DateType, nullable = false),
+    StructField("activeUntil", DateType, nullable = true),
+    StructField("sku", StringType, nullable = false),
+    StructField("contract_price", DoubleType, nullable = false)
   ))
 
   /**
