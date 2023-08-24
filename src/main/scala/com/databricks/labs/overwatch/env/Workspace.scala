@@ -311,6 +311,20 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   }
 
   /**
+   * Most of the warehouse data comes from the audit logs but there are several edge cases that result in incomplete
+   * warehouses log data in the audit logs (same true for cluster specs). As such, each time the warehouse module executes
+   * a snapshot of actively defined warehouses is captured and used to fill in the blanks in the silver+ layers.
+   * @return
+   */
+  def getWarehousesDF: DataFrame = {
+    val warehousesEndpoint = "sql/warehouses"
+    ApiCallV2(config.apiEnv, warehousesEndpoint)
+      .execute()
+      .asDF()
+      .withColumn("organization_id", lit(config.organizationId))
+  }
+
+  /**
    * Create a backup of the Overwatch datasets
    *
    * @param targetPrefix prefix of path target to send the snap
