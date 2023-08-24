@@ -81,3 +81,4 @@ n2d-standard-64,n2d-standard-64,64,256.0,6.336,6.336,11.52
 n2d-standard-8,n2d-standard-8,8,32.0,0.792,0.792,1.44
 n2d-standard-80,n2d-standard-80,80,320.0,7.92,7.92,14.4
 n2d-standard-96,n2d-standard-96,96,384.0,9.504,9.504,17.28
+a2-megagpu-16g,a2-megagpu-16g,96,1360.0,35.112,35.112,63.84
