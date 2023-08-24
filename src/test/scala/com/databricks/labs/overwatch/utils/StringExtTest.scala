@@ -1,10 +1,8 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.utils.StringExt.StringHelpers
-import org.scalatest.Ignore
 import org.scalatest.funspec.AnyFunSpec
 
-//@Ignore
 class StringExtTest extends AnyFunSpec {
 
   describe("StringHelpers Test") {
