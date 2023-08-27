@@ -49,13 +49,6 @@ Bronze(workspace).snapshot(
 )
 ```
 
-#### Overwrite Option
-Note that the snapshot function performs a deep clone for all bronze tables except the tables in the excludes
-array. As such, these are complete backups each time. If the *overwrite* option is set to true you will have a backup
-created each run but it will be replaced on each subsequent run. If you would like to maintain more than one backup 
-you must set *overwrite = false*. If you set overwrite to false, you may want to consider a cleanup function to ensure 
-you don't have 52 copies of bronze per year (assuming 1X / week).
-
 ### Snapshot Process
 Snapshoting in Big Data World is very rare but often times the cluster logs and / or
 the audit logs are transient (especially Azure deployments as Event Hub only maintains 7 days). This means that if
@@ -75,14 +68,14 @@ This process will require us to maintain a checkpoint directory. Below is the sc
 
 ![Snapshot_Target](/images/DataEngineer/snapshotTarget.png)
 
-1. "snapshotRootPath/data" - Contains the backup data of Bronze Tables.
+1. "snapshotRootPath/data" - Contains the Snapshot Data of Source Database Tables.
 2. "snapshotRootPath/clone_report" - Contains the data containing run metrics.
 3. "snapshotRootPath/checkpoint" - Checkpoint Location for Streaming Operation.
 
 #### How to run the Snapshot Process
 You can run the Snapshot process via a scheduled job, or a notebook.
 
-##### Snapshot through Databricks Notebook
+#### Snapshot through Databricks Notebook
 
 The code snippet to run the Snapshot process is as below:
 
@@ -116,7 +109,7 @@ If you look into the targetPrefix folder you will find another subdirectory call
 
 ![clone_report](/images/DataEngineer/clone_report.png)
 
-##### Snapshot through Databricks Job
+#### Snapshot through Databricks Job
 
 You can also schedule a job to either run the notebook above, or use the SnapshotRunner class. For example:
 
@@ -153,10 +146,9 @@ res14: Boolean = true
 
 ### Restore Process
 You can use the Restore process to bring back snapshot data
-
 Similar to Snapshot, Restore can be run by both Databricks Job and Databricks Notebook.
 
-##### Restore through Databricks Notebook
+#### Restore through Databricks Notebook
 
 The code snippet to run the Restore process is as below:
 ```scala
@@ -172,18 +164,16 @@ We need below parameters to run the Restore process through Databricks Notebook:
 | sourcePrefix   | String | No        | Source ETL Path Prefix from where restore need to be performed. |
 | targetPrefix   | String | No        | Target ETL Path Prefix where restore data will be loaded to.    |
 
-After Restore process is done the tables from sourcePrefix will be restored in the `targetPrefix/globalshare` location
 
+After Restore process is done the tables from sourcePrefix will be restored in the `targetPrefix/globalshare` location
 ![Restore](/images/DataEngineer/restore_path.png)
 
-##### Restore through Databricks Job
+#### Restore through Databricks Job
 In cases where you need to periodically run the Restore process, you can configure a job using the RestoreRunner class.
-
 
 1. **Type** - Jar
 2. **Main class** - com.databricks.labs.overwatch.pipeline.RestoreRunner
-3. **Parameters for the Job** - Same as mentioned above for `Restore through Databricks Notebook`
-
+3. **Parameters for the Job** - Same as mentioned above for [Restore through Databricks Notebook](#restore-through-databricks-notebook)
 ![Restore_Job](/images/DataEngineer/restore_job.png)
 
 #### Validation Functionality
@@ -218,7 +208,7 @@ These the steps required to Migrate your Overwatch data:
 2. Run the Migration process (Use Migrate.process)
 3. Resume Overwatch jobs (Need to be done by User)
 
-##### Migration through Databricks Notebook
+#### Migration through Databricks Notebook
 The code snippet to run the Migration process is as below:
 ```scala
 import com.databricks.labs.overwatch.pipeline.Migration
@@ -230,22 +220,21 @@ Migration.process(sourceETLDB,migrateRootPath,configPath,tablesToExclude)
 ```
 We need below parameters to run the Migration process through Databricks Notebook:
 
-| Param           | Type     | Optional   | Description                                                                                                                                                                            |
-|-----------------|----------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| sourceETLDB     | String   | No         | Source Database Name to migrate. Note that you can only use the Overwatch ETL database.                                                                                                |
-| migrateRootPath | String   | No         | Target path to where migration need to be performed.                                                                                                                                   |
-| configPath      | String   | No         | Configuration Path where the config file for the source is present. Path can be to a CSV file or path to a delta table, or simple a delta table name that contains your configuration. |
-| tablesToExclude | String   | Yes        | Array of table names to exclude from the migration. This is the table name only - without the database prefix. By Default it is empty.                                                 |
+| Param           | Type     | Optional   | Description                                                                                                                                                                                  |
+|-----------------|----------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| sourceETLDB     | String   | No         | Source Database Name to migrate. Note that you can only use the Overwatch ETL database.                                                                                                      |
+| migrateRootPath | String   | No         | Target path to where migration need to be performed.                                                                                                                                         |
+| configPath      | String   | No         | Configuration Path where the config file for the source is present. <br/>Path can be to a CSV file or path to a delta table, or simple a delta table name that contains your configuration.  |
+| tablesToExclude | String   | Yes        | Array of table names to exclude from the migration. This is the table name only - <br/>without the database prefix. By Default it is empty.                                                  |
 
 After Migration process is done the tables from sourcePrefix will be restored in the `migrateRootPath/globalshare` location
 ![Migration](/images/DataEngineer/Migration_path.png)
 
-
-##### Migration through Databricks Job
+#### Migration through Databricks Job
 Below is the Configuration for the Databricks Job
 1. **Type** - Jar
 2. **Main class** - com.databricks.labs.overwatch.pipeline.MigrationRunner
-3. **Parameters for the Job** Same as mentioned above for `Migration through Databricks Notebook`
+3. **Parameters for the Job** Same as mentioned above for [Migration through Databricks Notebook](#migration-through-databricks-notebook)
 
 
 ![Migration_Job](/images/DataEngineer/Migration_Job.png)
@@ -271,8 +260,6 @@ Validation successful.You Can proceed with Migration process
 import com.databricks.labs.overwatch.pipeline.Migration
 res13: Boolean = true
 ```
-
-
 
 ### Alerting On Failures
 Overwatch modules are designed to fail softly. This means that if your silver jobs module fails the job will still 
