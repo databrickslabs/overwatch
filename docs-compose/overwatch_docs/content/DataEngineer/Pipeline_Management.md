@@ -179,7 +179,7 @@ progression of the "until" time as no data is not considered an error. Below are
 | 3016      | Gold_SparkStream                    | sparkstream_gold                  | 1006,2005                | 0.7.0   |
 | 3015      | Gold_jobRunCostPotentialFact        | jobruncostpotentialfact_gold      | 3001,3003,3005,3010,3012 | 0.6.0   |
 | 3017      | Gold_Sql_QueryHistory               | sql_query_history_gold            | 2020                     | 0.7.0   |
-| 3018      | Gold_NotebookCommands               | notebookCommands_gold             | 1004,3004,3005           | 0.7.0   |
+| 3018      | Gold_NotebookCommands               | notebookCommands_gold             | 1004,3004,3005           | 0.7.2.1 |
 
 \* **Bronze_Job_Runs_Snapshot** is experimental as of 0711. The module works as expected but the API can only pull 
 25 runs per API call; therefore, for some customers with many runs per day (i.e. thousands) this module can take 

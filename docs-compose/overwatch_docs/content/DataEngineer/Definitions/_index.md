@@ -66,8 +66,9 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [sparkStage](#sparkstage)
 * [sparkTask](#sparktask)
 * [sparkStream](#sparkstream)
-* [Common Meta Fields](#common-meta-fields)
 * [notebookCommands](#notebookcommands)
+* [Common Meta Fields](#common-meta-fields)
+
   * There are several fields that are present in all tables. Instead of cluttering each table with them, this section
   was created as a reference to each of these.
 
@@ -887,6 +888,42 @@ to improve performance.
 | streaming_metrics | dynamic struct | All metrics available for the stream batch run                                                                 |
 | execution_ids     | array<long>    | Array of execution_ids in the spark_context. Can explode and tie back to sparkExecution and other spark tables |
 
+#### NotebookCommands
+**KEY** -- notebook_id + unixTimeMS
+
+**Incremental Columns** -- unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Merge
+
+| Column             | Type   | Description                                                                               |
+|:-------------------|:-------|:------------------------------------------------------------------------------------------|
+| organization_id    | string | Canonical workspace id                                                                    |
+| workspace_name     | string | Canonical workspace name                                                                  |
+| date               | date   | unixTimeMS as a date type                                                                 |
+| timestamp          | long   | unixTimeMS as a timestamp type in milliseconds                                            |
+| notebook_id        | string | id for the notebook in the workspace                                                      |
+| notebook_path      | string | notebook path in the workspace                                                            |
+| notebook_name      | string | canonical notebook name for the workspace                                                 |
+| command_id         | string | id of the notebook command                                                                |
+| command_text       | string | the command for which the cost is being derived                                           |
+| execution_time_s   | double | notebook command execution time in second                                                 |
+| source_ip_address  | string | Origin IP of action requested                                                             |
+| user_identity      | struct | User information as available. Will include userid and email address                      |
+| estimated_dbu_cost | double | dbu cost per second for the command runtime                                               |
+| status             | string | Status of the notebook command run                                                        |
+| cluster_id         | string | Canonical workspace cluster id                                                            |
+| cluster_name       | string | The name of the compute asset used to execute the task run                                |
+| custom_tags        | string | JSON string of key/value pairs for all cluster associated custom tags give to the cluster |
+| node_type_id       | string | Worker Node type for the compute asset (not supported for Warehouses yet)                 |
+| node_count         | long   | cluster worker node count                                                                 |
+| response           | struct | HTTP response including errorMessage, result, and statusCode                              |
+| user_agent         | string | request origin such as browser, terraform, api, etc.                                      |
+| unixTimeMS         | long   | unix time epoch as a long in milliseconds                                                 |
+| Pipeline_SnapTS    | string | Snapshot timestamp of Overwatch run that added the record                                 |
+| Overwatch_RunID    | string | Overwatch canonical ID that resulted in the record load                                   |
+
 #### Common Meta Fields
 | Column          | Type   | Description                                                       |
 |:----------------|:-------|:------------------------------------------------------------------|
@@ -905,39 +942,6 @@ to improve performance.
 | Pipeline_SnapTS | string | Snapshot timestmap of Overwatch run that added the record         |
 | Overwatch_RunID | string | Overwatch canonical ID that resulted in the record load           |
 
-#### NotebookCommands
-**KEY** -- notebook_id + unixTimeMS 
-
-**Incremental Columns** -- unixTimeMS
-
-**Partition Columns** -- organization_id
-
-**Write Mode** -- Merge
-
-| Column                     | Type   | Description                                                                                |
-|:---------------------------|:-------|:-------------------------------------------------------------------------------------------|
-| organization_id            | string | Canonical workspace id                                                                     |
-| workspace_name             | string | Canonical workspace name                                                                   |
-| date                       | string | unixTimeMS as a date type                                                                  |
-| timestamp                  | long   | unixTimeMS as a timestamp type in milliseconds                                             |
-| notebook_id                | string | id for the notebook in the workspace                                                       |
-| notebook_path              | string | notebook path in the workspace                                                             |
-| notebook_name              | struct | canonical notebook name for the workspace                                                  |
-| command_id                 | struct | id of the notebook command                                                                 |
-| command_text               | struct | the command for which the cost is being derived                                            |
-| execution_time_s           | struct | notebook commands execution time in second                                                 |
-| source_ip_address          | struct | Origin IP of action requested                                                              |
-| user_identity              | struct | HTTP response including userid and user mail address                                       |
-| estimated_dbu_cost         | struct | dbu cost per second for the command runtime                                                |
-| status                     | struct | Status of the notebook command run                                                         |
-| cluster_id                 | struct | Canonical workspace cluster id                                                             |
-| cluster_name               | struct | The name of the compute asset used to execute the task run                                 |
-| custom_tags                | struct | JSON string of key/value pairs for all cluster associated custom tags give to the cluster  |
-| node_type_id               | struct | Worker Node type for the compute asset (not supported for Warehouses yet)                  |
-| node_count                 | struct | cluster woker node count                                                                   |
-| response                   | struct | HTTP response including errorMessage, result, and statusCode                               |
-| user_agent                 | struct | request origin such as browser, terraform, api, etc.                                       |
-| unixTimeMS                 | struct | unix time epoch as a long in milliseconds                                                  |
 
 
 ## ETL Tables
@@ -996,4 +1000,4 @@ all tables. Users should always reference Consumption and Gold layers unless the
 | sparktask_gold          | sparkEvents      | gold  | All spark event data relevant to spark tasks                                                                                                                                                                                                                                                                                                                                       |
 | sparkstream_gold        | sparkEvents      | gold  | All spark event data relevant to spark streams                                                                                                                                                                                                                                                                                                                                     |
 | sql_query_history_gold  | sqlHistory       | gold  | History of all the sql queries executed through SQL warehouses                                                                                                                                                                                                                                                                                                                     |
-| notebookCommands_gold  | audit,notebooks,<br/>clusterEvents | gold  | Information related to Notebook Commands(Verbose Logging)                                                                                                                                                                                                                                                                                                                          |
+| notebookCommands_gold  | audit,notebooks,<br/>clusterEvents | gold  | Information related to Notebook Commands                                                                                                                                                                                                                                                                                                                                           |
