@@ -565,42 +565,44 @@ trait GoldTransforms extends SparkSessionWrapper {
     // Cluster State Started before cmd start time and ended after command run time
     val state_before_after = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end > 'unixTimeMSEnd
 
-    val windowSpec  = Window.partitionBy("commandId","clusterId","unixTimeMSStart","unixTimeMSEnd").orderBy("executionTime")
+    val windowSpec  = Window.partitionBy("commandId","clusterId","unixTimeMSStart","unixTimeMSEnd")
+
+    val windowSpec1  = Window.partitionBy("commandId","clusterId","unixTimeMSStart","unixTimeMSEnd").orderBy(desc("uptime_in_state_H"))
 
     val joinedDF_before_before = joinedDF.filter(state_before_before)
       .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
       .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec))
-      .withColumn("rnk",rank.over(windowSpec))
-    joinedDF_before_before.cache()
-    val joinedDF_before_before_final = joinedDF_before_before.filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+      .withColumn("rn",row_number.over(windowSpec1))
+      .withColumn("rnk",rank.over(windowSpec1))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+
 
     val joinedDF_after_before = joinedDF.filter(state_after_before)
       .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
       .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
       .withColumn("rn",row_number.over(windowSpec))
-      .withColumn("rnk",rank.over(windowSpec)).cache()
-    joinedDF_after_before.cache()
-    val joinedDF_after_before_final = joinedDF_after_before.filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+      .withColumn("rnk",rank.over(windowSpec))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+
 
     val joinedDF_after = joinedDF.filter(state_after)
       .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
       .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
       .withColumn("rn",row_number.over(windowSpec))
-      .withColumn("rnk",rank.over(windowSpec)).cache()
-    joinedDF_after.cache()
-    val joinedDF_after_final = joinedDF_after.filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+      .withColumn("rnk",rank.over(windowSpec))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+
 
     val joinedDF_before_after = joinedDF.filter(state_before_after)
       .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
       .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
       .withColumn("rn",row_number.over(windowSpec))
-      .withColumn("rnk",rank.over(windowSpec)).cache()
-    joinedDF_before_after.cache()
-    val joinedDF_before_after_final = joinedDF_before_after.filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+      .withColumn("rnk",rank.over(windowSpec))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
 
-    val unionDF = joinedDF_before_before_final.union(joinedDF_after_before_final).union(joinedDF_after_final).union(joinedDF_before_after_final)
+
+    val unionDF = joinedDF_before_before.union(joinedDF_after_before).union(joinedDF_after).union(joinedDF_before_after)
       .withColumn("total_DBU_cost",sum(col("sum_total_DBU_cost")).over(windowSpec))
       .withColumn("uptime_in_state_H",sum(col("sum_uptime_in_state_H")).over(windowSpec))
       .withColumn("rn",row_number.over(windowSpec))
