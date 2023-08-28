@@ -898,6 +898,41 @@ trait GoldTransforms extends SparkSessionWrapper {
     df.select(sparkExecutorCols: _*)
   }
 
+  protected def buildWarehouse()(df: DataFrame): DataFrame = {
+
+    val warehouseCols : Array[Column] = Array(
+      'warehouse_id,
+      'warehouse_name,
+      'organization_id,
+      'serviceName.alias("service_name"),
+      'actionName.alias("action_name"),
+      'userEmail.alias("user_email"),
+      'cluster_size,
+      'min_num_clusters,
+      'max_num_clusters,
+      'auto_stop_mins,
+      'spot_instance_policy,
+      'enable_photon,
+      'channel,
+      'enable_serverless_compute,
+      'warehouse_type,
+      'warehouse_state,
+      'size,
+      'auto_resume,
+      'creator_id,
+      'tags,
+      'num_clusters,
+      'num_active_sessions,
+      'jdbc_url,
+      'timestamp.alias("unixTimeMS"),
+      from_unixtime('timestamp.cast("double") / 1000).cast("timestamp").alias("timestamp"),
+      from_unixtime('timestamp.cast("double") / 1000).cast("timestamp").cast("date").alias("date"),
+      'createdBy.alias("created_by")
+    )
+
+    df.select(warehouseCols: _*)
+  }
+
   protected val clusterViewColumnMapping: String =
     """
       |organization_id, workspace_name, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type,
@@ -1030,6 +1065,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       |pruned_bytes,pruned_files_count,read_bytes,read_cache_bytes,read_files_count,read_partitions_count,
       |read_remote_bytes,result_fetch_time_ms,result_from_cache,rows_produced_count,rows_read_count,
       |spill_to_disk_bytes,task_total_time_ms,total_time_ms,write_remote_bytes
+      |""".stripMargin
+
+  protected val warehouseViewColumnMapping: String =
+    """
+      |organization_id,workspace_name,warehouse_id,warehouse_name,service_name,action_name,
+      |user_email,cluster_size,min_num_clusters,max_num_clusters,auto_stop_mins,spot_instance_policy,enable_photon,
+      |channel,enable_serverless_compute,warehouse_type,warehouse_state,size,auto_resume,creator_id,tags,num_clusters,
+      |num_active_sessions,jdbc_url,unixTimeMS,date,created_by
       |""".stripMargin
 
 }
