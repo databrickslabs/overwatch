@@ -32,6 +32,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkStreamTarget,
       GoldTargets.sparkExecutorTarget,
       GoldTargets.sqlQueryHistoryTarget,
+      GoldTargets.warehouseTarget,
       GoldTargets.notebookCommandsTarget
     )
   }
@@ -41,41 +42,43 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     config.overwatchScope.contains(OverwatchScope.clusterEvents)
 
   def getAllModules: Seq[Module] = {
-
-   config.overwatchScope.flatMap {
-     case OverwatchScope.accounts => {
-       Array(accountModModule, accountLoginModule)
-     }
-     case OverwatchScope.notebooks => {
-       Array(notebookModule)
-     }
-     case OverwatchScope.pools => {
-       Array(poolsModule)
-     }
-     case OverwatchScope.clusters => {
-       Array(clusterModule)
-     }
-     case OverwatchScope.clusterEvents => {
-       Array(clusterStateFactModule)
-     }
-     case OverwatchScope.jobs => {
-       Array(jobsModule, jobRunsModule, jobRunCostPotentialFactModule)
-     }
-     case OverwatchScope.sparkEvents => {
-       Array(
-         sparkJobModule,
-         sparkStageModule,
-         sparkTaskModule,
-         sparkExecutorModule,
-         sparkExecutionModule,
-         sparkStreamModule
-       )
-     }
-     case OverwatchScope.dbsql => {
-       Array(sqlQueryHistoryModule)
-     }
-     case _ => Array[Module]()
-   }
+    config.overwatchScope.flatMap {
+      case OverwatchScope.accounts => {
+        Array(accountModModule, accountLoginModule)
+      }
+      case OverwatchScope.notebooks => {
+        Array(notebookModule)
+      }
+      case OverwatchScope.pools => {
+        Array(poolsModule)
+      }
+      case OverwatchScope.clusters => {
+        Array(clusterModule)
+      }
+      case OverwatchScope.clusterEvents => {
+        Array(clusterStateFactModule)
+      }
+      case OverwatchScope.jobs => {
+        Array(jobsModule, jobRunsModule, jobRunCostPotentialFactModule)
+      }
+      case OverwatchScope.sparkEvents => {
+        Array(
+          sparkJobModule,
+          sparkStageModule,
+          sparkTaskModule,
+          sparkExecutorModule,
+          sparkExecutionModule,
+          sparkStreamModule
+        )
+      }
+      case OverwatchScope.dbsql => {
+        Array(
+          sqlQueryHistoryModule,
+          warehouseModule
+        )
+      }
+      case _ => Array[Module]()
+    }
     if(notebookCommandsDerivedScope) {
       Array(notebookCommandsFactModule)
     }else{
@@ -100,9 +103,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   private val clsfSparkOverrides = Map(
     "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
   )
-
-
-
   lazy private[overwatch] val clusterStateFactModule = Module(3005, "Gold_ClusterStateFact", this, Array(2019, 2014), 3.0)
     .withSparkOverrides(clsfSparkOverrides)
   lazy private val appendClusterStateFactProccess: () => ETLDefinition = {
@@ -300,7 +300,16 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val notebookCommandsFactModule = Module(3018, "Gold_NotebookCommands", this, Array(1004,3004,3005))
+  lazy private[overwatch] val warehouseModule = Module(3018, "Gold_Warehouse", this, Array(2021))
+  lazy private val appendWarehouseProcess: () => ETLDefinition = {
+    () =>
+    ETLDefinition(
+      SilverTargets.warehousesSpecTarget.asIncrementalDF(warehouseModule, SilverTargets.warehousesSpecTarget.incrementalColumns),
+      Seq(buildWarehouse()),
+      append(GoldTargets.warehouseTarget)
+    )
+  }
+  lazy private[overwatch] val notebookCommandsFactModule = Module(3019, "Gold_NotebookCommands", this, Array(1004,3004,3005))
   lazy private val appendNotebookCommandsFactProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
@@ -330,6 +339,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     GoldTargets.sparkStreamViewTarget.publish(sparkStreamViewColumnMapping)
     GoldTargets.sparkExecutorViewTarget.publish(sparkExecutorViewColumnMapping)
     GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
+    GoldTargets.warehouseViewTarget.publish(warehouseViewColumnMapping)
 
   }
 
@@ -340,7 +350,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
 
   private def executeModules(): Unit = {
     validateCostSources()
-
     config.overwatchScope.foreach {
       case OverwatchScope.accounts => {
         accountModModule.execute(appendAccountModProcess)
@@ -369,7 +378,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case OverwatchScope.dbsql => {
         sqlQueryHistoryModule.execute(appendSqlQueryHistoryProcess)
+        warehouseModule.execute(appendWarehouseProcess)
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping)
+        GoldTargets.warehouseViewTarget.publish(warehouseViewColumnMapping)
       }
       case OverwatchScope.sparkEvents => {
         processSparkEvents()
@@ -395,7 +406,6 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping)
     }
   }
-
 
   def refreshViews(workspacesAllowed: Array[String] = Array()): Unit = {
     config.overwatchScope.foreach {
@@ -430,6 +440,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case OverwatchScope.dbsql => {
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping,workspacesAllowed = workspacesAllowed)
+        GoldTargets.warehouseViewTarget.publish(warehouseViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case _ =>
     }
