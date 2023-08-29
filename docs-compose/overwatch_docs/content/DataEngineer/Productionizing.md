@@ -19,7 +19,7 @@ over the place. These will be very challenging to clean up and can eat up a sign
 pile up indefinitely. Suggested time to live time is 30 days.
 
 ### Backups
-#### (This will be Deprecated from version 7.2.1.Please refer Snapshot for backup process)
+#### (This will be Deprecated from version 7.2.1.Please refer to the Snapshot section for the new way to do backups)
 **Perform Bronze Backups**
 I know we don't hear a lot about backups in big data world but often times the cluster logs and / or 
 the audit logs are transient (especially Azure deployments as Event Hub only maintains 7 days). This means that if
