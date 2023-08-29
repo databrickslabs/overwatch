@@ -499,8 +499,6 @@ trait GoldTransforms extends SparkSessionWrapper {
                                    clsfIncrementalDF : DataFrame,
                                  )(auditIncrementalDF: DataFrame): DataFrame = {
 
-
-
     val notebookLookupTSDF = notebook.asDF
       .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS","date")
       .withColumnRenamed("notebook_id", "notebookId")
@@ -515,9 +513,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .distinct
       .withColumnRenamed("cluster_id", "clusterId")
       .withColumnRenamed("current_num_workers", "node_count")
-
-
-
+    
     val colNames: Array[Column] = Array(
       'organization_id,
       'clusterId.alias("cluster_id"),
@@ -576,37 +572,32 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("rnk",rank.over(windowSpec1))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
-
     val joinedDF_after_before = joinedDF.filter(state_after_before)
       .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
       .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec))
-      .withColumn("rnk",rank.over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec1))
+      .withColumn("rnk",rank.over(windowSpec1))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-
 
     val joinedDF_after = joinedDF.filter(state_after)
       .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
       .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec))
-      .withColumn("rnk",rank.over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec1))
+      .withColumn("rnk",rank.over(windowSpec1))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-
 
     val joinedDF_before_after = joinedDF.filter(state_before_after)
       .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
       .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec))
-      .withColumn("rnk",rank.over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec1))
+      .withColumn("rnk",rank.over(windowSpec1))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-
-
 
     val unionDF = joinedDF_before_before.union(joinedDF_after_before).union(joinedDF_after).union(joinedDF_before_after)
       .withColumn("total_DBU_cost",sum(col("sum_total_DBU_cost")).over(windowSpec))
       .withColumn("uptime_in_state_H",sum(col("sum_uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec))
-      .withColumn("rnk",rank.over(windowSpec))
+      .withColumn("rn",row_number.over(windowSpec1))
+      .withColumn("rnk",rank.over(windowSpec1))
       .drop("sum_total_DBU_cost","sum_uptime_in_state_H")
 
     unionDF.cache()
@@ -623,8 +614,8 @@ trait GoldTransforms extends SparkSessionWrapper {
               maxLookAhead = 100
             )
       .df
-      .withColumn("total_dbu_cost_ps", col("total_DBU_cost") / col("uptime_in_state_H")/lit(3600))
-      .withColumn("estimated_dbu_cost", col("executionTime") * col("total_dbu_cost_ps"))
+      .withColumn("dbu_cost_ps", col("total_DBU_cost") / col("uptime_in_state_H")/lit(3600))
+      .withColumn("estimated_dbu_cost", col("executionTime") * col("dbu_cost_ps"))
       .drop("cluster_id")
 
     notebookCodeAndMetaDF.select(colNames: _*)

@@ -309,6 +309,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         append(GoldTargets.warehouseTarget)
       )
   }
+
   lazy private[overwatch] val notebookCommandsFactModule = Module(3019, "Gold_NotebookCommands", this, Array(1004,3004,3005))
   lazy private val appendNotebookCommandsFactProcess: () => ETLDefinition = {
     () =>
