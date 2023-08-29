@@ -41,7 +41,7 @@ When you create a workspace, Databricks on Google Cloud creates two Google Cloud
 * `databricks-<workspace-id>` - stores system data that is generated as you use various Databricks features.
 This bucket includes notebook revisions, job run details, command results, and Spark logs
 * `databricks-<workspace-id>-system` - contains workspace’s root storage for the Databricks File System (DBFS). 
-Your DBFS root bucket is not intended for storage of production customer data.
+Your DBFS root bucket is not intended for storage of production data.
 
 Follow the [databricks-docs](https://docs.gcp.databricks.com/administration-guide/workspace/create-workspace.html#secure-the-workspaces-gcs-buckets-in-your-project) 
 to get more information on these buckets. 
