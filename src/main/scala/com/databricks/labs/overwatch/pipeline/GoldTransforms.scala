@@ -509,11 +509,11 @@ trait GoldTransforms extends SparkSessionWrapper {
     val clsfDF = clsfIncrementalDF
       .select(
         "organization_id", "state_start_date", "unixTimeMS_state_start", "cluster_id",
-        "current_num_workers", "uptime_in_state_H", "total_DBU_cost","unixTimeMS_state_end")
+        "current_num_workers", "uptime_in_state_H", "total_DBU_cost","unixTimeMS_state_end","cluster_name","custom_tags","node_type_id")
       .distinct
       .withColumnRenamed("cluster_id", "clusterId")
       .withColumnRenamed("current_num_workers", "node_count")
-    
+
     val colNames: Array[Column] = Array(
       'organization_id,
       'clusterId.alias("cluster_id"),
@@ -547,7 +547,10 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("executionTime",col("executionTime").cast("double"))
       .withColumn("unixTimeMSEnd",(col("unixTimeMSStart")+(col("executionTime")*1000)).cast("double"))
       .filter('notebookId.isNotNull)
-    val joinedDF = auditDF.join(clsfDF,Seq("clusterId","organization_id"),"left")
+      .drop("cluster_name","custom_tags","node_type_id")
+
+
+    val joinedDF = clsfDF.join(auditDF,Seq("clusterId","organization_id"),"left")
 
     // Cluster_state started before cmd start time and ended before command end time
     val state_before_before = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end < 'unixTimeMSEnd
