@@ -161,52 +161,55 @@ when they occur. Sometimes, there will truly be no new data in an upstream Modul
 progression of the "until" time as no data is not considered an error. Below are the ETL Modules and their dependencies
 
 ### Module Dependencies Diagram
-![ModuleDepDiagram](/images/DataEngineer/Overwatch_Entity_Dependencies.png)
+![ModuleDepDiagram](/images/DataEngineer/Overwatch_Entity_Dependencies_0721.png)
 
-| Module ID | Module Name                         | Target Table Name                 | Module ID Dependencies   | As Of   |
-|:----------|:------------------------------------|:----------------------------------|:-------------------------|---------|
-| 1001      | Bronze_Jobs_Snapshot                | jobs_snapshot_bronze              |                          | 0.6.0   |
-| 1002      | Bronze_Clusters_Snapshot            | clusters_snapshot_bronze          |                          | 0.6.0   |
-| 1003      | Bronze_Pools                        | pools_snapshot_bronze             |                          | 0.6.0   |
-| 1004      | Bronze_AuditLogs                    | audit_log_bronze                  |                          | 0.6.0   |
-| 1005      | Bronze_ClusterEventLogs             | cluster_events_bronze             | 1004                     | 0.6.0   |
-| 1006      | Bronze_SparkEventLogs               | spark_events_bronze               | 1004                     | 0.6.0   |
-| 1007      | Bronze_Libraries_Snapshot           | libs_snapshot_bronze              |                          | 0.7.1.1 |
-| 1008      | Bronze_Policies_Snapshot            | policies_snapshot_bronze          |                          | 0.7.1.1 |
-| 1009      | Bronze_Instance_Profile_Snapshot    | instance_profiles_snapshot_bronze |                          | 0.7.1.1 |
-| 1010      | Bronze_Token_Snapshot               | tokens_snapshot_bronze            |                          | 0.7.1.1 |
-| 1011      | Bronze_Global_Init_Scripts_Snapshot | global_inits_snapshot_bronze      |                          | 0.7.1.1 |
-| 1012      | Bronze_Job_Runs_Snapshot*           | job_runs_snapshot_bronze          |                          | 0.7.1.1 |
-| 2003      | Silver_SPARK_Executors              | spark_executors_silver            | 1006                     | 0.6.0   |
-| 2005      | Silver_SPARK_Executions             | spark_executions_silver           | 1006                     | 0.6.0   |
-| 2006      | Silver_SPARK_Jobs                   | spark_jobs_silver                 | 1006                     | 0.6.0   |
-| 2007      | Silver_SPARK_Stages                 | spark_stages_silver               | 1006                     | 0.6.0   |
-| 2008      | Silver_SPARK_Tasks                  | spark_tasks_silver                | 1006                     | 0.6.0   |
-| 2009      | Silver_PoolsSpec                    | pools_silver                      | 1003,1004                | 0.6.0   |
-| 2010      | Silver_JobsStatus                   | job_status_silver                 | 1004                     | 0.6.0   |
-| 2011      | Silver_JobsRuns                     | jobrun_silver                     | 1004,2010,2014           | 0.6.0   |
-| 2014      | Silver_ClusterSpec                  | cluster_spec_silver               | 1004                     | 0.6.0   |
-| 2016      | Silver_AccountLogins                | accountlogin                      | 1004                     | 0.6.0   |
-| 2017      | Silver_ModifiedAccounts             | account_mods_silver               | 1004                     | 0.6.0   |
-| 2018      | Silver_Notebooks                    | notebook_silver                   | 1004                     | 0.6.0   |
-| 2019      | Silver_ClusterStateDetail           | cluster_state_detail_silver       | 1005                     | 0.6.0   |
-| 2020      | Silver_SQLQueryHistory              | sql_query_history_silver          | 1004                     | 0.7.0   |
-| 3001      | Gold_Cluster                        | cluster_gold                      | 2014                     | 0.6.0   |
-| 3002      | Gold_Job                            | job_gold                          | 2010                     | 0.6.0   |
-| 3003      | Gold_JobRun                         | jobrun_gold                       | 2011                     | 0.6.0   |
-| 3004      | Gold_Notebook                       | notebook_gold                     | 2018                     | 0.6.0   |
-| 3005      | Gold_ClusterStateFact               | clusterstatefact_gold             | 1005,2014                | 0.6.0   |
-| 3007      | Gold_AccountMod                     | account_mods_gold                 | 2017                     | 0.6.0   |
-| 3008      | Gold_AccountLogin                   | account_login_gold                | 2016                     | 0.6.0   |
-| 3009      | Gold_Pools                          | instancepool_gold                 | 2009                     | 0.6.0   |
-| 3010      | Gold_SparkJob                       | sparkjob_gold                     | 2006                     | 0.6.0   |
-| 3011      | Gold_SparkStage                     | sparkstage_gold                   | 2007                     | 0.6.0   |
-| 3012      | Gold_SparkTask                      | sparktask_gold                    | 2008                     | 0.6.0   |
-| 3013      | Gold_SparkExecution                 | sparkexecution_gold               | 2005                     | 0.6.0   |
-| 3014      | Gold_SparkExecutor                  | sparkexecutor_gold                | 2003                     | 0.6.0   |
-| 3016      | Gold_SparkStream                    | sparkstream_gold                  | 1006,2005                | 0.7.0   |
-| 3015      | Gold_jobRunCostPotentialFact        | jobruncostpotentialfact_gold      | 3001,3003,3005,3010,3012 | 0.6.0   |
-| 3017      | Gold_Sql_QueryHistory               | sql_query_history_gold            | 2020                     | 0.7.0   |
+| Module ID | Module Name                         | Target Table Name                  | Module ID Dependencies   | As Of   |
+|:----------|:------------------------------------|:-----------------------------------|:-------------------------|---------|
+| 1001      | Bronze_Jobs_Snapshot                | jobs_snapshot_bronze               |                          | 0.6.0   |
+| 1002      | Bronze_Clusters_Snapshot            | clusters_snapshot_bronze           |                          | 0.6.0   |
+| 1003      | Bronze_Pools                        | pools_snapshot_bronze              |                          | 0.6.0   |
+| 1004      | Bronze_AuditLogs                    | audit_log_bronze                   |                          | 0.6.0   |
+| 1005      | Bronze_ClusterEventLogs             | cluster_events_bronze              | 1004                     | 0.6.0   |
+| 1006      | Bronze_SparkEventLogs               | spark_events_bronze                | 1004                     | 0.6.0   |
+| 1007      | Bronze_Libraries_Snapshot           | libs_snapshot_bronze               |                          | 0.7.1.1 |
+| 1008      | Bronze_Policies_Snapshot            | policies_snapshot_bronze           |                          | 0.7.1.1 |
+| 1009      | Bronze_Instance_Profile_Snapshot    | instance_profiles_snapshot_bronze  |                          | 0.7.1.1 |
+| 1010      | Bronze_Token_Snapshot               | tokens_snapshot_bronze             |                          | 0.7.1.1 |
+| 1011      | Bronze_Global_Init_Scripts_Snapshot | global_inits_snapshot_bronze       |                          | 0.7.1.1 |
+| 1012      | Bronze_Job_Runs_Snapshot*           | job_runs_snapshot_bronze           |                          | 0.7.1.1 |
+| 1013      | Bronze_Warehouses_Snapshot          | warehouses_snapshot_bronze         |                          | 0.7.2   | 
+| 2003      | Silver_SPARK_Executors              | spark_executors_silver             | 1006                     | 0.6.0   |
+| 2005      | Silver_SPARK_Executions             | spark_executions_silver            | 1006                     | 0.6.0   |
+| 2006      | Silver_SPARK_Jobs                   | spark_jobs_silver                  | 1006                     | 0.6.0   |
+| 2007      | Silver_SPARK_Stages                 | spark_stages_silver                | 1006                     | 0.6.0   |
+| 2008      | Silver_SPARK_Tasks                  | spark_tasks_silver                 | 1006                     | 0.6.0   |
+| 2009      | Silver_PoolsSpec                    | pools_silver                       | 1003,1004                | 0.6.0   |
+| 2010      | Silver_JobsStatus                   | job_status_silver                  | 1004                     | 0.6.0   |
+| 2011      | Silver_JobsRuns                     | jobrun_silver                      | 1004,2010,2014           | 0.6.0   |
+| 2014      | Silver_ClusterSpec                  | cluster_spec_silver                | 1004                     | 0.6.0   |
+| 2016      | Silver_AccountLogins                | accountlogin                       | 1004                     | 0.6.0   |
+| 2017      | Silver_ModifiedAccounts             | account_mods_silver                | 1004                     | 0.6.0   |
+| 2018      | Silver_Notebooks                    | notebook_silver                    | 1004                     | 0.6.0   |
+| 2019      | Silver_ClusterStateDetail           | cluster_state_detail_silver        | 1005                     | 0.6.0   |
+| 2020      | Silver_SQLQueryHistory              | sql_query_history_silver           | 1004                     | 0.7.0   |
+| 2021      | Silver_WarehouseSpec                | warehouse_spec_silver              | 1004,1013                | 0.7.2   |
+| 3001      | Gold_Cluster                        | cluster_gold                       | 2014                     | 0.6.0   |
+| 3002      | Gold_Job                            | job_gold                           | 2010                     | 0.6.0   |
+| 3003      | Gold_JobRun                         | jobrun_gold                        | 2011                     | 0.6.0   |
+| 3004      | Gold_Notebook                       | notebook_gold                      | 2018                     | 0.6.0   |
+| 3005      | Gold_ClusterStateFact               | clusterstatefact_gold              | 1005,2014                | 0.6.0   |
+| 3007      | Gold_AccountMod                     | account_mods_gold                  | 2017                     | 0.6.0   |
+| 3008      | Gold_AccountLogin                   | account_login_gold                 | 2016                     | 0.6.0   |
+| 3009      | Gold_Pools                          | instancepool_gold                  | 2009                     | 0.6.0   |
+| 3010      | Gold_SparkJob                       | sparkjob_gold                      | 2006                     | 0.6.0   |
+| 3011      | Gold_SparkStage                     | sparkstage_gold                    | 2007                     | 0.6.0   |
+| 3012      | Gold_SparkTask                      | sparktask_gold                     | 2008                     | 0.6.0   |
+| 3013      | Gold_SparkExecution                 | sparkexecution_gold                | 2005                     | 0.6.0   |
+| 3014      | Gold_SparkExecutor                  | sparkexecutor_gold                 | 2003                     | 0.6.0   |
+| 3016      | Gold_SparkStream                    | sparkstream_gold                   | 1006,2005                | 0.7.0   |
+| 3015      | Gold_jobRunCostPotentialFact        | jobruncostpotentialfact_gold       | 3001,3003,3005,3010,3012 | 0.6.0   |
+| 3017      | Gold_Sql_QueryHistory               | sql_query_history_gold             | 2020                     | 0.7.0   |
+| 3018      | Gold_Warehouse                      | warehouse_gold                     | 2021                     | 0.7.2.1 |
 
 \* **Bronze_Job_Runs_Snapshot** is experimental as of 0711. The module works as expected but the API can only pull 
 25 runs per API call; therefore, for some customers with many runs per day (i.e. thousands) this module can take 

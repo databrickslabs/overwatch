@@ -171,7 +171,7 @@ Currently a very simple module that just enables the materialization of notebook
 As of 0.7.0
 *Requires:* Audit
 
-*Gold Entities:* sqlQueryHistory
+*Gold Entities:* sqlQueryHistory|Warehouse
 
 Additional DBSQL entities will be coming shortly to enable users to join with warehouses and other assets. As of 0.7.0
 this is a preview; we're looking for feedback, so please submit a
