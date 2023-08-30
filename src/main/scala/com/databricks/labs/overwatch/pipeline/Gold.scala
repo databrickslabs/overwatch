@@ -42,7 +42,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     config.overwatchScope.contains(OverwatchScope.clusterEvents)
 
   def getAllModules: Seq[Module] = {
-    config.overwatchScope.flatMap {
+    val basicModules = config.overwatchScope.flatMap {
       case OverwatchScope.accounts => {
         Array(accountModModule, accountLoginModule)
       }
@@ -80,9 +80,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case _ => Array[Module]()
     }
     if(notebookCommandsDerivedScope) {
-      Array(notebookCommandsFactModule)
+     basicModules :+ notebookCommandsFactModule
     }else{
-      Array[Module]()
+      basicModules
     }
   }
 
