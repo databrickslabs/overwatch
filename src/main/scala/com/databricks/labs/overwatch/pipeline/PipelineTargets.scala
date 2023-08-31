@@ -518,6 +518,22 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
+    lazy private[overwatch] val notebookCommandsTarget: PipelineTable = PipelineTable(
+      name = "notebookCommands_gold",
+      _keys = Array("notebook_id", "unixTimeMS"),
+      config,
+      _mode = WriteMode.merge,
+      mergeScope = MergeScope.insertOnly,
+      partitionBy = Seq("organization_id"),
+      incrementalColumns = Array("unixTimeMS"),
+    )
+
+    lazy private[overwatch] val notebookCommandsFactViewTarget: PipelineView = PipelineView(
+      name = "notebookCommands",
+      notebookCommandsTarget,
+      config
+    )
+
     lazy private[overwatch] val sparkJobTarget: PipelineTable = PipelineTable(
       name = "sparkJob_gold",
       _keys = Array("spark_context_id", "job_id", "unixTimeMS"),

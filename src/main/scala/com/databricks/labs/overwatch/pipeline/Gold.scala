@@ -32,12 +32,17 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkStreamTarget,
       GoldTargets.sparkExecutorTarget,
       GoldTargets.sqlQueryHistoryTarget,
-      GoldTargets.warehouseTarget
+      GoldTargets.warehouseTarget,
+      GoldTargets.notebookCommandsTarget
     )
   }
 
+  private val notebookCommandsDerivedScope: Boolean = config.overwatchScope.contains(OverwatchScope.audit) &&
+    config.overwatchScope.contains(OverwatchScope.notebooks) &&
+    config.overwatchScope.contains(OverwatchScope.clusterEvents)
+
   def getAllModules: Seq[Module] = {
-    config.overwatchScope.flatMap {
+    val basicModules = config.overwatchScope.flatMap {
       case OverwatchScope.accounts => {
         Array(accountModModule, accountLoginModule)
       }
@@ -73,6 +78,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         )
       }
       case _ => Array[Module]()
+    }
+    if(notebookCommandsDerivedScope) {
+     basicModules :+ notebookCommandsFactModule
+    }else{
+      basicModules
     }
   }
 
@@ -293,12 +303,27 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
   lazy private[overwatch] val warehouseModule = Module(3018, "Gold_Warehouse", this, Array(2021))
   lazy private val appendWarehouseProcess: () => ETLDefinition = {
     () =>
-    ETLDefinition(
-      SilverTargets.warehousesSpecTarget.asIncrementalDF(warehouseModule, SilverTargets.warehousesSpecTarget.incrementalColumns),
-      Seq(buildWarehouse()),
-      append(GoldTargets.warehouseTarget)
-    )
+      ETLDefinition(
+        SilverTargets.warehousesSpecTarget.asIncrementalDF(warehouseModule, SilverTargets.warehousesSpecTarget.incrementalColumns),
+        Seq(buildWarehouse()),
+        append(GoldTargets.warehouseTarget)
+      )
   }
+
+  lazy private[overwatch] val notebookCommandsFactModule = Module(3019, "Gold_NotebookCommands", this, Array(1004,3004,3005))
+  lazy private val appendNotebookCommandsFactProcess: () => ETLDefinition = {
+    () =>
+      ETLDefinition(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(notebookCommandsFactModule, BronzeTargets.auditLogsTarget.incrementalColumns,1),
+        Seq(buildNotebookCommandsFact(
+          GoldTargets.notebookTarget,
+          GoldTargets.clusterStateFactTarget
+            .asIncrementalDF(notebookCommandsFactModule, GoldTargets.clusterStateFactTarget.incrementalColumns, 90)
+        )),
+        append(GoldTargets.notebookCommandsTarget)
+      )
+  }
+
   private def processSparkEvents(): Unit = {
 
     sparkExecutorModule.execute(appendSparkExecutorProcess)
@@ -377,6 +402,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       }
       case _ =>
     }
+    if (notebookCommandsDerivedScope) {
+      notebookCommandsFactModule.execute(appendNotebookCommandsFactProcess)
+      GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping)
+    }
   }
 
   def refreshViews(workspacesAllowed: Array[String] = Array()): Unit = {
@@ -415,6 +444,9 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.warehouseViewTarget.publish(warehouseViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
       case _ =>
+    }
+    if (notebookCommandsDerivedScope) {
+      GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping,workspacesAllowed = workspacesAllowed)
     }
   }
 

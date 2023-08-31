@@ -46,7 +46,7 @@ object PipelineFunctions extends SparkSessionWrapper {
     val retrievedConnectionString = maybeGetSecret(connectionString)
     if ((withSAS && !retrievedConnectionString.matches("^Endpoint=sb://.*;SharedAccessKey=.*$")) ||
       !retrievedConnectionString.matches("^Endpoint=sb://.*$")) {
-        throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
+      throw new BadConfigException(s"Retrieved EH Connection string is not in the correct format.")
     }
 
     retrievedConnectionString
@@ -182,8 +182,8 @@ object PipelineFunctions extends SparkSessionWrapper {
   }
 
   def optimizeDFForWrite(
-                        df: DataFrame,
-                        target: PipelineTable
+                          df: DataFrame,
+                          target: PipelineTable
                         ): DataFrame = {
 
     var mutationDF = df
@@ -239,7 +239,7 @@ object PipelineFunctions extends SparkSessionWrapper {
     if (corruptedNames.length != corruptedNames.diff(flatFieldNames).length) { // df has at least one of the corrupted names
       logger.warn("Handling corrupted source audit log field requestParams.DataSourceId")
       spark.conf.set("spark.sql.caseSensitive", "true")
-    val rpFlatFields = flatFieldNames
+      val rpFlatFields = flatFieldNames
         .filterNot(fName => corruptedNames.contains(fName))
 
       val cleanRPFields = rpFlatFields.map {
@@ -280,12 +280,12 @@ object PipelineFunctions extends SparkSessionWrapper {
   }
 
   def buildIncrementalFilters(
-                              target: PipelineTable,
+                               target: PipelineTable,
                                df: DataFrame,
                                fromTime: TimeTypes,
                                untilTime: TimeTypes,
-                              additionalLagDays: Long = 0,
-                              moduleName: String = "UNDEFINED"
+                               additionalLagDays: Long = 0,
+                               moduleName: String = "UNDEFINED"
                              ): Array[IncrementalFilter] = {
     if (target.exists) {
       val dfFields = df.schema.fields
@@ -425,12 +425,12 @@ object PipelineFunctions extends SparkSessionWrapper {
    * @param snapDate snapshot date of the pipeline "yyyy-MM-dd" format
    */
   def validateType2Input(
-                           target: PipelineTable,
-                           fromCol: String,
-                           untilCol: String,
-                           isActiveCol: String,
-                           snapDate: String = java.time.LocalDate.now.toString
-                         ): Unit = {
+                          target: PipelineTable,
+                          fromCol: String,
+                          untilCol: String,
+                          isActiveCol: String,
+                          snapDate: String = java.time.LocalDate.now.toString
+                        ): Unit = {
     val df = target.asDF
     val keyCols = target.keys.map(k => lower(trim(col(k))).alias(k))
 
@@ -659,6 +659,7 @@ object PipelineFunctions extends SparkSessionWrapper {
       case 3016 => "sparkStream_gold"
       case 3017 => "sql_query_history_gold"
       case 3018 => "warehouse_gold"
+      case 3019 => "notebookCommands_gold"
     }
   }
 
