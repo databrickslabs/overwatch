@@ -564,51 +564,47 @@ trait GoldTransforms extends SparkSessionWrapper {
     // Cluster State Started before cmd start time and ended after command run time
     val state_before_after = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end > 'unixTimeMSEnd
 
-    val windowSpec  = Window.partitionBy("commandId","clusterId","unixTimeMSStart","unixTimeMSEnd")
-
-    val windowSpec1  = Window.partitionBy("commandId","clusterId","unixTimeMSStart","unixTimeMSEnd").orderBy(desc("uptime_in_state_H"))
-
     val joinedDF_before_before = joinedDF.filter(state_before_before)
-      .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
-      .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec1))
-      .withColumn("rnk",rank.over(windowSpec1))
-      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+      .groupBy("organization_id", "commandId","clusterId","unixTimeMSStart","unixTimeMSEnd")
+      .agg(
+        sum("total_DBU_cost").as("sum_total_DBU_cost"),
+        sum("uptime_in_state_H").as("sum_uptime_in_state_H")
+      )
 
     val joinedDF_after_before = joinedDF.filter(state_after_before)
-      .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
-      .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec1))
-      .withColumn("rnk",rank.over(windowSpec1))
-      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+      .groupBy("organization_id", "commandId","clusterId","unixTimeMSStart","unixTimeMSEnd")
+      .agg(
+        sum("total_DBU_cost").as("sum_total_DBU_cost"),
+        sum("uptime_in_state_H").as("sum_uptime_in_state_H")
+      )
 
     val joinedDF_after = joinedDF.filter(state_after)
-      .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
-      .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec1))
-      .withColumn("rnk",rank.over(windowSpec1))
-      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+      .groupBy("organization_id", "commandId","clusterId","unixTimeMSStart","unixTimeMSEnd")
+      .agg(
+        sum("total_DBU_cost").as("sum_total_DBU_cost"),
+        sum("uptime_in_state_H").as("sum_uptime_in_state_H")
+      )
 
     val joinedDF_before_after = joinedDF.filter(state_before_after)
-      .withColumn("sum_total_DBU_cost",sum(col("total_DBU_cost")).over(windowSpec))
-      .withColumn("sum_uptime_in_state_H",sum(col("uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec1))
-      .withColumn("rnk",rank.over(windowSpec1))
-      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+      .groupBy("organization_id", "commandId","clusterId","unixTimeMSStart","unixTimeMSEnd")
+      .agg(
+        sum("total_DBU_cost").as("sum_total_DBU_cost"),
+        sum("uptime_in_state_H").as("sum_uptime_in_state_H")
+      )
 
-    val unionDF = joinedDF_before_before.union(joinedDF_after_before).union(joinedDF_after).union(joinedDF_before_after)
-      .withColumn("total_DBU_cost",sum(col("sum_total_DBU_cost")).over(windowSpec))
-      .withColumn("uptime_in_state_H",sum(col("sum_uptime_in_state_H")).over(windowSpec))
-      .withColumn("rn",row_number.over(windowSpec1))
-      .withColumn("rnk",rank.over(windowSpec1))
+    val unionDF = joinedDF_before_before
+      .union(joinedDF_after_before)
+      .union(joinedDF_after)
+      .union(joinedDF_before_after)
+      .groupBy("organization_id", "commandId","clusterId","unixTimeMSStart","unixTimeMSEnd")
+      .agg(
+        sum("total_DBU_cost").as("sum_total_DBU_cost"),
+        sum("uptime_in_state_H").as("sum_uptime_in_state_H")
+      )
       .drop("sum_total_DBU_cost","sum_uptime_in_state_H")
 
-    unionDF.cache()
-
-    val unionDF_final = unionDF.filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-
-    val df = joinedDF.join(unionDF_final,Seq("unixTimeMSStart","unixTimeMSEnd","commandId"),"leftAnti")
-    val notebookClsfDF = unionDF_final.union(df.select(unionDF_final.schema.fieldNames.map(col): _*))
+    val df = joinedDF.join(unionDF,Seq("unixTimeMSStart","unixTimeMSEnd","commandId"),"leftAnti")
+    val notebookClsfDF = unionDF.union(df.select(unionDF.schema.fieldNames.map(col): _*))
 
     val notebookCodeAndMetaDF = notebookClsfDF.withColumnRenamed("unixTimeMS_state_start","unixTimeMS")
       .toTSDF("unixTimeMS", "organization_id", "date","notebookId")
