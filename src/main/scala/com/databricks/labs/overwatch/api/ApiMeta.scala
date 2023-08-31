@@ -182,6 +182,7 @@ class ApiMetaFactory {
       case "policies/clusters/list" => new ClusterPolicesApi
       case "token/list" => new TokensApi
       case "global-init-scripts" => new GlobalInitsScriptsApi
+      case "sql/warehouses" => new WarehouseListApi
       case _ => new UnregisteredApi
     }
     logger.log(Level.INFO, meta.toString)
@@ -375,5 +376,10 @@ class TokensApi extends  ApiMeta {
 
 class GlobalInitsScriptsApi extends ApiMeta {
   setDataframeColumn("scripts")
+  setApiCallType("GET")
+}
+
+class WarehouseListApi extends ApiMeta {
+  setDataframeColumn("warehouses")
   setApiCallType("GET")
 }

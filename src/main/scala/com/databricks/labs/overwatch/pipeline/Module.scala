@@ -65,7 +65,10 @@ class Module(
    */
   def shuffleFactor: Double = {
     val daysBucket = 30
-    val derivedShuffleFactor = _shuffleFactor * Math.max(Math.floor(daysToProcess / daysBucket).toInt, 1)
+    val derivedShuffleFactor = _shuffleFactor *
+        config.megaFactor *
+        Math.max(Math.floor(daysToProcess / daysBucket).toInt, 1)
+
     logger.info(s"SHUFFLE FACTOR: Set to $derivedShuffleFactor")
 
     derivedShuffleFactor
@@ -74,17 +77,25 @@ class Module(
   private def optimizeShufflePartitions(): Unit = {
     val defaultShuffleParts = spark.conf.get("spark.sql.shuffle.partitions").toInt
     val coreTargetOptimization = getTotalCores * 2
+    // Never allow shuffle partitions to exceed 160K even during mega run
+    // when not mega run never exceed 40K
+    val hardLimitMaxShuffle = Math.min(160000, config.megaFactor * 40000)
 
     // At least 2 * cluster core count
     val derivedShuffleParts = Math.max(
       // Max out at 40,000 shuffle parts
       Math.min(
         Math.floor(defaultShuffleParts * shuffleFactor).toInt,
-        40000
+        hardLimitMaxShuffle
       ),
       coreTargetOptimization
     )
-    logger.info(s"SHUFFLE PARTITIONS SET: $derivedShuffleParts")
+    logger.info(
+      s"""SHUFFLE PARTITIONS SET: $derivedShuffleParts FOR
+         |organization_id: ${config.organizationId}
+         |module: $moduleId -- $moduleName
+         |""".stripMargin
+    )
     withSparkOverrides(Map("spark.sql.shuffle.partitions" -> derivedShuffleParts.toString))
   }
 

@@ -549,6 +549,19 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
           .select("mapCol").collect().head.get(0).asInstanceOf[Map[String, String]].keys.mkString(",")
       )
     }
+    it("should return converted column with the name containing period") {
+      Given("a dataframe with struct column name having period")
+      val df = spark.range(1)
+        .withColumn("st", struct(lit("c1").alias("c1.c2")))
+
+      When("function is called on the struct column name having period")
+
+      Then("returns converted column name having period")
+      assertResult("c1.c2") (
+        df.withColumn("mapCol", SchemaTools.structToMap(df, "st"))
+          .select("mapCol").collect().head.get(0).asInstanceOf[Map[String, String]].keys.mkString
+      )
+    }
   }
 
   describe("Test cases for SchemaTools.modifyStruct") {

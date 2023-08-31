@@ -208,6 +208,15 @@ object Schema extends SparkSessionWrapper {
         StructField("ssh_public_keys", StringType, nullable = true),
         StructField("single_user_name", StringType, nullable = true),
         StructField("resourceId", LongType, nullable = true),
+        StructField("cluster_size", StringType, nullable = true),
+        StructField("min_num_clusters", LongType, nullable = true),
+        StructField("max_num_clusters", LongType, nullable = true),
+        StructField("auto_stop_mins", LongType, nullable = true),
+        StructField("spot_instance_policy", StringType, nullable = true),
+        StructField("enable_photon", BooleanType, nullable = true),
+        StructField("channel", StringType, nullable = true),
+        StructField("enable_serverless_compute", BooleanType, nullable = true),
+        StructField("warehouse_type", StringType, nullable = true),
         // EXPLICIT EXCLUSIONS -- fields will not be in targetDF
         StructField("organization_id", NullType, nullable = true),
         StructField("shardName", NullType, nullable = true),
@@ -218,6 +227,8 @@ object Schema extends SparkSessionWrapper {
         StructField("runtime_engine", StringType, nullable = true),
         StructField("fields_to_remove", StringType, nullable = true)
       )), nullable = true),
+    StructField("instanceId", NullType, nullable = true),
+    StructField("containerId", NullType, nullable = true),
     common("response"),
     common("useridentity")
   ))
@@ -725,6 +736,54 @@ object Schema extends SparkSessionWrapper {
     StructField("workspace_name", StringType, nullable = true)
   ))
 
+  val warehouseSnapMinimumSchema: StructType = StructType(Seq(
+    StructField("warehouse_id", StringType, nullable = false),
+    StructField("name", StringType, nullable = true),
+    StructField("size", StringType, nullable = true),
+    StructField("cluster_size", StringType, nullable = true),
+    StructField("min_num_clusters", LongType, nullable = true),
+    StructField("max_num_clusters", LongType, nullable = true),
+    StructField("auto_stop_mins", LongType, nullable = true),
+    StructField("auto_resume", BooleanType, nullable = true),
+    StructField("creator_name", StringType, nullable = true),
+    StructField("creator_id", LongType, nullable = true),
+    StructField("tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("spot_instance_policy", StringType, nullable = true),
+    StructField("enable_photon", BooleanType, nullable = true),
+    StructField("enable_serverless_compute", BooleanType, nullable = true),
+    StructField("warehouse_type", StringType, nullable = true),
+    StructField("num_clusters", LongType, nullable = true),
+    StructField("num_active_sessions", LongType, nullable = true),
+    StructField("state", StringType, nullable = true),
+    StructField("organization_id", StringType, nullable = false),
+    StructField("Pipeline_SnapTS", TimestampType, nullable = true),
+    StructField("Overwatch_RunID", StringType, nullable = true),
+    StructField("workspace_name", StringType, nullable = true)
+  ))
+
+  val instanceDetailsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id", StringType, nullable = false),
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("Hourly_DBUs", DoubleType, nullable = false),
+    StructField("isActive", BooleanType, nullable = false),
+    StructField("activeFrom", DateType, nullable = false),
+    StructField("activeUntil", DateType, nullable = true),
+    StructField("Compute_Contract_Price", DoubleType, nullable = false),
+    StructField("Memory_GB", DoubleType, nullable = false),
+    StructField("vCPUs", IntegerType, nullable = false),
+    StructField("API_Name", StringType, nullable = false)
+  ))
+
+  val dbuCostDetailsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id", StringType, nullable = false),
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("isActive", BooleanType, nullable = false),
+    StructField("activeFrom", DateType, nullable = false),
+    StructField("activeUntil", DateType, nullable = true),
+    StructField("sku", StringType, nullable = false),
+    StructField("contract_price", DoubleType, nullable = false)
+  ))
+
   /**
    * Minimum required schema by module. "Minimum Requierd Schema" means that at least these columns of these types
    * must exist for the downstream ETLs to function.
@@ -763,6 +822,8 @@ object Schema extends SparkSessionWrapper {
     2017 -> auditMasterSchema,
     // Notebook Summary
     2018 -> auditMasterSchema,
+    // Warehouse Spec
+    2021 -> auditMasterSchema,
     // jobStatus
     3002 -> StructType(Seq(
       StructField("timestamp", LongType, nullable = false),

@@ -133,7 +133,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
           )
         }else{
           val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
-         AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+          AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
         }
         AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
       }
@@ -347,8 +347,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     true
   }
 
-
-  private def generateBaseConfig(configLocation: String): DataFrame = {
+  /**
+   * Generate Config Dataframe from Config Location(csv, delta path or Delta Table)
+   */
+  def generateBaseConfig(configLocation: String): DataFrame = {
     val rawBaseConfigDF = try {
       if (configLocation.toLowerCase().endsWith(".csv")) { // CSV file
         println(s"Config source: csv path ${configLocation}")
