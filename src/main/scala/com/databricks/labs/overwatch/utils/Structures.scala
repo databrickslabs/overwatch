@@ -336,7 +336,7 @@ case class OrgWorkspace(organization_id: String, workspace: Workspace)
 
 case class NamedColumn(fieldName: String, column: Column)
 
-case class ModuleRollbackTS(organization_id: String, moduleId: Int, rollbackTS: Long)
+case class ModuleRollbackTS(organization_id: String, moduleId: Int, rollbackTS: Long, isAzure: Boolean)
 
 case class TargetRollbackTS(organization_id: String, target: PipelineTable, rollbackTS: Long)
 
