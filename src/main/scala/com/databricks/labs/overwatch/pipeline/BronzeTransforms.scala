@@ -894,7 +894,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private[overwatch] def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
     try{
       val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
-        .filter(col("mount_point") =!= "/").filter(col("mount_point") =!= "")
+        .filter(trim(col("mount_point")) =!= "/" && trim(col("mount_point")) =!= "") //Added for #1021
         .withColumn("mount_point", removeTrailingSlashes('mount_point))
         .withColumn("source",  removeTrailingSlashes('source))
       //Cleaning the data for cluster log path
@@ -1023,26 +1023,42 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // This captures clusters that have not been edited/restarted since the last run with
     // log confs as they will not be in the audit logs
     val latestSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
-    val newLogDirsNotIdentifiedInAudit = clusterSnapshot
-      .join(incrementalClusterIDs, Seq("cluster_id"))
-      .withColumn("snapRnk", rank.over(latestSnapW))
-      .filter('snapRnk === 1)
-      .withColumn("cluster_log_conf",
-        fetchClusterLogConfiguration(cloudProvider,coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"),
-          isMultiWorkSpaceDeployment, organisationId))
-      .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
-      .select('cluster_id, 'cluster_log_conf)
+
+    val newLogDirsNotIdentifiedInAudit = {
+      if(clusterSnapshot.isEmpty){
+        spark.emptyDataFrame
+      }else{
+        clusterSnapshot
+          .join(incrementalClusterIDs, Seq("cluster_id"))
+          .withColumn("snapRnk", rank.over(latestSnapW))
+          .filter('snapRnk === 1)
+          .withColumn("cluster_log_conf",
+            fetchClusterLogConfiguration(cloudProvider, coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"),
+              isMultiWorkSpaceDeployment, organisationId))
+          .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
+          .select('cluster_id, 'cluster_log_conf)
+      }
+    }
 
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes =
     if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId(Some(apiEnv.workspaceURL))) {
-      getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
-        .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
+        if(newLogDirsNotIdentifiedInAudit.isEmpty){
+          getAllEventLogPrefix(incrementalClusterWLogging, apiEnv).select('wildPrefix).distinct()
+        }else{
+          getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
+            .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
+        }
+
     } else {
-      newLogDirsNotIdentifiedInAudit
-        .unionByName(incrementalClusterWLogging)
-        .withColumn("cluster_log_conf",removeTrailingSlashes('cluster_log_conf))
+       val allEvent = if(newLogDirsNotIdentifiedInAudit.isEmpty){
+         newLogDirsNotIdentifiedInAudit
+        }else{
+         newLogDirsNotIdentifiedInAudit
+           .unionByName(incrementalClusterWLogging)
+       }
+      allEvent.withColumn("cluster_log_conf",removeTrailingSlashes('cluster_log_conf))
         .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
         .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
         .select('wildPrefix)
