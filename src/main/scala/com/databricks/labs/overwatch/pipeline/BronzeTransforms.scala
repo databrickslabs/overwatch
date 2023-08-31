@@ -894,7 +894,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private[overwatch] def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
     try{
       val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
-        .filter(col("mount_point") =!= "/" && col("mount_point") =!= "") //Added for #1021
+        .filter(trim(col("mount_point")) =!= "/" && trim(col("mount_point")) =!= "") //Added for #1021
         .withColumn("mount_point", removeTrailingSlashes('mount_point))
         .withColumn("source",  removeTrailingSlashes('source))
       //Cleaning the data for cluster log path
