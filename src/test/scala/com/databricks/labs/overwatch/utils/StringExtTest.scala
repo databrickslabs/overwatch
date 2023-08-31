@@ -32,6 +32,6 @@ class StringExtTest extends AnyFunSpec {
 
     it("String with white $ characters") {
       assert(!"""Business $Name""".containsNoSpecialChars)
-    }
   }
+ }
 }

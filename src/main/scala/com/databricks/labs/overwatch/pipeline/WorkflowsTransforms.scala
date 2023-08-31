@@ -841,7 +841,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
         ).alias("TaskExecutionRunTime"), // from cluster up and run begin until terminal event
         'run_name,
-        coalesce('jobClusterType_Started, 'jobClusterType_Completed).alias("clusterType"),
+        when(coalesce('jobClusterType_Started, 'jobClusterType_Completed).isNull and ('job_clusters.isNotNull or 'new_cluster.isNotNull), "new")
+          .otherwise(coalesce('jobClusterType_Started, 'jobClusterType_Completed)).alias("clusterType"),
         coalesce('jobTaskType_Started, 'jobTaskType_Completed).alias("taskType"),
         coalesce('jobTriggerType_Triggered,'jobTriggerType_Started, 'jobTriggerType_Completed, 'jobTriggerType_runNow).alias("jobTriggerType"),
         when('cancellationRequestId.isNotNull, "Cancelled")
@@ -1461,7 +1462,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   def jrcpAppendUtilAndCosts(df: DataFrame): DataFrame = {
     df
       .withColumn("cluster_type",
-        when('cluster_type === "new", lit("automated"))
+        when('cluster_type.isin("new", "job_cluster"), lit("automated"))
           .otherwise(lit("interactive"))
       )
       .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time

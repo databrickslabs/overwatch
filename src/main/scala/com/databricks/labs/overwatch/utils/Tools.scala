@@ -1051,6 +1051,7 @@ object Helpers extends SparkSessionWrapper {
       }
     })
   }
+
   def getQueryListener(query: StreamingQuery, config: Config, minEventsPerTrigger: Long): StreamingQueryListener = {
     val streamManager = new StreamingQueryListener() {
       override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {

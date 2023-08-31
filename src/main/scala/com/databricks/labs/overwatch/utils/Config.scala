@@ -13,6 +13,7 @@ class Config() {
   private final val _runID = UUID.randomUUID().toString.replace("-", "")
   private final val packageVersion: String = getClass.getPackage.getImplementationVersion
   private val _isLocalTesting: Boolean = System.getenv("OVERWATCH") == "LOCAL"
+  private var _megaFactor: Int = spark.conf.getOption("overwatch.mega.factor").getOrElse("1").toInt
   private var _debugFlag: Boolean = false
   private var _overwatchSchemaVersion = "0.700"
   private var _organizationId: String = _
@@ -53,6 +54,11 @@ class Config() {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
+  assert(megaFactor <= 10 && megaFactor > 0,
+    s"""
+       |ERROR: overwatch.mega.factor must be between 1 and 10. The current value of $megaFactor is not supported.
+       |""".stripMargin)
+
   /**
    * BEGIN GETTERS
    * The next section is getters that provide access to local configuration variables. Only adding details where
@@ -86,6 +92,8 @@ class Config() {
   def maxDays: Int = _maxDays
 
   def initialWorkerCount: Int = _initialWorkerCount
+
+  def megaFactor: Int = _megaFactor
 
   def databaseName: String = _databaseName
 
@@ -160,9 +168,21 @@ class Config() {
    * @return
    */
   private[overwatch] def registerInitialSparkConf(value: Map[String, String]): this.type = {
+    val isMegaOverrides = if (megaFactor > 1) { // disable autoBroadcastJoin during mega loads
+      val driverMaxResultSize = spark.conf.getOption("spark.driver.maxResultSize").getOrElse("NOT SET")
+      logger.log(Level.INFO, s"Mega Factor Set: $megaFactor")
+      println(s"MEGA RUN DETECTED! Be sure to use a spark.driver.maxResultSize >= 32g to handle the task metadata " +
+        s"and a driver with at least 64g of memory.\nspark.driver.maxResultSize currently set to: $driverMaxResultSize")
+      Map(
+        "spark.sql.autoBroadcastJoinThreshold" -> "-1",
+        "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "-1"
+      )
+    } else Map[String, String]()
+
+    val sparkOverrides = SparkSessionWrapper.globalSparkConfOverrides ++ isMegaOverrides
     logger.log(Level.INFO, s"Config Initialized with Spark Overrides of:\n" +
-      s"${SparkSessionWrapper.globalSparkConfOverrides}")
-    _initialSparkConf = value ++ SparkSessionWrapper.globalSparkConfOverrides
+      s"$sparkOverrides")
+    _initialSparkConf = value ++ sparkOverrides
     this
   }
 
@@ -337,6 +357,11 @@ class Config() {
 
   private[overwatch] def setTokenType(value: String): this.type = {
     _tokenType = value
+    this
+  }
+
+  private[overwatch] def overrideMegaFactor(value: Int): this.type = {
+    _megaFactor = value
     this
   }
 
