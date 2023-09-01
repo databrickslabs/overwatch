@@ -27,19 +27,37 @@ be provisioned read/write access to the storage target for the Overwatch Output
 (which will ultimately become your external location). This Service Account can be added to Overwatch Job/Interactive 
 Clusters.
 
-The following steps needs to be performed to external location’s GCS bucket permissions -
+The following steps needs to be performed in external location’s GCS bucket permissions -
+* Go to the `Permissions` tab of the external location’s GCS bucket
+* Click on `Grant Access`
+* Add Service Account which is attached to the Overwatch Job cluster in the `Add Pricipal` section
 * Add Service Account which is attached to the Overwatch Job cluster
 * Add Roles - 
   * Storage Admin 
   * Storage Legacy Bucket Owner
 
 ### Cluster Logging Locations Setup
+When you create a workspace, Databricks on Google Cloud creates two Google Cloud Storage GCS buckets in your GCP project:
+* `databricks-<workspace-id>` - stores system data that is generated as you use various Databricks features.
+This bucket includes notebook revisions, job run details, command results, and Spark logs
+* `databricks-<workspace-id>-system` - contains workspace’s root storage for the Databricks File System (DBFS). 
+Your DBFS root bucket is not intended for storage of production data.
+
+Follow the [databricks-docs](https://docs.gcp.databricks.com/administration-guide/workspace/create-workspace.html#secure-the-workspaces-gcs-buckets-in-your-project) 
+to get more information on these buckets. 
+
+In order to fetch the cluster logs of the remote workspace, cluster should have access to the GCS bucket - 
+`databricks-<workspace-id>`. This GCS Bucket is created in the Google Cloud project that hosts your Databricks workspace.
+
+The following steps needs to be performed in `databricks-<workspace-id>` GCS bucket permissions -
+* Go to the `Permissions` tab of the `databricks-<workspace-id>` GCS bucket
+* Click on `Grant Access`
+* Add Service Account which is attached to the Overwatch Job cluster in the `Add Pricipal` section
+* Add Roles -
+  * Storage Admin
+  * Storage Legacy Bucket Owner
 
 {{% notice note%}}
-**GCP -- Remote Cluster Logs** - Overwatch version 0.7.2.0.x  does not support cluster logs to be collected from remote
-workspaces. Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
-provide DBFS root path as a target for log delivery. This disables Overwatch's ability to collect cluster logs from
-remote workspaces at this time. A fix is in progress and expected to be available in the next release but for now,
-Overwatch customers must make a deployment on each workspace to the same target. After the fix is published you will
-be able to unify the configs and execute Overwatch from a single workspace and monitor remote workspaces.
+**GCP -- Remote Cluster Logs** - Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
+provide DBFS root path as a target for log delivery.
 {{% /notice %}}

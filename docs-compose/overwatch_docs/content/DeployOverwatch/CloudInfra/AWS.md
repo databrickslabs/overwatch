@@ -26,14 +26,11 @@ There are two primary sources of data that need to be configured:
     * Best Practice - Multi-Workspace -- When multiple workspaces are using Overwatch within a single region it's best to
       ensure that each are going to their own prefix, even if sharing a bucket. This greatly reduces Overwatch scan times
       as the log files build up.
+    * To enable Cluster Logs on Multiworkspace - follow this [link]({{%relref "DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/gcp"%}}/#cluster-logging-locations-setup)
   
 {{% notice note%}}
-**GCP -- Remote Cluster Logs** - Overwatch version 0.7.2.0.x  does not support cluster logs to be collected from remote 
-workspaces. Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
-provide DBFS root path as a target for log delivery. This disables Overwatch's ability to collect cluster logs from 
-remote workspaces at this time. A fix is in progress and expected to be available in the next release but for now, 
-Overwatch customers must make a deployment on each workspace to the same target. After the fix is published you will 
-be able to unify the configs and execute Overwatch from a single workspace and monitor remote workspaces.
+**GCP -- Remote Cluster Logs** - Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
+provide DBFS root path as a target for log delivery.
 {{% /notice %}}
 
 

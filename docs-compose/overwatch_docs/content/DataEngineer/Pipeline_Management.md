@@ -77,7 +77,38 @@ so be sure to read the rest of this page before altering this table.
 The Pipeline Report is very useful for identifying issues in the pipeline. Each module, each run is detailed here. 
 The structure of the table is outlined [below](#pipeline_report-structure).
 
-A *pipReport* view has been created atop the pipeline_report table to simplify reviewing the historical runs. The 
+### Pipeline_Report Structure
+[**SAMPLE**](/assets/TableSamples/pipeline_report.tab)
+
+**KEY** -- organization_id + moduleID + Overwatch_RunID
+
+**Write Mode** -- Append
+
+For the developers -- This output is created as a DataSet via the Case Class
+*com.databricks.labs.overwatch.utils.ModuleStatusReport*
+
+| Column               | Type      | Description                                                                                                                                                                                                             |
+|:---------------------|:----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| organization_id      | string    | Canonical workspace id                                                                                                                                                                                                  |
+| workspace_name       | string    | Customizable human-legible name of the workspace, should be globally unique within the organization                                                                                                                     |
+| moduleId             | int       | Module ID -- Unique identifier for the module                                                                                                                                                                           |
+| moduleName           | string    | Name of the module                                                                                                                                                                                                      |
+| primordialDateString | string    | The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022                                                                                                   |
+| runStartTS           | long      | Snapshot time of when the Overwatch run begins                                                                                                                                                                          |
+| runEndTS             | long      | Snapshot time of when the Overwatch run ends                                                                                                                                                                            |
+| fromTS               | long      | The snapshot start time from which data will be loaded for the module                                                                                                                                                   |
+| untilTS              | long      | The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS                                                                                                 |
+| status               | string    | Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues |
+| writeOpsMetrics      | map       | Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written                                                            |
+| lastOptimizedTS      | long      | Epoch millis of the last delta optimize run. Used by Overwatch internals to maintain healthy and optimized tables.                                                                                                      |
+| vacuumRetentionHours | int       | Retention hours for delta -- How long to retain deleted data                                                                                                                                                            |
+| inputConfig          | struct    | Captured input of OverwatchParams config at time of module run                                                                                                                                                          |
+| parsedConfig         | struct    | The config that was parsed into OverwatchParams through the json deserializer                                                                                                                                           |
+| Pipeline_SnapTS      | timestamp | Timestamp when the module was completed as part of the pipeline. This timestamp is reported in server time.                                                                                                             |
+| Overwatch_RunID      | string    | GUID for the overwatch run                                                                                                                                                                                              |
+
+## The PipReport View
+A *pipReport* view has been created atop the pipeline_report table to simplify reviewing the historical runs. The
 query most commonly used is below. If you are asked for the pipReport, please provide the output from the following
 
 **SCALA**
@@ -93,32 +124,28 @@ select * from overwatch_etl.pipReport
     order by Pipeline_SnapTS desc
 ```
 
-### Pipeline_Report Structure
-[**SAMPLE**](/assets/TableSamples/pipeline_report.tab)
+The structure of the table is outlined [below](#pipreport-structure).
+
+### PipReport Structure
+[**SAMPLE**](/assets/TableSamples/pipreport.tab)
 
 **KEY** -- organization_id + moduleID + Overwatch_RunID
 
-For the developers -- This output is created as a DataSet via the Case Class
-*com.databricks.labs.overwatch.utils.ModuleStatusReport*
+**Write Mode** -- Append
 
-| Column               | Type      | Description                                                                                                                                                                                                                         |
-|:---------------------|:----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| organization_id      | string    | Canonical workspace id                                                                                                                                                                                                              |
-| moduleId             | int       | Module ID -- Unique identifier for the module                                                                                                                                                                                       |
-| moduleName           | string    | Name of the module                                                                                                                                                                                                                  |
-| runStartTS           | long      | Snapshot time of when the Overwatch run begins                                                                                                                                                                                      |
-| runEndTS             | long      | Snapshot time of when the Overwatch run ends                                                                                                                                                                                        |
-| fromTS               | long      | The snapshot start time from which data will be loaded for the module                                                                                                                                                               |
-| untilTS              | long      | The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS                                                                                                             |
-| dataFrequency        | string    | (milliSecond OR Daily) Most modules have a time resolution at the millisecond level; however there are certain modules that can only be run daily. This column is used by Overwatch internals to calculate start/stops for new data |
-| status               | string    | Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues             |
-| recordsAppended      | long      | Count of records appended. Not always enabled for performance reasons, see [advanced topics]({{%relref "DataEngineer/AdvancedTopics.md"%}}) for additional information.                                                             |
-| lastOptimizedTS      | long      | Epoch millis of the last delta optimize run. Used by Overwatch internals to maintain healthy and optimized tables.                                                                                                                  |
-| vacuumRetentionHours | int       | Retention hours for delta -- How long to retain deleted data                                                                                                                                                                        |
-| inputConfig          | struct    | Captured input of OverwatchParams config at time of module run                                                                                                                                                                      |
-| parsedConfig         | struct    | The config that was parsed into OverwatchParams through the json deserializer                                                                                                                                                       |
-| Pipeline_SnapTS      | timestamp | Timestamp type of the pipeline snapshot time (server time)                                                                                                                                                                          |
-| Overwatch_RunID      | string    | GUID for the overwatch run                                                                                                                                                                                                          |
+| Column          | Type      | Description                                                                                                                                                                                                             |
+|:----------------|:----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| organization_id | string    | Canonical workspace id                                                                                                                                                                                                  |
+| workspace_name  | string    | Customizable human-legible name of the workspace, should be globally unique within the organization                                                                                                                     | 
+| module_id       | int       | Module ID -- Unique identifier for the module                                                                                                                                                                           |
+| module_name     | string    | Name of the module                                                                                                                                                                                                      |
+| primodialDate   | date      | The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022                                                                                                   | 
+| fromTS          | long      | The snapshot start time from which data will be loaded for the module                                                                                                                                                   |
+| untilTS         | long      | The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS                                                                                                 |
+| status          | string    | Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues |
+| write_metrics   | string    | Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written.                                                           |  
+| Pipeline_SnapTS | timestamp | Timestamp when the module was completed as part of the pipeline. This timestamp is reported in server time.                                                                                                             |
+| Overwatch_RunID | string    | GUID for the overwatch run                                                                                                                                                                                              |
 
 ## Overwatch Time
 Overwatch will default timezone to that of the server / cluster on which it runs. This is a critical point to 
@@ -133,7 +160,7 @@ when they occur. Sometimes, there will truly be no new data in an upstream Modul
 progression of the "until" time as no data is not considered an error. Below are the ETL Modules and their dependencies
 
 ### Module Dependencies Diagram
-![ModuleDepDiagram](/images/DataEngineer/Overwatch_Entity_Dependencies.png)
+![ModuleDepDiagram](/images/DataEngineer/Overwatch_Entity_Dependencies_0721.png)
 
 | Module ID | Module Name                         | Target Table Name                 | Module ID Dependencies   | As Of   |
 |:----------|:------------------------------------|:----------------------------------|:-------------------------|---------|
@@ -149,6 +176,7 @@ progression of the "until" time as no data is not considered an error. Below are
 | 1010      | Bronze_Token_Snapshot               | tokens_snapshot_bronze            |                          | 0.7.1.1 |
 | 1011      | Bronze_Global_Init_Scripts_Snapshot | global_inits_snapshot_bronze      |                          | 0.7.1.1 |
 | 1012      | Bronze_Job_Runs_Snapshot*           | job_runs_snapshot_bronze          |                          | 0.7.1.1 |
+| 1013      | Bronze_Warehouses_Snapshot          | warehouses_snapshot_bronze        |                          | 0.7.2   | 
 | 2003      | Silver_SPARK_Executors              | spark_executors_silver            | 1006                     | 0.6.0   |
 | 2005      | Silver_SPARK_Executions             | spark_executions_silver           | 1006                     | 0.6.0   |
 | 2006      | Silver_SPARK_Jobs                   | spark_jobs_silver                 | 1006                     | 0.6.0   |
@@ -163,6 +191,7 @@ progression of the "until" time as no data is not considered an error. Below are
 | 2018      | Silver_Notebooks                    | notebook_silver                   | 1004                     | 0.6.0   |
 | 2019      | Silver_ClusterStateDetail           | cluster_state_detail_silver       | 1005                     | 0.6.0   |
 | 2020      | Silver_SQLQueryHistory              | sql_query_history_silver          | 1004                     | 0.7.0   |
+| 2021      | Silver_WarehouseSpec                | warehouse_spec_silver             | 1004,1013                | 0.7.2   |
 | 3001      | Gold_Cluster                        | cluster_gold                      | 2014                     | 0.6.0   |
 | 3002      | Gold_Job                            | job_gold                          | 2010                     | 0.6.0   |
 | 3003      | Gold_JobRun                         | jobrun_gold                       | 2011                     | 0.6.0   |
@@ -179,7 +208,9 @@ progression of the "until" time as no data is not considered an error. Below are
 | 3016      | Gold_SparkStream                    | sparkstream_gold                  | 1006,2005                | 0.7.0   |
 | 3015      | Gold_jobRunCostPotentialFact        | jobruncostpotentialfact_gold      | 3001,3003,3005,3010,3012 | 0.6.0   |
 | 3017      | Gold_Sql_QueryHistory               | sql_query_history_gold            | 2020                     | 0.7.0   |
-| 3018      | Gold_NotebookCommands               | notebookCommands_gold             | 1004,3004,3005           | 0.7.2.1 |
+| 3018      | Gold_Warehouse                      | warehouse_gold                    | 2021                     | 0.7.2.1 |
+| 3019      | Gold_NotebookCommands               | notebookCommands_gold             | 1004,3004,3005           | 0.7.2.1 |
+
 
 \* **Bronze_Job_Runs_Snapshot** is experimental as of 0711. The module works as expected but the API can only pull 
 25 runs per API call; therefore, for some customers with many runs per day (i.e. thousands) this module can take 
