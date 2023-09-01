@@ -574,9 +574,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       extrapolateSupportedStructure(rawDf)
     }
   }
- case class ApiCallMeta(apiName: String, response_code: Int, jsonQuery: String, apiSuccessCount: Int)
 
-  case class TraceApi(apiCallMeta: ApiCallMeta, rawResponse: String)
 
   private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
     val mapper = new ObjectMapper()
@@ -683,7 +681,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))
-     // _apiResponseArray.add(response.body)
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
@@ -700,7 +697,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
     try {
       executeHelper()
-      println(successTempPath.get+"successTempPath.nonEmpty")
       this
     } catch {
       case e: java.lang.NoClassDefFoundError => {
@@ -750,7 +746,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     val acc = sc.longAccumulator(tempEndpointLocation)
 
     val tmpSuccessPath = if(jsonInput.contains("tmp_success_path")) jsonInput.get("tmp_success_path").get
-//    else s"${config.tempWorkingDir}/${tempEndpointLocation}/${System.currentTimeMillis()}" NO DOESNT WORK
       else s"${config.tempWorkingDir}/${tempEndpointLocation}/${pipelineSnapTime}"
 
     val tmpErrorPath = if(jsonInput.contains("tmp_error_path")) jsonInput.get("tmp_error_path").get

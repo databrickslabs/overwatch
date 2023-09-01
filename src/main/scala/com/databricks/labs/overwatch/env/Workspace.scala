@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.env
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.ApiCallV2
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.utils.Helpers.deriveRawApiResponseDF
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -188,7 +189,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
     if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
       try {
-        spark.read.json(tmpSqlQueryHistorySuccessPath)
+        deriveRawApiResponseDF(spark.read.json(tmpSqlQueryHistorySuccessPath))
           .select(explode(col("res")).alias("res")).select(col("res" + ".*"))
           .withColumn("organization_id", lit(config.organizationId))
       } catch {
