@@ -399,6 +399,8 @@ private[overwatch] class ModuleDisabled(moduleId: Int, s: String) extends Except
   logger.log(Level.INFO, s"MODULE DISABLED: MODULE_ID: $moduleId -- SKIPPING")
 }
 
+private[overwatch] class VerboseAuditLoggingDisabled(s: String) extends Exception(s) {}
+
 private[overwatch] class ApiCallFailure(
                                          val httpResponse: HttpResponse[String],
                                          apiCallDetail: String,
