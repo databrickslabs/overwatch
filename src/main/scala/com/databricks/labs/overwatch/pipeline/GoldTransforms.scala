@@ -492,9 +492,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .withColumn("job_run_cluster_util", lit(null).cast("double"))
     }
 
-
   }
-
 
   protected def buildNotebookCommandsFact(
                                    notebook: PipelineTable,
