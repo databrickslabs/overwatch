@@ -506,7 +506,7 @@ trait GoldTransforms extends SparkSessionWrapper {
     if (!auditDF_base.columns.contains("executionTime")) {
       logger.info("Verbose Audit Log not enabled in workspace")
       throw new VerboseAuditLoggingDisabled(s"Verbose Audit Logging is not enabled in the workspace. To get the data in notebookCommands_gold it is necessary you " +
-        s"enable verbose audit logging in the workspace. Also you can exclude audit, notebook, clusterEvents")
+        s"enable verbose audit logging in the workspace. Also you can exclude scopes - audit, notebook, clusterEvents if you dont want to get notebookCommands_gold")
     }else{
       val notebookLookupTSDF = notebook.asDF
         .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS", "date")
