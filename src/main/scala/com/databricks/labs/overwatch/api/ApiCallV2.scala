@@ -564,7 +564,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       true
     } else if (apiResultDF.columns.size == 1 && apiResultDF.columns.contains(apiMeta.paginationKey)) { //Check if only pagination key in present in the response
       true
-    } else {
+    } else if (apiResultDF.columns.size == 1 && apiResultDF.columns.contains(apiMeta.emptyResponseColumn)) { //Check if only pagination key in present in the response
+      true
+    }
+    else {
       false
     }
   }
