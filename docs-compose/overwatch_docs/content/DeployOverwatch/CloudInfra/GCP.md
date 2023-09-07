@@ -1,13 +1,13 @@
 ---
-title: "AWS"
-date: 2022-12-12T11:29:56-05:00
+title: "GCP"
+date: 2023-09-07
 ---
 
-## Configuring Overwatch on AWS - Databricks
-Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
+## Configuring Overwatch on GCP - Databricks
+Reach out to your Databricks representative to help you with these tasks as needed.
 
 There are two primary sources of data that need to be configured:
-* [Audit Logs-AWS](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)
+* [Audit Logs-GCP](https://docs.gcp.databricks.com/administration-guide/account-settings/audit-logs.html)
     * These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis
       and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.
       We don't want multiple workspaces delivering into the same prefix. The audit logs contain data for every interaction
@@ -23,7 +23,13 @@ There are two primary sources of data that need to be configured:
     * Best Practice - Multi-Workspace -- When multiple workspaces are using Overwatch within a single region it's best to
       ensure that each are going to their own prefix, even if sharing a bucket. This greatly reduces Overwatch scan times
       as the log files build up.
-  
+    * To enable Cluster Logs on Multiworkspace - follow this [link]({{%relref "DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/gcp"%}}/#cluster-logging-locations-setup)
+
+{{% notice note%}}
+**GCP -- Remote Cluster Logs** - Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
+provide DBFS root path as a target for log delivery.
+{{% /notice %}}
+
 
 ## Reference Architecture
 As of 0.7.1 Overwatch can be deployed on a single workspace and retrieve data from all workspaces. For more details
@@ -42,14 +48,4 @@ The legacy architecture method (pre 0.7.1.0) required that Overwtach be deployed
 | Basic Deployment       | Multi-Region Deployment |
 | ---------------------- | ----------------------  |
 | ![BasicAwsArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_AWS.png)| ![AWSArch](/images/EnvironmentSetup/Overwatch_Arch_AWS_Legacy.png)|
-
-## With Databricks Billable Usage Delivery Logs
-Detailed costs data
-[directly from Databricks](https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html).
-This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn't support this just yet,
-if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
-to load all the historical data from the day that you began receiving it.
-
-In the meantime, it's easy to join these up with the Overwatch data for cost validation and / or exact cost break
-down by dimensions not supported in the usage logs.
 
