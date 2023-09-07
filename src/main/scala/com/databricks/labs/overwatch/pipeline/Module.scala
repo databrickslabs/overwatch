@@ -399,6 +399,7 @@ class Module(
       case e: ModuleDisabled =>
         fail(e.getMessage)
       case e: VerboseAuditLoggingDisabled =>
+        println("Verbose AUdit Log Disabled")
         fail(e.getMessage)
       case e: FailedModuleException =>
         val errMessage = s"FAILED: $moduleId-$moduleName Module"

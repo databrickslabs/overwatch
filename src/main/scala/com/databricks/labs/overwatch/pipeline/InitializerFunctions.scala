@@ -207,7 +207,7 @@ trait InitializerFunctions
       case "audit" => audit
       case "accounts" => accounts
       case "dbsql" => dbsql
-      case "notebookCommands" => notebookCommands
+      case "notebookcommands" => notebookCommands
       case scope => {
         val supportedScopes = s"${OverwatchScope.values.mkString(", ")}, all"
         throw new BadConfigException(s"Scope $scope is not supported. Supported scopes include: " +

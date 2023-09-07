@@ -619,7 +619,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .drop("cluster_id")
       notebookCodeAndMetaDF.select(colNames: _*)
     }else{
-      logger.info("Verbose Audit Log not enabled in workspace")
+      println("Verbose Audit Log not enabled in workspace")
       throw new VerboseAuditLoggingDisabled(s"Verbose Audit Logging is not enabled in the workspace. To get the data in notebookCommands_gold it is necessary you " +
         s"enable verbose audit logging in the workspace and also you should include scope notebookCommands")
     }
