@@ -258,4 +258,7 @@ Additional clarification of the Spark Hierachy can be found on this [Spark+AI Su
 *Gold Entities:* NotebookCommands
 
 This module enables the materialization of notebooks commands with estimated cost dimension related to the notebook commands.
-It requires **verbose audit logging** to be enabled in the workspace. 
+It requires **verbose audit logging** to be enabled in the workspace.
+{{% notice note %}}
+NotebookCommands are not available for notebooks run on a SQL Warehouse yet. This feature will be added in a future release
+{{% /notice %}}

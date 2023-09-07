@@ -934,6 +934,9 @@ to improve performance.
 **Partition Columns** -- organization_id
 
 **Write Mode** -- Merge
+{{% notice note %}}
+NotebookCommands are not available for notebooks run on a SQL Warehouse yet. This feature will be added in a future release
+{{% /notice %}}
 
 | Column             | Type   | Description                                                                               |
 |:-------------------|:-------|:------------------------------------------------------------------------------------------|
