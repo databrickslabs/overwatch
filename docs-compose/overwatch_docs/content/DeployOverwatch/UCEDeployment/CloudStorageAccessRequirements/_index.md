@@ -14,6 +14,6 @@ validate sizes / etc are much more efficient (12-20x) then doing this sequential
 Databricks is in the process of making "Volumes" GA and Overwatch will continue to monitor capabilities and remove 
 these requirements as soon as its feasible.
 
+* [Azure]({{%relref "/DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/Azure.md"%}})
 * [AWS]({{%relref "/DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/AWS.md"%}}) 
 * [GCP]({{%relref "/DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/GCP.md"%}})
-* [Azure]({{%relref "/DeployOverwatch/UCEDeployment/CloudStorageAccessRequirements/Azure.md"%}})
