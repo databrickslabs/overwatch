@@ -45,8 +45,7 @@ find a section in which the difference is not made clear.
 ### [Spark Context Composition & Hierarchy]({{%relref "DataEngineer/Modules.md"%}})
 
 ## Data Ingestion and Resume Process
-The specificities can vary slightly between cloud provider but the general methodology is the exact same. 
-Specific differences will be discussed in [Cloud-Specific Variations](#cloud-specific-variations) section. 
+The specificities can vary slightly between cloud provider but the general methodology is the exact same.  
 
 Each module is responsible for building certain entities at each layer, bronze, silver, gold, and presentation.
 The mapping between module and gold entity can be found in the [Modules]({{%relref "DataEngineer/Modules.md"%}}) section.

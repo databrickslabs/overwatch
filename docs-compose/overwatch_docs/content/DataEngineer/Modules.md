@@ -63,7 +63,7 @@ repo](https://github.com/databrickslabs/overwatch) for release updates.
 Audit is the base, fundamental module from which the other modules build upon. This module is required.
 
 For details on how to configure audit logging please refer to the Databricks docs online and/or the [environment
-setup]({{%relref "DeployOverwatch/CloudInfra/_index.md"%}}) details for your cloud provider.
+setup](/deployoverwatch/cloudinfra/index.html) details for your cloud provider.
 
 The source data is landed in the bronze layer table `audit_log_bronze`. The schema is ultimately inferred but a minimum
 base, required schema is defined to ensure requisite data fields are present. Additional data will land in the audit

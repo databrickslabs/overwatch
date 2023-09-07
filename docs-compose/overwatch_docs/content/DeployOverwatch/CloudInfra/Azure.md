@@ -57,7 +57,7 @@ The legacy architecture method (pre 0.7.1.0) required that Overwtach be deployed
       Eventhub to deliver these logs, follow the steps below.
 
 {{% notice note%}}
-**LIMIT** Max of 10 Event Hubs per Event Hub Namespace. If more than 10 workspaces are deployed in the same region plan to
+**LIMIT** If Event Hub subscription is Standard, max of 10 Hubs per Namespace. If more than 10 workspaces are deployed in the same region plan to
 distribute your Event Hubs and Namespaces appropriately.
 {{% /notice %}}
 

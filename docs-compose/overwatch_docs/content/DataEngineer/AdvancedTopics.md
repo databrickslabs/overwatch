@@ -60,13 +60,6 @@ need be carried out on a single workspace per Overwatch output target (i.e. stor
     * This is critical as there are some regressions in 10.4LTS that have been handled in Overwatch 0.6.1 but not
       in previous versions
 * (Azure) Follow recommendations for Event Hub. If using less than 32 partitions, increase this immediately.
-    * If workspace is VERY large or has 50+ concurrent users, suggest increasing `minEventsPerTrigger` in the audit
-      log config. This is defaulted to 10, increase it to 100+. TLDR, this is the minimum number of events in Event Hub
-      allowed before Overwatch will progress past the audit log events module. If the workspace is generating more than 10
-      events faster than Overwatch can complete the streaming batch then the module may never complete or may get stuck
-      here for some time.
-    * Consider increasing `maxEventsPerTrigger` from default of 10000 to 50000 to load more audit logs per batch. This
-      will only help if there are 10K+ audit events per day on the workspace.
 * Ensure direct networking routes are used between storage and compute and that they are in the same region
     * Overwatch target can be in separate region for multi-region architectures but sources should be co-located with
       compute.
