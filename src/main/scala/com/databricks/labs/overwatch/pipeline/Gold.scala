@@ -37,12 +37,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
-  private val notebookCommandsDerivedScope: Boolean = config.overwatchScope.contains(OverwatchScope.audit) &&
-    config.overwatchScope.contains(OverwatchScope.notebooks) &&
-    config.overwatchScope.contains(OverwatchScope.clusterEvents)
-
   def getAllModules: Seq[Module] = {
-    val basicModules = config.overwatchScope.flatMap {
+    config.overwatchScope.flatMap {
       case OverwatchScope.accounts => {
         Array(accountModModule, accountLoginModule)
       }
@@ -77,12 +73,12 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           warehouseModule
         )
       }
+      case OverwatchScope.notebookCommands => {
+        Array(
+          notebookCommandsFactModule
+        )
+      }
       case _ => Array[Module]()
-    }
-    if(notebookCommandsDerivedScope) {
-     basicModules :+ notebookCommandsFactModule
-    }else{
-      basicModules
     }
   }
 
@@ -400,11 +396,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         jobRunCostPotentialFactModule.execute(appendJobRunCostPotentialFactProcess)
         GoldTargets.jobRunCostPotentialFactViewTarget.publish(jobRunCostPotentialFactViewColumnMapping)
       }
+      case OverwatchScope.notebookCommands => {
+        notebookCommandsFactModule.execute(appendNotebookCommandsFactProcess)
+        GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping)
+      }
       case _ =>
-    }
-    if (notebookCommandsDerivedScope) {
-      notebookCommandsFactModule.execute(appendNotebookCommandsFactProcess)
-      GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping)
     }
   }
 
@@ -443,10 +439,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         GoldTargets.sqlQueryHistoryViewTarget.publish(sqlQueryHistoryViewColumnMapping,workspacesAllowed = workspacesAllowed)
         GoldTargets.warehouseViewTarget.publish(warehouseViewColumnMapping,workspacesAllowed = workspacesAllowed)
       }
+      case OverwatchScope.notebookCommands => {
+        GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping,workspacesAllowed = workspacesAllowed)
+      }
       case _ =>
-    }
-    if (notebookCommandsDerivedScope) {
-      GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping,workspacesAllowed = workspacesAllowed)
     }
   }
 
