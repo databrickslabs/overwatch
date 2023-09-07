@@ -27,7 +27,7 @@ Scopes are:
 * [notebooks](#notebooks)
 * [DBSQL](#dbsql)
 * [sparkEvents](#sparkevents)
-* [NotebookCommands](#notebookcommands)
+* [notebookCommands](#notebookcommands)
 
 The default is to use all scopes so if none are specified in the configuration, all scopes will be enabled. Currently,
 under normal, daily operations, there no significant cost to any of these modules. It's likely best to leave them
@@ -121,6 +121,7 @@ other resources are heavily utilizing api calls.
 *Requires:* Audit
 
 *Gold Entities:* InstancePool
+
 Simple module that offers observability to configuration changes (not state) of an instance pool. Databricks does
 not yet publish the state change data for instance pools; thus Overwatch cannot deliver metrics for
 how long a node was used, how long it was idle, when it became idle, when it was terminated, etc. When Databricks
@@ -169,14 +170,12 @@ Overwatch should not be used as single source of truth for any audit requirement
 Currently a very simple module that just enables the materialization of notebooks as slow changing dimensions.
 
 ### DBSQL
-As of 0.7.0
 *Requires:* Audit
 
 *Gold Entities:* sqlQueryHistory|Warehouse
 
-Additional DBSQL entities will be coming shortly to enable users to join with warehouses and other assets. As of 0.7.0
-this is a preview; we're looking for feedback, so please submit a
-[new git issue](https://github.com/databrickslabs/overwatch/issues/new) if you identify an issue with the data.
+This module will contain all assets of DBSQL. Additional entities will be coming shortly to enable the estimation 
+of costs in DBSQL
 
 ### SparkEvents
 *Requires:* Clusters
@@ -254,8 +253,9 @@ Additional clarification of the Spark Hierachy can be found on this [Spark+AI Su
   ![TaskViz](/images/GettingStarted/Modules/Task_Detail.png)
 
 ### NotebookCommands
-*Requires:* notebookCommands
+*Requires:* ClusterEvents|Notebooks|notebookCommands
 
 *Gold Entities:* NotebookCommands
 
-To enable this module the user needs to enable **verbose audit logging** in their workspace and also notebookcommands scope need to be included in the configuration. This module enables the materialization of notebooks commands with cost dimension related to the notebook commands.
+This module enables the materialization of notebooks commands with estimated cost dimension related to the notebook commands.
+It requires **verbose audit logging** to be enabled in the workspace. 
