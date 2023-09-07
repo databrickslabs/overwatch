@@ -147,12 +147,12 @@ or both use the examples below and apply them to your cluster policies appropria
 * [Interactive AND Automated Cluster Policy](/assets/FAQ/global_logs_policy_rule.json)
 
 ## Q8: Can I deploy Overwatch on Unity Catalog (UC)
-**NO**
-As of 0.7.0 UC is not supported. Overwatch dev team is working with the UC teams to identify best practices, 
-a proper strategy, and implement first-party support. It appears that the issue is in an Overwatch requirement 
-which should be easy to correct. Assuming no major hurdles this will be out shortly after 0.7.0 and will require no 
-schema changes. We recommend deploying on a traditional metastore for now and an update will be published as soon 
-as possible.
+**Yes!**
+
+As of [v0.7.2.0](https://databrickslabs.github.io/overwatch/changelog/#0720) You can deploy Overwatch on your UC-enabled workspace. 
+We have also provided a step-by-step [migration guide](/deployoverwatch/ucedeployment/migratingtouc/index.html) to help you migrate your existing Overwatch data.  
+hint: On top of the added security benefits of UC, deploying Overwatch onto it will significantly improve the deployment process 
+for Azure customers in the future, since Overwatch will soon leverage System Tables as the bronze layer source of data when applicable.
 
 ## Q9: How to enable user-email tracking in sparkJob Table for DBR versions < 11.3
 Until DBR 11.3+ the user_email field in sparkJob table was incomplete as Databricks did not begin publishing this 
