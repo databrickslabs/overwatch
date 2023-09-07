@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
-import com.databricks.labs.overwatch.utils.{ModuleDisabled, NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes, VerboseAuditLoggingDisabled}
+import com.databricks.labs.overwatch.utils.{ModuleDisabled, NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -620,7 +620,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       notebookCodeAndMetaDF.select(colNames: _*)
     }else{
       println("Verbose Audit Log not enabled in workspace")
-      throw new VerboseAuditLoggingDisabled(s"Verbose Audit Logging is not enabled in the workspace. To get the data in notebookCommands_gold it is necessary you " +
+      throw new ModuleDisabled(3019,s"Verbose Audit Logging is not enabled in the workspace. To get the data in notebookCommands_gold it is necessary you " +
         s"enable verbose audit logging in the workspace and also you should include scope notebookCommands")
     }
   }
