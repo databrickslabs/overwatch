@@ -254,8 +254,8 @@ Additional clarification of the Spark Hierachy can be found on this [Spark+AI Su
   ![TaskViz](/images/GettingStarted/Modules/Task_Detail.png)
 
 ### NotebookCommands
-*Requires:* Audit|Notebook|ClusterEvents
+*Requires:* notebookCommands
 
 *Gold Entities:* NotebookCommands
 
-To enable this module the user needs to enable verbose audit logging in their workspace. This module enables the materialization of notebooks commands with cost dimension related to the notebook commands.
+To enable this module the user needs to enable **verbose audit logging** in their workspace and also notebookcommands scope need to be included in the configuration. This module enables the materialization of notebooks commands with cost dimension related to the notebook commands.
