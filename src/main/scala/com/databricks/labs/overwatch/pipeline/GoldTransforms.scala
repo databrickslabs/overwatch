@@ -503,11 +503,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
       .selectExpr("*", "requestParams.*").drop("requestParams")
 
-    if (!auditDF_base.columns.contains("executionTime")) {
-      logger.info("Verbose Audit Log not enabled in workspace")
-      throw new VerboseAuditLoggingDisabled(s"Verbose Audit Logging is not enabled in the workspace. To get the data in notebookCommands_gold it is necessary you " +
-        s"enable verbose audit logging in the workspace. Also you can exclude scope notebookCommands if you don't want to get notebookCommands_gold table to be populated")
-    }else{
+    if (auditDF_base.columns.contains("executionTime")){
       val notebookLookupTSDF = notebook.asDF
         .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS", "date")
         .withColumnRenamed("notebook_id", "notebookId")
@@ -622,6 +618,10 @@ trait GoldTransforms extends SparkSessionWrapper {
         .withColumn("estimated_dbu_cost", col("executionTime") * col("dbu_cost_ps"))
         .drop("cluster_id")
       notebookCodeAndMetaDF.select(colNames: _*)
+    }else{
+      logger.info("Verbose Audit Log not enabled in workspace")
+      throw new VerboseAuditLoggingDisabled(s"Verbose Audit Logging is not enabled in the workspace. To get the data in notebookCommands_gold it is necessary you " +
+        s"enable verbose audit logging in the workspace and also you should include scope notebookCommands")
     }
   }
 
