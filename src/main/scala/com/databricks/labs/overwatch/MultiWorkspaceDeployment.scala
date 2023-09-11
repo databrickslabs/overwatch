@@ -142,7 +142,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val sqlComputerDBUPrice: Double = config.sql_compute_dbu_price
       val jobsLightDBUPrice: Double = config.jobs_light_dbu_price
       val customWorkspaceName: String = config.workspace_name
-      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql".split(",")
+      val standardScopes = "audit,sparkEvents,jobs,clusters,clusterEvents,notebooks,pools,accounts,dbsql,notebookCommands".split(",")
       val scopesToExecute = (standardScopes.map(_.toLowerCase).toSet --
         config.excluded_scopes.getOrElse("").split(":").map(_.toLowerCase).toSet).toArray
 
@@ -347,8 +347,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     true
   }
 
-
-  private def generateBaseConfig(configLocation: String): DataFrame = {
+  /**
+   * Generate Config Dataframe from Config Location(csv, delta path or Delta Table)
+   */
+  def generateBaseConfig(configLocation: String): DataFrame = {
     val rawBaseConfigDF = try {
       if (configLocation.toLowerCase().endsWith(".csv")) { // CSV file
         println(s"Config source: csv path ${configLocation}")

@@ -110,6 +110,14 @@ class ApiCallV2Test extends AnyFunSpec with BeforeAndAfterAll {
       ApiCallV2(apiEnv, endpoint, query).execute()
     }
 
+    it("Consume data from policies/clusters/list API where no cluster policies are available") {
+      val endpoint = "policies/clusters/list"
+      ApiCallV2(apiEnv, endpoint).execute().asDF()
+      assert(
+        ApiCallV2(apiEnv, endpoint).execute().asDF().isEmpty
+      )
+    }
+
 
   }
 

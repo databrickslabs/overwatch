@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
@@ -415,6 +416,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("date",
             split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
           .drop("filenameAR")
+          .verifyMinimumSchema(Schema.auditMasterSchema)
       } else {
         throw new Exception(auditLogsFailureMsg)
       }
@@ -892,7 +894,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private[overwatch] def getAllEventLogPrefix(inputDataframe: DataFrame, apiEnv: ApiEnv): DataFrame = {
     try{
       val mountMap = getMountPointMapping(apiEnv) //Getting the mount info from api and cleaning the data
-        .filter(col("mount_point") =!= "/")
+        .filter(trim(col("mount_point")) =!= "/" && trim(col("mount_point")) =!= "") //Added for #1021
         .withColumn("mount_point", removeTrailingSlashes('mount_point))
         .withColumn("source",  removeTrailingSlashes('source))
       //Cleaning the data for cluster log path
@@ -915,7 +917,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("derivedSource", when('source.isNull, 'cluster_mount_point) otherwise ('source_temp))
         .withColumn("topLevelTargets", array(col("derivedSource"), col("cluster_id"), lit("eventlog")))
         .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
-
       val result = pathsDF.select('wildPrefix, 'cluster_id)
       result
     }catch {
@@ -949,6 +950,30 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
   }
 
+  /**
+   * Create cluster_log path based on the cloud provider passed. For GCP, it will create the cluster log path based on the
+   * default GCS bucket created during workspace deployment (databricks-organisation-id). This GCS bucket will contains
+   * clusters logs for that workspace. For AWS and Azure cloud, input column will pe passed as it is.
+   * @param cloudProvider  Its value can be AWS, Azure or GCP
+   * @param inputCol Input column contains the default dbfs/mounted cluster log path.
+   * @param isMultiWorkSpaceDeployment Flag specifying if it is a multi workspace deployment.
+   * @param organisationId
+   * @return
+   */
+  private def fetchClusterLogConfiguration(cloudProvider: String,
+                                           inputCol: Column,
+                                           isMultiWorkSpaceDeployment: Boolean,
+                                           organisationId: String): Column = {
+    // If cloud provider is GCP and if it is a multi workspace deployment, then we need to create the cluster logs path
+    // using default GCS bucket and organisation-id else input-column containing the cluster-log path will be returned
+    if(cloudProvider.toLowerCase() == "gcp" && isMultiWorkSpaceDeployment &&
+      organisationId != Initializer.getOrgId) {
+      regexp_replace(inputCol, "dbfs:/", s"gs://databricks-${organisationId}/${organisationId}/")
+    }
+    else {
+      inputCol
+    }
+  }
 
   protected def collectEventLogPaths(
                                       fromTime: TimeTypes,
@@ -959,7 +984,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                       sparkLogClusterScaleCoefficient: Double,
                                       apiEnv: ApiEnv,
                                       isMultiWorkSpaceDeployment: Boolean,
-                                      organisationId: String
+                                      organisationId: String,
+                                      cloudProvider: String
                                     )(incrementalAuditDF: DataFrame): DataFrame = {
 
     logger.log(Level.INFO, "Collecting Event Log Paths Glob. This can take a while depending on the " +
@@ -985,32 +1011,54 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .select('global_cluster_id.alias("cluster_id"), $"requestParams.cluster_log_conf")
       // Change for #357
       .join(incrementalClusterIDs.hint("SHUFFLE_HASH"), Seq("cluster_id"))
-      .withColumn("cluster_log_conf", coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
-      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
+      .withColumn("cluster_log_conf",
+        coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
+//      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
+      .withColumn("cluster_log_conf",
+        fetchClusterLogConfiguration(cloudProvider, get_json_object('cluster_log_conf, "$.destination"),
+          isMultiWorkSpaceDeployment, organisationId))
       .filter('cluster_log_conf.isNotNull)
 
     // Get latest incremental snapshot of clusters with logging dirs but not existing in audit updates
     // This captures clusters that have not been edited/restarted since the last run with
     // log confs as they will not be in the audit logs
     val latestSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
-    val newLogDirsNotIdentifiedInAudit = clusterSnapshot
-      .join(incrementalClusterIDs, Seq("cluster_id"))
-      .withColumn("snapRnk", rank.over(latestSnapW))
-      .filter('snapRnk === 1)
-      .withColumn("cluster_log_conf", coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"))
-      .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
-      .select('cluster_id, 'cluster_log_conf)
+
+    val newLogDirsNotIdentifiedInAudit = {
+      if(clusterSnapshot.isEmpty){
+        spark.emptyDataFrame
+      }else{
+        clusterSnapshot
+          .join(incrementalClusterIDs, Seq("cluster_id"))
+          .withColumn("snapRnk", rank.over(latestSnapW))
+          .filter('snapRnk === 1)
+          .withColumn("cluster_log_conf",
+            fetchClusterLogConfiguration(cloudProvider, coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"),
+              isMultiWorkSpaceDeployment, organisationId))
+          .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
+          .select('cluster_id, 'cluster_log_conf)
+      }
+    }
 
     // Build root level eventLog path prefix from clusterID and log conf
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes =
     if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId(Some(apiEnv.workspaceURL))) {
-      getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
-        .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
+        if(newLogDirsNotIdentifiedInAudit.isEmpty){
+          getAllEventLogPrefix(incrementalClusterWLogging, apiEnv).select('wildPrefix).distinct()
+        }else{
+          getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
+            .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
+        }
+
     } else {
-      newLogDirsNotIdentifiedInAudit
-        .unionByName(incrementalClusterWLogging)
-        .withColumn("cluster_log_conf",removeTrailingSlashes('cluster_log_conf))
+       val allEvent = if(newLogDirsNotIdentifiedInAudit.isEmpty){
+         newLogDirsNotIdentifiedInAudit
+        }else{
+         newLogDirsNotIdentifiedInAudit
+           .unionByName(incrementalClusterWLogging)
+       }
+      allEvent.withColumn("cluster_log_conf",removeTrailingSlashes('cluster_log_conf))
         .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
         .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
         .select('wildPrefix)
@@ -1039,6 +1087,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO,s"""Count of log path: ${eventLogPaths.count()}""")
     eventLogPaths
 
+  }
+
+  protected def cleanseRawWarehouseSnapDF(df: DataFrame): DataFrame = {
+    val outputDF = SchemaScrubber.scrubSchema(df)
+    outputDF
+      .withColumn("tags", SchemaTools.structToMap(outputDF, "tags"))
+      .withColumn("odbc_params", SchemaTools.structToMap(outputDF, "odbc_params"))
+      .withColumnRenamed("id","warehouse_id")
+      .verifyMinimumSchema(Schema.warehouseSnapMinimumSchema)
   }
 
   protected def cleanseRawJobRunsSnapDF(keys: Array[String], runId: String)(df: DataFrame): DataFrame = {

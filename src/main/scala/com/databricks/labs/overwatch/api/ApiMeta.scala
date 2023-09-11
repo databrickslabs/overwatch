@@ -21,6 +21,7 @@ trait ApiMeta {
   protected var _isDerivePaginationLogic = false
   protected var _apiEnv: ApiEnv = _
   protected var _apiName: String = _
+  protected var _emptyResponseColumn: String = ""
 
   protected[overwatch] def apiName: String = _apiName
   protected[overwatch] def apiEnv: ApiEnv = _apiEnv
@@ -37,6 +38,8 @@ trait ApiMeta {
   protected[overwatch] def apiV: String = _apiV
 
   protected[overwatch] def isDerivePaginationLogic: Boolean = _isDerivePaginationLogic
+
+  protected[overwatch] def emptyResponseColumn: String = _emptyResponseColumn
 
   private[overwatch] def setApiV(value: String): this.type = {
     _apiV = value
@@ -93,6 +96,11 @@ trait ApiMeta {
 
   private[overwatch] def hasNextPage(jsonObject: JsonNode): Boolean = {
     true
+  }
+
+  private[overwatch] def setEmptyResponseColumn(value: String): this.type = {
+    _emptyResponseColumn = value
+    this
   }
 
   /**
@@ -182,6 +190,7 @@ class ApiMetaFactory {
       case "policies/clusters/list" => new ClusterPolicesApi
       case "token/list" => new TokensApi
       case "global-init-scripts" => new GlobalInitsScriptsApi
+      case "sql/warehouses" => new WarehouseListApi
       case _ => new UnregisteredApi
     }
     logger.log(Level.INFO, meta.toString)
@@ -366,6 +375,7 @@ class ClusterLibraryApi extends ApiMeta {
 class ClusterPolicesApi extends ApiMeta {
   setDataframeColumn("policies")
   setApiCallType("GET")
+  setEmptyResponseColumn("total_count")
 }
 
 class TokensApi extends  ApiMeta {
@@ -375,5 +385,10 @@ class TokensApi extends  ApiMeta {
 
 class GlobalInitsScriptsApi extends ApiMeta {
   setDataframeColumn("scripts")
+  setApiCallType("GET")
+}
+
+class WarehouseListApi extends ApiMeta {
+  setDataframeColumn("warehouses")
   setApiCallType("GET")
 }
