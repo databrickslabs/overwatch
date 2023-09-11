@@ -30,7 +30,7 @@ Clusters.
 The following steps needs to be performed in external location’s GCS bucket permissions -
 * Go to the `Permissions` tab of the external location’s GCS bucket
 * Click on `Grant Access`
-* Add Service Account which is attached to the Overwatch Job cluster in the `Add Pricipal` section
+* Add Service Account which is attached to the Overwatch Job cluster in the `Add Principal` section
 * Add Service Account which is attached to the Overwatch Job cluster
 * Add Roles - 
   * Storage Admin 
@@ -52,7 +52,7 @@ In order to fetch the cluster logs of the remote workspace, cluster should have 
 The following steps needs to be performed in `databricks-<workspace-id>` GCS bucket permissions -
 * Go to the `Permissions` tab of the `databricks-<workspace-id>` GCS bucket
 * Click on `Grant Access`
-* Add Service Account which is attached to the Overwatch Job cluster in the `Add Pricipal` section
+* Add Service Account which is attached to the Overwatch Job cluster in the `Add Principal` section
 * Add Roles -
   * Storage Admin
   * Storage Legacy Bucket Owner
