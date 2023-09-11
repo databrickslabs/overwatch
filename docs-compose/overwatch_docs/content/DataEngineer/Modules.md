@@ -27,6 +27,7 @@ Scopes are:
 * [notebooks](#notebooks)
 * [DBSQL](#dbsql)
 * [sparkEvents](#sparkevents)
+* [notebookCommands](#notebookcommands)
 
 The default is to use all scopes so if none are specified in the configuration, all scopes will be enabled. Currently,
 under normal, daily operations, there no significant cost to any of these modules. It's likely best to leave them
@@ -62,7 +63,7 @@ repo](https://github.com/databrickslabs/overwatch) for release updates.
 Audit is the base, fundamental module from which the other modules build upon. This module is required.
 
 For details on how to configure audit logging please refer to the Databricks docs online and/or the [environment
-setup]({{%relref "DeployOverwatch/CloudInfra/_index.md"%}}) details for your cloud provider.
+setup](/deployoverwatch/cloudinfra/index.html) details for your cloud provider.
 
 The source data is landed in the bronze layer table `audit_log_bronze`. The schema is ultimately inferred but a minimum
 base, required schema is defined to ensure requisite data fields are present. Additional data will land in the audit
@@ -120,6 +121,7 @@ other resources are heavily utilizing api calls.
 *Requires:* Audit
 
 *Gold Entities:* InstancePool
+
 Simple module that offers observability to configuration changes (not state) of an instance pool. Databricks does
 not yet publish the state change data for instance pools; thus Overwatch cannot deliver metrics for
 how long a node was used, how long it was idle, when it became idle, when it was terminated, etc. When Databricks
@@ -168,14 +170,12 @@ Overwatch should not be used as single source of truth for any audit requirement
 Currently a very simple module that just enables the materialization of notebooks as slow changing dimensions.
 
 ### DBSQL
-As of 0.7.0
 *Requires:* Audit
 
-*Gold Entities:* sqlQueryHistory
+*Gold Entities:* sqlQueryHistory|Warehouse
 
-Additional DBSQL entities will be coming shortly to enable users to join with warehouses and other assets. As of 0.7.0
-this is a preview; we're looking for feedback, so please submit a
-[new git issue](https://github.com/databrickslabs/overwatch/issues/new) if you identify an issue with the data.
+This module will contain all assets of DBSQL. Additional entities will be coming shortly to enable the estimation 
+of costs in DBSQL
 
 ### SparkEvents
 *Requires:* Clusters
@@ -251,3 +251,14 @@ Additional clarification of the Spark Hierachy can be found on this [Spark+AI Su
   due to node failure, the task + attempt is marked as failed and a new attempt is executed on another node. The
   ExecutorID is the node on which the work was executed.
   ![TaskViz](/images/GettingStarted/Modules/Task_Detail.png)
+
+### NotebookCommands
+*Requires:* ClusterEvents|Notebooks|notebookCommands
+
+*Gold Entities:* NotebookCommands
+
+This module enables the materialization of notebooks commands with estimated cost dimension related to the notebook commands.
+It requires **verbose audit logging** to be enabled in the workspace.
+{{% notice note %}}
+NotebookCommands are not available for notebooks run on a SQL Warehouse yet. This feature will be added in a future release
+{{% /notice %}}

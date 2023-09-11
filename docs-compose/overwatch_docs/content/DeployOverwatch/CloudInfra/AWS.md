@@ -1,16 +1,13 @@
 ---
-title: "AWS/GCP"
+title: "AWS"
 date: 2022-12-12T11:29:56-05:00
 ---
 
-## Configuring Overwatch on AWS/GCP - Databricks
+## Configuring Overwatch on AWS - Databricks
 Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
-<br>
-To get started, the [Basic Deployment](#basic-deployment) configuration. As more modules are enabled, additional
-environment configuration may be required in addition to the Basic Deployment.
 
 There are two primary sources of data that need to be configured:
-* [Audit Logs-AWS](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)/[Audit Logs-GCP](https://docs.gcp.databricks.com/administration-guide/account-settings/audit-logs.html)
+* [Audit Logs-AWS](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)
     * These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis
       and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.
       We don't want multiple workspaces delivering into the same prefix. The audit logs contain data for every interaction
@@ -27,15 +24,6 @@ There are two primary sources of data that need to be configured:
       ensure that each are going to their own prefix, even if sharing a bucket. This greatly reduces Overwatch scan times
       as the log files build up.
   
-{{% notice note%}}
-**GCP -- Remote Cluster Logs** - Overwatch version 0.7.2.0.x  does not support cluster logs to be collected from remote 
-workspaces. Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
-provide DBFS root path as a target for log delivery. This disables Overwatch's ability to collect cluster logs from 
-remote workspaces at this time. A fix is in progress and expected to be available in the next release but for now, 
-Overwatch customers must make a deployment on each workspace to the same target. After the fix is published you will 
-be able to unify the configs and execute Overwatch from a single workspace and monitor remote workspaces.
-{{% /notice %}}
-
 
 ## Reference Architecture
 As of 0.7.1 Overwatch can be deployed on a single workspace and retrieve data from all workspaces. For more details

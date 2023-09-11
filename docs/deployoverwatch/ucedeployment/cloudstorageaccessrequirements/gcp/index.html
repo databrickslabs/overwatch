@@ -12,21 +12,21 @@
     <title>GCP :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1691553677" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1694458807" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1691553677" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1694458807" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1694458807"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1691553677"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1691553677"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1694458807"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1694458807"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1691553677"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1694458807"></script>
 
     
   </div>
@@ -147,6 +147,27 @@
  
   
     
+      <li data-nav-id="/deployoverwatch/cloudinfra/gcp/" title="GCP" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/">
+        GCP
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
       <li data-nav-id="/deployoverwatch/cloudinfra/azure/" title="Azure" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/">
         Azure
@@ -168,9 +189,9 @@
  
   
     
-      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS/GCP" class="dd-item ">
+      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/">
-        AWS/GCP
+        AWS
         
         </a>
     </li>
@@ -761,6 +782,9 @@
             
             
           
+            
+            
+          
         
         </ul>
       
@@ -922,6 +946,30 @@
         ">
       <a href="https://databrickslabs.github.io/overwatch/faq/">
           FAQ
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
+    <li data-nav-id="/dashboards/" title="Dashboards" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dashboards/">
+          Dashboards
           
       </a>
       
@@ -1122,8 +1170,11 @@ for detailed steps.</p>
 be provisioned read/write access to the storage target for the Overwatch Output
 (which will ultimately become your external location). This Service Account can be added to Overwatch Job/Interactive
 Clusters.</p>
-<p>The following steps needs to be performed to external location’s GCS bucket permissions -</p>
+<p>The following steps needs to be performed in external location’s GCS bucket permissions -</p>
 <ul>
+<li>Go to the <code>Permissions</code> tab of the external location’s GCS bucket</li>
+<li>Click on <code>Grant Access</code></li>
+<li>Add Service Account which is attached to the Overwatch Job cluster in the <code>Add Principal</code> section</li>
 <li>Add Service Account which is attached to the Overwatch Job cluster</li>
 <li>Add Roles -
 <ul>
@@ -1133,13 +1184,32 @@ Clusters.</p>
 </li>
 </ul>
 <h3 id="cluster-logging-locations-setup">Cluster Logging Locations Setup</h3>
+<p>When you create a workspace, Databricks on Google Cloud creates two Google Cloud Storage GCS buckets in your GCP project:</p>
+<ul>
+<li><code>databricks-&lt;workspace-id&gt;</code> - stores system data that is generated as you use various Databricks features.
+This bucket includes notebook revisions, job run details, command results, and Spark logs</li>
+<li><code>databricks-&lt;workspace-id&gt;-system</code> - contains workspace’s root storage for the Databricks File System (DBFS).
+Your DBFS root bucket is not intended for storage of production data.</li>
+</ul>
+<p>Follow the <a href="https://docs.gcp.databricks.com/administration-guide/workspace/create-workspace.html#secure-the-workspaces-gcs-buckets-in-your-project">databricks-docs</a>
+to get more information on these buckets.</p>
+<p>In order to fetch the cluster logs of the remote workspace, cluster should have access to the GCS bucket -
+<code>databricks-&lt;workspace-id&gt;</code>. This GCS Bucket is created in the Google Cloud project that hosts your Databricks workspace.</p>
+<p>The following steps needs to be performed in <code>databricks-&lt;workspace-id&gt;</code> GCS bucket permissions -</p>
+<ul>
+<li>Go to the <code>Permissions</code> tab of the <code>databricks-&lt;workspace-id&gt;</code> GCS bucket</li>
+<li>Click on <code>Grant Access</code></li>
+<li>Add Service Account which is attached to the Overwatch Job cluster in the <code>Add Principal</code> section</li>
+<li>Add Roles -
+<ul>
+<li>Storage Admin</li>
+<li>Storage Legacy Bucket Owner</li>
+</ul>
+</li>
+</ul>
 
-<div class="notices note" ><p><strong>GCP &ndash; Remote Cluster Logs</strong> - Overwatch version 0.7.2.0.x  does not support cluster logs to be collected from remote
-workspaces. Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
-provide DBFS root path as a target for log delivery. This disables Overwatch&rsquo;s ability to collect cluster logs from
-remote workspaces at this time. A fix is in progress and expected to be available in the next release but for now,
-Overwatch customers must make a deployment on each workspace to the same target. After the fix is published you will
-be able to unify the configs and execute Overwatch from a single workspace and monitor remote workspaces.</p>
+<div class="notices note" ><p><strong>GCP &ndash; Remote Cluster Logs</strong> - Databricks on GCP, does not support mounted/GCS bucket locations. Customers must
+provide DBFS root path as a target for log delivery.</p>
 </div>
 
 
@@ -1238,9 +1308,6 @@ be able to unify the configs and execute Overwatch from a single workspace and m
             
         
                     
-            
-        
-                    
                         
             
             
@@ -1254,88 +1321,6 @@ be able to unify the configs and execute Overwatch from a single workspace and m
                     
 
                     
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
             
         
                     
@@ -1435,6 +1420,107 @@ be able to unify the configs and execute Overwatch from a single workspace and m
             
         
                     
+                        
+            
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
             
         
                     
@@ -1629,6 +1715,11 @@ be able to unify the configs and execute Overwatch from a single workspace and m
             
         
                     
+                        
+            
+            
+        
+                    
             
         
                     
@@ -1711,6 +1802,22 @@ be able to unify the configs and execute Overwatch from a single workspace and m
                     
             
         
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
                     
             
         
@@ -1801,19 +1908,19 @@ be able to unify the configs and execute Overwatch from a single workspace and m
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1694458807"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1694458807"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1691553677" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1691553677"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1694458807" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1694458807"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

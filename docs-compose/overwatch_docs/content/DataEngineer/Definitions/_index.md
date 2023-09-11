@@ -12,11 +12,11 @@ from one table to the other). The relations depicted are to call the analyst's a
 
 The goal is to present a data model that unifies the different parts of the platform. The Overwatch team will continue 
 to work with Databricks platform teams to publish and simplify this data. The gray boxes annotated as 
-"Backlog/Research" are simply a known gap and a pursuit of the Overwatch dev team, it does NOT mean it's going to be 
-released soon but rather that we are aware of the missing component and we hope to enable gold-level data here in 
+"Backlog/Research" are simply a known gap, and a pursuit of the Overwatch dev team, it does NOT mean it's going to be 
+released soon but rather that we are aware of the missing component, and we hope to enable gold-level data here in 
 the future.
 
-![OverwatchERD](/images/_index/Overwatch_Gold_070.png)
+![OverwatchERD](/images/_index/Overwatch_Gold_0.7.2.1.png)
 
 ## Consumption Layer "Tables" (Views)
 All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex.
@@ -66,7 +66,10 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [sparkStage](#sparkstage)
 * [sparkTask](#sparktask)
 * [sparkStream](#sparkstream)
+* [warehouse](#warehouse)
+* [notebookCommands](#notebookcommands)
 * [Common Meta Fields](#common-meta-fields)
+
   * There are several fields that are present in all tables. Instead of cluttering each table with them, this section
   was created as a reference to each of these.
 
@@ -102,16 +105,16 @@ The data in the files were generated from an Azure, test deployment created by O
 | enable_elastic_disk       | boolean       | Whether autoscaling disk was enabled or not                                                                                                                                                                                                                                                              |
 | is_automated              | booelan       | Whether the cluster is automated (true if automated false if interactive)                                                                                                                                                                                                                                |
 | cluster_type              | string        | Type of cluster (i.e. Serverless, SQL Analytics, Single Node, Standard)                                                                                                                                                                                                                                  |
-| security_profile          | struct        | Complex type to describe secrity features enabled on the cluster. More information [Below]()                                                                                                                                                                                                             |
+| security_profile          | struct        | Complex type to describe security features enabled on the cluster. More information [Below]()                                                                                                                                                                                                             |
 | cluster_log_conf          | string        | Logging directory if configured                                                                                                                                                                                                                                                                          |
 | init_script               | array<struct> | Array of init scripts                                                                                                                                                                                                                                                                                    |
 | custom_tags               | string        | User-Defined tags AND also includes Databricks JobID and Databricks RunName when the cluster is created by a Databricks Job as an automated cluster. Other Databricks services that create clusters also store unique information here such as SqlEndpointID when a cluster is created by "SqlAnalytics" |
-| cluster_source            | string        | Shows the source of the action **(TODO -- checking on why null scenario with BUI)                                                                                                                                                                                                                        |
+| cluster_source            | string        | Shows the source of the action 
 | spark_env_vars            | string        | Spark environment variables defined on the cluster                                                                                                                                                                                                                                                       |
 | spark_conf                | string        | custom spark configuration on the cluster that deviate from default                                                                                                                                                                                                                                      |
 | acl_path_prefix           | string        | Automated jobs pass acl to clusters via a path format, the path is defined here                                                                                                                                                                                                                          |
-| instance_pool_id          | string        | Canononical pool id from which workers receive nodes                                                                                                                                                                                                                                                     |
-| driver_instance_pool_id   | string        | Canononical pool id from which driver receives node                                                                                                                                                                                                                                                      |
+| instance_pool_id          | string        | Canonical pool id from which workers receive nodes                                                                                                                                                                                                                                                     |
+| driver_instance_pool_id   | string        | Canonical pool id from which driver receives node                                                                                                                                                                                                                                                      |
 | instance_pool_name        | string        | Name of pool from which workers receive nodes                                                                                                                                                                                                                                                            |
 | driver_instance_pool_name | string        | Name of pool from which driver receives node                                                                                                                                                                                                                                                             |
 | spark_version             | string        | DBR version - scala version                                                                                                                                                                                                                                                                              |
@@ -144,7 +147,7 @@ The **[Cost Functions](#cost-functions-explained) are detailed below** the defin
 
 {{% notice warning %}}
 Any static clusters spanning 90 days without any state changes will never get a state closure and result in costs 
-increasing forever. This should be a VERY rare circumstance and usually only happens in extreemely stable, small 
+increasing forever. This should be a VERY rare circumstance and usually only happens in extremely stable, small 
 streams. This max days for clsf will be externalized as an override config in the future but for now it's static.
 {{% /notice %}}
 
@@ -378,9 +381,9 @@ prefix, "Legacy" in the Description and have been colored red on the ERD.
 #### JobRun
 [**SAMPLE**](/assets/TableSamples/jobrun.tab)
 
-Databricks has moved to "multi-task jobs" (MTJs) and each run now refers to the run of a task not a job. This migration 
-will likely cause a lot of confusion so please read this carefully.
-
+In Databricks, jobs (also called Workflows) can have 1 or more tasks associated with it. Whenever the job is triggered, a 
+job run occurs, which will have the execution of the tasks. In this table, each row represents the metrics of each task 
+executed during the job run. 
 Each record references the full lifecycle of a single task run with some legacy fields to accommodate historical 
 job-level runs (and jobs/runs still being created/launched from the deprecated Jobs 2.0 API). 
 Since the inception of multi-task jobs and Databricks jobs API 2.1, all run logic has been migrated from 
@@ -397,8 +400,6 @@ there will be a delay.
 * **Runs executing for more than 30 Days** -- This is a limitation for performance. This will be an externalized config at a later time but for now
 the hard limit is 30 days. The progress of this feature can be tracked in [Issue 528](https://github.com/databrickslabs/overwatch/issues/528)
 
-**TODO -- clarify the taskRunId vs jobRunId confusion from the UI**
-
 **KEY** -- organization_id + run_id + startEpochMS
 
 **Incremental Columns** -- startEpochMS
@@ -413,15 +414,15 @@ Inventory of every canonical task run executed by databricks workspace.
 |:--------------------------|:--------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | organization_id           | string  | Canonical workspace id                                                                                                                                                                                                        |
 | workspace_name            | string  | Customer defined name of the workspace or workspace_id (default)                                                                                                                                                              |
-| job_id                    | long    | ID of the job                                                                                                                                                                                                                 |
-| job_name                  | string  | Name of the runName if run is named, otherwise it will be job name                                                                                                                                                            |
+| job_id                    | long    | ID of the job (workflow)                                                                                                                                                                                                                 |
+| job_name                  | string  | Name of the job                                                                                                                                                           |
 | job_trigger_type          | string  | One of "cron" (automated scheduled), "manual", "repair"                                                                                                                                                                       |
 | terminal_state            | string  | State of the task run at the time of Overwatch pipeline execution                                                                                                                                                             |
-| run_id                    | long    | The lowest level of the run_id (i.e. legacy jobs may not have a task_run_id, in this case, it will be the job_run_id).                                                                                                        |
+| run_id                    | long    | The lowest level of the run_id (i.e. legacy jobs may not have a task_run_id, in this case, it will be the same as job_run_id).                                                                                                        |
 | run_name                  | string  | The name of the run if the run is named (i.e. in submitRun) otherwise this is set == taskKey                                                                                                                                  |
 | multitask_parent_run_id   | long    | If the task belongs to a multi-task job the job_run_id will be populated here, otherwise it will be null                                                                                                                      |
-| job_run_id                | long    | The run id of the job, not the task                                                                                                                                                                                           |
-| task_run_id               | long    | The run id of the task except for legacy and                                                                                                                                                                                  |
+| job_run_id                | long    | he run id of the job, not the task                                                                                                                                                                                           |
+| task_run_id               | long    | The run id of the task                                                                                                                                                                                  |
 | repair_id                 | long    | If the task or job was repaired, the repair id will be present here and the details of the repair will be in repair_details                                                                                                   |
 | task_key                  | string  | The name of the task is actually a key and must be unique within a job, this field specifies the task that was executed in this task_run_id                                                                                   |
 | cluster_type              | string  | Type of cluster used in the execution, one of "new", "job_cluster", "existing", "SQL Warehouse", null -- will be null for DLT pipelines and/or in situations where the type is not provided from Databricks                   |
@@ -671,17 +672,30 @@ spark.table("overwatch.audit_log_bronze")
   .selectExpr("*", "requestParams.*").drop("requestParams")      
 ```
 
-Slow changing dimension of user entity through time. Also used as reference map from user_email to user_id
+#### AccountLogin
+[**SAMPLE**](/assets/TableSamples/accountloginfact.tab)
 
-| Column                | Type   | Description                                                                          |
-|:----------------------|:-------|:-------------------------------------------------------------------------------------|
-| organization_id       | string | Canonical workspace id                                                               |
-| user_id               | string | Canonical user id for which the action was requested (within the workspace) (target) |
-| user_email            | string | User's email for which the action was requested (target)                             |
-| action                | string | Action requested to be performed                                                     |
-| added_from_ip_address | string | Source IP of the request                                                             |
-| added_by              | string | Authenticated user that made the request                                             |
-| user_agent            | string | request origin such as browser, terraform, api, etc.                                 |
+**KEY** -- organization_id + login_type + login_unixTimeMS + from_ip_address
+
+**Incremental Columns** -- login_unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
+
+| Column                | Type   | Description                                           |
+|:----------------------|:-------|:------------------------------------------------------|
+| login_unixTimeMS      | string | Unix Timestamp when the user logged in              |
+| login_date            | string | Date when user logged in             |
+| login_type            | string | How did the user log in. One of *aadTokenLogin*, *login*, *aadBrowserLogin*, *tokenLogin*, *samlLogin*, *jwtLogin*, *ssh*            |
+| login_user            | string | Canonical user id (within the workspace)              |
+| user_email            | string | User's email                                          |
+| login_type            | string | Type of login such as web, ssh, token                 |
+| from_ip_address       | struct | Details about the source login and target logged into |
+| user_agent            | string | request origin such as browser, terraform, api, etc.  |
+| request_id            | string | GUID of the login request                                     |
+| response              | struct | HTTP Response to login attempt, including statusCode, error message, and result (if any)                                    |
+
 
 #### AccountMod
 [**SAMPLE**](/assets/TableSamples/accountmodificationfact.tab)
@@ -694,35 +708,23 @@ Slow changing dimension of user entity through time. Also used as reference map 
 
 **Write Mode** -- Append
 
-TODO
-
-#### AccountLogin
-[**SAMPLE**](/assets/TableSamples/accountloginfact.tab)
-
-**KEY** -- organization_id + login_type + login_unixTimeMS + from_ip_address
-
-**Incremental Columns** -- login_unixTimeMS
-
-**Partition Columns** -- organization_id
-
-**Write Mode** -- Append
-
-{{% notice note%}}
-**Not exposed in the consumer database**. This table contains more sensitive information and by default is not
-exposed in the consumer database but held back in the etl datbase. This is done purposely to simplify security when/if
-desired. If desired, this can be exposed in consumer database with a simple vew definition exposing the columns desired.
-{{% /notice %}}
+This table tracks any admin changes made to user entities, such as group membership, user updates, etc.
 
 | Column                | Type   | Description                                           |
 |:----------------------|:-------|:------------------------------------------------------|
-| user_id               | string | Canonical user id (within the workspace)              |
-| user_email            | string | User's email                                          |
-| login_type            | string | Type of login such as web, ssh, token                 |
-| ssh_username          | string | username used to login via SSH                        |
-| groups_user_name      | string | ?? To research ??                                     |
-| account_admin_userID  | string | ?? To research ??                                     |
-| login_from_ip_address | struct | Details about the source login and target logged into |
-| user_agent            | string | request origin such as browser, terraform, api, etc.  |
+| mod_unixTimeMS        | bigint | Unix timestamp when the modification happened         |
+| mod_date              | date | Date when the modification happened                     |
+| action                | string | Action performed, one of: *add*, *addPrincipalToGroup*, *removePrincipalFromGroup*, *setAdmin*, *updateUser*, *delete*     |
+| endpoint              | string | Mechanism for making the change, one of: *scim*, *adminConsole*, *autoUserCreation*, *roleAssignment*     |
+| modified_by           | string | Email of user making the change                       |
+| user_name             | string | Email or username of user profile being changed           |
+| user_id               | string | Canonical user id (within the workspace) of user profile      |
+| group_name            | string | In case the modification is to a group, the group name, otherwise this will ne NULL     |
+| group_id              | string | In case the modification is to a group, the group ID, otherwise this will ne NULL     |
+| from_ip_address       | string | IP Address where the change originated from     |
+| user_agent            | string | request origin such as browser, terraform, api, etc.    |
+| request_id            | string | GUID of the login request                                     |
+| response              | struct | HTTP Response to login attempt, including statusCode, error message, and result (if any)
 
 {{% notice note%}}
 The following sections are related to Spark. Everything that can be seend/found in the SparkUI is visibel in the 
@@ -886,6 +888,83 @@ to improve performance.
 | streaming_metrics | dynamic struct | All metrics available for the stream batch run                                                                 |
 | execution_ids     | array<long>    | Array of execution_ids in the spark_context. Can explode and tie back to sparkExecution and other spark tables |
 
+#### Warehouse
+[**SAMPLE**](/assets/TableSamples/)
+
+**KEY** -- organization_id + warehouse_id + unixTimeMS
+
+**Incremental Columns** -- unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
+
+| Column                    | Type    | Description                                                                                                                                                                                                   |                                                                                                                                                                                                             
+|:--------------------------|:--------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| organization_id           | string  | Canonical workspace id                                                                                                                                                                                        |
+| workspace_name            | string  | Customizable human-legible name of the workspace, should be globally unique within the organization                                                                                                           |                                                                                                                      
+| warehouse_id              | string  | Canonical workspace warehouse id                                                                                                                                                                              |                                                                                                                     
+| warehouse_name            | string  | User-defined name of the warehouse                                                                                                                                                                            |                                                                                                                    
+| service_name              | string  | Name of the service corresponding to DBSQL warehouse                                                                                                                                                          |                                                                                                                   
+| action_name               | string  | create, edit, or snapImpute – depicts the type of action for the warehouse – **snapImpute is used on first run to initialize the state of the cluster even if it wasn’t created/edited since audit logs began |              
+| user_email                | string  | Email of the user requesting the action                                                                                                                                                                       |                                                                                                                                                                                  
+| cluster_size              | string  | Size of the clusters allocated for this warehouse                                                                                                                                                          | 
+| min_num_clusters          | long    | Minimum number of available clusters that will be maintained for this SQL warehouse                                                                                                             | 
+| max_num_clusters          | long    | Maximum number of clusters that the autoscaler will create to handle concurrent queries                                                                                                                      | 
+| auto_stop_mins            | long    | The amount of time in minutes that a SQL warehouse must be idle (i.e., no RUNNING queries) before it is automatically stopped                                                                                | 
+| spot_instance_policy      | string  | Configurations whether the warehouse should use spot instances                                                                                                                                               | 
+| enable_photon             | boolean | Configures whether the warehouse should use Photon optimized clusters                                                                                                                                        | 
+| channel                   | struct  | This column contains channel details. Some examples - CHANNEL_NAME_UNSPECIFIED, CHANNEL_NAME_PREVIEW, CHANNEL_NAME_CURRENT, CHANNEL_NAME_PREVIOUS, CHANNEL_NAME_CUSTOM                                        |
+| enable_serverless_compute | boolean | Flag indicating whether the warehouse should use serverless compute                                                                                                                                          |                                                                                                                                                     
+| warehouse_type            | string  | Warehouse type: PRO or CLASSIC                                                                                                                                                                                |                                                                                                                                                                                           
+| warehouse_state           | string  | State of the warehouse                                                                                                                                                                                        |                                                                                                                                                                                                   
+| size                      | string  | Size of the clusters allocated for this warehouse                                                                                                                                                            |                                                                                                                                                                       
+| creator_id                | long    | warehouse creator id                                                                                                                                                                                          |                                                                                                                                                                                                     
+| tags                      | map     | A set of key-value pairs that will be tagged on all resources (e.g., AWS instances and EBS volumes) associated with this SQL warehouse                                                                       |                                                                                  
+| num_clusters              | long    | current number of clusters running for the service                                                                                                                                                            |                                                                                                                                                                       
+| num_active_sessions       | long    | current number of active sessions for the warehouse                                                                                                                                                           |                                                                                                                                                                      
+| jdbc_url                  | string  | the jdbc connection string for this warehouse                                                                                                                                                                 |                                                                                                                                                                            
+| created_by                | string  | warehouse creator name                                                                                                                                                                                        |
+
+#### NotebookCommands
+**KEY** -- notebook_id + unixTimeMS
+
+**Incremental Columns** -- unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Merge
+{{% notice note %}}
+NotebookCommands are not available for notebooks run on a SQL Warehouse yet. This feature will be added in a future release
+{{% /notice %}}
+
+| Column             | Type   | Description                                                                               |
+|:-------------------|:-------|:------------------------------------------------------------------------------------------|
+| organization_id    | string | Canonical workspace id                                                                    |
+| workspace_name     | string | Customizable human-legible name of the workspace, should be globally unique within the organization|
+| date               | date   | unixTimeMS as a date type                                                                 |
+| timestamp          | long   | unixTimeMS as a timestamp type in milliseconds                                            |
+| notebook_id        | string | id for the notebook in the workspace                                                      |
+| notebook_path      | string | Notebook path in the workspace                                                            |
+| notebook_name      | string | Canonical notebook name for the workspace                                                 |
+| command_id         | string | id of the notebook command                                                                |
+| command_text       | string | The actual text of the command
+| execution_time_s   | double | Notebook command execution time in second                                                 |
+| source_ip_address  | string | Origin IP of action requested                                                             |
+| user_identity      | struct | User information as available. Will include userid and email address                      |
+| estimated_dbu_cost | double | dbu cost per second for the command runtime                                               |
+| status             | string | Status of the notebook command run                                                        |
+| cluster_id         | string | Canonical workspace cluster id                                                            |
+| cluster_name       | string | The name of the compute asset used to execute the task run                                |
+| custom_tags        | string | JSON string of key/value pairs for all cluster associated custom tags give to the cluster |
+| node_type_id       | string | Worker Node type for the compute asset (not supported for Warehouses yet)                 |
+| node_count         | long   | Cluster worker node count                                                                 |
+| response           | struct | HTTP response including errorMessage, result, and statusCode                              |
+| user_agent         | string | Request origin such as browser, terraform, api, etc                                      |
+| unixTimeMS         | long   | Unix time epoch as a long in milliseconds                                                 |
+| Pipeline_SnapTS    | string | Snapshot timestamp of Overwatch run that added the record                                 |
+| Overwatch_RunID    | string | Overwatch canonical ID that resulted in the record load                                   |
+
 #### Common Meta Fields
 | Column          | Type   | Description                                                       |
 |:----------------|:-------|:------------------------------------------------------------------|
@@ -922,41 +1001,45 @@ all tables. Users should always reference Consumption and Gold layers unless the
 | pools_snapshot_bronze       | pools         | bronze         | API snapshot of existing pools defined in Databricks workspace at the time of the Overwatch run. Snapshot is taken on each run                                                                                                                                                                                                  |
 | spark_events_bronze         | sparkEvents   | bronze         | Raw landing of the master sparkEvents schema and data for all cluster logs. Cluster log locations are defined by cluster specs and all locations will be scanned for new files not yet captured by Overwatch. Overwatch uses an implicit schema generation here, as such, **a lack of real-world can cause unforeseen issues**. |
 | spark_events_processedfiles | sparkEvents   | bronze         | Table that keeps track of all previously processed cluster log files (spark event logs) to minimize future file scanning and improve performance. This table can be used to reprocess and/or find specific eventLog files.                                                                                                      |
+| warehouses_snapshot_bronze  | DBSQL         | bronze         | API snapshot of existing warehouse defined in Databricks workspace at the time of the Overwatch run. Snapshot is taken on each run                                                                                                                                                                                              | 
 | pipeline_report             | NA            | tracking       | Tracking table used to identify state and status of each Overwatch Pipeline run. This table is also used to control the start and end points of each run. Altering the timestamps and status of this table will change the ETL start/end points.                                                                                |
 
 ### Silver
-| Table                        | Scope         | Layer  | Description                                                                                                                                                                                                                                                     |
-|:-----------------------------|:--------------|:-------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| account_login_silver         | accounts      | silver | Login events                                                                                                                                                                                                                                                    |
-| account_mods_silver          | accounts      | silver | Account modification events                                                                                                                                                                                                                                     |
-| cluster_spec_silver          | clusters      | silver | Slow changing dimension used to track all clusters through time including edits but **excluding state change**.                                                                                                                                                 |
-| cluster_state_detail_silver  | clusterEvents | silver | State detail for each cluster event enriched with cost information                                                                                                                                                                                              |
-| job_status_silver            | jobs          | silver | Slow changing dimension used to track all jobs specifications through time                                                                                                                                                                                      |
-| jobrun_silver                | jobs          | silver | Historical run of every job since Overwatch began capturing the audit_log_data                                                                                                                                                                                  |
-| notebook_silver              | notebooks     | silver | Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook. |
-| pools_silver                 | pools         | silver | Slow changing dimension used to track all changes to instance pools                                                                                                                                                                                             |
-| spark_executions_silver      | sparkEvents   | silver | All spark event data relevant to spark executions                                                                                                                                                                                                               |
-| spark_executors_silver       | sparkEvents   | silver | All spark event data relevant to spark executors                                                                                                                                                                                                                |
-| spark_jobs_silver            | sparkEvents   | silver | All spark event data relevant to spark jobs                                                                                                                                                                                                                     |
-| spark_stages_silver          | sparkEvents   | silver | All spark event data relevant to spark stages                                                                                                                                                                                                                   |
-| spark_tasks_silver           | sparkEvents   | silver | All spark event data relevant to spark tasks                                                                                                                                                                                                                    |
-| sql_query_history_silver     | sqlHistory    | silver | History of all the sql queries executed through SQL warehouses                                                                                                                                                                                                  |
+| Table                       | Scope         | Layer   | Description                                                                                                                                                                                                                                                     |
+|:----------------------------|:--------------|:--------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| account_login_silver        | accounts      | silver  | Login events                                                                                                                                                                                                                                                    |
+| account_mods_silver         | accounts      | silver  | Account modification events                                                                                                                                                                                                                                     |
+| cluster_spec_silver         | clusters      | silver  | Slow changing dimension used to track all clusters through time including edits but **excluding state change**.                                                                                                                                                 |
+| cluster_state_detail_silver | clusterEvents | silver  | State detail for each cluster event enriched with cost information                                                                                                                                                                                              |
+| job_status_silver           | jobs          | silver  | Slow changing dimension used to track all jobs specifications through time                                                                                                                                                                                      |
+| jobrun_silver               | jobs          | silver  | Historical run of every job since Overwatch began capturing the audit_log_data                                                                                                                                                                                  |
+| notebook_silver             | notebooks     | silver  | Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook. |
+| pools_silver                | pools         | silver  | Slow changing dimension used to track all changes to instance pools                                                                                                                                                                                             |
+| spark_executions_silver     | sparkEvents   | silver  | All spark event data relevant to spark executions                                                                                                                                                                                                               |
+| spark_executors_silver      | sparkEvents   | silver  | All spark event data relevant to spark executors                                                                                                                                                                                                                |
+| spark_jobs_silver           | sparkEvents   | silver  | All spark event data relevant to spark jobs                                                                                                                                                                                                                     |
+| spark_stages_silver         | sparkEvents   | silver  | All spark event data relevant to spark stages                                                                                                                                                                                                                   |
+| spark_tasks_silver          | sparkEvents   | silver  | All spark event data relevant to spark tasks                                                                                                                                                                                                                    |
+| sql_query_history_silver    | DBSQL         | silver  | History of all the sql queries executed through SQL warehouses                                                                                                                                                                                                  |
+| warehouse_spec_silver       | DBSQL         | silver  | State detail for each warehouse event                                                                                                                                                                                                                           |
 
 ### Gold
-| Table                   | Scope         | Layer | Description                                                                                                                                                                                                                                                                                                                                                                        |
-|:------------------------|:--------------|:------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| account_login_gold      | accounts      | gold  | Login events                                                                                                                                                                                                                                                                                                                                                                       |
-| account_mods_gold       | accounts      | gold  | Account modification events                                                                                                                                                                                                                                                                                                                                                        |
-| cluster_gold            | clusters      | gold  | Slow-changing dimension with all cluster creates and edits through time. These events **DO NOT INCLUDE automated cluster resize events or cluster state changes**. Automated cluster resize and cluster state changes will be in clusterstatefact_gold. If user changes min/max nodes or node count (non-autoscaling) the event will be registered here AND clusterstatefact_gold. |
-| clusterStateFact_gold   | clusterEvents | gold  | All cluster event changes along with the time spent in each state and the core hours in each state. This table should be used to find cluster anomalies and/or calculate compute/DBU costs of some given scope.                                                                                                                                                                    |
-| job_gold                | jobs          | gold  | Slow-changing dimension of all changes to a job definition through time                                                                                                                                                                                                                                                                                                            |
-| jobrun_gold             | jobs          | gold  | Dimensional data for each job run in the databricks workspace                                                                                                                                                                                                                                                                                                                      |
-| notebook_gold           | notebooks     | gold  | Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook.                                                                                                                    |
-| instancepool_gold       | pools         | gold  | Slow changing dimension used to track all changes to instance pools                                                                                                                                                                                                                                                                                                                |
-| sparkexecution_gold     | sparkEvents   | gold  | All spark event data relevant to spark executions                                                                                                                                                                                                                                                                                                                                  |
-| sparkexecutor_gold      | sparkEvents   | gold  | All spark event data relevant to spark executors                                                                                                                                                                                                                                                                                                                                   |
-| sparkjob_gold           | sparkEvents   | gold  | All spark event data relevant to spark jobs                                                                                                                                                                                                                                                                                                                                        |
-| sparkstage_gold         | sparkEvents   | gold  | All spark event data relevant to spark stages                                                                                                                                                                                                                                                                                                                                      |
-| sparktask_gold          | sparkEvents   | gold  | All spark event data relevant to spark tasks                                                                                                                                                                                                                                                                                                                                       |
-| sparkstream_gold        | sparkEvents   | gold  | All spark event data relevant to spark streams                                                                                                                                                                                                                                                                                                                                     |
-| sql_query_history_gold  | sqlHistory    | gold  | History of all the sql queries executed through SQL warehouses                                                                                                                                                                                                                                                                                                                     |
+| Table                  | Scope                               | Layer | Description                                                                                                                                                                                                                                                                                                                                                                        |
+|:-----------------------|:------------------------------------|:------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| account_login_gold     | accounts                            | gold  | Login events                                                                                                                                                                                                                                                                                                                                                                       |
+| account_mods_gold      | accounts                            | gold  | Account modification events                                                                                                                                                                                                                                                                                                                                                        |
+| cluster_gold           | clusters                            | gold  | Slow-changing dimension with all cluster creates and edits through time. These events **DO NOT INCLUDE automated cluster resize events or cluster state changes**. Automated cluster resize and cluster state changes will be in clusterstatefact_gold. If user changes min/max nodes or node count (non-autoscaling) the event will be registered here AND clusterstatefact_gold. |
+| clusterStateFact_gold  | clusterEvents                       | gold  | All cluster event changes along with the time spent in each state and the core hours in each state. This table should be used to find cluster anomalies and/or calculate compute/DBU costs of some given scope.                                                                                                                                                                    |
+| job_gold               | jobs                                | gold  | Slow-changing dimension of all changes to a job definition through time                                                                                                                                                                                                                                                                                                            |
+| jobrun_gold            | jobs                                | gold  | Dimensional data for each job run in the databricks workspace                                                                                                                                                                                                                                                                                                                      |
+| notebook_gold          | notebooks                           | gold  | Slow changing dimension used to track all notebook changes as it morphs through time along with which user instigated the change. This does not include specific change details of the commands within a notebook just metadata changes regarding the notebook.                                                                                                                    |
+| instancepool_gold      | pools                               | gold  | Slow changing dimension used to track all changes to instance pools                                                                                                                                                                                                                                                                                                                |
+| sparkexecution_gold    | sparkEvents                         | gold  | All spark event data relevant to spark executions                                                                                                                                                                                                                                                                                                                                  |
+| sparkexecutor_gold     | sparkEvents                         | gold  | All spark event data relevant to spark executors                                                                                                                                                                                                                                                                                                                                   |
+| sparkjob_gold          | sparkEvents                         | gold  | All spark event data relevant to spark jobs                                                                                                                                                                                                                                                                                                                                        |
+| sparkstage_gold        | sparkEvents                         | gold  | All spark event data relevant to spark stages                                                                                                                                                                                                                                                                                                                                      |
+| sparktask_gold         | sparkEvents                         | gold  | All spark event data relevant to spark tasks                                                                                                                                                                                                                                                                                                                                       |
+| sparkstream_gold       | sparkEvents                         | gold  | All spark event data relevant to spark streams                                                                                                                                                                                                                                                                                                                                     |
+| sql_query_history_gold | DBSQL                               | gold  | History of all the sql queries executed through SQL warehouses                                                                                                                                                                                                                                                                                                                     |
+| warehouse_gold         | DBSQL                               | gold  | Slow-changing dimension with all warehouse creates and edits through time.                                                                                                                                                                                                                                                                                                         |
+| notebookCommands_gold  | audit,notebooks,<br/>clusterEvents  | gold  | Information related to Notebook Commands                                                                                                                                                                                                                                                                                                                                           |

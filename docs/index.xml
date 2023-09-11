@@ -6,7 +6,7 @@
     <description>Recent content in Welcome To OverWatch on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
-    <lastBuildDate>Tue, 18 Apr 2023 11:28:39 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 07 Sep 2023 00:00:00 +0000</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>AWS</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</link>
@@ -229,6 +229,17 @@ Many users forget to enable cluster logging and without it Overwatch cannot prov
     </item>
     
     <item>
+      <title>GCP</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/</link>
+      <pubDate>Thu, 07 Sep 2023 00:00:00 +0000</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/</guid>
+      <description>Configuring Overwatch on GCP - Databricks Reach out to your Databricks representative to help you with these tasks as needed.
+There are two primary sources of data that need to be configured:
+Audit Logs-GCP These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions. We don&amp;rsquo;t want multiple workspaces delivering into the same prefix.</description>
+    </item>
+    
+    <item>
       <title>Configuration (Legacy)</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configurationlegacy/</link>
       <pubDate>Mon, 12 Dec 2022 11:35:49 -0500</pubDate>
@@ -248,14 +259,14 @@ Configuration Basics The Overwatch configuration can be created as a case class 
     </item>
     
     <item>
-      <title>AWS/GCP</title>
+      <title>AWS</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</link>
       <pubDate>Mon, 12 Dec 2022 11:29:56 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</guid>
-      <description>Configuring Overwatch on AWS/GCP - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+      <description>Configuring Overwatch on AWS - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
 There are two primary sources of data that need to be configured:
-Audit Logs-AWS/Audit Logs-GCP These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
+Audit Logs-AWS These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
     </item>
     
     <item>
@@ -265,6 +276,16 @@ Audit Logs-AWS/Audit Logs-GCP These will be delivered to the configured bucket. 
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</guid>
       <description>Consumption Layer Column Descriptions ETL Tables Bronze Silver Gold Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
+    </item>
+    
+    <item>
+      <title>Data Dictionary - 0.7.1.x</title>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/071x/</link>
+      <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/071x/</guid>
+      <description>ERD The &amp;ldquo;ERD&amp;rdquo; below is a visual representation of the consumer layer data model. Many of the joinable lines have been omitted to reduce chaos and complexity in the visualization. All columns with the same name are joinable (even if there&amp;rsquo;s not a line from one table to the other). The relations depicted are to call the analyst&amp;rsquo;s attention to less obvious joins.
+The goal is to present a data model that unifies the different parts of the platform.</description>
     </item>
     
     <item>

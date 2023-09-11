@@ -3,12 +3,47 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+
+## 0.7.2.1
+### Upgrading
+Although there are no breaking schema changes with this release, we recommend you run the upgrade script to:
+- Update your instance details to the latest available data
+- (**GCP ONLY**) Process all the remote workspaces cluster logs, which you weren't able to do until this release.
+
+Upgrade script: **[HTML](/assets/ChangeLog/0721_Upgrade.html) | [DBC](/assets/ChangeLog/0721_Upgrade.dbc)**
+
+
+### Major Features
+- Warehouse dimension now available
+  - Schema is available [here]({{%relref "dataengineer/definitions/_index.md"%}}/#warehouse)
+- NotebookCommands table now available 
+  - Customers will now be able to see metrics for each command run on every notebook in your workspace, including estimated costs
+  - Support is limited to Notebooks run on clusters for now. Notebooks run on warehouses will be supported soon 
+  - Schema is available [here]({{%relref "dataengineer/definitions/_index.md"%}}/#notebookcommands) 
+  - It requires Verbose Audit Logging to be enabled in each workspace that needs to be monitored
+- Customers can now Snapshot, Restore, and Migrate their Overwatch data in a few clicks. Read more info about it [here]({{%relref "dataengineer/productionizing.md"%}}/#snapshot-process)
+- Updated Azure and GCP instanceDetails node types to include all new supported node types as of August 24, 2023.
+- Released the first set of pre-canned dashboards
+  - You can find them [here]({{%relref "dashboards/_index.md"%}})
+
+### Key Bug Fixes
+- (GCP) Capture cluster logs for remote workspaces
+- Captured cluster changes when they are only resized when running
+- Improved logic for detecting job/automated clusters in JRCP
+- Ensured AutoOptimize is set for tables that needed
+- Fixed bug where all error messages were printing to "API Call" incorrectly
+- When Bronze_Clusters_Snapshot didn't have data then Bronze_SparkEventLogs was failing
+- Fixed bug when converting data from Struct to map where keys had multiple periods in it
+
+Released Sept 11th, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/25?closed=1)
+
+------------------------------------------------------------------------------------------------
 ## 0.7.2.0.4 (Patch)
 **To Upgrade**, simply swap the JAR
 
 ### Bug Fixes
 * Fixed schema issue while merging in job_status_silver
-
+------------------------------------------------------------------------------------------------
 ## 0.7.2.0.3 (Deprecated)
 Pulled forward all bug fixes from [0715](#0715-patch)
 
@@ -17,8 +52,9 @@ Pulled forward all bug fixes from [0715](#0715-patch)
 ### Bug Fixes
 * PVC - instanceId and containerId duplicate columns in audit_log_bronze handled
 
-Released Aug 3rd, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/28)
+Released Aug 3rd, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/28) 
 
+------------------------------------------------------------------------------------------------
 ## 0.7.2.0.2 (Deprecated)
 Pulled forward all bug fixes from [0714](#0714)
 
@@ -26,6 +62,7 @@ Pulled forward all bug fixes from [0714](#0714)
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/26?closed=1)
 
+------------------------------------------------------------------------------------------------
 ## 0.7.2.0.1 (Patch)
 Bug Fix - **mount_mapping_path** was being ignored
 
@@ -34,6 +71,7 @@ mount_mapping_path will be affected.
 
 **To Upgrade**, simply swap the JAR
 
+------------------------------------------------------------------------------------------------
 ## 0.7.2.0
 ### Upgrading
 There were a few column name changes to the config file (multi-workspace). Please run this script to update your
@@ -57,6 +95,7 @@ config file if upgrading from 071x multi-workspace deployment. **[HTML](/assets/
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/5?closed=1)
 
+------------------------------------------------------------------------------------------------
 ## 0.7.1.5 (Patch)
 **To Upgrade**, simply swap the JAR
 
@@ -66,6 +105,7 @@ config file if upgrading from 071x multi-workspace deployment. **[HTML](/assets/
 
 Released Aug 3rd, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/28)
 
+------------------------------------------------------------------------------------------------
 ## 0.7.1.4 (Deprecated)
 **To Upgrade**, simply swap the JAR
 
@@ -85,6 +125,7 @@ Released Aug 3rd, 2023 - [Full Change Inventory](https://github.com/databricksla
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/26?closed=1)
 
+------------------------------------------------------------------------------------------------
 ## 0.7.1.3
 * Data Quality Fixes - primarily around cost and utilization
 * **Upgrade Process**
@@ -115,6 +156,7 @@ Released Aug 3rd, 2023 - [Full Change Inventory](https://github.com/databricksla
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/24?closed=1)
 
+------------------------------------------------------------------------------------------------
 ## 0.7.1.2
 * Fixes bugs from 0711 that may affect workflow
   * **If already using 0711** -- simply swap the JAR -- no other action necessary
@@ -123,6 +165,7 @@ Released Aug 3rd, 2023 - [Full Change Inventory](https://github.com/databricksla
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/17)
 
+------------------------------------------------------------------------------------------------
 ## 0.7.1.1 (Deprecated)
 **USE [0712](#0712) Version**
 Bug Fixes Plus a Few New Features
@@ -156,6 +199,7 @@ details of script are in the script.
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/16) (0711)
 
+------------------------------------------------------------------------------------------------
 ## 0.7.1.0
 **Multi-Workspace Deployments Are Here!!**
 
@@ -178,6 +222,7 @@ migrate to the new deployment method.
 
 [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/13)
 
+------------------------------------------------------------------------------------------------
 ## 0.7.0.0.5 (PATCH)
 Patch for 0.7.0.0.4. Fixes a [regression introduced in 0.7.0.0.4](https://github.com/databrickslabs/overwatch/pull/649)
 for clusterEventsBronze. This patch also promotes total_dbus field to JRCP table.
@@ -186,7 +231,8 @@ for clusterEventsBronze. This patch also promotes total_dbus field to JRCP table
   If you don't you will receive schema merge errors in clusterEvents bronze module. If you did not run 07004, you do not
   need to run this script.
   * [HTML](/assets/ChangeLog/07005_clusterEventsSchemaRepair.html) | [DBC](/assets/ChangeLog/07005_clusterEventsSchemaRepair.dbc)
-
+  
+------------------------------------------------------------------------------------------------
 ## 0.7.0.0.4 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
 the same as 0700 with the bug fixes closed in [PR 633](https://github.com/databrickslabs/overwatch/pull/633).
@@ -201,6 +247,7 @@ the same as 0700 with the bug fixes closed in [PR 633](https://github.com/databr
 * Bug fix related to dbu utilization and cost calculation [Issue 632](https://github.com/databrickslabs/overwatch/issues/632).
 * Bug fix related to sqlQueryHistory [Issue 625](https://github.com/databrickslabs/overwatch/issues/625).
 
+------------------------------------------------------------------------------------------------
 ## 0.7.0.0.3 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
 the same as 0700 with the bug fixes closed in [PR 602](https://github.com/databrickslabs/overwatch/pull/602).
@@ -209,8 +256,7 @@ the same as 0700 with the bug fixes closed in [PR 602](https://github.com/databr
 * If you were affected by one of the issues fixed and you would like to repair the historical data,
   please do so using this script. Instructions are in the notebook.
   [HTML](/assets/ChangeLog/0700x_data_repair.html) | [DBC](/assets/ChangeLog/0700x_data_repair.dbc)
-
-
+------------------------------------------------------------------------------------------------
 ## 0.7.0.0.2 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
 the same as 0700 with the bug fixes closed in [PR 580](https://github.com/databrickslabs/overwatch/pull/580).
@@ -219,11 +265,11 @@ the same as 0700 with the bug fixes closed in [PR 580](https://github.com/databr
 * If you were affected by one of the issues fixed in the PR above and you would like to repair the historical data,
   please do so using this script. Instructions are in the notebook.
   [HTML](/assets/ChangeLog/0700x_data_repair.html) | [DBC](/assets/ChangeLog/0700x_data_repair.dbc)
-
+------------------------------------------------------------------------------------------------
 ## 0.7.0.0.1 (PATCH)
 This is a patch for 0.7.0.0. There were a few issues identified with 0.7.0 by our early movers. This patch is
 the same as 0700 with the bug fixes closed in [PR 559](https://github.com/databrickslabs/overwatch/pull/559).
-
+------------------------------------------------------------------------------------------------
 ## 0.7.0.0 (Major Release)
 **Please use [PATCH 0.7.0.0.1](#07001-patch)** from maven. Everything in this release stands
 
@@ -289,6 +335,7 @@ the same as 0700 with the bug fixes closed in [PR 559](https://github.com/databr
 
 Full list of bug fixes for this release can be found [here](https://github.com/databrickslabs/overwatch/milestone/12?closed=1)
 
+------------------------------------------------------------------------------------------------
 ## 0.6.1.1 (Maintenance Release)
 To upgrade from 0.6.1.0, simply swap the JAR from 0.6.1.0 to this version, no upgrade script necessary
 
@@ -301,8 +348,7 @@ To upgrade from 0.6.1.0, simply swap the JAR from 0.6.1.0 to this version, no up
 
 * Bug Fixes
   * Full list of bug fixes for this release can be found [here](https://github.com/databrickslabs/overwatch/issues?q=is%3Aissue+milestone%3A0.6.1.1+)
-
-
+------------------------------------------------------------------------------------------------
 ## 0.6.1.0 (Upgrade Release)
 **Upgrade Process Required** for existing customers on 0.6.0.x
 The upgrade is small and quick but is very important. Some new Databricks features have resulted in some unsafe
@@ -338,6 +384,7 @@ For questions / issues with the upgrade, please file a [git ticket](https://gith
 
 The full list of fixes can be found on the [0610 Milestone](https://github.com/databrickslabs/overwatch/milestone/11?closed=1)
 
+------------------------------------------------------------------------------------------------
 ## 0.6.0.4 (Maintenance Release)
 * Bug fixes
   * [Issue 305](https://github.com/databrickslabs/overwatch/issues/305) - Silver_jobStatus timeout_seconds schema type
@@ -346,8 +393,7 @@ The full list of fixes can be found on the [0610 Milestone](https://github.com/d
   * [Issue 310](https://github.com/databrickslabs/overwatch/issues/310) - SparkJob table, many nulled fields
   * [Issue 313](https://github.com/databrickslabs/overwatch/issues/313) - Silver_ClusterStateDetail - no column
     autoscale
-
-
+------------------------------------------------------------------------------------------------
 ## 0.6.0.3 (Deprecated)
 If an issue is found in this version, please try the latest 0.6.x version, if the issue persists, please open a
 [git ticket](https://github.com/databrickslabs/overwatch/issues/new)
@@ -363,13 +409,14 @@ If an issue is found in this version, please try the latest 0.6.x version, if th
 * Performance Improvement for Azure Audit log ingestion
 * Improved Schema enforcement
 * Fix for ArrayType minimum schema requirements
-
+------------------------------------------------------------------------------------------------
 ## 0.6.0.2 -- DEPRECATED -- DONT USE
 Contains data quality regression - See [Issue 297](https://github.com/databrickslabs/overwatch/issues/297)
 Several bug fixes - mostly edge cases
 
 A full list of resolutions can be found [here](https://github.com/databrickslabs/overwatch/milestone/7?closed=1)
 
+------------------------------------------------------------------------------------------------
 ## 0.6.0.1 (MAJOR UPGRADE/RELEASE)
 **Existing Customers on 0.5.x --> 0.6.x [UPGRADE PROCESS REQUIRED]({{%relref "DataEngineer/Upgrade.md"%}})**
 * Upgrade process detailed in linked upgrade script [**HTML**](/assets/ChangeLog/060_upgrade_process.html) |
@@ -428,6 +475,7 @@ shows deprecated, please note thta it doesn't mean that we won't try to offer as
 that you swap the jar out to the latest version of 0.5.x before we do a deep dive as many of the issues you may face
 are already resolved in the later version. Please do upgrade to the latest release as soon as possible.
 
+------------------------------------------------------------------------------------------------
 ## 0.5.0.6.1
 Apologies for the insanity of the version number -- will be better in future
 * Patch for [Issue_278](https://github.com/databrickslabs/overwatch/issues/278)
@@ -438,10 +486,11 @@ Apologies for the insanity of the version number -- will be better in future
 
 ```AnalysisException: Found duplicate column(s) in the data schema: <column_name>```
 
+------------------------------------------------------------------------------------------------
 ## 0.5.0.6
 * Patch for [Issue_235](https://github.com/databrickslabs/overwatch/issues/235)
   * Edge cases resulted in nulls for several values in clusterstatefact.
-
+------------------------------------------------------------------------------------------------
 ## 0.5.0.5 - deprecated
 * Feature [Feature_223](https://github.com/databrickslabs/overwatch/issues/223)
   * Adds package version to parsed config in pipeline_report
@@ -459,12 +508,12 @@ Apologies for the insanity of the version number -- will be better in future
   * Some spark overrides in the Overwatch pipeline were not getting applied
 * Patch fix for [Issue_206](https://github.com/databrickslabs/overwatch/issues/206)
   * Incorrect default prices for several node types
-
+------------------------------------------------------------------------------------------------
 ## 0.5.0.4 - deprecated
 * Patch fix for [Issue_196](https://github.com/databrickslabs/overwatch/issues/196)
 * AZURE - Enhancement - Enable full EH configuration to be passed through the job arguments to the main class using
   secrets / scopes -- [Issue_197](https://github.com/databrickslabs/overwatch/issues/197)
-
+------------------------------------------------------------------------------------------------
 ## 0.5.0.3 - deprecated
 {{% notice warning %}}
 **BUG FOR NEW DEPLOYMENTS**
@@ -493,20 +542,20 @@ delete from <overwatch_etl>.instancedetails where API_Name = 'Standard_E4as_v4' 
 * basic refactoring for sparkOverrides -- full refactor in 0.5.1
 * Improved logging
 * Costing - node details lookups for edge cases -- there was a bug in the join condition for users running Overwatch multiple times per day in the same workspace
-
+------------------------------------------------------------------------------------------------
 ## 0.5.0.2 - deprecated
 **If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
 * Hotfix release to resolve [Issue 179](https://github.com/databrickslabs/overwatch/issues/179).
   * clusterstatefact_gold incremental column was start_timestamp instead of end_timestamp. Meant to roll this into
     0.5.0.1 but it got missed, sorry for the double release.
-
+------------------------------------------------------------------------------------------------
 ## 0.5.0.1 - deprecated
 **If upgrading from Overwatch version prior to [0.5.0](#050) please see schema upgrade requirements**
 * Hotfix release to resolve [Issue 170](https://github.com/databrickslabs/overwatch/issues/170).
 * Hotfix to resolve laggard DF lookups required to join across pipeline runs.
   * Caused some events to not be joined with their lagging start events in the data model.
 * Hotfix to enable non-json formatted audit logs (AWS) primarily for PVC edge cases
-
+------------------------------------------------------------------------------------------------
 ## 0.5.0 - deprecated
 ### Upgrading and Required Changes
 * **[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED** - If you are upgrading from 0.4.12+ please
@@ -579,11 +628,11 @@ Below are the major feature and enhancements in 0.4.2
 * elementType implicit casting to target schemas within arrays
 * aws - non-json formatted audit logs schema unification
 * api schema scrubber improvements for addtional edge cases
-
-
+------------------------------------------------------------------------------------------------
 ## 0.4.2 - deprecated
 * Deprecated release - please use [0.5.0](#050)
 * The 0.4.2 can be viewed as an RC for 0.5.0. The 0.5.0 release is the 0.4.2 release with several bug fixes
+------------------------------------------------------------------------------------------------
 
 ## 0.4.13 - deprecated
 * Hotfix for [Issue 138](https://github.com/databrickslabs/overwatch/issues/138)
@@ -592,6 +641,7 @@ An upgrade to this minor release is only necessary if you're experience api limi
 Otherwise, this release can be skipped as the fix will be in 0.4.2+. New users should use this version until
 the next release is published.
 
+------------------------------------------------------------------------------------------------
 ## 0.4.12 - deprecated
 **[SCHEMA UPGRADE]({{%relref "DataEngineer/Upgrade.md"%}}) REQUIRED**
 * Hotfix for [Issue 126](https://github.com/databrickslabs/overwatch/issues/126).
@@ -603,13 +653,13 @@ the next release is published.
   to state tables with mismatched column name case sensitivity causing errors
 * Corrected issue with missing quotes around update statement to track failed files in
   spark_events_processedFiles
-
+------------------------------------------------------------------------------------------------
 ## 0.4.11 - deprecated
 * Hotfix for [Issue 119](https://github.com/databrickslabs/overwatch/issues/119). Issue was only present in edge cases.
   Edge cases include workspaces missing data and attempting to run modules for which data didn't exist.
 * Added additional guard rails to pipeline state checks to help clarify workspace / pipeline state issues for
   future users.
-
+------------------------------------------------------------------------------------------------
 ## 0.4.1 - deprecated
 * [Converted all delta targets from managed tables to external tables](https://github.com/databrickslabs/overwatch/issues/50)
   * Better security and best practice
@@ -630,6 +680,6 @@ the next release is published.
 * Bug fix for [Issue 111](https://github.com/databrickslabs/overwatch/issues/111)
 * Bug fix for multi-workspace Azure, filter from audit_raw_land table was incomplete
 * Bug fix to allow for consumerDB to be omitted from DataTarget in config
-
+------------------------------------------------------------------------------------------------
 ## 0.4.0 - deprecated
 Initial Public Release
