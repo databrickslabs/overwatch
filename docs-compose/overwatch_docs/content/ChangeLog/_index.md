@@ -24,6 +24,7 @@ Upgrade script: **[HTML](/assets/ChangeLog/0721_Upgrade.html) | [DBC](/assets/Ch
 - Customers can now Snapshot, Restore, and Migrate their Overwatch data in a few clicks. Read more info about it [here]({{%relref "dataengineer/productionizing.md"%}}/#snapshot-process)
 - Updated Azure and GCP instanceDetails node types to include all new supported node types as of August 24, 2023.
 - Released the first set of pre-canned dashboards
+  - You can find them [here]({{%relref "dashboards/_index.md"%}})
 
 ### Key Bug Fixes
 - (GCP) Capture cluster logs for remote workspaces
@@ -34,7 +35,7 @@ Upgrade script: **[HTML](/assets/ChangeLog/0721_Upgrade.html) | [DBC](/assets/Ch
 - When Bronze_Clusters_Snapshot didn't have data then Bronze_SparkEventLogs was failing
 - Fixed bug when converting data from Struct to map where keys had multiple periods in it
 
-Released Sept 11th, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/asdfasdf?closed=1)
+Released Sept 11th, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/25?closed=1)
 
 ------------------------------------------------------------------------------------------------
 ## 0.7.2.0.4 (Patch)

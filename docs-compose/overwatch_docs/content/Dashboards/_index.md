@@ -79,4 +79,4 @@ Metrics available in this dashboard
 Please download the dbc file and import it into your workspace, read through the readme, and you should be 
 able to get them running right away. 
 
-- Version 1 - [DBC](/assets/Dashboards/Dashboards_v1.0.dbc) Released September 11, 2023
+- **Version 1** - [DBC](/assets/Dashboards/Dashboards_v1.0.dbc) Released September 11, 2023
