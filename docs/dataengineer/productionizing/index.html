@@ -12,21 +12,21 @@
     <title>Productionizing :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1691553677" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1694458807" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1691553677" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1694458807" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1694458807"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1691553677"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1691553677"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1694458807"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1694458807"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1691553677"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1694458807"></script>
 
     
   </div>
@@ -147,6 +147,27 @@
  
   
     
+      <li data-nav-id="/deployoverwatch/cloudinfra/gcp/" title="GCP" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/">
+        GCP
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
       <li data-nav-id="/deployoverwatch/cloudinfra/azure/" title="Azure" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/">
         Azure
@@ -168,9 +189,9 @@
  
   
     
-      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS/GCP" class="dd-item ">
+      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/">
-        AWS/GCP
+        AWS
         
         </a>
     </li>
@@ -761,6 +782,9 @@
             
             
           
+            
+            
+          
         
         </ul>
       
@@ -939,6 +963,30 @@
  
   
     
+    <li data-nav-id="/dashboards/" title="Dashboards" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dashboards/">
+          Dashboards
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
     <li data-nav-id="/troubleshooting/" title="Troubleshooting" class="dd-item
         
         
@@ -1061,6 +1109,9 @@
       <ul>
         <li><a href="#cluster-logging">Cluster Logging</a></li>
         <li><a href="#backups">Backups</a></li>
+        <li><a href="#snapshot-process">Snapshot Process</a></li>
+        <li><a href="#restore-process">Restore Process</a></li>
+        <li><a href="#migration-process">Migration Process</a></li>
         <li><a href="#alerting-on-failures">Alerting On Failures</a></li>
         <li><a href="#ensure-externalize-optimize-is-enabled">Ensure Externalize Optimize is Enabled</a></li>
       </ul>
@@ -1104,6 +1155,7 @@ over the place. These will be very challenging to clean up and can eat up a sign
 pile up indefinitely. Suggested time to live time is 30 days.</li>
 </ul>
 <h3 id="backups">Backups</h3>
+<h4 id="this-will-be-deprecated-from-version-721please-refer-to-the-snapshot-section-for-the-new-way-to-do-backups">(This will be Deprecated from version 7.2.1.Please refer to the Snapshot section for the new way to do backups)</h4>
 <p><strong>Perform Bronze Backups</strong>
 I know we don&rsquo;t hear a lot about backups in big data world but often times the cluster logs and / or
 the audit logs are transient (especially Azure deployments as Event Hub only maintains 7 days). This means that if
@@ -1128,13 +1180,255 @@ the <code>snapshot</code> helper function.</p>
 </span></span><span style="display:flex;"><span>  overwrite <span style="color:#66d9ef">=</span> <span style="color:#66d9ef">true</span><span style="color:#f92672">,</span>
 </span></span><span style="display:flex;"><span>  excludes <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Array</span><span style="color:#f92672">(</span><span style="color:#e6db74">&#34;audit_log_raw_events&#34;</span><span style="color:#f92672">,</span> <span style="color:#e6db74">&#34;clusters_snapshot_bronze&#34;</span><span style="color:#f92672">)</span> <span style="color:#75715e">// not recommended but here for example purposes
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#f92672">)</span>
-</span></span></code></pre></div><h4 id="overwrite-option">Overwrite Option</h4>
-<p>Note that the snapshot function performs a deep clone for all bronze tables except the tables in the excludes
-array. As such, these are complete backups each time. If the <em>overwrite</em> option is set to true you will have a backup
-created each run but it will be replaced on each subsequent run. If you would like to maintain more than one backup
-you must set <em>overwrite = false</em>. If you set overwrite to false, you may want to consider a cleanup function to ensure
-you don&rsquo;t have 52 copies of bronze per year (assuming 1X / week).</p>
-<h3 id="alerting-on-failures">Alerting On Failures</h3>
+</span></span></code></pre></div><h3 id="snapshot-process">Snapshot Process</h3>
+<p>Snapshoting in Big Data World is very rare but often times the cluster logs and / or
+the audit logs are transient (especially Azure deployments as Event Hub only maintains 7 days). This means that if
+something happened to the bronze data your Overwatch history could be lost forever. To guard against this you now have the option to periodically snapshot the Overwatch data,
+as of version 0.7.2.1</p>
+<p>Currently, There are two types of Snapshot process available in Overwatch: Full or Incremental:</p>
+<h4 id="full-snapshot">Full Snapshot</h4>
+<p>This is normal Snapshot process where we take the backup of ETL Database in Batch method.
+Here we can do Deep Cloning of existing ETL database tables to target Snapshot RootPath.</p>
+<h4 id="incremental-snapshot">Incremental Snapshot</h4>
+<p>Through Incremental_Snap we take the snapshot of the ETL tables incrementally i.e. through streaming operation.</p>
+<p>This process will require us to maintain a checkpoint directory. Below is the screenshot of the snap location after snapshot process is done</p>
+<p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/snapshotTarget.png" alt="Snapshot_Target"></p>
+<ol>
+<li>&ldquo;snapshotRootPath/data&rdquo; - Contains the Snapshot Data of Source Database Tables.</li>
+<li>&ldquo;snapshotRootPath/clone_report&rdquo; - Contains the data containing run metrics.</li>
+<li>&ldquo;snapshotRootPath/checkpoint&rdquo; - Checkpoint Location for Streaming Operation.</li>
+</ol>
+<h4 id="how-to-run-the-snapshot-process">How to run the Snapshot Process</h4>
+<p>You can run the Snapshot process via a scheduled job, or a notebook.</p>
+<h4 id="snapshot-through-databricks-notebook">Snapshot through Databricks Notebook</h4>
+<p>The code snippet to run the Snapshot process is as below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Snapshot
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> sourceETLDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;ow_bronze_snapshot_etl&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> targetPrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_playground/721-snap/incremental&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> pipeline <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Bronze,Silver,Gold&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> snapshotType <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Incremental&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> tablesToExclude <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;notebook_silver,notebook_gold&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Snapshot</span><span style="color:#f92672">.</span>process<span style="color:#f92672">(</span>sourceETLDB<span style="color:#f92672">,</span>targetPrefix<span style="color:#f92672">,</span>snapshotType<span style="color:#f92672">,</span>pipeline<span style="color:#f92672">,</span>tablesToExclude<span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>We need below parameters to run the snapshot process through Databricks Notebook:</p>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Type</th>
+<th>Optional</th>
+<th>Default Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sourceETLDB</td>
+<td>String</td>
+<td>No</td>
+<td>NA</td>
+<td>Source Database Name for which Snapshot need to be done(note you should only snapshot your Overwatch etl database).</td>
+</tr>
+<tr>
+<td>targetPrefix</td>
+<td>String</td>
+<td>No</td>
+<td>NA</td>
+<td>Target path where Snapshot data will be saved to.</td>
+</tr>
+<tr>
+<td>snapshotType</td>
+<td>String</td>
+<td>No</td>
+<td>NA</td>
+<td>Type of Snapshot to be performed. &ldquo;Full&rdquo; for Full Snapshot, &ldquo;Incremental&rdquo; for Incremental Snapshot</td>
+</tr>
+<tr>
+<td>pipeline</td>
+<td>String</td>
+<td>Yes</td>
+<td>&ldquo;Bronze,Silver,Gold&rdquo;</td>
+<td>Define the Medallion Layers. Argument should be in form of &ldquo;Bronze, Silver, Gold&rdquo;(All 3 or any combination of them)</td>
+</tr>
+<tr>
+<td>cloneLevel</td>
+<td>String</td>
+<td>Yes</td>
+<td>&ldquo;DEEP&rdquo;</td>
+<td>Clone Level for Snapshot. By Default it is &ldquo;DEEP&rdquo;. You can also specify &ldquo;SHALLOW&rdquo; Clone. You can get more details on cloning <a href="https://learn.microsoft.com/en-us/azure/databricks/delta/clone">here</a></td>
+</tr>
+<tr>
+<td>tablesToExclude</td>
+<td>String</td>
+<td>Yes</td>
+<td>&quot;&quot;</td>
+<td>Array of table names to exclude from the snapshot. Tables should be separated with &ldquo;,&rdquo;. This is the table name only - without the database prefix.</td>
+</tr>
+</tbody>
+</table>
+<p>The snapshot data will be in the &ldquo;targetPrefix/data&rdquo; path as shown below:</p>
+<p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/snapshotTarget_Data.png" alt="Snapshot_Target_Data"></p>
+<p>If you look into the targetPrefix folder you will find another subdirectory called &ldquo;clone_report&rdquo;. This folder contains the data regarding the status of your snapshot process for each table:</p>
+<p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/clone_report.png" alt="clone_report"></p>
+<h4 id="snapshot-through-databricks-job">Snapshot through Databricks Job</h4>
+<p>You can also schedule a job to either run the notebook above, or use the SnapshotRunner class. For example:</p>
+<ol>
+<li><strong>Type</strong> - Jar</li>
+<li><strong>Main class</strong> - com.databricks.labs.overwatch.pipeline.SnapshotRunner</li>
+<li><strong>Parameters for the Job</strong> - Same as mentioned above for <a href="#snapshot-through-databricks-notebook">snapshot-through-databricks-notebook</a></li>
+</ol>
+<p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/snapshot_job.png" alt="Snapshot_Job"></p>
+<h4 id="validation-functionality">Validation Functionality</h4>
+<p>This is a special module in Snapshot Process.
+Before running your Snapshot, you can validate that your configuration is correct by calling the Snapshot.isValid function. This function is also used internally when the Snapshot is kicked off.</p>
+<p>Below is the code snippet for the validation function</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Snapshot
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> sourceETLDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;ow_bronze_snapshot_etl&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> pipeline <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Bronze,Silver,Gold&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> snapshotType <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;Incremental&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Snapshot</span><span style="color:#f92672">.</span>isValid<span style="color:#f92672">(</span>sourceETLDB<span style="color:#f92672">,</span>snapshotType<span style="color:#f92672">,</span>pipeline<span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>This function will return true if the configuration is valid, and will also output relevant info for the fields checked. For example:</p>
+<pre tabindex="0"><code>ow_bronze_snapshot_etl is Overwatch Database and suitable for Snapshot.
+Snapshot Type is Suitable for Snapshot Process. Provided SnapshotType value is Incremental.
+cloneLevel Type is Suitable for Snapshot Process. Provided cloneLevel value is DEEP.
+Validation successful.You Can proceed with Snapshot process
+import com.databricks.labs.overwatch.pipeline.Snapshot
+res14: Boolean = true
+</code></pre><h3 id="restore-process">Restore Process</h3>
+<p>You can use the Restore process to bring back snapshot data
+Similar to Snapshot, Restore can be run by both Databricks Job and Databricks Notebook.</p>
+<h4 id="restore-through-databricks-notebook">Restore through Databricks Notebook</h4>
+<p>The code snippet to run the Restore process is as below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Restore
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> sourcePrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_playground/721-snap/full&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> targetPrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_playground/721-snap/restore&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Restore</span><span style="color:#f92672">.</span>process<span style="color:#f92672">(</span>sourcePrefix<span style="color:#f92672">,</span>targetPrefix<span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>We need below parameters to run the Restore process through Databricks Notebook:</p>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Type</th>
+<th>Optional</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sourcePrefix</td>
+<td>String</td>
+<td>No</td>
+<td>Source ETL Path Prefix from where restore need to be performed.</td>
+</tr>
+<tr>
+<td>targetPrefix</td>
+<td>String</td>
+<td>No</td>
+<td>Target ETL Path Prefix where restore data will be loaded to.</td>
+</tr>
+</tbody>
+</table>
+<p>After Restore process is done the tables from sourcePrefix will be restored in the <code>targetPrefix/globalshare</code> location
+<img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/restore_path.png" alt="Restore"></p>
+<h4 id="restore-through-databricks-job">Restore through Databricks Job</h4>
+<p>In cases where you need to periodically run the Restore process, you can configure a job using the RestoreRunner class.</p>
+<ol>
+<li><strong>Type</strong> - Jar</li>
+<li><strong>Main class</strong> - com.databricks.labs.overwatch.pipeline.RestoreRunner</li>
+<li><strong>Parameters for the Job</strong> - Same as mentioned above for <a href="#restore-through-databricks-notebook">Restore through Databricks Notebook</a>
+<img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/restore_job.png" alt="Restore_Job"></li>
+</ol>
+<h4 id="validation-functionality-1">Validation Functionality</h4>
+<p>Before running Restore, we recommend that you validate that your configuration is correct by calling the Restore.isValid function.
+This function is also used internally when the Restore process is kicked off</p>
+<p>Below is the code snippet for the validation function</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Restore
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> sourcePrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_playground/721-snap/full&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> targetPrefix <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_playground/721-snap/restore&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Restore</span><span style="color:#f92672">.</span>isValid<span style="color:#f92672">(</span>sourcePrefix<span style="color:#f92672">,</span>targetPrefix<span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>This function will return true if the configuration is valid, and will also output relevant info for the fields checked. For example:</p>
+<pre tabindex="0"><code>SourcePrefix Path Exists.
+Target Path /mnt/overwatch_playground/721-snap/restore is Empty and is Suitable for Restore Process
+Validation successful.You Can proceed with Restoration process
+import com.databricks.labs.overwatch.pipeline.Restore
+res43: Boolean = true
+</code></pre><h3 id="migration-process">Migration Process</h3>
+<p>There are cases when you need to move your data altogether. During the Migration process, we will move your data to the new location, update the configuration to point to this new location, as well as delete the old database if everything looks good.
+These the steps required to Migrate your Overwatch data:</p>
+<ol>
+<li>Stop Overwatch jobs  (Need to be done by User)</li>
+<li>Run the Migration process (Use Migrate.process)</li>
+<li>Resume Overwatch jobs (Need to be done by User)</li>
+</ol>
+<h4 id="migration-through-databricks-notebook">Migration through Databricks Notebook</h4>
+<p>The code snippet to run the Migration process is as below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Migration
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> sourceETLDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;ow_bronze_migration_etl&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> migrateRootPath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;/mnt/overwatch_playground/721-snap/migration&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> configPath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;abfss://overwatch-field-playground@overwatchglobalinternal.dfs.core.windows.net/sourav/configs/721-migration&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> tablesToExclude <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;notebook_silver:notebook_gold&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Migration</span><span style="color:#f92672">.</span>process<span style="color:#f92672">(</span>sourceETLDB<span style="color:#f92672">,</span>migrateRootPath<span style="color:#f92672">,</span>configPath<span style="color:#f92672">,</span>tablesToExclude<span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>We need below parameters to run the Migration process through Databricks Notebook:</p>
+<table>
+<thead>
+<tr>
+<th>Param</th>
+<th>Type</th>
+<th>Optional</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sourceETLDB</td>
+<td>String</td>
+<td>No</td>
+<td>Source Database Name to migrate. Note that you can only use the Overwatch ETL database.</td>
+</tr>
+<tr>
+<td>migrateRootPath</td>
+<td>String</td>
+<td>No</td>
+<td>Target path to where migration need to be performed.</td>
+</tr>
+<tr>
+<td>configPath</td>
+<td>String</td>
+<td>No</td>
+<td>Configuration Path where the config file for the source is present. <!-- raw HTML omitted -->Path can be to a CSV file or path to a delta table, or simple a delta table name that contains your configuration.</td>
+</tr>
+<tr>
+<td>tablesToExclude</td>
+<td>String</td>
+<td>Yes</td>
+<td>Array of table names to exclude from the migration. This is the table name only - <!-- raw HTML omitted -->without the database prefix. By Default it is empty.</td>
+</tr>
+</tbody>
+</table>
+<p>After Migration process is done the tables from sourcePrefix will be restored in the <code>migrateRootPath/globalshare</code> location
+<img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/Migration_path.png" alt="Migration"></p>
+<h4 id="migration-through-databricks-job">Migration through Databricks Job</h4>
+<p>Below is the Configuration for the Databricks Job</p>
+<ol>
+<li><strong>Type</strong> - Jar</li>
+<li><strong>Main class</strong> - com.databricks.labs.overwatch.pipeline.MigrationRunner</li>
+<li><strong>Parameters for the Job</strong> Same as mentioned above for <a href="#migration-through-databricks-notebook">Migration through Databricks Notebook</a></li>
+</ol>
+<p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/Migration_Job.png" alt="Migration_Job"></p>
+<h4 id="validation-functionality-2">Validation Functionality</h4>
+<p>Before running the Migration, we recommend that you validate that your configuration is correct by calling the Migration.isValid function. This function is also used internally when the Migration process is kicked off.</p>
+<p>Below is the code snippet for the validation function</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.pipeline.Migration
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> sourceETLDB <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;ow_bronze_migration_etl&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> configPath <span style="color:#66d9ef">=</span> <span style="color:#e6db74">&#34;abfss://overwatch-field-playground@overwatchglobalinternal.dfs.core.windows.net/sourav/configs/721-migration&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">Migration</span><span style="color:#f92672">.</span>isValid<span style="color:#f92672">(</span>sourceETLDB<span style="color:#f92672">,</span>configPath<span style="color:#f92672">)</span>
+</span></span></code></pre></div><p>This function will return true if the configuration is valid, and will also output relevant info for the fields checked. For example</p>
+<pre tabindex="0"><code>ow_bronze_migration_etl is Overwatch Database and suitable for Migration
+Config file is properly configured and suitable for Migration
+Config source: delta path abfss://overwatch-field-playground@overwatchglobalinternal.dfs.core.windows.net/sourav/configs/721-migration
+Validation successful.You Can proceed with Migration process
+import com.databricks.labs.overwatch.pipeline.Migration
+res13: Boolean = true
+</code></pre><h3 id="alerting-on-failures">Alerting On Failures</h3>
 <p>Overwatch modules are designed to fail softly. This means that if your silver jobs module fails the job will still
 succeed but the silver jobs module will not progress and neither will any downstream modules that depend on it. To
 be alerted when a specific module fails you need to configure a DBSQL alert to monitor the pipReport output and
@@ -1240,9 +1534,6 @@ To do this, follow the instructions for
             
         
                     
-            
-        
-                    
                         
             
             
@@ -1256,88 +1547,6 @@ To do this, follow the instructions for
                     
 
                     
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
             
         
                     
@@ -1437,98 +1646,8 @@ To do this, follow the instructions for
             
         
                     
-            
-        
-                    
                         
             
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                        
-                    
-                    
-
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
             
         
                     
@@ -1548,9 +1667,6 @@ To do this, follow the instructions for
                     
 
                     
-            
-        
-                    
                         
             
             
@@ -1563,68 +1679,6 @@ To do this, follow the instructions for
                     
                     
 
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-            
-        
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                    
-                
-                
-
-                    
-                    
-                        
-                    
-                    
-
-                    
-                        
-            
-            
-                
-                    
-                        
-                        
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-                        
-            
-            
-        
                     
             
         
@@ -1682,6 +1736,267 @@ To do this, follow the instructions for
             
                 
                     
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+        
+                    
+                        
+            
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
                     
                 
                 
@@ -1712,6 +2027,22 @@ To do this, follow the instructions for
                     
             
         
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
                     
             
         
@@ -1802,19 +2133,19 @@ To do this, follow the instructions for
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1694458807"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1694458807"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1691553677" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1691553677"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1694458807" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1694458807"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

@@ -12,21 +12,21 @@
     <title>Pipeline_Management :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1691553677" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1691553677" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1694458807" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1694458807" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1691553677" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1694458807" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1694458807"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1691553677"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1691553677"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1694458807"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1694458807"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1691553677"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1694458807"></script>
 
     
   </div>
@@ -147,6 +147,27 @@
  
   
     
+      <li data-nav-id="/deployoverwatch/cloudinfra/gcp/" title="GCP" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/">
+        GCP
+        
+        </a>
+    </li>
+     
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
       <li data-nav-id="/deployoverwatch/cloudinfra/azure/" title="Azure" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/">
         Azure
@@ -168,9 +189,9 @@
  
   
     
-      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS/GCP" class="dd-item ">
+      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/">
-        AWS/GCP
+        AWS
         
         </a>
     </li>
@@ -761,6 +782,9 @@
             
             
           
+            
+            
+          
         
         </ul>
       
@@ -939,6 +963,30 @@
  
   
     
+    <li data-nav-id="/dashboards/" title="Dashboards" class="dd-item
+        
+        
+        
+        ">
+      <a href="https://databrickslabs.github.io/overwatch/dashboards/">
+          Dashboards
+          
+      </a>
+      
+      
+    </li>
+  
+ 
+
+          
+          
+
+
+
+
+ 
+  
+    
     <li data-nav-id="/troubleshooting/" title="Troubleshooting" class="dd-item
         
         
@@ -1075,6 +1123,11 @@
         <li><a href="#pipeline_report-structure">Pipeline_Report Structure</a></li>
       </ul>
     </li>
+    <li><a href="#the-pipreport-view">The PipReport View</a>
+      <ul>
+        <li><a href="#pipreport-structure">PipReport Structure</a></li>
+      </ul>
+    </li>
     <li><a href="#overwatch-time">Overwatch Time</a></li>
     <li><a href="#module-dependencies">Module Dependencies</a>
       <ul>
@@ -1147,8 +1200,7 @@ find a section in which the difference is not made clear.</p>
 
 <h3 id="spark-context-composition--hierarchydataengineermodules"><a href="https://databrickslabs.github.io/overwatch/dataengineer/modules/">Spark Context Composition &amp; Hierarchy</a></h3>
 <h2 id="data-ingestion-and-resume-process">Data Ingestion and Resume Process</h2>
-<p>The specificities can vary slightly between cloud provider but the general methodology is the exact same.
-Specific differences will be discussed in <a href="#cloud-specific-variations">Cloud-Specific Variations</a> section.</p>
+<p>The specificities can vary slightly between cloud provider but the general methodology is the exact same.</p>
 <p>Each module is responsible for building certain entities at each layer, bronze, silver, gold, and presentation.
 The mapping between module and gold entity can be found in the <a href="https://databrickslabs.github.io/overwatch/dataengineer/modules/">Modules</a> section.
 Each module is also tracked individually in the primary tracking tabe, <a href="#the-pipeline-report"><strong>Pipeline_Report</strong></a>.</p>
@@ -1172,19 +1224,10 @@ for each module and tracks the status of each run. Manipulating this table will 
 so be sure to read the rest of this page before altering this table.</p>
 <p>The Pipeline Report is very useful for identifying issues in the pipeline. Each module, each run is detailed here.
 The structure of the table is outlined <a href="#pipeline_report-structure">below</a>.</p>
-<p>A <em>pipReport</em> view has been created atop the pipeline_report table to simplify reviewing the historical runs. The
-query most commonly used is below. If you are asked for the pipReport, please provide the output from the following</p>
-<p><strong>SCALA</strong></p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span>table<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;overwatch_etl.pipReport&#34;</span><span style="color:#f92672">)</span>
-</span></span><span style="display:flex;"><span>  <span style="color:#f92672">.</span>filter<span style="color:#f92672">(</span>&#39;organization_id <span style="color:#f92672">===</span> <span style="color:#e6db74">&#34;&lt;workspace_id&gt;&#34;</span><span style="color:#f92672">)</span> <span style="color:#75715e">// if you want to see the pipReport for only a specific workspace
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#f92672">.</span>orderBy<span style="color:#f92672">(</span>&#39;Pipeline_SnapTS<span style="color:#f92672">.</span>desc<span style="color:#f92672">)</span>
-</span></span></code></pre></div><p><strong>SQL</strong></p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="color:#66d9ef">select</span> <span style="color:#f92672">*</span> <span style="color:#66d9ef">from</span> overwatch_etl.pipReport
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">where</span> organization_id <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;&lt;workspace_id&gt;&#39;</span> <span style="color:#75715e">-- if you want to see the pipReport for only a specific workspace
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">order</span> <span style="color:#66d9ef">by</span> Pipeline_SnapTS <span style="color:#66d9ef">desc</span>
-</span></span></code></pre></div><h3 id="pipeline_report-structure">Pipeline_Report Structure</h3>
+<h3 id="pipeline_report-structure">Pipeline_Report Structure</h3>
 <p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/pipeline_report.tab"><strong>SAMPLE</strong></a></p>
 <p><strong>KEY</strong> &ndash; organization_id + moduleID + Overwatch_RunID</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
 <p>For the developers &ndash; This output is created as a DataSet via the Case Class
 <em>com.databricks.labs.overwatch.utils.ModuleStatusReport</em></p>
 <table>
@@ -1202,6 +1245,11 @@ query most commonly used is below. If you are asked for the pipReport, please pr
 <td style="text-align:left">Canonical workspace id</td>
 </tr>
 <tr>
+<td style="text-align:left">workspace_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Customizable human-legible name of the workspace, should be globally unique within the organization</td>
+</tr>
+<tr>
 <td style="text-align:left">moduleId</td>
 <td style="text-align:left">int</td>
 <td style="text-align:left">Module ID &ndash; Unique identifier for the module</td>
@@ -1210,6 +1258,11 @@ query most commonly used is below. If you are asked for the pipReport, please pr
 <td style="text-align:left">moduleName</td>
 <td style="text-align:left">string</td>
 <td style="text-align:left">Name of the module</td>
+</tr>
+<tr>
+<td style="text-align:left">primordialDateString</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022</td>
 </tr>
 <tr>
 <td style="text-align:left">runStartTS</td>
@@ -1232,19 +1285,14 @@ query most commonly used is below. If you are asked for the pipReport, please pr
 <td style="text-align:left">The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS</td>
 </tr>
 <tr>
-<td style="text-align:left">dataFrequency</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">(milliSecond OR Daily) Most modules have a time resolution at the millisecond level; however there are certain modules that can only be run daily. This column is used by Overwatch internals to calculate start/stops for new data</td>
-</tr>
-<tr>
 <td style="text-align:left">status</td>
 <td style="text-align:left">string</td>
 <td style="text-align:left">Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues</td>
 </tr>
 <tr>
-<td style="text-align:left">recordsAppended</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">Count of records appended. Not always enabled for performance reasons, see <a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/">advanced topics</a> for additional information.</td>
+<td style="text-align:left">writeOpsMetrics</td>
+<td style="text-align:left">map</td>
+<td style="text-align:left">Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written</td>
 </tr>
 <tr>
 <td style="text-align:left">lastOptimizedTS</td>
@@ -1269,7 +1317,89 @@ query most commonly used is below. If you are asked for the pipReport, please pr
 <tr>
 <td style="text-align:left">Pipeline_SnapTS</td>
 <td style="text-align:left">timestamp</td>
-<td style="text-align:left">Timestamp type of the pipeline snapshot time (server time)</td>
+<td style="text-align:left">Timestamp when the module was completed as part of the pipeline. This timestamp is reported in server time.</td>
+</tr>
+<tr>
+<td style="text-align:left">Overwatch_RunID</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">GUID for the overwatch run</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-pipreport-view">The PipReport View</h2>
+<p>A <em>pipReport</em> view has been created atop the pipeline_report table to simplify reviewing the historical runs. The
+query most commonly used is below. If you are asked for the pipReport, please provide the output from the following</p>
+<p><strong>SCALA</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span>table<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;overwatch_etl.pipReport&#34;</span><span style="color:#f92672">)</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">.</span>filter<span style="color:#f92672">(</span>&#39;organization_id <span style="color:#f92672">===</span> <span style="color:#e6db74">&#34;&lt;workspace_id&gt;&#34;</span><span style="color:#f92672">)</span> <span style="color:#75715e">// if you want to see the pipReport for only a specific workspace
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#f92672">.</span>orderBy<span style="color:#f92672">(</span>&#39;Pipeline_SnapTS<span style="color:#f92672">.</span>desc<span style="color:#f92672">)</span>
+</span></span></code></pre></div><p><strong>SQL</strong></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="color:#66d9ef">select</span> <span style="color:#f92672">*</span> <span style="color:#66d9ef">from</span> overwatch_etl.pipReport
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">where</span> organization_id <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;&lt;workspace_id&gt;&#39;</span> <span style="color:#75715e">-- if you want to see the pipReport for only a specific workspace
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">order</span> <span style="color:#66d9ef">by</span> Pipeline_SnapTS <span style="color:#66d9ef">desc</span>
+</span></span></code></pre></div><p>The structure of the table is outlined <a href="#pipreport-structure">below</a>.</p>
+<h3 id="pipreport-structure">PipReport Structure</h3>
+<p><a href="https://databrickslabs.github.io/overwatch/assets/TableSamples/pipreport.tab"><strong>SAMPLE</strong></a></p>
+<p><strong>KEY</strong> &ndash; organization_id + moduleID + Overwatch_RunID</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Column</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">organization_id</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Canonical workspace id</td>
+</tr>
+<tr>
+<td style="text-align:left">workspace_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Customizable human-legible name of the workspace, should be globally unique within the organization</td>
+</tr>
+<tr>
+<td style="text-align:left">module_id</td>
+<td style="text-align:left">int</td>
+<td style="text-align:left">Module ID &ndash; Unique identifier for the module</td>
+</tr>
+<tr>
+<td style="text-align:left">module_name</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Name of the module</td>
+</tr>
+<tr>
+<td style="text-align:left">primodialDate</td>
+<td style="text-align:left">date</td>
+<td style="text-align:left">The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022</td>
+</tr>
+<tr>
+<td style="text-align:left">fromTS</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">The snapshot start time from which data will be loaded for the module</td>
+</tr>
+<tr>
+<td style="text-align:left">untilTS</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS</td>
+</tr>
+<tr>
+<td style="text-align:left">status</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues</td>
+</tr>
+<tr>
+<td style="text-align:left">write_metrics</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written.</td>
+</tr>
+<tr>
+<td style="text-align:left">Pipeline_SnapTS</td>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">Timestamp when the module was completed as part of the pipeline. This timestamp is reported in server time.</td>
 </tr>
 <tr>
 <td style="text-align:left">Overwatch_RunID</td>
@@ -1289,7 +1419,7 @@ several types of errors that result in a module failure, and those errors are wr
 when they occur. Sometimes, there will truly be no new data in an upstream Module, this is ok and will not stop the
 progression of the &ldquo;until&rdquo; time as no data is not considered an error. Below are the ETL Modules and their dependencies</p>
 <h3 id="module-dependencies-diagram">Module Dependencies Diagram</h3>
-<p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/Overwatch_Entity_Dependencies.png" alt="ModuleDepDiagram"></p>
+<p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/Overwatch_Entity_Dependencies_0721.png" alt="ModuleDepDiagram"></p>
 <table>
 <thead>
 <tr>
@@ -1384,6 +1514,13 @@ progression of the &ldquo;until&rdquo; time as no data is not considered an erro
 <td style="text-align:left">job_runs_snapshot_bronze</td>
 <td style="text-align:left"></td>
 <td>0.7.1.1</td>
+</tr>
+<tr>
+<td style="text-align:left">1013</td>
+<td style="text-align:left">Bronze_Warehouses_Snapshot</td>
+<td style="text-align:left">warehouses_snapshot_bronze</td>
+<td style="text-align:left"></td>
+<td>0.7.2</td>
 </tr>
 <tr>
 <td style="text-align:left">2003</td>
@@ -1482,6 +1619,13 @@ progression of the &ldquo;until&rdquo; time as no data is not considered an erro
 <td style="text-align:left">sql_query_history_silver</td>
 <td style="text-align:left">1004</td>
 <td>0.7.0</td>
+</tr>
+<tr>
+<td style="text-align:left">2021</td>
+<td style="text-align:left">Silver_WarehouseSpec</td>
+<td style="text-align:left">warehouse_spec_silver</td>
+<td style="text-align:left">1004,1013</td>
+<td>0.7.2</td>
 </tr>
 <tr>
 <td style="text-align:left">3001</td>
@@ -1594,6 +1738,20 @@ progression of the &ldquo;until&rdquo; time as no data is not considered an erro
 <td style="text-align:left">sql_query_history_gold</td>
 <td style="text-align:left">2020</td>
 <td>0.7.0</td>
+</tr>
+<tr>
+<td style="text-align:left">3018</td>
+<td style="text-align:left">Gold_Warehouse</td>
+<td style="text-align:left">warehouse_gold</td>
+<td style="text-align:left">2021</td>
+<td>0.7.2.1</td>
+</tr>
+<tr>
+<td style="text-align:left">3019</td>
+<td style="text-align:left">Gold_NotebookCommands</td>
+<td style="text-align:left">notebookCommands_gold</td>
+<td style="text-align:left">1004,3004,3005</td>
+<td>0.7.2.1</td>
 </tr>
 </tbody>
 </table>
@@ -1781,9 +1939,6 @@ information on how to run a single pipeline from main class. The same can also b
             
         
                     
-            
-        
-                    
                         
             
             
@@ -1797,88 +1952,6 @@ information on how to run a single pipeline from main class. The same can also b
                     
 
                     
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
-                        
-            
             
         
                     
@@ -1978,39 +2051,13 @@ information on how to run a single pipeline from main class. The same can also b
             
         
                     
+                        
+            
             
         
                     
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
             
         
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                        
-                    
-                    
-
                     
                         
             
@@ -2053,25 +2100,6 @@ information on how to run a single pipeline from main class. The same can also b
                     
                     
 
-                    
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
                     
             
         
@@ -2127,49 +2155,6 @@ information on how to run a single pipeline from main class. The same can also b
             
         
                     
-            
-        
-                    
-                        
-            
-            
-                
-                    
-                    
-                
-                
-
-                    
-                    
-                        
-                    
-                    
-
-                    
-                        
-            
-            
-                
-                    
-                        
-                        
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-                        
-            
-            
-        
-                    
-            
-        
-                    
                         
             
             
@@ -2191,6 +2176,20 @@ information on how to run a single pipeline from main class. The same can also b
             
                 
                     
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
                     
                 
                 
@@ -2200,16 +2199,10 @@ information on how to run a single pipeline from main class. The same can also b
                     
 
                     
-            
-        
-                    
                         
             
             
                 
-                    
-                        
-                        
                     
                 
                 
@@ -2253,6 +2246,208 @@ information on how to run a single pipeline from main class. The same can also b
                     
             
         
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                        
+                    
+                    
+
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+                        
+            
+            
+        
+                    
+                        
+            
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                        
+                        
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
+                
+                
+
+                    
+                    
+                    
+
                     
             
         
@@ -2343,19 +2538,19 @@ information on how to run a single pipeline from main class. The same can also b
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1694458807"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1691553677"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1691553677"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1694458807"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1694458807"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1691553677" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1691553677"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1694458807" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1694458807"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
