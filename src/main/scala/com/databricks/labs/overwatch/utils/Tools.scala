@@ -137,39 +137,6 @@ object JsonUtils {
     )
   }
 
-
-  /**
-   *  Function creates json string from provided key and value
-   * @param key
-   * @param value
-   * @return
-   */
-  def createJsonFromString(key: String, value: String): String = {
-    //function creates json string from provided key and value
-    return null
-  }
-
-  /**
-   * Function combines two json values and returns a single json
-   * @param value1
-   * @param value2
-   * @return
-   */
-  def mergeJson(value:Array[String]):String = {
-    // Function combines two json values and returns a single json
-    return null
-  }
-
-  /**
-   * Function gets the value of the provided key from the json
-   * @param key
-   * @return
-   */
-  def getJsonValueByKey(key: String,json: String): String = {
-    //function gets the value of the provided key from the json
-    return null
-  }
-
 }
 
 /**
@@ -1137,6 +1104,52 @@ object Helpers extends SparkSessionWrapper {
     when(url.endsWith("/"), url.substr(lit(0), length(url) - 1)).otherwise(url)
   }
 
+
+  def deriveRawApiResponseDF(dataFrame: DataFrame): DataFrame = {
+    val filteredDf = dataFrame.select('rawResponse)
+      .filter('rawResponse =!= "{}")
+    if (filteredDf.isEmpty) {
+      filteredDf
+    } else {
+      filteredDf
+        .withColumn("rawResponse", SchemaTools.structFromJson(spark, dataFrame, "rawResponse"))
+        .select("rawResponse.*")
+    }
+  }
+
+  def deriveApiTempDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
+    s"${tempWOrkingDir}/${endpointDir}/success_" + pipelineSnapTs.asUnixTimeMilli
+  }
+
+  def deriveApiTempErrDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
+    s"${tempWOrkingDir}/${endpointDir}/error_" + pipelineSnapTs.asUnixTimeMilli
+  }
+
+  def transformBinaryDf(df: DataFrame): DataFrame = {
+    df.withColumnRenamed("data", "rawResponse").withColumn("rawResponse", col("rawResponse").cast("String"))
+  }
+
+  def deriveTraceDFByApiName(df: DataFrame, apiName: String): DataFrame = {
+    val rawDF = deriveRawApiResponseDF(transformBinaryDf(df))
+    val apiMetaFactory = new ApiMetaFactory().getApiClass(apiName)
+    rawDF.select(explode(col(apiMetaFactory.dataframeColumn)).alias(apiMetaFactory.dataframeColumn)).select(col(apiMetaFactory.dataframeColumn + ".*"))
+  }
+
+  def getTraceDFByModule(apiEventPath: String, moduleId: Long): DataFrame = {
+    val rawDF = spark.read.load(apiEventPath).filter('moduleId === moduleId)
+    val endPoint = rawDF.head().getAs("end_point")
+    deriveTraceDFByApiName(rawDF, endPoint)
+  }
+
+  def getTraceDFByTable(apiEventTable: String, endPoint: String): DataFrame = {
+    deriveTraceDFByApiName(spark.read.table(apiEventTable).filter('end_point === endPoint), endPoint)
+  }
+
+  def getTraceDFByPath(apiEventPath: String, endPoint: String): DataFrame = {
+    deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('end_point === endPoint), endPoint)
+  }
+
+
   /**
    * Registers the missing tables for Bronze,Silver and Gold into the metastore.
    * @param workspace
@@ -1163,48 +1176,6 @@ object Helpers extends SparkSessionWrapper {
       override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
         logger.log(Level.INFO,s"Query started: ${queryStarted.id}")
       }
-    // TOMES -- include error column in case catch
-  def deriveRawApiResponseDF(dataFrame: DataFrame) : DataFrame ={
-    val filteredDf =  dataFrame.select('rawResponse)
-        .filter('rawResponse =!= "{}")
-      if(filteredDf.isEmpty){
-         filteredDf
-      }else {
-         filteredDf
-          .withColumn("rawResponse", SchemaTools.structFromJson(spark, dataFrame, "rawResponse"))
-          .select("rawResponse.*")
-      }
-    }
-
-  def deriveApiTempDir(tempWOrkingDir: String, endpointDir: String , pipelineSnapTs: TimeTypes):String = {
-    s"${tempWOrkingDir}/${endpointDir}/success_" + pipelineSnapTs.asUnixTimeMilli
-  }
-
-  def deriveApiTempErrDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
-    s"${tempWOrkingDir}/${endpointDir}/error_" + pipelineSnapTs.asUnixTimeMilli
-  }
-
-  def transformBinaryDf(df: DataFrame) : DataFrame = {
-      df.withColumnRenamed("data","rawResponse").withColumn("rawResponse",col("rawResponse").cast("String"))
-  }
-  def deriveTraceDFByApiName(df: DataFrame, apiName: String): DataFrame ={
-    val rawDF = deriveRawApiResponseDF(transformBinaryDf(df))
-    val apiMetaFactory = new ApiMetaFactory().getApiClass(apiName)
-    rawDF.select(explode(col(apiMetaFactory.dataframeColumn)).alias(apiMetaFactory.dataframeColumn)).select(col(apiMetaFactory.dataframeColumn + ".*"))
-  }
-
-  def getTraceDFByModule(apiEventPath: String ,moduleId : Long): DataFrame ={
-    val rawDF = spark.read.load(apiEventPath).filter('moduleId === moduleId)
-    val endPoint = rawDF.head().getAs("end_point")
-    deriveTraceDFByApiName(rawDF,endPoint)
-  }
-
-  def getTraceDFByTable(apiEventTable: String, endPoint: String): DataFrame = {
-    deriveTraceDFByApiName(spark.read.table(apiEventTable).filter('end_point === endPoint),endPoint)
-  }
-  def getTraceDFByPath(apiEventPath: String ,endPoint : String): DataFrame ={
-    deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('end_point === endPoint),endPoint)
-  }
 
       override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
         logger.log(Level.INFO,s"Query terminated: ${queryTerminated.id}")
