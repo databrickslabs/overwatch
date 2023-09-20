@@ -73,7 +73,7 @@ object Optimizer extends SparkSessionWrapper{
 
       val optimizationCandidates = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget
       val postProcessor = new PostProcessor(config)
-      postProcessor.optimizeOverwatch(spark, optimizationCandidates)
+      postProcessor.optimizeOverwatch(spark, optimizationCandidates,orgId)
     }
 
   }

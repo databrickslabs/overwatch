@@ -93,8 +93,8 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
    * When the optimize is not executed from within the pipeline run structure it's necessary to go back and
    * update the latest "lastOptimizedTS" state of each module to reflect this optimize as the latest optimization complete
    */
-  private def updateLastOptimizedDate(spark: SparkSession): Unit = {
-    val lastOptimizedUpdateDF = Optimizer.getLatestSuccessState(config.databaseName)
+  private def updateLastOptimizedDate(spark: SparkSession,orgId:String): Unit = {
+    val lastOptimizedUpdateDF = Optimizer.getLatestSuccessState(config.databaseName,orgId)
       .withColumn("lastOptimizedTS", lit(System.currentTimeMillis()))
       .alias("updates")
 
@@ -135,11 +135,11 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
    * Start the optimize process. This should only be called from the Optimizer Main Class.
    * @param targetsToOptimize Array of PipelineTables considered as optimize candidates.
    */
-  private[overwatch] def optimizeOverwatch(spark: SparkSession, targetsToOptimize: Array[PipelineTable]): Unit = {
+  private[overwatch] def optimizeOverwatch(spark: SparkSession, targetsToOptimize: Array[PipelineTable],orgId:String): Unit = {
     emitStartLog
     targetsToOptimize.foreach(t => tablesToOptimize.append(t))
     executeOptimize
-    updateLastOptimizedDate(spark)
+    updateLastOptimizedDate(spark,orgId)
     emitCompletionLog
   }
 
