@@ -50,7 +50,9 @@ object Optimizer extends SparkSessionWrapper{
 
   /**
    * pass in the overwatch ETL database name to optimize overwatch in parallel
-   * @param args ["overwatch_etl"]
+   * @param args(0)   Overwatch ETL Database.
+   * @param args(1)   Organization_ID for which optmization need to be performed.(Optional). By default optimizer will run for all
+   *                  the organization ID in pipeline_report.
    */
   def main(args: Array[String]): Unit = {
 
