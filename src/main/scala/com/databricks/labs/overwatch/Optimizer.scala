@@ -60,10 +60,25 @@ object Optimizer extends SparkSessionWrapper{
       throw new BadConfigException(s"Main class requires at least 1 but less than 5 arguments. Received ${args.length} " +
         s"arguments. Please review the docs to compose the input arguments appropriately.")
     }
+    val orgId = if (args.length > 1) {
+      args(1).toString
+    } else {
+      " "
+    }
 
     val orgIdList = spark.table(s"${overwatchETLDB}.pipeline_report").select("organization_id").distinct().collect().map(x =>x(0).toString)
 
-    orgIdList.foreach { orgId =>
+    val orgIDs = if (orgId != " ") {
+      if (orgIdList.contains(orgId)) {
+        Array(orgId)
+      } else {
+        throw new BadConfigException("Input Organization_ID is not part of the Overwatch Deployment for which you want to run the optimizer")
+      }
+    } else {
+      orgIdList
+    }
+
+    orgIDs.foreach { orgId =>
       val workspace = getLatestWorkspace(overwatchETLDB,orgId)
       val config = workspace.getConfig
       if (config.debugFlag) println(JsonUtils.objToJson(config.inputConfig).compactString)
