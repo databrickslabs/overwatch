@@ -93,7 +93,7 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
    * When the optimize is not executed from within the pipeline run structure it's necessary to go back and
    * update the latest "lastOptimizedTS" state of each module to reflect this optimize as the latest optimization complete
    */
-  private def updateLastOptimizedDate(spark: SparkSession,orgId:String): Unit = {
+  private def updateLastOptimizedDate(spark: SparkSession,orgId: String): Unit = {
     val lastOptimizedUpdateDF = Optimizer.getLatestSuccessState(config.databaseName,orgId)
       .withColumn("lastOptimizedTS", lit(System.currentTimeMillis()))
       .alias("updates")
